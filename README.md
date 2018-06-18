@@ -7,3 +7,5 @@
 </p>
 
 Experimental Python SDK
+
+Do not use me yet, use raven-python instead for now.
