@@ -1,15 +1,17 @@
-import atexit
+from contextlib import contextmanager
+
+import sentry_minimal
 
 from .hub import Hub
+from .scope import Scope
 from .client import Client
 
 
-__all__ = ['Hub', 'Client']
+__all__ = ['Hub', 'Client', 'init'] + sentry_minimal.__all__
 
 
-def public(f):
-    __all__.append(f.__name__)
-    return f
+for _key in sentry_minimal.__all__:
+    globals()[_key] = getattr(sentry_minimal, _key)
 
 
 class _InitGuard(object):
@@ -26,37 +28,8 @@ class _InitGuard(object):
             c.close()
 
 
-@public
 def init(*args, **kwargs):
     client = Client(*args, **kwargs)
     if client.dsn is not None:
         Hub.main.bind_client(client)
     return _InitGuard(client)
-
-
-@public
-def capture_event(event):
-    hub = Hub.current
-    if hub is not None:
-        return hub.capture_event(event)
-
-
-@public
-def capture_message(message, level=None):
-    hub = Hub.current
-    if hub is not None:
-        return hub.capture_message(message, level)
-
-
-@public
-def capture_exception(error=None):
-    hub = Hub.current
-    if hub is not None:
-        return hub.capture_exception(error)
-
-
-@public
-def add_breadcrumb(crumb):
-    hub = Hub.current
-    if hub is not None:
-        return hub.add_breadcrumb(crumb)
