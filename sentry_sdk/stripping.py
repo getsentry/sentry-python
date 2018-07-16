@@ -18,17 +18,19 @@ def strip_event(event):
     return event, meta
 
 def strip_frame(frame):
-    frame['vars'], meta = strip_object(frame.get('vars'))
+    frame['vars'], meta = strip_databag(frame.get('vars'))
     return frame, ({"vars": meta} if meta is not None else None)
 
-def strip_object(obj, depth=0):
+def strip_databag(obj, remaining_depth=20):
+    if remaining_depth <= 0:
+        return None, {"": {"rem": [["!dep", "x"]]}}
     if isinstance(obj, text_type):
         return strip_string(obj)
     if isinstance(obj, Mapping):
         rv = {}
         meta = {}
         for k, v in obj.items():
-            rv[k], v_meta = strip_object(v, depth + 1)
+            rv[k], v_meta = strip_databag(v, remaining_depth - 1)
             if v_meta is not None:
                 meta[k] = v_meta
         return rv, meta
@@ -36,7 +38,7 @@ def strip_object(obj, depth=0):
         rv = []
         meta = {}
         for i, v in enumerate(obj):
-            new_v, v_meta = strip_object(obj, depth + 1)
+            new_v, v_meta = strip_databag(obj, remaining_depth - 1)
             rv.append(new_v)
             if v_meta is not None:
                 meta[str(i)] = v_meta
@@ -52,7 +54,7 @@ def strip_string(value, length=512):
         meta = {
             "": {
                 "len": len(value),
-                "rem": [["@string:truncate", "x", length, len(value)]]
+                "rem": [["!len", "x", length, len(value)]]
             }
         }
         return value[:length - 3] + '...', meta
