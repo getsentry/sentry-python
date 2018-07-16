@@ -31,10 +31,10 @@ def capture_exception(error=None):
 
 
 @public
-def add_breadcrumb(crumb):
+def add_breadcrumb(*args, **kwargs):
     hub = Hub.current
     if hub is not None:
-        return hub.add_breadcrumb(crumb)
+        return hub.add_breadcrumb(*args, **kwargs)
 
 
 @public
@@ -46,6 +46,11 @@ def configure_scope():
             yield scope
     else:
         yield Scope()
+
+
+@public
+def get_current_hub():
+    return Hub.current
 
 
 try:

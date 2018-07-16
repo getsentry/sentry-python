@@ -12,6 +12,8 @@ __all__ = ['Hub', 'Client', 'init'] + sentry_minimal.__all__
 
 for _key in sentry_minimal.__all__:
     globals()[_key] = getattr(sentry_minimal, _key)
+    globals()[_key].__module__ = __name__
+del _key
 
 
 class _InitGuard(object):

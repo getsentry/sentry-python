@@ -144,10 +144,12 @@ class Hub(with_metaclass(HubMeta)):
 
     def add_event_processor(self, factory):
         """Registers a new event processor with the top scope."""
-        self._pending_processors.append(factory)
+        if self._stack[1][0] is not None:
+            self._pending_processors.append(factory)
 
     def push_scope(self):
         """Pushes a new layer on the scope stack."""
+        self._flush_event_processors()
         client, scope = self._stack[-1]
         self._stack.append((client, copy.copy(scope)))
         return _ScopeManager(self)
