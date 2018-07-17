@@ -1,19 +1,9 @@
 from contextlib import contextmanager
 
-import sentry_minimal
-
 from .hub import Hub
 from .scope import Scope
 from .client import Client
 
-
-__all__ = ['Hub', 'Client', 'init'] + sentry_minimal.__all__
-
-
-for _key in sentry_minimal.__all__:
-    globals()[_key] = getattr(sentry_minimal, _key)
-    globals()[_key].__module__ = __name__
-del _key
 
 
 class _InitGuard(object):
@@ -35,3 +25,14 @@ def init(*args, **kwargs):
     if client.dsn is not None:
         Hub.main.bind_client(client)
     return _InitGuard(client)
+
+
+import sentry_minimal
+
+__all__ = ['Hub', 'Scope', 'Client', 'init'] + sentry_minimal.__all__
+
+
+for _key in sentry_minimal.__all__:
+    globals()[_key] = getattr(sentry_minimal, _key)
+    globals()[_key].__module__ = __name__
+del _key
