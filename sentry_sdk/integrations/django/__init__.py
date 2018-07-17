@@ -22,6 +22,8 @@ def _get_transaction_from_request(request):
 _request_scope = local()
 
 
+# request_started (or any other signal) cannot be used because the request is
+# not yet available
 class SentryMiddleware(MiddlewareMixin):
     def process_view(self, request, func, args, kwargs):
         try:
