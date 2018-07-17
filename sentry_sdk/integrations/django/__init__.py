@@ -1,11 +1,12 @@
 from threading import Lock, local
 
 from django.apps import AppConfig
-from django.core import signals
 from django.conf import settings
+from django.core import signals
 from django.urls import resolve
 
-from .. import get_current_hub, configure_scope, capture_exception
+from sentry_sdk import get_current_hub, configure_scope, capture_exception
+
 
 try:
     # Django >= 1.10
@@ -14,7 +15,6 @@ except ImportError:
     # Not required for Django <= 1.9, see:
     # https://docs.djangoproject.com/en/1.10/topics/http/middleware/#upgrading-pre-django-1-10-style-middleware
     MiddlewareMixin = object
-
 
 def _get_transaction_from_request(request):
     return resolve(request.path).func

@@ -21,5 +21,6 @@ from . import views
 urlpatterns = [
     path('self-check', views.self_check, name='self_check'),
     path('view-exc', views.view_exc, name='view_exc'),
-    path('middleware-exc', views.view_exc, name='middleware_exc')
+    path('middleware-exc', views.view_exc, name='middleware_exc'),
+    path('get-dsn', views.get_dsn, name='get_dsn')
 ]
