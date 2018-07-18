@@ -332,3 +332,10 @@ def create_event():
         'timestamp': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
         'level': 'error',
     }
+
+
+def to_string(value):
+    try:
+        return text_type(value)
+    except UnicodeDecodeError:
+        return repr(value)[1:-1]

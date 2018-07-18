@@ -3,8 +3,6 @@ from django.template import Template, Context
 
 import sentry_sdk
 
-sentry_sdk.init()
-
 def self_check(request):
     with sentry_sdk.configure_scope() as scope:
         assert scope._data['transaction'] == self_check

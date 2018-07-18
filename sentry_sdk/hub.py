@@ -133,6 +133,11 @@ class Hub(with_metaclass(HubMeta)):
         }
         return self.capture_event(event)
 
+    def capture_internal_exception(self, error=None):
+        """Capture an exception that is likely caused by a bug in the SDK
+        itself."""
+        pass
+
     def add_breadcrumb(self, crumb):
         """Adds a breadcrumb."""
         client, scope = self._stack[-1]
