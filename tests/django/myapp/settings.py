@@ -11,6 +11,15 @@ https://docs.djangoproject.com/en/2.0/ref/settings/
 """
 
 import os
+import sentry_sdk
+
+try:
+    # Django >= 1.10
+    from django.utils.deprecation import MiddlewareMixin
+except ImportError:
+    # Not required for Django <= 1.9, see:
+    # https://docs.djangoproject.com/en/1.10/topics/http/middleware/#upgrading-pre-django-1-10-style-middleware
+    MiddlewareMixin = object
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -39,25 +48,28 @@ INSTALLED_APPS = [
     'sentry_sdk.integrations.django'
 ]
 
-class TestMiddleware(object):
-    def __init__(self, get_response):
-        self.get_response = get_response
 
-    def __call__(self, request):
+class TestMiddleware(MiddlewareMixin):
+    def process_request(self, request):
         if 'middleware-exc' in request.path:
             1/0
-        return get_response(request)
 
+        with sentry_sdk.configure_scope() as scope:
+            assert scope._data['transaction'] is not None
 
-MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware'
+    def process_response(self, request, response):
+        with sentry_sdk.configure_scope() as scope:
+            assert scope._data['transaction'] is not None
+
+        return response
+
+MIDDLEWARE_CLASSES = [
+    'tests.django.myapp.settings.TestMiddleware'
 ]
+
+if MiddlewareMixin is not object:
+    MIDDLEWARE = MIDDLEWARE_CLASSES
+
 
 ROOT_URLCONF = 'tests.django.myapp.urls'
 

@@ -1,9 +1,13 @@
+from __future__ import absolute_import
+
 from threading import Lock, local
 
-from django.apps import AppConfig
 from django.conf import settings
 from django.core import signals
-from django.urls import resolve
+try:
+    from django.urls import resolve
+except ImportError:
+    from django.core.urlresolvers import resolve
 
 from sentry_sdk import get_current_hub, configure_scope, capture_exception
 
@@ -25,17 +29,15 @@ _request_scope = local()
 # request_started (or any other signal) cannot be used because the request is
 # not yet available
 class SentryMiddleware(MiddlewareMixin):
-    def process_view(self, request, func, args, kwargs):
+    def process_request(self, request):
+        assert getattr(_request_scope, 'manager', None) is None, 'race condition'
+        _request_scope.manager = get_current_hub().push_scope().__enter__()
+
         try:
             with configure_scope() as scope:
                 scope.transaction = _get_transaction_from_request(request)
         except Exception:
             capture_exception()
-
-
-def _request_started(*args, **kwargs):
-    assert getattr(_request_scope, 'manager', None) is None, 'race condition'
-    _request_scope.manager = get_current_hub().push_scope().__enter__()
 
 
 def _request_finished(*args, **kwargs):
@@ -86,18 +88,24 @@ def _initialize_impl():
             middleware_attr,
             [MIDDLEWARE_NAME] + list(middleware))
 
-    signals.request_started.connect(_request_started)
     signals.request_finished.connect(_request_finished)
     signals.got_request_exception.connect(_got_request_exception)
 
 
-default_app_config = 'sentry_sdk.integrations.django.SentryConfig'
 
 
-class SentryConfig(AppConfig):
-    name = 'sentry_sdk.integrations.django'
-    label = 'sentry_sdk_integrations_django'
-    verbose_name = 'Sentry'
+try:
+    # Django >= 1.7
+    from django.apps import AppConfig
+except ImportError:
+    initialize()
+else:
+    class SentryConfig(AppConfig):
+        name = 'sentry_sdk.integrations.django'
+        label = 'sentry_sdk_integrations_django'
+        verbose_name = 'Sentry'
 
-    def ready(self):
-        initialize()
+        def ready(self):
+            initialize()
+
+    default_app_config = 'sentry_sdk.integrations.django.SentryConfig'
