@@ -40,8 +40,6 @@ class SentryHandler(logging.Handler, object):
             'params': record.args
         }
 
-        # TODO: also send formatted message
-
         capture_event(event)
 
 
