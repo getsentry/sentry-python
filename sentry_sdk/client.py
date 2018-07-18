@@ -4,6 +4,7 @@ import uuid
 from .utils import Dsn
 from .transport import Transport
 from .consts import DEFAULT_OPTIONS, SDK_INFO
+from .stripping import strip_event
 
 
 NO_DSN = object()
@@ -56,6 +57,10 @@ class Client(object):
 
         if event.get('platform') is None:
             event['platform'] = 'python'
+
+        if event.get('') is None:
+            event, event_meta = strip_event(event)
+            event[""] = event_meta
 
     def capture_event(self, event, scope=None):
         """Captures an event."""
