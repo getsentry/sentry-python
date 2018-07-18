@@ -126,6 +126,10 @@ install:
   - pip install -e .
   - pip install -Ur dev-requirements.txt
   - pip install -U "django==$DJANGO_VERSION"
-# command to run tests
+  - |
+    if [ "$DJANGO_VERSION" = 1.4.* ] || [ "$DJANGO_VERSION" = 1.5.* ] || [ "$DJANGO_VERSION" = 1.6.* ] || [ "$DJANGO_VERSION" = 1.7.* ] || [ "$DJANGO_VERSION" = 1.8.* ]; then
+      pip install 'pytest-django<3.0';
+    fi
+
 script:
   - pytest # or py.test for Python versions 3.5 and below
