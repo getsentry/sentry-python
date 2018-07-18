@@ -54,7 +54,32 @@ def get_current_hub():
 
 
 try:
-    from sentry_sdk import Hub, Scope
+    from sentry_sdk.hub import Hub
+    from sentry_sdk.scope import Scope
 except ImportError:
     class Hub(object):
         current = main = None
+
+    class Scope(object):
+        fingerprint = transaction = user = None
+
+        def set_tag(self, key, value):
+            pass
+
+        def remove_tag(self, key):
+            pass
+
+        def set_context(self, key, value):
+            pass
+
+        def remove_context(self, key):
+            pass
+
+        def set_extra(self, key, value):
+            pass
+
+        def remove_extra(self, key):
+            pass
+
+        def clear(self):
+            pass

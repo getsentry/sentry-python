@@ -16,3 +16,4 @@ pip-log.txt
 .eggs
 venv
 .vscode/tags
+.pytest_cache

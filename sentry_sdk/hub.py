@@ -43,8 +43,11 @@ class _ScopeManager(object):
     def __init__(self, hub):
         self._hub = hub
 
+    def __enter__(self):
+        return self
+
     def __exit__(self, exc_type, exc_value, tb):
-        self._hub.stack.pop()
+        self._hub._stack.pop()
 
 
 class Hub(with_metaclass(HubMeta)):
