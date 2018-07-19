@@ -61,7 +61,7 @@ except ImportError:
         current = main = None
 
     class Scope(object):
-        fingerprint = transaction = user = None
+        fingerprint = transaction = user = request = None
 
         def set_tag(self, key, value):
             pass

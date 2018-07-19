@@ -64,14 +64,14 @@ class TestMiddleware(MiddlewareMixin):
         return response
 
 MIDDLEWARE_CLASSES = [
-    'tests.django.myapp.settings.TestMiddleware'
+    'tests.integrations.django.myapp.settings.TestMiddleware'
 ]
 
 if MiddlewareMixin is not object:
     MIDDLEWARE = MIDDLEWARE_CLASSES
 
 
-ROOT_URLCONF = 'tests.django.myapp.urls'
+ROOT_URLCONF = 'tests.integrations.django.myapp.urls'
 
 TEMPLATES = [
     {
