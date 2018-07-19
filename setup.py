@@ -15,6 +15,6 @@ setup(
     license='BSD',
     install_requires=['urllib3', 'certifi'],
     extras_require={
-        'flask>=0.8': ['flask', 'blinker>=1.1']
+        'flask': ['flask>=0.8', 'blinker>=1.1']
     }
 )

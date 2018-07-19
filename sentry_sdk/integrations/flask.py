@@ -106,7 +106,6 @@ def _get_user_info():
         # - flask_login could not be imported
         # - flask_login is not configured
         # - no user is logged in
-        raise 
         pass
 
     return user_info

@@ -20,6 +20,12 @@ class TestTransport(Transport):
     def __init__(self):
         pass
 
+    def start(self):
+        pass
+
+    def close(self):
+        pass
+
 test_client = TestClient()
 
 sentry_sdk.init()

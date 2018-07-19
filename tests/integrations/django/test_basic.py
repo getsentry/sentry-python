@@ -1,6 +1,8 @@
 import sys
-
 import pytest
+
+django = pytest.importorskip('django')
+
 
 from django.test import Client
 from django.test.utils import setup_test_environment

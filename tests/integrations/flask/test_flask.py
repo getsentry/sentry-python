@@ -1,4 +1,7 @@
 import pytest
+
+flask = pytest.importorskip('flask')
+
 from flask import Flask, request
 
 from flask_login import LoginManager, login_user
@@ -105,7 +108,8 @@ def test_flask_login_configured(app, user_id, capture_events, monkeypatch):
 
     @app.route('/login')
     def login():
-        login_user(User())
+        if user_id is not None:
+            login_user(User())
         return 'ok'
 
     client = app.test_client()
