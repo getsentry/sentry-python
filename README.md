@@ -8,4 +8,6 @@
 
 Experimental Python SDK
 
+[![Build Status](https://travis-ci.com/getsentry/sentry-python.svg?branch=master)](https://travis-ci.com/getsentry/sentry-python)
+
 Do not use me yet, use raven-python instead for now.
