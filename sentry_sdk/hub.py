@@ -112,6 +112,8 @@ class Hub(with_metaclass(HubMeta)):
             return
         if error is None:
             exc_type, exc_value, tb = sys.exc_info()
+        elif isinstance(error, tuple) and len(error) == 3:
+            exc_type, exc_value, tb = error
         else:
             tb = getattr(error, '__traceback__', None)
             if tb is not None:
@@ -119,18 +121,23 @@ class Hub(with_metaclass(HubMeta)):
                 exc_value = error
             else:
                 exc_type, exc_value, tb = sys.exc_info()
-                tb = skip_internal_frames(tb)
                 if exc_value is not error:
                     tb = None
                     exc_value = error
                     exc_type = type(error)
 
+        if tb is not None:
+            tb = skip_internal_frames(tb)
+
         event = create_event()
-        event['exception'] = {
-            'values': exceptions_from_error_tuple(
-                exc_type, exc_value, tb, client.options['with_locals'])
-        }
-        return self.capture_event(event)
+        try:
+            event['exception'] = {
+                'values': exceptions_from_error_tuple(
+                    exc_type, exc_value, tb, client.options['with_locals'])
+            }
+            return self.capture_event(event)
+        except Exception:
+            capture_internal_exception()
 
     def capture_internal_exception(self, error=None):
         """Capture an exception that is likely caused by a bug in the SDK
