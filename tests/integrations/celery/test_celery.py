@@ -1,5 +1,7 @@
 import pytest
 
+pytest.importorskip('celery')
+
 from celery import Celery
 
 from sentry_sdk.integrations.celery import install
