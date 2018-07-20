@@ -1,8 +1,9 @@
+import json
 import pytest
 
 flask = pytest.importorskip("flask")
 
-from flask import Flask
+from flask import Flask, request
 
 from flask_login import LoginManager, login_user
 
@@ -127,3 +128,99 @@ def test_flask_login_configured(app, user_id, capture_events, monkeypatch):
         assert event.get("user", {}).get("id") is None
     else:
         assert event["user"]["id"] == str(user_id)
+
+
+def test_flask_large_json_request(capture_events, app):
+    data = {"foo": {"bar": "a" * 2000}}
+
+    @app.route("/", methods=["POST"])
+    def index():
+        assert request.json == data
+        assert request.data == json.dumps(data).encode("ascii")
+        assert not request.form
+        capture_message("hi")
+        return "ok"
+
+    client = app.test_client()
+    response = client.post("/", content_type="application/json", data=json.dumps(data))
+    assert response.status_code == 200
+
+    event, = capture_events
+    assert event[""]["request"]["data"]["foo"]["bar"] == {
+        "": {"len": 2000, "rem": [["!len", "x", 509, 512]]}
+    }
+    assert len(event["request"]["data"]["foo"]["bar"]) == 512
+    assert event["request"]["data_info"] == {"ct": "json", "repr": "structured"}
+
+
+def test_flask_large_formdata_request(capture_events, app):
+    data = {"foo": "a" * 2000}
+
+    @app.route("/", methods=["POST"])
+    def index():
+        assert request.form["foo"] == data["foo"]
+        assert not request.data
+        assert not request.json
+        capture_message("hi")
+        return "ok"
+
+    client = app.test_client()
+    response = client.post("/", data=data)
+    assert response.status_code == 200
+
+    event, = capture_events
+    assert event[""]["request"]["data"]["foo"] == {
+        "": {"len": 2000, "rem": [["!len", "x", 509, 512]]}
+    }
+    assert len(event["request"]["data"]["foo"]) == 512
+    assert event["request"]["data_info"] == {"ct": "urlencoded", "repr": "structured"}
+
+
+@pytest.mark.parametrize("input_char", [u"a", b"a"])
+def test_flask_large_text_request(input_char, capture_events, app):
+    data = input_char * 2000
+
+    @app.route("/", methods=["POST"])
+    def index():
+        assert not request.form
+        if isinstance(data, bytes):
+            assert request.data == data
+        else:
+            assert request.data == data.encode("ascii")
+        assert not request.json
+        capture_message("hi")
+        return "ok"
+
+    client = app.test_client()
+    response = client.post("/", data=data)
+    assert response.status_code == 200
+
+    event, = capture_events
+    assert event[""]["request"]["data"] == {
+        "": {"len": 2000, "rem": [["!len", "x", 509, 512]]}
+    }
+    assert len(event["request"]["data"]) == 512
+    assert event["request"]["data_info"] == {"ct": "plain", "repr": "other"}
+
+
+def test_flask_large_bytes_request(capture_events, app):
+    data = b"\xc3" * 2000
+
+    @app.route("/", methods=["POST"])
+    def index():
+        assert not request.form
+        assert request.data == data
+        assert not request.json
+        capture_message("hi")
+        return "ok"
+
+    client = app.test_client()
+    response = client.post("/", data=data)
+    assert response.status_code == 200
+
+    event, = capture_events
+    assert event[""]["request"]["data"] == {
+        "": {"len": 2668, "rem": [["!len", "x", 509, 512]]}
+    }
+    assert len(event["request"]["data"]) == 512
+    assert event["request"]["data_info"] == {"ct": "bytes", "repr": "base64"}
