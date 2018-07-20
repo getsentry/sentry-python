@@ -1,26 +1,25 @@
 import sys
 import copy
 import linecache
-from threading import local
 from contextlib import contextmanager
 
 from ._compat import with_metaclass
 from .scope import Scope
 from .utils import exceptions_from_error_tuple, create_event, \
-    skip_internal_frames
+    skip_internal_frames, ContextVar
 
 
-_local = local()
+_local = ContextVar('sentry_current_hub')
 
 
 class HubMeta(type):
 
     @property
     def current(self):
-        try:
-            rv = _local.hub
-        except AttributeError:
-            _local.hub = rv = Hub(GLOBAL_HUB)
+        rv = _local.get(None)
+        if rv is None:
+            rv = Hub(GLOBAL_HUB)
+            _local.set(rv)
         return rv
 
     @property
@@ -32,10 +31,10 @@ class _HubManager(object):
 
     def __init__(self, hub):
         self._old = Hub.current
-        _local.hub = hub
+        _local.set(hub)
 
     def __exit__(self, exc_type, exc_value, tb):
-        _local.hub = self._old
+        _local.set(self._old)
 
 
 class _ScopeManager(object):

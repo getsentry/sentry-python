@@ -339,3 +339,23 @@ def to_string(value):
         return text_type(value)
     except UnicodeDecodeError:
         return repr(value)[1:-1]
+
+
+try:
+    from contextvars import ContextVar
+except ImportError:
+    from threading import local
+    _nothing = object()
+
+    class ContextVar(object):
+        # Super-limited impl of ContextVar
+
+        def __init__(self, name):
+            self._name = name
+            self._local = local()
+
+        def get(self, default):
+            return getattr(self._local, 'value', default)
+
+        def set(self, value):
+            setattr(self._local, 'value', value)
