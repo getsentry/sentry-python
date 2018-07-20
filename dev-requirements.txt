@@ -1,5 +1,0 @@
-pytest
-pytest-django
-django
-flask
-flask-login
