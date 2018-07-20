@@ -31,23 +31,29 @@ class FlaskSentry(object):
 
 
 def _push_appctx(*args, **kwargs):
-    assert getattr(
-        _app_ctx_stack.top,
-        '_sentry_app_scope_manager',
-        None
-    ) is None, 'race condition'
-    _app_ctx_stack.top._sentry_app_scope_manager = \
-        get_current_hub().push_scope().__enter__()
+    try:
+        assert getattr(
+            _app_ctx_stack.top,
+            '_sentry_app_scope_manager',
+            None
+        ) is None, 'race condition'
+        _app_ctx_stack.top._sentry_app_scope_manager = \
+            get_current_hub().push_scope().__enter__()
+    except Exception:
+        get_current_hub().capture_internal_exception()
 
 
 def _pop_appctx(exception):
-    assert getattr(
-        _app_ctx_stack.top,
-        '_sentry_app_scope_manager',
-        None
-    ) is not None, 'race condition'
-    _app_ctx_stack.top._sentry_app_scope_manager.__exit__(None, None, None)
-    _app_ctx_stack.top._sentry_app_scope_manager = None
+    try:
+        assert getattr(
+            _app_ctx_stack.top,
+            '_sentry_app_scope_manager',
+            None
+        ) is not None, 'race condition'
+        _app_ctx_stack.top._sentry_app_scope_manager.__exit__(None, None, None)
+        _app_ctx_stack.top._sentry_app_scope_manager = None
+    except Exception:
+        get_current_hub().capture_internal_exception()
 
 
 def _capture_exception(sender, exception, **kwargs):
@@ -55,26 +61,29 @@ def _capture_exception(sender, exception, **kwargs):
 
 
 def _before_request(*args, **kwargs):
-    assert getattr(
-        _app_ctx_stack.top,
-        '_sentry_app_scope_manager',
-        None
-    ) is not None, 'scope push failed'
+    try:
+        assert getattr(
+            _app_ctx_stack.top,
+            '_sentry_app_scope_manager',
+            None
+        ) is not None, 'scope push failed'
 
-    with configure_scope() as scope:
-        if request.url_rule:
-            scope.transaction = request.url_rule.endpoint
+        with configure_scope() as scope:
+            if request.url_rule:
+                scope.transaction = request.url_rule.endpoint
 
-        try:
-            scope.request = _get_request_info()
-        except Exception:
-            get_current_hub().capture_internal_exception()
+            try:
+                scope.request = _get_request_info()
+            except Exception:
+                get_current_hub().capture_internal_exception()
 
-        try:
-            scope.user = _get_user_info()
-        except Exception:
-            raise
-            get_current_hub().capture_internal_exception()
+            try:
+                scope.user = _get_user_info()
+            except Exception:
+                raise
+                get_current_hub().capture_internal_exception()
+    except Exception:
+        get_current_hub().capture_internal_exception()
 
 def _get_request_info():
     {

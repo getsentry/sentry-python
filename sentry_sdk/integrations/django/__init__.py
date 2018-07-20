@@ -31,21 +31,24 @@ _request_scope = ContextVar('sentry_django_request_scope')
 # not yet available
 class SentryMiddleware(MiddlewareMixin):
     def process_request(self, request):
-        assert _request_scope.get(None) is None, 'race condition'
-        _request_scope.set(get_current_hub().push_scope().__enter__())
-
         try:
+            assert _request_scope.get(None) is None, 'race condition'
+            _request_scope.set(get_current_hub().push_scope().__enter__())
+
             with configure_scope() as scope:
                 scope.transaction = _get_transaction_from_request(request)
         except Exception:
-            capture_exception()
+            get_current_hub().capture_internal_exception()
 
 
 def _request_finished(*args, **kwargs):
-    val = _request_scope.get(None)
-    assert val is not None, 'race condition'
-    val.__exit__(None, None, None)
-    _request_scope.set(None)
+    try:
+        val = _request_scope.get(None)
+        assert val is not None, 'race condition'
+        val.__exit__(None, None, None)
+        _request_scope.set(None)
+    except Exception:
+        get_current_hub().capture_internal_exception()
 
 
 def _got_request_exception(request=None, **kwargs):
