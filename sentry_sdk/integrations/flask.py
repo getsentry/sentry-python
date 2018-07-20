@@ -86,9 +86,9 @@ def _before_request(*args, **kwargs):
         get_current_hub().capture_internal_exception()
 
 def _get_request_info():
-    {
-        'url': '%s://%s%s' % (request.scheme, urlparts.host, request.path),
-        'query_string': urlparts.query,
+    return {
+        'url': '%s://%s%s' % (request.scheme, request.host, request.path),
+        'query_string': request.query_string,
         'method': request.method,
         'data': request.get_data(cache=True, as_text=True, parse_form_data=True),
         'headers': dict(request.headers),

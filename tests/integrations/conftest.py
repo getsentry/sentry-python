@@ -6,11 +6,6 @@ class TestClient(Client):
     def __init__(self):
         pass
 
-    def capture_internal_exception(self, error=None):
-        if not error:
-            raise
-        raise error
-
     dsn = 'LOL'
     options = {'with_locals': False, 'release': 'fake_release', 'environment': 'fake_environment', 'server_name': 'fake_servername'}
     _transport = None
@@ -30,6 +25,17 @@ test_client = TestClient()
 
 sentry_sdk.init()
 sentry_sdk.get_current_hub().bind_client(test_client)
+
+@pytest.fixture(autouse=True)
+def reraise_internal_exceptions(monkeypatch):
+    def capture_internal_exception(error=None):
+        if not error:
+            raise
+        raise error
+
+    monkeypatch.setattr(sentry_sdk.get_current_hub(),
+                        'capture_internal_exception',
+                        capture_internal_exception)
 
 
 @pytest.fixture
