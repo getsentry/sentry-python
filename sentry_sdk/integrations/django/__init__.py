@@ -21,7 +21,7 @@ except ImportError:
     MiddlewareMixin = object
 
 def _get_transaction_from_request(request):
-    return resolve(request.path).func
+    return resolve(request.path).func.__name__
 
 _request_scope = local()
 

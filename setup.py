@@ -13,5 +13,8 @@ setup(
     packages=find_packages(exclude=("tests", "tests.*",)),
     zip_safe=False,
     license='BSD',
-    install_requires=['urllib3', 'certifi']
+    install_requires=['urllib3', 'certifi'],
+    extras_require={
+        'flask': ['flask>=0.8', 'blinker>=1.1']
+    }
 )

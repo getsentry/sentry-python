@@ -1,6 +1,8 @@
 import sys
-
 import pytest
+
+django = pytest.importorskip('django')
+
 
 from django.test import Client
 from django.test.utils import setup_test_environment
@@ -46,16 +48,5 @@ def test_middleware_exceptions(client, capture_exceptions):
 
 
 def test_get_dsn(request, client):
-    class Client(SentryClient):
-        def __init__(self):
-            pass
-
-        dsn = 'LOL'
-        options = {'with_locals': False}
-        _transport = None
-
-    Hub.current.bind_client(Client())
-    request.addfinalizer(lambda: Hub.current.bind_client(None))
-
     response = client.get(reverse('get_dsn'))
     assert response.content == b'LOL!'

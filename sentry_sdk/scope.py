@@ -21,6 +21,11 @@ class Scope(object):
     user = property(fset=_set_user)
     del _set_user
 
+    def _set_request(self, request):
+        self._data['request'] = request
+    request = property(fset=_set_request)
+    del _set_request
+
     def set_tag(self, key, value):
         self._data.setdefault('tags', {})[key] = value
 
