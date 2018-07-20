@@ -1,7 +1,12 @@
 from __future__ import absolute_import
 
+import base64
+
 from sentry_sdk import capture_exception, configure_scope, get_current_hub
-from ._wsgi import get_environ
+from sentry_sdk.stripping import strip_string
+from sentry_sdk._compat import text_type
+
+from ._wsgi import get_environ, peek_io_stream
 
 try:
     from flask_login import current_user
@@ -55,30 +60,77 @@ def _before_request(*args, **kwargs):
                 scope.transaction = request.url_rule.endpoint
 
             try:
-                scope.request = _get_request_info()
+                _set_request_info(scope)
             except Exception:
                 get_current_hub().capture_internal_exception()
 
             try:
-                scope.user = _get_user_info()
+                _set_user_info(scope)
             except Exception:
                 get_current_hub().capture_internal_exception()
     except Exception:
         get_current_hub().capture_internal_exception()
 
-
-def _get_request_info():
-    return {
-        "url": "%s://%s%s" % (request.scheme, request.host, request.path),
-        "query_string": request.query_string,
-        "method": request.method,
-        "data": request.get_data(cache=True, as_text=True, parse_form_data=True),
-        "headers": dict(request.headers),
-        "env": get_environ(request.environ),
+def _set_request_info(scope):
+    request_info = {
+        'url': '%s://%s%s' % (
+            request.scheme,
+            request.host,
+            request.path
+        ),
+        'query_string': request.query_string,
+        'method': request.method,
+        'headers': dict(request.headers),
+        'env': dict(get_environ(request.environ))
     }
 
+    scope.request = request_info
+    # if this crashes we at least have the rest of the request already set
+    _set_request_body(request_info, scope)
 
-def _get_user_info():
+
+def _set_request_body(request_info, scope):
+    # TODO: peek for length of configured max length
+    peek, request.stream = peek_io_stream(request.stream)
+
+    data = None
+    meta = None
+
+    if request.form:
+        data = request.form
+        if request.mimetype == 'multipart/form-data':
+            ct = 'multipart'
+        else:
+            ct = 'urlencoded'
+        repr = 'structured'
+    elif request.json is not None:
+        data = request.json
+        ct = 'json'
+        repr = 'structured'
+    else:
+        try:
+            if isinstance(peek, text_type):
+                data = peek
+            else:
+                data = peek.decode('utf-8')
+        except UnicodeDecodeError:
+            ct = 'bytes'
+            repr = 'base64'
+            data = base64.b64encode(peek).decode('ascii')
+        else:
+            ct = 'unicode'
+            repr = 'text'
+
+        data = strip_string(
+            data,
+            assume_length=request.content_length
+        )
+
+    request_info['data'] = data
+    request_info['data_info'] = {'ct': ct, 'repr': repr}
+
+
+def _set_user_info(scope):
     try:
         ip_address = request.access_route[0]
     except IndexError:
@@ -96,4 +148,4 @@ def _get_user_info():
         # - no user is logged in
         pass
 
-    return user_info
+    scope.user = user_info
