@@ -220,13 +220,7 @@ def skip_internal_frames(frame):
 
 def safe_str(value):
     try:
-        try:
-            rv = text_type(value)
-        except UnicodeError:
-            rv = bytes(value)
-        if isinstance(rv, bytes):
-            rv = rv.decode('utf-8', 'replace')
-        return rv
+        return text_type(value)
     except Exception:
         return safe_repr(value)
 
@@ -236,9 +230,12 @@ def safe_repr(value):
         rv = repr(value)
         if isinstance(rv, bytes):
             rv = rv.decode('utf-8', 'replace')
-        return rv
+        try:
+            return rv.encode('utf-8').decode('unicode-escape')
+        except Exception:
+            return rv
     except Exception:
-        return '<broken repr>'
+        return u'<broken repr>'
 
 
 def object_to_json(obj):
@@ -246,10 +243,8 @@ def object_to_json(obj):
         if depth >= 4:
             return safe_repr(obj)
         if obj is None or obj is True or obj is False or \
-           isinstance(obj, number_types) or isinstance(obj, text_type):
+           isinstance(obj, number_types):
             return obj
-        if isinstance(obj, bytes):
-            return obj.decode('utf-8', 'replace')
         if isinstance(obj, Sequence):
             return [_walk(x, depth + 1) for x in obj]
         if isinstance(obj, Mapping):
