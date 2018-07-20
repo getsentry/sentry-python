@@ -63,7 +63,6 @@ def _before_request(*args, **kwargs):
             try:
                 scope.user = _get_user_info()
             except Exception:
-                raise
                 get_current_hub().capture_internal_exception()
     except Exception:
         get_current_hub().capture_internal_exception()

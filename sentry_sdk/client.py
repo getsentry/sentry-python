@@ -4,7 +4,7 @@ import uuid
 from .utils import Dsn
 from .transport import Transport
 from .consts import DEFAULT_OPTIONS, SDK_INFO
-from .stripping import strip_event
+from .stripping import strip_event, flatten_metadata
 
 
 NO_DSN = object()
@@ -58,15 +58,15 @@ class Client(object):
         if event.get('platform') is None:
             event['platform'] = 'python'
 
-        if event.get('') is None:
-            event, event_meta = strip_event(event)
-            event[""] = event_meta
+        event = strip_event(event)
+        event = flatten_metadata(event)
+        return event
 
     def capture_event(self, event, scope=None):
         """Captures an event."""
         if self._transport is None:
             return
-        self._prepare_event(event, scope)
+        event = self._prepare_event(event, scope)
         self._transport.capture_event(event)
 
     def drain_events(self, timeout=None):
