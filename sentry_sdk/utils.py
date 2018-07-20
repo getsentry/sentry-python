@@ -240,16 +240,12 @@ def safe_repr(value):
 
 def object_to_json(obj):
     def _walk(obj, depth):
-        if depth >= 4:
-            return safe_repr(obj)
-        if obj is None or obj is True or obj is False or \
-           isinstance(obj, number_types):
-            return obj
-        if isinstance(obj, Sequence):
-            return [_walk(x, depth + 1) for x in obj]
-        if isinstance(obj, Mapping):
-            return {safe_repr(k): _walk(v, depth + 1) for k, v in
-                    obj.items()}
+        if depth < 4:
+            if isinstance(obj, Sequence):
+                return [_walk(x, depth + 1) for x in obj]
+            if isinstance(obj, Mapping):
+                return {safe_repr(k): _walk(v, depth + 1) for k, v in
+                        obj.items()}
         return safe_repr(obj)
     return _walk(obj, 0)
 
