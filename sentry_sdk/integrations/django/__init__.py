@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-from threading import Lock, local
+from threading import Lock
 
 from django.conf import settings
 from django.core import signals
@@ -10,6 +10,7 @@ except ImportError:
     from django.core.urlresolvers import resolve
 
 from sentry_sdk import get_current_hub, configure_scope, capture_exception
+from sentry_sdk.utils import ContextVar
 
 
 try:
@@ -23,15 +24,15 @@ except ImportError:
 def _get_transaction_from_request(request):
     return resolve(request.path).func.__name__
 
-_request_scope = local()
+_request_scope = ContextVar('sentry_django_request_scope')
 
 
 # request_started (or any other signal) cannot be used because the request is
 # not yet available
 class SentryMiddleware(MiddlewareMixin):
     def process_request(self, request):
-        assert getattr(_request_scope, 'manager', None) is None, 'race condition'
-        _request_scope.manager = get_current_hub().push_scope().__enter__()
+        assert _request_scope.get(None) is None, 'race condition'
+        _request_scope.set(get_current_hub().push_scope().__enter__())
 
         try:
             with configure_scope() as scope:
@@ -41,9 +42,10 @@ class SentryMiddleware(MiddlewareMixin):
 
 
 def _request_finished(*args, **kwargs):
-    assert getattr(_request_scope, 'manager', None) is not None, 'race condition'
-    _request_scope.manager.__exit__(None, None, None)
-    _request_scope.manager = None
+    val = _request_scope.get(None)
+    assert val is not None, 'race condition'
+    val.__exit__(None, None, None)
+    _request_scope.set(None)
 
 
 def _got_request_exception(request=None, **kwargs):
