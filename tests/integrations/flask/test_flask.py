@@ -34,7 +34,7 @@ def test_has_context(app):
     @app.route('/')
     def index():
         with configure_scope() as scope:
-            assert scope._data['transaction'] is 'index'
+            assert scope._data['transaction'] == 'index'
             assert scope._data['request']['data'] == ''
             assert scope._data['request']['url'] == 'http://localhost/'
 
