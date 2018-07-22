@@ -13,4 +13,4 @@ install:
   - pip install tox
 
 script:
-  - tox -e $(tox -l | grep py$(echo $TRAVIS_PYTHON_VERSION | sed -e 's/pypypy/pypy/g') | tr '\n' ',')
+  - sh scripts/runtox.sh
