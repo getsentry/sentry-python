@@ -65,6 +65,10 @@ class Scope(object):
         if tags:
             event.setdefault('tags', {}).update(tags)
 
+        tags = self._data.get('request')
+        if tags:
+            event.setdefault('request', {}).update(tags)
+
         contexts = self._data.get('contexts')
         if contexts:
             event.setdefault('contexts', {}).update(contexts)
