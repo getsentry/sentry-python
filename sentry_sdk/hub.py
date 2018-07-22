@@ -39,14 +39,15 @@ class _HubManager(object):
 
 class _ScopeManager(object):
 
-    def __init__(self, hub):
+    def __init__(self, hub, layer):
         self._hub = hub
+        self._layer = layer
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
-        self._hub._stack.pop()
+        assert self._hub._stack.pop() == self._layer, 'popped wrong scope'
 
 
 class Hub(with_metaclass(HubMeta)):
@@ -162,11 +163,18 @@ class Hub(with_metaclass(HubMeta)):
             self._pending_processors.append(factory)
 
     def push_scope(self):
-        """Pushes a new layer on the scope stack."""
+        """Pushes a new layer on the scope stack. Returns a context manager
+        that should be used to pop the scope again."""
         self._flush_event_processors()
         client, scope = self._stack[-1]
-        self._stack.append((client, copy.copy(scope)))
-        return _ScopeManager(self)
+        new_layer = (client, copy.copy(scope))
+        self._stack.append(new_layer)
+        return _ScopeManager(self, new_layer)
+
+    def pop_scope_unsafe(self):
+        """Pops a scope layer from the stack. Try to use the context manager
+        `push_scope()` instead."""
+        self._stack.pop()
 
     @contextmanager
     def configure_scope(self):

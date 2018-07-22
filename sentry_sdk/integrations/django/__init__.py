@@ -24,16 +24,12 @@ except ImportError:
 def _get_transaction_from_request(request):
     return resolve(request.path).func.__name__
 
-_request_scope = ContextVar('sentry_django_request_scope')
-
-
 # request_started (or any other signal) cannot be used because the request is
 # not yet available
 class SentryMiddleware(MiddlewareMixin):
     def process_request(self, request):
         try:
-            assert _request_scope.get(None) is None, 'race condition'
-            _request_scope.set(get_current_hub().push_scope().__enter__())
+            get_current_hub().push_scope()
 
             with configure_scope() as scope:
                 scope.transaction = _get_transaction_from_request(request)
@@ -42,13 +38,7 @@ class SentryMiddleware(MiddlewareMixin):
 
 
 def _request_finished(*args, **kwargs):
-    try:
-        val = _request_scope.get(None)
-        assert val is not None, 'race condition'
-        val.__exit__(None, None, None)
-        _request_scope.set(None)
-    except Exception:
-        get_current_hub().capture_internal_exception()
+    get_current_hub().pop_scope_unsafe()
 
 
 def _got_request_exception(request=None, **kwargs):

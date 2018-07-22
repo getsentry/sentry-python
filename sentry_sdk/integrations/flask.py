@@ -31,29 +31,12 @@ class FlaskSentry(object):
 
 
 def _push_appctx(*args, **kwargs):
-    try:
-        assert getattr(
-            _app_ctx_stack.top,
-            '_sentry_app_scope_manager',
-            None
-        ) is None, 'race condition'
-        _app_ctx_stack.top._sentry_app_scope_manager = \
-            get_current_hub().push_scope().__enter__()
-    except Exception:
-        get_current_hub().capture_internal_exception()
+    get_current_hub().push_scope()
+    _app_ctx_stack.top._sentry_app_scope_pushed = True
 
 
 def _pop_appctx(exception):
-    try:
-        assert getattr(
-            _app_ctx_stack.top,
-            '_sentry_app_scope_manager',
-            None
-        ) is not None, 'race condition'
-        _app_ctx_stack.top._sentry_app_scope_manager.__exit__(None, None, None)
-        _app_ctx_stack.top._sentry_app_scope_manager = None
-    except Exception:
-        get_current_hub().capture_internal_exception()
+    get_current_hub().pop_scope_unsafe()
 
 
 def _capture_exception(sender, exception, **kwargs):
@@ -64,9 +47,9 @@ def _before_request(*args, **kwargs):
     try:
         assert getattr(
             _app_ctx_stack.top,
-            '_sentry_app_scope_manager',
+            '_sentry_app_scope_pushed',
             None
-        ) is not None, 'scope push failed'
+        ), 'scope push failed'
 
         with configure_scope() as scope:
             if request.url_rule:
