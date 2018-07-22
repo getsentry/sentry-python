@@ -1,5 +1,6 @@
 import pytest
 import sentry_sdk
+from sentry_sdk.consts import DEFAULT_OPTIONS
 from sentry_sdk.client import Client, Transport
 
 class TestClient(Client):
@@ -7,7 +8,7 @@ class TestClient(Client):
         pass
 
     dsn = 'LOL'
-    options = {'with_locals': False, 'release': 'fake_release', 'environment': 'fake_environment', 'server_name': 'fake_servername'}
+    options = dict(DEFAULT_OPTIONS)
     _transport = None
 
 

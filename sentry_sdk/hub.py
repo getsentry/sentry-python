@@ -152,9 +152,9 @@ class Hub(with_metaclass(HubMeta)):
         if callable(crumb):
             crumb = crumb()
         if crumb is not None:
-            scope.breadcrumbs.append(crumb)
-        while len(scope.breadcrumbs) >= client.options['max_breadcrumbs']:
-            scope.breadcrumbs.popleft()
+            scope._breadcrumbs.append(crumb)
+        while len(scope._breadcrumbs) >= client.options['max_breadcrumbs']:
+            scope._breadcrumbs.popleft()
 
     def add_event_processor(self, factory):
         """Registers a new event processor with the top scope."""
