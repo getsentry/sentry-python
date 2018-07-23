@@ -4,13 +4,13 @@ from threading import Lock
 
 from django.conf import settings
 from django.core import signals
+
 try:
     from django.urls import resolve
 except ImportError:
     from django.core.urlresolvers import resolve
 
 from sentry_sdk import get_current_hub, configure_scope, capture_exception
-from sentry_sdk.utils import ContextVar
 
 
 try:
@@ -21,8 +21,10 @@ except ImportError:
     # https://docs.djangoproject.com/en/1.10/topics/http/middleware/#upgrading-pre-django-1-10-style-middleware
     MiddlewareMixin = object
 
+
 def _get_transaction_from_request(request):
     return resolve(request.path).func.__name__
+
 
 # request_started (or any other signal) cannot be used because the request is
 # not yet available
@@ -45,11 +47,11 @@ def _got_request_exception(request=None, **kwargs):
     capture_exception()
 
 
-MIDDLEWARE_NAME = 'sentry_sdk.integrations.django.SentryMiddleware'
+MIDDLEWARE_NAME = "sentry_sdk.integrations.django.SentryMiddleware"
 
 CONFLICTING_MIDDLEWARE = (
-    'raven.contrib.django.middleware.SentryMiddleware',
-    'raven.contrib.django.middleware.SentryLogMiddleware'
+    "raven.contrib.django.middleware.SentryMiddleware",
+    "raven.contrib.django.middleware.SentryLogMiddleware",
 ) + (MIDDLEWARE_NAME,)
 
 _installer_lock = Lock()
@@ -67,21 +69,18 @@ def _install():
 
 def _install_impl():
     # default settings.MIDDLEWARE is None
-    if getattr(settings, 'MIDDLEWARE', None):
-        middleware_attr = 'MIDDLEWARE'
+    if getattr(settings, "MIDDLEWARE", None):
+        middleware_attr = "MIDDLEWARE"
     else:
-        middleware_attr = 'MIDDLEWARE_CLASSES'
+        middleware_attr = "MIDDLEWARE_CLASSES"
 
     # make sure to get an empty tuple when attr is None
     middleware = getattr(settings, middleware_attr, ()) or ()
     conflicts = set(CONFLICTING_MIDDLEWARE).intersection(set(middleware))
     if conflicts:
-        raise RuntimeError('Other sentry-middleware already registered: %s' %
-                           conflicts)
+        raise RuntimeError("Other sentry-middleware already registered: %s" % conflicts)
 
-    setattr(settings,
-            middleware_attr,
-            [MIDDLEWARE_NAME] + list(middleware))
+    setattr(settings, middleware_attr, [MIDDLEWARE_NAME] + list(middleware))
 
     signals.request_finished.connect(_request_finished)
     signals.got_request_exception.connect(_got_request_exception)
@@ -93,12 +92,13 @@ try:
 except ImportError:
     _install()
 else:
+
     class SentryConfig(AppConfig):
-        name = 'sentry_sdk.integrations.django'
-        label = 'sentry_sdk_integrations_django'
-        verbose_name = 'Sentry'
+        name = "sentry_sdk.integrations.django"
+        label = "sentry_sdk_integrations_django"
+        verbose_name = "Sentry"
 
         def ready(self):
             _install()
 
-    default_app_config = 'sentry_sdk.integrations.django.SentryConfig'
+    default_app_config = "sentry_sdk.integrations.django.SentryConfig"

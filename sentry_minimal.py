@@ -57,6 +57,7 @@ try:
     from sentry_sdk.hub import Hub
     from sentry_sdk.scope import Scope
 except ImportError:
+
     class Hub(object):
         current = main = None
 

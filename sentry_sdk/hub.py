@@ -1,19 +1,21 @@
 import sys
 import copy
-import linecache
 from contextlib import contextmanager
 
 from ._compat import with_metaclass
 from .scope import Scope
-from .utils import exceptions_from_error_tuple, create_event, \
-    skip_internal_frames, ContextVar
+from .utils import (
+    exceptions_from_error_tuple,
+    create_event,
+    skip_internal_frames,
+    ContextVar,
+)
 
 
-_local = ContextVar('sentry_current_hub')
+_local = ContextVar("sentry_current_hub")
 
 
 class HubMeta(type):
-
     @property
     def current(self):
         rv = _local.get(None)
@@ -28,7 +30,6 @@ class HubMeta(type):
 
 
 class _HubManager(object):
-
     def __init__(self, hub):
         self._old = Hub.current
         _local.set(hub)
@@ -38,7 +39,6 @@ class _HubManager(object):
 
 
 class _ScopeManager(object):
-
     def __init__(self, hub, layer):
         self._hub = hub
         self._layer = layer
@@ -47,11 +47,10 @@ class _ScopeManager(object):
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
-        assert self._hub._stack.pop() == self._layer, 'popped wrong scope'
+        assert self._hub._stack.pop() == self._layer, "popped wrong scope"
 
 
 class Hub(with_metaclass(HubMeta)):
-
     def __init__(self, client_or_hub=None, scope=None):
         if isinstance(client_or_hub, Hub):
             hub = client_or_hub
@@ -92,18 +91,18 @@ class Hub(with_metaclass(HubMeta)):
         client, scope = self._stack[-1]
         if client is not None:
             client.capture_event(event, scope)
-            return event.get('event_id')
+            return event.get("event_id")
 
     def capture_message(self, message, level=None):
         """Captures a message."""
         if self.client is None:
             return
         if level is None:
-            level = 'info'
+            level = "info"
         event = create_event()
-        event['message'] = message
+        event["message"] = message
         if level is not None:
-            event['level'] = level
+            event["level"] = level
         return self.capture_event(event)
 
     def capture_exception(self, error=None):
@@ -116,7 +115,7 @@ class Hub(with_metaclass(HubMeta)):
         elif isinstance(error, tuple) and len(error) == 3:
             exc_type, exc_value, tb = error
         else:
-            tb = getattr(error, '__traceback__', None)
+            tb = getattr(error, "__traceback__", None)
             if tb is not None:
                 exc_type = type(error)
                 exc_value = error
@@ -132,9 +131,10 @@ class Hub(with_metaclass(HubMeta)):
 
         event = create_event()
         try:
-            event['exception'] = {
-                'values': exceptions_from_error_tuple(
-                    exc_type, exc_value, tb, client.options['with_locals'])
+            event["exception"] = {
+                "values": exceptions_from_error_tuple(
+                    exc_type, exc_value, tb, client.options["with_locals"]
+                )
             }
             return self.capture_event(event)
         except Exception:
@@ -154,7 +154,7 @@ class Hub(with_metaclass(HubMeta)):
             crumb = crumb()
         if crumb is not None:
             scope._breadcrumbs.append(crumb)
-        while len(scope._breadcrumbs) >= client.options['max_breadcrumbs']:
+        while len(scope._breadcrumbs) >= client.options["max_breadcrumbs"]:
             scope._breadcrumbs.popleft()
 
     def add_event_processor(self, factory):

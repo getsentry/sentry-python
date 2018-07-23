@@ -8,8 +8,9 @@ try:
 except ImportError:
     current_user = None
 
-from flask import current_app, request, _app_ctx_stack
-from flask.signals import appcontext_pushed, appcontext_popped, got_request_exception
+from flask import request, _app_ctx_stack
+from flask.signals import appcontext_pushed, got_request_exception
+
 
 class FlaskSentry(object):
     def __init__(self, app=None):
@@ -18,10 +19,10 @@ class FlaskSentry(object):
             self.init_app(app)
 
     def init_app(self, app):
-        if not hasattr(app, 'extensions'):
+        if not hasattr(app, "extensions"):
             app.extensions = {}
         elif app.extensions.get(__name__, None):
-            raise RuntimeError('Sentry registration is already registered')
+            raise RuntimeError("Sentry registration is already registered")
         app.extensions[__name__] = True
 
         appcontext_pushed.connect(_push_appctx, sender=app)
@@ -46,10 +47,8 @@ def _capture_exception(sender, exception, **kwargs):
 def _before_request(*args, **kwargs):
     try:
         assert getattr(
-            _app_ctx_stack.top,
-            '_sentry_app_scope_pushed',
-            None
-        ), 'scope push failed'
+            _app_ctx_stack.top, "_sentry_app_scope_pushed", None
+        ), "scope push failed"
 
         with configure_scope() as scope:
             if request.url_rule:
@@ -67,14 +66,15 @@ def _before_request(*args, **kwargs):
     except Exception:
         get_current_hub().capture_internal_exception()
 
+
 def _get_request_info():
     return {
-        'url': '%s://%s%s' % (request.scheme, request.host, request.path),
-        'query_string': request.query_string,
-        'method': request.method,
-        'data': request.get_data(cache=True, as_text=True, parse_form_data=True),
-        'headers': dict(request.headers),
-        'env': get_environ(request.environ)
+        "url": "%s://%s%s" % (request.scheme, request.host, request.path),
+        "query_string": request.query_string,
+        "method": request.method,
+        "data": request.get_data(cache=True, as_text=True, parse_form_data=True),
+        "headers": dict(request.headers),
+        "env": get_environ(request.environ),
     }
 
 
@@ -84,13 +84,10 @@ def _get_user_info():
     except IndexError:
         ip_address = request.remote_addr
 
-    user_info = {
-        'id': None,
-        'ip_address': ip_address
-    }
+    user_info = {"id": None, "ip_address": ip_address}
 
     try:
-        user_info['id'] = current_user.get_id()
+        user_info["id"] = current_user.get_id()
         # TODO: more configurable user attrs here
     except AttributeError:
         # might happen if:

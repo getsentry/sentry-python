@@ -1,2 +1,2 @@
-from .api import *
-from .api import __all__
+from .api import *  # noqa
+from .api import __all__  # noqa

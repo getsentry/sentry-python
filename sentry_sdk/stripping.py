@@ -35,38 +35,37 @@ def flatten_metadata(obj):
 
     obj, meta = inner(obj)
     if meta is not None:
-        obj[''] = meta
+        obj[""] = meta
     return obj
 
 
 def strip_event(event):
-    old_frames = event.get('stacktrace', {}).get('frames', None)
+    old_frames = event.get("stacktrace", {}).get("frames", None)
     if old_frames:
-        event['stacktrace']['frames'] = [strip_frame(frame)
-                                         for frame in old_frames]
+        event["stacktrace"]["frames"] = [strip_frame(frame) for frame in old_frames]
 
-    old_request_data = event.get('request', {}).get('data', None)
+    old_request_data = event.get("request", {}).get("data", None)
     if old_request_data:
-        event['request']['data'] = strip_databag(old_request_data)
+        event["request"]["data"] = strip_databag(old_request_data)
 
     return event
 
+
 def strip_frame(frame):
-    frame['vars'], meta = strip_databag(frame.get('vars'))
+    frame["vars"], meta = strip_databag(frame.get("vars"))
     return frame, ({"vars": meta} if meta is not None else None)
 
+
 def strip_databag(obj, remaining_depth=20):
-    assert not isinstance(obj, bytes), 'bytes should have been normalized before'
+    assert not isinstance(obj, bytes), "bytes should have been normalized before"
     if remaining_depth <= 0:
         return AnnotatedValue(None, {"": {"rem": [["!dep", "x"]]}})
     if isinstance(obj, text_type):
         return strip_string(obj)
     if isinstance(obj, Mapping):
-        return {k: strip_databag(v, remaining_depth - 1)
-                for k, v in obj.items()}
+        return {k: strip_databag(v, remaining_depth - 1) for k, v in obj.items()}
     if isinstance(obj, Sequence):
-        return [strip_databag(v, remaining_depth - 1)
-                for v in obj]
+        return [strip_databag(v, remaining_depth - 1) for v in obj]
     return obj
 
 
@@ -79,10 +78,10 @@ def strip_string(value, assume_length=None, max_length=512):
 
     if assume_length > max_length:
         return AnnotatedValue(
-            value=value[:max_length - 3] + u'...',
+            value=value[: max_length - 3] + u"...",
             metadata={
                 "len": assume_length,
-                "rem": [["!len", "x", max_length - 3, max_length]]
-            }
+                "rem": [["!len", "x", max_length - 3, max_length]],
+            },
         )
     return value[:max_length]

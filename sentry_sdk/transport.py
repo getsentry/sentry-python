@@ -16,12 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 def _make_pool():
-    proxy = os.environ.get('HTTP_PROXY')
-    opts = {
-        'num_pools': 2,
-        'cert_reqs': 'CERT_REQUIRED',
-        'ca_certs': certifi.where(),
-    }
+    proxy = os.environ.get("HTTP_PROXY")
+    opts = {"num_pools": 2, "cert_reqs": "CERT_REQUIRED", "ca_certs": certifi.where()}
     if proxy is not None:
         return urllib3.ProxyManager(proxy, **opts)
     else:
@@ -34,22 +30,28 @@ _retry = urllib3.util.Retry()
 
 
 def send_event(event, auth):
-    body = zlib.compress(json.dumps(event).encode('utf-8'))
-    response = _pool.request('POST', auth.store_api_url, body=body, headers={
-        'X-Sentry-Auth': auth.to_header(),
-        'Content-Type': 'application/json',
-        'Content-Encoding': 'deflate',
-    })
+    body = zlib.compress(json.dumps(event).encode("utf-8"))
+    response = _pool.request(
+        "POST",
+        auth.store_api_url,
+        body=body,
+        headers={
+            "X-Sentry-Auth": auth.to_header(),
+            "Content-Type": "application/json",
+            "Content-Encoding": "deflate",
+        },
+    )
     try:
         if response.status == 429:
             return datetime.utcnow() + timedelta(
-                seconds=_retry.get_retry_after(response))
+                seconds=_retry.get_retry_after(response)
+            )
     finally:
         response.close()
 
 
 def spawn_thread(transport):
-    auth = transport.dsn.to_auth('sentry-python/%s' % VERSION)
+    auth = transport.dsn.to_auth("sentry-python/%s" % VERSION)
 
     def thread():
         disabled_until = None
@@ -73,7 +75,7 @@ def spawn_thread(transport):
             try:
                 disabled_until = send_event(item, auth)
             except Exception:
-                logger.exception('Could not send sentry event')
+                logger.exception("Could not send sentry event")
                 continue
 
     t = threading.Thread(target=thread)
@@ -82,7 +84,6 @@ def spawn_thread(transport):
 
 
 class Transport(object):
-
     def __init__(self, dsn):
         self.dsn = dsn
         self._queue = None
@@ -95,7 +96,7 @@ class Transport(object):
 
     def capture_event(self, event):
         if self._queue is None:
-            raise RuntimeError('Transport shut down')
+            raise RuntimeError("Transport shut down")
         try:
             self._queue.put_nowait(event)
         except queue.Full:

@@ -1,13 +1,8 @@
-from contextlib import contextmanager
-
 from .hub import Hub
-from .scope import Scope
 from .client import Client
 
 
-
 class _InitGuard(object):
-
     def __init__(self, client):
         self._client = client
 
@@ -29,7 +24,7 @@ def init(*args, **kwargs):
 
 import sentry_minimal
 
-__all__ = ['Hub', 'Scope', 'Client', 'init'] + sentry_minimal.__all__
+__all__ = ["Hub", "Scope", "Client", "init"] + sentry_minimal.__all__
 
 
 for _key in sentry_minimal.__all__:

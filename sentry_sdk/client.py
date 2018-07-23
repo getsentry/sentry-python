@@ -11,13 +11,12 @@ NO_DSN = object()
 
 
 class Client(object):
-
     def __init__(self, dsn=None, *args, **kwargs):
         if dsn is NO_DSN:
             dsn = None
         else:
             if dsn is None:
-                dsn = os.environ.get('SENTRY_DSN')
+                dsn = os.environ.get("SENTRY_DSN")
             if not dsn:
                 dsn = None
             else:
@@ -43,20 +42,20 @@ class Client(object):
         return cls(NO_DSN)
 
     def _prepare_event(self, event, scope):
-        if event.get('event_id') is None:
-            event['event_id'] = uuid.uuid4().hex
+        if event.get("event_id") is None:
+            event["event_id"] = uuid.uuid4().hex
 
         if scope is not None:
             scope.apply_to_event(event)
 
-        for key in 'release', 'environment', 'server_name':
+        for key in "release", "environment", "server_name":
             if event.get(key) is None:
                 event[key] = self.options[key]
-        if event.get('sdk') is None:
-            event['sdk'] = SDK_INFO
+        if event.get("sdk") is None:
+            event["sdk"] = SDK_INFO
 
-        if event.get('platform') is None:
-            event['platform'] = 'python'
+        if event.get("platform") is None:
+            event["platform"] = "python"
 
         event = strip_event(event)
         event = flatten_metadata(event)
@@ -71,7 +70,7 @@ class Client(object):
 
     def drain_events(self, timeout=None):
         if timeout is None:
-            timeout = self.options['drain_timeout']
+            timeout = self.options["drain_timeout"]
         if self._transport is not None:
             self._transport.drain_events(timeout)
 

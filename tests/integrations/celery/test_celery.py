@@ -1,6 +1,6 @@
 import pytest
 
-pytest.importorskip('celery')
+pytest.importorskip("celery")
 
 from celery import Celery
 
@@ -17,21 +17,21 @@ def celery():
 
 
 def test_simple(capture_events, celery):
-    @celery.task(name='dummy_task')
+    @celery.task(name="dummy_task")
     def dummy_task(x, y):
         return x / y
 
     dummy_task.delay(1, 2)
     dummy_task.delay(1, 0)
     event, = capture_events
-    assert event['transaction'] == 'dummy_task'
+    assert event["transaction"] == "dummy_task"
 
-    exception, = event['exception']['values']
-    assert exception['type'] == 'ZeroDivisionError'
+    exception, = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
 
 
 def test_ignore_expected(capture_events, celery):
-    @celery.task(name='dummy_task', throws=(ZeroDivisionError,))
+    @celery.task(name="dummy_task", throws=(ZeroDivisionError,))
     def dummy_task(x, y):
         return x / y
 
