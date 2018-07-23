@@ -81,7 +81,8 @@ def _set_request_info(scope):
         'query_string': request.query_string,
         'method': request.method,
         'headers': dict(request.headers),
-        'env': dict(get_environ(request.environ))
+        'env': dict(get_environ(request.environ)),
+        'cookies': dict(request.cookies)
     }
 
     scope.request = request_info
