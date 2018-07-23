@@ -11,6 +11,7 @@ except ImportError:
     from django.core.urlresolvers import resolve
 
 from sentry_sdk import get_current_hub, configure_scope, capture_exception
+from .._wsgi import RequestExtractor
 
 
 try:
@@ -35,8 +36,48 @@ class SentryMiddleware(MiddlewareMixin):
 
             with configure_scope() as scope:
                 scope.transaction = _get_transaction_from_request(request)
+                try:
+                    DjangoRequestExtractor(request).extract_into_scope(scope)
+                except Exception:
+                    get_current_hub().capture_internal_exception()
+
+                # TODO: user info
+
         except Exception:
             get_current_hub().capture_internal_exception()
+
+
+class DjangoRequestExtractor(RequestExtractor):
+    @property
+    def url(self):
+        return "%s://%s%s" % (
+            self.request.scheme,
+            self.request.get_host(),
+            self.request.path
+        )
+
+    @property
+    def env(self):
+        return self.request.META
+
+    @property
+    def cookies(self):
+        return self.request.COOKIES
+
+    @property
+    def raw_data(self):
+        return self.request.body
+
+    @property
+    def form(self):
+        return self.request.POST
+
+    @property
+    def files(self):
+        return self.request.FILES
+
+    def size_of_file(self, file):
+        return file.size
 
 
 def _request_finished(*args, **kwargs):

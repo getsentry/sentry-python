@@ -1,3 +1,4 @@
+import json
 import base64
 
 from sentry_sdk.stripping import AnnotatedValue
@@ -12,9 +13,13 @@ def get_environ(environ):
 
 
 # `get_headers` comes from `werkzeug.datastructures.EnvironHeaders`
+#
+# We need this function because Django does not give us a "pure" http header
+# dict. So we might as well use it for all WSGI integrations.
 def get_headers(environ):
     """
     Returns only proper HTTP headers.
+
     """
     for key, value in environ.items():
         key = str(key)
@@ -60,7 +65,7 @@ class RequestExtractor(object):
             data = self.json
             ct = "json"
             repr = "structured"
-        else:
+        elif self.raw_data:
             data = self.raw_data
 
             try:
@@ -72,6 +77,8 @@ class RequestExtractor(object):
                 ct = "bytes"
                 repr = "base64"
                 data = base64.b64encode(data).decode("ascii")
+        else:
+            return
 
         request_info["data"] = data
         request_info["data_info"] = {"ct": ct, "repr": repr}
@@ -82,11 +89,11 @@ class RequestExtractor(object):
 
     @property
     def query_string(self):
-        raise NotImplementedError()
+        return self.env.get('QUERY_STRING')
 
     @property
     def method(self):
-        raise NotImplementedError()
+        return self.env.get('REQUEST_METHOD')
 
     @property
     def headers(self):
@@ -110,11 +117,24 @@ class RequestExtractor(object):
 
     @property
     def form_is_multipart(self):
-        raise NotImplementedError()
+        return self.env.get('CONTENT_TYPE') \
+            .startswith("multipart/form-data")
+
+    @property
+    def is_json(self):
+        mt = (self.env.get('CONTENT_TYPE') or '').split(';', 1)[0]
+        return (
+            mt == 'application/json'
+            or (mt.startswith('application/')) and mt.endswith('+json')
+        )
 
     @property
     def json(self):
-        raise NotImplementedError()
+        try:
+            if self.is_json:
+                return json.loads(self.raw_data)
+        except ValueError:
+            pass
 
     @property
     def files(self):

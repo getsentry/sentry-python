@@ -75,16 +75,8 @@ class FlaskRequestExtractor(RequestExtractor):
         return "%s://%s%s" % (
             self.request.scheme,
             self.request.host,
-            request.path
+            self.request.path
         )
-
-    @property
-    def query_string(self):
-        return self.request.query_string
-
-    @property
-    def method(self):
-        return self.request.method
 
     @property
     def env(self):
@@ -101,14 +93,6 @@ class FlaskRequestExtractor(RequestExtractor):
     @property
     def form(self):
         return self.request.form
-
-    @property
-    def form_is_multipart(self):
-        return request.mimetype == "multipart/form-data"
-
-    @property
-    def json(self):
-        return request.json
 
     @property
     def files(self):
