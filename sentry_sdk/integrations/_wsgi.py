@@ -132,7 +132,7 @@ class RequestExtractor(object):
     def json(self):
         try:
             if self.is_json:
-                return json.loads(self.raw_data)
+                return json.loads(self.raw_data.decode('utf-8'))
         except ValueError:
             pass
 
