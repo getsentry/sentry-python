@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 
 
-__all__ = []
+__all__ = ["Scope", "Hub"]
 
 
 def public(f):
