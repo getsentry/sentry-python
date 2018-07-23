@@ -50,11 +50,7 @@ class SentryMiddleware(MiddlewareMixin):
 class DjangoRequestExtractor(RequestExtractor):
     @property
     def url(self):
-        return "%s://%s%s" % (
-            self.request.scheme,
-            self.request.get_host(),
-            self.request.path,
-        )
+        return self.request.build_absolute_uri(self.request.path)
 
     @property
     def env(self):
