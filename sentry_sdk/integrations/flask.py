@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
 from sentry_sdk import capture_exception, configure_scope, get_current_hub
-from ._wsgi import get_environ
+from ._wsgi import RequestExtractor
 
 try:
     from flask_login import current_user
@@ -55,30 +55,48 @@ def _before_request(*args, **kwargs):
                 scope.transaction = request.url_rule.endpoint
 
             try:
-                scope.request = _get_request_info()
+                FlaskRequestExtractor(request).extract_into_scope(scope)
             except Exception:
                 get_current_hub().capture_internal_exception()
 
             try:
-                scope.user = _get_user_info()
+                _set_user_info(scope)
             except Exception:
                 get_current_hub().capture_internal_exception()
     except Exception:
         get_current_hub().capture_internal_exception()
 
 
-def _get_request_info():
-    return {
-        "url": "%s://%s%s" % (request.scheme, request.host, request.path),
-        "query_string": request.query_string,
-        "method": request.method,
-        "data": request.get_data(cache=True, as_text=True, parse_form_data=True),
-        "headers": dict(request.headers),
-        "env": get_environ(request.environ),
-    }
+class FlaskRequestExtractor(RequestExtractor):
+    @property
+    def url(self):
+        return "%s://%s%s" % (self.request.scheme, self.request.host, self.request.path)
+
+    @property
+    def env(self):
+        return self.request.environ
+
+    @property
+    def cookies(self):
+        return self.request.cookies
+
+    @property
+    def raw_data(self):
+        return self.request.data
+
+    @property
+    def form(self):
+        return self.request.form
+
+    @property
+    def files(self):
+        return request.files
+
+    def size_of_file(self, file):
+        return file.content_length
 
 
-def _get_user_info():
+def _set_user_info(scope):
     try:
         ip_address = request.access_route[0]
     except IndexError:
@@ -96,4 +114,4 @@ def _get_user_info():
         # - no user is logged in
         pass
 
-    return user_info
+    scope.user = user_info

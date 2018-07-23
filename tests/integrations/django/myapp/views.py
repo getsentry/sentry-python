@@ -19,3 +19,8 @@ def get_dsn(request):
     return HttpResponse(
         template.render(Context()), content_type="application/xhtml+xml"
     )
+
+
+def message(request):
+    sentry_sdk.capture_message("hi")
+    return HttpResponse("ok")
