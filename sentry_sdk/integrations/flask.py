@@ -118,8 +118,8 @@ def _set_request_body(request_info, scope):
             repr = 'base64'
             data = base64.b64encode(peek).decode('ascii')
         else:
-            ct = 'unicode'
-            repr = 'text'
+            ct = 'plain'
+            repr = 'other'
 
         data = strip_string(
             data,
