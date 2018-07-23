@@ -56,16 +56,16 @@ _installer_lock = Lock()
 _installed = False
 
 
-def initialize():
+def _install():
     global _installed
     with _installer_lock:
         if _installed:
             return
-        _initialize_impl()
+        _install_impl()
         _installed = True
 
 
-def _initialize_impl():
+def _install_impl():
     # default settings.MIDDLEWARE is None
     if getattr(settings, 'MIDDLEWARE', None):
         middleware_attr = 'MIDDLEWARE'
@@ -87,13 +87,11 @@ def _initialize_impl():
     signals.got_request_exception.connect(_got_request_exception)
 
 
-
-
 try:
     # Django >= 1.7
     from django.apps import AppConfig
 except ImportError:
-    initialize()
+    _install()
 else:
     class SentryConfig(AppConfig):
         name = 'sentry_sdk.integrations.django'
@@ -101,6 +99,6 @@ else:
         verbose_name = 'Sentry'
 
         def ready(self):
-            initialize()
+            _install()
 
     default_app_config = 'sentry_sdk.integrations.django.SentryConfig'
