@@ -1,11 +1,9 @@
 from __future__ import absolute_import
 
-import base64
-
 from sentry_sdk import capture_exception, configure_scope, get_current_hub
 from sentry_sdk.stripping import AnnotatedValue
 
-from ._wsgi import get_environ
+from ._wsgi import RequestExtractor, get_environ
 
 try:
     from flask_login import current_user
@@ -59,7 +57,7 @@ def _before_request(*args, **kwargs):
                 scope.transaction = request.url_rule.endpoint
 
             try:
-                _set_request_info(scope)
+                FlaskRequestExtractor(request).extract_into_scope(scope)
             except Exception:
                 get_current_hub().capture_internal_exception()
 
@@ -71,53 +69,53 @@ def _before_request(*args, **kwargs):
         get_current_hub().capture_internal_exception()
 
 
-def _set_request_info(scope):
-    request_info = {
-        "url": "%s://%s%s" % (request.scheme, request.host, request.path),
-        "query_string": request.query_string,
-        "method": request.method,
-        "headers": dict(request.headers),
-        "env": dict(get_environ(request.environ)),
-        "cookies": dict(request.cookies),
-    }
+class FlaskRequestExtractor(RequestExtractor):
+    @property
+    def url(self):
+        return "%s://%s%s" % (
+            self.request.scheme,
+            self.request.host,
+            request.path
+        )
 
-    scope.request = request_info
-    # if this crashes we at least have the rest of the request already set
-    _set_request_body(request_info, scope)
+    @property
+    def query_string(self):
+        return self.request.query_string
 
+    @property
+    def method(self):
+        return self.request.method
 
-def _set_request_body(request_info, scope):
-    if request.form or request.files:
-        data = dict(request.form.items())
-        for k, v in request.files.items():
-            data[k] = AnnotatedValue(
-                None, {"len": "", "rem": [["!filecontent", "x", 0, 0]]}
-            )
+    @property
+    def env(self):
+        return self.request.environ
 
-        if request.files or request.mimetype == "multipart/form-data":
-            ct = "multipart"
-        else:
-            ct = "urlencoded"
-        repr = "structured"
-    elif request.json is not None:
-        data = request.json
-        ct = "json"
-        repr = "structured"
-    else:
-        data = request.data
+    @property
+    def cookies(self):
+        return self.request.cookies
 
-        try:
-            if isinstance(data, bytes):
-                data = data.decode("utf-8")
-            ct = "plain"
-            repr = "other"
-        except UnicodeDecodeError:
-            ct = "bytes"
-            repr = "base64"
-            data = base64.b64encode(data).decode("ascii")
+    @property
+    def raw_data(self):
+        return self.request.data
 
-    request_info["data"] = data
-    request_info["data_info"] = {"ct": ct, "repr": repr}
+    @property
+    def form(self):
+        return self.request.form
+
+    @property
+    def form_is_multipart(self):
+        return request.mimetype == "multipart/form-data"
+
+    @property
+    def json(self):
+        return request.json
+
+    @property
+    def files(self):
+        return request.files
+
+    def size_of_file(self, file):
+        return file.content_length
 
 
 def _set_user_info(scope):
