@@ -37,9 +37,12 @@ class RequestExtractor(object):
     def __init__(self, request):
         self.request = request
 
-    def extract_into_scope(self, scope):
+    def extract_into_event(self, event):
+        if "request" in event:
+            return
+
         # if the code below fails halfway through we at least have some data
-        scope.request = request_info = {}
+        event["request"] = request_info = {}
 
         request_info["url"] = self.url
         request_info["query_string"] = self.query_string

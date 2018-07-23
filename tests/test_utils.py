@@ -1,4 +1,4 @@
-from hypothesis import given, assume, settings
+from hypothesis import given, assume
 import hypothesis.strategies as st
 
 from sentry_sdk.utils import safe_repr
@@ -8,7 +8,6 @@ any_string = st.one_of(st.binary(), st.text())
 
 
 @given(x=any_string)
-@settings(max_examples=1000)
 def test_safe_repr_never_broken_for_strings(x):
     r = safe_repr(x)
     assert isinstance(r, text_type)
@@ -16,7 +15,6 @@ def test_safe_repr_never_broken_for_strings(x):
 
 
 @given(x=any_string)
-@settings(max_examples=1000)
 def test_safe_repr_never_leaves_escapes_in(x):
     if isinstance(x, bytes):
         assume(b"\\u" not in x and b"\\x" not in x)

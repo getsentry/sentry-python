@@ -25,46 +25,48 @@ class FlaskSentry(object):
             raise RuntimeError("Sentry registration is already registered")
         app.extensions[__name__] = True
 
-        appcontext_pushed.connect(_push_appctx, sender=app)
-        app.teardown_appcontext(_pop_appctx)
-        got_request_exception.connect(_capture_exception, sender=app)
-        app.before_request(_before_request)
+        appcontext_pushed.connect(self._push_appctx, sender=app)
+        app.teardown_appcontext(self._pop_appctx)
+        got_request_exception.connect(self._capture_exception, sender=app)
+        app.before_request(self._before_request)
 
+    def _push_appctx(self, *args, **kwargs):
+        get_current_hub().push_scope()
+        _app_ctx_stack.top._sentry_app_scope_pushed = True
 
-def _push_appctx(*args, **kwargs):
-    get_current_hub().push_scope()
-    _app_ctx_stack.top._sentry_app_scope_pushed = True
+    def _pop_appctx(self, exception):
+        get_current_hub().pop_scope_unsafe()
 
+    def _capture_exception(self, sender, exception, **kwargs):
+        capture_exception(exception)
 
-def _pop_appctx(exception):
-    get_current_hub().pop_scope_unsafe()
+    def _before_request(self, *args, **kwargs):
+        try:
+            assert getattr(
+                _app_ctx_stack.top, "_sentry_app_scope_pushed", None
+            ), "scope push failed"
 
+            with configure_scope() as scope:
+                if request.url_rule:
+                    scope.transaction = request.url_rule.endpoint
 
-def _capture_exception(sender, exception, **kwargs):
-    capture_exception(exception)
+                get_current_hub().add_event_processor(self.make_event_processor)
+        except Exception:
+            get_current_hub().capture_internal_exception()
 
-
-def _before_request(*args, **kwargs):
-    try:
-        assert getattr(
-            _app_ctx_stack.top, "_sentry_app_scope_pushed", None
-        ), "scope push failed"
-
-        with configure_scope() as scope:
-            if request.url_rule:
-                scope.transaction = request.url_rule.endpoint
-
+    def make_event_processor(self):
+        def processor(event):
             try:
-                FlaskRequestExtractor(request).extract_into_scope(scope)
+                FlaskRequestExtractor(request).extract_into_event(event)
             except Exception:
                 get_current_hub().capture_internal_exception()
 
             try:
-                _set_user_info(scope)
+                _set_user_info(event)
             except Exception:
                 get_current_hub().capture_internal_exception()
-    except Exception:
-        get_current_hub().capture_internal_exception()
+
+        return processor
 
 
 class FlaskRequestExtractor(RequestExtractor):
@@ -96,7 +98,10 @@ class FlaskRequestExtractor(RequestExtractor):
         return file.content_length
 
 
-def _set_user_info(scope):
+def _set_user_info(event):
+    if "user" in event:
+        return
+
     try:
         ip_address = request.access_route[0]
     except IndexError:
@@ -114,4 +119,4 @@ def _set_user_info(scope):
         # - no user is logged in
         pass
 
-    scope.user = user_info
+    event["user"] = user_info
