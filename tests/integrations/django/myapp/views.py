@@ -22,5 +22,5 @@ def get_dsn(request):
 
 
 def message(request):
-    sentry_sdk.capture_message('hi')
-    return HttpResponse('ok')
+    sentry_sdk.capture_message("hi")
+    return HttpResponse("ok")

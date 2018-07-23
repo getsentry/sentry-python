@@ -229,12 +229,12 @@ def test_flask_large_bytes_request(capture_events, app):
 
 
 def test_flask_files_and_form(capture_events, app):
-    data = {'foo': 'a' * 2000, 'file': (BytesIO(b'hello'), 'hello.txt')}
+    data = {"foo": "a" * 2000, "file": (BytesIO(b"hello"), "hello.txt")}
 
     @app.route("/", methods=["POST"])
     def index():
-        assert list(request.form) == ['foo']
-        assert list(request.files) == ['file']
+        assert list(request.form) == ["foo"]
+        assert list(request.files) == ["file"]
         assert not request.json
         capture_message("hi")
         return "ok"
@@ -250,6 +250,6 @@ def test_flask_files_and_form(capture_events, app):
     assert len(event["request"]["data"]["foo"]) == 512
 
     assert event[""]["request"]["data"]["file"] == {
-        '': {'len': 0, 'rem': [['!filecontent', 'x', 0, 0]]}
+        "": {"len": 0, "rem": [["!filecontent", "x", 0, 0]]}
     }
     assert not event["request"]["data"]["file"]

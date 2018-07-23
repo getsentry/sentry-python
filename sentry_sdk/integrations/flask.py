@@ -1,9 +1,7 @@
 from __future__ import absolute_import
 
 from sentry_sdk import capture_exception, configure_scope, get_current_hub
-from sentry_sdk.stripping import AnnotatedValue
-
-from ._wsgi import RequestExtractor, get_environ
+from ._wsgi import RequestExtractor
 
 try:
     from flask_login import current_user
@@ -72,11 +70,7 @@ def _before_request(*args, **kwargs):
 class FlaskRequestExtractor(RequestExtractor):
     @property
     def url(self):
-        return "%s://%s%s" % (
-            self.request.scheme,
-            self.request.host,
-            self.request.path
-        )
+        return "%s://%s%s" % (self.request.scheme, self.request.host, self.request.path)
 
     @property
     def env(self):

@@ -53,7 +53,7 @@ class DjangoRequestExtractor(RequestExtractor):
         return "%s://%s%s" % (
             self.request.scheme,
             self.request.get_host(),
-            self.request.path
+            self.request.path,
         )
 
     @property

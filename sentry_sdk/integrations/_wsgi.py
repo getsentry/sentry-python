@@ -3,6 +3,7 @@ import base64
 
 from sentry_sdk.stripping import AnnotatedValue
 
+
 def get_environ(environ):
     """
     Returns our whitelisted environment variables.
@@ -23,11 +24,13 @@ def get_headers(environ):
     """
     for key, value in environ.items():
         key = str(key)
-        if key.startswith('HTTP_') and key not in \
-           ('HTTP_CONTENT_TYPE', 'HTTP_CONTENT_LENGTH'):
-            yield key[5:].replace('_', '-').title(), value
-        elif key in ('CONTENT_TYPE', 'CONTENT_LENGTH'):
-            yield key.replace('_', '-').title(), value
+        if key.startswith("HTTP_") and key not in (
+            "HTTP_CONTENT_TYPE",
+            "HTTP_CONTENT_LENGTH",
+        ):
+            yield key[5:].replace("_", "-").title(), value
+        elif key in ("CONTENT_TYPE", "CONTENT_LENGTH"):
+            yield key.replace("_", "-").title(), value
 
 
 class RequestExtractor(object):
@@ -38,7 +41,7 @@ class RequestExtractor(object):
         # if the code below fails halfway through we at least have some data
         scope.request = request_info = {}
 
-        request_info['url'] = self.url
+        request_info["url"] = self.url
         request_info["query_string"] = self.query_string
         request_info["method"] = self.method
         request_info["headers"] = dict(self.headers)
@@ -50,10 +53,7 @@ class RequestExtractor(object):
             for k, v in self.files.items():
                 data[k] = AnnotatedValue(
                     "",
-                    {
-                        "len": self.size_of_file(v),
-                        "rem": [["!filecontent", "x", 0, 0]]
-                    }
+                    {"len": self.size_of_file(v), "rem": [["!filecontent", "x", 0, 0]]},
                 )
 
             if self.files or self.form_is_multipart:
@@ -89,11 +89,11 @@ class RequestExtractor(object):
 
     @property
     def query_string(self):
-        return self.env.get('QUERY_STRING')
+        return self.env.get("QUERY_STRING")
 
     @property
     def method(self):
-        return self.env.get('REQUEST_METHOD')
+        return self.env.get("REQUEST_METHOD")
 
     @property
     def headers(self):
@@ -117,15 +117,15 @@ class RequestExtractor(object):
 
     @property
     def form_is_multipart(self):
-        return self.env.get('CONTENT_TYPE') \
-            .startswith("multipart/form-data")
+        return self.env.get("CONTENT_TYPE").startswith("multipart/form-data")
 
     @property
     def is_json(self):
-        mt = (self.env.get('CONTENT_TYPE') or '').split(';', 1)[0]
+        mt = (self.env.get("CONTENT_TYPE") or "").split(";", 1)[0]
         return (
-            mt == 'application/json'
-            or (mt.startswith('application/')) and mt.endswith('+json')
+            mt == "application/json"
+            or (mt.startswith("application/"))
+            and mt.endswith("+json")
         )
 
     @property

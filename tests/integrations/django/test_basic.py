@@ -59,19 +59,19 @@ def test_get_dsn(client):
 
 
 def test_request_captured(client, capture_events):
-    response = client.get(reverse('message'))
-    assert response.content == b'ok'
+    response = client.get(reverse("message"))
+    assert response.content == b"ok"
 
     event, = capture_events
-    assert event['request'] == {
-        'cookies': {},
-        'env': {
-            'REMOTE_ADDR': '127.0.0.1',
-            'SERVER_NAME': 'testserver',
-            'SERVER_PORT': '80'
+    assert event["request"] == {
+        "cookies": {},
+        "env": {
+            "REMOTE_ADDR": "127.0.0.1",
+            "SERVER_NAME": "testserver",
+            "SERVER_PORT": "80",
         },
-        'headers': {'Cookie': ''},
-        'method': 'GET',
-        'query_string': '',
-        'url': 'http://testserver/message'
+        "headers": {"Cookie": ""},
+        "method": "GET",
+        "query_string": "",
+        "url": "http://testserver/message",
     }
