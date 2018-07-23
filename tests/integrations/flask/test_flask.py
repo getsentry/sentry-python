@@ -39,7 +39,7 @@ def test_has_context(app):
     def index():
         with configure_scope() as scope:
             assert scope._data["transaction"] == "index"
-            assert scope._data["request"]["data"] == ""
+            assert "data" not in scope._data["request"]
             assert scope._data["request"]["url"] == "http://localhost/"
 
         return "ok"
