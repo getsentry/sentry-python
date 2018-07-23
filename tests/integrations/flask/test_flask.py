@@ -9,7 +9,7 @@ from flask import Flask, request
 
 from flask_login import LoginManager, login_user
 
-from sentry_sdk import configure_scope, capture_message
+from sentry_sdk import capture_message
 import sentry_sdk.integrations.flask as flask_sentry
 
 sentry = flask_sentry.FlaskSentry()
@@ -40,8 +40,8 @@ def test_has_context(app, capture_events):
     assert response.status_code == 200
 
     event, = capture_events
-    assert event["transaction"] == 'hi'
-    assert 'data' not in event["request"]
+    assert event["transaction"] == "hi"
+    assert "data" not in event["request"]
     assert event["request"]["url"] == "http://localhost/message"
 
 

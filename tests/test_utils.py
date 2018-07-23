@@ -1,4 +1,4 @@
-from hypothesis import given, assume, settings
+from hypothesis import given, assume
 import hypothesis.strategies as st
 
 from sentry_sdk.utils import safe_repr

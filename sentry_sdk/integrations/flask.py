@@ -65,6 +65,7 @@ class FlaskSentry(object):
                 _set_user_info(event)
             except Exception:
                 get_current_hub().capture_internal_exception()
+
         return processor
 
 
@@ -98,7 +99,7 @@ class FlaskRequestExtractor(RequestExtractor):
 
 
 def _set_user_info(event):
-    if 'user' in event:
+    if "user" in event:
         return
 
     try:
@@ -118,4 +119,4 @@ def _set_user_info(event):
         # - no user is logged in
         pass
 
-    event['user'] = user_info
+    event["user"] = user_info

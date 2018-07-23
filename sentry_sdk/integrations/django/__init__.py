@@ -34,8 +34,9 @@ class SentryMiddleware(MiddlewareMixin):
         try:
             get_current_hub().push_scope()
 
-            get_current_hub() \
-                .add_event_processor(lambda: self.make_event_processor(request))
+            get_current_hub().add_event_processor(
+                lambda: self.make_event_processor(request)
+            )
 
             with configure_scope() as scope:
                 scope.transaction = _get_transaction_from_request(request)
@@ -50,6 +51,7 @@ class SentryMiddleware(MiddlewareMixin):
                 get_current_hub().capture_internal_exception()
 
             # TODO: user info
+
         return processor
 
 
