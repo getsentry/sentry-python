@@ -9,6 +9,11 @@ python:
   - "3.6"
   - "3.7-dev"
 
+matrix:
+  include:
+    - python: "3.6"
+      script: tox -e linters
+
 install:
   - pip install tox
 
