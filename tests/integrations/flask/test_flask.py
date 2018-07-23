@@ -212,7 +212,7 @@ def test_flask_large_text_request(input_char, capture_events, app):
     }
     assert len(event['request']['data']) == 512
     assert event['request']['data_info'] == {
-        'ct': 'unicode', 'repr': 'text'
+        'ct': 'plain', 'repr': 'other'
     }
 
 
