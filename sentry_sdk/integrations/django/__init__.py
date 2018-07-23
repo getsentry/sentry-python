@@ -34,17 +34,23 @@ class SentryMiddleware(MiddlewareMixin):
         try:
             get_current_hub().push_scope()
 
+            get_current_hub() \
+                .add_event_processor(lambda: self.make_event_processor(request))
+
             with configure_scope() as scope:
                 scope.transaction = _get_transaction_from_request(request)
-                try:
-                    DjangoRequestExtractor(request).extract_into_scope(scope)
-                except Exception:
-                    get_current_hub().capture_internal_exception()
-
-                # TODO: user info
-
         except Exception:
             get_current_hub().capture_internal_exception()
+
+    def make_event_processor(self, request):
+        def processor(event):
+            try:
+                DjangoRequestExtractor(request).extract_into_event(event)
+            except Exception:
+                get_current_hub().capture_internal_exception()
+
+            # TODO: user info
+        return processor
 
 
 class DjangoRequestExtractor(RequestExtractor):

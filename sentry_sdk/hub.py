@@ -174,6 +174,7 @@ class Hub(with_metaclass(HubMeta)):
     def pop_scope_unsafe(self):
         """Pops a scope layer from the stack. Try to use the context manager
         `push_scope()` instead."""
+        self._pending_processors = []
         self._stack.pop()
 
     @contextmanager

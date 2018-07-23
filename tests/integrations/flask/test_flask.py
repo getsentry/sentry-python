@@ -34,19 +34,15 @@ def app():
     return app
 
 
-def test_has_context(app):
-    @app.route("/")
-    def index():
-        with configure_scope() as scope:
-            assert scope._data["transaction"] == "index"
-            assert "data" not in scope._data["request"]
-            assert scope._data["request"]["url"] == "http://localhost/"
-
-        return "ok"
-
+def test_has_context(app, capture_events):
     client = app.test_client()
-    response = client.get("/")
+    response = client.get("/message")
     assert response.status_code == 200
+
+    event, = capture_events
+    assert event["transaction"] == 'hi'
+    assert 'data' not in event["request"]
+    assert event["request"]["url"] == "http://localhost/message"
 
 
 @pytest.mark.parametrize("debug", (True, False))
