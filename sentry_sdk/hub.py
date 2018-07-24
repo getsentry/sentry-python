@@ -47,7 +47,7 @@ class _ScopeManager(object):
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
-        assert self._hub._stack.pop() == self._layer, "popped wrong scope"
+        assert self._hub.pop_scope_unsafe() == self._layer, "popped wrong scope"
 
 
 class Hub(with_metaclass(HubMeta)):
@@ -175,7 +175,7 @@ class Hub(with_metaclass(HubMeta)):
         """Pops a scope layer from the stack. Try to use the context manager
         `push_scope()` instead."""
         self._pending_processors = []
-        self._stack.pop()
+        return self._stack.pop()
 
     @contextmanager
     def configure_scope(self):
