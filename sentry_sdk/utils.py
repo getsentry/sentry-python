@@ -240,10 +240,10 @@ def safe_repr(value):
 def object_to_json(obj):
     def _walk(obj, depth):
         if depth < 4:
-            if isinstance(obj, Sequence):
+            if isinstance(obj, Sequence) and not isinstance(obj, (bytes, text_type)):
                 return [_walk(x, depth + 1) for x in obj]
             if isinstance(obj, Mapping):
-                return {safe_repr(k): _walk(v, depth + 1) for k, v in obj.items()}
+                return {safe_str(k): _walk(v, depth + 1) for k, v in obj.items()}
         return safe_repr(obj)
 
     return _walk(obj, 0)
@@ -315,12 +315,63 @@ def exceptions_from_error_tuple(exc_type, exc_value, tb, with_locals=True):
     return rv
 
 
-def create_event():
-    return {
-        "event_id": uuid.uuid4().hex,
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "level": "error",
-    }
+class Event(Mapping):
+    __slots__ = ("_data", "_exc_value")
+
+    def __init__(self):
+        self._data = {
+            "event_id": uuid.uuid4().hex,
+            "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "level": "error",
+        }
+        self._exc_value = None
+
+    def get_json(self):
+        return self._data
+
+    def set_exception(self, exc_type, exc_value, tb, with_locals):
+        self["exception"] = {
+            "values": exceptions_from_error_tuple(exc_type, exc_value, tb, with_locals)
+        }
+        self._exc_value = exc_value
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+    def __contains__(self, key):
+        return key in self._data
+
+    def get(self, *a, **kw):
+        return self._data.get(*a, **kw)
+
+    def setdefault(self, *a, **kw):
+        return self._data.setdefault(*a, **kw)
+
+    def __setitem__(self, key, value):
+        self._data[key] = value
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __len__(self):
+        return len(self._data)
+
+
+class DefaultEventProcessor(object):
+    def __init__(self):
+        self._most_recent_exception = None
+
+    def __call__(self, event):
+        if event._exc_value is None:
+            return
+        if self._most_recent_exception is event._exc_value:
+            raise SkipEvent()
+        self._most_recent_exception = event._exc_value
+
+
+class SkipEvent(Exception):
+    """Risen from an event processor to indicate that the event should be
+    ignored and not be reported."""
 
 
 def to_string(value):

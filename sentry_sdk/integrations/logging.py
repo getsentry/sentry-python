@@ -5,12 +5,7 @@ import sys
 import logging
 
 from sentry_sdk import get_current_hub, capture_event, add_breadcrumb
-from sentry_sdk.utils import (
-    to_string,
-    create_event,
-    exceptions_from_error_tuple,
-    skip_internal_frames,
-)
+from sentry_sdk.utils import to_string, Event, skip_internal_frames
 
 
 class SentryHandler(logging.Handler, object):
@@ -35,19 +30,19 @@ class SentryHandler(logging.Handler, object):
     def _emit(self, record):
         add_breadcrumb(self._breadcrumb_from_record(record))
 
-        if not self._should_create_event(record):
+        if not self._should_Event(record):
             return
 
         if not self.can_record(record):
             print(to_string(record.message), file=sys.stderr)
             return
 
-        event = create_event()
+        event = Event()
 
         # exc_info might be None or (None, None, None)
         if record.exc_info and all(record.exc_info):
             exc_type, exc_value, tb = record.exc_info
-            event["exception"] = exceptions_from_error_tuple(
+            event.set_exception(
                 exc_type,
                 exc_value,
                 skip_internal_frames(tb),
@@ -64,7 +59,7 @@ class SentryHandler(logging.Handler, object):
     def _logging_to_event_level(self, levelname):
         return {"critical": "fatal"}.get(levelname.lower(), levelname.lower())
 
-    def _should_create_event(self, record):
+    def _should_Event(self, record):
         # TODO: make configurable
         if record.levelno in (logging.ERROR, logging.CRITICAL):
             return True

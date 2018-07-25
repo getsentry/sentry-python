@@ -1,7 +1,7 @@
 import os
 import uuid
 
-from .utils import Dsn
+from .utils import Dsn, SkipEvent
 from .transport import Transport
 from .consts import DEFAULT_OPTIONS, SDK_INFO
 from .stripping import strip_event, flatten_metadata
@@ -65,7 +65,10 @@ class Client(object):
         """Captures an event."""
         if self._transport is None:
             return
-        event = self._prepare_event(event, scope)
+        try:
+            event = self._prepare_event(event, scope)
+        except SkipEvent:
+            return
         self._transport.capture_event(event)
 
     def drain_events(self, timeout=None):

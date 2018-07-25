@@ -13,12 +13,12 @@ from flask.signals import appcontext_pushed, got_request_exception
 
 
 class FlaskSentry(object):
-    def __init__(self, app=None):
+    def __init__(self, app=None, **options):
         self.app = app
         if app is not None:
-            self.init_app(app)
+            self.init_app(app, **options)
 
-    def init_app(self, app):
+    def init_app(self, app, setup_logger=True):
         if not hasattr(app, "extensions"):
             app.extensions = {}
         elif app.extensions.get(__name__, None):
@@ -29,6 +29,11 @@ class FlaskSentry(object):
         app.teardown_appcontext(self._pop_appctx)
         got_request_exception.connect(self._capture_exception, sender=app)
         app.before_request(self._before_request)
+
+        if setup_logger:
+            from .logging import HANDLER
+
+            app.logger.addHandler(HANDLER)
 
     def _push_appctx(self, *args, **kwargs):
         get_current_hub().push_scope()

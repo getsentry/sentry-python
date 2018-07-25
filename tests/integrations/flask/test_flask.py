@@ -1,5 +1,6 @@
 import json
 import pytest
+import logging
 
 from io import BytesIO
 
@@ -21,6 +22,7 @@ def app():
     app = Flask(__name__)
     app.config["TESTING"] = True
     app.secret_key = "haha"
+    app.logger.setLevel(logging.DEBUG)
 
     login_manager.init_app(app)
 
@@ -249,3 +251,19 @@ def test_flask_files_and_form(capture_events, app):
         "": {"len": 0, "rem": [["!filecontent", "x", 0, 0]]}
     }
     assert not event["request"]["data"]["file"]
+
+
+def test_errors_not_reported_twice(capture_events, app):
+    @app.route("/")
+    def index():
+        try:
+            1 / 0
+        except Exception as e:
+            app.logger.exception(e)
+            raise e
+
+    client = app.test_client()
+    with pytest.raises(ZeroDivisionError):
+        client.get("/")
+
+    assert len(capture_events) == 1

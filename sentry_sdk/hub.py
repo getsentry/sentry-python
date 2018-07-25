@@ -4,12 +4,7 @@ from contextlib import contextmanager
 
 from ._compat import with_metaclass
 from .scope import Scope
-from .utils import (
-    exceptions_from_error_tuple,
-    create_event,
-    skip_internal_frames,
-    ContextVar,
-)
+from .utils import Event, skip_internal_frames, ContextVar, DefaultEventProcessor
 
 
 _local = ContextVar("sentry_current_hub")
@@ -99,7 +94,7 @@ class Hub(with_metaclass(HubMeta)):
             return
         if level is None:
             level = "info"
-        event = create_event()
+        event = Event()
         event["message"] = message
         if level is not None:
             event["level"] = level
@@ -129,13 +124,9 @@ class Hub(with_metaclass(HubMeta)):
         if tb is not None:
             tb = skip_internal_frames(tb)
 
-        event = create_event()
+        event = Event()
         try:
-            event["exception"] = {
-                "values": exceptions_from_error_tuple(
-                    exc_type, exc_value, tb, client.options["with_locals"]
-                )
-            }
+            event.set_exception(exc_type, exc_value, tb, client.options["with_locals"])
             return self.capture_event(event)
         except Exception:
             self.capture_internal_exception()
@@ -159,8 +150,7 @@ class Hub(with_metaclass(HubMeta)):
 
     def add_event_processor(self, factory):
         """Registers a new event processor with the top scope."""
-        if self._stack[1][0] is not None:
-            self._pending_processors.append(factory)
+        self._pending_processors.append(factory)
 
     def push_scope(self):
         """Pushes a new layer on the scope stack. Returns a context manager
@@ -191,3 +181,4 @@ class Hub(with_metaclass(HubMeta)):
 
 
 GLOBAL_HUB = Hub()
+GLOBAL_HUB.add_event_processor(DefaultEventProcessor)

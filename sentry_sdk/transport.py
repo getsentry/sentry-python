@@ -30,7 +30,7 @@ _retry = urllib3.util.Retry()
 
 
 def send_event(event, auth):
-    body = zlib.compress(json.dumps(event).encode("utf-8"))
+    body = zlib.compress(json.dumps(event.get_json()).encode("utf-8"))
     response = _pool.request(
         "POST",
         auth.store_api_url,
