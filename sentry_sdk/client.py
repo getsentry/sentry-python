@@ -30,6 +30,11 @@ class Client(object):
             self._transport = Transport(dsn)
             self._transport.start()
 
+        for integration in options.get("integrations", None) or ():
+            assert integration.identifier, "identifier of integration must be set"
+            assert isinstance(integration.identifier, str), "identifier of integration must be a string"
+            integration.install(self)
+
     @property
     def dsn(self):
         """The DSN that created this event."""

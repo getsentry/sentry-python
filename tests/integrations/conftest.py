@@ -5,15 +5,6 @@ from sentry_sdk.consts import DEFAULT_OPTIONS
 from sentry_sdk.client import Client, Transport
 
 
-class TestClient(Client):
-    def __init__(self):
-        pass
-
-    dsn = "LOL"
-    options = dict(DEFAULT_OPTIONS)
-    _transport = None
-
-
 class TestTransport(Transport):
     def __init__(self):
         pass
@@ -24,11 +15,20 @@ class TestTransport(Transport):
     def close(self):
         pass
 
+    def capture_event(self, event):
+        pass
 
-test_client = TestClient()
+    dsn = 'LOL'
 
-sentry_sdk.init()
-sentry_sdk.get_current_hub().bind_client(test_client)
+
+@pytest.fixture(autouse=True)
+def test_client():
+    client = sentry_sdk.get_current_hub().client
+    if not client:
+        client = Client()
+        sentry_sdk.get_current_hub().bind_client(client)
+    client._transport = TestTransport()
+    return client
 
 
 @pytest.fixture(autouse=True)
@@ -57,7 +57,7 @@ def capture_exceptions(monkeypatch):
 
 
 @pytest.fixture
-def capture_events(monkeypatch):
+def capture_events(test_client, monkeypatch):
     events = []
     monkeypatch.setattr(test_client, "_transport", TestTransport())
     monkeypatch.setattr(test_client._transport, "capture_event", events.append)

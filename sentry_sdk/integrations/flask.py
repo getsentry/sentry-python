@@ -1,7 +1,8 @@
 from __future__ import absolute_import
 
-from sentry_sdk import capture_exception, configure_scope, get_current_hub
+from sentry_sdk import capture_exception, configure_scope, get_current_hub, init
 from ._wsgi import RequestExtractor
+from . import Integration
 
 try:
     from flask_login import current_user
@@ -13,7 +14,7 @@ from flask.signals import appcontext_pushed, got_request_exception
 
 
 class FlaskSentry(object):
-    def __init__(self, app=None, **options):
+    def __init__(self, app=None):
         self.app = app
         if app is not None:
             self.init_app(app, **options)
@@ -22,18 +23,33 @@ class FlaskSentry(object):
         if not hasattr(app, "extensions"):
             app.extensions = {}
         elif app.extensions.get(__name__, None):
-            raise RuntimeError("Sentry registration is already registered")
+            raise RuntimeError("Sentry extension is already registered")
         app.extensions[__name__] = True
 
-        appcontext_pushed.connect(self._push_appctx, sender=app)
-        app.teardown_appcontext(self._pop_appctx)
-        got_request_exception.connect(self._capture_exception, sender=app)
-        app.before_request(self._before_request)
+        client_options, integration_options = \
+            FlaskIntegration.parse_environment(app.config)
+        integration = FlaskIntegration(app, **integration_options)
+        client_options.setdefault('integrations', []).append(integration)
+        init(**client_options)
 
-        if setup_logger:
+
+class FlaskIntegration(Integration):
+    identifier = "flask"
+
+    def __init__(self, app, setup_logger=True):
+        self._app = app
+        self._setup_logger = setup_logger
+
+    def install(self, client=None):
+        appcontext_pushed.connect(self._push_appctx, sender=self._app)
+        self._app.teardown_appcontext(self._pop_appctx)
+        got_request_exception.connect(self._capture_exception,
+                                      sender=self._app)
+        self._app.before_request(self._before_request)
+
+        if self._setup_logger:
             from .logging import HANDLER
-
-            app.logger.addHandler(HANDLER)
+            self._app.logger.addHandler(HANDLER)
 
     def _push_appctx(self, *args, **kwargs):
         get_current_hub().push_scope()

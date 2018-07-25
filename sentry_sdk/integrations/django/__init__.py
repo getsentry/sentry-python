@@ -10,8 +10,9 @@ try:
 except ImportError:
     from django.core.urlresolvers import resolve
 
-from sentry_sdk import get_current_hub, configure_scope, capture_exception
+from sentry_sdk import get_current_hub, configure_scope, capture_exception, init
 from .._wsgi import RequestExtractor
+from .. import Integration
 
 
 try:
@@ -108,7 +109,16 @@ def _install():
     with _installer_lock:
         if _installed:
             return
-        _install_impl()
+
+        client_options, integration_options = \
+            DjangoIntegration.parse_environment(dict(
+                (key, getattr(settings, key)) for key in dir(settings)
+            ))
+
+        client_options.setdefault("integrations", []) \
+            .append(DjangoIntegration(**integration_options))
+
+        init(**client_options)
         _installed = True
 
 
@@ -120,15 +130,22 @@ def _install_impl():
         middleware_attr = "MIDDLEWARE_CLASSES"
 
     # make sure to get an empty tuple when attr is None
-    middleware = getattr(settings, middleware_attr, ()) or ()
+    middleware = list(getattr(settings, middleware_attr, ()) or ())
     conflicts = set(CONFLICTING_MIDDLEWARE).intersection(set(middleware))
     if conflicts:
         raise RuntimeError("Other sentry-middleware already registered: %s" % conflicts)
 
-    setattr(settings, middleware_attr, [MIDDLEWARE_NAME] + list(middleware))
+    setattr(settings, middleware_attr, [MIDDLEWARE_NAME] + middleware)
 
     signals.request_finished.connect(_request_finished)
     signals.got_request_exception.connect(_got_request_exception)
+
+
+class DjangoIntegration(Integration):
+    identifier  = 'django'
+
+    def install(self, client):
+        _install_impl()
 
 
 try:
