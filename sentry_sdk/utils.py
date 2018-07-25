@@ -354,14 +354,14 @@ class Event(Mapping):
 
 class DefaultEventProcessor(object):
     def __init__(self):
-        self._most_recent_exception = None
+        self._most_recent_exception = ContextVar("most-recent-exception")
 
     def __call__(self, event):
         if event._exc_value is None:
             return
-        if self._most_recent_exception is event._exc_value:
+        if self._most_recent_exception.get(None) is event._exc_value:
             raise SkipEvent()
-        self._most_recent_exception = event._exc_value
+        self._most_recent_exception.set(event._exc_value)
 
 
 class SkipEvent(Exception):
