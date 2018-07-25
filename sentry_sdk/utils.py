@@ -169,10 +169,13 @@ def get_lines_from_file(filename, lineno, loader=None, module=None):
     upper_bound = min(lineno + 1 + context_lines, len(source))
 
     try:
-        pre_context = [slim_string(line.strip("\r\n")) for line in source[lower_bound:lineno]]
+        pre_context = [
+            slim_string(line.strip("\r\n")) for line in source[lower_bound:lineno]
+        ]
         context_line = slim_string(source[lineno].strip("\r\n"))
         post_context = [
-            slim_string(line.strip("\r\n")) for line in source[(lineno + 1) : upper_bound]
+            slim_string(line.strip("\r\n"))
+            for line in source[(lineno + 1) : upper_bound]
         ]
         return pre_context, context_line, post_context
     except IndexError:

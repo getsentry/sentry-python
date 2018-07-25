@@ -32,7 +32,9 @@ class Client(object):
 
         for integration in options.get("integrations", None) or ():
             assert integration.identifier, "identifier of integration must be set"
-            assert isinstance(integration.identifier, str), "identifier of integration must be a string"
+            assert isinstance(
+                integration.identifier, str
+            ), "identifier of integration must be a string"
             integration.install(self)
 
     @property

@@ -1,7 +1,6 @@
 import sys
 import pytest
 import sentry_sdk
-from sentry_sdk.consts import DEFAULT_OPTIONS
 from sentry_sdk.client import Client, Transport
 
 
@@ -18,7 +17,7 @@ class TestTransport(Transport):
     def capture_event(self, event):
         pass
 
-    dsn = 'LOL'
+    dsn = "LOL"
 
 
 @pytest.fixture(autouse=True)

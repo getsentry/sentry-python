@@ -110,13 +110,13 @@ def _install():
         if _installed:
             return
 
-        client_options, integration_options = \
-            DjangoIntegration.parse_environment(dict(
-                (key, getattr(settings, key)) for key in dir(settings)
-            ))
+        client_options, integration_options = DjangoIntegration.parse_environment(
+            dict((key, getattr(settings, key)) for key in dir(settings))
+        )
 
-        client_options.setdefault("integrations", []) \
-            .append(DjangoIntegration(**integration_options))
+        client_options.setdefault("integrations", []).append(
+            DjangoIntegration(**integration_options)
+        )
 
         init(**client_options)
         _installed = True
@@ -142,7 +142,7 @@ def _install_impl():
 
 
 class DjangoIntegration(Integration):
-    identifier  = 'django'
+    identifier = "django"
 
     def install(self, client):
         _install_impl()

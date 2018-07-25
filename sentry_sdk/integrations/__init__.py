@@ -17,10 +17,10 @@ class Integration(object):
         for key, value in environ.items():
             if not key.startswith("SENTRY_"):
                 continue
-            key = key[len("SENTRY_"):].replace("-","_").lower()
+            key = key[len("SENTRY_") :].replace("-", "_").lower()
             identifier_prefix = "%s_" % cls.identifier
             if key.startswith(identifier_prefix):
-                integration_options[key[len(identifier_prefix):]] = value
+                integration_options[key[len(identifier_prefix) :]] = value
             else:
                 client_options[key] = value
 

@@ -17,19 +17,20 @@ class FlaskSentry(object):
     def __init__(self, app=None):
         self.app = app
         if app is not None:
-            self.init_app(app, **options)
+            self.init_app(app)
 
-    def init_app(self, app, setup_logger=True):
+    def init_app(self, app):
         if not hasattr(app, "extensions"):
             app.extensions = {}
         elif app.extensions.get(__name__, None):
             raise RuntimeError("Sentry extension is already registered")
         app.extensions[__name__] = True
 
-        client_options, integration_options = \
-            FlaskIntegration.parse_environment(app.config)
+        client_options, integration_options = FlaskIntegration.parse_environment(
+            app.config
+        )
         integration = FlaskIntegration(app, **integration_options)
-        client_options.setdefault('integrations', []).append(integration)
+        client_options.setdefault("integrations", []).append(integration)
         init(**client_options)
 
 
@@ -43,12 +44,12 @@ class FlaskIntegration(Integration):
     def install(self, client=None):
         appcontext_pushed.connect(self._push_appctx, sender=self._app)
         self._app.teardown_appcontext(self._pop_appctx)
-        got_request_exception.connect(self._capture_exception,
-                                      sender=self._app)
+        got_request_exception.connect(self._capture_exception, sender=self._app)
         self._app.before_request(self._before_request)
 
         if self._setup_logger:
             from .logging import HANDLER
+
             self._app.logger.addHandler(HANDLER)
 
     def _push_appctx(self, *args, **kwargs):
