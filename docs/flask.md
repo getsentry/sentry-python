@@ -20,7 +20,7 @@ Easiest way to get started:
 
         # logging
         app.logger.debug("hi")  # this will be a breadcrumb
-        app.logger.debug("oh no")  # this will be an event
+        app.logger.error("oh no")  # this will be an event
 
         # thrown errors are captured
         1 / 0  
