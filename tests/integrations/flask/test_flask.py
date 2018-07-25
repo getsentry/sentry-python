@@ -267,3 +267,16 @@ def test_errors_not_reported_twice(capture_events, app):
         client.get("/")
 
     assert len(capture_events) == 1
+
+
+def test_logging(capture_events, app):
+    @app.route("/")
+    def index():
+        app.logger.error("hi")
+        return "ok"
+
+    client = app.test_client()
+    client.get("/")
+
+    event, = capture_events
+    assert event["level"] == "error"
