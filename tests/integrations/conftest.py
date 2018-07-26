@@ -1,8 +1,8 @@
 import sys
 import pytest
 import sentry_sdk
-from sentry_sdk.client import Client, Transport
 
+from sentry_sdk.client import Transport
 
 class TestTransport(Transport):
     def __init__(self):
@@ -21,13 +21,10 @@ class TestTransport(Transport):
 
 
 @pytest.fixture(autouse=True)
-def test_client():
-    client = sentry_sdk.get_current_hub().client
-    if not client:
-        client = Client()
-        sentry_sdk.get_current_hub().bind_client(client)
-    client._transport = TestTransport()
-    return client
+def set_test_transport(monkeypatch):
+    test_client = sentry_sdk.Hub.current.client
+    if test_client:
+        monkeypatch.setattr(test_client, "_transport", TestTransport())
 
 
 @pytest.fixture(autouse=True)
@@ -56,8 +53,8 @@ def capture_exceptions(monkeypatch):
 
 
 @pytest.fixture
-def capture_events(test_client, monkeypatch):
+def capture_events(monkeypatch):
     events = []
-    monkeypatch.setattr(test_client, "_transport", TestTransport())
+    test_client = sentry_sdk.Hub.current.client
     monkeypatch.setattr(test_client._transport, "capture_event", events.append)
     return events

@@ -10,10 +10,11 @@ from flask import Flask, request
 
 from flask_login import LoginManager, login_user
 
-from sentry_sdk import capture_message
+from sentry_sdk import capture_message, Client, get_current_hub
+from sentry_sdk.integrations.logging import SentryHandler
 import sentry_sdk.integrations.flask as flask_sentry
 
-sentry = flask_sentry.FlaskSentry()
+get_current_hub().bind_client(Client(integrations=["flask"]))
 login_manager = LoginManager()
 
 
@@ -23,10 +24,11 @@ def app():
     app.config["TESTING"] = True
     app.secret_key = "haha"
     app.logger.setLevel(logging.DEBUG)
+    handler = SentryHandler()
+    handler.setLevel(logging.DEBUG)
+    app.logger.addHandler(handler)
 
     login_manager.init_app(app)
-
-    sentry.init_app(app)
 
     @app.route("/message")
     def hi():

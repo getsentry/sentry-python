@@ -1,27 +1,40 @@
-class Integration(object):
-    """
-    A interface with an install hook for integrations to patch themselves
-    into their environment. Integrations don't really *need* to use this hook
-    if the idiomatic control flow of some framework mandates otherwise.
-    """
+_locked = False
+_integrations = {}
 
-    identifier = None
 
-    def install(self, client):
-        pass
+def register_integration(identifier, integration=None):
+    def inner(integration):
+        if _locked:
+            raise ValueError("A client has already been initialized. "
+                             "Registration of integrations no longer possible")
+        if identifier in _integrations:
+            raise ValueError("Integration with that name already exists.")
+        _integrations[identifier] = integration
 
-    @classmethod
-    def parse_environment(cls, environ):
-        client_options = {}
-        integration_options = {}
-        for key, value in environ.items():
-            if not key.startswith("SENTRY_"):
-                continue
-            key = key[len("SENTRY_") :].replace("-", "_").lower()
-            identifier_prefix = "%s_" % cls.identifier
-            if key.startswith(identifier_prefix):
-                integration_options[key[len(identifier_prefix) :]] = value
-            else:
-                client_options[key] = value
+    if integration is not None:
+        return inner(integration)
+    return inner
 
-        return client_options, integration_options
+
+def get_integration(identifier):
+    global _locked
+    _locked = True
+    return _integrations[identifier]
+
+
+@register_integration('django')
+def _django_integration(*a, **kw):
+    from .django import install
+    return install(*a, **kw)
+
+
+@register_integration('flask')
+def _flask_integration(*a, **kw):
+    from .flask import install
+    return install(*a, **kw)
+
+
+@register_integration('celery')
+def _celery_integration(*a, **kw):
+    from .celery import install
+    return install(*a, **kw)
