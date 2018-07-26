@@ -26,6 +26,7 @@ def app():
     app.logger.setLevel(logging.DEBUG)
     handler = SentryHandler()
     handler.setLevel(logging.DEBUG)
+    app.logger.handlers = []
     app.logger.addHandler(handler)
 
     login_manager.init_app(app)
