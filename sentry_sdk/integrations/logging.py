@@ -64,6 +64,3 @@ class SentryHandler(logging.Handler, object):
         if record.levelno in (logging.ERROR, logging.CRITICAL):
             return True
         return False
-
-
-HANDLER = SentryHandler()

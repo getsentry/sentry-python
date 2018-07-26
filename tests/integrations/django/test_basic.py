@@ -5,7 +5,6 @@ django = pytest.importorskip("django")
 
 
 from django.test import Client
-from django.test.utils import setup_test_environment
 
 try:
     from django.urls import reverse
@@ -13,11 +12,6 @@ except ImportError:
     from django.core.urlresolvers import reverse
 
 from sentry_sdk import Hub
-
-
-@pytest.fixture
-def setup():
-    setup_test_environment()
 
 
 @pytest.fixture

@@ -1,14 +1,27 @@
 from __future__ import absolute_import
 
+from threading import Lock
+
 from celery.signals import task_failure, task_prerun, task_postrun
 
 from sentry_sdk import get_current_hub, configure_scope, capture_exception
 
 
-def install():
-    task_prerun.connect(_handle_task_prerun, weak=False)
-    task_postrun.connect(_handle_task_postrun, weak=False)
-    task_failure.connect(_process_failure_signal, weak=False)
+_installer_lock = Lock()
+_installed = False
+
+
+def install(client):
+    global _installed
+    with _installer_lock:
+        if _installed:
+            return
+
+        task_prerun.connect(_handle_task_prerun, weak=False)
+        task_postrun.connect(_handle_task_postrun, weak=False)
+        task_failure.connect(_process_failure_signal, weak=False)
+
+        _installed = True
 
 
 def _process_failure_signal(sender, task_id, einfo, **kw):
