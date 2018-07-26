@@ -45,7 +45,7 @@ def _celery_integration(*a, **kw):
     return install(*a, **kw)
 
 
-@register_integration('logging')
+@register_integration("logging")
 def _logging_integration(*a, **kw):
     from .logging import install
 

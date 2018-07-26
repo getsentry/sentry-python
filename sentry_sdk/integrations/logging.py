@@ -13,6 +13,7 @@ _installer_lock = Lock()
 _installed = False
 _master_handler = None
 
+
 def install(client):
     global _installed
     global _master_handler
@@ -21,7 +22,7 @@ def install(client):
             return
 
         _master_handler = SentryHandler()
-        _master_handler.setLevel(logging.INFO) # TODO: make configurable
+        _master_handler.setLevel(logging.INFO)  # TODO: make configurable
 
         old_callhandlers = logging.Logger.callHandlers
 

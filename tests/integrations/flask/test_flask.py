@@ -1,6 +1,5 @@
 import json
 import pytest
-import logging
 
 from io import BytesIO
 
@@ -11,7 +10,6 @@ from flask import Flask, request
 from flask_login import LoginManager, login_user
 
 from sentry_sdk import capture_message, Client, get_current_hub
-from sentry_sdk.integrations.logging import SentryHandler
 import sentry_sdk.integrations.flask as flask_sentry
 
 get_current_hub().bind_client(Client(integrations=["flask", "logging"]))
