@@ -14,7 +14,7 @@ from sentry_sdk import capture_message, Client, get_current_hub
 from sentry_sdk.integrations.logging import SentryHandler
 import sentry_sdk.integrations.flask as flask_sentry
 
-get_current_hub().bind_client(Client(integrations=["flask"]))
+get_current_hub().bind_client(Client(integrations=["flask", "logging"]))
 login_manager = LoginManager()
 
 
@@ -23,11 +23,6 @@ def app():
     app = Flask(__name__)
     app.config["TESTING"] = True
     app.secret_key = "haha"
-    app.logger.setLevel(logging.DEBUG)
-    handler = SentryHandler()
-    handler.setLevel(logging.DEBUG)
-    app.logger.handlers = []
-    app.logger.addHandler(handler)
 
     login_manager.init_app(app)
 
@@ -273,6 +268,8 @@ def test_errors_not_reported_twice(capture_events, app):
 
 
 def test_logging(capture_events, app):
+    # ensure that Flask's logger magic doesn't break ours
+
     @app.route("/")
     def index():
         app.logger.error("hi")
