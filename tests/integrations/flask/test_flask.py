@@ -24,7 +24,9 @@ def app():
     app.config["TESTING"] = True
     app.secret_key = "haha"
     app.logger.setLevel(logging.DEBUG)
-    app.logger.addHandler(SentryHandler())
+    handler = SentryHandler()
+    handler.setLevel(logging.DEBUG)
+    app.logger.addHandler(handler)
 
     login_manager.init_app(app)
 
