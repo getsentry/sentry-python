@@ -10,7 +10,7 @@ try:
 except ImportError:
     from django.core.urlresolvers import resolve
 
-from sentry_sdk import get_current_hub, configure_scope, capture_exception, init
+from sentry_sdk import get_current_hub, configure_scope, capture_exception
 from .._wsgi import RequestExtractor
 
 
@@ -121,7 +121,6 @@ def _install_impl():
             except AttributeError:
                 rv = []
 
-
             rv = type(rv)([MIDDLEWARE_NAME]) + rv
         elif key == "INSTALLED_APPS":
             try:
@@ -137,7 +136,6 @@ def _install_impl():
         if key in self.__dict__:
             self.__dict__[key] = rv
         return rv
-
 
     type(settings).__getattr__ = sentry_patched_getattr
 

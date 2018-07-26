@@ -1,5 +1,4 @@
 import pytest
-import sentry_sdk
 from sentry_sdk import Client, get_current_hub
 
 pytest.importorskip("celery")

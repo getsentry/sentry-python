@@ -129,6 +129,4 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 
-
-import sentry_sdk
 sentry_sdk.get_current_hub().bind_client(sentry_sdk.Client(integrations=["django"]))

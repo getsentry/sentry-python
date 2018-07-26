@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 from threading import Lock
 
-from sentry_sdk import capture_exception, configure_scope, get_current_hub, init
+from sentry_sdk import capture_exception, get_current_hub
 from ._wsgi import RequestExtractor
 
 try:
@@ -10,8 +10,12 @@ try:
 except ImportError:
     current_user = None
 
-from flask import request, _app_ctx_stack
-from flask.signals import appcontext_pushed, appcontext_tearing_down, got_request_exception
+from flask import request
+from flask.signals import (
+    appcontext_pushed,
+    appcontext_tearing_down,
+    got_request_exception,
+)
 
 
 _installer_lock = Lock()
@@ -30,14 +34,15 @@ def install(client):
 
         _installed = True
 
+
 def _push_appctx(*args, **kwargs):
     get_current_hub().push_scope()
+    get_current_hub().add_event_processor(lambda: _event_processor)
 
-    with configure_scope() as scope:
-        get_current_hub().add_event_processor(lambda: _event_processor)
 
 def _pop_appctx(*args, **kwargs):
     get_current_hub().pop_scope_unsafe()
+
 
 def _capture_exception(sender, exception, **kwargs):
     capture_exception(exception)

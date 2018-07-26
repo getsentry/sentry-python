@@ -4,6 +4,7 @@ import sentry_sdk
 
 from sentry_sdk.client import Transport
 
+
 class TestTransport(Transport):
     def __init__(self):
         pass
