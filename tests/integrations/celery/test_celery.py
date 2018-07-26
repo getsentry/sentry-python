@@ -1,12 +1,12 @@
 import pytest
+import sentry_sdk
+from sentry_sdk import Client, get_current_hub
 
 pytest.importorskip("celery")
 
 from celery import Celery
 
-from sentry_sdk.integrations.celery import install
-
-install()
+get_current_hub().bind_client(Client(integrations=["celery"]))
 
 
 @pytest.fixture

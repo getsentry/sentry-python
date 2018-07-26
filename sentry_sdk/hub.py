@@ -165,7 +165,9 @@ class Hub(with_metaclass(HubMeta)):
         """Pops a scope layer from the stack. Try to use the context manager
         `push_scope()` instead."""
         self._pending_processors = []
-        return self._stack.pop()
+        rv = self._stack.pop()
+        assert self._stack
+        return rv
 
     @contextmanager
     def configure_scope(self):

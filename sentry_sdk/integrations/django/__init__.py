@@ -12,7 +12,6 @@ except ImportError:
 
 from sentry_sdk import get_current_hub, configure_scope, capture_exception, init
 from .._wsgi import RequestExtractor
-from .. import Integration
 
 
 try:
@@ -93,74 +92,54 @@ def _got_request_exception(request=None, **kwargs):
     capture_exception()
 
 
-MIDDLEWARE_NAME = "sentry_sdk.integrations.django.SentryMiddleware"
-
-CONFLICTING_MIDDLEWARE = (
-    "raven.contrib.django.middleware.SentryMiddleware",
-    "raven.contrib.django.middleware.SentryLogMiddleware",
-) + (MIDDLEWARE_NAME,)
+MIDDLEWARE_NAME = __name__ + ".SentryMiddleware"
 
 _installer_lock = Lock()
 _installed = False
 
 
-def _install():
+def install(client):
     global _installed
     with _installer_lock:
         if _installed:
             return
 
-        client_options, integration_options = DjangoIntegration.parse_environment(
-            dict((key, getattr(settings, key)) for key in dir(settings))
-        )
-
-        client_options.setdefault("integrations", []).append(
-            DjangoIntegration(**integration_options)
-        )
-
-        init(**client_options)
+        _install_impl()
         _installed = True
 
 
 def _install_impl():
-    # default settings.MIDDLEWARE is None
-    if getattr(settings, "MIDDLEWARE", None):
-        middleware_attr = "MIDDLEWARE"
-    else:
-        middleware_attr = "MIDDLEWARE_CLASSES"
+    old_getattr = settings.__getattr__
 
-    # make sure to get an empty tuple when attr is None
-    middleware = list(getattr(settings, middleware_attr, ()) or ())
-    conflicts = set(CONFLICTING_MIDDLEWARE).intersection(set(middleware))
-    if conflicts:
-        raise RuntimeError("Other sentry-middleware already registered: %s" % conflicts)
+    # When `sentry_sdk.init` is called, the settings object may or may not be
+    # initialized. So we need to lazily merge the array values.
 
-    setattr(settings, middleware_attr, [MIDDLEWARE_NAME] + middleware)
+    def sentry_patched_getattr(self, key):
+        if key in ("MIDDLEWARE", "MIDDLEWARE_CLASSES"):
+            try:
+                rv = old_getattr(key)
+            except AttributeError:
+                rv = []
+
+
+            rv = type(rv)([MIDDLEWARE_NAME]) + rv
+        elif key == "INSTALLED_APPS":
+            try:
+                rv = old_getattr(key)
+            except AttributeError:
+                rv = []
+
+            rv = type(rv)([__name__]) + rv
+        else:
+            rv = old_getattr(key)
+
+        # fix cache set by old_getattr
+        if key in self.__dict__:
+            self.__dict__[key] = rv
+        return rv
+
+
+    type(settings).__getattr__ = sentry_patched_getattr
 
     signals.request_finished.connect(_request_finished)
     signals.got_request_exception.connect(_got_request_exception)
-
-
-class DjangoIntegration(Integration):
-    identifier = "django"
-
-    def install(self, client):
-        _install_impl()
-
-
-try:
-    # Django >= 1.7
-    from django.apps import AppConfig
-except ImportError:
-    _install()
-else:
-
-    class SentryConfig(AppConfig):
-        name = "sentry_sdk.integrations.django"
-        label = "sentry_sdk_integrations_django"
-        verbose_name = "Sentry"
-
-        def ready(self):
-            _install()
-
-    default_app_config = "sentry_sdk.integrations.django.SentryConfig"

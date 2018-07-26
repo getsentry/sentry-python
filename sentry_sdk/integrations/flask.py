@@ -1,8 +1,9 @@
 from __future__ import absolute_import
 
+from threading import Lock
+
 from sentry_sdk import capture_exception, configure_scope, get_current_hub, init
 from ._wsgi import RequestExtractor
-from . import Integration
 
 try:
     from flask_login import current_user
@@ -10,85 +11,54 @@ except ImportError:
     current_user = None
 
 from flask import request, _app_ctx_stack
-from flask.signals import appcontext_pushed, got_request_exception
+from flask.signals import appcontext_pushed, appcontext_tearing_down, got_request_exception
 
 
-class FlaskSentry(object):
-    def __init__(self, app=None):
-        self.app = app
-        if app is not None:
-            self.init_app(app)
-
-    def init_app(self, app):
-        if not hasattr(app, "extensions"):
-            app.extensions = {}
-        elif app.extensions.get(__name__, None):
-            raise RuntimeError("Sentry extension is already registered")
-        app.extensions[__name__] = True
-
-        client_options, integration_options = FlaskIntegration.parse_environment(
-            app.config
-        )
-        integration = FlaskIntegration(app, **integration_options)
-        client_options.setdefault("integrations", []).append(integration)
-        init(**client_options)
+_installer_lock = Lock()
+_installed = False
 
 
-class FlaskIntegration(Integration):
-    identifier = "flask"
+def install(client):
+    global _installed
+    with _installer_lock:
+        if _installed:
+            return
 
-    def __init__(self, app, setup_logger=True):
-        self._app = app
-        self._setup_logger = setup_logger
+        appcontext_pushed.connect(_push_appctx)
+        appcontext_tearing_down.connect(_pop_appctx)
+        got_request_exception.connect(_capture_exception)
 
-    def install(self, client=None):
-        appcontext_pushed.connect(self._push_appctx, sender=self._app)
-        self._app.teardown_appcontext(self._pop_appctx)
-        got_request_exception.connect(self._capture_exception, sender=self._app)
-        self._app.before_request(self._before_request)
+        _installed = True
 
-        if self._setup_logger:
-            from .logging import HANDLER
+def _push_appctx(*args, **kwargs):
+    get_current_hub().push_scope()
 
-            self._app.logger.addHandler(HANDLER)
+    with configure_scope() as scope:
+        get_current_hub().add_event_processor(lambda: _event_processor)
 
-    def _push_appctx(self, *args, **kwargs):
-        get_current_hub().push_scope()
-        _app_ctx_stack.top._sentry_app_scope_pushed = True
+def _pop_appctx(*args, **kwargs):
+    get_current_hub().pop_scope_unsafe()
 
-    def _pop_appctx(self, exception):
-        get_current_hub().pop_scope_unsafe()
+def _capture_exception(sender, exception, **kwargs):
+    capture_exception(exception)
 
-    def _capture_exception(self, sender, exception, **kwargs):
-        capture_exception(exception)
 
-    def _before_request(self, *args, **kwargs):
+def _event_processor(event):
+    if "transaction" not in event:
         try:
-            assert getattr(
-                _app_ctx_stack.top, "_sentry_app_scope_pushed", None
-            ), "scope push failed"
-
-            with configure_scope() as scope:
-                if request.url_rule:
-                    scope.transaction = request.url_rule.endpoint
-
-                get_current_hub().add_event_processor(self.make_event_processor)
+            event["transaction"] = request.url_rule.endpoint
         except Exception:
             get_current_hub().capture_internal_exception()
 
-    def make_event_processor(self):
-        def processor(event):
-            try:
-                FlaskRequestExtractor(request).extract_into_event(event)
-            except Exception:
-                get_current_hub().capture_internal_exception()
+    try:
+        FlaskRequestExtractor(request).extract_into_event(event)
+    except Exception:
+        get_current_hub().capture_internal_exception()
 
-            try:
-                _set_user_info(event)
-            except Exception:
-                get_current_hub().capture_internal_exception()
-
-        return processor
+    try:
+        _set_user_info(event)
+    except Exception:
+        get_current_hub().capture_internal_exception()
 
 
 class FlaskRequestExtractor(RequestExtractor):
