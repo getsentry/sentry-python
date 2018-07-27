@@ -40,11 +40,6 @@ def test_middleware_exceptions(client, capture_exceptions):
     assert exceptions == [exc.value]
 
 
-def test_get_dsn(client):
-    response = client.get(reverse("get_dsn"))
-    assert response.content == b"LOL!"
-
-
 def test_request_captured(client, capture_events):
     events = capture_events()
     response = client.get(reverse("message"))
