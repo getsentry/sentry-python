@@ -14,6 +14,7 @@ _most_recent_exception = ContextVar("sentry_most_recent_exception")
 
 class Client(object):
     def __init__(self, dsn=None, *args, **kwargs):
+        passed_dsn = dsn
         if dsn is NO_DSN:
             dsn = None
         else:
@@ -26,14 +27,14 @@ class Client(object):
         options = dict(DEFAULT_OPTIONS)
         options.update(*args, **kwargs)
         self.options = options
-        if dsn is None:
-            self._transport = None
-        else:
+        self._transport = self.options.pop('transport')
+        if self._transport is None and dsn is not None:
             self._transport = Transport(dsn)
             self._transport.start()
+        elif passed_dsn is not None and self._transport is not None:
+            raise ValueError("Cannot pass DSN and a custom transport.")
 
         from .integrations import logging as logging_integration
-
         integrations = list(options.pop("integrations") or ())
 
         logging_configured = any(
@@ -68,7 +69,7 @@ class Client(object):
         if scope is not None:
             scope.apply_to_event(event)
 
-        for key in "release", "environment", "server_name":
+        for key in "release", "environment", "server_name", "repos", "dist":
             if event.get(key) is None:
                 event[key] = self.options[key]
         if event.get("sdk") is None:
