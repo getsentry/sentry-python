@@ -58,3 +58,23 @@ def test_request_captured(client, capture_events):
         "query_string": "",
         "url": "http://testserver/message",
     }
+
+
+@pytest.mark.django_db
+def test_user_captured(client, capture_events):
+    events = capture_events()
+    response = client.get(reverse("mylogin"))
+    assert response.content == b'ok'
+
+    assert not events
+
+    response = client.get(reverse("message"))
+    assert response.content == b'ok'
+
+    event, = events
+
+    assert event['user'] == {
+        'email': 'lennon@thebeatles.com',
+        'ip_address': "127.0.0.1",
+        "username": "john"
+    }

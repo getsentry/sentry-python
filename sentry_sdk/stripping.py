@@ -12,10 +12,14 @@ class AnnotatedValue(object):
 def flatten_metadata(obj):
     def inner(obj):
         if isinstance(obj, Mapping):
-            assert "" not in obj, "Merging metadata not supported"
             rv = {}
             meta = {}
             for k, v in obj.items():
+                # if we actually have "" keys in our data, throw them away. It's
+                # unclear how we would tell them apart from metadata
+                if k == "":
+                    continue
+
                 rv[k], meta[k] = inner(v)
                 if meta[k] is None:
                     del meta[k]

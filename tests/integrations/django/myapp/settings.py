@@ -66,7 +66,11 @@ class TestMiddleware(MiddlewareMixin):
         return response
 
 
-MIDDLEWARE_CLASSES = ["tests.integrations.django.myapp.settings.TestMiddleware"]
+MIDDLEWARE_CLASSES = [
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    "tests.integrations.django.myapp.settings.TestMiddleware"
+]
 
 if MiddlewareMixin is not object:
     MIDDLEWARE = MIDDLEWARE_CLASSES

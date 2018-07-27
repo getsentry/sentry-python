@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+from django import VERSION as DJANGO_VERSION
 from django.core import signals
 
 try:
@@ -9,8 +10,16 @@ except ImportError:
 
 from sentry_sdk import get_current_hub, configure_scope, capture_exception
 from sentry_sdk.hub import _internal_exceptions
-from ._wsgi import RequestExtractor
+from ._wsgi import RequestExtractor, get_client_ip
 from . import Integration
+
+
+if DJANGO_VERSION < (1, 10):
+    def is_authenticated(request_user):
+        return request_user.is_authenticated()
+else:
+    def is_authenticated(request_user):
+        return request_user.is_authenticated
 
 
 class DjangoIntegration(Integration):
@@ -45,6 +54,10 @@ class DjangoIntegration(Integration):
         def processor(event):
             with _internal_exceptions():
                 DjangoRequestExtractor(request).extract_into_event(event)
+
+            if 'user' not in event:
+                with _internal_exceptions():
+                    _set_user_info(request, event)
 
             # TODO: user info
 
@@ -83,3 +96,24 @@ class DjangoRequestExtractor(RequestExtractor):
 
     def size_of_file(self, file):
         return file.size
+
+
+def _set_user_info(request, event):
+    event['user'] = user_info = {
+        'ip_address': get_client_ip(request.META),
+    }
+
+    user = getattr(request, "user", None)
+
+    if user is None or not is_authenticated(user):
+        return
+
+    try:
+        user_info['email'] = user.email
+    except Exception:
+        pass
+
+    try:
+        user_info['username'] = user.get_username()
+    except Exception:
+        pass

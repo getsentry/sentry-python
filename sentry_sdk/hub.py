@@ -15,7 +15,7 @@ def _internal_exceptions():
     try:
         yield
     except Exception:
-        Hub.current.capture_exception()
+        Hub.current.capture_internal_exception()
 
 
 class HubMeta(type):
