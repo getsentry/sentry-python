@@ -10,6 +10,7 @@ DEFAULT_OPTIONS = {
     "server_name": DEFAULT_SERVER_NAME,
     "drain_timeout": 2.0,
     "integrations": [],
+    "default_integrations": True
 }
 
 SDK_INFO = {"name": "sentry-python", "version": VERSION}
