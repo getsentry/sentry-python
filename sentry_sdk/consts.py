@@ -11,9 +11,10 @@ DEFAULT_OPTIONS = {
     "drain_timeout": 2.0,
     "integrations": [],
     "default_integrations": True,
-    'repos': {},
-    'dist': None,
-    'transport': None
+    "repos": {},
+    "dist": None,
+    "transport": None,
+    "sample_rate": 1.0,
 }
 
 SDK_INFO = {"name": "sentry-python", "version": VERSION}

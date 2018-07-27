@@ -1,5 +1,6 @@
 import os
 import uuid
+import random
 
 from .utils import Dsn, SkipEvent, ContextVar
 from .transport import Transport
@@ -27,7 +28,7 @@ class Client(object):
         options = dict(DEFAULT_OPTIONS)
         options.update(*args, **kwargs)
         self.options = options
-        self._transport = self.options.pop('transport')
+        self._transport = self.options.pop("transport")
         if self._transport is None and dsn is not None:
             self._transport = Transport(dsn)
             self._transport.start()
@@ -35,6 +36,7 @@ class Client(object):
             raise ValueError("Cannot pass DSN and a custom transport.")
 
         from .integrations import logging as logging_integration
+
         integrations = list(options.pop("integrations") or ())
 
         logging_configured = any(
@@ -77,6 +79,12 @@ class Client(object):
 
         if event.get("platform") is None:
             event["platform"] = "python"
+
+        if (
+            self.options["sample_rate"] < 1.0
+            and random.random() >= self.options["sample_rate"]
+        ):
+            raise SkipEvent()
 
         event = strip_event(event)
         event = flatten_metadata(event)

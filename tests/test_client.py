@@ -2,9 +2,10 @@ import pytest
 from sentry_sdk import Client
 from sentry_sdk.transport import Transport
 
+
 def test_transport_option(monkeypatch):
-    dsn = 'https://foo@sentry.io/123'
-    dsn2 = 'https://bar@sentry.io/124'
+    dsn = "https://foo@sentry.io/123"
+    dsn2 = "https://bar@sentry.io/124"
     assert str(Client(dsn=dsn).dsn) == dsn
     assert Client().dsn is None
     with pytest.raises(ValueError):
