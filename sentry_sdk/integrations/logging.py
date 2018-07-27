@@ -3,36 +3,29 @@ from __future__ import print_function
 
 import sys
 import logging
-from threading import Lock
 
 from sentry_sdk import get_current_hub, capture_event, add_breadcrumb
 from sentry_sdk.utils import to_string, Event, skip_internal_frames
 from sentry_sdk.hub import _internal_exceptions
 
-
-_installer_lock = Lock()
-_installed = False
-_master_handler = None
+from . import Integration
 
 
-def install(client, level=logging.INFO, event_level=None):
-    global _installed
-    global _master_handler
-    with _installer_lock:
-        if _installed:
-            return
+class LoggingIntegration(Integration):
+    identifier = 'logging'
+    def __init__(self, level=logging.INFO, event_level=None):
+        self._handler = SentryHandler(level=level, event_level=event_level)
 
-        _master_handler = SentryHandler(level=level, event_level=event_level)
+    def install(self, client):
+        handler = self._handler
 
         old_callhandlers = logging.Logger.callHandlers
 
         def sentry_patched_callhandlers(self, record):
-            _master_handler.handle(record)
+            handler.handle(record)
             return old_callhandlers(self, record)
 
         logging.Logger.callHandlers = sentry_patched_callhandlers
-
-        _installed = True
 
 
 class SentryHandler(logging.Handler, object):

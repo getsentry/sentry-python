@@ -5,7 +5,6 @@ from .utils import Dsn, SkipEvent
 from .transport import Transport
 from .consts import DEFAULT_OPTIONS, SDK_INFO
 from .stripping import strip_event, flatten_metadata
-from .integrations import get_integration
 
 
 NO_DSN = object()
@@ -31,15 +30,8 @@ class Client(object):
             self._transport = Transport(dsn)
             self._transport.start()
 
-        integrations = options.get("integrations", ["logging"]) or ()
-        if not isinstance(integrations, dict):
-            integrations = {name: {} for name in integrations}
-
-        for name, options in integrations.items():
-            install_fn = get_integration(name)
-            if options is None:
-                options = {}
-            install_fn(self, **options)
+        for integration in options.get("integrations", ["logging"]) or ():
+            integration(self)
 
     @property
     def dsn(self):

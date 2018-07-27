@@ -10,6 +10,7 @@ from flask import Flask, request
 from flask_login import LoginManager, login_user
 
 from sentry_sdk import capture_message, capture_exception
+from sentry_sdk.integrations.logging import LoggingIntegration
 import sentry_sdk.integrations.flask as flask_sentry
 
 
@@ -18,7 +19,10 @@ login_manager = LoginManager()
 
 @pytest.fixture
 def app(sentry_init):
-    sentry_init(integrations={"flask": None, "logging": {"event_level": "ERROR"}})
+    sentry_init(integrations=[
+        flask_sentry.FlaskIntegration(),
+        LoggingIntegration(event_level="ERROR")
+    ])
 
     app = Flask(__name__)
     app.config["TESTING"] = True

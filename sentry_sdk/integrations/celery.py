@@ -1,44 +1,40 @@
 from __future__ import absolute_import
 
-from threading import Lock
-
 from celery.signals import task_failure, task_prerun, task_postrun
 
 from sentry_sdk import get_current_hub, configure_scope, capture_exception
 from sentry_sdk.hub import _internal_exceptions
 
-
-_installer_lock = Lock()
-_installed = False
+from . import Integration
 
 
-def install(client):
-    global _installed
-    with _installer_lock:
-        if _installed:
+class CeleryIntegration(Integration):
+    identifier = 'celery'
+
+    def __init__(self):
+        pass
+
+    def install(self, client):
+        task_prerun.connect(self._handle_task_prerun, weak=False)
+        task_postrun.connect(self._handle_task_postrun, weak=False)
+        task_failure.connect(self._process_failure_signal, weak=False)
+
+
+    def _process_failure_signal(self, sender, task_id, einfo, **kw):
+        if hasattr(sender, "throws") and isinstance(einfo.exception,
+                                                    sender.throws):
             return
 
-        task_prerun.connect(_handle_task_prerun, weak=False)
-        task_postrun.connect(_handle_task_postrun, weak=False)
-        task_failure.connect(_process_failure_signal, weak=False)
-
-        _installed = True
+        capture_exception(einfo.exc_info)
 
 
-def _process_failure_signal(sender, task_id, einfo, **kw):
-    if hasattr(sender, "throws") and isinstance(einfo.exception, sender.throws):
-        return
+    def _handle_task_prerun(self, sender, task, **kw):
+        with _internal_exceptions():
+            get_current_hub().push_scope()
 
-    capture_exception(einfo.exc_info)
-
-
-def _handle_task_prerun(sender, task, **kw):
-    with _internal_exceptions():
-        get_current_hub().push_scope()
-
-        with configure_scope() as scope:
-            scope.transaction = task.name
+            with configure_scope() as scope:
+                scope.transaction = task.name
 
 
-def _handle_task_postrun(sender, task_id, task, **kw):
-    get_current_hub().pop_scope_unsafe()
+    def _handle_task_postrun(self, sender, task_id, task, **kw):
+        get_current_hub().pop_scope_unsafe()

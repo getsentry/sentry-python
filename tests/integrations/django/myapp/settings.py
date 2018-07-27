@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/2.0/ref/settings/
 import os
 import sentry_sdk
 
+from sentry_sdk.integrations.django import DjangoIntegration
+
 
 try:
     # Django >= 1.10
@@ -129,4 +131,6 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 
-sentry_sdk.get_current_hub().bind_client(sentry_sdk.Client(integrations=["django"]))
+sentry_sdk.get_current_hub().bind_client(sentry_sdk.Client(integrations=[
+    DjangoIntegration()
+]))

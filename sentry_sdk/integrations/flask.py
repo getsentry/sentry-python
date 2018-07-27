@@ -1,10 +1,9 @@
 from __future__ import absolute_import
 
-from threading import Lock
-
 from sentry_sdk import capture_exception, get_current_hub
 from sentry_sdk.hub import _internal_exceptions
 from ._wsgi import RequestExtractor
+from . import Integration
 
 try:
     from flask_login import current_user
@@ -19,21 +18,16 @@ from flask.signals import (
 )
 
 
-_installer_lock = Lock()
-_installed = False
+class FlaskIntegration(Integration):
+    identifier = "flask"
 
+    def __init__(self):
+        pass
 
-def install(client):
-    global _installed
-    with _installer_lock:
-        if _installed:
-            return
-
+    def install(self, client):
         appcontext_pushed.connect(_push_appctx)
         appcontext_tearing_down.connect(_pop_appctx)
         got_request_exception.connect(_capture_exception)
-
-        _installed = True
 
 
 def _push_appctx(*args, **kwargs):

@@ -1,52 +1,31 @@
-_locked = False
-_integrations = {}
+from __future__ import print_function
+
+import sys
+from threading import Lock
 
 
-def register_integration(identifier, integration=None):
-    def inner(integration):
-        if _locked:
-            raise ValueError(
-                "A client has already been initialized. "
-                "Registration of integrations no longer possible"
-            )
-        if identifier in _integrations:
-            raise ValueError("Integration with that name already exists.")
-        _integrations[identifier] = integration
-
-    if integration is not None:
-        return inner(integration)
-    return inner
+_installer_lock = Lock()
+_installed_integrations = {}
 
 
-def get_integration(identifier):
-    global _locked
-    _locked = True
-    return _integrations[identifier]
+class Integration(object):
+    identifier = None
 
+    def __init__(self, **kwargs):
+        """Initialize an integration."""
+        raise NotImplementedError()
 
-@register_integration("django")
-def _django_integration(*a, **kw):
-    from .django import install
+    def install(self, client):
+        raise NotImplementedError()
 
-    return install(*a, **kw)
+    def __call__(self, client):
+        assert self.identifier
+        with _installer_lock:
+            if self.identifier in _installed_integrations:
+                print("warning: %s integration for Sentry is already "
+                      "configured. Will ignore second configuration." % self.identifier,
+                      file=sys.stderr)
+                return
 
-
-@register_integration("flask")
-def _flask_integration(*a, **kw):
-    from .flask import install
-
-    return install(*a, **kw)
-
-
-@register_integration("celery")
-def _celery_integration(*a, **kw):
-    from .celery import install
-
-    return install(*a, **kw)
-
-
-@register_integration("logging")
-def _logging_integration(*a, **kw):
-    from .logging import install
-
-    return install(*a, **kw)
+            self.install(client)
+            _installed_integrations[self.identifier] = self

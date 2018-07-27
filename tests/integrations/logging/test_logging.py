@@ -3,6 +3,8 @@ import logging
 
 import sentry_sdk
 
+from sentry_sdk.integrations.logging import LoggingIntegration
+
 other_logger = logging.getLogger("testfoo")
 other_logger.setLevel(logging.DEBUG)
 
@@ -12,7 +14,7 @@ logger.setLevel(logging.DEBUG)
 
 @pytest.mark.parametrize("logger", [logger, other_logger])
 def test_logging_works_with_many_loggers(sentry_init, capture_events, logger):
-    sentry_init(integrations={"logging": {"event_level": "ERROR"}})
+    sentry_init(integrations=[LoggingIntegration(event_level = "ERROR")])
     events = capture_events()
 
     logger.info("bread")
@@ -25,7 +27,7 @@ def test_logging_works_with_many_loggers(sentry_init, capture_events, logger):
 
 
 def test_logging_defaults(sentry_init, capture_events):
-    sentry_init(integrations=["logging"])
+    sentry_init(integrations=[LoggingIntegration()])
     events = capture_events()
 
     logger.info("bread")

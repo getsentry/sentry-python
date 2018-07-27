@@ -2,12 +2,14 @@ import pytest
 
 pytest.importorskip("celery")
 
+from sentry_sdk.integrations.celery import CeleryIntegration
+
 from celery import Celery
 
 
 @pytest.fixture
 def celery(sentry_init):
-    sentry_init(integrations=["celery"])
+    sentry_init(integrations=[CeleryIntegration()])
     celery = Celery(__name__)
     celery.conf.CELERY_ALWAYS_EAGER = True
     return celery
