@@ -15,6 +15,7 @@ DEFAULT_OPTIONS = {
     "dist": None,
     "transport": None,
     "sample_rate": 1.0,
+    "send_default_pii": False,
 }
 
 SDK_INFO = {"name": "sentry-python", "version": VERSION}

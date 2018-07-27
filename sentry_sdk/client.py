@@ -86,7 +86,7 @@ class Client(object):
         ):
             raise SkipEvent()
 
-        event = strip_event(event)
+        event = strip_event(event, client=self)
         event = flatten_metadata(event)
         return event
 

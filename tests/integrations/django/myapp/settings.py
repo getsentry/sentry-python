@@ -136,5 +136,5 @@ USE_TZ = True
 STATIC_URL = "/static/"
 
 sentry_sdk.get_current_hub().bind_client(
-    sentry_sdk.Client(integrations=[DjangoIntegration()])
+    sentry_sdk.Client(integrations=[DjangoIntegration()], send_default_pii=True)
 )

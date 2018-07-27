@@ -115,9 +115,15 @@ def test_flask_login_partially_configured(
     assert event.get("user", {}).get("id") is None
 
 
+@pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("user_id", [None, "42", 3])
-def test_flask_login_configured(sentry_init, app, user_id, capture_events, monkeypatch):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+def test_flask_login_configured(
+    send_default_pii, sentry_init, app, user_id, capture_events, monkeypatch
+):
+    sentry_init(
+        send_default_pii=send_default_pii,
+        integrations=[flask_sentry.FlaskIntegration()],
+    )
 
     class User(object):
         is_authenticated = is_active = True
@@ -146,7 +152,7 @@ def test_flask_login_configured(sentry_init, app, user_id, capture_events, monke
     assert client.get("/message").status_code == 200
 
     event, = events
-    if user_id is None:
+    if user_id is None or not send_default_pii:
         assert event.get("user", {}).get("id") is None
     else:
         assert event["user"]["id"] == str(user_id)

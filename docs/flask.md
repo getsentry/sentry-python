@@ -1,5 +1,6 @@
 # Using Sentry with Flask
 
+
     from sentry_sdk.integrations.flask import FlaskIntegration
     from sentry_sdk import init
 
@@ -14,7 +15,16 @@
 * The Flask integration will be installed for all of your apps. It hooks into
   Flask's signals, not anything on the app object.
 
-* Request data is attached to all events.
+* A bit of data is attached to each event:
+
+    * Personally identifiable information (such as user ids, usernames,
+      cookies, authorization headers, ip addresses) is excluded unless
+      ``send_default_pii`` is set to ``true``. See ``README.md``, section "PII"
+
+    * Request data is attached to all events.
+
+    * If you have Flask-Login installed and configured, user data is attached to
+      the event.
 
 * All exceptions leading to a Internal Server Error are reported.
 

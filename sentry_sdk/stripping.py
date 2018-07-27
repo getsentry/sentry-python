@@ -23,6 +23,8 @@ def flatten_metadata(obj):
                 rv[k], meta[k] = inner(v)
                 if meta[k] is None:
                     del meta[k]
+                if rv[k] is None:
+                    del rv[k]
             return rv, (meta or None)
         if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
             rv = []
@@ -43,7 +45,7 @@ def flatten_metadata(obj):
     return obj
 
 
-def strip_event(event):
+def strip_event(event, client=None):
     old_frames = event.get("stacktrace", {}).get("frames", None)
     if old_frames:
         event["stacktrace"]["frames"] = [strip_frame(frame) for frame in old_frames]
@@ -51,6 +53,32 @@ def strip_event(event):
     old_request_data = event.get("request", {}).get("data", None)
     if old_request_data:
         event["request"]["data"] = strip_databag(old_request_data)
+
+    if not client or not client.options["send_default_pii"]:
+        event = strip_default_pii(event)
+
+    return event
+
+
+def strip_default_pii(event):
+    gone = lambda: AnnotatedValue(None, {"rem": [["!strip_default_pii", "x"]]})
+
+    if event.get("user"):
+        event["user"] = gone()
+
+    request = event.get("request")
+    if request:
+        if request.get("cookies"):
+            request["cookies"] = gone()
+        if request.get("headers"):
+            headers = request["headers"]
+            for key in list(headers):
+                if key.lower().replace("_", "-") in (
+                    "set-cookie",
+                    "cookie",
+                    "authentication",
+                ):
+                    headers[key] = gone()
 
     return event
 
@@ -63,7 +91,7 @@ def strip_frame(frame):
 def strip_databag(obj, remaining_depth=20):
     assert not isinstance(obj, bytes), "bytes should have been normalized before"
     if remaining_depth <= 0:
-        return AnnotatedValue(None, {"": {"rem": [["!dep", "x"]]}})
+        return AnnotatedValue(None, {"rem": [["!dep", "x"]]})
     if isinstance(obj, text_type):
         return strip_string(obj)
     if isinstance(obj, Mapping):
