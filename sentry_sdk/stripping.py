@@ -45,7 +45,7 @@ def flatten_metadata(obj):
     return obj
 
 
-def strip_event(event, client=None):
+def strip_event(event):
     old_frames = event.get("stacktrace", {}).get("frames", None)
     if old_frames:
         event["stacktrace"]["frames"] = [strip_frame(frame) for frame in old_frames]
@@ -53,30 +53,6 @@ def strip_event(event, client=None):
     old_request_data = event.get("request", {}).get("data", None)
     if old_request_data:
         event["request"]["data"] = strip_databag(old_request_data)
-
-    if not client or not client.options["send_default_pii"]:
-        event = strip_default_pii(event)
-
-    return event
-
-
-def strip_default_pii(event):
-    if event.get("user"):
-        event["user"] = None
-
-    request = event.get("request")
-    if request:
-        if request.get("cookies"):
-            request["cookies"] = None
-        if request.get("headers"):
-            headers = request["headers"]
-            for key in list(headers):
-                if key.lower().replace("_", "-") in (
-                    "set-cookie",
-                    "cookie",
-                    "authentication",
-                ):
-                    headers[key] = None
 
     return event
 

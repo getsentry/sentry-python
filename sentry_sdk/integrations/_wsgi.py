@@ -1,6 +1,7 @@
 import json
 import base64
 
+from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.stripping import AnnotatedValue
 
 
@@ -47,9 +48,19 @@ class RequestExtractor(object):
         request_info["url"] = self.url
         request_info["query_string"] = self.query_string
         request_info["method"] = self.method
-        request_info["headers"] = dict(self.headers)
+
         request_info["env"] = dict(get_environ(self.env))
-        request_info["cookies"] = dict(self.cookies)
+
+        if _should_send_default_pii():
+            request_info["headers"] = dict(self.headers)
+            request_info["cookies"] = dict(self.cookies)
+        else:
+            request_info["headers"] = {
+                k: v
+                for k, v in dict(self.headers).items()
+                if k.lower().replace("_", "-")
+                not in ("set-cookie", "cookie", "authentication")
+            }
 
         if self.form or self.files:
             data = dict(self.form.items())

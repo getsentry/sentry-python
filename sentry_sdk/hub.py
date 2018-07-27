@@ -18,6 +18,13 @@ def _internal_exceptions():
         Hub.current.capture_internal_exception()
 
 
+def _should_send_default_pii():
+    client = Hub.current.client
+    if not client:
+        return False
+    return client.options["send_default_pii"]
+
+
 class HubMeta(type):
     @property
     def current(self):

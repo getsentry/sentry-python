@@ -9,7 +9,7 @@ except ImportError:
     from django.core.urlresolvers import resolve
 
 from sentry_sdk import get_current_hub, configure_scope, capture_exception
-from sentry_sdk.hub import _internal_exceptions
+from sentry_sdk.hub import _internal_exceptions, _should_send_default_pii
 from ._wsgi import RequestExtractor, get_client_ip
 from . import Integration
 
@@ -59,7 +59,7 @@ class DjangoIntegration(Integration):
             with _internal_exceptions():
                 DjangoRequestExtractor(request).extract_into_event(event)
 
-            if "user" not in event:
+            if _should_send_default_pii():
                 with _internal_exceptions():
                     _set_user_info(request, event)
 
@@ -102,6 +102,9 @@ class DjangoRequestExtractor(RequestExtractor):
 
 
 def _set_user_info(request, event):
+    if "user" in event:
+        return
+
     event["user"] = user_info = {"ip_address": get_client_ip(request.META)}
 
     user = getattr(request, "user", None)

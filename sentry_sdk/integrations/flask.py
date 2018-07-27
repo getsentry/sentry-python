@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
 from sentry_sdk import capture_exception, get_current_hub
-from sentry_sdk.hub import _internal_exceptions
+from sentry_sdk.hub import _internal_exceptions, _should_send_default_pii
 from ._wsgi import RequestExtractor
 from . import Integration
 
@@ -52,8 +52,9 @@ def _event_processor(event):
         with _internal_exceptions():
             FlaskRequestExtractor(request).extract_into_event(event)
 
-    with _internal_exceptions():
-        _set_user_info(event)
+    if _should_send_default_pii():
+        with _internal_exceptions():
+            _set_user_info(event)
 
 
 class FlaskRequestExtractor(RequestExtractor):
