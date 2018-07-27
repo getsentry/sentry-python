@@ -1,13 +1,15 @@
 import os
 import uuid
 
-from .utils import Dsn, SkipEvent
+from .utils import Dsn, SkipEvent, ContextVar
 from .transport import Transport
 from .consts import DEFAULT_OPTIONS, SDK_INFO
 from .stripping import strip_event, flatten_metadata
 
 
 NO_DSN = object()
+
+_most_recent_exception = ContextVar("sentry_most_recent_exception")
 
 
 class Client(object):
@@ -57,6 +59,11 @@ class Client(object):
     def _prepare_event(self, event, scope):
         if event.get("event_id") is None:
             event["event_id"] = uuid.uuid4().hex
+
+        if event._exc_value is not None:
+            if _most_recent_exception.get(None) is event._exc_value:
+                raise SkipEvent()
+            _most_recent_exception.set(event._exc_value)
 
         if scope is not None:
             scope.apply_to_event(event)

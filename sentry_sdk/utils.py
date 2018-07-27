@@ -355,18 +355,6 @@ class Event(Mapping):
         return len(self._data)
 
 
-class DefaultEventProcessor(object):
-    def __init__(self):
-        self._most_recent_exception = ContextVar("most-recent-exception")
-
-    def __call__(self, event):
-        if event._exc_value is None:
-            return
-        if self._most_recent_exception.get(None) is event._exc_value:
-            raise SkipEvent()
-        self._most_recent_exception.set(event._exc_value)
-
-
 class SkipEvent(Exception):
     """Risen from an event processor to indicate that the event should be
     ignored and not be reported."""

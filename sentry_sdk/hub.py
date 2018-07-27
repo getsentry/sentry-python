@@ -4,7 +4,7 @@ from contextlib import contextmanager
 
 from ._compat import with_metaclass
 from .scope import Scope
-from .utils import Event, skip_internal_frames, ContextVar, DefaultEventProcessor
+from .utils import Event, skip_internal_frames, ContextVar
 
 
 _local = ContextVar("sentry_current_hub")
@@ -191,4 +191,3 @@ class Hub(with_metaclass(HubMeta)):
 
 
 GLOBAL_HUB = Hub()
-GLOBAL_HUB.add_event_processor(DefaultEventProcessor)
