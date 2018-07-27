@@ -9,7 +9,7 @@ from flask import Flask, request
 
 from flask_login import LoginManager, login_user
 
-from sentry_sdk import capture_message, Client, get_current_hub
+from sentry_sdk import capture_message, Client, get_current_hub, capture_exception
 import sentry_sdk.integrations.flask as flask_sentry
 
 get_current_hub().bind_client(Client(integrations=["flask", "logging"]))
@@ -278,3 +278,8 @@ def test_logging(capture_events, app):
 
     event, = capture_events
     assert event["level"] == "error"
+
+
+def test_no_errors_without_request(app):
+    with app.app_context():
+        capture_exception(ValueError())

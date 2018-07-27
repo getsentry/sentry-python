@@ -49,16 +49,17 @@ def _capture_exception(sender, exception, **kwargs):
 
 
 def _event_processor(event):
-    if "transaction" not in event:
+    if request:
+        if "transaction" not in event:
+            try:
+                event["transaction"] = request.url_rule.endpoint
+            except Exception:
+                get_current_hub().capture_internal_exception()
+
         try:
-            event["transaction"] = request.url_rule.endpoint
+            FlaskRequestExtractor(request).extract_into_event(event)
         except Exception:
             get_current_hub().capture_internal_exception()
-
-    try:
-        FlaskRequestExtractor(request).extract_into_event(event)
-    except Exception:
-        get_current_hub().capture_internal_exception()
 
     try:
         _set_user_info(event)
@@ -99,10 +100,13 @@ def _set_user_info(event):
     if "user" in event:
         return
 
-    try:
-        ip_address = request.access_route[0]
-    except IndexError:
-        ip_address = request.remote_addr
+    if request:
+        try:
+            ip_address = request.access_route[0]
+        except IndexError:
+            ip_address = request.remote_addr
+    else:
+        ip_address = None
 
     user_info = {"id": None, "ip_address": ip_address}
 
