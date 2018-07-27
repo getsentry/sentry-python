@@ -31,10 +31,15 @@ class Client(object):
             self._transport = Transport(dsn)
             self._transport.start()
 
-        for install_fn in options.get("integrations", None) or ():
-            if isinstance(install_fn, str):
-                install_fn = get_integration(install_fn)
-            install_fn(self)
+        integrations = options.get("integrations", ["logging"]) or ()
+        if not isinstance(integrations, dict):
+            integrations = {name: {} for name in integrations}
+
+        for name, options in integrations.items():
+            install_fn = get_integration(name)
+            if options is None:
+                options = {}
+            install_fn(self, **options)
 
     @property
     def dsn(self):
