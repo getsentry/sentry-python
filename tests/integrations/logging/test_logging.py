@@ -14,7 +14,7 @@ logger.setLevel(logging.DEBUG)
 
 @pytest.mark.parametrize("logger", [logger, other_logger])
 def test_logging_works_with_many_loggers(sentry_init, capture_events, logger):
-    sentry_init(integrations=[LoggingIntegration(event_level = "ERROR")])
+    sentry_init(integrations=[LoggingIntegration(event_level="ERROR")])
     events = capture_events()
 
     logger.info("bread")

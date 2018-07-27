@@ -19,10 +19,12 @@ login_manager = LoginManager()
 
 @pytest.fixture
 def app(sentry_init):
-    sentry_init(integrations=[
-        flask_sentry.FlaskIntegration(),
-        LoggingIntegration(event_level="ERROR")
-    ])
+    sentry_init(
+        integrations=[
+            flask_sentry.FlaskIntegration(),
+            LoggingIntegration(event_level="ERROR"),
+        ]
+    )
 
     app = Flask(__name__)
     app.config["TESTING"] = True

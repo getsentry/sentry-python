@@ -156,6 +156,6 @@ def get_client_ip(environ):
     value may be forged from a client.
     """
     try:
-        return environ['HTTP_X_FORWARDED_FOR'].split(',')[0].strip()
+        return environ["HTTP_X_FORWARDED_FOR"].split(",")[0].strip()
     except (KeyError, IndexError):
-        return environ.get('REMOTE_ADDR')
+        return environ.get("REMOTE_ADDR")

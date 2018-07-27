@@ -21,7 +21,7 @@ def message(request):
 
 
 def mylogin(request):
-    user = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
-    user.backend = 'django.contrib.auth.backends.ModelBackend'
+    user = User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
+    user.backend = "django.contrib.auth.backends.ModelBackend"
     login(request, user)
     return HttpResponse("ok")

@@ -9,7 +9,7 @@ from . import Integration
 
 
 class CeleryIntegration(Integration):
-    identifier = 'celery'
+    identifier = "celery"
 
     def __init__(self):
         pass
@@ -19,14 +19,11 @@ class CeleryIntegration(Integration):
         task_postrun.connect(self._handle_task_postrun, weak=False)
         task_failure.connect(self._process_failure_signal, weak=False)
 
-
     def _process_failure_signal(self, sender, task_id, einfo, **kw):
-        if hasattr(sender, "throws") and isinstance(einfo.exception,
-                                                    sender.throws):
+        if hasattr(sender, "throws") and isinstance(einfo.exception, sender.throws):
             return
 
         capture_exception(einfo.exc_info)
-
 
     def _handle_task_prerun(self, sender, task, **kw):
         with _internal_exceptions():
@@ -34,7 +31,6 @@ class CeleryIntegration(Integration):
 
             with configure_scope() as scope:
                 scope.transaction = task.name
-
 
     def _handle_task_postrun(self, sender, task_id, task, **kw):
         get_current_hub().pop_scope_unsafe()

@@ -67,9 +67,9 @@ class TestMiddleware(MiddlewareMixin):
 
 
 MIDDLEWARE_CLASSES = [
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    "tests.integrations.django.myapp.settings.TestMiddleware"
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "tests.integrations.django.myapp.settings.TestMiddleware",
 ]
 
 if MiddlewareMixin is not object:
@@ -135,6 +135,6 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 
-sentry_sdk.get_current_hub().bind_client(sentry_sdk.Client(integrations=[
-    DjangoIntegration()
-]))
+sentry_sdk.get_current_hub().bind_client(
+    sentry_sdk.Client(integrations=[DjangoIntegration()])
+)

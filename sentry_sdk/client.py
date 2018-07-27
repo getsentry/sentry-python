@@ -31,9 +31,10 @@ class Client(object):
             self._transport.start()
 
         try:
-            integrations = options['integrations']
+            integrations = options["integrations"]
         except KeyError:
             from .integrations.logging import LoggingIntegration
+
             integrations = [LoggingIntegration()]
 
         for integration in integrations or ():

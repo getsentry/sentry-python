@@ -15,15 +15,19 @@ from . import Integration
 
 
 if DJANGO_VERSION < (1, 10):
+
     def is_authenticated(request_user):
         return request_user.is_authenticated()
+
+
 else:
+
     def is_authenticated(request_user):
         return request_user.is_authenticated
 
 
 class DjangoIntegration(Integration):
-    identifier = 'django'
+    identifier = "django"
 
     def __init__(self):
         pass
@@ -55,7 +59,7 @@ class DjangoIntegration(Integration):
             with _internal_exceptions():
                 DjangoRequestExtractor(request).extract_into_event(event)
 
-            if 'user' not in event:
+            if "user" not in event:
                 with _internal_exceptions():
                     _set_user_info(request, event)
 
@@ -66,7 +70,6 @@ class DjangoIntegration(Integration):
 
 def _got_request_exception(request=None, **kwargs):
     capture_exception()
-
 
 
 class DjangoRequestExtractor(RequestExtractor):
@@ -99,9 +102,7 @@ class DjangoRequestExtractor(RequestExtractor):
 
 
 def _set_user_info(request, event):
-    event['user'] = user_info = {
-        'ip_address': get_client_ip(request.META),
-    }
+    event["user"] = user_info = {"ip_address": get_client_ip(request.META)}
 
     user = getattr(request, "user", None)
 
@@ -109,11 +110,11 @@ def _set_user_info(request, event):
         return
 
     try:
-        user_info['email'] = user.email
+        user_info["email"] = user.email
     except Exception:
         pass
 
     try:
-        user_info['username'] = user.get_username()
+        user_info["username"] = user.get_username()
     except Exception:
         pass

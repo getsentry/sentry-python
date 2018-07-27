@@ -12,7 +12,8 @@ from . import Integration
 
 
 class LoggingIntegration(Integration):
-    identifier = 'logging'
+    identifier = "logging"
+
     def __init__(self, level=logging.INFO, event_level=None):
         self._handler = SentryHandler(level=level, event_level=event_level)
 

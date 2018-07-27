@@ -22,9 +22,11 @@ class Integration(object):
         assert self.identifier
         with _installer_lock:
             if self.identifier in _installed_integrations:
-                print("warning: %s integration for Sentry is already "
-                      "configured. Will ignore second configuration." % self.identifier,
-                      file=sys.stderr)
+                print(
+                    "warning: %s integration for Sentry is already "
+                    "configured. Will ignore second configuration." % self.identifier,
+                    file=sys.stderr,
+                )
                 return
 
             self.install(client)
