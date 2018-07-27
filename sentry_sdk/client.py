@@ -30,11 +30,17 @@ class Client(object):
             self._transport = Transport(dsn)
             self._transport.start()
 
-        if not any(isinstance(x, LoggingIntegration) for x in options['integrations']) and \
-           options['default_integrations']:
-            options['integrations'] = [LoggingIntegration()]
+        from .integrations import logging as logging_integration
 
-        for integration in options['integrations'] or ():
+        integrations = list(options.pop("integrations") or ())
+
+        logging_configured = any(
+            isinstance(x, logging_integration.LoggingIntegration) for x in integrations
+        )
+        if not logging_configured and options["default_integrations"]:
+            integrations.append(logging_integration.LoggingIntegration())
+
+        for integration in integrations:
             integration(self)
 
     @property

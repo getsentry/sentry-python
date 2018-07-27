@@ -26,8 +26,9 @@ def test_logging_works_with_many_loggers(sentry_init, capture_events, logger):
     assert any(crumb["message"] == "bread" for crumb in event["breadcrumbs"])
 
 
-def test_logging_defaults(sentry_init, capture_events):
-    sentry_init(integrations=[LoggingIntegration()])
+@pytest.mark.parametrize("integrations", [None, [], [LoggingIntegration()]])
+def test_logging_defaults(integrations, sentry_init, capture_events):
+    sentry_init(integrations=integrations)
     events = capture_events()
 
     logger.info("bread")

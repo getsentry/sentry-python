@@ -18,14 +18,7 @@ login_manager = LoginManager()
 
 
 @pytest.fixture
-def app(sentry_init):
-    sentry_init(
-        integrations=[
-            flask_sentry.FlaskIntegration(),
-            LoggingIntegration(event_level="ERROR"),
-        ]
-    )
-
+def app():
     app = Flask(__name__)
     app.config["TESTING"] = True
     app.secret_key = "haha"
@@ -40,7 +33,8 @@ def app(sentry_init):
     return app
 
 
-def test_has_context(app, capture_events):
+def test_has_context(sentry_init, app, capture_events):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
     client = app.test_client()
@@ -55,7 +49,9 @@ def test_has_context(app, capture_events):
 
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("testing", (True, False))
-def test_errors(capture_exceptions, app, debug, testing):
+def test_errors(sentry_init, capture_exceptions, app, debug, testing):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
     app.debug = debug
     app.testing = testing
 
@@ -75,7 +71,9 @@ def test_errors(capture_exceptions, app, debug, testing):
     assert isinstance(exc, ZeroDivisionError)
 
 
-def test_flask_login_not_installed(app, capture_events, monkeypatch):
+def test_flask_login_not_installed(sentry_init, app, capture_events, monkeypatch):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
     monkeypatch.setattr(flask_sentry, "current_user", None)
 
     events = capture_events()
@@ -87,7 +85,9 @@ def test_flask_login_not_installed(app, capture_events, monkeypatch):
     assert event.get("user", {}).get("id") is None
 
 
-def test_flask_login_not_configured(app, capture_events, monkeypatch):
+def test_flask_login_not_configured(sentry_init, app, capture_events, monkeypatch):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
     assert flask_sentry.current_user is not None
 
     events = capture_events()
@@ -98,7 +98,11 @@ def test_flask_login_not_configured(app, capture_events, monkeypatch):
     assert event.get("user", {}).get("id") is None
 
 
-def test_flask_login_partially_configured(app, capture_events, monkeypatch):
+def test_flask_login_partially_configured(
+    sentry_init, app, capture_events, monkeypatch
+):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
     events = capture_events()
 
     login_manager = LoginManager()
@@ -112,7 +116,9 @@ def test_flask_login_partially_configured(app, capture_events, monkeypatch):
 
 
 @pytest.mark.parametrize("user_id", [None, "42", 3])
-def test_flask_login_configured(app, user_id, capture_events, monkeypatch):
+def test_flask_login_configured(sentry_init, app, user_id, capture_events, monkeypatch):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
     class User(object):
         is_authenticated = is_active = True
         is_anonymous = user_id is not None
@@ -146,7 +152,9 @@ def test_flask_login_configured(app, user_id, capture_events, monkeypatch):
         assert event["user"]["id"] == str(user_id)
 
 
-def test_flask_large_json_request(capture_events, app):
+def test_flask_large_json_request(sentry_init, capture_events, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
     data = {"foo": {"bar": "a" * 2000}}
 
     @app.route("/", methods=["POST"])
@@ -171,7 +179,9 @@ def test_flask_large_json_request(capture_events, app):
     assert event["request"]["data_info"] == {"ct": "json", "repr": "structured"}
 
 
-def test_flask_large_formdata_request(capture_events, app):
+def test_flask_large_formdata_request(sentry_init, capture_events, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
     data = {"foo": "a" * 2000}
 
     @app.route("/", methods=["POST"])
@@ -197,7 +207,9 @@ def test_flask_large_formdata_request(capture_events, app):
 
 
 @pytest.mark.parametrize("input_char", [u"a", b"a"])
-def test_flask_large_text_request(input_char, capture_events, app):
+def test_flask_large_text_request(sentry_init, input_char, capture_events, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
     data = input_char * 2000
 
     @app.route("/", methods=["POST"])
@@ -225,7 +237,9 @@ def test_flask_large_text_request(input_char, capture_events, app):
     assert event["request"]["data_info"] == {"ct": "plain", "repr": "other"}
 
 
-def test_flask_large_bytes_request(capture_events, app):
+def test_flask_large_bytes_request(sentry_init, capture_events, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
     data = b"\xc3" * 2000
 
     @app.route("/", methods=["POST"])
@@ -250,7 +264,9 @@ def test_flask_large_bytes_request(capture_events, app):
     assert event["request"]["data_info"] == {"ct": "bytes", "repr": "base64"}
 
 
-def test_flask_files_and_form(capture_events, app):
+def test_flask_files_and_form(sentry_init, capture_events, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
     data = {"foo": "a" * 2000, "file": (BytesIO(b"hello"), "hello.txt")}
 
     @app.route("/", methods=["POST"])
@@ -279,7 +295,16 @@ def test_flask_files_and_form(capture_events, app):
     assert not event["request"]["data"]["file"]
 
 
-def test_errors_not_reported_twice(capture_events, app):
+@pytest.mark.parametrize(
+    "integrations",
+    [
+        [flask_sentry.FlaskIntegration()],
+        [flask_sentry.FlaskIntegration(), LoggingIntegration(event_level="ERROR")],
+    ],
+)
+def test_errors_not_reported_twice(sentry_init, integrations, capture_events, app):
+    sentry_init(integrations=integrations)
+
     @app.route("/")
     def index():
         try:
@@ -297,8 +322,14 @@ def test_errors_not_reported_twice(capture_events, app):
     assert len(events) == 1
 
 
-def test_logging(capture_events, app):
+def test_logging(sentry_init, capture_events, app):
     # ensure that Flask's logger magic doesn't break ours
+    sentry_init(
+        integrations=[
+            flask_sentry.FlaskIntegration(),
+            LoggingIntegration(event_level="ERROR"),
+        ]
+    )
 
     @app.route("/")
     def index():
