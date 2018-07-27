@@ -1,4 +1,4 @@
-# Using Flask with Celery
+# Using Sentry with Celery
 
 Just add ``CeleryIntegration()`` to your ``integrations`` array. For example, in Django:
 
@@ -7,3 +7,7 @@ Just add ``CeleryIntegration()`` to your ``integrations`` array. For example, in
     from sentry_sdk import init
 
     init(dsn="https://foo@sentry.io/123", integrations=[DjangoIntegration(), CeleryIntegration()])
+
+
+With that, the transaction on the event will be set to the task name, and
+exceptions will be reported to Sentry.
