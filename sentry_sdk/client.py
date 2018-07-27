@@ -30,7 +30,13 @@ class Client(object):
             self._transport = Transport(dsn)
             self._transport.start()
 
-        for integration in options.get("integrations", ["logging"]) or ():
+        try:
+            integrations = options['integrations']
+        except KeyError:
+            from .integrations.logging import LoggingIntegration
+            integrations = [LoggingIntegration()]
+
+        for integration in integrations or ():
             integration(self)
 
     @property
