@@ -61,15 +61,13 @@ def strip_event(event, client=None):
 
 
 def strip_default_pii(event):
-    gone = lambda: AnnotatedValue(None, {"rem": [["!strip_default_pii", "x"]]})
-
     if event.get("user"):
-        event["user"] = gone()
+        event["user"] = None
 
     request = event.get("request")
     if request:
         if request.get("cookies"):
-            request["cookies"] = gone()
+            request["cookies"] = None
         if request.get("headers"):
             headers = request["headers"]
             for key in list(headers):
@@ -78,7 +76,7 @@ def strip_default_pii(event):
                     "cookie",
                     "authentication",
                 ):
-                    headers[key] = gone()
+                    headers[key] = None
 
     return event
 
