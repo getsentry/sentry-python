@@ -6,18 +6,35 @@ import sentry_sdk
 other_logger = logging.getLogger("testfoo")
 other_logger.setLevel(logging.DEBUG)
 
-sentry_sdk.get_current_hub().bind_client(sentry_sdk.Client(integrations=["logging"]))
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
 @pytest.mark.parametrize("logger", [logger, other_logger])
-def test_logging(capture_events, logger):
+def test_logging_works_with_many_loggers(sentry_init, capture_events, logger):
+    sentry_init(integrations={"logging": {"event_level": "ERROR"}})
+    events = capture_events()
+
     logger.info("bread")
     logger.critical("LOL")
-    event, = capture_events
+    event, = events
     assert event["level"] == "fatal"
     assert not event["logentry"]["params"]
     assert event["logentry"]["message"] == "LOL"
     assert any(crumb["message"] == "bread" for crumb in event["breadcrumbs"])
+
+
+def test_logging_defaults(sentry_init, capture_events):
+    sentry_init(integrations=["logging"])
+    events = capture_events()
+
+    logger.info("bread")
+    logger.critical("LOL")
+    assert not events
+
+    sentry_sdk.capture_exception(ValueError())
+    event, = events
+
+    assert event["level"] == "error"
+    assert any(crumb["message"] == "bread" for crumb in event["breadcrumbs"])
+    assert any(crumb["message"] == "LOL" for crumb in event["breadcrumbs"])

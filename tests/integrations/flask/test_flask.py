@@ -9,15 +9,17 @@ from flask import Flask, request
 
 from flask_login import LoginManager, login_user
 
-from sentry_sdk import capture_message, Client, get_current_hub, capture_exception
+from sentry_sdk import capture_message, capture_exception
 import sentry_sdk.integrations.flask as flask_sentry
 
-get_current_hub().bind_client(Client(integrations=["flask", "logging"]))
+
 login_manager = LoginManager()
 
 
 @pytest.fixture
-def app():
+def app(sentry_init):
+    sentry_init(integrations={"flask": None, "logging": {"event_level": "ERROR"}})
+
     app = Flask(__name__)
     app.config["TESTING"] = True
     app.secret_key = "haha"
@@ -33,11 +35,13 @@ def app():
 
 
 def test_has_context(app, capture_events):
+    events = capture_events()
+
     client = app.test_client()
     response = client.get("/message")
     assert response.status_code == 200
 
-    event, = capture_events
+    event, = events
     assert event["transaction"] == "hi"
     assert "data" not in event["request"]
     assert event["request"]["url"] == "http://localhost/message"
@@ -53,43 +57,51 @@ def test_errors(capture_exceptions, app, debug, testing):
     def index():
         1 / 0
 
+    exceptions = capture_exceptions()
+
     client = app.test_client()
     try:
         client.get("/")
     except ZeroDivisionError:
         pass
 
-    exc, = capture_exceptions
+    exc, = exceptions
     assert isinstance(exc, ZeroDivisionError)
 
 
 def test_flask_login_not_installed(app, capture_events, monkeypatch):
     monkeypatch.setattr(flask_sentry, "current_user", None)
 
+    events = capture_events()
+
     client = app.test_client()
     client.get("/message")
 
-    event, = capture_events
+    event, = events
     assert event.get("user", {}).get("id") is None
 
 
 def test_flask_login_not_configured(app, capture_events, monkeypatch):
     assert flask_sentry.current_user is not None
+
+    events = capture_events()
     client = app.test_client()
     client.get("/message")
 
-    event, = capture_events
+    event, = events
     assert event.get("user", {}).get("id") is None
 
 
 def test_flask_login_partially_configured(app, capture_events, monkeypatch):
+    events = capture_events()
+
     login_manager = LoginManager()
     login_manager.init_app(app)
 
     client = app.test_client()
     client.get("/message")
 
-    event, = capture_events
+    event, = events
     assert event.get("user", {}).get("id") is None
 
 
@@ -113,13 +125,15 @@ def test_flask_login_configured(app, user_id, capture_events, monkeypatch):
             login_user(User())
         return "ok"
 
+    events = capture_events()
+
     client = app.test_client()
     assert client.get("/login").status_code == 200
-    assert not capture_events
+    assert not events
 
     assert client.get("/message").status_code == 200
 
-    event, = capture_events
+    event, = events
     if user_id is None:
         assert event.get("user", {}).get("id") is None
     else:
@@ -137,11 +151,13 @@ def test_flask_large_json_request(capture_events, app):
         capture_message("hi")
         return "ok"
 
+    events = capture_events()
+
     client = app.test_client()
     response = client.post("/", content_type="application/json", data=json.dumps(data))
     assert response.status_code == 200
 
-    event, = capture_events
+    event, = events
     assert event[""]["request"]["data"]["foo"]["bar"] == {
         "": {"len": 2000, "rem": [["!len", "x", 509, 512]]}
     }
@@ -160,11 +176,13 @@ def test_flask_large_formdata_request(capture_events, app):
         capture_message("hi")
         return "ok"
 
+    events = capture_events()
+
     client = app.test_client()
     response = client.post("/", data=data)
     assert response.status_code == 200
 
-    event, = capture_events
+    event, = events
     assert event[""]["request"]["data"]["foo"] == {
         "": {"len": 2000, "rem": [["!len", "x", 509, 512]]}
     }
@@ -187,11 +205,13 @@ def test_flask_large_text_request(input_char, capture_events, app):
         capture_message("hi")
         return "ok"
 
+    events = capture_events()
+
     client = app.test_client()
     response = client.post("/", data=data)
     assert response.status_code == 200
 
-    event, = capture_events
+    event, = events
     assert event[""]["request"]["data"] == {
         "": {"len": 2000, "rem": [["!len", "x", 509, 512]]}
     }
@@ -210,11 +230,13 @@ def test_flask_large_bytes_request(capture_events, app):
         capture_message("hi")
         return "ok"
 
+    events = capture_events()
+
     client = app.test_client()
     response = client.post("/", data=data)
     assert response.status_code == 200
 
-    event, = capture_events
+    event, = events
     assert event[""]["request"]["data"] == {
         "": {"len": 2668, "rem": [["!len", "x", 509, 512]]}
     }
@@ -233,11 +255,13 @@ def test_flask_files_and_form(capture_events, app):
         capture_message("hi")
         return "ok"
 
+    events = capture_events()
+
     client = app.test_client()
     response = client.post("/", data=data)
     assert response.status_code == 200
 
-    event, = capture_events
+    event, = events
     assert event[""]["request"]["data"]["foo"] == {
         "": {"len": 2000, "rem": [["!len", "x", 509, 512]]}
     }
@@ -258,11 +282,13 @@ def test_errors_not_reported_twice(capture_events, app):
             app.logger.exception(e)
             raise e
 
+    events = capture_events()
+
     client = app.test_client()
     with pytest.raises(ZeroDivisionError):
         client.get("/")
 
-    assert len(capture_events) == 1
+    assert len(events) == 1
 
 
 def test_logging(capture_events, app):
@@ -273,10 +299,12 @@ def test_logging(capture_events, app):
         app.logger.error("hi")
         return "ok"
 
+    events = capture_events()
+
     client = app.test_client()
     client.get("/")
 
-    event, = capture_events
+    event, = events
     assert event["level"] == "error"
 
 

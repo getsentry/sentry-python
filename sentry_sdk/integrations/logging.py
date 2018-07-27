@@ -15,15 +15,14 @@ _installed = False
 _master_handler = None
 
 
-def install(client):
+def install(client, level=logging.INFO, event_level=None):
     global _installed
     global _master_handler
     with _installer_lock:
         if _installed:
             return
 
-        _master_handler = SentryHandler()
-        _master_handler.setLevel(logging.INFO)  # TODO: make configurable
+        _master_handler = SentryHandler(level=level, event_level=event_level)
 
         old_callhandlers = logging.Logger.callHandlers
 
@@ -37,6 +36,13 @@ def install(client):
 
 
 class SentryHandler(logging.Handler, object):
+    def __init__(self, level, event_level):
+        logging.Handler.__init__(self, level)
+        if event_level is None:
+            self._event_level = None
+        else:
+            self._event_level = logging._checkLevel(event_level)
+
     def emit(self, record):
         with _internal_exceptions():
             self.format(record)
@@ -56,7 +62,7 @@ class SentryHandler(logging.Handler, object):
     def _emit(self, record):
         add_breadcrumb(self._breadcrumb_from_record(record))
 
-        if not self._should_Event(record):
+        if not self._should_create_event(record):
             return
 
         if not self.can_record(record):
@@ -85,8 +91,5 @@ class SentryHandler(logging.Handler, object):
     def _logging_to_event_level(self, levelname):
         return {"critical": "fatal"}.get(levelname.lower(), levelname.lower())
 
-    def _should_Event(self, record):
-        # TODO: make configurable
-        if record.levelno in (logging.ERROR, logging.CRITICAL):
-            return True
-        return False
+    def _should_create_event(self, record):
+        return self._event_level is not None and record.levelno >= self._event_level

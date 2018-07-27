@@ -1,4 +1,3 @@
-import sys
 import pytest
 
 django = pytest.importorskip("django")
@@ -15,19 +14,9 @@ from sentry_sdk import Hub
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch_test_transport):
+    monkeypatch_test_transport(Hub.current.client)
     return Client()
-
-
-@pytest.fixture
-def capture_exceptions(monkeypatch):
-    errors = []
-
-    def capture_exception(error=None):
-        errors.append(error or sys.exc_info()[1])
-
-    monkeypatch.setattr(Hub.current, "capture_exception", capture_exception)
-    return errors
 
 
 def test_scope_working(client):
@@ -36,15 +25,19 @@ def test_scope_working(client):
 
 
 def test_view_exceptions(client, capture_exceptions):
+    exceptions = capture_exceptions()
     with pytest.raises(ZeroDivisionError) as exc:
         client.get(reverse("view_exc"))
-    assert capture_exceptions == [exc.value]
+
+    assert exceptions == [exc.value]
 
 
 def test_middleware_exceptions(client, capture_exceptions):
+    exceptions = capture_exceptions()
     with pytest.raises(ZeroDivisionError) as exc:
         client.get(reverse("middleware_exc"))
-    assert capture_exceptions == [exc.value]
+
+    assert exceptions == [exc.value]
 
 
 def test_get_dsn(client):
@@ -53,10 +46,11 @@ def test_get_dsn(client):
 
 
 def test_request_captured(client, capture_events):
+    events = capture_events()
     response = client.get(reverse("message"))
     assert response.content == b"ok"
 
-    event, = capture_events
+    event, = events
     assert event["request"] == {
         "cookies": {},
         "env": {
