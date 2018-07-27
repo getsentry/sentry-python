@@ -7,6 +7,7 @@ from threading import Lock
 
 from sentry_sdk import get_current_hub, capture_event, add_breadcrumb
 from sentry_sdk.utils import to_string, Event, skip_internal_frames
+from sentry_sdk.hub import _internal_exceptions
 
 
 _installer_lock = Lock()
@@ -37,11 +38,9 @@ def install(client):
 
 class SentryHandler(logging.Handler, object):
     def emit(self, record):
-        try:
+        with _internal_exceptions():
             self.format(record)
             return self._emit(record)
-        except Exception:
-            get_current_hub().capture_internal_exception()
 
     def can_record(self, record):
         return not record.name.startswith("sentry_sdk")

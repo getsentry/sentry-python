@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from threading import Lock
 
 from sentry_sdk import capture_exception, get_current_hub
+from sentry_sdk.hub import _internal_exceptions
 from ._wsgi import RequestExtractor
 
 try:
@@ -51,20 +52,14 @@ def _capture_exception(sender, exception, **kwargs):
 def _event_processor(event):
     if request:
         if "transaction" not in event:
-            try:
+            with _internal_exceptions():
                 event["transaction"] = request.url_rule.endpoint
-            except Exception:
-                get_current_hub().capture_internal_exception()
 
-        try:
+        with _internal_exceptions():
             FlaskRequestExtractor(request).extract_into_event(event)
-        except Exception:
-            get_current_hub().capture_internal_exception()
 
-    try:
+    with _internal_exceptions():
         _set_user_info(event)
-    except Exception:
-        get_current_hub().capture_internal_exception()
 
 
 class FlaskRequestExtractor(RequestExtractor):

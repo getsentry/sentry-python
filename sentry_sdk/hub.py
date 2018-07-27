@@ -10,6 +10,14 @@ from .utils import Event, skip_internal_frames, ContextVar, DefaultEventProcesso
 _local = ContextVar("sentry_current_hub")
 
 
+@contextmanager
+def _internal_exceptions():
+    try:
+        yield
+    except Exception:
+        Hub.current.capture_exception()
+
+
 class HubMeta(type):
     @property
     def current(self):

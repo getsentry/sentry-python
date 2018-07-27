@@ -11,6 +11,7 @@ except ImportError:
     from django.core.urlresolvers import resolve
 
 from sentry_sdk import get_current_hub, configure_scope, capture_exception
+from sentry_sdk.hub import _internal_exceptions
 from .._wsgi import RequestExtractor
 
 
@@ -31,7 +32,7 @@ def _get_transaction_from_request(request):
 # not yet available
 class SentryMiddleware(MiddlewareMixin):
     def process_request(self, request):
-        try:
+        with _internal_exceptions():
             get_current_hub().push_scope()
 
             get_current_hub().add_event_processor(
@@ -40,15 +41,11 @@ class SentryMiddleware(MiddlewareMixin):
 
             with configure_scope() as scope:
                 scope.transaction = _get_transaction_from_request(request)
-        except Exception:
-            get_current_hub().capture_internal_exception()
 
     def make_event_processor(self, request):
         def processor(event):
-            try:
+            with _internal_exceptions():
                 DjangoRequestExtractor(request).extract_into_event(event)
-            except Exception:
-                get_current_hub().capture_internal_exception()
 
             # TODO: user info
 

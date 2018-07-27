@@ -5,6 +5,7 @@ from threading import Lock
 from celery.signals import task_failure, task_prerun, task_postrun
 
 from sentry_sdk import get_current_hub, configure_scope, capture_exception
+from sentry_sdk.hub import _internal_exceptions
 
 
 _installer_lock = Lock()
@@ -32,13 +33,11 @@ def _process_failure_signal(sender, task_id, einfo, **kw):
 
 
 def _handle_task_prerun(sender, task, **kw):
-    try:
+    with _internal_exceptions():
         get_current_hub().push_scope()
 
         with configure_scope() as scope:
             scope.transaction = task.name
-    except Exception:
-        get_current_hub().capture_internal_exception()
 
 
 def _handle_task_postrun(sender, task_id, task, **kw):
