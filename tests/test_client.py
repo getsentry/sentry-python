@@ -1,6 +1,6 @@
 import pytest
 from sentry_sdk import Client
-from sentry_sdk.utils import Event
+from sentry_sdk.utils import Event, Dsn
 from sentry_sdk.transport import Transport
 
 
@@ -10,13 +10,13 @@ def test_transport_option(monkeypatch):
     assert str(Client(dsn=dsn).dsn) == dsn
     assert Client().dsn is None
     with pytest.raises(ValueError):
-        Client(dsn, transport=Transport(dsn2))
+        Client(dsn, transport=Transport(Dsn(dsn2)))
     with pytest.raises(ValueError):
-        Client(dsn, transport=Transport(dsn))
-    assert str(Client(transport=Transport(dsn2)).dsn) == dsn2
+        Client(dsn, transport=Transport(Dsn(dsn)))
+    assert str(Client(transport=Transport(Dsn(dsn2))).dsn) == dsn2
 
     monkeypatch.setenv("SENTRY_DSN", dsn)
-    assert str(Client(transport=Transport(dsn2)).dsn) == dsn2
+    assert str(Client(transport=Transport(Dsn(dsn2))).dsn) == dsn2
 
 
 def test_ignore_errors():

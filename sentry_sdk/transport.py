@@ -10,22 +10,24 @@ from datetime import datetime, timedelta
 from ._compat import queue
 from .consts import VERSION
 
+try:
+    from urllib.request import getproxies
+except ImportError:
+    from urllib import getproxies
+
 
 logger = logging.getLogger(__name__)
 
 
-def _make_pool(http_proxy, https_proxy):
-    if https_proxy and http_proxy:
-        raise ValueError("Either http_proxy or https_proxy can be set, not " "both.")
-    elif https_proxy and not https_proxy.startswith("https://"):
-        raise ValueError("https_proxy URL must have https scheme.")
-    elif http_proxy and not http_proxy.startswith("http://"):
-        raise ValueError("http_proxy URL must have http scheme.")
+def _make_pool(dsn, http_proxy, https_proxy):
+    proxy = https_proxy if dsn == "https" else http_proxy
+    if not proxy:
+        proxy = getproxies().get(dsn.scheme)
 
-    opts = {"num_pools": 2, "cert_reqs": "CERT_REQUIRED", "ca_certs": certifi.where()}
+    opts = {"num_pools": 2, "cert_reqs": "CERT_NONE", "ca_certs": certifi.where()}
 
-    if https_proxy or http_proxy:
-        return urllib3.ProxyManager(https_proxy or http_proxy, **opts)
+    if proxy:
+        return urllib3.ProxyManager(proxy, **opts)
     else:
         return urllib3.PoolManager(**opts)
 
@@ -93,7 +95,7 @@ class Transport(object):
         self.dsn = dsn
         self._queue = None
         self._done = False
-        self._pool = _make_pool(http_proxy=http_proxy, https_proxy=https_proxy)
+        self._pool = _make_pool(dsn, http_proxy=http_proxy, https_proxy=https_proxy)
 
     def start(self):
         if self._queue is None:

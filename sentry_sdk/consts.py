@@ -1,4 +1,3 @@
-import os
 import socket
 
 VERSION = "0.1"
@@ -17,8 +16,8 @@ DEFAULT_OPTIONS = {
     "transport": None,
     "sample_rate": 1.0,
     "send_default_pii": False,
-    "http_proxy": os.environ.get("http_proxy"),
-    "https_proxy": os.environ.get("https_proxy"),
+    "http_proxy": None,
+    "https_proxy": None,
     "ignore_errors": (),
 }
 
