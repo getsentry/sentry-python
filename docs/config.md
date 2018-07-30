@@ -28,7 +28,8 @@
         # the prefix where the local source code is found in the repo
         'prefix': 'src'
     }
-- ``dist`` (default: ``None``): An optional distribution identifier (FIXME)
+- ``dist`` (default: ``None``): An optional distribution identifier in addition
+  to ``release`` (e.g. release ``1.0.3``, distribution ``2``).
 - ``transport`` (default: ``None``): You may pass your own instance of
   ``sentry_sdk.transport.Transport`` if you have special requirements w.r.t.
   how your HTTP data is sent. This interface is not documented yet.
