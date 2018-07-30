@@ -30,7 +30,11 @@ class Client(object):
         self.options = options
         self._transport = self.options.pop("transport")
         if self._transport is None and dsn is not None:
-            self._transport = Transport(dsn)
+            self._transport = Transport(
+                dsn=dsn,
+                http_proxy=self.options.pop("http_proxy"),
+                https_proxy=self.options.pop("https_proxy"),
+            )
             self._transport.start()
         elif passed_dsn is not None and self._transport is not None:
             raise ValueError("Cannot pass DSN and a custom transport.")
