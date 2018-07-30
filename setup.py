@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 setup(
     name="sentry-sdk",
     version="0.1.0-preview2",
-    author="Sentry",
+    author="Sentry Team and Contributors",
     author_email="hello@getsentry.com",
     url="https://github.com/getsentry/sentry-sdk",
     description="Python client for Sentry (https://getsentry.com)",
