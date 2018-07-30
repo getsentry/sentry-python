@@ -6,8 +6,6 @@
     <h1>sentry-python - Sentry SDK for Python</h1>
 </p>
 
-Experimental Python SDK
-
 [![Build Status](https://travis-ci.com/getsentry/sentry-python.svg?branch=master)](https://travis-ci.com/getsentry/sentry-python)
 
 ***Sentry-Python is an experimental SDK for Sentry.*** For a stable one, use
