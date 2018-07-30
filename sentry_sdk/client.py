@@ -1,7 +1,6 @@
 import os
 import uuid
 import random
-import inspect
 
 from .utils import Dsn, SkipEvent, ContextVar
 from .transport import Transport
