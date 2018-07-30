@@ -89,7 +89,7 @@ def spawn_thread(transport):
 
 
 class Transport(object):
-    def __init__(self, dsn, http_proxy, https_proxy):
+    def __init__(self, dsn, http_proxy=None, https_proxy=None):
         self.dsn = dsn
         self._queue = None
         self._done = False

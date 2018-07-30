@@ -19,6 +19,7 @@ DEFAULT_OPTIONS = {
     "send_default_pii": False,
     "http_proxy": os.environ.get("http_proxy"),
     "https_proxy": os.environ.get("https_proxy"),
+    "ignore_errors": (),
 }
 
 SDK_INFO = {"name": "sentry-python", "version": VERSION}

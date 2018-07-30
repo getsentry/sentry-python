@@ -1,6 +1,7 @@
 import os
 import uuid
 import random
+import inspect
 
 from .utils import Dsn, SkipEvent, ContextVar
 from .transport import Transport
@@ -67,11 +68,6 @@ class Client(object):
         if event.get("event_id") is None:
             event["event_id"] = uuid.uuid4().hex
 
-        if event._exc_value is not None:
-            if _most_recent_exception.get(None) is event._exc_value:
-                raise SkipEvent()
-            _most_recent_exception.set(event._exc_value)
-
         if scope is not None:
             scope.apply_to_event(event)
 
@@ -84,21 +80,34 @@ class Client(object):
         if event.get("platform") is None:
             event["platform"] = "python"
 
+        event = strip_event(event)
+        event = flatten_metadata(event)
+        return event
+
+    def _check_should_capture(self, event):
         if (
             self.options["sample_rate"] < 1.0
             and random.random() >= self.options["sample_rate"]
         ):
             raise SkipEvent()
 
-        event = strip_event(event)
-        event = flatten_metadata(event)
-        return event
+        if event._exc_value is not None:
+            exclusions = self.options["ignore_errors"]
+            exc_type = type(event._exc_value)
+
+            if any(inspect.isclass(e) and issubclass(exc_type, e) for e in exclusions):
+                raise SkipEvent()
+
+            if _most_recent_exception.get(None) is event._exc_value:
+                raise SkipEvent()
+            _most_recent_exception.set(event._exc_value)
 
     def capture_event(self, event, scope=None):
         """Captures an event."""
         if self._transport is None:
             return
         try:
+            self._check_should_capture(event)
             event = self._prepare_event(event, scope)
         except SkipEvent:
             return
