@@ -63,10 +63,7 @@ def spawn_thread(transport):
     def thread():
         disabled_until = None
         while 1:
-            try:
-                item = transport._queue.get(timeout=0.5)
-            except queue.Empty:
-                continue
+            item = transport._queue.get()
             if disabled_until is not None:
                 if disabled_until < datetime.utcnow():
                     continue
