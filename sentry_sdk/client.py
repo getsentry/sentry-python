@@ -95,7 +95,7 @@ class Client(object):
             exclusions = self.options["ignore_errors"]
             exc_type = type(event._exc_value)
 
-            if any(inspect.isclass(e) and issubclass(exc_type, e) for e in exclusions):
+            if any(issubclass(exc_type, e) for e in exclusions):
                 raise SkipEvent()
 
             if _most_recent_exception.get(None) is event._exc_value:
