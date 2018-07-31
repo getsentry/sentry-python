@@ -14,7 +14,7 @@ setup(
     version="0.1.0-preview5",
     author="Sentry Team and Contributors",
     author_email="hello@getsentry.com",
-    url="https://github.com/getsentry/sentry-sdk",
+    url="https://github.com/getsentry/sentry-python",
     description="Python client for Sentry (https://getsentry.com)",
     long_description=long_description,
     long_description_content_type="text/markdown",
