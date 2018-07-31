@@ -264,7 +264,7 @@ def frame_from_traceback(tb, with_locals=True):
         abs_path = None
         function = None
     try:
-        module = frame.f_globals["__module__"]
+        module = frame.f_globals["__name__"]
     except Exception:
         module = None
 
@@ -353,6 +353,18 @@ class Event(Mapping):
 
     def __len__(self):
         return len(self._data)
+
+    def iter_frames(self):
+        stacktraces = []
+        if "stacktrace" in self:
+            stacktraces.append(self["stacktrace"])
+        if "exception" in self:
+            for exception in self["exception"].get("values") or ():
+                if "stacktrace" in exception:
+                    stacktraces.append(exception["stacktrace"])
+        for stacktrace in stacktraces:
+            for frame in stacktrace.get("frames") or ():
+                yield frame
 
 
 class SkipEvent(Exception):
