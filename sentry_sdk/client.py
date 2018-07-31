@@ -1,6 +1,7 @@
 import os
 import uuid
 import random
+import atexit
 
 from .utils import Dsn, SkipEvent, ContextVar
 from .transport import Transport
@@ -51,6 +52,8 @@ class Client(object):
 
         for integration in integrations:
             integration(self)
+
+        atexit.register(self.close)
 
     @property
     def dsn(self):

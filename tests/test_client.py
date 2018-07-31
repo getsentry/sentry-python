@@ -1,7 +1,11 @@
+import time
 import pytest
+import sys
+import subprocess
+from textwrap import dedent
 from sentry_sdk import Client
-from sentry_sdk.utils import Event, Dsn
 from sentry_sdk.transport import Transport
+from sentry_sdk.utils import Event, Dsn
 
 
 def test_transport_option(monkeypatch):
@@ -42,3 +46,34 @@ def test_ignore_errors():
     c.capture_event(e(Exception))
     c.capture_event(e(ValueError))
     pytest.raises(EventCaptured, lambda: c.capture_event(e(BaseException)))
+
+
+@pytest.mark.parametrize("num_messages", [10, 20])
+def test_atexit(tmpdir, monkeypatch, num_messages):
+    app = tmpdir.join("app.py")
+    app.write(
+        dedent(
+            """
+    import time
+    from sentry_sdk import init, transport, capture_message
+
+    def send_event(pool, event, auth):
+        time.sleep(0.1)
+        print(event["message"])
+
+    transport.send_event = send_event
+    init("http://foobar@localhost/123", drain_timeout={num_messages})
+
+    for _ in range({num_messages}):
+        capture_message("HI")
+    """.format(
+                num_messages=num_messages
+            )
+        )
+    )
+
+    start = time.time()
+    output = subprocess.check_output([sys.executable, str(app)])
+    end = time.time()
+    assert int(end - start) == num_messages / 10
+    assert output.count(b"HI") == num_messages
