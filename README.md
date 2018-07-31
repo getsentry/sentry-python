@@ -51,6 +51,29 @@ Scopes can be nested. If you call ``push_scope`` inside of the
 ``with``-statement again, that scope will be pushed onto a stack. It will also
 inherit all data from the outer scope.
 
+### Scopes in unconfigured environments
+
+If you never call ``init``, no data will ever get sent to any server. In such
+situations, code like this is essentially deadweight:
+
+    with sentry_sdk.configure_scope() as scope:
+        scope.user = _get_user_data()
+
+Sentry-Python supports an alternative syntax for configuring a scope that
+solves this problem:
+
+    @sentry_sdk.configure_scope
+    def _(scope):
+        scope.user = _get_user_data()
+
+Your function will just not be executed if there is no client configured.
+
+In your testing and development environment you still might want to run that
+code without sending any events. In that case, simply call ``init`` without a
+DSN:
+
+    sentry_sdk.init()
+
 ### Breadcrumbs
 
 Breadcrumbs also live on the stack. By default any (non-debug) log message

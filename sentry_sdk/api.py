@@ -17,8 +17,7 @@ class _InitGuard(object):
 
 def init(*args, **kwargs):
     client = Client(*args, **kwargs)
-    if client.dsn is not None:
-        Hub.main.bind_client(client)
+    Hub.main.bind_client(client)
     return _InitGuard(client)
 
 

@@ -184,10 +184,22 @@ class Hub(with_metaclass(HubMeta)):
         assert self._stack
         return rv
 
-    @contextmanager
-    def configure_scope(self):
+    def configure_scope(self, callback=None):
         """Reconfigures the scope."""
-        yield self._stack[-1][1]
+        client, scope = self._stack[-1]
+        if callback is not None:
+            if client is not None and scope is not None:
+                callback(scope)
+        else:
+
+            @contextmanager
+            def inner():
+                if client is not None and scope is not None:
+                    yield scope
+                else:
+                    yield Scope()
+
+            return inner()
 
     def _flush_event_processors(self):
         rv = self._pending_processors

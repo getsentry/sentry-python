@@ -38,14 +38,17 @@ def add_breadcrumb(*args, **kwargs):
 
 
 @public
-@contextmanager
-def configure_scope():
+def configure_scope(callback=None):
     hub = Hub.current
     if hub is not None:
-        with hub.configure_scope() as scope:
-            yield scope
-    else:
-        yield Scope()
+        return hub.configure_scope(callback)
+    elif callback is None:
+
+        @contextmanager
+        def inner():
+            yield Scope()
+
+        return inner()
 
 
 @public

@@ -3,7 +3,8 @@ import pytest
 import sys
 import subprocess
 from textwrap import dedent
-from sentry_sdk import Client
+from sentry_sdk import init, Hub, Client, configure_scope
+from sentry_sdk.hub import HubMeta
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import Event, Dsn
 
@@ -77,3 +78,46 @@ def test_atexit(tmpdir, monkeypatch, num_messages):
     end = time.time()
     assert int(end - start) == num_messages / 10
     assert output.count(b"HI") == num_messages
+
+
+def test_configure_scope_available(request, monkeypatch):
+    # Test that scope is configured if client is configured
+    init()
+    request.addfinalizer(lambda: Hub.current.bind_client(None))
+
+    with configure_scope() as scope:
+        assert scope is Hub.current._stack[-1][1]
+        scope.set_tag("foo", "bar")
+
+    calls = []
+
+    def callback(scope):
+        calls.append(scope)
+        scope.set_tag("foo", "bar")
+
+    assert configure_scope(callback) is None
+    assert len(calls) == 1
+    assert calls[0] is Hub.current._stack[-1][1]
+
+
+@pytest.mark.parametrize("no_sdk", (True, False))
+def test_configure_scope_unavailable(no_sdk, monkeypatch):
+    if no_sdk:
+        # Emulate sentry_minimal without SDK installation: callbacks are not called
+        monkeypatch.setattr(HubMeta, "current", None)
+        assert not Hub.current
+    else:
+        # Still, no client configured
+        assert Hub.current
+
+    calls = []
+
+    def callback(scope):
+        calls.append(scope)
+        scope.set_tag("foo", "bar")
+
+    with configure_scope() as scope:
+        scope.set_tag("foo", "bar")
+
+    assert configure_scope(callback) is None
+    assert not calls
