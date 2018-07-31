@@ -10,9 +10,8 @@ try:
 except ImportError:
     current_user = None
 
-from flask import request
+from flask import current_app, request
 from flask.signals import (
-    current_app,
     appcontext_pushed,
     appcontext_tearing_down,
     got_request_exception,
