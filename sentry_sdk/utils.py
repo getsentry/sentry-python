@@ -372,8 +372,6 @@ try:
 except ImportError:
     from threading import local
 
-    _nothing = object()
-
     class ContextVar(object):
         # Super-limited impl of ContextVar
 

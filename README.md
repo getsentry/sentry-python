@@ -88,6 +88,15 @@ breadcrumbs manually:
         "message": "hi"
     })
 
+### Concurrency
+
+* Sentry-Python currently does not support gevent-based setups.
+* On ``init``, Sentry-Python spawns a thread on its own. That means if you use
+  ``uwsgi``, you currently need to enable threads.
+* On Python 3.7, Sentry-Python supports and automatically uses ``ContextVars``.
+  This should effectively enable Sentry-Python to work with ``asyncio`` under
+  that Python version.
+
 ## Integrations
 
 Head over to [the other pages](./docs/) to check out integrations, which use
