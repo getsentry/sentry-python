@@ -76,4 +76,4 @@ def test_atexit(tmpdir, monkeypatch, num_messages):
     output = subprocess.check_output([sys.executable, str(app)])
     end = time.time()
     assert int(end - start) == num_messages / 10
-    assert output.count("HI") == num_messages
+    assert output.count(b"HI") == num_messages
