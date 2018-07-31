@@ -2,16 +2,16 @@
     <a href="https://sentry.io" target="_blank" align="center">
         <img src="https://sentry-brand.storage.googleapis.com/sentry-logo-black.png" width="280">
     </a>
-<br/>
-    <h1>sentry-python - Sentry SDK for Python</h1>
 </p>
+
+# sentry-python - Sentry SDK for Python
 
 [![Build Status](https://travis-ci.com/getsentry/sentry-python.svg?branch=master)](https://travis-ci.com/getsentry/sentry-python)
 
 ***Sentry-Python is an experimental SDK for Sentry.*** For a stable one, use
 [raven](https://github.com/getsentry/raven-python).
 
-# Getting started with the new Sentry SDK for Python
+## Getting started with the new Sentry SDK for Python
 
 Install this package with ``pip install sentry-sdk``. Then, in your code:
 
