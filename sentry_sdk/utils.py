@@ -354,6 +354,18 @@ class Event(Mapping):
     def __len__(self):
         return len(self._data)
 
+    def iter_frames(self):
+        stacktraces = []
+        if "stacktrace" in self:
+            stacktraces.append(self["stacktrace"])
+        if "exception" in self:
+            for exception in self["exception"].get("values") or ():
+                if "stacktrace" in exception:
+                    stacktraces.append(exception["stacktrace"])
+        for stacktrace in stacktraces:
+            for frame in stacktrace.get("frames") or ():
+                yield frame
+
 
 class SkipEvent(Exception):
     """Risen from an event processor to indicate that the event should be

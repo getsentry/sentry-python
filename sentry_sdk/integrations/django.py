@@ -63,9 +63,22 @@ class DjangoIntegration(Integration):
                 with _internal_exceptions():
                     _set_user_info(request, event)
 
-            # TODO: user info
+            with _internal_exceptions():
+                _process_frames(event)
 
         return processor
+
+
+def _process_frames(event):
+    for frame in event.iter_frames():
+        if "in_app" in frame:
+            continue
+
+        module = frame.get("module")
+        if not module:
+            continue
+        if module.startswith("django."):
+            frame["in_app"] = False
 
 
 def _got_request_exception(request=None, **kwargs):

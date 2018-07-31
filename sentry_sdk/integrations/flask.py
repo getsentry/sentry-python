@@ -12,6 +12,7 @@ except ImportError:
 
 from flask import request
 from flask.signals import (
+    current_app,
     appcontext_pushed,
     appcontext_tearing_down,
     got_request_exception,
@@ -55,6 +56,23 @@ def _event_processor(event):
     if _should_send_default_pii():
         with _internal_exceptions():
             _set_user_info(event)
+
+    with _internal_exceptions():
+        _process_frames(event)
+
+
+def _process_frames(event):
+    for frame in event.iter_frames():
+        if "in_app" in frame:
+            continue
+        module = frame.get("module")
+        if not module:
+            continue
+
+        if module.startswith("flask."):
+            frame["in_app"] = False
+        elif current_app and module.startswith(current_app.name):
+            frame["in_app"] = True
 
 
 class FlaskRequestExtractor(RequestExtractor):
