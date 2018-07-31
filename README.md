@@ -108,6 +108,5 @@ with events by default. You need to explicitly enable this behavior with the
 
 ## Integrations
 
-Head over to [the other
-pages](https://github.com/getsentry/sentry-python/tree/master/docs) to check
-out integrations, which use these low-level APIs so you don't have to.
+Head over to [the other pages](https://github.com/getsentry/sentry-python/tree/master/docs)
+to check out integrations, which use these low-level APIs so you don't have to.
