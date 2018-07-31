@@ -24,7 +24,7 @@ def _make_pool(dsn, http_proxy, https_proxy):
     if not proxy:
         proxy = getproxies().get(dsn.scheme)
 
-    opts = {"num_pools": 2, "cert_reqs": "CERT_NONE", "ca_certs": certifi.where()}
+    opts = {"num_pools": 2, "cert_reqs": "CERT_REQUIRED", "ca_certs": certifi.where()}
 
     if proxy:
         return urllib3.ProxyManager(proxy, **opts)
