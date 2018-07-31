@@ -7,7 +7,7 @@ from os import path
 
 this_directory = path.abspath(path.dirname(__file__))
 with open(path.join(this_directory, "README.md")) as f:
-    long_description = "".join(f.read().splitlines()[6:])
+    long_description = "\n".join(f.read().splitlines()[6:])
 
 setup(
     name="sentry-sdk",
