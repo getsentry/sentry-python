@@ -77,7 +77,7 @@ def _process_frames(event):
         module = frame.get("module")
         if not module:
             continue
-        if module.startswith("django."):
+        if module == "django" or module.startswith("django."):
             frame["in_app"] = False
 
 

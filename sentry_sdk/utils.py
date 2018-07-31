@@ -264,7 +264,7 @@ def frame_from_traceback(tb, with_locals=True):
         abs_path = None
         function = None
     try:
-        module = frame.f_globals["__module__"]
+        module = frame.f_globals["__name__"]
     except Exception:
         module = None
 

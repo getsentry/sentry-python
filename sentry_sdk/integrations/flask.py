@@ -68,9 +68,12 @@ def _process_frames(event):
         if not module:
             continue
 
-        if module.startswith("flask."):
+        if module == "flask" or module.startswith("flask."):
             frame["in_app"] = False
-        elif current_app and module.startswith(current_app.name):
+        elif current_app and (
+            module.startswith("%s." % current_app.import_name)
+            or module == current_app.import_name
+        ):
             frame["in_app"] = True
 
 
