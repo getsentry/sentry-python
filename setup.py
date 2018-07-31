@@ -11,7 +11,7 @@ with open(path.join(this_directory, "README.md")) as f:
 
 setup(
     name="sentry-sdk",
-    version="0.1.0-preview4",
+    version="0.1.0-preview5",
     author="Sentry Team and Contributors",
     author_email="hello@getsentry.com",
     url="https://github.com/getsentry/sentry-sdk",
