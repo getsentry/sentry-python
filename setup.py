@@ -4,8 +4,9 @@ from setuptools import setup, find_packages
 
 # read the contents of your README file
 from os import path
+
 this_directory = path.abspath(path.dirname(__file__))
-with open(path.join(this_directory, 'README.md')) as f:
+with open(path.join(this_directory, "README.md")) as f:
     long_description = f.read()
 
 setup(
@@ -16,7 +17,7 @@ setup(
     url="https://github.com/getsentry/sentry-sdk",
     description="Python client for Sentry (https://getsentry.com)",
     long_description=long_description,
-    long_description_content_type='text/markdown',
+    long_description_content_type="text/markdown",
     packages=find_packages(exclude=("tests", "tests.*")),
     zip_safe=False,
     license="BSD",
