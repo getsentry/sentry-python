@@ -44,8 +44,8 @@ def _capture_exception(sender, exception, **kwargs):
 
 
 def _make_event_processor():
-    request = getattr(_request_ctx_stack.top, 'request', None)
-    app = getattr(_app_ctx_stack.top, 'app', None)
+    request = getattr(_request_ctx_stack.top, "request", None)
+    app = getattr(_app_ctx_stack.top, "app", None)
 
     def event_processor(event):
         if request:
