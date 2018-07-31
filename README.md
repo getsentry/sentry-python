@@ -88,7 +88,7 @@ breadcrumbs manually:
         "message": "hi"
     })
 
-### Concurrency
+## Concurrency
 
 * Sentry-Python currently does not support gevent-based setups.
 * On ``init``, Sentry-Python spawns a thread on its own. That means if you use
