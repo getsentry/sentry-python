@@ -13,7 +13,7 @@ In your ``settings.py``:
 
     * Personally identifiable information (such as user ids, usernames,
       cookies, authorization headers, ip addresses) is excluded unless
-      ``send_default_pii`` is set to ``true``. See ``README.md``, section "PII"
+      ``send_default_pii`` is set to ``True``. See ``README.md``, section "PII"
 
     * Request data is attached to all events.
 

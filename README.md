@@ -97,6 +97,15 @@ breadcrumbs manually:
   This should effectively enable Sentry-Python to work with ``asyncio`` under
   that Python version.
 
+
+## PII
+
+Currently Sentry-Python does not send any personally-identifiable user data
+with events by default. You need to explicitly enable this behavior with the
+``send_default_pii`` option passed to ``init``:
+
+    init(..., send_default_pii=True)
+
 ## Integrations
 
 Head over to [the other pages](./docs/) to check out integrations, which use
