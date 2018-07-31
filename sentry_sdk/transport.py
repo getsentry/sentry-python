@@ -1,5 +1,6 @@
+from __future__ import print_function
+
 import json
-import time
 import zlib
 import urllib3
 import logging
