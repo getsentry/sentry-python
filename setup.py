@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
+"""
+Sentry-Python - Sentry SDK for Python
+=====================================
+
+**Sentry-Python is an experimental SDK for Sentry.** Check out `GitHub
+<https://github.com/getsentry/sentry-python>`_ to find out more.
+"""
+
 from setuptools import setup, find_packages
-
-# read the contents of your README file
-from os import path
-
-this_directory = path.abspath(path.dirname(__file__))
-with open(path.join(this_directory, "README.md")) as f:
-    long_description = "\n".join(f.read().splitlines()[6:])
 
 setup(
     name="sentry-sdk",
@@ -16,8 +17,7 @@ setup(
     author_email="hello@getsentry.com",
     url="https://github.com/getsentry/sentry-python",
     description="Python client for Sentry (https://getsentry.com)",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
+    long_description=__doc__,
     packages=find_packages(exclude=("tests", "tests.*")),
     zip_safe=False,
     license="BSD",
