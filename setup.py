@@ -12,7 +12,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="sentry-sdk",
-    version="0.1.0-preview10",
+    version="0.1.0-preview11",
     author="Sentry Team and Contributors",
     author_email="hello@getsentry.com",
     url="https://github.com/getsentry/sentry-python",
