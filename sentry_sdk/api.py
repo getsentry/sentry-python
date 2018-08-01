@@ -21,7 +21,7 @@ def init(*args, **kwargs):
     return _InitGuard(client)
 
 
-import sentry_minimal
+from . import  minimal as sentry_minimal
 
 __all__ = ["Hub", "Scope", "Client", "init"] + sentry_minimal.__all__
 
