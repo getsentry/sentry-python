@@ -55,9 +55,13 @@ class DjangoIntegration(Integration):
         signals.got_request_exception.connect(_got_request_exception)
 
     def _make_event_processor(self, request):
+        client_options = get_current_hub().client.options
+
         def processor(event):
             with _internal_exceptions():
-                DjangoRequestExtractor(request).extract_into_event(event)
+                DjangoRequestExtractor(request).extract_into_event(
+                    event, client_options
+                )
 
             if _should_send_default_pii():
                 with _internal_exceptions():

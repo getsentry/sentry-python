@@ -58,6 +58,14 @@ class Client(object):
         for integration in integrations:
             integration(self)
 
+        request_bodies = ("always", "never", "small", "medium")
+        if options["request_bodies"] not in request_bodies:
+            raise ValueError(
+                "Invalid value for request_bodies. Must be one of {}".format(
+                    request_bodies
+                )
+            )
+
         atexit.register(self.close)
 
     @property

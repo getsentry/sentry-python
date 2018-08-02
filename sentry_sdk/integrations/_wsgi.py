@@ -1,5 +1,4 @@
 import json
-import base64
 
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.stripping import AnnotatedValue
@@ -38,7 +37,7 @@ class RequestExtractor(object):
     def __init__(self, request):
         self.request = request
 
-    def extract_into_event(self, event):
+    def extract_into_event(self, event, client_options):
         if "request" in event:
             return
 
@@ -62,40 +61,48 @@ class RequestExtractor(object):
                 not in ("set-cookie", "cookie", "authentication")
             }
 
-        if self.form or self.files:
+        bodies = client_options.get("request_bodies")
+        if (
+            bodies == "never"
+            or (bodies == "small" and self.content_length > 10 ** 3)
+            or (bodies == "medium" and self.content_length > 10 ** 6)
+        ):
+            data = AnnotatedValue(
+                "",
+                {
+                    "rem": [["!config", "x", 0, self.content_length]],
+                    "len": self.content_length,
+                },
+            )
+        elif self.form or self.files:
             data = dict(self.form.items())
             for k, v in self.files.items():
+                size = self.size_of_file(v)
                 data[k] = AnnotatedValue(
-                    "",
-                    {"len": self.size_of_file(v), "rem": [["!filecontent", "x", 0, 0]]},
+                    "", {"len": size, "rem": [["!filecontent", "x", 0, size]]}
                 )
 
-            if self.files or self.form_is_multipart:
-                ct = "multipart"
-            else:
-                ct = "urlencoded"
-            repr = "structured"
         elif self.json is not None:
             data = self.json
-            ct = "json"
-            repr = "structured"
         elif self.raw_data:
-            data = self.raw_data
-
-            try:
-                if isinstance(data, bytes):
-                    data = data.decode("utf-8")
-                ct = "plain"
-                repr = "other"
-            except UnicodeDecodeError:
-                ct = "bytes"
-                repr = "base64"
-                data = base64.b64encode(data).decode("ascii")
+            data = AnnotatedValue(
+                "",
+                {
+                    "rem": [["!rawbody", "x", 0, self.content_length]],
+                    "len": self.content_length,
+                },
+            )
         else:
             return
 
         request_info["data"] = data
-        request_info["data_info"] = {"ct": ct, "repr": repr}
+
+    @property
+    def content_length(self):
+        try:
+            return int(self.env.get("CONTENT_LENGTH", 0))
+        except ValueError:
+            return 0
 
     @property
     def url(self):

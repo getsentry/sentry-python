@@ -182,10 +182,9 @@ def test_flask_large_json_request(sentry_init, capture_events, app):
         "": {"len": 2000, "rem": [["!len", "x", 509, 512]]}
     }
     assert len(event["request"]["data"]["foo"]["bar"]) == 512
-    assert event["request"]["data_info"] == {"ct": "json", "repr": "structured"}
 
 
-def test_flask_large_formdata_request(sentry_init, capture_events, app):
+def test_flask_medium_formdata_request(sentry_init, capture_events, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     data = {"foo": "a" * 2000}
@@ -209,12 +208,11 @@ def test_flask_large_formdata_request(sentry_init, capture_events, app):
         "": {"len": 2000, "rem": [["!len", "x", 509, 512]]}
     }
     assert len(event["request"]["data"]["foo"]) == 512
-    assert event["request"]["data_info"] == {"ct": "urlencoded", "repr": "structured"}
 
 
 @pytest.mark.parametrize("input_char", [u"a", b"a"])
-def test_flask_large_text_request(sentry_init, input_char, capture_events, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="small")
 
     data = input_char * 2000
 
@@ -237,41 +235,13 @@ def test_flask_large_text_request(sentry_init, input_char, capture_events, app):
 
     event, = events
     assert event[""]["request"]["data"] == {
-        "": {"len": 2000, "rem": [["!len", "x", 509, 512]]}
+        "": {"len": 2000, "rem": [["!config", "x", 0, 2000]]}
     }
-    assert len(event["request"]["data"]) == 512
-    assert event["request"]["data_info"] == {"ct": "plain", "repr": "other"}
-
-
-def test_flask_large_bytes_request(sentry_init, capture_events, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
-
-    data = b"\xc3" * 2000
-
-    @app.route("/", methods=["POST"])
-    def index():
-        assert not request.form
-        assert request.data == data
-        assert not request.json
-        capture_message("hi")
-        return "ok"
-
-    events = capture_events()
-
-    client = app.test_client()
-    response = client.post("/", data=data)
-    assert response.status_code == 200
-
-    event, = events
-    assert event[""]["request"]["data"] == {
-        "": {"len": 2668, "rem": [["!len", "x", 509, 512]]}
-    }
-    assert len(event["request"]["data"]) == 512
-    assert event["request"]["data_info"] == {"ct": "bytes", "repr": "base64"}
+    assert not event["request"]["data"]
 
 
 def test_flask_files_and_form(sentry_init, capture_events, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="always")
 
     data = {"foo": "a" * 2000, "file": (BytesIO(b"hello"), "hello.txt")}
 

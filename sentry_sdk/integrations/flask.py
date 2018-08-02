@@ -46,6 +46,7 @@ def _capture_exception(sender, exception, **kwargs):
 def _make_event_processor():
     request = getattr(_request_ctx_stack.top, "request", None)
     app = getattr(_app_ctx_stack.top, "app", None)
+    client_options = get_current_hub().client.options
 
     def event_processor(event):
         if request:
@@ -54,7 +55,7 @@ def _make_event_processor():
                     event["transaction"] = request.url_rule.endpoint
 
             with _internal_exceptions():
-                FlaskRequestExtractor(request).extract_into_event(event)
+                FlaskRequestExtractor(request).extract_into_event(event, client_options)
 
         if _should_send_default_pii():
             with _internal_exceptions():

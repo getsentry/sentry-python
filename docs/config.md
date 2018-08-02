@@ -49,3 +49,11 @@
   The provided list must contain actual classes, "string identifiers" are not
   supported. Subclass hierarchies are respected, for example, setting
   ``ignore_errors=[BaseException]`` will ignore all exceptions.
+- ``request_bodies`` (default ``"medium"``): One of
+  ``always|medium|small|never``. Whether to send the request body with each event.
+
+  - ``always``: Always send the request body. It is still omitted if it is not
+    JSON or formdata.
+  - ``medium``: Send "medium-large" request bodies but omit bigger ones.
+  - ``small``: Send "small" request bodies but omit bigger ones.
+  - ``never``: Never touch the request body.
