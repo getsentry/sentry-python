@@ -3,7 +3,7 @@ import uuid
 import random
 import atexit
 
-from .utils import Dsn, SkipEvent, ContextVar
+from .utils import Dsn, SkipEvent, ContextVar, Event
 from .transport import Transport
 from .consts import DEFAULT_OPTIONS, SDK_INFO
 from .stripping import strip_event, flatten_metadata
@@ -121,6 +121,8 @@ class Client(object):
         """Captures an event."""
         if self._transport is None:
             return
+        if not isinstance(event, Event):
+            event = Event(event)
         try:
             self._check_should_capture(event)
             event = self._prepare_event(event, scope)

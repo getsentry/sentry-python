@@ -316,12 +316,15 @@ def exceptions_from_error_tuple(exc_type, exc_value, tb, with_locals=True):
 class Event(Mapping):
     __slots__ = ("_data", "_exc_value")
 
-    def __init__(self):
+    def __init__(self, data={}):
         self._data = {
             "event_id": uuid.uuid4().hex,
             "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
             "level": "error",
         }
+
+        self._data.update(data)
+
         self._exc_value = None
 
     def get_json(self):

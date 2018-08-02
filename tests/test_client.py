@@ -8,6 +8,19 @@ from sentry_sdk.hub import HubMeta
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import Event, Dsn
 
+class EventCaptured(Exception):
+    pass
+
+class _TestTransport(Transport):
+    def __init__(self, *a, **kw):
+        pass
+
+    def start(self):
+        pass
+
+    def capture_event(self, event):
+        raise EventCaptured()
+
 
 def test_transport_option(monkeypatch):
     dsn = "https://foo@sentry.io/123"
@@ -30,23 +43,16 @@ def test_ignore_errors():
         rv._exc_value = exc_type()
         return rv
 
-    class EventCaptured(Exception):
-        pass
-
-    class TestTransport(Transport):
-        def __init__(self, *a, **kw):
-            pass
-
-        def start(self):
-            pass
-
-        def capture_event(self, event):
-            raise EventCaptured()
-
-    c = Client(ignore_errors=[Exception], transport=TestTransport())
+    c = Client(ignore_errors=[Exception], transport=_TestTransport())
     c.capture_event(e(Exception))
     c.capture_event(e(ValueError))
     pytest.raises(EventCaptured, lambda: c.capture_event(e(BaseException)))
+
+
+def test_capture_event_works():
+    c = Client(transport=_TestTransport())
+    pytest.raises(EventCaptured, lambda: c.capture_event({}))
+    pytest.raises(EventCaptured, lambda: c.capture_event(Event()))
 
 
 @pytest.mark.parametrize("num_messages", [10, 20])
