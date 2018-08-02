@@ -22,6 +22,21 @@ class _TestTransport(Transport):
         raise EventCaptured()
 
 
+class EventCaptured(Exception):
+    pass
+
+
+class _TestTransport(Transport):
+    def __init__(self, *a, **kw):
+        pass
+
+    def start(self):
+        pass
+
+    def capture_event(self, event):
+        raise EventCaptured()
+
+
 def test_transport_option(monkeypatch):
     dsn = "https://foo@sentry.io/123"
     dsn2 = "https://bar@sentry.io/124"
