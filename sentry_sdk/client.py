@@ -14,6 +14,14 @@ NO_DSN = object()
 _most_recent_exception = ContextVar("sentry_most_recent_exception")
 
 
+def _get_default_integrations():
+    from .integrations.logging import LoggingIntegration
+    from .integrations.excepthook import ExcepthookIntegration
+
+    yield LoggingIntegration
+    yield ExcepthookIntegration
+
+
 class Client(object):
     def __init__(self, dsn=None, *args, **kwargs):
         passed_dsn = dsn
@@ -40,15 +48,12 @@ class Client(object):
         elif passed_dsn is not None and self._transport is not None:
             raise ValueError("Cannot pass DSN and a custom transport.")
 
-        from .integrations import logging as logging_integration
-
         integrations = list(options.pop("integrations") or ())
 
-        logging_configured = any(
-            isinstance(x, logging_integration.LoggingIntegration) for x in integrations
-        )
-        if not logging_configured and options["default_integrations"]:
-            integrations.append(logging_integration.LoggingIntegration())
+        if options["default_integrations"]:
+            for cls in _get_default_integrations():
+                if not any(isinstance(x, cls) for x in integrations):
+                    integrations.append(cls())
 
         for integration in integrations:
             integration(self)
