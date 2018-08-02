@@ -8,8 +8,10 @@ from sentry_sdk.hub import HubMeta
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import Event, Dsn
 
+
 class EventCaptured(Exception):
     pass
+
 
 class _TestTransport(Transport):
     def __init__(self, *a, **kw):
