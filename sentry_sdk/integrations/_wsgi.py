@@ -65,7 +65,7 @@ class RequestExtractor(object):
         if (
             bodies == "never"
             or (bodies == "small" and self.content_length > 10 ** 3)
-            or (bodies == "medium" and self.content_length > 10 ** 6)
+            or (bodies == "medium" and self.content_length > 10 ** 4)
         ):
             data = AnnotatedValue(
                 "",
