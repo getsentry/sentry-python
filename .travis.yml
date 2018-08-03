@@ -26,7 +26,7 @@ matrix:
         - zeus upload -t "application/zip+wheel" dist/*
 
 install:
-  - curl https://sh.rustup.rs -sSf | sh
+  - curl https://sh.rustup.rs -sSf | sh -s -- -y
   - pip install tox
   - sh scripts/checkout-semaphore.sh
 
