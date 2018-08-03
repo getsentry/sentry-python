@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 import json
-import zlib
+import gzip
 import urllib3
 import logging
 import threading
@@ -41,7 +41,7 @@ _retry = urllib3.util.Retry()
 
 
 def send_event(pool, event, auth):
-    body = zlib.compress(json.dumps(event).encode("utf-8"))
+    body = gzip.compress(json.dumps(event).encode("utf-8"))
     response = pool.request(
         "POST",
         str(auth.store_api_url),
@@ -49,7 +49,7 @@ def send_event(pool, event, auth):
         headers={
             "X-Sentry-Auth": str(auth.to_header()),
             "Content-Type": "application/json",
-            "Content-Encoding": "deflate",
+            "Content-Encoding": "gzip",
         },
     )
     try:
