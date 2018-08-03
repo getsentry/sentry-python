@@ -67,7 +67,9 @@ def assert_semaphore_acceptance(tmpdir):
         file = tmpdir.join("event")
         file.write(json.dumps(dict(event)))
         output = json.loads(
-            subprocess.check_output([SEMAPHORE, "process-event"], stdin=file.open())
+            subprocess.check_output(
+                [SEMAPHORE, "process-event"], stdin=file.open()
+            ).decode("utf-8")
         )
         _no_errors_in_semaphore_response(output)
 
