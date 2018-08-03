@@ -9,6 +9,13 @@ python:
   - "3.6"
   - "3.7-dev"
 
+cache:
+  pip: true
+  directories:
+    - checkouts/semaphore/target/debug/
+    - ~/.cargo/registry/
+    - ~/.rustup/
+
 branches:
   only:
     - master
