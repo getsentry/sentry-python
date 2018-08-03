@@ -44,10 +44,10 @@ def send_event(pool, event, auth):
     body = zlib.compress(json.dumps(event).encode("utf-8"))
     response = pool.request(
         "POST",
-        auth.store_api_url,
+        str(auth.store_api_url),
         body=body,
         headers={
-            "X-Sentry-Auth": auth.to_header(),
+            "X-Sentry-Auth": str(auth.to_header()),
             "Content-Type": "application/json",
             "Content-Encoding": "deflate",
         },

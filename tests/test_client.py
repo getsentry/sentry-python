@@ -3,7 +3,7 @@ import pytest
 import sys
 import subprocess
 from textwrap import dedent
-from sentry_sdk import init, Hub, Client, configure_scope
+from sentry_sdk import init, Hub, Client, configure_scope, capture_message
 from sentry_sdk.hub import HubMeta
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import Event, Dsn
@@ -129,3 +129,14 @@ def test_configure_scope_unavailable(no_sdk, monkeypatch):
 
     assert configure_scope(callback) is None
     assert not calls
+
+
+def test_transport_works(httpserver, request, capsys):
+    httpserver.serve_content("ok", 200)
+    with init("http://foobar@{}/123".format(httpserver.url[len("http://"):])):
+        capture_message("lol")
+
+    request.addfinalizer(lambda: Hub.current.bind_client(None))
+
+    out, err = capsys.readouterr()
+    assert not err and not out
