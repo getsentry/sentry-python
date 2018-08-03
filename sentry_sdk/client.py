@@ -3,10 +3,10 @@ import uuid
 import random
 import atexit
 
-from .utils import Dsn, SkipEvent, ContextVar, Event
+from .utils import Dsn, SkipEvent, ContextVar
 from .transport import Transport
 from .consts import DEFAULT_OPTIONS, SDK_INFO
-from .stripping import strip_event, flatten_metadata
+from .event import strip_event, flatten_metadata, Event
 
 
 NO_DSN = object()

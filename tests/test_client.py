@@ -3,10 +3,11 @@ import pytest
 import sys
 import subprocess
 from textwrap import dedent
-from sentry_sdk import init, Hub, Client, configure_scope, capture_message
+from sentry_sdk import Hub, Client, configure_scope, capture_message
 from sentry_sdk.hub import HubMeta
 from sentry_sdk.transport import Transport
-from sentry_sdk.utils import Event, Dsn
+from sentry_sdk.utils import Dsn
+from sentry_sdk.event import Event
 
 
 class EventCaptured(Exception):
@@ -88,10 +89,9 @@ def test_atexit(tmpdir, monkeypatch, num_messages):
     assert output.count(b"HI") == num_messages
 
 
-def test_configure_scope_available(request, monkeypatch):
+def test_configure_scope_available(sentry_init, request, monkeypatch):
     # Test that scope is configured if client is configured
-    init()
-    request.addfinalizer(lambda: Hub.current.bind_client(None))
+    sentry_init()
 
     with configure_scope() as scope:
         assert scope is Hub.current._stack[-1][1]
@@ -131,10 +131,11 @@ def test_configure_scope_unavailable(no_sdk, monkeypatch):
     assert not calls
 
 
-def test_transport_works(httpserver, request, capsys):
+def test_transport_works(sentry_init, httpserver, request, capsys):
     httpserver.serve_content("ok", 200)
-    with init("http://foobar@{}/123".format(httpserver.url[len("http://") :])):
-        capture_message("lol")
+    sentry_init("http://foobar@{}/123".format(httpserver.url[len("http://") :]))
+    capture_message("lol")
+    Hub.current.client.drain_events()
 
     request.addfinalizer(lambda: Hub.current.bind_client(None))
 

@@ -1,4 +1,4 @@
-from sentry_sdk.stripping import AnnotatedValue, flatten_metadata, strip_databag
+from sentry_sdk.event import AnnotatedValue, flatten_metadata, strip_databag
 
 
 def test_flatten_metadata():
