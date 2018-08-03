@@ -27,6 +27,7 @@ matrix:
 
 install:
   - curl https://sh.rustup.rs -sSf | sh -s -- -y
+  - . $HOME/.cargo/env
   - pip install tox
   - sh scripts/checkout-semaphore.sh
 
