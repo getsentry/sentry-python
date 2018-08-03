@@ -6,7 +6,8 @@ import logging
 import datetime
 
 from sentry_sdk import get_current_hub, capture_event, add_breadcrumb
-from sentry_sdk.utils import to_string, Event, skip_internal_frames, datetime_to_json
+from sentry_sdk.utils import to_string, skip_internal_frames
+from sentry_sdk.event import Event, datetime_to_json
 from sentry_sdk.hub import _internal_exceptions
 
 from . import Integration

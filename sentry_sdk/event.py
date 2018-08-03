@@ -1,6 +1,68 @@
+import uuid
+from datetime import datetime
+
 from collections import Mapping, Sequence
 
+from .utils import exceptions_from_error_tuple
 from ._compat import text_type
+
+
+def datetime_to_json(dt):
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+class Event(Mapping):
+    __slots__ = ("_data", "_exc_value")
+
+    def __init__(self, data={}):
+        self._data = {
+            "event_id": uuid.uuid4().hex,
+            "timestamp": datetime_to_json(datetime.utcnow()),
+            "level": "error",
+        }
+
+        self._data.update(data)
+
+        self._exc_value = None
+
+    def set_exception(self, exc_type, exc_value, tb, with_locals):
+        self["exception"] = {
+            "values": exceptions_from_error_tuple(exc_type, exc_value, tb, with_locals)
+        }
+        self._exc_value = exc_value
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+    def __contains__(self, key):
+        return key in self._data
+
+    def get(self, *a, **kw):
+        return self._data.get(*a, **kw)
+
+    def setdefault(self, *a, **kw):
+        return self._data.setdefault(*a, **kw)
+
+    def __setitem__(self, key, value):
+        self._data[key] = value
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __len__(self):
+        return len(self._data)
+
+    def iter_frames(self):
+        stacktraces = []
+        if "stacktrace" in self:
+            stacktraces.append(self["stacktrace"])
+        if "exception" in self:
+            for exception in self["exception"].get("values") or ():
+                if "stacktrace" in exception:
+                    stacktraces.append(exception["stacktrace"])
+        for stacktrace in stacktraces:
+            for frame in stacktrace.get("frames") or ():
+                yield frame
 
 
 class AnnotatedValue(object):

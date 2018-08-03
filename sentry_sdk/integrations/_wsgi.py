@@ -1,7 +1,7 @@
 import json
 
 from sentry_sdk.hub import _should_send_default_pii
-from sentry_sdk.stripping import AnnotatedValue
+from sentry_sdk.event import AnnotatedValue
 
 
 def get_environ(environ):

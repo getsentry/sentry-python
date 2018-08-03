@@ -6,7 +6,8 @@ from textwrap import dedent
 from sentry_sdk import Hub, Client, configure_scope, capture_message
 from sentry_sdk.hub import HubMeta
 from sentry_sdk.transport import Transport
-from sentry_sdk.utils import Event, Dsn
+from sentry_sdk.utils import Dsn
+from sentry_sdk.event import Event
 
 
 class EventCaptured(Exception):

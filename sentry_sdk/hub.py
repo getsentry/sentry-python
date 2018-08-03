@@ -4,7 +4,8 @@ from contextlib import contextmanager
 
 from ._compat import with_metaclass
 from .scope import Scope
-from .utils import Event, skip_internal_frames, ContextVar
+from .utils import skip_internal_frames, ContextVar
+from .event import Event
 
 
 _local = ContextVar("sentry_current_hub")
