@@ -133,7 +133,7 @@ def test_configure_scope_unavailable(no_sdk, monkeypatch):
 
 def test_transport_works(httpserver, request, capsys):
     httpserver.serve_content("ok", 200)
-    with init("http://foobar@{}/123".format(httpserver.url[len("http://"):])):
+    with init("http://foobar@{}/123".format(httpserver.url[len("http://") :])):
         capture_message("lol")
 
     request.addfinalizer(lambda: Hub.current.bind_client(None))
