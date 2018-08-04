@@ -80,12 +80,11 @@ def spawn_thread(transport):
 
             try:
                 disabled_until = send_event(transport._pool, item, auth)
-                transport._queue.task_done()
             except Exception:
                 print("Could not send sentry event", file=sys.stderr)
                 print(traceback.format_exc(), file=sys.stderr)
+            finally:
                 transport._queue.task_done()
-                continue
 
     t = threading.Thread(target=thread)
     t.setDaemon(True)
@@ -121,12 +120,10 @@ class Transport(object):
 
     def drain_events(self, timeout):
         q = self._queue
-        if q is None:
-            return True
-
-        with q.all_tasks_done:
-            q.all_tasks_done.wait(timeout)
-        return True
+        if q is not None:
+            with q.all_tasks_done:
+                while q.unfinished_tasks:
+                    q.all_tasks_done.wait(timeout)
 
     def __del__(self):
         self.close()
