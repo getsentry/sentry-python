@@ -7,7 +7,6 @@ python:
   - "3.4"
   - "3.5"
   - "3.6"
-  - "3.7-dev"
 
 cache:
   pip: true
@@ -23,6 +22,12 @@ branches:
 
 matrix:
   include:
+    - python: "3.7"
+      dist: xenial
+      sudo: true
+    - python: "3.8-dev"
+      dist: xenial
+      sudo: true
     - python: "3.6"
       script: tox -e linters
     - python: "3.6"
