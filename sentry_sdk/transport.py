@@ -1,13 +1,14 @@
 from __future__ import print_function
 
 import json
-import gzip
+import io
 import urllib3
 import logging
 import threading
 import certifi
 import sys
 import traceback
+import gzip
 
 from datetime import datetime, timedelta
 
@@ -41,11 +42,14 @@ _retry = urllib3.util.Retry()
 
 
 def send_event(pool, event, auth):
-    body = gzip.compress(json.dumps(event).encode("utf-8"))
+    body = io.BytesIO()
+    with gzip.GzipFile(fileobj=body, mode="w") as f:
+        f.write(json.dumps(event).encode("utf-8"))
+
     response = pool.request(
         "POST",
         str(auth.store_api_url),
-        body=body,
+        body=body.getvalue(),
         headers={
             "X-Sentry-Auth": str(auth.to_header()),
             "Content-Type": "application/json",

@@ -1,3 +1,4 @@
+# coding: utf-8
 import time
 import pytest
 import sys
@@ -133,11 +134,14 @@ def test_configure_scope_unavailable(no_sdk, monkeypatch):
 
 def test_transport_works(sentry_init, httpserver, request, capsys):
     httpserver.serve_content("ok", 200)
-    sentry_init("http://foobar@{}/123".format(httpserver.url[len("http://") :]))
-    capture_message("lol")
-    Hub.current.client.drain_events()
 
+    client = Client("http://foobar@{}/123".format(httpserver.url[len("http://") :]))
+    Hub.current.bind_client(client)
     request.addfinalizer(lambda: Hub.current.bind_client(None))
+
+    capture_message("löl")
+    client.drain_events()
 
     out, err = capsys.readouterr()
     assert not err and not out
+    assert httpserver.requests
