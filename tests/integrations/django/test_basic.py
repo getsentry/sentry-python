@@ -74,3 +74,8 @@ def test_user_captured(client, capture_events):
         "ip_address": "127.0.0.1",
         "username": "john",
     }
+
+
+def test_404(client):
+    response = client.get("/404")
+    assert response.status_code == 404
