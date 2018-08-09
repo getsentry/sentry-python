@@ -45,11 +45,7 @@ class DjangoIntegration(Integration):
                     lambda: make_event_processor(request)
                 )
 
-                try:
-                    return old_get_response(self, request)
-                except Exception as e:
-                    capture_exception()
-                    raise e
+                return old_get_response(self, request)
 
         BaseHandler.get_response = sentry_patched_get_response
 
