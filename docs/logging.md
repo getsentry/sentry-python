@@ -4,14 +4,14 @@ Calling ``sentry_sdk.init()`` already captures any logging message with a level
 higher than or equal to ``INFO``. You can change this behavior by explicitly
 passing the logging integration like any other:
 
+    import sentry_sdk
     from sentry_sdk.integrations.logging import LoggingIntegration
-    from sentry_sdk import init
 
     sentry_logging = LoggingIntegration(
         level=logging.DEBUG,
         event_level=logging.ERROR
     )
-    init(dsn="https://foo@sentry.io/123", integrations=[sentry_logging])
+    sentry_sdk.init(dsn="https://foo@sentry.io/123", integrations=[sentry_logging])
 
 The above configuration captures *all* messages, now including ``DEBUG``, as
 breadcrumbs. Messages with level ``ERROR`` and above will show up as their own

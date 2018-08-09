@@ -1,10 +1,9 @@
 # Using Sentry with Flask
 
-
+    import sentry_sdk
     from sentry_sdk.integrations.flask import FlaskIntegration
-    from sentry_sdk import init
 
-    init(dsn="https://foo@sentry.io/123", integrations=[FlaskIntegration()])
+    sentry_sdk.init(dsn="https://foo@sentry.io/123", integrations=[FlaskIntegration()])
 
     app = Flask(__name__)
 

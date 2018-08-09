@@ -2,10 +2,10 @@
 
 In your ``settings.py``:
 
+    import sentry_sdk
     from sentry_sdk.integrations.django import DjangoIntegration
-    from sentry_sdk import init
 
-    init(dsn="https://foo@sentry.io/123", integrations=[DjangoIntegration()])
+    sentry_sdk.init(dsn="https://foo@sentry.io/123", integrations=[DjangoIntegration()])
 
 * All exceptions are reported.
 
