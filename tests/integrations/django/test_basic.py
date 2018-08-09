@@ -19,11 +19,6 @@ def client(monkeypatch_test_transport):
     return Client()
 
 
-def test_scope_working(client):
-    response = client.get(reverse("self_check"))
-    assert response.status_code == 200
-
-
 def test_view_exceptions(client, capture_exceptions):
     exceptions = capture_exceptions()
     with pytest.raises(ZeroDivisionError) as exc:
@@ -46,6 +41,7 @@ def test_request_captured(client, capture_events):
     assert response.content == b"ok"
 
     event, = events
+    assert event["transaction"] == "message"
     assert event["request"] == {
         "cookies": {},
         "env": {

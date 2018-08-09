@@ -8,7 +8,7 @@ try:
 except ImportError:
     from django.core.urlresolvers import resolve
 
-from sentry_sdk import get_current_hub, configure_scope, capture_exception
+from sentry_sdk import get_current_hub, capture_exception
 from sentry_sdk.hub import _internal_exceptions, _should_send_default_pii
 from ._wsgi import RequestExtractor, get_client_ip
 from . import Integration
@@ -45,10 +45,10 @@ class DjangoIntegration(Integration):
                     lambda: make_event_processor(request)
                 )
 
-                with configure_scope() as scope:
-                    scope.transaction = resolve(request.path).func.__name__
-
-                return old_get_response(self, request)
+                try:
+                    return old_get_response(self, request)
+                except Exception:
+                    capture_exception()
 
         BaseHandler.get_response = sentry_patched_get_response
 
@@ -58,6 +58,10 @@ class DjangoIntegration(Integration):
         client_options = get_current_hub().client.options
 
         def processor(event):
+            if "transaction" not in event:
+                with _internal_exceptions():
+                    event["transaction"] = resolve(request.path).func.__name__
+
             with _internal_exceptions():
                 DjangoRequestExtractor(request).extract_into_event(
                     event, client_options

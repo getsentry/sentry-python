@@ -56,13 +56,7 @@ class TestMiddleware(MiddlewareMixin):
         if "middleware-exc" in request.path:
             1 / 0
 
-        with sentry_sdk.configure_scope() as scope:
-            assert scope._data["transaction"] is not None
-
     def process_response(self, request, response):
-        with sentry_sdk.configure_scope() as scope:
-            assert scope._data["transaction"] is not None
-
         return response
 
 

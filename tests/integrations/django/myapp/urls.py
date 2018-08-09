@@ -23,9 +23,8 @@ except ImportError:
 from . import views
 
 urlpatterns = [
-    path("self-check", views.self_check, name="self_check"),
     path("view-exc", views.view_exc, name="view_exc"),
-    path("middleware-exc", views.self_check, name="middleware_exc"),
+    path("middleware-exc", views.message, name="middleware_exc"),
     path("message", views.message, name="message"),
     path("mylogin", views.mylogin, name="mylogin"),
 ]
