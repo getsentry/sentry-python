@@ -47,8 +47,9 @@ class DjangoIntegration(Integration):
 
                 try:
                     return old_get_response(self, request)
-                except Exception:
+                except Exception as e:
                     capture_exception()
+                    raise e
 
         BaseHandler.get_response = sentry_patched_get_response
 
