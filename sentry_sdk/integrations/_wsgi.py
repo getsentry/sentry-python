@@ -1,7 +1,10 @@
 import json
+import sys
 
-from sentry_sdk.hub import _should_send_default_pii
+import sentry_sdk
+from sentry_sdk.hub import _internal_exceptions, _should_send_default_pii
 from sentry_sdk.event import AnnotatedValue
+from sentry_sdk._compat import reraise, implements_iterator
 
 
 def get_environ(environ):
@@ -38,28 +41,11 @@ class RequestExtractor(object):
         self.request = request
 
     def extract_into_event(self, event, client_options):
-        if "request" in event:
-            return
-
-        # if the code below fails halfway through we at least have some data
-        event["request"] = request_info = {}
-
+        request_info = event.setdefault("request", {})
         request_info["url"] = self.url
-        request_info["query_string"] = self.query_string
-        request_info["method"] = self.method
-
-        request_info["env"] = dict(get_environ(self.env))
 
         if _should_send_default_pii():
-            request_info["headers"] = dict(self.headers)
             request_info["cookies"] = dict(self.cookies)
-        else:
-            request_info["headers"] = {
-                k: v
-                for k, v in dict(self.headers).items()
-                if k.lower().replace("_", "-")
-                not in ("set-cookie", "cookie", "authentication")
-            }
 
         bodies = client_options.get("request_bodies")
         if (
@@ -109,22 +95,6 @@ class RequestExtractor(object):
         raise NotImplementedError()
 
     @property
-    def query_string(self):
-        return self.env.get("QUERY_STRING")
-
-    @property
-    def method(self):
-        return self.env.get("REQUEST_METHOD")
-
-    @property
-    def headers(self):
-        return get_headers(self.env)
-
-    @property
-    def env(self):
-        raise NotImplementedError()
-
-    @property
     def cookies(self):
         raise NotImplementedError()
 
@@ -135,10 +105,6 @@ class RequestExtractor(object):
     @property
     def form(self):
         raise NotImplementedError()
-
-    @property
-    def form_is_multipart(self):
-        return self.env.get("CONTENT_TYPE").startswith("multipart/form-data")
 
     @property
     def is_json(self):
@@ -177,3 +143,87 @@ def get_client_ip(environ):
         return environ["HTTP_X_FORWARDED_FOR"].split(",")[0].strip()
     except (KeyError, IndexError):
         return environ.get("REMOTE_ADDR")
+
+
+def run_wsgi_app(app, environ, start_response):
+    hub = sentry_sdk.get_current_hub()
+    hub.push_scope()
+    with _internal_exceptions():
+        client_options = sentry_sdk.get_current_hub().client.options
+        sentry_sdk.get_current_hub().add_event_processor(
+            lambda: _make_wsgi_event_processor(environ, client_options)
+        )
+
+    try:
+        rv = app(environ, start_response)
+    except Exception:
+        einfo = sys.exc_info()
+        sentry_sdk.capture_exception(einfo)
+        hub.pop_scope_unsafe()
+        reraise(*einfo)
+
+    return _ScopePoppingResponse(hub, rv)
+
+
+@implements_iterator
+class _ScopePoppingResponse(object):
+    __slots__ = ("_response", "_hub")
+
+    def __init__(self, hub, response):
+        self._hub = hub
+        self._response = response
+
+    def __iter__(self):
+        try:
+            self._response = iter(self._response)
+        except Exception:
+            einfo = sys.exc_info()
+            sentry_sdk.capture_exception(einfo)
+            reraise(*einfo)
+        return self
+
+    def __next__(self):
+        try:
+            return next(self._response)
+        except Exception:
+            einfo = sys.exc_info()
+            sentry_sdk.capture_exception(einfo)
+            reraise(*einfo)
+
+    def close(self):
+        self._hub.pop_scope_unsafe()
+        if hasattr(self._response, "close"):
+            try:
+                self._response.close()
+            except Exception:
+                einfo = sys.exc_info()
+                sentry_sdk.capture_exception(einfo)
+                reraise(*einfo)
+
+
+def _make_wsgi_event_processor(environ, client_options):
+    def event_processor(event):
+        with _internal_exceptions():
+            # if the code below fails halfway through we at least have some data
+            request_info = event.setdefault("request", {})
+
+            if "query_string" not in request_info:
+                request_info["query_string"] = environ.get("QUERY_STRING")
+
+            if "method" not in request_info:
+                request_info["method"] = environ.get("REQUEST_METHOD")
+
+            if "env" not in request_info:
+                request_info["env"] = dict(get_environ(environ))
+
+            if "headers" not in request_info:
+                request_info["headers"] = dict(get_headers(environ))
+                if not _should_send_default_pii():
+                    request_info["headers"] = {
+                        k: v
+                        for k, v in request_info["headers"].items()
+                        if k.lower().replace("_", "-")
+                        not in ("set-cookie", "cookie", "authentication")
+                    }
+
+    return event_processor

@@ -3,7 +3,8 @@ import pytest
 django = pytest.importorskip("django")
 
 
-from django.test import Client
+from tests.integrations.django.myapp.wsgi import application
+from werkzeug.test import Client
 
 try:
     from django.urls import reverse
@@ -16,66 +17,58 @@ from sentry_sdk import Hub
 @pytest.fixture
 def client(monkeypatch_test_transport):
     monkeypatch_test_transport(Hub.current.client)
-    return Client()
+    return Client(application)
 
 
 def test_view_exceptions(client, capture_exceptions):
     exceptions = capture_exceptions()
-    with pytest.raises(ZeroDivisionError) as exc:
-        client.get(reverse("view_exc"))
+    client.get(reverse("view_exc"))
 
-    assert exceptions == [exc.value]
+    error, = exceptions
+    assert isinstance(error, ZeroDivisionError)
 
 
 def test_middleware_exceptions(client, capture_exceptions):
     exceptions = capture_exceptions()
-    with pytest.raises(ZeroDivisionError) as exc:
-        client.get(reverse("middleware_exc"))
+    client.get(reverse("middleware_exc"))
 
-    assert exceptions == [exc.value]
+    error, = exceptions
+    assert isinstance(error, ZeroDivisionError)
 
 
 def test_request_captured(client, capture_events):
     events = capture_events()
-    response = client.get(reverse("message"))
-    assert response.content == b"ok"
+    content, status, headers = client.get(reverse("message"))
+    assert b"".join(content) == b"ok"
 
     event, = events
     assert event["transaction"] == "message"
     assert event["request"] == {
         "cookies": {},
-        "env": {
-            "REMOTE_ADDR": "127.0.0.1",
-            "SERVER_NAME": "testserver",
-            "SERVER_PORT": "80",
-        },
-        "headers": {"Cookie": ""},
+        "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
+        "headers": {"Content-Length": "0", "Content-Type": "", "Host": "localhost"},
         "method": "GET",
         "query_string": "",
-        "url": "http://testserver/message",
+        "url": "http://localhost/message",
     }
 
 
 @pytest.mark.django_db
 def test_user_captured(client, capture_events):
     events = capture_events()
-    response = client.get(reverse("mylogin"))
-    assert response.content == b"ok"
+    content, status, headers = client.get(reverse("mylogin"))
+    assert b"".join(content) == b"ok"
 
     assert not events
 
-    response = client.get(reverse("message"))
-    assert response.content == b"ok"
+    content, status, headers = client.get(reverse("message"))
+    assert b"".join(content) == b"ok"
 
     event, = events
 
-    assert event["user"] == {
-        "email": "lennon@thebeatles.com",
-        "ip_address": "127.0.0.1",
-        "username": "john",
-    }
+    assert event["user"] == {"email": "lennon@thebeatles.com", "username": "john"}
 
 
 def test_404(client):
-    response = client.get("/404")
-    assert response.status_code == 404
+    content, status, headers = client.get("/404")
+    assert status.lower() == "404 not found"
