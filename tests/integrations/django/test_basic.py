@@ -4,6 +4,7 @@ django = pytest.importorskip("django")
 
 
 from django.test import Client
+from django.core.management import execute_from_command_line
 
 try:
     from django.urls import reverse
@@ -79,3 +80,11 @@ def test_user_captured(client, capture_events):
 def test_404(client):
     response = client.get("/404")
     assert response.status_code == 404
+
+
+def test_management_command_raises():
+    # This just checks for our assumption that Django passes through all
+    # exceptions by default, so our excepthook can be used for management
+    # commands.
+    with pytest.raises(ZeroDivisionError):
+        execute_from_command_line(["manage.py", "mycrash"])
