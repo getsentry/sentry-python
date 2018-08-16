@@ -324,3 +324,19 @@ def test_logging(sentry_init, capture_events, app):
 def test_no_errors_without_request(app):
     with app.app_context():
         capture_exception(ValueError())
+
+
+def test_cli_commands_raise(app):
+    if not hasattr(app, "cli"):
+        pytest.skip("Too old flask version")
+
+    from flask.cli import ScriptInfo
+
+    @app.cli.command()
+    def foo():
+        1 / 0
+
+    with pytest.raises(ZeroDivisionError):
+        app.cli.main(
+            args=["foo"], prog_name="myapp", obj=ScriptInfo(create_app=lambda _: app)
+        )
