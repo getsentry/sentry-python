@@ -3,8 +3,9 @@ import pytest
 django = pytest.importorskip("django")
 
 
-from tests.integrations.django.myapp.wsgi import application
 from werkzeug.test import Client
+from django.core.management import execute_from_command_line
+
 
 try:
     from django.urls import reverse
@@ -12,6 +13,8 @@ except ImportError:
     from django.core.urlresolvers import reverse
 
 from sentry_sdk import Hub
+
+from tests.integrations.django.myapp.wsgi import application
 
 
 @pytest.fixture
@@ -72,3 +75,11 @@ def test_user_captured(client, capture_events):
 def test_404(client):
     content, status, headers = client.get("/404")
     assert status.lower() == "404 not found"
+
+
+def test_management_command_raises():
+    # This just checks for our assumption that Django passes through all
+    # exceptions by default, so our excepthook can be used for management
+    # commands.
+    with pytest.raises(ZeroDivisionError):
+        execute_from_command_line(["manage.py", "mycrash"])
