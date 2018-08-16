@@ -185,6 +185,8 @@ class _ScopePoppingResponse(object):
     def __next__(self):
         try:
             return next(self._response)
+        except StopIteration:
+            raise
         except Exception:
             einfo = sys.exc_info()
             sentry_sdk.capture_exception(einfo)
