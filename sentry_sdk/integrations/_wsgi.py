@@ -225,7 +225,7 @@ def _make_wsgi_event_processor(environ, client_options):
                         k: v
                         for k, v in request_info["headers"].items()
                         if k.lower().replace("_", "-")
-                        not in ("set-cookie", "cookie", "authentication")
+                        not in ("set-cookie", "cookie", "authorization")
                     }
 
     return event_processor
