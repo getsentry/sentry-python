@@ -56,8 +56,10 @@ class DjangoIntegration(Integration):
 
         def processor(event):
             if "transaction" not in event:
-                with _internal_exceptions():
+                try:
                     event["transaction"] = resolve(request.path).func.__name__
+                except Exception:
+                    pass
 
             with _internal_exceptions():
                 DjangoRequestExtractor(request).extract_into_event(

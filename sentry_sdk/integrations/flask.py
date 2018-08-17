@@ -51,8 +51,10 @@ def _make_event_processor():
     def event_processor(event):
         if request:
             if "transaction" not in event:
-                with _internal_exceptions():
+                try:
                     event["transaction"] = request.url_rule.endpoint
+                except Exception:
+                    pass
 
             with _internal_exceptions():
                 FlaskRequestExtractor(request).extract_into_event(event, client_options)
