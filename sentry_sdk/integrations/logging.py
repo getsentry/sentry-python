@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
-import sys
 import logging
 import datetime
 
@@ -59,33 +58,34 @@ class SentryHandler(logging.Handler, object):
         }
 
     def _emit(self, record):
-        add_breadcrumb(self._breadcrumb_from_record(record))
-
-        if not self._should_create_event(record):
-            return
-
         if not self.can_record(record):
-            print(to_string(record.message), file=sys.stderr)
             return
 
-        event = Event()
+        if self._should_create_event(record):
+            with _internal_exceptions():
+                event = Event()
 
-        # exc_info might be None or (None, None, None)
-        if record.exc_info and all(record.exc_info):
-            exc_type, exc_value, tb = record.exc_info
-            event.set_exception(
-                exc_type,
-                exc_value,
-                skip_internal_frames(tb),
-                get_current_hub().client.options["with_locals"],
-            )
+                # exc_info might be None or (None, None, None)
+                if record.exc_info and all(record.exc_info):
+                    exc_type, exc_value, tb = record.exc_info
+                    event.set_exception(
+                        exc_type,
+                        exc_value,
+                        skip_internal_frames(tb),
+                        get_current_hub().client.options["with_locals"],
+                    )
 
-        event["level"] = self._logging_to_event_level(record.levelname)
-        event["logger"] = record.name
+                event["level"] = self._logging_to_event_level(record.levelname)
+                event["logger"] = record.name
+                event["logentry"] = {
+                    "message": to_string(record.msg),
+                    "params": record.args,
+                }
 
-        event["logentry"] = {"message": to_string(record.msg), "params": record.args}
+                capture_event(event)
 
-        capture_event(event)
+        with _internal_exceptions():
+            add_breadcrumb(self._breadcrumb_from_record(record))
 
     def _logging_to_event_level(self, levelname):
         return {"critical": "fatal"}.get(levelname.lower(), levelname.lower())
