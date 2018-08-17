@@ -10,7 +10,7 @@ except ImportError:
 
 from sentry_sdk import get_current_hub, capture_exception
 from sentry_sdk.hub import _internal_exceptions, _should_send_default_pii
-from ._wsgi import RequestExtractor, get_client_ip
+from ._wsgi import RequestExtractor, get_client_ip, run_wsgi_app
 from . import Integration
 
 
@@ -33,19 +33,31 @@ class DjangoIntegration(Integration):
         pass
 
     def install(self, client):
+        # Patch in our custom middleware.
+
+        from django.core.handlers.wsgi import WSGIHandler
+
+        old_app = WSGIHandler.__call__
+
+        def sentry_patched_wsgi_handler(self, environ, start_response):
+            return run_wsgi_app(
+                lambda *a, **kw: old_app(self, *a, **kw), environ, start_response
+            )
+
+        WSGIHandler.__call__ = sentry_patched_wsgi_handler
+
+        # patch get_response, because at that point we have the Django request
+        # object
+
         from django.core.handlers.base import BaseHandler
 
+        old_get_response = BaseHandler.get_response
         make_event_processor = self._make_event_processor
 
-        old_get_response = BaseHandler.get_response
-
         def sentry_patched_get_response(self, request):
-            with get_current_hub().push_scope():
-                get_current_hub().add_event_processor(
-                    lambda: make_event_processor(request)
-                )
+            get_current_hub().add_event_processor(lambda: make_event_processor(request))
 
-                return old_get_response(self, request)
+            return old_get_response(self, request)
 
         BaseHandler.get_response = sentry_patched_get_response
 

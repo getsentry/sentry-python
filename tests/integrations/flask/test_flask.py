@@ -321,7 +321,8 @@ def test_logging(sentry_init, capture_events, app):
     assert event["level"] == "error"
 
 
-def test_no_errors_without_request(app):
+def test_no_errors_without_request(app, sentry_init):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     with app.app_context():
         capture_exception(ValueError())
 
@@ -340,3 +341,23 @@ def test_cli_commands_raise(app):
         app.cli.main(
             args=["foo"], prog_name="myapp", obj=ScriptInfo(create_app=lambda _: app)
         )
+
+
+def test_wsgi_level_error_is_caught(app, capture_exceptions, sentry_init):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
+    def wsgi_app(environ, start_response):
+        1 / 0
+
+    app.wsgi_app = wsgi_app
+
+    client = app.test_client()
+
+    exceptions = capture_exceptions()
+
+    with pytest.raises(ZeroDivisionError) as exc:
+        client.get("/")
+
+    error, = exceptions
+
+    assert error is exc.value

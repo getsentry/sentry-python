@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 from sentry_sdk import capture_exception, get_current_hub
 from sentry_sdk.hub import _internal_exceptions, _should_send_default_pii
-from ._wsgi import RequestExtractor
+from ._wsgi import RequestExtractor, run_wsgi_app
 from . import Integration
 
 try:
@@ -10,7 +10,7 @@ try:
 except ImportError:
     current_user = None
 
-from flask import _request_ctx_stack, _app_ctx_stack
+from flask import Flask, _request_ctx_stack, _app_ctx_stack
 from flask.signals import (
     appcontext_pushed,
     appcontext_tearing_down,
@@ -29,8 +29,19 @@ class FlaskIntegration(Integration):
         appcontext_tearing_down.connect(_pop_appctx)
         got_request_exception.connect(_capture_exception)
 
+        old_app = Flask.__call__
+
+        def sentry_patched_wsgi_app(self, environ, start_response):
+            return run_wsgi_app(
+                lambda *a, **kw: old_app(self, *a, **kw), environ, start_response
+            )
+
+        Flask.__call__ = sentry_patched_wsgi_app
+
 
 def _push_appctx(*args, **kwargs):
+    # always want to push scope regardless of whether WSGI app might already
+    # have (not the case for CLI for example)
     get_current_hub().push_scope()
     get_current_hub().add_event_processor(_make_event_processor)
 
