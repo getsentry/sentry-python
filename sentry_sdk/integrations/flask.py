@@ -29,14 +29,14 @@ class FlaskIntegration(Integration):
         appcontext_tearing_down.connect(_pop_appctx)
         got_request_exception.connect(_capture_exception)
 
-        old_app = Flask.wsgi_app
+        old_app = Flask.__call__
 
         def sentry_patched_wsgi_app(self, environ, start_response):
             return run_wsgi_app(
                 lambda *a, **kw: old_app(self, *a, **kw), environ, start_response
             )
 
-        Flask.wsgi_app = sentry_patched_wsgi_app
+        Flask.__call__ = sentry_patched_wsgi_app
 
 
 def _push_appctx(*args, **kwargs):
