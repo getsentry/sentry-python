@@ -41,89 +41,88 @@ class RequestExtractor(object):
         self.request = request
 
     def extract_into_event(self, event, client_options):
+        content_length = self.content_length()
         request_info = event.setdefault("request", {})
-        request_info["url"] = self.url
+        request_info["url"] = self.url()
 
         if _should_send_default_pii():
-            request_info["cookies"] = dict(self.cookies)
+            request_info["cookies"] = dict(self.cookies())
 
         bodies = client_options.get("request_bodies")
         if (
             bodies == "never"
-            or (bodies == "small" and self.content_length > 10 ** 3)
-            or (bodies == "medium" and self.content_length > 10 ** 4)
+            or (bodies == "small" and content_length > 10 ** 3)
+            or (bodies == "medium" and content_length > 10 ** 4)
         ):
             data = AnnotatedValue(
                 "",
-                {
-                    "rem": [["!config", "x", 0, self.content_length]],
-                    "len": self.content_length,
-                },
+                {"rem": [["!config", "x", 0, content_length]], "len": content_length},
             )
-        elif self.form or self.files:
-            data = dict(self.form.items())
-            for k, v in self.files.items():
+        else:
+            parsed_body = self.parsed_body()
+            if parsed_body:
+                data = parsed_body
+            elif self.raw_data():
+                data = AnnotatedValue(
+                    "",
+                    {
+                        "rem": [["!rawbody", "x", 0, content_length]],
+                        "len": content_length,
+                    },
+                )
+            else:
+                return
+
+        request_info["data"] = data
+
+    def content_length(self):
+        try:
+            return int(self.env().get("CONTENT_LENGTH", 0))
+        except ValueError:
+            return 0
+
+    def url(self):
+        raise NotImplementedError()
+
+    def cookies(self):
+        raise NotImplementedError()
+
+    def raw_data(self):
+        raise NotImplementedError()
+
+    def form(self):
+        raise NotImplementedError()
+
+    def parsed_body(self):
+        form = self.form()
+        files = self.files()
+        if form or files:
+            data = dict(form.items())
+            for k, v in files.items():
                 size = self.size_of_file(v)
                 data[k] = AnnotatedValue(
                     "", {"len": size, "rem": [["!filecontent", "x", 0, size]]}
                 )
 
-        elif self.json is not None:
-            data = self.json
-        elif self.raw_data:
-            data = AnnotatedValue(
-                "",
-                {
-                    "rem": [["!rawbody", "x", 0, self.content_length]],
-                    "len": self.content_length,
-                },
-            )
-        else:
-            return
+            return data
 
-        request_info["data"] = data
+        return self.json()
 
-    @property
-    def content_length(self):
-        try:
-            return int(self.env.get("CONTENT_LENGTH", 0))
-        except ValueError:
-            return 0
-
-    @property
-    def url(self):
-        raise NotImplementedError()
-
-    @property
-    def cookies(self):
-        raise NotImplementedError()
-
-    @property
-    def raw_data(self):
-        raise NotImplementedError()
-
-    @property
-    def form(self):
-        raise NotImplementedError()
-
-    @property
     def is_json(self):
-        mt = (self.env.get("CONTENT_TYPE") or "").split(";", 1)[0]
+        mt = (self.env().get("CONTENT_TYPE") or "").split(";", 1)[0]
         return (
             mt == "application/json"
             or (mt.startswith("application/"))
             and mt.endswith("+json")
         )
 
-    @property
     def json(self):
         try:
-            if self.is_json:
-                return json.loads(self.raw_data.decode("utf-8"))
+            if self.is_json():
+                return json.loads(self.raw_data().decode("utf-8"))
         except ValueError:
             pass
 
-    @property
     def files(self):
         raise NotImplementedError()
 
