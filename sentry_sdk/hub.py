@@ -152,13 +152,17 @@ class Hub(with_metaclass(HubMeta)):
         itself."""
         pass
 
-    def add_breadcrumb(self, crumb):
+    def add_breadcrumb(self, *args, **kwargs):
         """Adds a breadcrumb."""
         client, scope = self._stack[-1]
         if client is None:
             return
-        if callable(crumb):
-            crumb = crumb()
+
+        if not kwargs and len(args) == 1 and callable(args[0]):
+            crumb = args[0]()
+        else:
+            crumb = dict(*args, **kwargs)
+
         if crumb is not None:
             scope._breadcrumbs.append(crumb)
         while len(scope._breadcrumbs) >= client.options["max_breadcrumbs"]:

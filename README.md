@@ -81,12 +81,24 @@ anywhere in your system ends up as a breadcrumb, see [the logging
 docs](./docs/logging.md) for more information. You can, however, also create
 breadcrumbs manually:
 
-    sentry_sdk.add_breadcrumb({
+    sentry_sdk.add_breadcrumb(
+        # ty="log",
+        # level="debug",
+        # category="myapp.models",
+        message="hi"
+    })
+
+You can also pass a callback to `add_breadcrumb` like so:
+
+    sentry_sdk.add_breadcrumb(lambda: {
         # "ty": "log",
         # "level": "debug",
         # "category": "myapp.models",
         "message": "hi"
     })
+
+The callback will only be called if a sentry client is configured.
+
 
 ## Concurrency
 
