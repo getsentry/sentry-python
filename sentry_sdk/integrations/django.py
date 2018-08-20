@@ -105,32 +105,31 @@ def _got_request_exception(request=None, **kwargs):
 
 
 class DjangoRequestExtractor(RequestExtractor):
-    @property
     def url(self):
         return self.request.build_absolute_uri(self.request.path)
 
-    @property
     def env(self):
         return self.request.META
 
-    @property
     def cookies(self):
         return self.request.COOKIES
 
-    @property
     def raw_data(self):
         return self.request.body
 
-    @property
     def form(self):
         return self.request.POST
 
-    @property
     def files(self):
         return self.request.FILES
 
     def size_of_file(self, file):
         return file.size
+
+    def parsed_body(self):
+        if hasattr(self.request, "data"):
+            return self.request.data
+        return RequestExtractor.parsed_body(self)
 
 
 def _set_user_info(request, event):

@@ -97,27 +97,21 @@ def _process_frames(app, event):
 
 
 class FlaskRequestExtractor(RequestExtractor):
-    @property
     def url(self):
         return "%s://%s%s" % (self.request.scheme, self.request.host, self.request.path)
 
-    @property
     def env(self):
         return self.request.environ
 
-    @property
     def cookies(self):
         return self.request.cookies
 
-    @property
     def raw_data(self):
         return self.request.data
 
-    @property
     def form(self):
         return self.request.form
 
-    @property
     def files(self):
         return self.request.files
 
