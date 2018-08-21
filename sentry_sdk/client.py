@@ -132,7 +132,7 @@ class Client(object):
 
     def drain_events(self, timeout=None):
         if timeout is None:
-            timeout = self.options["drain_timeout"]
+            timeout = self.options["shutdown_timeout"]
         if self._transport is not None:
             self._transport.drain_events(timeout)
 

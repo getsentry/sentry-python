@@ -9,7 +9,7 @@
   running in, e.g.  ``"staging"`` or ``"production"``.
 - ``server_name`` (default to the system's hostname): The actual hostname of your
   system.
-- ``drain_timeout`` (default ``2.0``): When calling ``Client.close()`` or when
+- ``shutdown_timeout`` (default ``2.0``): When calling ``Client.close()`` or when
   exiting the contextmanager provided by ``sentry_sdk.init``, wait this many
   seconds for the last events to be sent.
 - ``integrations`` (default: ``[]``): Integrations to be enabled in addition to

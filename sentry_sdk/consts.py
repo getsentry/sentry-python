@@ -8,7 +8,7 @@ DEFAULT_OPTIONS = {
     "release": None,
     "environment": None,
     "server_name": DEFAULT_SERVER_NAME,
-    "drain_timeout": 2.0,
+    "shutdown_timeout": 2.0,
     "integrations": [],
     "default_integrations": True,
     "repos": {},

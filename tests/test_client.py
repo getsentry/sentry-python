@@ -73,7 +73,7 @@ def test_atexit(tmpdir, monkeypatch, num_messages):
         print(event["message"])
 
     transport.send_event = send_event
-    init("http://foobar@localhost/123", drain_timeout={num_messages})
+    init("http://foobar@localhost/123", shutdown_timeout={num_messages})
 
     for _ in range({num_messages}):
         capture_message("HI")
