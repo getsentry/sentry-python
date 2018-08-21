@@ -126,6 +126,11 @@ class DjangoRequestExtractor(RequestExtractor):
     def size_of_file(self, file):
         return file.size
 
+    def parsed_body(self):
+        if hasattr(self.request, "data"):
+            return self.request.data
+        return RequestExtractor.parsed_body(self)
+
 
 def _set_user_info(request, event):
     if "user" in event:
