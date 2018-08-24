@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+import datetime
 
 from collections import Mapping, Sequence
 
@@ -7,7 +7,7 @@ from .utils import exceptions_from_error_tuple
 from ._compat import text_type
 
 
-def datetime_to_json(dt):
+def _datetime_to_json(dt):
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -17,7 +17,7 @@ class Event(Mapping):
     def __init__(self, data={}):
         self._data = {
             "event_id": uuid.uuid4().hex,
-            "timestamp": datetime_to_json(datetime.utcnow()),
+            "timestamp": datetime.datetime.utcnow(),
             "level": "error",
         }
 
@@ -122,6 +122,16 @@ def strip_event(event):
 def strip_frame(frame):
     frame["vars"], meta = strip_databag(frame.get("vars"))
     return frame, ({"vars": meta} if meta is not None else None)
+
+
+def convert_types(obj):
+    if isinstance(obj, (datetime.datetime, datetime.date)):
+        return _datetime_to_json(obj)
+    if isinstance(obj, Mapping):
+        return {k: convert_types(v) for k, v in obj.items()}
+    if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
+        return [convert_types(v) for v in obj]
+    return obj
 
 
 def strip_databag(obj, remaining_depth=20):

@@ -6,7 +6,7 @@ import atexit
 from .utils import Dsn, SkipEvent, ContextVar
 from .transport import Transport
 from .consts import DEFAULT_OPTIONS, SDK_INFO
-from .event import strip_event, flatten_metadata, Event
+from .event import strip_event, flatten_metadata, convert_types, Event
 
 
 NO_DSN = object()
@@ -97,6 +97,7 @@ class Client(object):
 
         event = strip_event(event)
         event = flatten_metadata(event)
+        event = convert_types(event)
         return event
 
     def _check_should_capture(self, event):

@@ -3,8 +3,9 @@ import time
 import pytest
 import sys
 import subprocess
+from datetime import datetime
 from textwrap import dedent
-from sentry_sdk import Hub, Client, configure_scope, capture_message
+from sentry_sdk import Hub, Client, configure_scope, capture_message, add_breadcrumb
 from sentry_sdk.hub import HubMeta
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import Dsn
@@ -139,6 +140,7 @@ def test_transport_works(sentry_init, httpserver, request, capsys):
     Hub.current.bind_client(client)
     request.addfinalizer(lambda: Hub.current.bind_client(None))
 
+    add_breadcrumb(level="info", message="i like bread", timestamp=datetime.now())
     capture_message("löl")
     client.drain_events()
 
