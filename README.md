@@ -83,7 +83,7 @@ breadcrumbs manually:
 
     sentry_sdk.add_breadcrumb(
         timestamp=datetime.datetime.now(),
-        ty="log",
+        type="log",
         level="debug",
         # message="hi",
         # category="myapp.models",
@@ -93,7 +93,7 @@ You can also pass a callback to `add_breadcrumb` like so:
 
     sentry_sdk.add_breadcrumb(lambda: {
         "timestamp": datetime.datetime.now(),
-        "ty": "log",
+        "type": "log",
         "level": "debug",
         # "message": "hi",
         # "category": "myapp.models",
