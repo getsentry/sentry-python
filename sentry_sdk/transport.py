@@ -56,11 +56,15 @@ def send_event(pool, event, auth):
             "Content-Encoding": "gzip",
         },
     )
+
     try:
         if response.status == 429:
             return datetime.utcnow() + timedelta(
                 seconds=_retry.get_retry_after(response)
             )
+
+        if response.status >= 300 or response.status < 200:
+            raise ValueError("Unexpected status code: %s" % response.status)
     finally:
         response.close()
 
