@@ -74,15 +74,19 @@ def spawn_thread(transport):
 
     def thread():
         disabled_until = None
+
+        # copy to local var in case transport._queue is set to None
+        queue = transport._queue
+
         while 1:
-            item = transport._queue.get()
+            item = queue.get()
             if item is _SHUTDOWN:
-                transport._queue.task_done()
+                queue.task_done()
                 break
 
             if disabled_until is not None:
                 if datetime.utcnow() < disabled_until:
-                    transport._queue.task_done()
+                    queue.task_done()
                     continue
                 disabled_until = None
 
@@ -92,7 +96,7 @@ def spawn_thread(transport):
                 print("Could not send sentry event", file=sys.stderr)
                 print(traceback.format_exc(), file=sys.stderr)
             finally:
-                transport._queue.task_done()
+                queue.task_done()
 
     t = threading.Thread(target=thread)
     t.setDaemon(True)
