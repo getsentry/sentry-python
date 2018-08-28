@@ -58,7 +58,9 @@ class DjangoIntegration(Integration):
 
         def sentry_patched_get_response(self, request):
             weak_request = weakref.ref(request)
-            get_current_hub().add_event_processor(lambda: make_event_processor(weak_request))
+            get_current_hub().add_event_processor(
+                lambda: make_event_processor(weak_request)
+            )
             return old_get_response(self, request)
 
         BaseHandler.get_response = sentry_patched_get_response
