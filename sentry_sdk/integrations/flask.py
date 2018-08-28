@@ -8,15 +8,16 @@ from ._wsgi import RequestExtractor, run_wsgi_app
 from . import Integration
 
 try:
-    from flask_login import current_user as current_user_proxy
+    import flask_login
 except ImportError:
-    current_user_proxy = None
+    flask_login = None
 
 from flask import Flask, _request_ctx_stack, _app_ctx_stack
 from flask.signals import (
     appcontext_pushed,
     appcontext_tearing_down,
     got_request_exception,
+    request_started,
 )
 
 
@@ -29,6 +30,7 @@ class FlaskIntegration(Integration):
     def install(self, client):
         appcontext_pushed.connect(_push_appctx)
         appcontext_tearing_down.connect(_pop_appctx)
+        request_started.connect(_request_started)
         got_request_exception.connect(_capture_exception)
 
         old_app = Flask.__call__
@@ -45,59 +47,23 @@ def _push_appctx(*args, **kwargs):
     # always want to push scope regardless of whether WSGI app might already
     # have (not the case for CLI for example)
     get_current_hub().push_scope()
-
-    app = getattr(_app_ctx_stack.top, "app", None)
-
-    try:
-        weak_request = weakref.ref(_request_ctx_stack.top.request)
-    except AttributeError:
-        weak_request = lambda: None
-
-    try:
-        weak_user = weakref.ref(current_user_proxy._get_current_object())
-    except (AttributeError, RuntimeError, TypeError):
-        weak_user = lambda: None
-
-    get_current_hub().add_event_processor(
-        lambda: _make_event_processor(app, weak_request, weak_user)
-    )
+    get_current_hub().add_event_processor(_make_user_event_processor)
 
 
 def _pop_appctx(*args, **kwargs):
     get_current_hub().pop_scope_unsafe()
 
 
+def _request_started(sender, **kwargs):
+    weak_request = weakref.ref(_request_ctx_stack.top.request)
+    app = _app_ctx_stack.top.app
+    get_current_hub().add_event_processor(
+        lambda: _make_request_event_processor(app, weak_request)
+    )
+
+
 def _capture_exception(sender, exception, **kwargs):
     capture_exception(exception)
-
-
-def _make_event_processor(app, weak_request, weak_user):
-    client_options = get_current_hub().client.options
-
-    def event_processor(event):
-        request = weak_request()
-
-        # if the request is gone we are fine not logging the data from
-        # it.  This might happen if the processor is pushed away to
-        # another thread.
-        if request is not None:
-            if "transaction" not in event:
-                try:
-                    event["transaction"] = request.url_rule.endpoint
-                except Exception:
-                    pass
-
-            with _internal_exceptions():
-                FlaskRequestExtractor(request).extract_into_event(event, client_options)
-
-        if _should_send_default_pii():
-            with _internal_exceptions():
-                _set_user_info(request, weak_user(), event)
-
-        with _internal_exceptions():
-            _process_frames(app, event)
-
-    return event_processor
 
 
 def _process_frames(app, event):
@@ -139,28 +105,57 @@ class FlaskRequestExtractor(RequestExtractor):
         return file.content_length
 
 
-def _set_user_info(request, user, event):
-    if "user" in event:
-        return
+def _make_request_event_processor(app, weak_request):
+    client_options = get_current_hub().client.options
 
-    if request:
-        try:
-            ip_address = request.access_route[0]
-        except IndexError:
-            ip_address = request.remote_addr
-    else:
-        ip_address = None
+    def inner(event):
+        with _internal_exceptions():
+            _process_frames(app, event)
 
-    user_info = {"id": None, "ip_address": ip_address}
+        request = weak_request()
 
-    try:
-        user_info["id"] = user.get_id()
-        # TODO: more configurable user attrs here
-    except AttributeError:
-        # might happen if:
-        # - flask_login could not be imported
-        # - flask_login is not configured
-        # - no user is logged in
-        pass
+        # if the request is gone we are fine not logging the data from
+        # it.  This might happen if the processor is pushed away to
+        # another thread.
+        if request is None:
+            return
 
-    event["user"] = user_info
+        if "transaction" not in event:
+            try:
+                event["transaction"] = request.url_rule.endpoint
+            except Exception:
+                pass
+
+        with _internal_exceptions():
+            FlaskRequestExtractor(request).extract_into_event(event, client_options)
+
+    return inner
+
+
+def _make_user_event_processor():
+    def inner(event):
+        if flask_login is None or not _should_send_default_pii():
+            return
+
+        user = flask_login.current_user
+        if user is None:
+            return
+
+        with _internal_exceptions():
+            # Access this object as late as possible as accessing the user
+            # is relatively costly
+
+            user_info = event.setdefault("user", {})
+
+            if user_info.get("id", None) is None:
+                try:
+                    user_info["id"] = user.get_id()
+                    # TODO: more configurable user attrs here
+                except AttributeError:
+                    # might happen if:
+                    # - flask_login could not be imported
+                    # - flask_login is not configured
+                    # - no user is logged in
+                    pass
+
+    return inner

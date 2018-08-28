@@ -74,7 +74,7 @@ def test_errors(sentry_init, capture_exceptions, app, debug, testing):
 def test_flask_login_not_installed(sentry_init, app, capture_events, monkeypatch):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
-    monkeypatch.setattr(flask_sentry, "current_user", None)
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
 
     events = capture_events()
 
@@ -88,7 +88,7 @@ def test_flask_login_not_installed(sentry_init, app, capture_events, monkeypatch
 def test_flask_login_not_configured(sentry_init, app, capture_events, monkeypatch):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
-    assert flask_sentry.current_user is not None
+    assert flask_sentry.flask_login
 
     events = capture_events()
     client = app.test_client()

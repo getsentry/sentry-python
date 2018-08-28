@@ -208,6 +208,10 @@ def _make_wsgi_event_processor(environ, client_options):
             # if the code below fails halfway through we at least have some data
             request_info = event.setdefault("request", {})
 
+            if _should_send_default_pii():
+                user_info = event.setdefault("user", {})
+                user_info["ip_address"] = get_client_ip(environ)
+
             if "query_string" not in request_info:
                 request_info["query_string"] = environ.get("QUERY_STRING")
 

@@ -12,7 +12,7 @@ except ImportError:
 
 from sentry_sdk import get_current_hub, capture_exception
 from sentry_sdk.hub import _internal_exceptions, _should_send_default_pii
-from ._wsgi import RequestExtractor, get_client_ip, run_wsgi_app
+from ._wsgi import RequestExtractor, run_wsgi_app
 from . import Integration
 
 
@@ -139,10 +139,7 @@ class DjangoRequestExtractor(RequestExtractor):
 
 
 def _set_user_info(request, event):
-    if "user" in event:
-        return
-
-    event["user"] = user_info = {"ip_address": get_client_ip(request.META)}
+    user_info = event.setdefault("user", {})
 
     user = getattr(request, "user", None)
 
