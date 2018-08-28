@@ -1,14 +1,16 @@
 from __future__ import absolute_import
 
+import weakref
+
 from sentry_sdk import capture_exception, get_current_hub
 from sentry_sdk.hub import _internal_exceptions, _should_send_default_pii
 from ._wsgi import RequestExtractor, run_wsgi_app
 from . import Integration
 
 try:
-    from flask_login import current_user
+    from flask_login import current_user as current_user_proxy
 except ImportError:
-    current_user = None
+    current_user_proxy = None
 
 from flask import Flask, _request_ctx_stack, _app_ctx_stack
 from flask.signals import (
@@ -43,7 +45,22 @@ def _push_appctx(*args, **kwargs):
     # always want to push scope regardless of whether WSGI app might already
     # have (not the case for CLI for example)
     get_current_hub().push_scope()
-    get_current_hub().add_event_processor(_make_event_processor)
+
+    app = getattr(_app_ctx_stack.top, "app", None)
+
+    try:
+        weak_request = weakref.ref(_request_ctx_stack.top.request)
+    except AttributeError:
+        weak_request = lambda: None
+
+    try:
+        weak_user = weakref.ref(current_user_proxy._get_current_object())
+    except (AttributeError, RuntimeError, TypeError):
+        weak_user = lambda: None
+
+    get_current_hub().add_event_processor(
+        lambda: _make_event_processor(app, weak_request, weak_user)
+    )
 
 
 def _pop_appctx(*args, **kwargs):
@@ -54,13 +71,16 @@ def _capture_exception(sender, exception, **kwargs):
     capture_exception(exception)
 
 
-def _make_event_processor():
-    request = getattr(_request_ctx_stack.top, "request", None)
-    app = getattr(_app_ctx_stack.top, "app", None)
+def _make_event_processor(app, weak_request, weak_user):
     client_options = get_current_hub().client.options
 
     def event_processor(event):
-        if request:
+        request = weak_request()
+
+        # if the request is gone we are fine not logging the data from
+        # it.  This might happen if the processor is pushed away to
+        # another thread.
+        if request is not None:
             if "transaction" not in event:
                 try:
                     event["transaction"] = request.url_rule.endpoint
@@ -72,7 +92,7 @@ def _make_event_processor():
 
         if _should_send_default_pii():
             with _internal_exceptions():
-                _set_user_info(request, event)
+                _set_user_info(request, weak_user(), event)
 
         with _internal_exceptions():
             _process_frames(app, event)
@@ -119,7 +139,7 @@ class FlaskRequestExtractor(RequestExtractor):
         return file.content_length
 
 
-def _set_user_info(request, event):
+def _set_user_info(request, user, event):
     if "user" in event:
         return
 
@@ -134,7 +154,7 @@ def _set_user_info(request, event):
     user_info = {"id": None, "ip_address": ip_address}
 
     try:
-        user_info["id"] = current_user.get_id()
+        user_info["id"] = user.get_id()
         # TODO: more configurable user attrs here
     except AttributeError:
         # might happen if:

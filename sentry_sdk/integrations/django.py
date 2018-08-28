@@ -1,5 +1,7 @@
 from __future__ import absolute_import
 
+import weakref
+
 from django import VERSION as DJANGO_VERSION
 from django.core import signals
 
@@ -55,18 +57,27 @@ class DjangoIntegration(Integration):
         make_event_processor = self._make_event_processor
 
         def sentry_patched_get_response(self, request):
-            get_current_hub().add_event_processor(lambda: make_event_processor(request))
-
+            weak_request = weakref.ref(request)
+            get_current_hub().add_event_processor(
+                lambda: make_event_processor(weak_request)
+            )
             return old_get_response(self, request)
 
         BaseHandler.get_response = sentry_patched_get_response
 
         signals.got_request_exception.connect(_got_request_exception)
 
-    def _make_event_processor(self, request):
+    def _make_event_processor(self, weak_request):
         client_options = get_current_hub().client.options
 
         def processor(event):
+            # if the request is gone we are fine not logging the data from
+            # it.  This might happen if the processor is pushed away to
+            # another thread.
+            request = weak_request()
+            if request is None:
+                return
+
             if "transaction" not in event:
                 try:
                     event["transaction"] = resolve(request.path).func.__name__
