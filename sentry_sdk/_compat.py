@@ -9,6 +9,7 @@ if PY2:
     text_type = unicode  # noqa
     import Queue as queue  # noqa
 
+    string_types = (str, text_type)
     number_types = (int, long, float)  # noqa
 
     def implements_str(cls):
@@ -29,6 +30,7 @@ else:
     import queue  # noqa
 
     text_type = str
+    string_types = (text_type,)
     number_types = (int, float)
 
     def _identity(x):

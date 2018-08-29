@@ -2,13 +2,16 @@ import os
 import uuid
 import random
 import atexit
+import weakref
 from datetime import datetime
 
+from ._compat import string_types
 from .utils import (
     strip_event,
     flatten_metadata,
     convert_types,
     handle_in_app,
+    pop_hidden_keys,
     Dsn,
     ContextVar,
 )
@@ -19,28 +22,37 @@ from .consts import DEFAULT_OPTIONS, SDK_INFO
 NO_DSN = object()
 
 
-def _get_default_integrations():
-    from .integrations.logging import LoggingIntegration
-    from .integrations.excepthook import ExcepthookIntegration
+def get_options(*args, **kwargs):
+    if args and (isinstance(args[0], string_types) or args[0] is None):
+        dsn = args[0]
+        args = args[1:]
+    else:
+        dsn = None
 
-    yield LoggingIntegration
-    yield ExcepthookIntegration
+    rv = dict(DEFAULT_OPTIONS)
+    options = dict(*args, **kwargs)
+    if dsn is not None and options.get("dsn") is None:
+        options["dsn"] = dsn
+
+    for key, value in options.items():
+        if key not in rv:
+            raise TypeError("Unknown option %r" % (key,))
+        rv[key] = value
+
+    if rv["dsn"] is None:
+        rv["dsn"] = os.environ.get("SENTRY_DSN")
+
+    return rv
 
 
 class Client(object):
-    def __init__(self, dsn=None, *args, **kwargs):
-        passed_dsn = dsn
-        if dsn is NO_DSN:
-            dsn = None
-        else:
-            if dsn is None:
-                dsn = os.environ.get("SENTRY_DSN")
-            if not dsn:
-                dsn = None
-            else:
-                dsn = Dsn(dsn)
-        options = dict(DEFAULT_OPTIONS)
-        options.update(*args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        options = get_options(*args, **kwargs)
+
+        dsn = options["dsn"]
+        if dsn is not None:
+            dsn = Dsn(dsn)
+
         self.options = options
         self._transport = self.options.pop("transport")
         if self._transport is None and dsn is not None:
@@ -50,18 +62,6 @@ class Client(object):
                 https_proxy=self.options.pop("https_proxy"),
             )
             self._transport.start()
-        elif passed_dsn is not None and self._transport is not None:
-            raise ValueError("Cannot pass DSN and a custom transport.")
-
-        integrations = list(options.pop("integrations") or ())
-
-        if options["default_integrations"]:
-            for cls in _get_default_integrations():
-                if not any(isinstance(x, cls) for x in integrations):
-                    integrations.append(cls())
-
-        for integration in integrations:
-            integration(self)
 
         request_bodies = ("always", "never", "small", "medium")
         if options["request_bodies"] not in request_bodies:
@@ -70,6 +70,8 @@ class Client(object):
                     request_bodies
                 )
             )
+
+        self._exceptions_seen = weakref.WeakKeyDictionary()
 
         atexit.register(self.close)
 
@@ -110,12 +112,13 @@ class Client(object):
             event = before_send(event)
 
         if event is not None:
+            pop_hidden_keys(event)
             event = flatten_metadata(event)
             event = convert_types(event)
 
         return event
 
-    def _should_capture(self, event):
+    def _should_capture(self, event, scope=None):
         return not (
             self.options["sample_rate"] < 1.0
             and random.random() >= self.options["sample_rate"]
@@ -128,11 +131,11 @@ class Client(object):
         rv = event.get("event_id")
         if rv is None:
             event["event_id"] = rv = uuid.uuid4().hex
-        if self._should_capture(event):
+        if self._should_capture(event, scope):
             event = self._prepare_event(event, scope)
             if event is not None:
                 self._transport.capture_event(event)
-        return rv
+        return True
 
     def drain_events(self, timeout=None):
         if timeout is None:

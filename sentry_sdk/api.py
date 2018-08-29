@@ -1,5 +1,6 @@
 from .hub import Hub
-from .client import Client
+from .client import Client, get_options
+from .integrations import setup_integrations
 
 
 class _InitGuard(object):
@@ -15,10 +16,17 @@ class _InitGuard(object):
             c.close()
 
 
-def init(*args, **kwargs):
-    client = Client(*args, **kwargs)
-    Hub.main.bind_client(client)
+def _init_on_hub(hub, args, kwargs):
+    options = get_options(*args, **kwargs)
+    install = setup_integrations(options)
+    client = Client(options)
+    hub.bind_client(client)
+    install()
     return _InitGuard(client)
+
+
+def init(*args, **kwargs):
+    return _init_on_hub(Hub.main, args, kwargs)
 
 
 from . import minimal as sentry_minimal

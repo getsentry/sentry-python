@@ -15,7 +15,7 @@ class CeleryIntegration(Integration):
     def __init__(self):
         pass
 
-    def install(self, client):
+    def install(self):
         task_prerun.connect(self._handle_task_prerun, weak=False)
         task_postrun.connect(self._handle_task_postrun, weak=False)
         task_failure.connect(self._process_failure_signal, weak=False)

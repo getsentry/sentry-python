@@ -17,7 +17,7 @@ class LoggingIntegration(Integration):
     def __init__(self, level=logging.INFO, event_level=None):
         self._handler = SentryHandler(level=level, event_level=event_level)
 
-    def install(self, client):
+    def install(self):
         handler = self._handler
 
         old_callhandlers = logging.Logger.callHandlers

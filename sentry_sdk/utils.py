@@ -383,13 +383,12 @@ def exc_info_from_error(error):
     return exc_type, exc_value, tb
 
 
-def event_from_exception(
-    exc_info, with_locals=False, in_app_include=None, in_app_exclude=None
-):
+def event_from_exception(exc_info, with_locals=False, processors=None):
     exc_info = exc_info_from_error(exc_info)
     return {
         "level": "error",
         "exception": {"values": exceptions_from_error_tuple(exc_info)},
+        "__sentry_exc_info": exc_info,
     }
 
 
@@ -459,6 +458,10 @@ def strip_event(event):
 def strip_frame(frame):
     frame["vars"], meta = strip_databag(frame.get("vars"))
     return frame, ({"vars": meta} if meta is not None else None)
+
+
+def pop_hidden_keys(event):
+    event.pop("__sentry_exc_info", None)
 
 
 def convert_types(obj):

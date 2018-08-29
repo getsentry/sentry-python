@@ -9,10 +9,7 @@ from . import Integration
 class ExcepthookIntegration(Integration):
     identifier = "excepthook"
 
-    def __init__(self):
-        pass
-
-    def install(self, client):
+    def install(self):
         if hasattr(sys, "ps1"):
             # Disable the excepthook for interactive Python shells, otherwise
             # every typo gets sent to Sentry.

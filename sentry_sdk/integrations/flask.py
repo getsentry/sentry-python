@@ -24,10 +24,7 @@ from flask.signals import (
 class FlaskIntegration(Integration):
     identifier = "flask"
 
-    def __init__(self):
-        pass
-
-    def install(self, client):
+    def install(self):
         appcontext_pushed.connect(_push_appctx)
         appcontext_tearing_down.connect(_pop_appctx)
         request_started.connect(_request_started)

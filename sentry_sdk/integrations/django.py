@@ -34,10 +34,7 @@ else:
 class DjangoIntegration(Integration):
     identifier = "django"
 
-    def __init__(self):
-        pass
-
-    def install(self, client):
+    def install(self):
         # Patch in our custom middleware.
 
         from django.core.handlers.wsgi import WSGIHandler
