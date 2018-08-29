@@ -92,7 +92,9 @@ class Client(object):
             event["timestamp"] = datetime.utcnow()
 
         if scope is not None:
-            scope.apply_to_event(event)
+            event = scope.apply_to_event(event)
+            if event is None:
+                return
 
         for key in "release", "environment", "server_name", "repos", "dist":
             if event.get(key) is None:

@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 import weakref
 
-from sentry_sdk import capture_exception, get_current_hub
+from sentry_sdk import capture_exception, get_current_hub, configure_scope
 from sentry_sdk.hub import _internal_exceptions, _should_send_default_pii
 from ._wsgi import RequestExtractor, run_wsgi_app
 from . import Integration
@@ -76,10 +76,6 @@ def event_processor(event):
 
     if _should_send_default_pii():
         with _internal_exceptions():
-            _set_user_info(request, event)
-
-    if _should_send_default_pii():
-        with _internal_exceptions():
             _add_user_to_event(event)
 
     return event
@@ -130,6 +126,8 @@ def _make_request_event_processor(app, weak_request):
 
         with _internal_exceptions():
             FlaskRequestExtractor(request).extract_into_event(event)
+
+        return event
 
     return inner
 

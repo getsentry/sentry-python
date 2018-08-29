@@ -92,7 +92,11 @@ class Scope(object):
                     return
 
         for processor in self._event_processors:
-            processor(event)
+            event = processor(event)
+            if event is None:
+                return None
+
+        return event
 
     def __copy__(self):
         rv = object.__new__(self.__class__)

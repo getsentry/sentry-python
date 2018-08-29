@@ -237,4 +237,6 @@ def _make_wsgi_event_processor(environ):
                         not in ("set-cookie", "cookie", "authorization")
                     }
 
+        return event
+
     return event_processor

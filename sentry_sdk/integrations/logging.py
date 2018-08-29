@@ -67,7 +67,7 @@ class SentryHandler(logging.Handler, object):
                 # exc_info might be None or (None, None, None)
                 if record.exc_info and all(record.exc_info):
                     event = event_from_exception(
-                        record.exc_info, with_locals=client.options["with_locals"]
+                        record.exc_info, with_locals=hub.client.options["with_locals"]
                     )
                 else:
                     event = {}

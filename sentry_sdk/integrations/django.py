@@ -10,7 +10,7 @@ try:
 except ImportError:
     from django.core.urlresolvers import resolve
 
-from sentry_sdk import get_current_hub, capture_exception, configure_scope
+from sentry_sdk import capture_exception, configure_scope
 from sentry_sdk.hub import _internal_exceptions, _should_send_default_pii
 from ._wsgi import RequestExtractor, run_wsgi_app
 from . import Integration
@@ -68,9 +68,7 @@ def _make_event_processor(weak_request):
         # another thread.
         request = weak_request()
         if request is None:
-            return
-
-        hub = get_current_hub()
+            return event
 
         if "transaction" not in event:
             try:
