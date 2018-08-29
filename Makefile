@@ -10,8 +10,12 @@ dist:
 test: .venv
 	@pip install -r test-requirements.txt
 	@pip install --editable .
-	@pytest tests
+	@pytest tests --tb=short
 .PHONY: test
+
+format:
+	@black sentry_sdk tests
+.PHONY: format
 
 tox-test:
 	@sh ./scripts/runtox.sh

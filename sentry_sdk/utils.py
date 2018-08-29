@@ -1,6 +1,9 @@
 import os
+import sys
+import uuid
 import linecache
 
+from collections import Mapping, Sequence
 from datetime import datetime
 from collections import Mapping, Sequence
 
@@ -297,7 +300,8 @@ def single_exception_from_error_tuple(exc_type, exc_value, tb, with_locals=True)
     }
 
 
-def exceptions_from_error_tuple(exc_type, exc_value, tb, with_locals=True):
+def exceptions_from_error_tuple(exc_info, with_locals=True):
+    exc_type, exc_value, tb = exc_info
     rv = []
     while exc_type is not None:
         rv.append(
@@ -312,16 +316,190 @@ def exceptions_from_error_tuple(exc_type, exc_value, tb, with_locals=True):
     return rv
 
 
-class SkipEvent(Exception):
-    """Risen from an event processor to indicate that the event should be
-    ignored and not be reported."""
-
-
 def to_string(value):
     try:
         return text_type(value)
     except UnicodeDecodeError:
         return repr(value)[1:-1]
+
+
+def iter_event_frames(event):
+    stacktraces = []
+    if "stacktrace" in event:
+        stacktraces.append(event["stacktrace"])
+    if "exception" in event:
+        for exception in event["exception"].get("values") or ():
+            if "stacktrace" in exception:
+                stacktraces.append(exception["stacktrace"])
+    for stacktrace in stacktraces:
+        for frame in stacktrace.get("frames") or ():
+            yield frame
+
+
+def handle_in_app(event, in_app_exclude=None, in_app_include=None):
+    any_in_app = False
+    for frame in iter_event_frames(event):
+        in_app = frame.get("in_app")
+        if in_app is not None:
+            if in_app:
+                any_in_app = True
+            continue
+
+        module = frame.get("module")
+        if not module:
+            continue
+
+        if _module_in_set(module, in_app_exclude):
+            frame["in_app"] = False
+        if _module_in_set(module, in_app_include):
+            frame["in_app"] = True
+            any_in_app = True
+
+    if not any_in_app:
+        for frame in iter_event_frames(event):
+            frame["in_app"] = True
+
+    return event
+
+
+def exc_info_from_error(error):
+    if isinstance(error, tuple) and len(error) == 3:
+        exc_type, exc_value, tb = error
+    else:
+        tb = getattr(error, "__traceback__", None)
+        if tb is not None:
+            exc_type = type(error)
+            exc_value = error
+        else:
+            exc_type, exc_value, tb = sys.exc_info()
+            if exc_value is not error:
+                tb = None
+                exc_value = error
+                exc_type = type(error)
+
+    if tb is not None:
+        tb = skip_internal_frames(tb)
+
+    return exc_type, exc_value, tb
+
+
+def event_from_exception(
+    exc_info, with_locals=False, in_app_include=None, in_app_exclude=None
+):
+    exc_info = exc_info_from_error(exc_info)
+    return {
+        "level": "error",
+        "exception": {"values": exceptions_from_error_tuple(exc_info)},
+    }
+
+
+def _module_in_set(name, set):
+    if not set:
+        return False
+    for item in set or ():
+        if item == name or name.startswith(item + "."):
+            return True
+    return False
+
+
+class AnnotatedValue(object):
+    def __init__(self, value, metadata):
+        self.value = value
+        self.metadata = metadata
+
+
+def flatten_metadata(obj):
+    def inner(obj):
+        if isinstance(obj, Mapping):
+            rv = {}
+            meta = {}
+            for k, v in obj.items():
+                # if we actually have "" keys in our data, throw them away. It's
+                # unclear how we would tell them apart from metadata
+                if k == "":
+                    continue
+
+                rv[k], meta[k] = inner(v)
+                if meta[k] is None:
+                    del meta[k]
+                if rv[k] is None:
+                    del rv[k]
+            return rv, (meta or None)
+        if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
+            rv = []
+            meta = {}
+            for i, v in enumerate(obj):
+                new_v, meta[i] = inner(v)
+                rv.append(new_v)
+                if meta[i] is None:
+                    del meta[i]
+            return rv, (meta or None)
+        if isinstance(obj, AnnotatedValue):
+            return obj.value, {"": obj.metadata}
+        return obj, None
+
+    obj, meta = inner(obj)
+    if meta is not None:
+        obj[""] = meta
+    return obj
+
+
+def strip_event(event):
+    old_frames = event.get("stacktrace", {}).get("frames", None)
+    if old_frames:
+        event["stacktrace"]["frames"] = [strip_frame(frame) for frame in old_frames]
+
+    old_request_data = event.get("request", {}).get("data", None)
+    if old_request_data:
+        event["request"]["data"] = strip_databag(old_request_data)
+
+    return event
+
+
+def strip_frame(frame):
+    frame["vars"], meta = strip_databag(frame.get("vars"))
+    return frame, ({"vars": meta} if meta is not None else None)
+
+
+def convert_types(obj):
+    if isinstance(obj, datetime):
+        return obj.strftime("%Y-%m-%dT%H:%M:%SZ")
+    if isinstance(obj, Mapping):
+        return {k: convert_types(v) for k, v in obj.items()}
+    if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
+        return [convert_types(v) for v in obj]
+    return obj
+
+
+def strip_databag(obj, remaining_depth=20):
+    assert not isinstance(obj, bytes), "bytes should have been normalized before"
+    if remaining_depth <= 0:
+        return AnnotatedValue(None, {"rem": [["!dep", "x"]]})
+    if isinstance(obj, text_type):
+        return strip_string(obj)
+    if isinstance(obj, Mapping):
+        return {k: strip_databag(v, remaining_depth - 1) for k, v in obj.items()}
+    if isinstance(obj, Sequence):
+        return [strip_databag(v, remaining_depth - 1) for v in obj]
+    return obj
+
+
+def strip_string(value, assume_length=None, max_length=512):
+    # TODO: read max_length from config
+    if not value:
+        return value
+    if assume_length is None:
+        assume_length = len(value)
+
+    if assume_length > max_length:
+        return AnnotatedValue(
+            value=value[: max_length - 3] + u"...",
+            metadata={
+                "len": assume_length,
+                "rem": [["!len", "x", max_length - 3, max_length]],
+            },
+        )
+    return value[:max_length]
 
 
 try:

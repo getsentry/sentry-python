@@ -10,6 +10,8 @@ DEFAULT_OPTIONS = {
     "server_name": DEFAULT_SERVER_NAME,
     "shutdown_timeout": 2.0,
     "integrations": [],
+    "in_app_include": [],
+    "in_app_exclude": [],
     "default_integrations": True,
     "repos": {},
     "dist": None,
@@ -18,7 +20,7 @@ DEFAULT_OPTIONS = {
     "send_default_pii": False,
     "http_proxy": None,
     "https_proxy": None,
-    "ignore_errors": (),
+    "ignore_errors": [],
     "request_bodies": "medium",
     "before_send": None,
 }

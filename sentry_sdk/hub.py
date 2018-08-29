@@ -4,8 +4,7 @@ from contextlib import contextmanager
 
 from ._compat import with_metaclass
 from .scope import Scope
-from .utils import skip_internal_frames, ContextVar
-from .event import Event
+from .utils import exc_info_from_error, event_from_exception, ContextVar
 
 
 _local = ContextVar("sentry_current_hub")
@@ -98,8 +97,7 @@ class Hub(with_metaclass(HubMeta)):
         """Captures an event."""
         client, scope = self._stack[-1]
         if client is not None:
-            client.capture_event(event, scope)
-            return event.get("event_id")
+            return client.capture_event(event, scope)
 
     def capture_message(self, message, level=None):
         """Captures a message."""
@@ -107,11 +105,7 @@ class Hub(with_metaclass(HubMeta)):
             return
         if level is None:
             level = "info"
-        event = Event()
-        event["message"] = message
-        if level is not None:
-            event["level"] = level
-        return self.capture_event(event)
+        return self.capture_event({"message": message, "level": level})
 
     def capture_exception(self, error=None):
         """Captures an exception."""
@@ -119,27 +113,14 @@ class Hub(with_metaclass(HubMeta)):
         if client is None:
             return
         if error is None:
-            exc_type, exc_value, tb = sys.exc_info()
-        elif isinstance(error, tuple) and len(error) == 3:
-            exc_type, exc_value, tb = error
+            exc_info = sys.exc_info()
         else:
-            tb = getattr(error, "__traceback__", None)
-            if tb is not None:
-                exc_type = type(error)
-                exc_value = error
-            else:
-                exc_type, exc_value, tb = sys.exc_info()
-                if exc_value is not error:
-                    tb = None
-                    exc_value = error
-                    exc_type = type(error)
+            exc_info = exc_info_from_error(error)
 
-        if tb is not None:
-            tb = skip_internal_frames(tb)
-
-        event = Event()
+        event = event_from_exception(
+            exc_info, with_locals=client.options["with_locals"]
+        )
         try:
-            event.set_exception(exc_type, exc_value, tb, client.options["with_locals"])
             return self.capture_event(event)
         except Exception:
             self.capture_internal_exception()

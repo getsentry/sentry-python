@@ -83,29 +83,11 @@ def event_processor(event):
         with _internal_exceptions():
             _set_user_info(request, event)
 
-    with _internal_exceptions():
-        _process_frames(app, event)
-
     if _should_send_default_pii():
-        _add_user_to_event(event)
+        with _internal_exceptions():
+            _add_user_to_event(event)
 
     return event
-
-
-def _process_frames(app, event):
-    for frame in event.iter_frames():
-        if "in_app" in frame:
-            continue
-        module = frame.get("module")
-        if not module:
-            continue
-
-        if module == "flask" or module.startswith("flask."):
-            frame["in_app"] = False
-        elif app and (
-            module.startswith("%s." % app.import_name) or module == app.import_name
-        ):
-            frame["in_app"] = True
 
 
 class FlaskRequestExtractor(RequestExtractor):

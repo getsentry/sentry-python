@@ -16,6 +16,9 @@ from ._wsgi import RequestExtractor, run_wsgi_app
 from . import Integration
 
 
+WELL_KNOWN_PACKAGES = ["django", "flask"]
+
+
 if DJANGO_VERSION < (1, 10):
 
     def is_authenticated(request_user):
@@ -89,24 +92,9 @@ def _make_event_processor(weak_request):
             with _internal_exceptions():
                 _set_user_info(request, event)
 
-        with _internal_exceptions():
-            _process_frames(event)
-
         return event
 
     return event_processor
-
-
-def _process_frames(event):
-    for frame in event.iter_frames():
-        if "in_app" in frame:
-            continue
-
-        module = frame.get("module")
-        if not module:
-            continue
-        if module == "django" or module.startswith("django."):
-            frame["in_app"] = False
 
 
 def _got_request_exception(request=None, **kwargs):

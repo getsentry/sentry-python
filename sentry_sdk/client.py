@@ -2,16 +2,21 @@ import os
 import uuid
 import random
 import atexit
+from datetime import datetime
 
-from .utils import Dsn, SkipEvent, ContextVar
+from .utils import (
+    strip_event,
+    flatten_metadata,
+    convert_types,
+    handle_in_app,
+    Dsn,
+    ContextVar,
+)
 from .transport import Transport
 from .consts import DEFAULT_OPTIONS, SDK_INFO
-from .event import strip_event, flatten_metadata, convert_types, Event
 
 
 NO_DSN = object()
-
-_most_recent_exception = ContextVar("sentry_most_recent_exception")
 
 
 def _get_default_integrations():
@@ -80,8 +85,8 @@ class Client(object):
         return cls(NO_DSN)
 
     def _prepare_event(self, event, scope):
-        if event.get("event_id") is None:
-            event["event_id"] = uuid.uuid4().hex
+        if event.get("timestamp") is None:
+            event["timestamp"] = datetime.utcnow()
 
         if scope is not None:
             scope.apply_to_event(event)
@@ -95,46 +100,39 @@ class Client(object):
         if event.get("platform") is None:
             event["platform"] = "python"
 
+        event = handle_in_app(
+            event, self.options["in_app_exclude"], self.options["in_app_include"]
+        )
         event = strip_event(event)
-        event = flatten_metadata(event)
-        event = convert_types(event)
 
         before_send = self.options["before_send"]
         if before_send is not None:
             event = before_send(event)
 
+        if event is not None:
+            event = flatten_metadata(event)
+            event = convert_types(event)
+
         return event
 
-    def _check_should_capture(self, event):
-        if (
+    def _should_capture(self, event):
+        return not (
             self.options["sample_rate"] < 1.0
             and random.random() >= self.options["sample_rate"]
-        ):
-            raise SkipEvent()
-
-        if event._exc_value is not None:
-            exclusions = self.options["ignore_errors"]
-            exc_type = type(event._exc_value)
-
-            if any(issubclass(exc_type, e) for e in exclusions):
-                raise SkipEvent()
-
-            if _most_recent_exception.get(None) is event._exc_value:
-                raise SkipEvent()
-            _most_recent_exception.set(event._exc_value)
+        )
 
     def capture_event(self, event, scope=None):
         """Captures an event."""
         if self._transport is None:
             return
-        if not isinstance(event, Event):
-            event = Event(event)
-        try:
-            self._check_should_capture(event)
+        rv = event.get("event_id")
+        if rv is None:
+            event["event_id"] = rv = uuid.uuid4().hex
+        if self._should_capture(event):
             event = self._prepare_event(event, scope)
-        except SkipEvent:
-            return
-        self._transport.capture_event(event)
+            if event is not None:
+                self._transport.capture_event(event)
+        return rv
 
     def drain_events(self, timeout=None):
         if timeout is None:

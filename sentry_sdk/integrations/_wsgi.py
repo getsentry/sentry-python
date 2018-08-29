@@ -3,7 +3,7 @@ import sys
 
 import sentry_sdk
 from sentry_sdk.hub import _internal_exceptions, _should_send_default_pii
-from sentry_sdk.event import AnnotatedValue
+from sentry_sdk.utils import AnnotatedValue
 from sentry_sdk._compat import reraise, implements_iterator
 
 
