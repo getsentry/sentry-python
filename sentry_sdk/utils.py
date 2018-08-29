@@ -1,9 +1,7 @@
 import os
 import sys
-import uuid
 import linecache
 
-from collections import Mapping, Sequence
 from datetime import datetime
 from collections import Mapping, Sequence
 

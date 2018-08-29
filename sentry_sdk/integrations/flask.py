@@ -62,7 +62,6 @@ def _request_started(sender, **kwargs):
 
 def event_processor(event):
     request = getattr(_request_ctx_stack.top, "request", None)
-    app = getattr(_app_ctx_stack.top, "app", None)
 
     if request:
         if "transaction" not in event:

@@ -1,7 +1,6 @@
 import weakref
 
-from sentry_sdk.hub import _internal_exceptions
-from sentry_sdk.api import get_current_hub, configure_scope
+from sentry_sdk.api import configure_scope
 from sentry_sdk.utils import ContextVar
 
 from . import Integration

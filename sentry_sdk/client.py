@@ -14,7 +14,6 @@ from .utils import (
     get_type_name,
     pop_hidden_keys,
     Dsn,
-    ContextVar,
 )
 from .transport import Transport
 from .consts import DEFAULT_OPTIONS, SDK_INFO
