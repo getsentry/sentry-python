@@ -120,18 +120,15 @@ class Client(object):
         return event
 
     def _is_ignored_error(self, event):
-        exc_info = event.get('__sentry_exc_info')
+        exc_info = event.get("__sentry_exc_info")
 
         if not exc_info or exc_info[0] is None:
             return False
 
         type_name = get_type_name(exc_info[0])
-        full_name = '%s.%s' % (
-            exc_info[0].__module__,
-            type_name
-        )
+        full_name = "%s.%s" % (exc_info[0].__module__, type_name)
 
-        for errcls in self.options['ignore_errors']:
+        for errcls in self.options["ignore_errors"]:
             # String types are matched against the type name in the
             # exception only
             if isinstance(errcls, string_types):
@@ -146,7 +143,8 @@ class Client(object):
     def _should_capture(self, event, scope=None):
         if (
             self.options["sample_rate"] < 1.0
-            and random.random() >= self.options["sample_rate"]):
+            and random.random() >= self.options["sample_rate"]
+        ):
             return False
 
         if self._is_ignored_error(event):

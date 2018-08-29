@@ -29,6 +29,10 @@ def init(*args, **kwargs):
     return _init_on_hub(Hub.main, args, kwargs)
 
 
+def _init_on_current(*args, **kwargs):
+    return _init_on_hub(Hub.current, args, kwargs)
+
+
 from . import minimal as sentry_minimal
 
 __all__ = ["Hub", "Scope", "Client", "init"] + sentry_minimal.__all__

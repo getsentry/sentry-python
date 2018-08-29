@@ -16,9 +16,6 @@ from ._wsgi import RequestExtractor, run_wsgi_app
 from . import Integration
 
 
-WELL_KNOWN_PACKAGES = ["django", "flask"]
-
-
 if DJANGO_VERSION < (1, 10):
 
     def is_authenticated(request_user):

@@ -19,7 +19,7 @@ def _internal_exceptions():
 
 
 def _get_client_options():
-    hub = get_current_hub()
+    hub = Hub.current
     if hub and hub.client:
         return hub.client.options
 
