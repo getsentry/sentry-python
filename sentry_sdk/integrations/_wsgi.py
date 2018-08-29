@@ -150,7 +150,9 @@ def run_wsgi_app(app, environ, start_response):
     with _internal_exceptions():
         client_options = hub.client.options
         with hub.configure_scope() as scope:
-            scope.add_event_processor(_make_wsgi_event_processor(environ, client_options))
+            scope.add_event_processor(
+                _make_wsgi_event_processor(environ, client_options)
+            )
 
     try:
         rv = app(environ, start_response)

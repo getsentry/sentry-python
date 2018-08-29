@@ -83,9 +83,7 @@ def _make_event_processor(weak_request):
                 pass
 
         with _internal_exceptions():
-            DjangoRequestExtractor(request).extract_into_event(
-                event, client_options
-            )
+            DjangoRequestExtractor(request).extract_into_event(event, client_options)
 
         if _should_send_default_pii():
             with _internal_exceptions():
@@ -95,6 +93,7 @@ def _make_event_processor(weak_request):
             _process_frames(event)
 
         return event
+
     return event_processor
 
 

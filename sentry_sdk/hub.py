@@ -194,6 +194,7 @@ class Hub(with_metaclass(HubMeta)):
                 yield scope
             else:
                 yield Scope()
+
         return inner()
 
 
