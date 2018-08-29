@@ -67,14 +67,12 @@ class Hub(with_metaclass(HubMeta)):
             hub = client_or_hub
             client, other_scope = hub._stack[-1]
             if scope is None:
-                hub._flush_event_processors()
                 scope = copy.copy(other_scope)
         else:
             client = client_or_hub
         if scope is None:
             scope = Scope()
         self._stack = [(client, scope)]
-        self._pending_processors = []
 
     def __enter__(self):
         return _HubManager(self)
@@ -98,7 +96,6 @@ class Hub(with_metaclass(HubMeta)):
 
     def capture_event(self, event):
         """Captures an event."""
-        self._flush_event_processors()
         client, scope = self._stack[-1]
         if client is not None:
             client.capture_event(event, scope)
@@ -168,14 +165,9 @@ class Hub(with_metaclass(HubMeta)):
         while len(scope._breadcrumbs) >= client.options["max_breadcrumbs"]:
             scope._breadcrumbs.popleft()
 
-    def add_event_processor(self, factory):
-        """Registers a new event processor with the top scope."""
-        self._pending_processors.append(factory)
-
     def push_scope(self):
         """Pushes a new layer on the scope stack. Returns a context manager
         that should be used to pop the scope again."""
-        self._flush_event_processors()
         client, scope = self._stack[-1]
         new_layer = (client, copy.copy(scope))
         self._stack.append(new_layer)
@@ -184,7 +176,6 @@ class Hub(with_metaclass(HubMeta)):
     def pop_scope_unsafe(self):
         """Pops a scope layer from the stack. Try to use the context manager
         `push_scope()` instead."""
-        self._pending_processors = []
         rv = self._stack.pop()
         assert self._stack
         return rv
@@ -195,23 +186,15 @@ class Hub(with_metaclass(HubMeta)):
         if callback is not None:
             if client is not None and scope is not None:
                 callback(scope)
-        else:
+            return
 
-            @contextmanager
-            def inner():
-                if client is not None and scope is not None:
-                    yield scope
-                else:
-                    yield Scope()
-
-            return inner()
-
-    def _flush_event_processors(self):
-        rv = self._pending_processors
-        self._pending_processors = []
-        top = self._stack[-1][1]
-        for factory in rv:
-            top._event_processors.append(factory())
+        @contextmanager
+        def inner():
+            if client is not None and scope is not None:
+                yield scope
+            else:
+                yield Scope()
+        return inner()
 
 
 GLOBAL_HUB = Hub()

@@ -148,10 +148,9 @@ def run_wsgi_app(app, environ, start_response):
     hub = sentry_sdk.get_current_hub()
     hub.push_scope()
     with _internal_exceptions():
-        client_options = sentry_sdk.get_current_hub().client.options
-        sentry_sdk.get_current_hub().add_event_processor(
-            lambda: _make_wsgi_event_processor(environ, client_options)
-        )
+        client_options = hub.client.options
+        with hub.configure_scope() as scope:
+            scope.add_event_processor(_make_wsgi_event_processor(environ, client_options))
 
     try:
         rv = app(environ, start_response)

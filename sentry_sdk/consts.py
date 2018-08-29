@@ -20,6 +20,7 @@ DEFAULT_OPTIONS = {
     "https_proxy": None,
     "ignore_errors": (),
     "request_bodies": "medium",
+    "before_send": None,
 }
 
 SDK_INFO = {"name": "sentry-python", "version": VERSION}

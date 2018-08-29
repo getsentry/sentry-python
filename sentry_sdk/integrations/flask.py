@@ -46,8 +46,10 @@ class FlaskIntegration(Integration):
 def _push_appctx(*args, **kwargs):
     # always want to push scope regardless of whether WSGI app might already
     # have (not the case for CLI for example)
-    get_current_hub().push_scope()
-    get_current_hub().add_event_processor(_make_user_event_processor)
+    hub = get_current_hub()
+    hub.push_scope()
+    with hub.configure_scope() as scope:
+        scope.add_event_processor(event_processor)
 
 
 def _pop_appctx(*args, **kwargs):
@@ -62,8 +64,32 @@ def _request_started(sender, **kwargs):
     )
 
 
-def _capture_exception(sender, exception, **kwargs):
-    capture_exception(exception)
+def event_processor(event):
+    request = getattr(_request_ctx_stack.top, "request", None)
+    app = getattr(_app_ctx_stack.top, "app", None)
+    client_options = get_current_hub().client.options
+
+    if request:
+        if "transaction" not in event:
+            try:
+                event["transaction"] = request.url_rule.endpoint
+            except Exception:
+                pass
+
+        with _internal_exceptions():
+            FlaskRequestExtractor(request).extract_into_event(event, client_options)
+
+    if _should_send_default_pii():
+        with _internal_exceptions():
+            _set_user_info(request, event)
+
+    with _internal_exceptions():
+        _process_frames(app, event)
+
+    if _should_send_default_pii():
+        _add_user_to_event(event)
+
+    return event
 
 
 def _process_frames(app, event):
@@ -132,30 +158,27 @@ def _make_request_event_processor(app, weak_request):
     return inner
 
 
-def _make_user_event_processor():
-    def inner(event):
-        if flask_login is None or not _should_send_default_pii():
-            return
+def _add_user_to_event(event):
+    if flask_login is None:
+        return
 
-        user = flask_login.current_user
-        if user is None:
-            return
+    user = flask_login.current_user
+    if user is None:
+        return
 
-        with _internal_exceptions():
-            # Access this object as late as possible as accessing the user
-            # is relatively costly
+    with _internal_exceptions():
+        # Access this object as late as possible as accessing the user
+        # is relatively costly
 
-            user_info = event.setdefault("user", {})
+        user_info = event.setdefault("user", {})
 
-            if user_info.get("id", None) is None:
-                try:
-                    user_info["id"] = user.get_id()
-                    # TODO: more configurable user attrs here
-                except AttributeError:
-                    # might happen if:
-                    # - flask_login could not be imported
-                    # - flask_login is not configured
-                    # - no user is logged in
-                    pass
-
-    return inner
+        if user_info.get("id", None) is None:
+            try:
+                user_info["id"] = user.get_id()
+                # TODO: more configurable user attrs here
+            except AttributeError:
+                # might happen if:
+                # - flask_login could not be imported
+                # - flask_login is not configured
+                # - no user is logged in
+                pass

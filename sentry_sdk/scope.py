@@ -53,6 +53,9 @@ class Scope(object):
         del self._breadcrumbs[:]
         del self._event_processors[:]
 
+    def add_event_processor(self, func):
+        self._event_processors.append(func)
+
     def apply_to_event(self, event):
         event.setdefault("breadcrumbs", []).extend(self._breadcrumbs)
         if event.get("user") is None and "user" in self._data:

@@ -98,6 +98,11 @@ class Client(object):
         event = strip_event(event)
         event = flatten_metadata(event)
         event = convert_types(event)
+
+        before_send = self.options["before_send"]
+        if before_send is not None:
+            event = before_send(event)
+
         return event
 
     def _check_should_capture(self, event):
