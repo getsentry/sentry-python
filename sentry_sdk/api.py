@@ -26,10 +26,14 @@ def _init_on_hub(hub, args, kwargs):
 
 
 def init(*args, **kwargs):
+    """Initializes the SDK and optionally integrations."""
     return _init_on_hub(Hub.main, args, kwargs)
 
 
 def _init_on_current(*args, **kwargs):
+    # This function only exists to support unittests.  Do not call it as
+    # initializing integrations on anything but the main hub is not going
+    # to yield the results you expect.
     return _init_on_hub(Hub.current, args, kwargs)
 
 

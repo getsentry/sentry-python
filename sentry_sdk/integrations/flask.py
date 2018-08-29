@@ -108,11 +108,12 @@ class FlaskRequestExtractor(RequestExtractor):
         return file.content_length
 
 
+def _capture_exception(sender, exception, **kwargs):
+    capture_exception(exception)
+
+
 def _make_request_event_processor(app, weak_request):
     def inner(event):
-        with _internal_exceptions():
-            _process_frames(app, event)
-
         request = weak_request()
 
         # if the request is gone we are fine not logging the data from
