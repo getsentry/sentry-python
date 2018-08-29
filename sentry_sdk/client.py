@@ -11,6 +11,7 @@ from .utils import (
     flatten_metadata,
     convert_types,
     handle_in_app,
+    get_type_name,
     pop_hidden_keys,
     Dsn,
     ContextVar,
@@ -118,11 +119,40 @@ class Client(object):
 
         return event
 
-    def _should_capture(self, event, scope=None):
-        return not (
-            self.options["sample_rate"] < 1.0
-            and random.random() >= self.options["sample_rate"]
+    def _is_ignored_error(self, event):
+        exc_info = event.get('__sentry_exc_info')
+
+        if not exc_info or exc_info[0] is None:
+            return False
+
+        type_name = get_type_name(exc_info[0])
+        full_name = '%s.%s' % (
+            exc_info[0].__module__,
+            type_name
         )
+
+        for errcls in self.options['ignore_errors']:
+            # String types are matched against the type name in the
+            # exception only
+            if isinstance(errcls, string_types):
+                if errcls == full_name or errcls == type_name:
+                    return True
+            else:
+                if issubclass(exc_info[0], errcls):
+                    return True
+
+        return False
+
+    def _should_capture(self, event, scope=None):
+        if (
+            self.options["sample_rate"] < 1.0
+            and random.random() >= self.options["sample_rate"]):
+            return False
+
+        if self._is_ignored_error(event):
+            return False
+
+        return True
 
     def capture_event(self, event, scope=None):
         """Captures an event."""

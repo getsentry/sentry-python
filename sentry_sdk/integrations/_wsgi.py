@@ -40,7 +40,11 @@ class RequestExtractor(object):
     def __init__(self, request):
         self.request = request
 
-    def extract_into_event(self, event, client_options):
+    def extract_into_event(self, event):
+        client_options = _get_client_options()
+        if client_options is None:
+            return
+
         content_length = self.content_length()
         request_info = event.setdefault("request", {})
         request_info["url"] = self.url()
@@ -48,7 +52,7 @@ class RequestExtractor(object):
         if _should_send_default_pii():
             request_info["cookies"] = dict(self.cookies())
 
-        bodies = client_options.get("request_bodies")
+        bodies = client_options["request_bodies"]
         if (
             bodies == "never"
             or (bodies == "small" and content_length > 10 ** 3)
@@ -148,11 +152,8 @@ def run_wsgi_app(app, environ, start_response):
     hub = sentry_sdk.get_current_hub()
     hub.push_scope()
     with _internal_exceptions():
-        client_options = hub.client.options
         with hub.configure_scope() as scope:
-            scope.add_event_processor(
-                _make_wsgi_event_processor(environ, client_options)
-            )
+            scope.add_event_processor(_make_wsgi_event_processor(environ))
 
     try:
         rv = app(environ, start_response)
@@ -203,7 +204,7 @@ class _ScopePoppingResponse(object):
                 reraise(*einfo)
 
 
-def _make_wsgi_event_processor(environ, client_options):
+def _make_wsgi_event_processor(environ):
     def event_processor(event):
         with _internal_exceptions():
             # if the code below fails halfway through we at least have some data

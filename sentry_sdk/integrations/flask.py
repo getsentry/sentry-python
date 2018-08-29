@@ -56,15 +56,13 @@ def _pop_appctx(*args, **kwargs):
 def _request_started(sender, **kwargs):
     weak_request = weakref.ref(_request_ctx_stack.top.request)
     app = _app_ctx_stack.top.app
-    get_current_hub().add_event_processor(
-        lambda: _make_request_event_processor(app, weak_request)
-    )
+    with configure_scope() as scope:
+        scope.add_event_processor(_make_request_event_processor(app, weak_request))
 
 
 def event_processor(event):
     request = getattr(_request_ctx_stack.top, "request", None)
     app = getattr(_app_ctx_stack.top, "app", None)
-    client_options = get_current_hub().client.options
 
     if request:
         if "transaction" not in event:
@@ -74,7 +72,7 @@ def event_processor(event):
                 pass
 
         with _internal_exceptions():
-            FlaskRequestExtractor(request).extract_into_event(event, client_options)
+            FlaskRequestExtractor(request).extract_into_event(event)
 
     if _should_send_default_pii():
         with _internal_exceptions():
@@ -111,8 +109,6 @@ class FlaskRequestExtractor(RequestExtractor):
 
 
 def _make_request_event_processor(app, weak_request):
-    client_options = get_current_hub().client.options
-
     def inner(event):
         with _internal_exceptions():
             _process_frames(app, event)
@@ -132,7 +128,7 @@ def _make_request_event_processor(app, weak_request):
                 pass
 
         with _internal_exceptions():
-            FlaskRequestExtractor(request).extract_into_event(event, client_options)
+            FlaskRequestExtractor(request).extract_into_event(event)
 
     return inner
 

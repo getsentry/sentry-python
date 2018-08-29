@@ -37,15 +37,17 @@ def test_transport_option(monkeypatch):
     assert str(Client(transport=Transport(Dsn(dsn2))).dsn) == dsn2
 
 
-@pytest.mark.xfail
 def test_ignore_errors():
     def e(exc_type):
         return event_from_exception(exc_type())
 
-    c = Client(ignore_errors=[Exception], transport=_TestTransport())
-    c.capture_event(e(Exception))
-    c.capture_event(e(ValueError))
-    pytest.raises(EventCaptured, lambda: c.capture_event(e(BaseException)))
+    class MyDivisionError(ZeroDivisionError):
+        pass
+
+    c = Client(ignore_errors=[ZeroDivisionError], transport=_TestTransport())
+    c.capture_event(e(ZeroDivisionError))
+    c.capture_event(e(MyDivisionError))
+    pytest.raises(EventCaptured, lambda: c.capture_event(e(ValueError)))
 
 
 def test_capture_event_works():

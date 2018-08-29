@@ -74,7 +74,6 @@ def _make_event_processor(weak_request):
             return
 
         hub = get_current_hub()
-        client_options = hub.client.options
 
         if "transaction" not in event:
             try:
@@ -83,7 +82,7 @@ def _make_event_processor(weak_request):
                 pass
 
         with _internal_exceptions():
-            DjangoRequestExtractor(request).extract_into_event(event, client_options)
+            DjangoRequestExtractor(request).extract_into_event(event)
 
         if _should_send_default_pii():
             with _internal_exceptions():

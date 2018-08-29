@@ -387,7 +387,7 @@ def event_from_exception(exc_info, with_locals=False, processors=None):
     exc_info = exc_info_from_error(exc_info)
     return {
         "level": "error",
-        "exception": {"values": exceptions_from_error_tuple(exc_info)},
+        "exception": {"values": exceptions_from_error_tuple(exc_info, with_locals)},
         "__sentry_exc_info": exc_info,
     }
 

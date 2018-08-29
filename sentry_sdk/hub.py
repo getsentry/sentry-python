@@ -18,6 +18,12 @@ def _internal_exceptions():
         Hub.current.capture_internal_exception()
 
 
+def _get_client_options():
+    hub = get_current_hub()
+    if hub and hub.client:
+        return hub.client.options
+
+
 def _should_send_default_pii():
     client = Hub.current.client
     if not client:
