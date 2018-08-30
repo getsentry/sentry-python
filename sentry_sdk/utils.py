@@ -1,6 +1,7 @@
 import os
 import sys
 import linecache
+import logging
 
 from datetime import datetime
 from collections import Mapping, Sequence
@@ -518,6 +519,14 @@ def strip_string(value, assume_length=None, max_length=512):
             },
         )
     return value[:max_length]
+
+
+def get_logger(name):
+    rv = logging.getLogger(name)
+    if not rv.handlers:
+        rv.addHandler(logging.StreamHandler(sys.stderr))
+        rv.setLevel(logging.DEBUG)
+    return rv
 
 
 try:
