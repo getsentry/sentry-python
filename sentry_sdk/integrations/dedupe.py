@@ -1,5 +1,3 @@
-import weakref
-
 from sentry_sdk.api import configure_scope
 from sentry_sdk.utils import ContextVar
 
@@ -11,9 +9,6 @@ last_seen = ContextVar("last-seen")
 
 class DedupeIntegration(Integration):
     identifier = "dedupe"
-
-    def __init__(self):
-        self._exceptions_seen = weakref.WeakKeyDictionary()
 
     def install(self):
         with configure_scope() as scope:

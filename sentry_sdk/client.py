@@ -2,7 +2,6 @@ import os
 import uuid
 import random
 import atexit
-import weakref
 from datetime import datetime
 
 from ._compat import string_types
@@ -70,8 +69,6 @@ class Client(object):
                     request_bodies
                 )
             )
-
-        self._exceptions_seen = weakref.WeakKeyDictionary()
 
         atexit.register(self.close)
 
