@@ -18,6 +18,5 @@ class DedupeIntegration(Integration):
                 exc = exc_info[1]
                 if last_seen.get(None) is exc:
                     return
-                seen = False
                 last_seen.set(exc)
                 return event
