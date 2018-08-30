@@ -14,15 +14,10 @@ class DedupeIntegration(Integration):
         with configure_scope() as scope:
 
             @scope.add_error_processor
-            def processor(event, error):
-                exc_info = event.get("__sentry_exc_info")
-                if exc_info and exc_info[1] is not None:
-                    exc = exc_info[1]
-                    if last_seen.get(None) is exc:
-                        seen = True
-                    else:
-                        seen = False
-                        last_seen.set(exc)
-                    if seen:
-                        return None
+            def processor(event, exc_info):
+                exc = exc_info[1]
+                if last_seen.get(None) is exc:
+                    return
+                seen = False
+                last_seen.set(exc)
                 return event

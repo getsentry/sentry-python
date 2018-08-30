@@ -85,7 +85,7 @@ class Scope(object):
             event.setdefault("contexts", {}).update(contexts)
 
         exc_info = event.get("__sentry_exc_info", None)
-        if exc_info is not None:
+        if exc_info and exc_info[0] is not None:
             for processor in self._error_processors:
                 event = processor(event, exc_info)
                 if event is None:
