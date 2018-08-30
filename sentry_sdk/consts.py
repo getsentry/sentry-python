@@ -3,6 +3,7 @@ import socket
 VERSION = "0.1"
 DEFAULT_SERVER_NAME = socket.gethostname() if hasattr(socket, "gethostname") else None
 DEFAULT_OPTIONS = {
+    "dsn": None,
     "with_locals": True,
     "max_breadcrumbs": 100,
     "release": None,
@@ -10,6 +11,8 @@ DEFAULT_OPTIONS = {
     "server_name": DEFAULT_SERVER_NAME,
     "shutdown_timeout": 2.0,
     "integrations": [],
+    "in_app_include": [],
+    "in_app_exclude": [],
     "default_integrations": True,
     "repos": {},
     "dist": None,
@@ -18,8 +21,9 @@ DEFAULT_OPTIONS = {
     "send_default_pii": False,
     "http_proxy": None,
     "https_proxy": None,
-    "ignore_errors": (),
+    "ignore_errors": [],
     "request_bodies": "medium",
+    "before_send": None,
 }
 
 SDK_INFO = {"name": "sentry-python", "version": VERSION}

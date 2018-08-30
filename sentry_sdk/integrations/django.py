@@ -10,7 +10,7 @@ try:
 except ImportError:
     from django.core.urlresolvers import resolve
 
-from sentry_sdk import get_current_hub, capture_exception
+from sentry_sdk import capture_exception, configure_scope
 from sentry_sdk.hub import _internal_exceptions, _should_send_default_pii
 from ._wsgi import RequestExtractor, run_wsgi_app
 from . import Integration
@@ -31,10 +31,7 @@ else:
 class DjangoIntegration(Integration):
     identifier = "django"
 
-    def __init__(self):
-        pass
-
-    def install(self, client):
+    def install(self):
         # Patch in our custom middleware.
 
         from django.core.handlers.wsgi import WSGIHandler
@@ -50,65 +47,45 @@ class DjangoIntegration(Integration):
 
         # patch get_response, because at that point we have the Django request
         # object
-
         from django.core.handlers.base import BaseHandler
 
         old_get_response = BaseHandler.get_response
-        make_event_processor = self._make_event_processor
 
         def sentry_patched_get_response(self, request):
-            weak_request = weakref.ref(request)
-            get_current_hub().add_event_processor(
-                lambda: make_event_processor(weak_request)
-            )
+            with configure_scope() as scope:
+                scope.add_event_processor(_make_event_processor(weakref.ref(request)))
             return old_get_response(self, request)
 
         BaseHandler.get_response = sentry_patched_get_response
 
         signals.got_request_exception.connect(_got_request_exception)
 
-    def _make_event_processor(self, weak_request):
-        client_options = get_current_hub().client.options
 
-        def processor(event):
-            # if the request is gone we are fine not logging the data from
-            # it.  This might happen if the processor is pushed away to
-            # another thread.
-            request = weak_request()
-            if request is None:
-                return
+def _make_event_processor(weak_request):
+    def event_processor(event):
+        # if the request is gone we are fine not logging the data from
+        # it.  This might happen if the processor is pushed away to
+        # another thread.
+        request = weak_request()
+        if request is None:
+            return event
 
-            if "transaction" not in event:
-                try:
-                    event["transaction"] = resolve(request.path).func.__name__
-                except Exception:
-                    pass
+        if "transaction" not in event:
+            try:
+                event["transaction"] = resolve(request.path).func.__name__
+            except Exception:
+                pass
 
+        with _internal_exceptions():
+            DjangoRequestExtractor(request).extract_into_event(event)
+
+        if _should_send_default_pii():
             with _internal_exceptions():
-                DjangoRequestExtractor(request).extract_into_event(
-                    event, client_options
-                )
+                _set_user_info(request, event)
 
-            if _should_send_default_pii():
-                with _internal_exceptions():
-                    _set_user_info(request, event)
+        return event
 
-            with _internal_exceptions():
-                _process_frames(event)
-
-        return processor
-
-
-def _process_frames(event):
-    for frame in event.iter_frames():
-        if "in_app" in frame:
-            continue
-
-        module = frame.get("module")
-        if not module:
-            continue
-        if module == "django" or module.startswith("django."):
-            frame["in_app"] = False
+    return event_processor
 
 
 def _got_request_exception(request=None, **kwargs):

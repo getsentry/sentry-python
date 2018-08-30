@@ -8,8 +8,7 @@ from textwrap import dedent
 from sentry_sdk import Hub, Client, configure_scope, capture_message, add_breadcrumb
 from sentry_sdk.hub import HubMeta
 from sentry_sdk.transport import Transport
-from sentry_sdk.utils import Dsn
-from sentry_sdk.event import Event
+from sentry_sdk.utils import Dsn, event_from_exception
 
 
 class EventCaptured(Exception):
@@ -32,10 +31,6 @@ def test_transport_option(monkeypatch):
     dsn2 = "https://bar@sentry.io/124"
     assert str(Client(dsn=dsn).dsn) == dsn
     assert Client().dsn is None
-    with pytest.raises(ValueError):
-        Client(dsn, transport=Transport(Dsn(dsn2)))
-    with pytest.raises(ValueError):
-        Client(dsn, transport=Transport(Dsn(dsn)))
     assert str(Client(transport=Transport(Dsn(dsn2))).dsn) == dsn2
 
     monkeypatch.setenv("SENTRY_DSN", dsn)
@@ -44,20 +39,21 @@ def test_transport_option(monkeypatch):
 
 def test_ignore_errors():
     def e(exc_type):
-        rv = Event()
-        rv._exc_value = exc_type()
-        return rv
+        return event_from_exception(exc_type())
 
-    c = Client(ignore_errors=[Exception], transport=_TestTransport())
-    c.capture_event(e(Exception))
-    c.capture_event(e(ValueError))
-    pytest.raises(EventCaptured, lambda: c.capture_event(e(BaseException)))
+    class MyDivisionError(ZeroDivisionError):
+        pass
+
+    c = Client(ignore_errors=[ZeroDivisionError], transport=_TestTransport())
+    c.capture_event(e(ZeroDivisionError))
+    c.capture_event(e(MyDivisionError))
+    pytest.raises(EventCaptured, lambda: c.capture_event(e(ValueError)))
 
 
 def test_capture_event_works():
     c = Client(transport=_TestTransport())
     pytest.raises(EventCaptured, lambda: c.capture_event({}))
-    pytest.raises(EventCaptured, lambda: c.capture_event(Event()))
+    pytest.raises(EventCaptured, lambda: c.capture_event({}))
 
 
 @pytest.mark.parametrize("num_messages", [10, 20])

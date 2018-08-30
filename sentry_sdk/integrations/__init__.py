@@ -8,17 +8,39 @@ _installer_lock = Lock()
 _installed_integrations = {}
 
 
+def _get_default_integrations():
+    from .logging import LoggingIntegration
+    from .excepthook import ExcepthookIntegration
+    from .dedupe import DedupeIntegration
+
+    yield LoggingIntegration
+    yield ExcepthookIntegration
+    yield DedupeIntegration
+
+
+def setup_integrations(options):
+    integrations = list(options.pop("integrations", None) or ())
+    default_integrations = options.pop("default_integrations") or False
+
+    def install():
+        if default_integrations:
+            for cls in _get_default_integrations():
+                if not any(isinstance(x, cls) for x in integrations):
+                    integrations.append(cls())
+
+        for integration in integrations:
+            integration()
+
+    return install
+
+
 class Integration(object):
     identifier = None
 
-    def __init__(self, **kwargs):
-        """Initialize an integration."""
+    def install(self):
         raise NotImplementedError()
 
-    def install(self, client):
-        raise NotImplementedError()
-
-    def __call__(self, client):
+    def __call__(self):
         assert self.identifier
         with _installer_lock:
             if self.identifier in _installed_integrations:
@@ -29,5 +51,5 @@ class Integration(object):
                 )
                 return
 
-            self.install(client)
+            self.install()
             _installed_integrations[self.identifier] = self

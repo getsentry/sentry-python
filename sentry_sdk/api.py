@@ -1,5 +1,6 @@
 from .hub import Hub
-from .client import Client
+from .client import Client, get_options
+from .integrations import setup_integrations
 
 
 class _InitGuard(object):
@@ -15,10 +16,25 @@ class _InitGuard(object):
             c.close()
 
 
-def init(*args, **kwargs):
-    client = Client(*args, **kwargs)
-    Hub.main.bind_client(client)
+def _init_on_hub(hub, args, kwargs):
+    options = get_options(*args, **kwargs)
+    install = setup_integrations(options)
+    client = Client(options)
+    hub.bind_client(client)
+    install()
     return _InitGuard(client)
+
+
+def init(*args, **kwargs):
+    """Initializes the SDK and optionally integrations."""
+    return _init_on_hub(Hub.main, args, kwargs)
+
+
+def _init_on_current(*args, **kwargs):
+    # This function only exists to support unittests.  Do not call it as
+    # initializing integrations on anything but the main hub is not going
+    # to yield the results you expect.
+    return _init_on_hub(Hub.current, args, kwargs)
 
 
 from . import minimal as sentry_minimal

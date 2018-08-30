@@ -5,8 +5,7 @@ import logging
 import datetime
 
 from sentry_sdk import get_current_hub, capture_event, add_breadcrumb
-from sentry_sdk.utils import to_string, skip_internal_frames
-from sentry_sdk.event import Event
+from sentry_sdk.utils import to_string, event_from_exception
 from sentry_sdk.hub import _internal_exceptions
 
 from . import Integration
@@ -18,7 +17,7 @@ class LoggingIntegration(Integration):
     def __init__(self, level=logging.INFO, event_level=None):
         self._handler = SentryHandler(level=level, event_level=event_level)
 
-    def install(self, client):
+    def install(self):
         handler = self._handler
 
         old_callhandlers = logging.Logger.callHandlers
@@ -60,18 +59,18 @@ class SentryHandler(logging.Handler, object):
             return
 
         if self._should_create_event(record):
-            with _internal_exceptions():
-                event = Event()
+            hub = get_current_hub()
+            if hub.client is None:
+                return
 
+            with _internal_exceptions():
                 # exc_info might be None or (None, None, None)
                 if record.exc_info and all(record.exc_info):
-                    exc_type, exc_value, tb = record.exc_info
-                    event.set_exception(
-                        exc_type,
-                        exc_value,
-                        skip_internal_frames(tb),
-                        get_current_hub().client.options["with_locals"],
+                    event = event_from_exception(
+                        record.exc_info, with_locals=hub.client.options["with_locals"]
                     )
+                else:
+                    event = {}
 
                 event["level"] = self._logging_to_event_level(record.levelname)
                 event["logger"] = record.name

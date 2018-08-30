@@ -2,40 +2,57 @@ import os
 import uuid
 import random
 import atexit
+import weakref
+from datetime import datetime
 
-from .utils import Dsn, SkipEvent, ContextVar
+from ._compat import string_types
+from .utils import (
+    strip_event,
+    flatten_metadata,
+    convert_types,
+    handle_in_app,
+    get_type_name,
+    pop_hidden_keys,
+    Dsn,
+)
 from .transport import Transport
 from .consts import DEFAULT_OPTIONS, SDK_INFO
-from .event import strip_event, flatten_metadata, convert_types, Event
 
 
 NO_DSN = object()
 
-_most_recent_exception = ContextVar("sentry_most_recent_exception")
 
+def get_options(*args, **kwargs):
+    if args and (isinstance(args[0], string_types) or args[0] is None):
+        dsn = args[0]
+        args = args[1:]
+    else:
+        dsn = None
 
-def _get_default_integrations():
-    from .integrations.logging import LoggingIntegration
-    from .integrations.excepthook import ExcepthookIntegration
+    rv = dict(DEFAULT_OPTIONS)
+    options = dict(*args, **kwargs)
+    if dsn is not None and options.get("dsn") is None:
+        options["dsn"] = dsn
 
-    yield LoggingIntegration
-    yield ExcepthookIntegration
+    for key, value in options.items():
+        if key not in rv:
+            raise TypeError("Unknown option %r" % (key,))
+        rv[key] = value
+
+    if rv["dsn"] is None:
+        rv["dsn"] = os.environ.get("SENTRY_DSN")
+
+    return rv
 
 
 class Client(object):
-    def __init__(self, dsn=None, *args, **kwargs):
-        passed_dsn = dsn
-        if dsn is NO_DSN:
-            dsn = None
-        else:
-            if dsn is None:
-                dsn = os.environ.get("SENTRY_DSN")
-            if not dsn:
-                dsn = None
-            else:
-                dsn = Dsn(dsn)
-        options = dict(DEFAULT_OPTIONS)
-        options.update(*args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        options = get_options(*args, **kwargs)
+
+        dsn = options["dsn"]
+        if dsn is not None:
+            dsn = Dsn(dsn)
+
         self.options = options
         self._transport = self.options.pop("transport")
         if self._transport is None and dsn is not None:
@@ -45,18 +62,6 @@ class Client(object):
                 https_proxy=self.options.pop("https_proxy"),
             )
             self._transport.start()
-        elif passed_dsn is not None and self._transport is not None:
-            raise ValueError("Cannot pass DSN and a custom transport.")
-
-        integrations = list(options.pop("integrations") or ())
-
-        if options["default_integrations"]:
-            for cls in _get_default_integrations():
-                if not any(isinstance(x, cls) for x in integrations):
-                    integrations.append(cls())
-
-        for integration in integrations:
-            integration(self)
 
         request_bodies = ("always", "never", "small", "medium")
         if options["request_bodies"] not in request_bodies:
@@ -65,6 +70,8 @@ class Client(object):
                     request_bodies
                 )
             )
+
+        self._exceptions_seen = weakref.WeakKeyDictionary()
 
         atexit.register(self.close)
 
@@ -80,11 +87,13 @@ class Client(object):
         return cls(NO_DSN)
 
     def _prepare_event(self, event, scope):
-        if event.get("event_id") is None:
-            event["event_id"] = uuid.uuid4().hex
+        if event.get("timestamp") is None:
+            event["timestamp"] = datetime.utcnow()
 
         if scope is not None:
-            scope.apply_to_event(event)
+            event = scope.apply_to_event(event)
+            if event is None:
+                return
 
         for key in "release", "environment", "server_name", "repos", "dist":
             if event.get(key) is None:
@@ -95,41 +104,67 @@ class Client(object):
         if event.get("platform") is None:
             event["platform"] = "python"
 
+        event = handle_in_app(
+            event, self.options["in_app_exclude"], self.options["in_app_include"]
+        )
         event = strip_event(event)
-        event = flatten_metadata(event)
-        event = convert_types(event)
+
+        before_send = self.options["before_send"]
+        if before_send is not None:
+            event = before_send(event)
+
+        if event is not None:
+            pop_hidden_keys(event)
+            event = flatten_metadata(event)
+            event = convert_types(event)
+
         return event
 
-    def _check_should_capture(self, event):
+    def _is_ignored_error(self, event):
+        exc_info = event.get("__sentry_exc_info")
+
+        if not exc_info or exc_info[0] is None:
+            return False
+
+        type_name = get_type_name(exc_info[0])
+        full_name = "%s.%s" % (exc_info[0].__module__, type_name)
+
+        for errcls in self.options["ignore_errors"]:
+            # String types are matched against the type name in the
+            # exception only
+            if isinstance(errcls, string_types):
+                if errcls == full_name or errcls == type_name:
+                    return True
+            else:
+                if issubclass(exc_info[0], errcls):
+                    return True
+
+        return False
+
+    def _should_capture(self, event, scope=None):
         if (
             self.options["sample_rate"] < 1.0
             and random.random() >= self.options["sample_rate"]
         ):
-            raise SkipEvent()
+            return False
 
-        if event._exc_value is not None:
-            exclusions = self.options["ignore_errors"]
-            exc_type = type(event._exc_value)
+        if self._is_ignored_error(event):
+            return False
 
-            if any(issubclass(exc_type, e) for e in exclusions):
-                raise SkipEvent()
-
-            if _most_recent_exception.get(None) is event._exc_value:
-                raise SkipEvent()
-            _most_recent_exception.set(event._exc_value)
+        return True
 
     def capture_event(self, event, scope=None):
         """Captures an event."""
         if self._transport is None:
             return
-        if not isinstance(event, Event):
-            event = Event(event)
-        try:
-            self._check_should_capture(event)
+        rv = event.get("event_id")
+        if rv is None:
+            event["event_id"] = rv = uuid.uuid4().hex
+        if self._should_capture(event, scope):
             event = self._prepare_event(event, scope)
-        except SkipEvent:
-            return
-        self._transport.capture_event(event)
+            if event is not None:
+                self._transport.capture_event(event)
+        return True
 
     def drain_events(self, timeout=None):
         if timeout is None:

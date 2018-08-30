@@ -4,8 +4,7 @@ from contextlib import contextmanager
 
 from ._compat import with_metaclass
 from .scope import Scope
-from .utils import skip_internal_frames, ContextVar
-from .event import Event
+from .utils import exc_info_from_error, event_from_exception, ContextVar
 
 
 _local = ContextVar("sentry_current_hub")
@@ -17,6 +16,12 @@ def _internal_exceptions():
         yield
     except Exception:
         Hub.current.capture_internal_exception()
+
+
+def _get_client_options():
+    hub = Hub.current
+    if hub and hub.client:
+        return hub.client.options
 
 
 def _should_send_default_pii():
@@ -67,14 +72,12 @@ class Hub(with_metaclass(HubMeta)):
             hub = client_or_hub
             client, other_scope = hub._stack[-1]
             if scope is None:
-                hub._flush_event_processors()
                 scope = copy.copy(other_scope)
         else:
             client = client_or_hub
         if scope is None:
             scope = Scope()
         self._stack = [(client, scope)]
-        self._pending_processors = []
 
     def __enter__(self):
         return _HubManager(self)
@@ -98,11 +101,9 @@ class Hub(with_metaclass(HubMeta)):
 
     def capture_event(self, event):
         """Captures an event."""
-        self._flush_event_processors()
         client, scope = self._stack[-1]
         if client is not None:
-            client.capture_event(event, scope)
-            return event.get("event_id")
+            return client.capture_event(event, scope)
 
     def capture_message(self, message, level=None):
         """Captures a message."""
@@ -110,11 +111,7 @@ class Hub(with_metaclass(HubMeta)):
             return
         if level is None:
             level = "info"
-        event = Event()
-        event["message"] = message
-        if level is not None:
-            event["level"] = level
-        return self.capture_event(event)
+        return self.capture_event({"message": message, "level": level})
 
     def capture_exception(self, error=None):
         """Captures an exception."""
@@ -122,27 +119,14 @@ class Hub(with_metaclass(HubMeta)):
         if client is None:
             return
         if error is None:
-            exc_type, exc_value, tb = sys.exc_info()
-        elif isinstance(error, tuple) and len(error) == 3:
-            exc_type, exc_value, tb = error
+            exc_info = sys.exc_info()
         else:
-            tb = getattr(error, "__traceback__", None)
-            if tb is not None:
-                exc_type = type(error)
-                exc_value = error
-            else:
-                exc_type, exc_value, tb = sys.exc_info()
-                if exc_value is not error:
-                    tb = None
-                    exc_value = error
-                    exc_type = type(error)
+            exc_info = exc_info_from_error(error)
 
-        if tb is not None:
-            tb = skip_internal_frames(tb)
-
-        event = Event()
+        event = event_from_exception(
+            exc_info, with_locals=client.options["with_locals"]
+        )
         try:
-            event.set_exception(exc_type, exc_value, tb, client.options["with_locals"])
             return self.capture_event(event)
         except Exception:
             self.capture_internal_exception()
@@ -168,14 +152,9 @@ class Hub(with_metaclass(HubMeta)):
         while len(scope._breadcrumbs) >= client.options["max_breadcrumbs"]:
             scope._breadcrumbs.popleft()
 
-    def add_event_processor(self, factory):
-        """Registers a new event processor with the top scope."""
-        self._pending_processors.append(factory)
-
     def push_scope(self):
         """Pushes a new layer on the scope stack. Returns a context manager
         that should be used to pop the scope again."""
-        self._flush_event_processors()
         client, scope = self._stack[-1]
         new_layer = (client, copy.copy(scope))
         self._stack.append(new_layer)
@@ -184,7 +163,6 @@ class Hub(with_metaclass(HubMeta)):
     def pop_scope_unsafe(self):
         """Pops a scope layer from the stack. Try to use the context manager
         `push_scope()` instead."""
-        self._pending_processors = []
         rv = self._stack.pop()
         assert self._stack
         return rv
@@ -195,23 +173,16 @@ class Hub(with_metaclass(HubMeta)):
         if callback is not None:
             if client is not None and scope is not None:
                 callback(scope)
-        else:
+            return
 
-            @contextmanager
-            def inner():
-                if client is not None and scope is not None:
-                    yield scope
-                else:
-                    yield Scope()
+        @contextmanager
+        def inner():
+            if client is not None and scope is not None:
+                yield scope
+            else:
+                yield Scope()
 
-            return inner()
-
-    def _flush_event_processors(self):
-        rv = self._pending_processors
-        self._pending_processors = []
-        top = self._stack[-1][1]
-        for factory in rv:
-            top._event_processors.append(factory())
+        return inner()
 
 
 GLOBAL_HUB = Hub()

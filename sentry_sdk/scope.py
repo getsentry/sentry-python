@@ -1,10 +1,11 @@
 class Scope(object):
-    __slots__ = ["_data", "_breadcrumbs", "_event_processors"]
+    __slots__ = ["_data", "_breadcrumbs", "_event_processors", "_error_processors"]
 
     def __init__(self):
         self._data = {}
         self._breadcrumbs = []
         self._event_processors = []
+        self._error_processors = []
 
     def _set_fingerprint(self, value):
         self._data["fingerprint"] = value
@@ -53,6 +54,12 @@ class Scope(object):
         del self._breadcrumbs[:]
         del self._event_processors[:]
 
+    def add_event_processor(self, func):
+        self._event_processors.append(func)
+
+    def add_error_processor(self, func):
+        self._error_processors.append(func)
+
     def apply_to_event(self, event):
         event.setdefault("breadcrumbs", []).extend(self._breadcrumbs)
         if event.get("user") is None and "user" in self._data:
@@ -77,12 +84,24 @@ class Scope(object):
         if contexts:
             event.setdefault("contexts", {}).update(contexts)
 
+        exc_info = event.get("__sentry_exc_info", None)
+        if exc_info is not None:
+            for processor in self._error_processors:
+                event = processor(event, exc_info)
+                if event is None:
+                    return
+
         for processor in self._event_processors:
-            processor(event)
+            event = processor(event)
+            if event is None:
+                return None
+
+        return event
 
     def __copy__(self):
         rv = object.__new__(self.__class__)
         rv._data = dict(self._data)
         rv._breadcrumbs = list(self._breadcrumbs)
         rv._event_processors = list(self._event_processors)
+        rv._error_processors = list(self._error_processors)
         return rv
