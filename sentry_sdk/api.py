@@ -39,11 +39,7 @@ def _init_on_current(*args, **kwargs):
 
 
 from . import minimal as sentry_minimal
+from .minimal import *  # noqa
 
-__all__ = ["Hub", "Scope", "Client", "EventHint", "init"] + sentry_minimal.__all__
-
-
-for _key in sentry_minimal.__all__:
-    globals()[_key] = getattr(sentry_minimal, _key)
-    globals()[_key].__module__ = __name__
-del _key
+__all__ = ["Hub", "Scope", "Client", "EventHint", "init"]
+__all__ += sentry_minimal.__all__

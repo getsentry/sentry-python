@@ -57,7 +57,19 @@ class Scope(object):
     def add_event_processor(self, func):
         self._event_processors.append(func)
 
-    def add_error_processor(self, func):
+    def add_error_processor(self, func, cls=None):
+        if cls is not None:
+            real_func = func
+
+            def func(event, exc_info):
+                try:
+                    is_inst = isinstance(exc_info[1], cls)
+                except Exception:
+                    is_inst = False
+                if is_inst:
+                    return real_func(event, exc_info)
+                return event
+
         self._error_processors.append(func)
 
     def apply_to_event(self, event, hint=None):

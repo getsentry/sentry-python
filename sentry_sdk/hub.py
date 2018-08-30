@@ -4,7 +4,7 @@ from contextlib import contextmanager
 
 from ._compat import with_metaclass
 from .scope import Scope
-from .utils import exc_info_from_error, event_from_exception, ContextVar, EventHint
+from .utils import exc_info_from_error, event_from_exception, ContextVar
 
 
 _local = ContextVar("sentry_current_hub")
@@ -123,11 +123,11 @@ class Hub(with_metaclass(HubMeta)):
         else:
             exc_info = exc_info_from_error(error)
 
-        event = event_from_exception(
+        event, hint = event_from_exception(
             exc_info, with_locals=client.options["with_locals"]
         )
         try:
-            return self.capture_event(event, hint=EventHint.with_exc_info(exc_info))
+            return self.capture_event(event, hint=hint)
         except Exception:
             self.capture_internal_exception(sys.exc_info())
 

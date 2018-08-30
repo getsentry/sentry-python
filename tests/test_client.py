@@ -6,9 +6,9 @@ import subprocess
 from datetime import datetime
 from textwrap import dedent
 from sentry_sdk import Hub, Client, configure_scope, capture_message, add_breadcrumb
-from sentry_sdk.hub import HubMeta, Hub
+from sentry_sdk.hub import HubMeta
 from sentry_sdk.transport import Transport
-from sentry_sdk.utils import Dsn, event_from_exception
+from sentry_sdk.utils import Dsn
 from sentry_sdk._compat import reraise
 
 

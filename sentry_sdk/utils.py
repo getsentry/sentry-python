@@ -401,10 +401,14 @@ def exc_info_from_error(error):
 
 def event_from_exception(exc_info, with_locals=False, processors=None):
     exc_info = exc_info_from_error(exc_info)
-    return {
-        "level": "error",
-        "exception": {"values": exceptions_from_error_tuple(exc_info, with_locals)},
-    }
+    hint = EventHint.with_exc_info(exc_info)
+    return (
+        {
+            "level": "error",
+            "exception": {"values": exceptions_from_error_tuple(exc_info, with_locals)},
+        },
+        hint,
+    )
 
 
 def _module_in_set(name, set):

@@ -96,3 +96,20 @@ class TestTransport(Transport):
         pass
 
     dsn = "LOL"
+
+
+@pytest.fixture
+def capture_events(monkeypatch):
+    def inner():
+        events = []
+        test_client = sentry_sdk.Hub.current.client
+        old_capture_event = test_client._transport.capture_event
+
+        def append(event):
+            events.append(event)
+            return old_capture_event(event)
+
+        monkeypatch.setattr(test_client._transport, "capture_event", append)
+        return events
+
+    return inner
