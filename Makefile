@@ -10,7 +10,7 @@ dist:
 test: .venv
 	@pip install -r test-requirements.txt
 	@pip install --editable .
-	@pytest tests --tb=short
+	@pytest tests
 .PHONY: test
 
 format:
