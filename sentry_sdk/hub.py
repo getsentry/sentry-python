@@ -4,7 +4,7 @@ from contextlib import contextmanager
 
 from ._compat import with_metaclass
 from .scope import Scope
-from .utils import exc_info_from_error, event_from_exception, ContextVar
+from .utils import exc_info_from_error, event_from_exception, ContextVar, EventHint
 
 
 _local = ContextVar("sentry_current_hub")
@@ -15,7 +15,7 @@ def _internal_exceptions():
     try:
         yield
     except Exception:
-        Hub.current.capture_internal_exception()
+        Hub.current.capture_internal_exception(sys.exc_info())
 
 
 def _get_client_options():
@@ -99,11 +99,11 @@ class Hub(with_metaclass(HubMeta)):
         top = self._stack[-1]
         self._stack[-1] = (new, top[1])
 
-    def capture_event(self, event):
+    def capture_event(self, event, hint=None):
         """Captures an event."""
         client, scope = self._stack[-1]
         if client is not None:
-            return client.capture_event(event, scope)
+            return client.capture_event(event, scope, hint)
 
     def capture_message(self, message, level=None):
         """Captures a message."""
@@ -127,11 +127,11 @@ class Hub(with_metaclass(HubMeta)):
             exc_info, with_locals=client.options["with_locals"]
         )
         try:
-            return self.capture_event(event)
+            return self.capture_event(event, hint=EventHint.with_exc_info(exc_info))
         except Exception:
-            self.capture_internal_exception()
+            self.capture_internal_exception(sys.exc_info())
 
-    def capture_internal_exception(self, error=None):
+    def capture_internal_exception(self, exc_info):
         """Capture an exception that is likely caused by a bug in the SDK
         itself."""
         pass

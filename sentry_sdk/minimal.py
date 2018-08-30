@@ -10,10 +10,10 @@ def public(f):
 
 
 @public
-def capture_event(event):
+def capture_event(event, hint=None):
     hub = Hub.current
     if hub is not None:
-        return hub.capture_event(event)
+        return hub.capture_event(event, hint)
 
 
 @public

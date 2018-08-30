@@ -6,9 +6,10 @@ import subprocess
 from datetime import datetime
 from textwrap import dedent
 from sentry_sdk import Hub, Client, configure_scope, capture_message, add_breadcrumb
-from sentry_sdk.hub import HubMeta
+from sentry_sdk.hub import HubMeta, Hub
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import Dsn, event_from_exception
+from sentry_sdk._compat import reraise
 
 
 class EventCaptured(Exception):
@@ -38,16 +39,24 @@ def test_transport_option(monkeypatch):
 
 
 def test_ignore_errors():
-    def e(exc_type):
-        return event_from_exception(exc_type())
-
     class MyDivisionError(ZeroDivisionError):
         pass
 
-    c = Client(ignore_errors=[ZeroDivisionError], transport=_TestTransport())
-    c.capture_event(e(ZeroDivisionError))
-    c.capture_event(e(MyDivisionError))
-    pytest.raises(EventCaptured, lambda: c.capture_event(e(ValueError)))
+    def raise_it(exc_info):
+        reraise(*exc_info)
+
+    hub = Hub(Client(ignore_errors=[ZeroDivisionError], transport=_TestTransport()))
+    hub.capture_internal_exception = raise_it
+
+    def e(exc):
+        try:
+            raise exc
+        except Exception:
+            hub.capture_exception()
+
+    e(ZeroDivisionError())
+    e(MyDivisionError())
+    pytest.raises(EventCaptured, lambda: e(ValueError()))
 
 
 def test_capture_event_works():

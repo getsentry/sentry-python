@@ -1,4 +1,5 @@
 from .hub import Hub
+from .utils import EventHint
 from .client import Client, get_options
 from .integrations import setup_integrations
 
@@ -39,7 +40,7 @@ def _init_on_current(*args, **kwargs):
 
 from . import minimal as sentry_minimal
 
-__all__ = ["Hub", "Scope", "Client", "init"] + sentry_minimal.__all__
+__all__ = ["Hub", "Scope", "Client", "EventHint", "init"] + sentry_minimal.__all__
 
 
 for _key in sentry_minimal.__all__:

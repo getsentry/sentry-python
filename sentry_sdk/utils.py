@@ -15,6 +15,24 @@ def to_timestamp(value):
     return (value - epoch).total_seconds()
 
 
+class EventHint(object):
+    """Extra information for an event that can be used during processing."""
+
+    def __init__(self, exc_info=None):
+        self.exc_info = exc_info
+
+    @classmethod
+    def with_exc_info(cls, exc_info=None):
+        """Creates a hint with the exc info filled in."""
+        if exc_info is None:
+            exc_info = sys.exc_info()
+        else:
+            exc_info = exc_info_from_error(exc_info)
+        if exc_info[0] is None:
+            exc_info = None
+        return cls(exc_info=exc_info)
+
+
 class BadDsn(ValueError):
     """Raised on invalid DSNs."""
 
@@ -386,7 +404,6 @@ def event_from_exception(exc_info, with_locals=False, processors=None):
     return {
         "level": "error",
         "exception": {"values": exceptions_from_error_tuple(exc_info, with_locals)},
-        "__sentry_exc_info": exc_info,
     }
 
 
@@ -456,10 +473,6 @@ def strip_event(event):
 def strip_frame(frame):
     frame["vars"], meta = strip_databag(frame.get("vars"))
     return frame, ({"vars": meta} if meta is not None else None)
-
-
-def pop_hidden_keys(event):
-    event.pop("__sentry_exc_info", None)
 
 
 def convert_types(obj):

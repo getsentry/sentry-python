@@ -60,7 +60,7 @@ class Scope(object):
     def add_error_processor(self, func):
         self._error_processors.append(func)
 
-    def apply_to_event(self, event):
+    def apply_to_event(self, event, hint=None):
         event.setdefault("breadcrumbs", []).extend(self._breadcrumbs)
         if event.get("user") is None and "user" in self._data:
             event["user"] = self._data["user"]
@@ -84,8 +84,8 @@ class Scope(object):
         if contexts:
             event.setdefault("contexts", {}).update(contexts)
 
-        exc_info = event.get("__sentry_exc_info", None)
-        if exc_info and exc_info[0] is not None:
+        if hint is not None and hint.exc_info is not None:
+            exc_info = hint.exc_info
             for processor in self._error_processors:
                 event = processor(event, exc_info)
                 if event is None:

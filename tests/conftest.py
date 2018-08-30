@@ -5,6 +5,7 @@ import json
 import pytest
 
 import sentry_sdk
+from sentry_sdk._compat import reraise
 from sentry_sdk.client import Transport
 
 SEMAPHORE = "./checkouts/semaphore/target/debug/semaphore"
@@ -15,10 +16,8 @@ if not os.path.isfile(SEMAPHORE):
 
 @pytest.fixture(autouse=True)
 def reraise_internal_exceptions(monkeypatch):
-    def capture_internal_exception(error=None):
-        if not error:
-            raise
-        raise error
+    def capture_internal_exception(exc_info):
+        reraise(*exc_info)
 
     monkeypatch.setattr(
         sentry_sdk.get_current_hub(),
