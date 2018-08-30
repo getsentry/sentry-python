@@ -15,7 +15,10 @@ if not os.path.isfile(SEMAPHORE):
 
 
 @pytest.fixture(autouse=True)
-def reraise_internal_exceptions(monkeypatch):
+def reraise_internal_exceptions(request, monkeypatch):
+    if "tests_internal_exceptions" in request.keywords:
+        return
+
     def capture_internal_exception(exc_info):
         reraise(*exc_info)
 

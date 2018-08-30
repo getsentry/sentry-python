@@ -138,7 +138,7 @@ def test_configure_scope_unavailable(no_sdk, monkeypatch):
     assert not calls
 
 
-def test_transport_works(sentry_init, httpserver, request, capsys):
+def test_transport_works(httpserver, request, capsys):
     httpserver.serve_content("ok", 200)
 
     client = Client("http://foobar@{}/123".format(httpserver.url[len("http://") :]))
@@ -152,3 +152,21 @@ def test_transport_works(sentry_init, httpserver, request, capsys):
     out, err = capsys.readouterr()
     assert not err and not out
     assert httpserver.requests
+
+
+@pytest.mark.tests_internal_exceptions
+def test_client_debug_option_enabled(sentry_init, caplog):
+    sentry_init(debug=True)
+
+    Hub.current.capture_internal_exception((ValueError, ValueError("OK"), None))
+    assert "OK" in caplog.text
+
+
+@pytest.mark.tests_internal_exceptions
+@pytest.mark.parametrize("with_client", (True, False))
+def test_client_debug_option_disabled(with_client, sentry_init, caplog):
+    if with_client:
+        sentry_init()
+
+    Hub.current.capture_internal_exception((ValueError, ValueError("OK"), None))
+    assert "OK" not in caplog.text
