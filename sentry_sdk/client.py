@@ -11,7 +11,6 @@ from .utils import (
     convert_types,
     handle_in_app,
     get_type_name,
-    pop_hidden_keys,
     Dsn,
 )
 from .transport import Transport
@@ -83,12 +82,12 @@ class Client(object):
         """Creates a guarnateed to be disabled client."""
         return cls(NO_DSN)
 
-    def _prepare_event(self, event, scope):
+    def _prepare_event(self, event, scope, hint=None):
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.utcnow()
 
         if scope is not None:
-            event = scope.apply_to_event(event)
+            event = scope.apply_to_event(event, hint)
             if event is None:
                 return
 
@@ -111,16 +110,14 @@ class Client(object):
             event = before_send(event)
 
         if event is not None:
-            pop_hidden_keys(event)
             event = flatten_metadata(event)
             event = convert_types(event)
 
         return event
 
-    def _is_ignored_error(self, event):
-        exc_info = event.get("__sentry_exc_info")
-
-        if not exc_info or exc_info[0] is None:
+    def _is_ignored_error(self, event, hint=None):
+        exc_info = hint and hint.exc_info or None
+        if exc_info is None:
             return False
 
         type_name = get_type_name(exc_info[0])
@@ -138,27 +135,27 @@ class Client(object):
 
         return False
 
-    def _should_capture(self, event, scope=None):
+    def _should_capture(self, event, scope=None, hint=None):
         if (
             self.options["sample_rate"] < 1.0
             and random.random() >= self.options["sample_rate"]
         ):
             return False
 
-        if self._is_ignored_error(event):
+        if self._is_ignored_error(event, hint):
             return False
 
         return True
 
-    def capture_event(self, event, scope=None):
+    def capture_event(self, event, scope=None, hint=None):
         """Captures an event."""
         if self._transport is None:
             return
         rv = event.get("event_id")
         if rv is None:
             event["event_id"] = rv = uuid.uuid4().hex
-        if self._should_capture(event, scope):
-            event = self._prepare_event(event, scope)
+        if self._should_capture(event, scope, hint):
+            event = self._prepare_event(event, scope, hint)
             if event is not None:
                 self._transport.capture_event(event)
         return True

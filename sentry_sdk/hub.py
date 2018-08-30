@@ -15,7 +15,7 @@ def _internal_exceptions():
     try:
         yield
     except Exception:
-        Hub.current.capture_internal_exception()
+        Hub.current.capture_internal_exception(sys.exc_info())
 
 
 def _get_client_options():
@@ -99,11 +99,11 @@ class Hub(with_metaclass(HubMeta)):
         top = self._stack[-1]
         self._stack[-1] = (new, top[1])
 
-    def capture_event(self, event):
+    def capture_event(self, event, hint=None):
         """Captures an event."""
         client, scope = self._stack[-1]
         if client is not None:
-            return client.capture_event(event, scope)
+            return client.capture_event(event, scope, hint)
 
     def capture_message(self, message, level=None):
         """Captures a message."""
@@ -123,15 +123,15 @@ class Hub(with_metaclass(HubMeta)):
         else:
             exc_info = exc_info_from_error(error)
 
-        event = event_from_exception(
+        event, hint = event_from_exception(
             exc_info, with_locals=client.options["with_locals"]
         )
         try:
-            return self.capture_event(event)
+            return self.capture_event(event, hint=hint)
         except Exception:
-            self.capture_internal_exception()
+            self.capture_internal_exception(sys.exc_info())
 
-    def capture_internal_exception(self, error=None):
+    def capture_internal_exception(self, exc_info):
         """Capture an exception that is likely caused by a bug in the SDK
         itself."""
         pass

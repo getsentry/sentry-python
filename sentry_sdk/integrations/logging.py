@@ -64,9 +64,10 @@ class SentryHandler(logging.Handler, object):
                 return
 
             with _internal_exceptions():
+                hint = None
                 # exc_info might be None or (None, None, None)
-                if record.exc_info and all(record.exc_info):
-                    event = event_from_exception(
+                if record.exc_info is not None and record.exc_info[0] is not None:
+                    event, hint = event_from_exception(
                         record.exc_info, with_locals=hub.client.options["with_locals"]
                     )
                 else:
@@ -79,7 +80,7 @@ class SentryHandler(logging.Handler, object):
                     "params": record.args,
                 }
 
-                capture_event(event)
+                capture_event(event, hint=hint)
 
         with _internal_exceptions():
             add_breadcrumb(self._breadcrumb_from_record(record))
