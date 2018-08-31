@@ -73,10 +73,7 @@ class RequestExtractor(object):
             elif self.raw_data():
                 data = AnnotatedValue(
                     "",
-                    {
-                        "rem": [["!raw", "x", 0, content_length]],
-                        "len": content_length,
-                    },
+                    {"rem": [["!raw", "x", 0, content_length]], "len": content_length},
                 )
             else:
                 return
