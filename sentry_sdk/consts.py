@@ -24,6 +24,7 @@ DEFAULT_OPTIONS = {
     "ignore_errors": [],
     "request_bodies": "medium",
     "before_send": None,
+    "before_breadcrumb": None,
     "debug": False,
 }
 

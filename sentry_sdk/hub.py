@@ -1,5 +1,6 @@
 import sys
 import copy
+from datetime import datetime
 from contextlib import contextmanager
 
 from ._compat import with_metaclass
@@ -158,6 +159,16 @@ class Hub(with_metaclass(HubMeta)):
             crumb = args[0]()
         else:
             crumb = dict(*args, **kwargs)
+        if crumb is None:
+            return
+
+        if crumb.get("timestamp") is None:
+            crumb["timestamp"] = datetime.utcnow()
+        if crumb.get("type") is None:
+            crumb["type"] = "default"
+
+        if client.options["before_breadcrumb"] is not None:
+            crumb = client.options["before_breadcrumb"](crumb)
 
         if crumb is not None:
             scope._breadcrumbs.append(crumb)
