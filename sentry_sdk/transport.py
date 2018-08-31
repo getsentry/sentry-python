@@ -1,6 +1,8 @@
 from __future__ import print_function
 
+import atexit
 import json
+import time
 import io
 import urllib3
 import logging
@@ -37,8 +39,15 @@ def _make_pool(dsn, http_proxy, https_proxy):
         return urllib3.PoolManager(**opts)
 
 
+_PYTHON_SHUTTING_DOWN = False
 _SHUTDOWN = object()
 _retry = urllib3.util.Retry()
+
+
+@atexit.register
+def _learn_about_shutting_down():
+    global _PYTHON_SHUTTING_DOWN
+    _PYTHON_SHUTTING_DOWN = True
 
 
 def send_event(pool, event, auth):
@@ -76,17 +85,23 @@ def spawn_thread(transport):
         disabled_until = None
 
         # copy to local var in case transport._queue is set to None
-        queue = transport._queue
+        q = transport._queue
 
         while 1:
-            item = queue.get()
+            try:
+                item = q.get(timeout=0.1)
+            except queue.Empty:
+                if _SHUTDOWN:
+                    break
+                continue
+
             if item is _SHUTDOWN:
-                queue.task_done()
+                q.task_done()
                 break
 
             if disabled_until is not None:
                 if datetime.utcnow() < disabled_until:
-                    queue.task_done()
+                    q.task_done()
                     continue
                 disabled_until = None
 
@@ -96,10 +111,9 @@ def spawn_thread(transport):
                 # XXX: use the logger
                 print(traceback.format_exc(), file=sys.stderr)
             finally:
-                queue.task_done()
+                q.task_done()
 
     t = threading.Thread(target=thread)
-    t.setDaemon(True)
     t.start()
 
 
@@ -133,9 +147,10 @@ class Transport(object):
     def drain_events(self, timeout):
         q = self._queue
         if q is not None:
+            started = time.time()
             with q.all_tasks_done:
-                while q.unfinished_tasks:
-                    q.all_tasks_done.wait(timeout)
+                while q.unfinished_tasks and (time.time() - started) < timeout:
+                    q.all_tasks_done.wait(0.1)
 
     def __del__(self):
         self.close()
