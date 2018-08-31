@@ -19,19 +19,16 @@ def _get_default_integrations():
 
 
 def setup_integrations(options):
-    integrations = list(options.pop("integrations", None) or ())
-    default_integrations = options.pop("default_integrations") or False
+    integrations = list(options.get("integrations", None) or ())
+    default_integrations = options.get("default_integrations") or False
 
-    def install():
-        if default_integrations:
-            for cls in _get_default_integrations():
-                if not any(isinstance(x, cls) for x in integrations):
-                    integrations.append(cls())
+    if default_integrations:
+        for cls in _get_default_integrations():
+            if not any(isinstance(x, cls) for x in integrations):
+                integrations.append(cls())
 
-        for integration in integrations:
-            integration()
-
-    return install
+    for integration in integrations:
+        integration()
 
 
 class Integration(object):

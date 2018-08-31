@@ -19,10 +19,9 @@ class _InitGuard(object):
 
 def _init_on_hub(hub, args, kwargs):
     options = get_options(*args, **kwargs)
-    install = setup_integrations(options)
     client = Client(options)
     hub.bind_client(client)
-    install()
+    setup_integrations(options)
     return _InitGuard(client)
 
 
