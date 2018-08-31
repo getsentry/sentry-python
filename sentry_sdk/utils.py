@@ -202,7 +202,7 @@ def get_lines_from_file(filename, lineno, loader=None, module=None):
         return [], None, []
 
 
-def get_source_context(frame):
+def get_source_context(frame, tb_lineno):
     try:
         abs_path = frame.f_code.co_filename
     except Exception:
@@ -215,7 +215,7 @@ def get_source_context(frame):
         loader = frame.f_globals["__loader__"]
     except Exception:
         loader = None
-    lineno = frame.f_lineno - 1
+    lineno = tb_lineno - 1
     if lineno is not None and abs_path:
         return get_lines_from_file(abs_path, lineno, loader, module)
     return [], None, []
@@ -287,7 +287,7 @@ def frame_from_traceback(tb, with_locals=True):
     except Exception:
         module = None
 
-    pre_context, context_line, post_context = get_source_context(frame)
+    pre_context, context_line, post_context = get_source_context(frame, tb.tb_lineno)
 
     rv = {
         "filename": abs_path and os.path.basename(abs_path) or None,
