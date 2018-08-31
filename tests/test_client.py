@@ -8,8 +8,7 @@ from textwrap import dedent
 from sentry_sdk import Hub, Client, configure_scope, capture_message, add_breadcrumb
 from sentry_sdk.hub import HubMeta
 from sentry_sdk.transport import Transport
-from sentry_sdk.utils import Dsn
-from sentry_sdk._compat import reraise
+from sentry_sdk._compat import reraise, text_type
 
 
 class EventCaptured(Exception):
@@ -17,12 +16,6 @@ class EventCaptured(Exception):
 
 
 class _TestTransport(Transport):
-    def __init__(self, *a, **kw):
-        pass
-
-    def start(self):
-        pass
-
     def capture_event(self, event):
         raise EventCaptured()
 
@@ -32,10 +25,18 @@ def test_transport_option(monkeypatch):
     dsn2 = "https://bar@sentry.io/124"
     assert str(Client(dsn=dsn).dsn) == dsn
     assert Client().dsn is None
-    assert str(Client(transport=Transport(Dsn(dsn2))).dsn) == dsn2
 
     monkeypatch.setenv("SENTRY_DSN", dsn)
-    assert str(Client(transport=Transport(Dsn(dsn2))).dsn) == dsn2
+    transport = Transport({"dsn": dsn2})
+    assert text_type(transport.parsed_dsn) == dsn2
+    assert str(Client(transport=transport).dsn) == dsn
+
+
+def test_simple_transport():
+    events = []
+    with Hub(Client(transport=events.append)):
+        capture_message("Hello World!")
+    assert events[0]["message"] == "Hello World!"
 
 
 def test_ignore_errors():
