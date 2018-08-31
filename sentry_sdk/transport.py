@@ -9,13 +9,13 @@ import logging
 import threading
 import certifi
 import sys
-import traceback
 import gzip
 
 from datetime import datetime, timedelta
 
 from ._compat import queue
 from .consts import VERSION
+from .utils import get_logger
 
 try:
     from urllib.request import getproxies
@@ -23,7 +23,7 @@ except ImportError:
     from urllib import getproxies
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def _make_pool(dsn, http_proxy, https_proxy):
@@ -108,8 +108,7 @@ def spawn_thread(transport):
             try:
                 disabled_until = send_event(transport._pool, item, auth)
             except Exception:
-                # XXX: use the logger
-                print(traceback.format_exc(), file=sys.stderr)
+                logger.error('Could not send event', exc_info=sys.exc_info())
             finally:
                 q.task_done()
 
