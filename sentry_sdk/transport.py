@@ -93,7 +93,7 @@ def spawn_thread(transport):
             try:
                 disabled_until = send_event(transport._pool, item, auth)
             except Exception:
-                print("Could not send sentry event", file=sys.stderr)
+                # XXX: use the logger
                 print(traceback.format_exc(), file=sys.stderr)
             finally:
                 queue.task_done()
