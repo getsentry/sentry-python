@@ -1,4 +1,4 @@
-from sentry_sdk import configure_scope, capture_exception, get_last_event_id, Hub
+from sentry_sdk import configure_scope, capture_exception, last_event_id, Hub
 
 
 def test_processors(sentry_init, capture_events):
@@ -36,5 +36,5 @@ def test_event_id(sentry_init, capture_events):
 
     event, = events
     assert event["event_id"] == event_id
-    assert get_last_event_id() == event_id
-    assert Hub.current.get_last_event_id() == event_id
+    assert last_event_id() == event_id
+    assert Hub.current.last_event_id() == event_id

@@ -97,7 +97,7 @@ class Hub(with_metaclass(HubMeta)):
         """Returns the current client on the hub."""
         return self._stack[-1][0]
 
-    def get_last_event_id(self):
+    def last_event_id(self):
         """Returns the last event ID."""
         return self._last_event_id
 

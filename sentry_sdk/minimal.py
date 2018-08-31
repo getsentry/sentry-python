@@ -57,10 +57,10 @@ def get_current_hub():
 
 
 @public
-def get_last_event_id():
+def last_event_id():
     hub = Hub.current
     if hub is not None:
-        return hub.get_last_event_id()
+        return hub.last_event_id()
 
 
 try:
