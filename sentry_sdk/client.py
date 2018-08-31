@@ -158,7 +158,7 @@ class Client(object):
             event = self._prepare_event(event, scope, hint)
             if event is not None:
                 self._transport.capture_event(event)
-        return True
+        return rv
 
     def drain_events(self, timeout=None):
         if timeout is None:

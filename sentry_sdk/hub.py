@@ -80,6 +80,7 @@ class Hub(with_metaclass(HubMeta)):
         if scope is None:
             scope = Scope()
         self._stack = [(client, scope)]
+        self._last_event_id = None
 
     def __enter__(self):
         return _HubManager(self)
@@ -96,6 +97,10 @@ class Hub(with_metaclass(HubMeta)):
         """Returns the current client on the hub."""
         return self._stack[-1][0]
 
+    def get_last_event_id(self):
+        """Returns the last event ID."""
+        return self._last_event_id
+
     def bind_client(self, new):
         """Binds a new client to the hub."""
         top = self._stack[-1]
@@ -105,7 +110,10 @@ class Hub(with_metaclass(HubMeta)):
         """Captures an event."""
         client, scope = self._stack[-1]
         if client is not None:
-            return client.capture_event(event, scope, hint)
+            rv = client.capture_event(event, scope, hint)
+            if rv is not None:
+                self._last_event_id = rv
+            return rv
 
     def capture_message(self, message, level=None):
         """Captures a message."""

@@ -56,6 +56,13 @@ def get_current_hub():
     return Hub.current
 
 
+@public
+def get_last_event_id():
+    hub = Hub.current
+    if hub is not None:
+        return hub.get_last_event_id()
+
+
 try:
     from sentry_sdk.hub import Hub
     from sentry_sdk.scope import Scope
