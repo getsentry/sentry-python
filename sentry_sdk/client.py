@@ -11,13 +11,9 @@ from .utils import (
     convert_types,
     handle_in_app,
     get_type_name,
-    Dsn,
 )
-from .transport import Transport
+from .transport import make_transport
 from .consts import DEFAULT_OPTIONS, SDK_INFO
-
-
-NO_DSN = object()
 
 
 def get_options(*args, **kwargs):
@@ -45,21 +41,8 @@ def get_options(*args, **kwargs):
 
 class Client(object):
     def __init__(self, *args, **kwargs):
-        options = get_options(*args, **kwargs)
-
-        dsn = options["dsn"]
-        if dsn is not None:
-            dsn = Dsn(dsn)
-
-        self.options = options
-        self._transport = self.options.pop("transport")
-        if self._transport is None and dsn is not None:
-            self._transport = Transport(
-                dsn=dsn,
-                http_proxy=self.options.pop("http_proxy"),
-                https_proxy=self.options.pop("https_proxy"),
-            )
-            self._transport.start()
+        self.options = options = get_options(*args, **kwargs)
+        self._transport = make_transport(options)
 
         request_bodies = ("always", "never", "small", "medium")
         if options["request_bodies"] not in request_bodies:
@@ -69,18 +52,13 @@ class Client(object):
                 )
             )
 
+        # XXX: we should probably only do this for the init()ed client
         atexit.register(self.close)
 
     @property
     def dsn(self):
-        """The DSN that created this event."""
-        if self._transport is not None:
-            return self._transport.dsn
-
-    @classmethod
-    def disabled(cls):
-        """Creates a guarnateed to be disabled client."""
-        return cls(NO_DSN)
+        """Returns the configured dsn."""
+        return self.options["dsn"]
 
     def _prepare_event(self, event, hint, scope):
         if event.get("timestamp") is None:

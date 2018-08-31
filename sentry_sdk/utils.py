@@ -146,11 +146,13 @@ def iter_stacks(tb):
     while tb is not None:
         f_locals = getattr(tb, "f_locals", None)
         skip = False
-        try:
-            if f_locals["__traceback_hide__"]:
-                skip = True
-        except Exception:
-            pass
+        for flag_name in "__traceback_hide__", "__tracebackhide__":
+            try:
+                if f_locals[flag_name]:
+                    skip = True
+            except Exception:
+                pass
+
         if not skip:
             yield tb
         tb = tb.tb_next
