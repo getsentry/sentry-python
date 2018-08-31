@@ -82,9 +82,16 @@ class Hub(with_metaclass(HubMeta)):
             scope = Scope()
         self._stack = [(client, scope)]
         self._last_event_id = None
+        self._old_hubs = []
 
     def __enter__(self):
-        return _HubManager(self)
+        self._old_hubs.append(Hub.current)
+        _local.set(self)
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        old = self._old_hubs.pop()
+        _local.set(old)
 
     def run(self, callback):
         """Runs a callback in the context of the hub.  Alternatively the

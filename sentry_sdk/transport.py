@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 
 from ._compat import queue
 from .consts import VERSION
+from .utils import Dsn
 
 try:
     from urllib.request import getproxies
@@ -24,10 +25,10 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-def _make_pool(dsn, http_proxy, https_proxy):
-    proxy = https_proxy if dsn == "https" else http_proxy
+def _make_pool(parsed_dsn, http_proxy, https_proxy):
+    proxy = https_proxy if parsed_dsn == "https" else http_proxy
     if not proxy:
-        proxy = getproxies().get(dsn.scheme)
+        proxy = getproxies().get(parsed_dsn.scheme)
 
     opts = {"num_pools": 2, "cert_reqs": "CERT_REQUIRED", "ca_certs": certifi.where()}
 
@@ -70,7 +71,7 @@ def send_event(pool, event, auth):
 
 
 def spawn_thread(transport):
-    auth = transport.dsn.to_auth("sentry-python/%s" % VERSION)
+    auth = transport.parsed_dsn.to_auth("sentry-python/%s" % VERSION)
 
     def thread():
         disabled_until = None
@@ -104,10 +105,36 @@ def spawn_thread(transport):
 
 
 class Transport(object):
-    def __init__(self, dsn, http_proxy=None, https_proxy=None):
-        self.dsn = dsn
+    def __init__(self, options=None):
+        self.options = options
+        if options and options["dsn"]:
+            self.parsed_dsn = Dsn(options["dsn"])
+        else:
+            self.parsed_dsn = None
+
+    def capture_event(self, event):
+        raise NotImplementedError()
+
+    def close(self):
+        pass
+
+    def drain_events(self, timeout):
+        pass
+
+    def __del__(self):
+        self.close()
+
+
+class HttpTransport(Transport):
+    def __init__(self, options):
+        Transport.__init__(self, options)
         self._queue = None
-        self._pool = _make_pool(dsn, http_proxy=http_proxy, https_proxy=https_proxy)
+        self._pool = _make_pool(
+            self.parsed_dsn,
+            http_proxy=options["http_proxy"],
+            https_proxy=options["https_proxy"],
+        )
+        self.start()
 
     def start(self):
         if self._queue is None:
@@ -139,3 +166,36 @@ class Transport(object):
 
     def __del__(self):
         self.close()
+
+
+class _FunctionTransport(Transport):
+    def __init__(self, func):
+        Transport.__init__(self)
+        self._func = func
+
+    def capture_event(self, event):
+        self._func(event)
+
+
+def make_transport(options):
+    ref_transport = options["transport"]
+
+    # If no transport is given, we use the http transport class
+    if ref_transport is None:
+        transport_cls = HttpTransport
+    else:
+        try:
+            issubclass(ref_transport, type)
+        except TypeError:
+            # if we are not a class but we are a callable, assume a
+            # function that acts as capture_event
+            if callable(ref_transport):
+                return _FunctionTransport(ref_transport)
+            # otherwise assume an object fulfilling the transport contract
+            return ref_transport
+        transport_cls = ref_transport
+
+    # if a transport class is given only instanciate it if the dsn is not
+    # empty or None
+    if options["dsn"]:
+        return transport_cls(options)
