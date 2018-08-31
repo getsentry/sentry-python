@@ -1,5 +1,3 @@
-import atexit
-
 from .hub import Hub
 from .utils import EventHint
 from .client import Client, get_options
@@ -29,9 +27,7 @@ def _init_on_hub(hub, args, kwargs):
 
 def init(*args, **kwargs):
     """Initializes the SDK and optionally integrations."""
-    guard = _init_on_hub(Hub.main, args, kwargs)
-    atexit.register(guard._client.close)
-    return guard
+    return _init_on_hub(Hub.main, args, kwargs)
 
 
 def _init_on_current(*args, **kwargs):

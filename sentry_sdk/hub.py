@@ -9,8 +9,7 @@ from .utils import exc_info_from_error, event_from_exception, get_logger, Contex
 
 
 _local = ContextVar("sentry_current_hub")
-
-logger = get_logger(__name__)
+logger = get_logger("sentry_sdk.errors")
 
 
 @contextmanager

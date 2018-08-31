@@ -53,3 +53,27 @@ def with_metaclass(meta, *bases):
             return meta(name, bases, d)
 
     return type.__new__(metaclass, "temporary_class", (), {})
+
+
+def check_thread_support():
+    try:
+        from uwsgi import opt
+    except ImportError:
+        return
+
+    # When `threads` is passed in as a uwsgi option,
+    # `enable-threads` is implied on.
+    if "threads" in opt:
+        return
+
+    if str(opt.get("enable-threads", "0")).lower() in ("false", "off", "no", "0"):
+        from warnings import warn
+
+        warn(
+            Warning(
+                "We detected the use of uwsgi with disabled threads.  "
+                "This will cause issues with the transport you are "
+                "trying to use.  Please enable threading for uwsgi.  "
+                '(Enable the "enable-threads" flag).'
+            )
+        )

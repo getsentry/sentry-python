@@ -75,11 +75,11 @@ def test_atexit(tmpdir, monkeypatch, num_messages):
     import time
     from sentry_sdk import init, transport, capture_message
 
-    def send_event(pool, event, auth):
+    def send_event(self, event):
         time.sleep(0.1)
         print(event["message"])
 
-    transport.send_event = send_event
+    transport.HttpTransport._send_event = send_event
     init("http://foobar@localhost/123", shutdown_timeout={num_messages})
 
     for _ in range({num_messages}):
@@ -148,7 +148,7 @@ def test_transport_works(httpserver, request, capsys):
 
     add_breadcrumb(level="info", message="i like bread", timestamp=datetime.now())
     capture_message("löl")
-    client.drain_events()
+    client.transport.wait_and_close()
 
     out, err = capsys.readouterr()
     assert not err and not out

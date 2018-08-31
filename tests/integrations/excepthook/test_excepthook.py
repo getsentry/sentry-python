@@ -12,11 +12,11 @@ def test_excepthook(tmpdir):
             """
     from sentry_sdk import init, transport
 
-    def send_event(pool, event, auth):
+    def send_event(self, event):
         print("capture event was called")
         print(event)
 
-    transport.send_event = send_event
+    transport.HttpTransport._send_event = send_event
 
     init("http://foobar@localhost/123")
 
@@ -31,6 +31,7 @@ def test_excepthook(tmpdir):
         subprocess.check_output([sys.executable, str(app)], stderr=subprocess.STDOUT)
 
     output = excinfo.value.output
+    print(output)
 
     assert b"ZeroDivisionError" in output
     assert b"LOL" in output
