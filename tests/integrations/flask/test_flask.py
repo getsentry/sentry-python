@@ -179,7 +179,7 @@ def test_flask_large_json_request(sentry_init, capture_events, app):
 
     event, = events
     assert event[""]["request"]["data"]["foo"]["bar"] == {
-        "": {"len": 2000, "rem": [["!len", "x", 509, 512]]}
+        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
     assert len(event["request"]["data"]["foo"]["bar"]) == 512
 
@@ -205,7 +205,7 @@ def test_flask_medium_formdata_request(sentry_init, capture_events, app):
 
     event, = events
     assert event[""]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!len", "x", 509, 512]]}
+        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
     assert len(event["request"]["data"]["foo"]) == 512
 
@@ -261,12 +261,12 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
 
     event, = events
     assert event[""]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!len", "x", 509, 512]]}
+        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
     assert len(event["request"]["data"]["foo"]) == 512
 
     assert event[""]["request"]["data"]["file"] == {
-        "": {"len": 0, "rem": [["!filecontent", "x", 0, 0]]}
+        "": {"len": 0, "rem": [["!raw", "x", 0, 0]]}
     }
     assert not event["request"]["data"]["file"]
 
