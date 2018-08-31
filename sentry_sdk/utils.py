@@ -476,8 +476,8 @@ def strip_event(event):
 
 
 def strip_frame(frame):
-    if 'vars' in frame:
-        frame["vars"] = strip_databag(frame['vars'])
+    if "vars" in frame:
+        frame["vars"] = strip_databag(frame["vars"])
     return frame
 
 
