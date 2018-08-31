@@ -82,7 +82,7 @@ class Client(object):
         """Creates a guarnateed to be disabled client."""
         return cls(NO_DSN)
 
-    def _prepare_event(self, event, scope, hint=None):
+    def _prepare_event(self, event, hint, scope):
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.utcnow()
 
@@ -135,7 +135,7 @@ class Client(object):
 
         return False
 
-    def _should_capture(self, event, scope=None, hint=None):
+    def _should_capture(self, event, hint=None, scope=None):
         if (
             self.options["sample_rate"] < 1.0
             and random.random() >= self.options["sample_rate"]
@@ -147,15 +147,15 @@ class Client(object):
 
         return True
 
-    def capture_event(self, event, scope=None, hint=None):
+    def capture_event(self, event, hint=None, scope=None):
         """Captures an event."""
         if self._transport is None:
             return
         rv = event.get("event_id")
         if rv is None:
             event["event_id"] = rv = uuid.uuid4().hex
-        if self._should_capture(event, scope, hint):
-            event = self._prepare_event(event, scope, hint)
+        if self._should_capture(event, hint, scope):
+            event = self._prepare_event(event, hint, scope)
             if event is not None:
                 self._transport.capture_event(event)
         return rv

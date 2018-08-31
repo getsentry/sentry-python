@@ -110,7 +110,7 @@ class Hub(with_metaclass(HubMeta)):
         """Captures an event."""
         client, scope = self._stack[-1]
         if client is not None:
-            rv = client.capture_event(event, scope, hint)
+            rv = client.capture_event(event, hint, scope)
             if rv is not None:
                 self._last_event_id = rv
             return rv
