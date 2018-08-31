@@ -493,7 +493,7 @@ def convert_types(obj):
 def strip_databag(obj, remaining_depth=20):
     assert not isinstance(obj, bytes), "bytes should have been normalized before"
     if remaining_depth <= 0:
-        return AnnotatedValue(None, {"rem": [["!dep", "x"]]})
+        return AnnotatedValue(None, {"rem": [["!limit", "x"]]})
     if isinstance(obj, text_type):
         return strip_string(obj)
     if isinstance(obj, Mapping):
@@ -515,7 +515,7 @@ def strip_string(value, assume_length=None, max_length=512):
             value=value[: max_length - 3] + u"...",
             metadata={
                 "len": assume_length,
-                "rem": [["!len", "x", max_length - 3, max_length]],
+                "rem": [["!limit", "x", max_length - 3, max_length]],
             },
         )
     return value[:max_length]

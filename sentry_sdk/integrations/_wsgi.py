@@ -74,7 +74,7 @@ class RequestExtractor(object):
                 data = AnnotatedValue(
                     "",
                     {
-                        "rem": [["!rawbody", "x", 0, content_length]],
+                        "rem": [["!raw", "x", 0, content_length]],
                         "len": content_length,
                     },
                 )
@@ -109,7 +109,7 @@ class RequestExtractor(object):
             for k, v in files.items():
                 size = self.size_of_file(v)
                 data[k] = AnnotatedValue(
-                    "", {"len": size, "rem": [["!filecontent", "x", 0, size]]}
+                    "", {"len": size, "rem": [["!raw", "x", 0, size]]}
                 )
 
             return data
