@@ -103,13 +103,15 @@ class Client(object):
         event = handle_in_app(
             event, self.options["in_app_exclude"], self.options["in_app_include"]
         )
-        event = strip_event(event)
 
         before_send = self.options["before_send"]
         if before_send is not None:
             event = before_send(event)
 
+        # Postprocess the event in the very end so that annotated types do
+        # generally not surface in before_send
         if event is not None:
+            event = strip_event(event)
             event = flatten_metadata(event)
             event = convert_types(event)
 

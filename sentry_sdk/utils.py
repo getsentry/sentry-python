@@ -476,8 +476,9 @@ def strip_event(event):
 
 
 def strip_frame(frame):
-    frame["vars"], meta = strip_databag(frame.get("vars"))
-    return frame, ({"vars": meta} if meta is not None else None)
+    if "vars" in frame:
+        frame["vars"] = strip_databag(frame["vars"])
+    return frame
 
 
 def convert_types(obj):
