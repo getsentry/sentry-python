@@ -115,7 +115,7 @@ def _make_request_event_processor(app, weak_request):
         # it.  This might happen if the processor is pushed away to
         # another thread.
         if request is None:
-            return
+            return event
 
         if "transaction" not in event:
             try:
