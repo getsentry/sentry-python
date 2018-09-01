@@ -1,5 +1,6 @@
 import socket
 
+
 VERSION = "0.1"
 DEFAULT_SERVER_NAME = socket.gethostname() if hasattr(socket, "gethostname") else None
 DEFAULT_OPTIONS = {

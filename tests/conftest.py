@@ -33,7 +33,7 @@ def reraise_internal_exceptions(request, monkeypatch):
 def monkeypatch_test_transport(monkeypatch, assert_semaphore_acceptance):
     def inner(client):
         monkeypatch.setattr(
-            client, "_transport", TestTransport(assert_semaphore_acceptance)
+            client, "transport", TestTransport(assert_semaphore_acceptance)
         )
 
     return inner
@@ -89,16 +89,9 @@ def sentry_init(monkeypatch_test_transport, assert_semaphore_acceptance):
 
 class TestTransport(Transport):
     def __init__(self, capture_event_callback):
+        Transport.__init__(self)
         self.capture_event = capture_event_callback
         self._queue = None
-
-    def start(self):
-        pass
-
-    def close(self):
-        pass
-
-    dsn = "LOL"
 
 
 @pytest.fixture
@@ -106,13 +99,13 @@ def capture_events(monkeypatch):
     def inner():
         events = []
         test_client = sentry_sdk.Hub.current.client
-        old_capture_event = test_client._transport.capture_event
+        old_capture_event = test_client.transport.capture_event
 
         def append(event):
             events.append(event)
             return old_capture_event(event)
 
-        monkeypatch.setattr(test_client._transport, "capture_event", append)
+        monkeypatch.setattr(test_client.transport, "capture_event", append)
         return events
 
     return inner

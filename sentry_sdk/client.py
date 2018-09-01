@@ -1,7 +1,6 @@
 import os
 import uuid
 import random
-import atexit
 from datetime import datetime
 
 from ._compat import string_types
@@ -11,6 +10,7 @@ from .utils import (
     convert_types,
     handle_in_app,
     get_type_name,
+    logger,
 )
 from .transport import make_transport
 from .consts import DEFAULT_OPTIONS, SDK_INFO
@@ -42,7 +42,7 @@ def get_options(*args, **kwargs):
 class Client(object):
     def __init__(self, *args, **kwargs):
         self.options = options = get_options(*args, **kwargs)
-        self._transport = make_transport(options)
+        self.transport = make_transport(options)
 
         request_bodies = ("always", "never", "small", "medium")
         if options["request_bodies"] not in request_bodies:
@@ -51,9 +51,6 @@ class Client(object):
                     request_bodies
                 )
             )
-
-        # XXX: we should probably only do this for the init()ed client
-        atexit.register(self.close)
 
     @property
     def dsn(self):
@@ -84,7 +81,10 @@ class Client(object):
 
         before_send = self.options["before_send"]
         if before_send is not None:
-            event = before_send(event)
+            new_event = before_send(event)
+            if new_event is None:
+                logger.info("before send dropped event (%s)", event)
+            event = new_event
 
         # Postprocess the event in the very end so that annotated types do
         # generally not surface in before_send
@@ -129,7 +129,7 @@ class Client(object):
 
     def capture_event(self, event, hint=None, scope=None):
         """Captures an event."""
-        if self._transport is None:
+        if self.transport is None:
             return
         rv = event.get("event_id")
         if rv is None:
@@ -137,16 +137,20 @@ class Client(object):
         if self._should_capture(event, hint, scope):
             event = self._prepare_event(event, hint, scope)
             if event is not None:
-                self._transport.capture_event(event)
+                self.transport.capture_event(event)
         return rv
 
-    def drain_events(self, timeout=None):
-        if timeout is None:
-            timeout = self.options["shutdown_timeout"]
-        if self._transport is not None:
-            self._transport.drain_events(timeout)
+    def close(self, timeout=None, shutdown_callback=None):
+        """Closes the client which shuts down the transport in an
+        orderly manner.
+        """
+        if self.transport is not None:
+            if timeout is None:
+                timeout = self.options["shutdown_timeout"]
+            self.transport.shutdown(timeout=timeout, callback=shutdown_callback)
 
-    def close(self):
-        self.drain_events()
-        if self._transport is not None:
-            self._transport.close()
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        self.close()

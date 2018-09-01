@@ -11,10 +11,12 @@ def _get_default_integrations():
     from .logging import LoggingIntegration
     from .excepthook import ExcepthookIntegration
     from .dedupe import DedupeIntegration
+    from .atexit import AtexitIntegration
 
     yield LoggingIntegration
     yield ExcepthookIntegration
     yield DedupeIntegration
+    yield AtexitIntegration
 
 
 def setup_integrations(options):

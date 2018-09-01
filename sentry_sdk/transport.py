@@ -3,17 +3,15 @@ from __future__ import print_function
 import json
 import io
 import urllib3
-import threading
 import certifi
-import sys
-import traceback
 import gzip
 
 from datetime import datetime, timedelta
 
-from ._compat import queue
 from .consts import VERSION
-from .utils import Dsn
+from .utils import Dsn, logger
+from .worker import BackgroundWorker
+from .hub import _internal_exceptions
 
 try:
     from urllib.request import getproxies
@@ -34,72 +32,6 @@ def _make_pool(parsed_dsn, http_proxy, https_proxy):
         return urllib3.PoolManager(**opts)
 
 
-_SHUTDOWN = object()
-_retry = urllib3.util.Retry()
-
-
-def send_event(pool, event, auth):
-    body = io.BytesIO()
-    with gzip.GzipFile(fileobj=body, mode="w") as f:
-        f.write(json.dumps(event).encode("utf-8"))
-
-    response = pool.request(
-        "POST",
-        str(auth.store_api_url),
-        body=body.getvalue(),
-        headers={
-            "X-Sentry-Auth": str(auth.to_header()),
-            "Content-Type": "application/json",
-            "Content-Encoding": "gzip",
-        },
-    )
-
-    try:
-        if response.status == 429:
-            return datetime.utcnow() + timedelta(
-                seconds=_retry.get_retry_after(response)
-            )
-
-        if response.status >= 300 or response.status < 200:
-            raise ValueError("Unexpected status code: %s" % response.status)
-    finally:
-        response.close()
-
-
-def spawn_thread(transport):
-    auth = transport.parsed_dsn.to_auth("sentry-python/%s" % VERSION)
-
-    def thread():
-        disabled_until = None
-
-        # copy to local var in case transport._queue is set to None
-        queue = transport._queue
-
-        while 1:
-            item = queue.get()
-            if item is _SHUTDOWN:
-                queue.task_done()
-                break
-
-            if disabled_until is not None:
-                if datetime.utcnow() < disabled_until:
-                    queue.task_done()
-                    continue
-                disabled_until = None
-
-            try:
-                disabled_until = send_event(transport._pool, item, auth)
-            except Exception:
-                print("Could not send sentry event", file=sys.stderr)
-                print(traceback.format_exc(), file=sys.stderr)
-            finally:
-                queue.task_done()
-
-    t = threading.Thread(target=thread)
-    t.setDaemon(True)
-    t.start()
-
-
 class Transport(object):
     def __init__(self, options=None):
         self.options = options
@@ -111,57 +43,87 @@ class Transport(object):
     def capture_event(self, event):
         raise NotImplementedError()
 
-    def close(self):
-        pass
+    def shutdown(self, timeout, callback=None):
+        self.kill()
 
-    def drain_events(self, timeout):
+    def kill(self):
         pass
 
     def __del__(self):
-        self.close()
+        try:
+            self.kill()
+        except Exception:
+            pass
 
 
 class HttpTransport(Transport):
     def __init__(self, options):
         Transport.__init__(self, options)
-        self._queue = None
+        self._worker = BackgroundWorker()
+        self._auth = self.parsed_dsn.to_auth("sentry-python/%s" % VERSION)
         self._pool = _make_pool(
             self.parsed_dsn,
             http_proxy=options["http_proxy"],
             https_proxy=options["https_proxy"],
         )
-        self.start()
+        self._disabled_until = None
+        self._retry = urllib3.util.Retry()
 
-    def start(self):
-        if self._queue is None:
-            self._queue = queue.Queue(30)
-            spawn_thread(self)
+    def _send_event(self, event):
+        if self._disabled_until is not None:
+            if datetime.utcnow() < self._disabled_until:
+                return
+            self._disabled_until = None
+
+        with _internal_exceptions():
+            body = io.BytesIO()
+            with gzip.GzipFile(fileobj=body, mode="w") as f:
+                f.write(json.dumps(event).encode("utf-8"))
+
+            logger.debug(
+                "Sending %s event [%s] to %s project:%s"
+                % (
+                    event.get("level") or "error",
+                    event["event_id"],
+                    self.parsed_dsn.host,
+                    self.parsed_dsn.project_id,
+                )
+            )
+            response = self._pool.request(
+                "POST",
+                str(self._auth.store_api_url),
+                body=body.getvalue(),
+                headers={
+                    "X-Sentry-Auth": str(self._auth.to_header()),
+                    "Content-Type": "application/json",
+                    "Content-Encoding": "gzip",
+                },
+            )
+
+            try:
+                if response.status == 429:
+                    self._disabled_until = datetime.utcnow() + timedelta(
+                        seconds=self._retry.get_retry_after(response)
+                    )
+                    return
+
+                elif response.status >= 300 or response.status < 200:
+                    raise ValueError("Unexpected status code: %s" % response.status)
+            finally:
+                response.close()
+
+            self._disabled_until = None
 
     def capture_event(self, event):
-        if self._queue is None:
-            raise RuntimeError("Transport shut down")
-        try:
-            self._queue.put_nowait(event)
-        except queue.Full:
-            pass
+        self._worker.submit(lambda: self._send_event(event))
 
-    def close(self):
-        if self._queue is not None:
-            try:
-                self._queue.put_nowait(_SHUTDOWN)
-            except queue.Full:
-                pass
-            self._queue = None
+    def shutdown(self, timeout, callback=None):
+        logger.debug("Shutting down HTTP transport orderly")
+        self._worker.shutdown(timeout, callback)
 
-    def drain_events(self, timeout):
-        q = self._queue
-        if q is not None:
-            with q.all_tasks_done:
-                while q.unfinished_tasks:
-                    q.all_tasks_done.wait(timeout)
-
-    def __del__(self):
-        self.close()
+    def kill(self):
+        logger.debug("Killing HTTP transport")
+        self._worker.kill()
 
 
 class _FunctionTransport(Transport):
