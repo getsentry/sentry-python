@@ -33,15 +33,6 @@ def _make_pool(parsed_dsn, http_proxy, https_proxy):
         return urllib3.PoolManager(**opts)
 
 
-@atexit.register
-def _shutdown():
-    from .hub import Hub
-
-    main_client = Hub.main.client
-    if main_client is not None:
-        main_client.close()
-
-
 class Transport(object):
     def __init__(self, options=None):
         self.options = options
@@ -53,7 +44,7 @@ class Transport(object):
     def capture_event(self, event):
         raise NotImplementedError()
 
-    def shutdown(self):
+    def shutdown(self, timeout, callback=None):
         self.kill()
 
     def kill(self):
@@ -69,10 +60,7 @@ class Transport(object):
 class HttpTransport(Transport):
     def __init__(self, options):
         Transport.__init__(self, options)
-        self._worker = BackgroundWorker(
-            shutdown_timeout=options["shutdown_timeout"],
-            shutdown_callback=options["shutdown_callback"],
-        )
+        self._worker = BackgroundWorker()
         self._auth = self.parsed_dsn.to_auth("sentry-python/%s" % VERSION)
         self._pool = _make_pool(
             self.parsed_dsn,
@@ -130,9 +118,9 @@ class HttpTransport(Transport):
     def capture_event(self, event):
         self._worker.submit(lambda: self._send_event(event))
 
-    def shutdown(self):
+    def shutdown(self, timeout, callback=None):
         logger.debug("Shutting down HTTP transport orderly")
-        self._worker.shutdown()
+        self._worker.shutdown(timeout, callback)
 
     def kill(self):
         logger.debug("Killing HTTP transport")

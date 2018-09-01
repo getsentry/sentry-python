@@ -523,7 +523,7 @@ def strip_string(value, assume_length=None, max_length=512):
     return value[:max_length]
 
 
-logger = logging.getLogger("sentry.errors")
+logger = logging.getLogger("sentry_sdk.errors")
 if not logger.handlers:
     _handler = logging.StreamHandler(sys.stderr)
     _handler.setFormatter(logging.Formatter(" [sentry] %(levelname)s: %(message)s"))

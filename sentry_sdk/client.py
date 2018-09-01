@@ -140,12 +140,14 @@ class Client(object):
                 self.transport.capture_event(event)
         return rv
 
-    def close(self):
+    def close(self, timeout=None, shutdown_callback=None):
         """Closes the client which shuts down the transport in an
         orderly manner.
         """
         if self.transport is not None:
-            self.transport.shutdown()
+            if timeout is None:
+                timeout = self.options["shutdown_timeout"]
+            self.transport.shutdown(timeout=timeout, callback=shutdown_callback)
 
     def __enter__(self):
         return self
