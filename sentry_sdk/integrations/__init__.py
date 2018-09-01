@@ -1,6 +1,3 @@
-from __future__ import print_function
-
-import sys
 from threading import Lock
 
 from ..utils import logger

@@ -3,7 +3,6 @@ from __future__ import print_function
 import json
 import io
 import urllib3
-import logging
 import threading
 import certifi
 import sys
@@ -14,7 +13,7 @@ from datetime import datetime, timedelta
 
 from ._compat import queue
 from .consts import VERSION
-from .utils import Dsn, logger
+from .utils import Dsn
 
 try:
     from urllib.request import getproxies
