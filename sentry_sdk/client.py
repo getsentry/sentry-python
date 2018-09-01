@@ -136,3 +136,16 @@ class Client(object):
             if event is not None:
                 self.transport.capture_event(event)
         return rv
+
+    def close(self):
+        """Closes the client which shuts down the transport in an
+        orderly manner.
+        """
+        if self.transport is not None:
+            self.transport.shutdown()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        self.close()

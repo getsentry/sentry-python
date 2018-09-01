@@ -58,12 +58,10 @@ class BackgroundWorker(object):
                 self._thread.start()
                 self._thread_for_pid = os.getpid()
 
-    def stop(self, timeout=None):
+    def kill(self):
         with self._lock:
             if self._thread:
                 self._queue.put_nowait(_TERMINATOR)
-                if timeout is not None:
-                    self._thread.join(timeout=timeout)
                 self._thread = None
                 self._thread_for_pid = None
 

@@ -45,7 +45,7 @@ def _shutdown():
     if main_client is not None:
         transport = main_client.transport
         if transport is not None:
-            transport.wait_and_close()
+            transport.shutdown()
 
 
 class Transport(object):
@@ -59,14 +59,17 @@ class Transport(object):
     def capture_event(self, event):
         raise NotImplementedError()
 
-    def wait_and_close(self):
-        self.close()
+    def shutdown(self):
+        self.kill()
 
-    def close(self):
+    def kill(self):
         pass
 
     def __del__(self):
-        self.close()
+        try:
+            self.kill()
+        except Exception:
+            pass
 
 
 class HttpTransport(Transport):
@@ -124,17 +127,11 @@ class HttpTransport(Transport):
     def capture_event(self, event):
         self._worker.submit(lambda: self._send_event(event))
 
-    def wait_and_close(self):
+    def shutdown(self):
         self._worker.shutdown()
 
-    def close(self):
-        self._worker.stop()
-
-    def __del__(self):
-        try:
-            self.close()
-        except Exception:
-            pass
+    def kill(self):
+        self._worker.kill()
 
 
 class _FunctionTransport(Transport):

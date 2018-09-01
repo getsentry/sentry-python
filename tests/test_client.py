@@ -148,7 +148,7 @@ def test_transport_works(httpserver, request, capsys):
 
     add_breadcrumb(level="info", message="i like bread", timestamp=datetime.now())
     capture_message("löl")
-    client.transport.wait_and_close()
+    client.close()
 
     out, err = capsys.readouterr()
     assert not err and not out

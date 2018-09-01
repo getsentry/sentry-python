@@ -89,16 +89,9 @@ def sentry_init(monkeypatch_test_transport, assert_semaphore_acceptance):
 
 class TestTransport(Transport):
     def __init__(self, capture_event_callback):
+        Transport.__init__(self)
         self.capture_event = capture_event_callback
         self._queue = None
-
-    def start(self):
-        pass
-
-    def close(self):
-        pass
-
-    dsn = "LOL"
 
 
 @pytest.fixture
