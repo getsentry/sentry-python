@@ -3,7 +3,6 @@ from __future__ import print_function
 import json
 import io
 import urllib3
-import logging
 import threading
 import certifi
 import sys
@@ -20,9 +19,6 @@ try:
     from urllib.request import getproxies
 except ImportError:
     from urllib import getproxies
-
-
-logger = logging.getLogger(__name__)
 
 
 def _make_pool(parsed_dsn, http_proxy, https_proxy):

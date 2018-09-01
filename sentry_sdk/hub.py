@@ -5,12 +5,10 @@ from contextlib import contextmanager
 
 from ._compat import with_metaclass
 from .scope import Scope
-from .utils import exc_info_from_error, event_from_exception, get_logger, ContextVar
+from .utils import exc_info_from_error, event_from_exception, logger, ContextVar
 
 
 _local = ContextVar("sentry_current_hub")
-
-logger = get_logger(__name__)
 
 
 @contextmanager
