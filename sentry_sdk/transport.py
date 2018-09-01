@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 
 from ._compat import queue
 from .consts import VERSION
-from .utils import Dsn, logger
+from .utils import Dsn
 
 try:
     from urllib.request import getproxies

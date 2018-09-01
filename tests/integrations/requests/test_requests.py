@@ -11,6 +11,7 @@ def test_crumb_capture(sentry_init, capture_events):
     events = capture_events()
 
     response = requests.get("https://httpbin.org/status/418")
+    assert response.status_code == 418
     capture_message("Testing!")
 
     event, = events
