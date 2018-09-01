@@ -1,7 +1,6 @@
 import os
 import uuid
 import random
-import atexit
 from datetime import datetime
 
 from ._compat import string_types
@@ -11,13 +10,10 @@ from .utils import (
     convert_types,
     handle_in_app,
     get_type_name,
-    get_logger,
+    logger,
 )
 from .transport import make_transport
 from .consts import DEFAULT_OPTIONS, SDK_INFO
-
-
-logger = get_logger("sentry_sdk.errors")
 
 
 def get_options(*args, **kwargs):

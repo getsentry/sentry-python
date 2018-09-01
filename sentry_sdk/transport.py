@@ -2,19 +2,15 @@ from __future__ import print_function
 
 import atexit
 import json
-import time
 import io
 import urllib3
-import logging
-import threading
 import certifi
-import sys
 import gzip
 
 from datetime import datetime, timedelta
 
 from .consts import VERSION
-from .utils import Dsn, get_logger
+from .utils import Dsn, logger
 from .worker import BackgroundWorker
 from .hub import _internal_exceptions
 
@@ -22,9 +18,6 @@ try:
     from urllib.request import getproxies
 except ImportError:
     from urllib import getproxies
-
-
-logger = get_logger("sentry_sdk.errors")
 
 
 def _make_pool(parsed_dsn, http_proxy, https_proxy):
@@ -123,7 +116,7 @@ class HttpTransport(Transport):
             try:
                 if response.status == 429:
                     self._disabled_until = datetime.utcnow() + timedelta(
-                        seconds=_retry.get_retry_after(response)
+                        seconds=self._retry.get_retry_after(response)
                     )
                     return
 

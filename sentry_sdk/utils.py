@@ -144,11 +144,10 @@ def get_type_module(cls):
 
 def iter_stacks(tb):
     while tb is not None:
-        f_locals = getattr(tb, "f_locals", None)
         skip = False
         for flag_name in "__traceback_hide__", "__tracebackhide__":
             try:
-                if f_locals[flag_name]:
+                if tb.tb_frame.f_locals[flag_name]:
                     skip = True
             except Exception:
                 pass
@@ -524,14 +523,12 @@ def strip_string(value, assume_length=None, max_length=512):
     return value[:max_length]
 
 
-def get_logger(name):
-    rv = logging.getLogger(name)
-    if not rv.handlers:
-        handler = logging.StreamHandler(sys.stderr)
-        handler.setFormatter(logging.Formatter(" [sentry] %(levelname)s: %(message)s"))
-        rv.addHandler(handler)
-        rv.setLevel(logging.DEBUG)
-    return rv
+logger = logging.getLogger("sentry.errors")
+if not logger.handlers:
+    _handler = logging.StreamHandler(sys.stderr)
+    _handler.setFormatter(logging.Formatter(" [sentry] %(levelname)s: %(message)s"))
+    logger.addHandler(_handler)
+    logger.setLevel(logging.DEBUG)
 
 
 try:

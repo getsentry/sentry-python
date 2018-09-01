@@ -11,6 +11,13 @@ from sentry_sdk.hub import _internal_exceptions
 from . import Integration
 
 
+IGNORED_LOGGERS = set(["sentry_sdk.errors"])
+
+
+def ignore_logger(name):
+    IGNORED_LOGGERS.add(name)
+
+
 class LoggingIntegration(Integration):
     identifier = "logging"
 
@@ -43,7 +50,7 @@ class SentryHandler(logging.Handler, object):
             return self._emit(record)
 
     def can_record(self, record):
-        return not record.name.startswith("sentry_sdk")
+        return record.name not in IGNORED_LOGGERS
 
     def _breadcrumb_from_record(self, record):
         return {

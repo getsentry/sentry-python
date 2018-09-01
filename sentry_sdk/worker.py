@@ -1,14 +1,12 @@
-import logging
 import threading
 import os
 
 from time import sleep, time
 from ._compat import queue, check_thread_support
-from .utils import get_logger
+from .utils import logger
 
 
 _TERMINATOR = object()
-logger = get_logger("sentry_sdk.errors")
 
 
 class BackgroundWorker(object):

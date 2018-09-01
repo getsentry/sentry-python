@@ -1,7 +1,4 @@
-from .utils import get_logger
-
-
-logger = get_logger("sentry_sdk.errors")
+from .utils import logger
 
 
 class Scope(object):
