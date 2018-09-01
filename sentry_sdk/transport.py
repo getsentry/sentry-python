@@ -14,7 +14,7 @@ import gzip
 from datetime import datetime, timedelta
 
 from .consts import VERSION
-from .utils import Dsn
+from .utils import Dsn, get_logger
 from .worker import BackgroundWorker
 from .hub import _internal_exceptions
 
@@ -22,6 +22,9 @@ try:
     from urllib.request import getproxies
 except ImportError:
     from urllib import getproxies
+
+
+logger = get_logger("sentry_sdk.errors")
 
 
 def _make_pool(parsed_dsn, http_proxy, https_proxy):
@@ -43,9 +46,7 @@ def _shutdown():
 
     main_client = Hub.main.client
     if main_client is not None:
-        transport = main_client.transport
-        if transport is not None:
-            transport.shutdown()
+        main_client.close()
 
 
 class Transport(object):
@@ -99,6 +100,15 @@ class HttpTransport(Transport):
             with gzip.GzipFile(fileobj=body, mode="w") as f:
                 f.write(json.dumps(event).encode("utf-8"))
 
+            logger.debug(
+                "Sending %s event [%s] to %s project:%s"
+                % (
+                    event.get("level") or "error",
+                    event["event_id"],
+                    self.parsed_dsn.host,
+                    self.parsed_dsn.project_id,
+                )
+            )
             response = self._pool.request(
                 "POST",
                 str(self._auth.store_api_url),
@@ -128,9 +138,11 @@ class HttpTransport(Transport):
         self._worker.submit(lambda: self._send_event(event))
 
     def shutdown(self):
+        logger.debug("Shutting down HTTP transport orderly")
         self._worker.shutdown()
 
     def kill(self):
+        logger.debug("Killing HTTP transport")
         self._worker.kill()
 
 

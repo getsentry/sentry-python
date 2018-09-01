@@ -11,9 +11,13 @@ from .utils import (
     convert_types,
     handle_in_app,
     get_type_name,
+    get_logger,
 )
 from .transport import make_transport
 from .consts import DEFAULT_OPTIONS, SDK_INFO
+
+
+logger = get_logger("sentry_sdk.errors")
 
 
 def get_options(*args, **kwargs):
@@ -81,7 +85,10 @@ class Client(object):
 
         before_send = self.options["before_send"]
         if before_send is not None:
-            event = before_send(event)
+            new_event = before_send(event)
+            if new_event is None:
+                logger.info("before send dropped event (%s)", event)
+            event = new_event
 
         # Postprocess the event in the very end so that annotated types do
         # generally not surface in before_send

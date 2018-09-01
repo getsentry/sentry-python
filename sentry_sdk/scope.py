@@ -1,3 +1,9 @@
+from .utils import get_logger
+
+
+logger = get_logger("sentry_sdk.errors")
+
+
 class Scope(object):
     __slots__ = ["_data", "_breadcrumbs", "_event_processors", "_error_processors"]
 
@@ -73,6 +79,9 @@ class Scope(object):
         self._error_processors.append(func)
 
     def apply_to_event(self, event, hint=None):
+        def _drop(event, cause, ty):
+            logger.info("%s (%s) dropped event (%s)", ty, cause, event)
+
         event.setdefault("breadcrumbs", []).extend(self._breadcrumbs)
         if event.get("user") is None and "user" in self._data:
             event["user"] = self._data["user"]
@@ -99,14 +108,16 @@ class Scope(object):
         if hint is not None and hint.exc_info is not None:
             exc_info = hint.exc_info
             for processor in self._error_processors:
-                event = processor(event, exc_info)
-                if event is None:
-                    return
+                new_event = processor(event, exc_info)
+                if new_event is None:
+                    return _drop(event, processor, "error processor")
+                event = new_event
 
         for processor in self._event_processors:
-            event = processor(event)
-            if event is None:
-                return None
+            new_event = processor(event)
+            if new_event is None:
+                return _drop(event, processor, "event processor")
+            event = new_event
 
         return event
 

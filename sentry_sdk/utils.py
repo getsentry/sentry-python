@@ -527,7 +527,9 @@ def strip_string(value, assume_length=None, max_length=512):
 def get_logger(name):
     rv = logging.getLogger(name)
     if not rv.handlers:
-        rv.addHandler(logging.StreamHandler(sys.stderr))
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setFormatter(logging.Formatter(" [sentry] %(levelname)s: %(message)s"))
+        rv.addHandler(handler)
         rv.setLevel(logging.DEBUG)
     return rv
 
