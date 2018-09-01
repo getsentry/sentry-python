@@ -523,12 +523,10 @@ def strip_string(value, assume_length=None, max_length=512):
     return value[:max_length]
 
 
-def get_logger(name):
-    rv = logging.getLogger(name)
-    if not rv.handlers:
-        rv.addHandler(logging.StreamHandler(sys.stderr))
-        rv.setLevel(logging.DEBUG)
-    return rv
+logger = logging.getLogger("sentry.errors")
+if not logger.handlers:
+    logger.addHandler(logging.StreamHandler(sys.stderr))
+    logger.setLevel(logging.DEBUG)
 
 
 try:

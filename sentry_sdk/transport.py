@@ -14,15 +14,12 @@ from datetime import datetime, timedelta
 
 from ._compat import queue
 from .consts import VERSION
-from .utils import Dsn
+from .utils import Dsn, logger
 
 try:
     from urllib.request import getproxies
 except ImportError:
     from urllib import getproxies
-
-
-logger = logging.getLogger(__name__)
 
 
 def _make_pool(parsed_dsn, http_proxy, https_proxy):

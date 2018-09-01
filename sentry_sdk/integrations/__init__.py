@@ -3,6 +3,8 @@ from __future__ import print_function
 import sys
 from threading import Lock
 
+from ..utils import logger
+
 
 _installer_lock = Lock()
 _installed_integrations = {}
@@ -41,10 +43,10 @@ class Integration(object):
         assert self.identifier
         with _installer_lock:
             if self.identifier in _installed_integrations:
-                print(
-                    "warning: %s integration for Sentry is already "
-                    "configured. Will ignore second configuration." % self.identifier,
-                    file=sys.stderr,
+                logger.warning(
+                    "%s integration for Sentry is already "
+                    "configured. Will ignore second configuration.",
+                    self.identifier,
                 )
                 return
 
