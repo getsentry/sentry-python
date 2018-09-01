@@ -20,3 +20,7 @@ format:
 tox-test:
 	@sh ./scripts/runtox.sh
 .PHONY: tox-test
+
+lint:
+	@tox -e linters
+.PHONY: lint

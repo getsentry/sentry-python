@@ -3,7 +3,6 @@ from __future__ import print_function
 import json
 import io
 import urllib3
-import logging
 import threading
 import certifi
 import sys
