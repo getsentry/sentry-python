@@ -1,6 +1,5 @@
 from __future__ import print_function
 
-import atexit
 import json
 import io
 import urllib3
