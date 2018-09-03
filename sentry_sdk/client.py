@@ -148,6 +148,7 @@ class Client(object):
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
             self.transport.shutdown(timeout=timeout, callback=shutdown_callback)
+            self.transport = None
 
     def __enter__(self):
         return self
