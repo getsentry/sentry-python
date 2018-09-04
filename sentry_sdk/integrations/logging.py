@@ -90,7 +90,9 @@ class SentryHandler(logging.Handler, object):
                 capture_event(event, hint=hint)
 
         with _internal_exceptions():
-            add_breadcrumb(self._breadcrumb_from_record(record))
+            add_breadcrumb(
+                self._breadcrumb_from_record(record), hint={"log_record": record}
+            )
 
     def _logging_to_event_level(self, levelname):
         return {"critical": "fatal"}.get(levelname.lower(), levelname.lower())

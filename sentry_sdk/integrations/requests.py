@@ -30,6 +30,7 @@ class RequestsIntegration(Integration):
                         or None,
                         "reason": response is not None and response.reason or None,
                     },
+                    hint={"requests_response": response},
                 )
 
             try:

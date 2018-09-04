@@ -161,6 +161,12 @@ class Hub(with_metaclass(HubMeta)):
             logger.info("Dropped breadcrumb because no client bound")
             return
 
+        hint = kwargs.pop("hint", None)
+        if not hint:
+            hint = {}
+        else:
+            hint = dict(hint)
+
         if not kwargs and len(args) == 1 and callable(args[0]):
             crumb = args[0]()
         else:
@@ -175,7 +181,7 @@ class Hub(with_metaclass(HubMeta)):
 
         original_crumb = crumb
         if client.options["before_breadcrumb"] is not None:
-            crumb = client.options["before_breadcrumb"](crumb)
+            crumb = client.options["before_breadcrumb"](crumb, hint)
 
         if crumb is not None:
             scope._breadcrumbs.append(crumb)

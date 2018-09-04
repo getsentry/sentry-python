@@ -55,7 +55,8 @@ def test_option_callback(sentry_init, capture_events):
             event["extra"] = {"foo": "bar"}
             return event
 
-    def before_breadcrumb(crumb):
+    def before_breadcrumb(crumb, hint):
+        assert hint == {"foo": 42}
         if not drop_breadcrumbs:
             crumb["data"] = {"foo": "bar"}
             return crumb
@@ -64,7 +65,7 @@ def test_option_callback(sentry_init, capture_events):
     events = capture_events()
 
     def do_this():
-        add_breadcrumb(message="Hello")
+        add_breadcrumb(message="Hello", hint={"foo": 42})
         try:
             raise ValueError("aha!")
         except Exception:
