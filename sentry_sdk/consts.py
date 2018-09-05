@@ -37,6 +37,7 @@ INTEGRATIONS = []
 
 
 def _get_packages():
+    yield "pypi:sentry-sdk", VERSION
     yield "python", ".".join(str(x) for x in sys.version_info[:3])
     if hasattr(sys, "pypy_version_info"):
         yield "pypy", ".".join(str(x) for x in sys.pypy_version_info[:3])
