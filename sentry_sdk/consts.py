@@ -1,6 +1,4 @@
-import sys
 import socket
-import platform
 
 
 VERSION = "0.1"
