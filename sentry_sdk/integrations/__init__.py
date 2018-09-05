@@ -1,10 +1,10 @@
 from threading import Lock
 
 from ..utils import logger
+from ..consts import INTEGRATIONS as _installed_integrations
 
 
 _installer_lock = Lock()
-_installed_integrations = {}
 
 
 def _get_default_integrations():
@@ -50,4 +50,4 @@ class Integration(object):
                 return
 
             self.install()
-            _installed_integrations[self.identifier] = self
+            _installed_integrations.append(self.identifier)
