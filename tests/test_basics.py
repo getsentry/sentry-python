@@ -55,7 +55,8 @@ def test_option_callback(sentry_init, capture_events):
             event["extra"] = {"foo": "bar"}
             return event
 
-    def before_breadcrumb(crumb):
+    def before_breadcrumb(crumb, hint):
+        assert hint == {"foo": 42}
         if not drop_breadcrumbs:
             crumb["data"] = {"foo": "bar"}
             return crumb
@@ -64,7 +65,7 @@ def test_option_callback(sentry_init, capture_events):
     events = capture_events()
 
     def do_this():
-        add_breadcrumb(message="Hello")
+        add_breadcrumb(message="Hello", hint={"foo": 42})
         try:
             raise ValueError("aha!")
         except Exception:
@@ -84,3 +85,22 @@ def test_option_callback(sentry_init, capture_events):
     assert crumb["message"] == "Hello"
     assert crumb["data"] == {"foo": "bar"}
     assert crumb["type"] == "default"
+
+
+def test_breadcrumb_arguments(sentry_init, capture_events):
+    assert_hint = {"bar": 42}
+
+    def before_breadcrumb(crumb, hint):
+        assert crumb["foo"] == 42
+        assert hint == assert_hint
+
+    sentry_init(before_breadcrumb=before_breadcrumb)
+
+    add_breadcrumb(foo=42, hint=dict(bar=42))
+    add_breadcrumb(dict(foo=42), dict(bar=42))
+    add_breadcrumb(dict(foo=42), hint=dict(bar=42))
+    add_breadcrumb(crumb=dict(foo=42), hint=dict(bar=42))
+
+    assert_hint.clear()
+    add_breadcrumb(foo=42)
+    add_breadcrumb(crumb=dict(foo=42))

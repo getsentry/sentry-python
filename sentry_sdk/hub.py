@@ -154,19 +154,19 @@ class Hub(with_metaclass(HubMeta)):
         if client is not None and client.options["debug"]:
             logger.debug("Internal error in sentry_sdk", exc_info=exc_info)
 
-    def add_breadcrumb(self, *args, **kwargs):
+    def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
         """Adds a breadcrumb."""
         client, scope = self._stack[-1]
         if client is None:
             logger.info("Dropped breadcrumb because no client bound")
             return
 
-        if not kwargs and len(args) == 1 and callable(args[0]):
-            crumb = args[0]()
-        else:
-            crumb = dict(*args, **kwargs)
-        if crumb is None:
+        crumb = dict(crumb or ())
+        crumb.update(kwargs)
+        if not crumb:
             return
+
+        hint = dict(hint or ())
 
         if crumb.get("timestamp") is None:
             crumb["timestamp"] = datetime.utcnow()
@@ -175,7 +175,7 @@ class Hub(with_metaclass(HubMeta)):
 
         original_crumb = crumb
         if client.options["before_breadcrumb"] is not None:
-            crumb = client.options["before_breadcrumb"](crumb)
+            crumb = client.options["before_breadcrumb"](crumb, hint)
 
         if crumb is not None:
             scope._breadcrumbs.append(crumb)
