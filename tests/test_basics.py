@@ -85,3 +85,22 @@ def test_option_callback(sentry_init, capture_events):
     assert crumb["message"] == "Hello"
     assert crumb["data"] == {"foo": "bar"}
     assert crumb["type"] == "default"
+
+
+def test_breadcrumb_arguments(sentry_init, capture_events):
+    assert_hint = {"bar": 42}
+
+    def before_breadcrumb(crumb, hint):
+        assert crumb["foo"] == 42
+        assert hint == assert_hint
+
+    sentry_init(before_breadcrumb=before_breadcrumb)
+
+    add_breadcrumb(foo=42, hint=dict(bar=42))
+    add_breadcrumb(dict(foo=42), dict(bar=42))
+    add_breadcrumb(dict(foo=42), hint=dict(bar=42))
+    add_breadcrumb(crumb=dict(foo=42), hint=dict(bar=42))
+
+    assert_hint.clear()
+    add_breadcrumb(foo=42)
+    add_breadcrumb(crumb=dict(foo=42))
