@@ -35,23 +35,9 @@ DEFAULT_OPTIONS = {
 # Modified by sentry_sdk.integrations
 INTEGRATIONS = []
 
-
-def _get_packages():
-    yield "pypi:sentry-sdk", VERSION
-    yield "python", ".".join(str(x) for x in sys.version_info[:3])
-    if hasattr(sys, "pypy_version_info"):
-        yield "pypy", ".".join(str(x) for x in sys.pypy_version_info[:3])
-
-
 SDK_INFO = {
     "name": "sentry.python",
     "version": VERSION,
-    "packages": [
-        {"package_name": package_name, "version": version}
-        for package_name, version in _get_packages()
-    ],
+    "packages": [{"package_name": "pypi:sentry-sdk", "version": VERSION}],
     "integrations": INTEGRATIONS,
 }
-
-
-del _get_packages
