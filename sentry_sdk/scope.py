@@ -1,69 +1,83 @@
 from .utils import logger
 
 
+def _attr_setter(fn):
+    return property(fset=fn, doc=fn.__doc__)
+
+
 class Scope(object):
     """The scope holds extra information that should be sent with all
     events that belong to it.
     """
 
-    __slots__ = ["_data", "_breadcrumbs", "_event_processors", "_error_processors"]
+    __slots__ = (
+        "_fingerprint",
+        "_transaction",
+        "_user",
+        "_tags",
+        "_contexts",
+        "_extras",
+        "_breadcrumbs",
+        "_event_processors",
+        "_error_processors",
+    )
 
     def __init__(self):
-        self._data = {}
-        self._breadcrumbs = []
         self._event_processors = []
         self._error_processors = []
 
-    def _set_fingerprint(self, value):
+        self.clear()
+
+    @_attr_setter
+    def fingerprint(self, value):
         """When set this overrides the default fingerprint."""
-        self._data["fingerprint"] = value
+        self._fingerprint = value
 
-    fingerprint = property(fset=_set_fingerprint, doc=_set_fingerprint.__doc__)
-    del _set_fingerprint
-
-    def _set_transaction(self, value):
+    @_attr_setter
+    def transaction(self, value):
         """When set this forces a specific transaction name to be set."""
-        self._data["transaction"] = value
+        self._transaction = value
 
-    transaction = property(fset=_set_transaction, doc=_set_transaction.__doc__)
-    del _set_transaction
-
-    def _set_user(self, value):
+    @_attr_setter
+    def user(self, value):
         """When set a specific user is bound to the scope."""
-        self._data["user"] = value
-
-    user = property(fset=_set_user, doc=_set_user.__doc__)
-    del _set_user
+        self._user = value
 
     def set_tag(self, key, value):
         """Sets a tag for a key to a specific value."""
-        self._data.setdefault("tags", {})[key] = value
+        self._tags[key] = value
 
     def remove_tag(self, key):
         """Removes a specific tag."""
-        self._data.setdefault("tags", {}).pop(key, None)
+        self._tags.pop(key, None)
 
     def set_context(self, key, value):
         """Binds a context at a certain key to a specific value."""
-        self._data.setdefault("contexts", {})[key] = value
+        self._contexts[key] = value
 
     def remove_context(self, key):
         """Removes a context."""
-        self._data.setdefault("contexts", {}).pop(key, None)
+        self._contexts.pop(key, None)
 
     def set_extra(self, key, value):
         """Sets an extra key to a specific value."""
-        self._data.setdefault("extras", {})[key] = value
+        self._extras[key] = value
 
     def remove_extra(self, key):
         """Removes a specific extra key."""
-        self._data.setdefault("extras", {}).pop(key, None)
+        self._extras.pop(key, None)
 
     def clear(self):
         """Clears the entire scope."""
-        self._data.clear()
-        del self._breadcrumbs[:]
-        del self._event_processors[:]
+        self._fingerprint = None
+        self._transaction = None
+        self._user = None
+
+        self._tags = {}
+        self._contexts = {}
+        self._extras = {}
+
+        self._breadcrumbs = []
 
     def add_event_processor(self, func):
         """"Register a scope local event processor on the scope.
@@ -99,23 +113,20 @@ class Scope(object):
             logger.info("%s (%s) dropped event (%s)", ty, cause, event)
 
         event.setdefault("breadcrumbs", []).extend(self._breadcrumbs)
-        if event.get("user") is None and "user" in self._data:
-            event["user"] = self._data["user"]
+        if event.get("user") is None and self._user is not None:
+            event["user"] = self._user
 
-        if event.get("transaction") is None and "transaction" in self._data:
-            event["transaction"] = self._data["transaction"]
+        if event.get("transaction") is None and self._transaction is not None:
+            event["transaction"] = self._transaction
 
-        extra = self._data.get("extra")
-        if extra:
-            event.setdefault("extra", {}).update(extra)
+        if self._extras:
+            event.setdefault("extra", {}).update(self._extras)
 
-        tags = self._data.get("tags")
-        if tags:
-            event.setdefault("tags", {}).update(tags)
+        if self._tags:
+            event.setdefault("tags", {}).update(self._tags)
 
-        contexts = self._data.get("contexts")
-        if contexts:
-            event.setdefault("contexts", {}).update(contexts)
+        if self._contexts:
+            event.setdefault("contexts", {}).update(self._contexts)
 
         if hint is not None and hint.exc_info is not None:
             exc_info = hint.exc_info
@@ -135,8 +146,17 @@ class Scope(object):
 
     def __copy__(self):
         rv = object.__new__(self.__class__)
-        rv._data = dict(self._data)
+
+        rv._fingerprint = self._fingerprint
+        rv._transaction = self._transaction
+        rv._user = self._user
+
+        rv._tags = dict(self._tags)
+        rv._contexts = dict(self._contexts)
+        rv._extras = dict(self._extras)
+
         rv._breadcrumbs = list(self._breadcrumbs)
         rv._event_processors = list(self._event_processors)
         rv._error_processors = list(self._error_processors)
+
         return rv
