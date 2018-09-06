@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import os
+import sys
 import atexit
 
 from sentry_sdk.hub import Hub
@@ -9,9 +10,12 @@ from . import Integration
 
 
 def default_shutdown_callback(pending, timeout):
-    print("Sentry is attempting to send %i pending error messages" % pending)
-    print("Waiting up to %s seconds" % timeout)
-    print("Press Ctrl-%s to quit" % (os.name == "nt" and "Break" or "C"))
+    def echo(msg):
+        sys.stderr.write(msg + '\n')
+    echo("Sentry is attempting to send %i pending error messages" % pending)
+    echo("Waiting up to %s seconds" % timeout)
+    echo("Press Ctrl-%s to quit" % (os.name == "nt" and "Break" or "C"))
+    sys.stderr.flush()
 
 
 class AtexitIntegration(Integration):
