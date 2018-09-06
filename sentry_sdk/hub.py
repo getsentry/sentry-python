@@ -35,6 +35,7 @@ def _should_send_default_pii():
 class HubMeta(type):
     @property
     def current(self):
+        """Returns the current instance of the hub."""
         rv = _local.get(None)
         if rv is None:
             rv = Hub(GLOBAL_HUB)
@@ -43,6 +44,7 @@ class HubMeta(type):
 
     @property
     def main(self):
+        """Returns the main instance of the hub."""
         return GLOBAL_HUB
 
 
@@ -68,6 +70,13 @@ class _ScopeManager(object):
 
 
 class Hub(with_metaclass(HubMeta)):
+    """The hub wraps the concurrency management of the SDK.  Each thread has
+    its own hub but the hub might transfer with the flow of execution if
+    context vars are available.
+
+    If the hub is used with a with statement it's temporarily activated.
+    """
+
     def __init__(self, client_or_hub=None, scope=None):
         if isinstance(client_or_hub, Hub):
             hub = client_or_hub
@@ -96,7 +105,7 @@ class Hub(with_metaclass(HubMeta)):
         with statement can be used on the hub directly.
         """
         with self:
-            callback()
+            return callback()
 
     @property
     def client(self):
