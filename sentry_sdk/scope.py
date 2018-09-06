@@ -112,23 +112,20 @@ class Scope(object):
             logger.info("%s (%s) dropped event (%s)", ty, cause, event)
 
         event.setdefault("breadcrumbs", []).extend(self._breadcrumbs)
-        if event.get("user") is None and "user" in self._data:
-            event["user"] = self._data["user"]
+        if event.get("user") is None and self._user is not None:
+            event["user"] = self._user
 
-        if event.get("transaction") is None and "transaction" in self._data:
-            event["transaction"] = self._data["transaction"]
+        if event.get("transaction") is None and self._transaction is not None:
+            event["transaction"] = self._transaction
 
-        extra = self._data.get("extra")
-        if extra:
-            event.setdefault("extra", {}).update(extra)
+        if self._extras:
+            event.setdefault("extra", {}).update(self._extras)
 
-        tags = self._data.get("tags")
-        if tags:
-            event.setdefault("tags", {}).update(tags)
+        if self._tags:
+            event.setdefault("tags", {}).update(self._tags)
 
-        contexts = self._data.get("contexts")
-        if contexts:
-            event.setdefault("contexts", {}).update(contexts)
+        if self._contexts:
+            event.setdefault("contexts", {}).update(self._contexts)
 
         if hint is not None and hint.exc_info is not None:
             exc_info = hint.exc_info
