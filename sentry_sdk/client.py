@@ -40,6 +40,12 @@ def get_options(*args, **kwargs):
 
 
 class Client(object):
+    """The client is internally responsible for capturing the events and
+    forwarding them to sentry through the configured transport.  It takes
+    the client options as keyword arguments and optionally the DSN as first
+    argument.
+    """
+
     def __init__(self, *args, **kwargs):
         self.options = options = get_options(*args, **kwargs)
         self.transport = make_transport(options)
@@ -54,7 +60,7 @@ class Client(object):
 
     @property
     def dsn(self):
-        """Returns the configured dsn."""
+        """Returns the configured DSN as string."""
         return self.options["dsn"]
 
     def _prepare_event(self, event, hint, scope):
@@ -128,7 +134,15 @@ class Client(object):
         return True
 
     def capture_event(self, event, hint=None, scope=None):
-        """Captures an event."""
+        """Captures an event.
+
+        This takes the ready made event and an optoinal hint and scope.  The
+        hint is internally used to further customize the representation of the
+        error.  For more information see `EventHint`.
+
+        If the transport is not set nothing happens, otherwise the return
+        value of this function will be the ID of the captured event.
+        """
         if self.transport is None:
             return
         rv = event.get("event_id")
@@ -143,6 +157,11 @@ class Client(object):
     def close(self, timeout=None, shutdown_callback=None):
         """Closes the client which shuts down the transport in an
         orderly manner.
+
+        The `shutdown_callback` is invoked with two arguments: the number of
+        pending events and the configured shutdown timeout.  For instance the
+        default atexit integration will use this to render out a message on
+        stderr.
         """
         if self.transport is not None:
             if timeout is None:

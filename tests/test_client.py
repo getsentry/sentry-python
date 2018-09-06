@@ -119,7 +119,7 @@ def test_configure_scope_available(sentry_init, request, monkeypatch):
 @pytest.mark.parametrize("no_sdk", (True, False))
 def test_configure_scope_unavailable(no_sdk, monkeypatch):
     if no_sdk:
-        # Emulate sentry_minimal without SDK installation: callbacks are not called
+        # Emulate minimal without SDK installation: callbacks are not called
         monkeypatch.setattr(HubMeta, "current", None)
         assert not Hub.current
     else:

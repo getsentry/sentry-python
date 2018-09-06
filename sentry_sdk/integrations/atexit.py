@@ -11,7 +11,8 @@ from . import Integration
 
 def default_shutdown_callback(pending, timeout):
     def echo(msg):
-        sys.stderr.write(msg + '\n')
+        sys.stderr.write(msg + "\n")
+
     echo("Sentry is attempting to send %i pending error messages" % pending)
     echo("Waiting up to %s seconds" % timeout)
     echo("Press Ctrl-%s to quit" % (os.name == "nt" and "Break" or "C"))
