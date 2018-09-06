@@ -38,7 +38,6 @@ class RequestsIntegration(Integration):
                 _record_request(None)
                 raise
             else:
-                print("here", resp)
                 _record_request(resp)
             return resp
 
