@@ -1,6 +1,3 @@
-from .utils import logger
-
-
 class Scope(object):
     """The scope holds extra information that should be sent with all
     events that belong to it.
@@ -140,3 +137,6 @@ class Scope(object):
         rv._event_processors = list(self._event_processors)
         rv._error_processors = list(self._error_processors)
         return rv
+
+
+from .utils import logger
