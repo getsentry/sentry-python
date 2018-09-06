@@ -23,7 +23,9 @@ class Scope(object):
     )
 
     def __init__(self):
+        self._event_processors = []
         self._error_processors = []
+
         self.clear()
 
     @_attr_setter
@@ -76,7 +78,6 @@ class Scope(object):
         self._extras = {}
 
         self._breadcrumbs = []
-        self._event_processors = []
 
     def add_event_processor(self, func):
         """"Register a scope local event processor on the scope.
