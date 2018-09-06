@@ -16,7 +16,9 @@ def _internal_exceptions():
     try:
         yield
     except Exception:
-        Hub.current.capture_internal_exception(sys.exc_info())
+        hub = Hub.current
+        if hub:
+            hub.capture_internal_exception(sys.exc_info())
 
 
 def _get_client_options():
@@ -159,9 +161,7 @@ class Hub(with_metaclass(HubMeta)):
     def capture_internal_exception(self, exc_info):
         """Capture an exception that is likely caused by a bug in the SDK
         itself."""
-        client = self.client
-        if client is not None and client.options["debug"]:
-            logger.debug("Internal error in sentry_sdk", exc_info=exc_info)
+        logger.debug("Internal error in sentry_sdk", exc_info=exc_info)
 
     def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
         """Adds a breadcrumb."""

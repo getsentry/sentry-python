@@ -12,6 +12,10 @@ from ._compat import urlparse, text_type, implements_str
 epoch = datetime(1970, 1, 1)
 
 
+# The logger is created here but initializde in the debug support module
+logger = logging.getLogger("sentry_sdk.errors")
+
+
 def to_timestamp(value):
     return (value - epoch).total_seconds()
 
@@ -521,14 +525,6 @@ def strip_string(value, assume_length=None, max_length=512):
             },
         )
     return value[:max_length]
-
-
-logger = logging.getLogger("sentry_sdk.errors")
-if not logger.handlers:
-    _handler = logging.StreamHandler(sys.stderr)
-    _handler.setFormatter(logging.Formatter(" [sentry] %(levelname)s: %(message)s"))
-    logger.addHandler(_handler)
-    logger.setLevel(logging.DEBUG)
 
 
 try:
