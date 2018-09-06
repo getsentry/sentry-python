@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 from collections import Mapping, Sequence
 
+
 from ._compat import urlparse, text_type, implements_str
 
 
@@ -523,14 +524,6 @@ def strip_string(value, assume_length=None, max_length=512):
     return value[:max_length]
 
 
-logger = logging.getLogger("sentry_sdk.errors")
-if not logger.handlers:
-    _handler = logging.StreamHandler(sys.stderr)
-    _handler.setFormatter(logging.Formatter(" [sentry] %(levelname)s: %(message)s"))
-    logger.addHandler(_handler)
-    logger.setLevel(logging.DEBUG)
-
-
 try:
     from contextvars import ContextVar
 except ImportError:
@@ -548,3 +541,24 @@ except ImportError:
 
         def set(self, value):
             setattr(self._local, "value", value)
+
+
+logger = logging.getLogger("sentry_sdk.errors")
+
+
+class SentryClientConfigFilter(logging.Filter):
+    def filter(self, record):
+        try:
+            return Hub.current.client.options["debug"]
+        except (AttributeError, KeyError):
+            return False
+
+
+if not logger.handlers:
+    _handler = logging.StreamHandler(sys.stderr)
+    _handler.setFormatter(logging.Formatter(" [sentry] %(levelname)s: %(message)s"))
+    logger.addHandler(_handler)
+    logger.setLevel(logging.DEBUG)
+
+logger.addFilter(SentryClientConfigFilter())
+from .hub import Hub

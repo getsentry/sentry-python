@@ -3,12 +3,9 @@ import copy
 from datetime import datetime
 from contextlib import contextmanager
 
-from ._compat import with_metaclass
 from .scope import Scope
-from .utils import exc_info_from_error, event_from_exception, logger, ContextVar
 
-
-_local = ContextVar("sentry_current_hub")
+from ._compat import with_metaclass
 
 
 @contextmanager
@@ -159,9 +156,7 @@ class Hub(with_metaclass(HubMeta)):
     def capture_internal_exception(self, exc_info):
         """Capture an exception that is likely caused by a bug in the SDK
         itself."""
-        client = self.client
-        if client is not None and client.options["debug"]:
-            logger.debug("Internal error in sentry_sdk", exc_info=exc_info)
+        logger.debug("Internal error in sentry_sdk", exc_info=exc_info)
 
     def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
         """Adds a breadcrumb."""
@@ -227,3 +222,7 @@ class Hub(with_metaclass(HubMeta)):
 
 
 GLOBAL_HUB = Hub()
+
+from .utils import exc_info_from_error, event_from_exception, ContextVar, logger
+
+_local = ContextVar("sentry_current_hub")

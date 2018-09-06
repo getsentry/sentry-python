@@ -1,8 +1,8 @@
 from contextlib import contextmanager
 
+from .utils import EventHint
 from .hub import Hub
 from .scope import Scope
-from .utils import EventHint
 from .client import Client, get_options
 from .integrations import setup_integrations
 
