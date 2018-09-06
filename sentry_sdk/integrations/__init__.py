@@ -9,11 +9,13 @@ _installed_integrations = {}
 
 def _get_default_integrations():
     from .logging import LoggingIntegration
+    from .stdlib import StdlibIntegration
     from .excepthook import ExcepthookIntegration
     from .dedupe import DedupeIntegration
     from .atexit import AtexitIntegration
 
     yield LoggingIntegration
+    yield StdlibIntegration
     yield ExcepthookIntegration
     yield DedupeIntegration
     yield AtexitIntegration
