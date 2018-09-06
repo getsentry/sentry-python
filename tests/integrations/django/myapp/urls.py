@@ -28,3 +28,5 @@ urlpatterns = [
     path("message", views.message, name="message"),
     path("mylogin", views.mylogin, name="mylogin"),
 ]
+
+handler500 = views.handler500
