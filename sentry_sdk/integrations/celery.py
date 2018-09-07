@@ -3,7 +3,7 @@ from __future__ import absolute_import
 from celery.signals import task_failure, task_prerun, task_postrun
 from celery.exceptions import SoftTimeLimitExceeded
 
-from sentry_sdk import get_current_hub
+from sentry_sdk import Hub
 from sentry_sdk.hub import _internal_exceptions
 
 from . import Integration
@@ -24,7 +24,7 @@ class CeleryIntegration(Integration):
         if hasattr(sender, "throws") and isinstance(einfo.exception, sender.throws):
             return
 
-        hub = get_current_hub()
+        hub = Hub.current
         if isinstance(einfo.exception, SoftTimeLimitExceeded):
             with hub.push_scope():
                 with hub.configure_scope() as scope:
@@ -40,10 +40,10 @@ class CeleryIntegration(Integration):
 
     def _handle_task_prerun(self, sender, task, **kw):
         with _internal_exceptions():
-            hub = get_current_hub()
+            hub = Hub.current
             hub.push_scope()
             with hub.configure_scope() as scope:
                 scope.transaction = task.name
 
     def _handle_task_postrun(self, sender, task_id, task, **kw):
-        get_current_hub().pop_scope_unsafe()
+        Hub.current.pop_scope_unsafe()

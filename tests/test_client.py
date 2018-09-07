@@ -47,7 +47,7 @@ def test_ignore_errors():
         reraise(*exc_info)
 
     hub = Hub(Client(ignore_errors=[ZeroDivisionError], transport=_TestTransport()))
-    hub.capture_internal_exception = raise_it
+    hub._capture_internal_exception = raise_it
 
     def e(exc):
         try:
@@ -159,7 +159,7 @@ def test_transport_works(httpserver, request, capsys):
 def test_client_debug_option_enabled(sentry_init, caplog):
     sentry_init(debug=True)
 
-    Hub.current.capture_internal_exception((ValueError, ValueError("OK"), None))
+    Hub.current._capture_internal_exception((ValueError, ValueError("OK"), None))
     assert "OK" in caplog.text
 
 
@@ -169,5 +169,5 @@ def test_client_debug_option_disabled(with_client, sentry_init, caplog):
     if with_client:
         sentry_init()
 
-    Hub.current.capture_internal_exception((ValueError, ValueError("OK"), None))
+    Hub.current._capture_internal_exception((ValueError, ValueError("OK"), None))
     assert "OK" not in caplog.text

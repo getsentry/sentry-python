@@ -19,13 +19,13 @@ def reraise_internal_exceptions(request, monkeypatch):
     if "tests_internal_exceptions" in request.keywords:
         return
 
-    def capture_internal_exception(exc_info):
+    def _capture_internal_exception(exc_info):
         reraise(*exc_info)
 
     monkeypatch.setattr(
-        sentry_sdk.get_current_hub(),
-        "capture_internal_exception",
-        capture_internal_exception,
+        sentry_sdk.Hub.current,
+        "_capture_internal_exception",
+        _capture_internal_exception,
     )
 
 

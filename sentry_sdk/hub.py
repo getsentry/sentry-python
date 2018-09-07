@@ -18,7 +18,7 @@ def _internal_exceptions():
     except Exception:
         hub = Hub.current
         if hub:
-            hub.capture_internal_exception(sys.exc_info())
+            hub._capture_internal_exception(sys.exc_info())
 
 
 def _get_client_options():
@@ -124,7 +124,13 @@ class Hub(with_metaclass(HubMeta)):
         self._stack[-1] = (new, top[1])
 
     def capture_event(self, event, hint=None):
-        """Captures an event."""
+        """Captures an event.  The return value is the ID of the event.
+
+        The event is a dictionary following the Sentry v7/v8 protocol
+        specification.  Optionally an `EventHint` object can be passed that
+        is used by processors to extract additional information from it.
+        Typically the event hint object would contain exception information.
+        """
         client, scope = self._stack[-1]
         if client is not None:
             rv = client.capture_event(event, hint, scope)
@@ -133,7 +139,9 @@ class Hub(with_metaclass(HubMeta)):
             return rv
 
     def capture_message(self, message, level=None):
-        """Captures a message."""
+        """Captures a message.  The message is just a string.  If no level
+        is provided the default level is `info`.
+        """
         if self.client is None:
             return
         if level is None:
@@ -141,7 +149,12 @@ class Hub(with_metaclass(HubMeta)):
         return self.capture_event({"message": message, "level": level})
 
     def capture_exception(self, error=None):
-        """Captures an exception."""
+        """Captures an exception.
+
+        The argument passed can be `None` in which case the last exception
+        will be reported, otherwise an exception object or an `exc_info`
+        tuple.
+        """
         client = self.client
         if client is None:
             return
@@ -156,15 +169,19 @@ class Hub(with_metaclass(HubMeta)):
         try:
             return self.capture_event(event, hint=hint)
         except Exception:
-            self.capture_internal_exception(sys.exc_info())
+            self._capture_internal_exception(sys.exc_info())
 
-    def capture_internal_exception(self, exc_info):
+    def _capture_internal_exception(self, exc_info):
         """Capture an exception that is likely caused by a bug in the SDK
         itself."""
         logger.debug("Internal error in sentry_sdk", exc_info=exc_info)
 
     def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
-        """Adds a breadcrumb."""
+        """Adds a breadcrumb.  The breadcrumbs are a dictionary with the
+        data as the sentry v7/v8 protocol expects.  `hint` is an optional
+        value that can be used by `before_breadcrumb` to customize the
+        breadcrumbs that are emitted.
+        """
         client, scope = self._stack[-1]
         if client is None:
             logger.info("Dropped breadcrumb because no client bound")

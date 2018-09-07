@@ -24,3 +24,8 @@ tox-test:
 lint:
 	@tox -e linters
 .PHONY: lint
+
+apidocs:
+	@pip install pdoc pygments
+	@pdoc --overwrite --html --html-dir build/apidocs sentry_sdk
+.PHONY: apidocs
