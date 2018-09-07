@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 import weakref
 
-from sentry_sdk import capture_exception, get_current_hub, configure_scope
+from sentry_sdk import Hub, capture_exception, configure_scope
 from sentry_sdk.hub import _internal_exceptions, _should_send_default_pii
 from ._wsgi import RequestExtractor, run_wsgi_app
 from . import Integration
@@ -43,14 +43,14 @@ class FlaskIntegration(Integration):
 def _push_appctx(*args, **kwargs):
     # always want to push scope regardless of whether WSGI app might already
     # have (not the case for CLI for example)
-    hub = get_current_hub()
+    hub = Hub.current
     hub.push_scope()
     with hub.configure_scope() as scope:
         scope.add_event_processor(event_processor)
 
 
 def _pop_appctx(*args, **kwargs):
-    get_current_hub().pop_scope_unsafe()
+    Hub.current.pop_scope_unsafe()
 
 
 def _request_started(sender, **kwargs):

@@ -10,6 +10,11 @@ from . import Integration
 
 
 def default_shutdown_callback(pending, timeout):
+    """This is the default shutdown callback that is set on the options.
+    It prints out a message to stderr that informs the user that some events
+    are still pending and the process is waiting for them to flush out.
+    """
+
     def echo(msg):
         sys.stderr.write(msg + "\n")
 

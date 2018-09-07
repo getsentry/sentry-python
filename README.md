@@ -35,7 +35,7 @@ After initialization, you can capture exceptions like this:
 
 You can create a scope to attach data to all events happening inside of it:
 
-    with sentry_sdk.get_current_hub().push_scope():
+    with sentry_sdk.Hub.current.push_scope():
         with sentry_sdk.configure_scope() as scope:
             scope.transaction = "my_view_name"
             scope.set_tag("key", "value")
