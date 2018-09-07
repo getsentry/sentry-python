@@ -9,7 +9,15 @@ _installer_lock = Lock()
 
 
 def get_default_integrations():
-    """Returns an iterator of default integration instances."""
+    """Returns an iterator of default integration instances.
+
+    This returns the following default integration:
+
+    - `LoggingIntegration`
+    - `ExcepthookIntegration`
+    - `DedupeIntegration`
+    - `AtexitIntegration`
+    """
     from .logging import LoggingIntegration
     from .excepthook import ExcepthookIntegration
     from .dedupe import DedupeIntegration
