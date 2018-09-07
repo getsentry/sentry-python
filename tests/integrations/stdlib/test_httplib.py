@@ -1,5 +1,3 @@
-import pytest
-
 try:
     from urllib.request import urlopen
 except ImportError:
@@ -26,5 +24,5 @@ def test_crumb_capture(sentry_init, capture_events):
         "url": url,
         "method": "GET",
         "status_code": 200,
-        "reason": 'OK',
+        "reason": "OK",
     }
