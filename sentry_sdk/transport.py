@@ -33,6 +33,11 @@ def _make_pool(parsed_dsn, http_proxy, https_proxy):
 
 
 class Transport(object):
+    """Baseclass for all transports.
+
+    A transport is used to send an event to sentry.
+    """
+
     def __init__(self, options=None):
         self.options = options
         if options and options["dsn"]:
@@ -41,12 +46,21 @@ class Transport(object):
             self.parsed_dsn = None
 
     def capture_event(self, event):
+        """This gets invoked with the event dictionary when an event should
+        be sent to sentry.
+        """
         raise NotImplementedError()
 
     def shutdown(self, timeout, callback=None):
+        """Initiates a controlled shutdown that should flush out pending
+        events.  The callback must be invoked with the number of pending
+        events and the timeout if the shutting down would take some period
+        of time (eg: not instant).
+        """
         self.kill()
 
     def kill(self):
+        """Forcefully kills the transport."""
         pass
 
     def __del__(self):
@@ -57,6 +71,8 @@ class Transport(object):
 
 
 class HttpTransport(Transport):
+    """The default HTTP transport."""
+
     def __init__(self, options):
         Transport.__init__(self, options)
         self._worker = BackgroundWorker()

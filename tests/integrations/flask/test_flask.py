@@ -9,7 +9,7 @@ from flask import Flask, request
 
 from flask_login import LoginManager, login_user
 
-from sentry_sdk import capture_message, capture_exception
+from sentry_sdk import capture_message, capture_exception, last_event_id
 from sentry_sdk.integrations.logging import LoggingIntegration
 import sentry_sdk.integrations.flask as flask_sentry
 
@@ -361,3 +361,26 @@ def test_wsgi_level_error_is_caught(app, capture_exceptions, sentry_init):
     error, = exceptions
 
     assert error is exc.value
+
+
+def test_500(sentry_init, capture_events, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
+    app.debug = False
+    app.testing = False
+
+    @app.route("/")
+    def index():
+        1 / 0
+
+    @app.errorhandler(500)
+    def error_handler(err):
+        return "Sentry error: %s" % last_event_id()
+
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.get("/")
+
+    event, = events
+    assert response.data.decode("utf-8") == "Sentry error: %s" % event["event_id"]
