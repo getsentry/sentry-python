@@ -4,18 +4,22 @@ from __future__ import print_function
 import logging
 import datetime
 
-from sentry_sdk import get_current_hub, capture_event, add_breadcrumb
+from sentry_sdk import capture_event, add_breadcrumb
 from sentry_sdk.utils import to_string, event_from_exception
-from sentry_sdk.hub import _internal_exceptions
+from sentry_sdk.hub import Hub, _internal_exceptions
 
 from . import Integration
 
 
-IGNORED_LOGGERS = set(["sentry_sdk.errors"])
+_IGNORED_LOGGERS = set(["sentry_sdk.errors"])
 
 
 def ignore_logger(name):
-    IGNORED_LOGGERS.add(name)
+    """This disables the breadcrumb integration for a logger of a specific
+    name.  This primary use is for some integrations to disable breadcrumbs
+    of this integration.
+    """
+    _IGNORED_LOGGERS.add(name)
 
 
 class LoggingIntegration(Integration):
@@ -50,7 +54,7 @@ class SentryHandler(logging.Handler, object):
             return self._emit(record)
 
     def can_record(self, record):
-        return record.name not in IGNORED_LOGGERS
+        return record.name not in _IGNORED_LOGGERS
 
     def _breadcrumb_from_record(self, record):
         return {
@@ -66,7 +70,7 @@ class SentryHandler(logging.Handler, object):
             return
 
         if self._should_create_event(record):
-            hub = get_current_hub()
+            hub = Hub.current
             if hub.client is None:
                 return
 

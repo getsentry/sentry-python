@@ -1,8 +1,9 @@
 import json
 import sys
 
-import sentry_sdk
+from sentry_sdk import capture_exception
 from sentry_sdk.hub import (
+    Hub,
     _internal_exceptions,
     _should_send_default_pii,
     _get_client_options,
@@ -150,7 +151,7 @@ def get_client_ip(environ):
 
 
 def run_wsgi_app(app, environ, start_response):
-    hub = sentry_sdk.get_current_hub()
+    hub = Hub.current
     hub.push_scope()
     with _internal_exceptions():
         with hub.configure_scope() as scope:
@@ -160,7 +161,7 @@ def run_wsgi_app(app, environ, start_response):
         rv = app(environ, start_response)
     except Exception:
         einfo = sys.exc_info()
-        sentry_sdk.capture_exception(einfo)
+        capture_exception(einfo)
         hub.pop_scope_unsafe()
         reraise(*einfo)
 
@@ -180,7 +181,7 @@ class _ScopePoppingResponse(object):
             self._response = iter(self._response)
         except Exception:
             einfo = sys.exc_info()
-            sentry_sdk.capture_exception(einfo)
+            capture_exception(einfo)
             reraise(*einfo)
         return self
 
@@ -191,7 +192,7 @@ class _ScopePoppingResponse(object):
             raise
         except Exception:
             einfo = sys.exc_info()
-            sentry_sdk.capture_exception(einfo)
+            capture_exception(einfo)
             reraise(*einfo)
 
     def close(self):
@@ -201,7 +202,7 @@ class _ScopePoppingResponse(object):
                 self._response.close()
             except Exception:
                 einfo = sys.exc_info()
-                sentry_sdk.capture_exception(einfo)
+                capture_exception(einfo)
                 reraise(*einfo)
 
 

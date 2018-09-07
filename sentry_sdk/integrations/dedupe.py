@@ -4,7 +4,7 @@ from sentry_sdk.utils import ContextVar
 from . import Integration
 
 
-last_seen = ContextVar("last-seen")
+_last_seen = ContextVar("last-seen")
 
 
 class DedupeIntegration(Integration):
@@ -16,7 +16,7 @@ class DedupeIntegration(Integration):
             @scope.add_error_processor
             def processor(event, exc_info):
                 exc = exc_info[1]
-                if last_seen.get(None) is exc:
+                if _last_seen.get(None) is exc:
                     return
-                last_seen.set(exc)
+                _last_seen.set(exc)
                 return event
