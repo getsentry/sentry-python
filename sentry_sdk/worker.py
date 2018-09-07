@@ -62,18 +62,22 @@ class BackgroundWorker(object):
     def shutdown(self, timeout, callback=None):
         logger.debug("background worker got shutdown request")
         with self._lock:
-            if not self.is_alive:
-                return
-            self._queue.put_nowait(_TERMINATOR)
-            initial_timeout = min(0.1, timeout)
-            if not self._timed_queue_join(initial_timeout):
-                pending = self._queue.qsize()
-                logger.debug("%d event(s) pending on shutdown", pending)
-                if callback is not None:
-                    callback(pending, timeout)
-                self._timed_queue_join(timeout - initial_timeout)
+            if self.is_alive:
+                self._queue.put_nowait(_TERMINATOR)
+                if timeout > 0.0:
+                    self._wait_shutdown(timeout, callback)
             self._thread = None
+            self._thread_for_pid = None
         logger.debug("background worker shut down")
+
+    def _wait_shutdown(self, timeout, callback):
+        initial_timeout = min(0.1, timeout)
+        if not self._timed_queue_join(initial_timeout):
+            pending = self._queue.qsize()
+            logger.debug("%d event(s) pending on shutdown", pending)
+            if callback is not None:
+                callback(pending, timeout)
+            self._timed_queue_join(timeout - initial_timeout)
 
     def submit(self, callback):
         self._ensure_thread()

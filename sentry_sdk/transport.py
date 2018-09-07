@@ -135,7 +135,10 @@ class HttpTransport(Transport):
 
     def shutdown(self, timeout, callback=None):
         logger.debug("Shutting down HTTP transport orderly")
-        self._worker.shutdown(timeout, callback)
+        if timeout <= 0:
+            self._worker.kill()
+        else:
+            self._worker.shutdown(timeout, callback)
 
     def kill(self):
         logger.debug("Killing HTTP transport")
