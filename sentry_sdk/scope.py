@@ -119,6 +119,9 @@ class Scope(object):
         if event.get("transaction") is None and self._transaction is not None:
             event["transaction"] = self._transaction
 
+        if event.get("fingerprint") is None and self._fingerprint is not None:
+            event["fingerprint"] = self._fingerprint
+
         if self._extras:
             event.setdefault("extra", {}).update(self._extras)
 
