@@ -5,10 +5,13 @@ import logging
 import datetime
 
 from sentry_sdk import capture_event, add_breadcrumb
-from sentry_sdk.utils import to_string, event_from_exception
-from sentry_sdk.hub import Hub, _internal_exceptions
-
-from . import Integration
+from sentry_sdk.utils import (
+    to_string,
+    event_from_exception,
+    capture_internal_exceptions,
+)
+from sentry_sdk.hub import Hub
+from sentry_sdk.integrations import Integration
 
 
 _IGNORED_LOGGERS = set(["sentry_sdk.errors"])
@@ -49,7 +52,7 @@ class SentryHandler(logging.Handler, object):
             self._event_level = logging._checkLevel(event_level)
 
     def emit(self, record):
-        with _internal_exceptions():
+        with capture_internal_exceptions():
             self.format(record)
             return self._emit(record)
 
@@ -74,7 +77,7 @@ class SentryHandler(logging.Handler, object):
             if hub.client is None:
                 return
 
-            with _internal_exceptions():
+            with capture_internal_exceptions():
                 hint = None
                 # exc_info might be None or (None, None, None)
                 if record.exc_info is not None and record.exc_info[0] is not None:
@@ -93,7 +96,7 @@ class SentryHandler(logging.Handler, object):
 
                 capture_event(event, hint=hint)
 
-        with _internal_exceptions():
+        with capture_internal_exceptions():
             add_breadcrumb(
                 self._breadcrumb_from_record(record), hint={"log_record": record}
             )

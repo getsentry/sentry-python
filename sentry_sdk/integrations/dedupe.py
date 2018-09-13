@@ -1,7 +1,6 @@
 from sentry_sdk.api import configure_scope
 from sentry_sdk.utils import ContextVar
-
-from . import Integration
+from sentry_sdk.integrations import Integration
 
 
 _last_seen = ContextVar("last-seen")

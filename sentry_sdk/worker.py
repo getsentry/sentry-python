@@ -2,8 +2,8 @@ import threading
 import os
 
 from time import sleep, time
-from ._compat import queue, check_thread_support
-from .utils import logger
+from sentry_sdk._compat import queue, check_thread_support
+from sentry_sdk.utils import logger
 
 
 _TERMINATOR = object()

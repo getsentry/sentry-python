@@ -3,22 +3,17 @@ import copy
 from datetime import datetime
 from contextlib import contextmanager
 
-from ._compat import with_metaclass
-from .scope import Scope
-from .utils import exc_info_from_error, event_from_exception, logger, ContextVar
+from sentry_sdk._compat import with_metaclass
+from sentry_sdk.scope import Scope
+from sentry_sdk.utils import (
+    exc_info_from_error,
+    event_from_exception,
+    logger,
+    ContextVar,
+)
 
 
 _local = ContextVar("sentry_current_hub")
-
-
-@contextmanager
-def _internal_exceptions():
-    try:
-        yield
-    except Exception:
-        hub = Hub.current
-        if hub:
-            hub._capture_internal_exception(sys.exc_info())
 
 
 def _get_client_options():

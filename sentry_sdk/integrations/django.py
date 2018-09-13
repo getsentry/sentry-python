@@ -11,9 +11,10 @@ except ImportError:
     from django.core.urlresolvers import resolve
 
 from sentry_sdk import capture_exception, configure_scope
-from sentry_sdk.hub import _internal_exceptions, _should_send_default_pii
-from ._wsgi import RequestExtractor, run_wsgi_app
-from . import Integration
+from sentry_sdk.hub import _should_send_default_pii
+from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations._wsgi import RequestExtractor, run_wsgi_app
 
 
 if DJANGO_VERSION < (1, 10):
@@ -76,11 +77,11 @@ def _make_event_processor(weak_request):
             except Exception:
                 pass
 
-        with _internal_exceptions():
+        with capture_internal_exceptions():
             DjangoRequestExtractor(request).extract_into_event(event)
 
         if _should_send_default_pii():
-            with _internal_exceptions():
+            with capture_internal_exceptions():
                 _set_user_info(request, event)
 
         return event

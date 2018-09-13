@@ -3,10 +3,11 @@ import sys
 import linecache
 import logging
 
+from contextlib import contextmanager
 from datetime import datetime
 from collections import Mapping, Sequence
 
-from ._compat import urlparse, text_type, implements_str
+from sentry_sdk._compat import urlparse, text_type, implements_str
 
 
 epoch = datetime(1970, 1, 1)
@@ -14,6 +15,21 @@ epoch = datetime(1970, 1, 1)
 
 # The logger is created here but initializde in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
+
+
+def _get_debug_hub():
+    # This function is replaced by debug.py
+    pass
+
+
+@contextmanager
+def capture_internal_exceptions():
+    try:
+        yield
+    except Exception:
+        hub = _get_debug_hub()
+        if hub is not None:
+            hub._capture_internal_exception(sys.exc_info())
 
 
 def to_timestamp(value):

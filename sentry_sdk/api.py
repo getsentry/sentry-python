@@ -1,12 +1,12 @@
 import inspect
 from contextlib import contextmanager
 
-from .hub import Hub
-from .scope import Scope
-from .utils import EventHint
-from .transport import Transport, HttpTransport
-from .client import Client, get_options
-from .integrations import setup_integrations
+from sentry_sdk.hub import Hub
+from sentry_sdk.scope import Scope
+from sentry_sdk.utils import EventHint
+from sentry_sdk.transport import Transport, HttpTransport
+from sentry_sdk.client import Client, get_options
+from sentry_sdk.integrations import setup_integrations
 
 
 __all__ = ["Hub", "Scope", "Client", "EventHint", "Transport", "HttpTransport"]

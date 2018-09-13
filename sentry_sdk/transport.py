@@ -8,10 +8,9 @@ import gzip
 
 from datetime import datetime, timedelta
 
-from .consts import VERSION
-from .utils import Dsn, logger
-from .worker import BackgroundWorker
-from .hub import _internal_exceptions
+from sentry_sdk.consts import VERSION
+from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
+from sentry_sdk.worker import BackgroundWorker
 
 try:
     from urllib.request import getproxies
@@ -91,7 +90,7 @@ class HttpTransport(Transport):
                 return
             self._disabled_until = None
 
-        with _internal_exceptions():
+        with capture_internal_exceptions():
             body = io.BytesIO()
             with gzip.GzipFile(fileobj=body, mode="w") as f:
                 f.write(json.dumps(event).encode("utf-8"))

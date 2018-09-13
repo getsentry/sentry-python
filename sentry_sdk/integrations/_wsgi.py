@@ -2,13 +2,8 @@ import json
 import sys
 
 from sentry_sdk import capture_exception
-from sentry_sdk.hub import (
-    Hub,
-    _internal_exceptions,
-    _should_send_default_pii,
-    _get_client_options,
-)
-from sentry_sdk.utils import AnnotatedValue
+from sentry_sdk.hub import Hub, _should_send_default_pii, _get_client_options
+from sentry_sdk.utils import AnnotatedValue, capture_internal_exceptions
 from sentry_sdk._compat import reraise, implements_iterator
 
 
@@ -153,7 +148,7 @@ def get_client_ip(environ):
 def run_wsgi_app(app, environ, start_response):
     hub = Hub.current
     hub.push_scope()
-    with _internal_exceptions():
+    with capture_internal_exceptions():
         with hub.configure_scope() as scope:
             scope.add_event_processor(_make_wsgi_event_processor(environ))
 
@@ -208,7 +203,7 @@ class _ScopePoppingResponse(object):
 
 def _make_wsgi_event_processor(environ):
     def event_processor(event):
-        with _internal_exceptions():
+        with capture_internal_exceptions():
             # if the code below fails halfway through we at least have some data
             request_info = event.setdefault("request", {})
 

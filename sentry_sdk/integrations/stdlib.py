@@ -1,5 +1,5 @@
 from sentry_sdk import add_breadcrumb
-from . import Integration
+from sentry_sdk.integrations import Integration
 
 
 class StdlibIntegration(Integration):
