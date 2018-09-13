@@ -36,28 +36,15 @@ def to_timestamp(value):
     return (value - epoch).total_seconds()
 
 
-class EventHint(object):
-    """Extra information for an event that can be used during processing."""
-
-    def __init__(self, exc_info=None):
-        self.exc_info = exc_info
-
-    @property
-    def exception(self):
-        """Returns the exception value on the hint if there is one."""
-        if self.exc_info is not None:
-            return self.exc_info[1]
-
-    @classmethod
-    def with_exc_info(cls, exc_info=None):
-        """Creates a hint with the exc info filled in."""
-        if exc_info is None:
-            exc_info = sys.exc_info()
-        else:
-            exc_info = exc_info_from_error(exc_info)
-        if exc_info[0] is None:
-            exc_info = None
-        return cls(exc_info=exc_info)
+def event_hint_with_exc_info(exc_info=None):
+    """Creates a hint with the exc info filled in."""
+    if exc_info is None:
+        exc_info = sys.exc_info()
+    else:
+        exc_info = exc_info_from_error(exc_info)
+    if exc_info[0] is None:
+        exc_info = None
+    return {"exc_info": exc_info}
 
 
 class BadDsn(ValueError):
@@ -429,7 +416,7 @@ def exc_info_from_error(error):
 
 def event_from_exception(exc_info, with_locals=False, processors=None):
     exc_info = exc_info_from_error(exc_info)
-    hint = EventHint.with_exc_info(exc_info)
+    hint = event_hint_with_exc_info(exc_info)
     return (
         {
             "level": "error",

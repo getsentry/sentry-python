@@ -122,7 +122,7 @@ class Hub(with_metaclass(HubMeta)):
         """Captures an event.  The return value is the ID of the event.
 
         The event is a dictionary following the Sentry v7/v8 protocol
-        specification.  Optionally an `EventHint` object can be passed that
+        specification.  Optionally an event hint dict can be passed that
         is used by processors to extract additional information from it.
         Typically the event hint object would contain exception information.
         """

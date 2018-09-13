@@ -104,7 +104,7 @@ class Client(object):
         return event
 
     def _is_ignored_error(self, event, hint=None):
-        exc_info = hint and hint.exc_info or None
+        exc_info = hint.get("exc_info")
         if exc_info is None:
             return False
 
@@ -123,7 +123,7 @@ class Client(object):
 
         return False
 
-    def _should_capture(self, event, hint=None, scope=None):
+    def _should_capture(self, event, hint, scope=None):
         if (
             self.options["sample_rate"] < 1.0
             and random.random() >= self.options["sample_rate"]
@@ -140,13 +140,16 @@ class Client(object):
 
         This takes the ready made event and an optoinal hint and scope.  The
         hint is internally used to further customize the representation of the
-        error.  For more information see `EventHint`.
+        error.  When provided it's a dictionary of optional information such
+        as exception info.
 
         If the transport is not set nothing happens, otherwise the return
         value of this function will be the ID of the captured event.
         """
         if self.transport is None:
             return
+        if hint is None:
+            hint = {}
         rv = event.get("event_id")
         if rv is None:
             event["event_id"] = rv = uuid.uuid4().hex

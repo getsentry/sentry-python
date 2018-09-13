@@ -131,8 +131,8 @@ class Scope(object):
         if self._contexts:
             event.setdefault("contexts", {}).update(self._contexts)
 
-        if hint is not None and hint.exc_info is not None:
-            exc_info = hint.exc_info
+        exc_info = hint.get("exc_info") if hint is not None else None
+        if exc_info is not None:
             for processor in self._error_processors:
                 new_event = processor(event, exc_info)
                 if new_event is None:
