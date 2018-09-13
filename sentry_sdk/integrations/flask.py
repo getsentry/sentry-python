@@ -3,9 +3,10 @@ from __future__ import absolute_import
 import weakref
 
 from sentry_sdk import Hub, capture_exception, configure_scope
-from sentry_sdk.hub import _internal_exceptions, _should_send_default_pii
-from ._wsgi import RequestExtractor, run_wsgi_app
-from . import Integration
+from sentry_sdk.hub import _should_send_default_pii
+from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations._wsgi import RequestExtractor, run_wsgi_app
 
 try:
     import flask_login
@@ -70,11 +71,11 @@ def event_processor(event):
             except Exception:
                 pass
 
-        with _internal_exceptions():
+        with capture_internal_exceptions():
             FlaskRequestExtractor(request).extract_into_event(event)
 
     if _should_send_default_pii():
-        with _internal_exceptions():
+        with capture_internal_exceptions():
             _add_user_to_event(event)
 
     return event
@@ -123,7 +124,7 @@ def _make_request_event_processor(app, weak_request):
             except Exception:
                 pass
 
-        with _internal_exceptions():
+        with capture_internal_exceptions():
             FlaskRequestExtractor(request).extract_into_event(event)
 
         return event
@@ -139,7 +140,7 @@ def _add_user_to_event(event):
     if user is None:
         return
 
-    with _internal_exceptions():
+    with capture_internal_exceptions():
         # Access this object as late as possible as accessing the user
         # is relatively costly
 

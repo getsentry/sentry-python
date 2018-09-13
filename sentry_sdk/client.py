@@ -3,8 +3,8 @@ import uuid
 import random
 from datetime import datetime
 
-from ._compat import string_types
-from .utils import (
+from sentry_sdk._compat import string_types
+from sentry_sdk.utils import (
     strip_event,
     flatten_metadata,
     convert_types,
@@ -12,8 +12,8 @@ from .utils import (
     get_type_name,
     logger,
 )
-from .transport import make_transport
-from .consts import DEFAULT_OPTIONS, SDK_INFO
+from sentry_sdk.transport import make_transport
+from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO
 
 
 def get_options(*args, **kwargs):

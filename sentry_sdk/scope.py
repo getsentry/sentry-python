@@ -1,4 +1,4 @@
-from .utils import logger
+from sentry_sdk.utils import logger
 
 
 def _attr_setter(fn):

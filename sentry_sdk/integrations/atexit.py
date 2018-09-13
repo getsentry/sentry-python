@@ -6,7 +6,7 @@ import atexit
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import logger
-from . import Integration
+from sentry_sdk.integrations import Integration
 
 
 def default_shutdown_callback(pending, timeout):

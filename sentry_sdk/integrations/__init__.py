@@ -1,8 +1,8 @@
 """This package"""
 from threading import Lock
 
-from ..utils import logger
-from ..consts import INTEGRATIONS as _installed_integrations
+from sentry_sdk.utils import logger
+from sentry_sdk.consts import INTEGRATIONS as _installed_integrations
 
 
 _installer_lock = Lock()
@@ -18,11 +18,11 @@ def get_default_integrations():
     - `DedupeIntegration`
     - `AtexitIntegration`
     """
-    from .logging import LoggingIntegration
-    from .stdlib import StdlibIntegration
-    from .excepthook import ExcepthookIntegration
-    from .dedupe import DedupeIntegration
-    from .atexit import AtexitIntegration
+    from sentry_sdk.integrations.logging import LoggingIntegration
+    from sentry_sdk.integrations.stdlib import StdlibIntegration
+    from sentry_sdk.integrations.excepthook import ExcepthookIntegration
+    from sentry_sdk.integrations.dedupe import DedupeIntegration
+    from sentry_sdk.integrations.atexit import AtexitIntegration
 
     yield LoggingIntegration()
     yield StdlibIntegration()
