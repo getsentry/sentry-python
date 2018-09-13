@@ -63,7 +63,7 @@ class DjangoIntegration(Integration):
 
 
 def _make_event_processor(weak_request):
-    def event_processor(event):
+    def event_processor(event, hint):
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.
