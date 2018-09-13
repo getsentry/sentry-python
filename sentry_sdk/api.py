@@ -3,13 +3,12 @@ from contextlib import contextmanager
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
-from sentry_sdk.utils import EventHint
 from sentry_sdk.transport import Transport, HttpTransport
 from sentry_sdk.client import Client, get_options
 from sentry_sdk.integrations import setup_integrations
 
 
-__all__ = ["Hub", "Scope", "Client", "EventHint", "Transport", "HttpTransport"]
+__all__ = ["Hub", "Scope", "Client", "Transport", "HttpTransport"]
 
 
 def public(f):

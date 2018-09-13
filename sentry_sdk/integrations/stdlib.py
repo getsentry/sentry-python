@@ -40,7 +40,12 @@ class StdlibIntegration(Integration):
             if "status_code" not in data:
                 data["status_code"] = rv.status
                 data["reason"] = rv.reason
-            add_breadcrumb(type="http", category="httplib", data=data)
+            add_breadcrumb(
+                type="http",
+                category="httplib",
+                data=data,
+                hint={"httplib_response": rv},
+            )
             return rv
 
         self.httplib_connection_cls.putrequest = putrequest
