@@ -10,6 +10,7 @@ from sentry_sdk.utils import (
     convert_types,
     handle_in_app,
     get_type_name,
+    capture_internal_exceptions,
     logger,
 )
 from sentry_sdk.transport import make_transport
@@ -87,7 +88,8 @@ class Client(object):
 
         before_send = self.options["before_send"]
         if before_send is not None:
-            new_event = before_send(event)
+            with capture_internal_exceptions():
+                new_event = before_send(event, hint)
             if new_event is None:
                 logger.info("before send dropped event (%s)", event)
             event = new_event

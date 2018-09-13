@@ -61,7 +61,7 @@ def _request_started(sender, **kwargs):
         scope.add_event_processor(_make_request_event_processor(app, weak_request))
 
 
-def event_processor(event):
+def event_processor(event, hint):
     request = getattr(_request_ctx_stack.top, "request", None)
 
     if request:
@@ -109,7 +109,7 @@ def _capture_exception(sender, exception, **kwargs):
 
 
 def _make_request_event_processor(app, weak_request):
-    def inner(event):
+    def inner(event, hint):
         request = weak_request()
 
         # if the request is gone we are fine not logging the data from

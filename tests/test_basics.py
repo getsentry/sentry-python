@@ -50,7 +50,9 @@ def test_option_callback(sentry_init, capture_events):
     drop_events = False
     drop_breadcrumbs = False
 
-    def before_send(event):
+    def before_send(event, hint):
+        assert hint is not None
+        assert isinstance(hint.exception, ValueError)
         if not drop_events:
             event["extra"] = {"foo": "bar"}
             return event

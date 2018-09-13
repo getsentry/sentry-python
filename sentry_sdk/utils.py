@@ -42,6 +42,12 @@ class EventHint(object):
     def __init__(self, exc_info=None):
         self.exc_info = exc_info
 
+    @property
+    def exception(self):
+        """Returns the exception value on the hint if there is one."""
+        if self.exc_info is not None:
+            return self.exc_info[1]
+
     @classmethod
     def with_exc_info(cls, exc_info=None):
         """Creates a hint with the exc info filled in."""

@@ -1,4 +1,4 @@
-from sentry_sdk.utils import logger
+from sentry_sdk.utils import logger, capture_internal_exceptions
 
 
 def _attr_setter(fn):
@@ -140,7 +140,8 @@ class Scope(object):
                 event = new_event
 
         for processor in self._event_processors:
-            new_event = processor(event)
+            with capture_internal_exceptions():
+                new_event = processor(event, hint)
             if new_event is None:
                 return _drop(event, processor, "event processor")
             event = new_event

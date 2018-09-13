@@ -202,7 +202,7 @@ class _ScopePoppingResponse(object):
 
 
 def _make_wsgi_event_processor(environ):
-    def event_processor(event):
+    def event_processor(event, hint):
         with capture_internal_exceptions():
             # if the code below fails halfway through we at least have some data
             request_info = event.setdefault("request", {})
