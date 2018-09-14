@@ -322,21 +322,36 @@ def stacktrace_from_traceback(tb, with_locals=True):
     return {"frames": [frame_from_traceback(tb, with_locals) for tb in iter_stacks(tb)]}
 
 
-def single_exception_from_error_tuple(exc_type, exc_value, tb, with_locals=True):
+def get_errno(exc_value):
+    return getattr(exc_value, "errno", None)
+
+
+def single_exception_from_error_tuple(
+    exc_type, exc_value, tb, with_locals=True, mechanism=None
+):
+    errno = get_errno(exc_value)
+    if errno is not None:
+        mechanism = mechanism or {}
+        mechanism_meta = mechanism.setdefault("meta", {})
+        mechanism_meta.setdefault("errno", {"code": errno})
+
     return {
         "module": get_type_module(exc_type),
         "type": get_type_name(exc_type),
         "value": safe_str(exc_value),
         "stacktrace": stacktrace_from_traceback(tb, with_locals),
+        "mechanism": mechanism,
     }
 
 
-def exceptions_from_error_tuple(exc_info, with_locals=True):
+def exceptions_from_error_tuple(exc_info, with_locals=True, mechanism=None):
     exc_type, exc_value, tb = exc_info
     rv = []
     while exc_type is not None:
         rv.append(
-            single_exception_from_error_tuple(exc_type, exc_value, tb, with_locals)
+            single_exception_from_error_tuple(
+                exc_type, exc_value, tb, with_locals, mechanism
+            )
         )
         cause = getattr(exc_value, "__cause__", None)
         if cause is None:
@@ -414,13 +429,15 @@ def exc_info_from_error(error):
     return exc_type, exc_value, tb
 
 
-def event_from_exception(exc_info, with_locals=False, processors=None):
+def event_from_exception(exc_info, with_locals=False, processors=None, mechanism=None):
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
     return (
         {
             "level": "error",
-            "exception": {"values": exceptions_from_error_tuple(exc_info, with_locals)},
+            "exception": {
+                "values": exceptions_from_error_tuple(exc_info, with_locals, mechanism)
+            },
         },
         hint,
     )

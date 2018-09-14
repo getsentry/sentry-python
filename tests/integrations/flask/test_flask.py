@@ -49,7 +49,7 @@ def test_has_context(sentry_init, app, capture_events):
 
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("testing", (True, False))
-def test_errors(sentry_init, capture_exceptions, app, debug, testing):
+def test_errors(sentry_init, capture_exceptions, capture_events, app, debug, testing):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     app.debug = debug
@@ -60,6 +60,7 @@ def test_errors(sentry_init, capture_exceptions, app, debug, testing):
         1 / 0
 
     exceptions = capture_exceptions()
+    events = capture_events()
 
     client = app.test_client()
     try:
@@ -69,6 +70,9 @@ def test_errors(sentry_init, capture_exceptions, app, debug, testing):
 
     exc, = exceptions
     assert isinstance(exc, ZeroDivisionError)
+
+    event, = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "flask"
 
 
 def test_flask_login_not_installed(sentry_init, app, capture_events, monkeypatch):
@@ -343,7 +347,9 @@ def test_cli_commands_raise(app):
         )
 
 
-def test_wsgi_level_error_is_caught(app, capture_exceptions, sentry_init):
+def test_wsgi_level_error_is_caught(
+    app, capture_exceptions, capture_events, sentry_init
+):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     def wsgi_app(environ, start_response):
@@ -354,6 +360,7 @@ def test_wsgi_level_error_is_caught(app, capture_exceptions, sentry_init):
     client = app.test_client()
 
     exceptions = capture_exceptions()
+    events = capture_events()
 
     with pytest.raises(ZeroDivisionError) as exc:
         client.get("/")
@@ -361,6 +368,9 @@ def test_wsgi_level_error_is_caught(app, capture_exceptions, sentry_init):
     error, = exceptions
 
     assert error is exc.value
+
+    event, = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "wsgi"
 
 
 def test_500(sentry_init, capture_events, app):

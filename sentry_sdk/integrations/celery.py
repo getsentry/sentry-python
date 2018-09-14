@@ -4,7 +4,7 @@ from celery.signals import task_failure, task_prerun, task_postrun
 from celery.exceptions import SoftTimeLimitExceeded
 
 from sentry_sdk import Hub
-from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 
 
@@ -33,9 +33,18 @@ class CeleryIntegration(Integration):
                         getattr(sender, "name", sender),
                     ]
 
-                hub.capture_exception(einfo.exc_info)
+                self._capture_event(hub, einfo.exc_info)
         else:
-            hub.capture_exception(einfo.exc_info)
+            self._capture_event(hub, einfo.exc_info)
+
+    def _capture_event(self, hub, exc_info):
+        event, hint = event_from_exception(
+            exc_info,
+            with_locals=hub.client.options["with_locals"],
+            mechanism={"type": "celery", "handled": False},
+        )
+
+        hub.capture_event(event, hint=hint)
 
     def _handle_task_prerun(self, sender, task, **kw):
         with capture_internal_exceptions():

@@ -23,12 +23,16 @@ def client(monkeypatch_test_transport):
     return Client(application)
 
 
-def test_view_exceptions(client, capture_exceptions):
+def test_view_exceptions(client, capture_exceptions, capture_events):
     exceptions = capture_exceptions()
+    events = capture_events()
     client.get(reverse("view_exc"))
 
     error, = exceptions
     assert isinstance(error, ZeroDivisionError)
+
+    event, = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "django"
 
 
 def test_middleware_exceptions(client, capture_exceptions):
