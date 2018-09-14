@@ -5,6 +5,7 @@ from sentry_sdk.integrations import Integration
 
 _installed_modules = None
 
+
 def _generate_installed_modules():
     try:
         import pkg_resources
@@ -27,6 +28,7 @@ class ModulesIntegration(Integration):
 
     def install(self):
         with configure_scope() as scope:
+
             @scope.add_event_processor
             def processor(event, hint):
                 if "modules" not in event:
