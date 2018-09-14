@@ -23,12 +23,14 @@ def get_default_integrations():
     from sentry_sdk.integrations.excepthook import ExcepthookIntegration
     from sentry_sdk.integrations.dedupe import DedupeIntegration
     from sentry_sdk.integrations.atexit import AtexitIntegration
+    from sentry_sdk.integrations.modules import ModulesIntegration
 
     yield LoggingIntegration()
     yield StdlibIntegration()
     yield ExcepthookIntegration()
     yield DedupeIntegration()
     yield AtexitIntegration()
+    yield ModulesIntegration()
 
 
 def setup_integrations(integrations, with_defaults=True):
