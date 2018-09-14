@@ -3,5 +3,6 @@ github:
   owner: getsentry
   repo: sentry-python
 targets: 
-  - name: github
   - name: pypi
+  - name: github
+  - name: gh-pages

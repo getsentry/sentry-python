@@ -28,14 +28,20 @@ matrix:
     - python: "3.8-dev"
       dist: xenial
       sudo: true
-    - python: "3.6"
+
+    - name: Linting
+      python: "3.6"
+      install:
+        - pip install tox
       script: tox -e linters
     - python: "3.6"
-      env: DIST=1
-      script: make dist
-      after_success:
-        - npm install -g @zeus-ci/cli
-        - zeus upload -t "application/zip+wheel" dist/*
+      name: Distribution packages
+      install: false
+      script: make travis-upload-dist
+    - python: "3.6"
+      name: Build documentation
+      install: false
+      script: make travis-upload-docs
 
 install:
   - curl https://sh.rustup.rs -sSf | sh -s -- -y
