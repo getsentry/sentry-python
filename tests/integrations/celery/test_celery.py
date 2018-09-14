@@ -16,7 +16,6 @@ def celery(sentry_init):
 
 
 def test_simple(capture_events, celery):
-
     events = capture_events()
 
     @celery.task(name="dummy_task")
@@ -30,6 +29,9 @@ def test_simple(capture_events, celery):
 
     exception, = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
+
+    event, = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "celery"
 
 
 def test_ignore_expected(capture_events, celery):

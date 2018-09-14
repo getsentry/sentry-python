@@ -1,9 +1,12 @@
 import json
 import sys
 
-from sentry_sdk import capture_exception
 from sentry_sdk.hub import Hub, _should_send_default_pii, _get_client_options
-from sentry_sdk.utils import AnnotatedValue, capture_internal_exceptions
+from sentry_sdk.utils import (
+    AnnotatedValue,
+    capture_internal_exceptions,
+    event_from_exception,
+)
 from sentry_sdk._compat import reraise, implements_iterator
 
 
@@ -155,12 +158,22 @@ def run_wsgi_app(app, environ, start_response):
     try:
         rv = app(environ, start_response)
     except Exception:
-        einfo = sys.exc_info()
-        capture_exception(einfo)
+        einfo = _capture_exception(hub)
         hub.pop_scope_unsafe()
         reraise(*einfo)
 
     return _ScopePoppingResponse(hub, rv)
+
+
+def _capture_exception(hub):
+    exc_info = sys.exc_info()
+    event, hint = event_from_exception(
+        exc_info,
+        with_locals=hub.client.options["with_locals"],
+        mechanism={"type": "wsgi", "handled": False},
+    )
+    hub.capture_event(event, hint=hint)
+    return exc_info
 
 
 @implements_iterator
@@ -175,9 +188,7 @@ class _ScopePoppingResponse(object):
         try:
             self._response = iter(self._response)
         except Exception:
-            einfo = sys.exc_info()
-            capture_exception(einfo)
-            reraise(*einfo)
+            reraise(*_capture_exception(self.hub))
         return self
 
     def __next__(self):
@@ -186,9 +197,7 @@ class _ScopePoppingResponse(object):
         except StopIteration:
             raise
         except Exception:
-            einfo = sys.exc_info()
-            capture_exception(einfo)
-            reraise(*einfo)
+            reraise(*_capture_exception(self.hub))
 
     def close(self):
         self._hub.pop_scope_unsafe()
@@ -196,9 +205,7 @@ class _ScopePoppingResponse(object):
             try:
                 self._response.close()
             except Exception:
-                einfo = sys.exc_info()
-                capture_exception(einfo)
-                reraise(*einfo)
+                reraise(*_capture_exception(self.hub))
 
 
 def _make_wsgi_event_processor(environ):

@@ -2,9 +2,9 @@ from __future__ import absolute_import
 
 import weakref
 
-from sentry_sdk import Hub, capture_exception, configure_scope
+from sentry_sdk import Hub, configure_scope
 from sentry_sdk.hub import _should_send_default_pii
-from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi import RequestExtractor, run_wsgi_app
 
@@ -105,7 +105,14 @@ class FlaskRequestExtractor(RequestExtractor):
 
 
 def _capture_exception(sender, exception, **kwargs):
-    capture_exception(exception)
+    hub = Hub.current
+    event, hint = event_from_exception(
+        exception,
+        with_locals=hub.client.options["with_locals"],
+        mechanism={"type": "flask", "handled": False},
+    )
+
+    hub.capture_event(event, hint=hint)
 
 
 def _make_request_event_processor(app, weak_request):

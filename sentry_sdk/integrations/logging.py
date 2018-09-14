@@ -4,7 +4,6 @@ from __future__ import print_function
 import logging
 import datetime
 
-from sentry_sdk import capture_event, add_breadcrumb
 from sentry_sdk.utils import (
     to_string,
     event_from_exception,
@@ -72,17 +71,19 @@ class SentryHandler(logging.Handler, object):
         if not self.can_record(record):
             return
 
-        if self._should_create_event(record):
-            hub = Hub.current
-            if hub.client is None:
-                return
+        hub = Hub.current
+        if hub.client is None:
+            return
 
+        if self._should_create_event(record):
             with capture_internal_exceptions():
                 hint = None
                 # exc_info might be None or (None, None, None)
                 if record.exc_info is not None and record.exc_info[0] is not None:
                     event, hint = event_from_exception(
-                        record.exc_info, with_locals=hub.client.options["with_locals"]
+                        record.exc_info,
+                        with_locals=hub.client.options["with_locals"],
+                        mechanism={"type": "logging", "handled": True},
                     )
                 else:
                     event = {}
@@ -94,10 +95,10 @@ class SentryHandler(logging.Handler, object):
                     "params": record.args,
                 }
 
-                capture_event(event, hint=hint)
+                hub.capture_event(event, hint=hint)
 
         with capture_internal_exceptions():
-            add_breadcrumb(
+            hub.add_breadcrumb(
                 self._breadcrumb_from_record(record), hint={"log_record": record}
             )
 

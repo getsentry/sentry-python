@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import sys
 import weakref
 
 from django import VERSION as DJANGO_VERSION
@@ -10,9 +11,9 @@ try:
 except ImportError:
     from django.core.urlresolvers import resolve
 
-from sentry_sdk import capture_exception, configure_scope
+from sentry_sdk import Hub, configure_scope
 from sentry_sdk.hub import _should_send_default_pii
-from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi import RequestExtractor, run_wsgi_app
 
@@ -90,7 +91,14 @@ def _make_event_processor(weak_request):
 
 
 def _got_request_exception(request=None, **kwargs):
-    capture_exception()
+    hub = Hub.current
+    event, hint = event_from_exception(
+        sys.exc_info(),
+        with_locals=hub.client.options["with_locals"],
+        mechanism={"type": "django", "handled": False},
+    )
+
+    hub.capture_event(event, hint=hint)
 
 
 class DjangoRequestExtractor(RequestExtractor):
