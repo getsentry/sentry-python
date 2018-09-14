@@ -36,6 +36,6 @@ INTEGRATIONS = []
 SDK_INFO = {
     "name": "sentry.python",
     "version": VERSION,
-    "packages": [{"package_name": "pypi:sentry-sdk", "version": VERSION}],
+    "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
     "integrations": INTEGRATIONS,
 }
