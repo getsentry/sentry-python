@@ -8,8 +8,8 @@
 
 [![Build Status](https://travis-ci.com/getsentry/sentry-python.svg?branch=master)](https://travis-ci.com/getsentry/sentry-python)
 
-***Sentry-Python is an experimental SDK for Sentry.*** For a stable one, use
-[raven](https://github.com/getsentry/raven-python).
+***Sentry-Python is still under development and not yet documented*** For a
+stable SDK, use [raven](https://github.com/getsentry/raven-python).
 
 ## Getting started with the new Sentry SDK for Python
 
