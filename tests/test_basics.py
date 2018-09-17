@@ -1,4 +1,5 @@
 from sentry_sdk import (
+    push_scope,
     configure_scope,
     capture_exception,
     add_breadcrumb,
@@ -105,3 +106,36 @@ def test_breadcrumb_arguments(sentry_init, capture_events):
     assert_hint.clear()
     add_breadcrumb(foo=42)
     add_breadcrumb(crumb=dict(foo=42))
+
+
+def test_push_scope(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    with push_scope() as scope:
+        scope.level = "warning"
+        try:
+            1 / 0
+        except Exception as e:
+            capture_exception(e)
+
+    event, = events
+
+    assert event["level"] == "warning"
+    assert "exception" in event
+
+
+def test_push_scope_null_client(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    Hub.current.bind_client(None)
+
+    with push_scope() as scope:
+        scope.level = "warning"
+        try:
+            1 / 0
+        except Exception as e:
+            capture_exception(e)
+
+    assert len(events) == 0

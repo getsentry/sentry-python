@@ -60,7 +60,10 @@ class _ScopeManager(object):
         self._layer = layer
 
     def __enter__(self):
-        return self
+        scope = self._layer[1]
+        if scope is None:
+            scope = Scope()
+        return scope
 
     def __exit__(self, exc_type, exc_value, tb):
         assert self._hub.pop_scope_unsafe() == self._layer, "popped wrong scope"
@@ -205,13 +208,20 @@ class Hub(with_metaclass(HubMeta)):
         while len(scope._breadcrumbs) >= client.options["max_breadcrumbs"]:
             scope._breadcrumbs.popleft()
 
-    def push_scope(self):
+    def push_scope(self, callback=None):
         """Pushes a new layer on the scope stack. Returns a context manager
-        that should be used to pop the scope again."""
+        that should be used to pop the scope again.  Alternatively a callback
+        can be provided that is executed in the context of the scope.
+        """
         client, scope = self._stack[-1]
         new_layer = (client, copy.copy(scope))
         self._stack.append(new_layer)
-        return _ScopeManager(self, new_layer)
+
+        if callback is not None:
+            if client is not None:
+                callback(scope)
+        else:
+            return _ScopeManager(self, new_layer)
 
     def pop_scope_unsafe(self):
         """Pops a scope layer from the stack. Try to use the context manager
@@ -224,18 +234,28 @@ class Hub(with_metaclass(HubMeta)):
         """Reconfigures the scope."""
         client, scope = self._stack[-1]
         if callback is not None:
-            if client is not None and scope is not None:
+            if client is not None:
                 callback(scope)
             return
 
         @contextmanager
         def inner():
-            if client is not None and scope is not None:
+            if client is not None:
                 yield scope
             else:
                 yield Scope()
 
         return inner()
+
+    def scope(self, callback=None):
+        """Pushes a new scope and yields it for configuration.
+
+        The scope is dropped at the end of the with statement.  Alternatively
+        a callback can be provided similar to `configure_scope`.
+        """
+        with self.push_scope():
+            client, scope = self._stack[-1]
+            return self.configure_scope(callback)
 
 
 GLOBAL_HUB = Hub()
