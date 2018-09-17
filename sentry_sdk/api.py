@@ -106,6 +106,20 @@ def configure_scope(callback=None):
 
 
 @hubmethod
+def push_scope(callback=None):
+    hub = Hub.current
+    if hub is not None:
+        return hub.push_scope(callback)
+    elif callback is None:
+
+        @contextmanager
+        def inner():
+            yield Scope()
+
+        return inner()
+
+
+@hubmethod
 def last_event_id():
     hub = Hub.current
     if hub is not None:

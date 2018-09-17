@@ -11,6 +11,7 @@ class Scope(object):
     """
 
     __slots__ = (
+        "_level",
         "_fingerprint",
         "_transaction",
         "_user",
@@ -27,6 +28,11 @@ class Scope(object):
         self._error_processors = []
 
         self.clear()
+
+    @_attr_setter
+    def level(self, value):
+        """When set this overrides the level."""
+        self._level = value
 
     @_attr_setter
     def fingerprint(self, value):
@@ -69,6 +75,7 @@ class Scope(object):
 
     def clear(self):
         """Clears the entire scope."""
+        self._level = None
         self._fingerprint = None
         self._transaction = None
         self._user = None
@@ -112,6 +119,9 @@ class Scope(object):
         def _drop(event, cause, ty):
             logger.info("%s (%s) dropped event (%s)", ty, cause, event)
 
+        if self._level is not None:
+            event["level"] = self._level
+
         event.setdefault("breadcrumbs", []).extend(self._breadcrumbs)
         if event.get("user") is None and self._user is not None:
             event["user"] = self._user
@@ -151,6 +161,7 @@ class Scope(object):
     def __copy__(self):
         rv = object.__new__(self.__class__)
 
+        rv._level = self._level
         rv._fingerprint = self._fingerprint
         rv._transaction = self._transaction
         rv._user = self._user
