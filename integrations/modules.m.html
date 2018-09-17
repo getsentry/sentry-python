@@ -3,7 +3,7 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 
-    <title>sentry_sdk.integrations.excepthook API documentation</title>
+    <title>sentry_sdk.integrations.modules API documentation</title>
     <meta name="description" content="" />
 
   <link href='http://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300' rel='stylesheet' type='text/css'>
@@ -1045,11 +1045,11 @@ table {
     <li class="set"><h3><a href="#header-classes">Classes</a></h3>
       <ul>
         <li class="mono">
-        <span class="class_name"><a href="#sentry_sdk.integrations.excepthook.ExcepthookIntegration">ExcepthookIntegration</a></span>
+        <span class="class_name"><a href="#sentry_sdk.integrations.modules.ModulesIntegration">ModulesIntegration</a></span>
         
           
   <ul>
-    <li class="mono"><a href="#sentry_sdk.integrations.excepthook.ExcepthookIntegration.install">install</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.modules.ModulesIntegration.install">install</a></li>
   </ul>
 
         </li>
@@ -1067,44 +1067,47 @@ table {
 
 
   <header id="section-intro">
-  <h1 class="title"><span class="name">sentry_sdk.integrations.excepthook</span> module</h1>
+  <h1 class="title"><span class="name">sentry_sdk.integrations.modules</span> module</h1>
   
   
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.excepthook', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.excepthook" class="source">
-    <div class="codehilite"><pre><span></span><span class="kn">import</span> <span class="nn">sys</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.modules', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.modules" class="source">
+    <div class="codehilite"><pre><span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">absolute_import</span>
 
-<span class="kn">from</span> <span class="nn">sentry_sdk</span> <span class="kn">import</span> <span class="n">Hub</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">capture_internal_exceptions</span><span class="p">,</span> <span class="n">event_from_exception</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.api</span> <span class="kn">import</span> <span class="n">configure_scope</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
 
+<span class="n">_installed_modules</span> <span class="o">=</span> <span class="bp">None</span>
 
-<span class="k">class</span> <span class="nc">ExcepthookIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
-    <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;excepthook&quot;</span>
+
+<span class="k">def</span> <span class="nf">_generate_installed_modules</span><span class="p">():</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span> <span class="nn">pkg_resources</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="k">for</span> <span class="n">info</span> <span class="ow">in</span> <span class="n">pkg_resources</span><span class="o">.</span><span class="n">working_set</span><span class="p">:</span>
+        <span class="k">yield</span> <span class="n">info</span><span class="o">.</span><span class="n">key</span><span class="p">,</span> <span class="n">info</span><span class="o">.</span><span class="n">version</span>
+
+
+<span class="k">def</span> <span class="nf">_get_installed_modules</span><span class="p">():</span>
+    <span class="k">global</span> <span class="n">_installed_modules</span>
+    <span class="k">if</span> <span class="n">_installed_modules</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">_installed_modules</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_generate_installed_modules</span><span class="p">())</span>
+    <span class="k">return</span> <span class="n">_installed_modules</span>
+
+
+<span class="k">class</span> <span class="nc">ModulesIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
+    <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;modules&quot;</span>
 
     <span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">sys</span><span class="p">,</span> <span class="s2">&quot;ps1&quot;</span><span class="p">):</span>
-            <span class="c1"># Disable the excepthook for interactive Python shells, otherwise</span>
-            <span class="c1"># every typo gets sent to Sentry.</span>
-            <span class="k">return</span>
+        <span class="k">with</span> <span class="n">configure_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
 
-        <span class="n">sys</span><span class="o">.</span><span class="n">excepthook</span> <span class="o">=</span> <span class="n">_make_excepthook</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">excepthook</span><span class="p">)</span>
-
-
-<span class="k">def</span> <span class="nf">_make_excepthook</span><span class="p">(</span><span class="n">old_excepthook</span><span class="p">):</span>
-    <span class="k">def</span> <span class="nf">sentry_sdk_excepthook</span><span class="p">(</span><span class="n">exctype</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">):</span>
-        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-            <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-            <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
-                <span class="p">(</span><span class="n">exctype</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">),</span>
-                <span class="n">with_locals</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;with_locals&quot;</span><span class="p">],</span>
-                <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;excepthook&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">},</span>
-            <span class="p">)</span>
-            <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">old_excepthook</span><span class="p">(</span><span class="n">exctype</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">)</span>
-
-    <span class="k">return</span> <span class="n">sentry_sdk_excepthook</span>
+            <span class="nd">@scope.add_event_processor</span>
+            <span class="k">def</span> <span class="nf">processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
+                <span class="k">if</span> <span class="s2">&quot;modules&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
+                    <span class="n">event</span><span class="p">[</span><span class="s2">&quot;modules&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_get_installed_modules</span><span class="p">())</span>
+                <span class="k">return</span> <span class="n">event</span>
 </pre></div>
 
   </div>
@@ -1117,23 +1120,24 @@ table {
     <h2 class="section-title" id="header-classes">Classes</h2>
       
       <div class="item">
-      <p id="sentry_sdk.integrations.excepthook.ExcepthookIntegration" class="name">class <span class="ident">ExcepthookIntegration</span></p>
+      <p id="sentry_sdk.integrations.modules.ModulesIntegration" class="name">class <span class="ident">ModulesIntegration</span></p>
       
   
     <div class="desc"><p>Baseclass for all integrations.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.excepthook.ExcepthookIntegration', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.excepthook.ExcepthookIntegration" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">ExcepthookIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
-    <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;excepthook&quot;</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.modules.ModulesIntegration', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.modules.ModulesIntegration" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">ModulesIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
+    <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;modules&quot;</span>
 
     <span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">sys</span><span class="p">,</span> <span class="s2">&quot;ps1&quot;</span><span class="p">):</span>
-            <span class="c1"># Disable the excepthook for interactive Python shells, otherwise</span>
-            <span class="c1"># every typo gets sent to Sentry.</span>
-            <span class="k">return</span>
+        <span class="k">with</span> <span class="n">configure_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
 
-        <span class="n">sys</span><span class="o">.</span><span class="n">excepthook</span> <span class="o">=</span> <span class="n">_make_excepthook</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">excepthook</span><span class="p">)</span>
+            <span class="nd">@scope.add_event_processor</span>
+            <span class="k">def</span> <span class="nf">processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
+                <span class="k">if</span> <span class="s2">&quot;modules&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
+                    <span class="n">event</span><span class="p">[</span><span class="s2">&quot;modules&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_get_installed_modules</span><span class="p">())</span>
+                <span class="k">return</span> <span class="n">event</span>
 </pre></div>
 
   </div>
@@ -1143,13 +1147,13 @@ table {
       <div class="class">
           <h3>Ancestors (in MRO)</h3>
           <ul class="class_list">
-          <li><a href="#sentry_sdk.integrations.excepthook.ExcepthookIntegration">ExcepthookIntegration</a></li>
+          <li><a href="#sentry_sdk.integrations.modules.ModulesIntegration">ModulesIntegration</a></li>
           <li>sentry_sdk.integrations.Integration</li>
           <li>builtins.object</li>
           </ul>
           <h3>Class variables</h3>
             <div class="item">
-            <p id="sentry_sdk.integrations.excepthook.ExcepthookIntegration.identifier" class="name">var <span class="ident">identifier</span></p>
+            <p id="sentry_sdk.integrations.modules.ModulesIntegration.identifier" class="name">var <span class="ident">identifier</span></p>
             
 
             
@@ -1161,7 +1165,7 @@ table {
           <h3>Static methods</h3>
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.excepthook.ExcepthookIntegration.install">
+    <div class="name def" id="sentry_sdk.integrations.modules.ModulesIntegration.install">
     <p>def <span class="ident">install</span>(</p><p>self)</p>
     </div>
     
@@ -1172,14 +1176,15 @@ table {
 <code>setup_integrations</code> function runs it will invoke this unless the
 integration was already activated elsewhere.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.excepthook.ExcepthookIntegration.install', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.excepthook.ExcepthookIntegration.install" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.modules.ModulesIntegration.install', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.modules.ModulesIntegration.install" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">sys</span><span class="p">,</span> <span class="s2">&quot;ps1&quot;</span><span class="p">):</span>
-        <span class="c1"># Disable the excepthook for interactive Python shells, otherwise</span>
-        <span class="c1"># every typo gets sent to Sentry.</span>
-        <span class="k">return</span>
-    <span class="n">sys</span><span class="o">.</span><span class="n">excepthook</span> <span class="o">=</span> <span class="n">_make_excepthook</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">excepthook</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">configure_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
+        <span class="nd">@scope.add_event_processor</span>
+        <span class="k">def</span> <span class="nf">processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
+            <span class="k">if</span> <span class="s2">&quot;modules&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
+                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;modules&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_get_installed_modules</span><span class="p">())</span>
+            <span class="k">return</span> <span class="n">event</span>
 </pre></div>
 
   </div>

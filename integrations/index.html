@@ -1070,6 +1070,7 @@ table {
         <li class="mono"><a href="dedupe.m.html">sentry_sdk.integrations.dedupe</a></li>
         <li class="mono"><a href="excepthook.m.html">sentry_sdk.integrations.excepthook</a></li>
         <li class="mono"><a href="logging.m.html">sentry_sdk.integrations.logging</a></li>
+        <li class="mono"><a href="modules.m.html">sentry_sdk.integrations.modules</a></li>
         <li class="mono"><a href="stdlib.m.html">sentry_sdk.integrations.stdlib</a></li>
       </ul>
     </li>
@@ -1114,12 +1115,14 @@ table {
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.excepthook</span> <span class="kn">import</span> <span class="n">ExcepthookIntegration</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.dedupe</span> <span class="kn">import</span> <span class="n">DedupeIntegration</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.atexit</span> <span class="kn">import</span> <span class="n">AtexitIntegration</span>
+    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.modules</span> <span class="kn">import</span> <span class="n">ModulesIntegration</span>
 
     <span class="k">yield</span> <span class="n">LoggingIntegration</span><span class="p">()</span>
     <span class="k">yield</span> <span class="n">StdlibIntegration</span><span class="p">()</span>
     <span class="k">yield</span> <span class="n">ExcepthookIntegration</span><span class="p">()</span>
     <span class="k">yield</span> <span class="n">DedupeIntegration</span><span class="p">()</span>
     <span class="k">yield</span> <span class="n">AtexitIntegration</span><span class="p">()</span>
+    <span class="k">yield</span> <span class="n">ModulesIntegration</span><span class="p">()</span>
 
 
 <span class="k">def</span> <span class="nf">setup_integrations</span><span class="p">(</span><span class="n">integrations</span><span class="p">,</span> <span class="n">with_defaults</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
@@ -1209,12 +1212,14 @@ table {
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.excepthook</span> <span class="kn">import</span> <span class="n">ExcepthookIntegration</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.dedupe</span> <span class="kn">import</span> <span class="n">DedupeIntegration</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.atexit</span> <span class="kn">import</span> <span class="n">AtexitIntegration</span>
+    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.modules</span> <span class="kn">import</span> <span class="n">ModulesIntegration</span>
 
     <span class="k">yield</span> <span class="n">LoggingIntegration</span><span class="p">()</span>
     <span class="k">yield</span> <span class="n">StdlibIntegration</span><span class="p">()</span>
     <span class="k">yield</span> <span class="n">ExcepthookIntegration</span><span class="p">()</span>
     <span class="k">yield</span> <span class="n">DedupeIntegration</span><span class="p">()</span>
     <span class="k">yield</span> <span class="n">AtexitIntegration</span><span class="p">()</span>
+    <span class="k">yield</span> <span class="n">ModulesIntegration</span><span class="p">()</span>
 </pre></div>
 
   </div>
@@ -1374,6 +1379,12 @@ integration was already activated elsewhere.</p></div>
       </div>
       <div class="item">
       <p class="name"><a href="logging.m.html">sentry_sdk.integrations.logging</a></p>
+      
+  
+
+      </div>
+      <div class="item">
+      <p class="name"><a href="modules.m.html">sentry_sdk.integrations.modules</a></p>
       
   
 

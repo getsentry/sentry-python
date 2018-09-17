@@ -1112,7 +1112,6 @@ table {
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">datetime</span>
 
-<span class="kn">from</span> <span class="nn">sentry_sdk</span> <span class="kn">import</span> <span class="n">capture_event</span><span class="p">,</span> <span class="n">add_breadcrumb</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">to_string</span><span class="p">,</span>
     <span class="n">event_from_exception</span><span class="p">,</span>
@@ -1180,17 +1179,19 @@ table {
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
             <span class="k">return</span>
 
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_create_event</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
-            <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-            <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="k">return</span>
+        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+        <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span>
 
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_create_event</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
                 <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
                 <span class="c1"># exc_info might be None or (None, None, None)</span>
                 <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                     <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
-                        <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">,</span> <span class="n">with_locals</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;with_locals&quot;</span><span class="p">]</span>
+                        <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">,</span>
+                        <span class="n">with_locals</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;with_locals&quot;</span><span class="p">],</span>
+                        <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;logging&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">},</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
@@ -1202,10 +1203,10 @@ table {
                     <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">,</span>
                 <span class="p">}</span>
 
-                <span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
+                <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
 
         <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-            <span class="n">add_breadcrumb</span><span class="p">(</span>
+            <span class="n">hub</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;log_record&quot;</span><span class="p">:</span> <span class="n">record</span><span class="p">}</span>
             <span class="p">)</span>
 
@@ -1398,17 +1399,19 @@ the 'raw' message as determined by record.message is logged.</p></div>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
             <span class="k">return</span>
 
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_create_event</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
-            <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-            <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="k">return</span>
+        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+        <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span>
 
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_create_event</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
                 <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
                 <span class="c1"># exc_info might be None or (None, None, None)</span>
                 <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                     <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
-                        <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">,</span> <span class="n">with_locals</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;with_locals&quot;</span><span class="p">]</span>
+                        <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">,</span>
+                        <span class="n">with_locals</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;with_locals&quot;</span><span class="p">],</span>
+                        <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;logging&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">},</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
@@ -1420,10 +1423,10 @@ the 'raw' message as determined by record.message is logged.</p></div>
                     <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">,</span>
                 <span class="p">}</span>
 
-                <span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
+                <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
 
         <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-            <span class="n">add_breadcrumb</span><span class="p">(</span>
+            <span class="n">hub</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;log_record&quot;</span><span class="p">:</span> <span class="n">record</span><span class="p">}</span>
             <span class="p">)</span>
 

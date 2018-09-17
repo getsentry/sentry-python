@@ -1052,6 +1052,7 @@ table {
     <li class="mono"><a href="#sentry_sdk.configure_scope">configure_scope</a></li>
     <li class="mono"><a href="#sentry_sdk.init">init</a></li>
     <li class="mono"><a href="#sentry_sdk.last_event_id">last_event_id</a></li>
+    <li class="mono"><a href="#sentry_sdk.push_scope">push_scope</a></li>
   </ul>
 
     </li>
@@ -1097,6 +1098,7 @@ table {
     <li class="mono"><a href="#sentry_sdk.Hub.pop_scope_unsafe">pop_scope_unsafe</a></li>
     <li class="mono"><a href="#sentry_sdk.Hub.push_scope">push_scope</a></li>
     <li class="mono"><a href="#sentry_sdk.Hub.run">run</a></li>
+    <li class="mono"><a href="#sentry_sdk.Hub.scope">scope</a></li>
   </ul>
 
         </li>
@@ -1413,6 +1415,41 @@ is provided the default level is <code>info</code>.</p></div>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
     <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">hub</span><span class="o">.</span><span class="n">last_event_id</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+      
+  <div class="item">
+    <div class="name def" id="sentry_sdk.push_scope">
+    <p>def <span class="ident">push_scope</span>(</p><p>callback=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Alias for <code>Hub.push_scope</code></p>
+<p>Pushes a new layer on the scope stack. Returns a context manager
+that should be used to pop the scope again.  Alternatively a callback
+can be provided that is executed in the context of the scope.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.push_scope', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.push_scope" class="source">
+    <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>
+<span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+    <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">hub</span><span class="o">.</span><span class="n">push_scope</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">callback</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+
+        <span class="nd">@contextmanager</span>
+        <span class="k">def</span> <span class="nf">inner</span><span class="p">():</span>
+            <span class="k">yield</span> <span class="n">Scope</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">inner</span><span class="p">()</span>
 </pre></div>
 
   </div>
@@ -2084,13 +2121,20 @@ context vars are available.</p>
         <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;max_breadcrumbs&quot;</span><span class="p">]:</span>
             <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
 
-    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Pushes a new layer on the scope stack. Returns a context manager</span>
-<span class="sd">        that should be used to pop the scope again.&quot;&quot;&quot;</span>
+<span class="sd">        that should be used to pop the scope again.  Alternatively a callback</span>
+<span class="sd">        can be provided that is executed in the context of the scope.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="n">new_layer</span> <span class="o">=</span> <span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">scope</span><span class="p">))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_layer</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_layer</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_layer</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">pop_scope_unsafe</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Pops a scope layer from the stack. Try to use the context manager</span>
@@ -2103,18 +2147,28 @@ context vars are available.</p>
         <span class="sd">&quot;&quot;&quot;Reconfigures the scope.&quot;&quot;&quot;</span>
         <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">scope</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
             <span class="k">return</span>
 
         <span class="nd">@contextmanager</span>
         <span class="k">def</span> <span class="nf">inner</span><span class="p">():</span>
-            <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">scope</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="k">yield</span> <span class="n">scope</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">yield</span> <span class="n">Scope</span><span class="p">()</span>
 
         <span class="k">return</span> <span class="n">inner</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Pushes a new scope and yields it for configuration.</span>
+
+<span class="sd">        The scope is dropped at the end of the with statement.  Alternatively</span>
+<span class="sd">        a callback can be provided similar to `configure_scope`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">push_scope</span><span class="p">():</span>
+            <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">configure_scope</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2363,12 +2417,12 @@ is provided the default level is <code>info</code>.</p></div>
     <span class="sd">&quot;&quot;&quot;Reconfigures the scope.&quot;&quot;&quot;</span>
     <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">scope</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
         <span class="k">return</span>
     <span class="nd">@contextmanager</span>
     <span class="k">def</span> <span class="nf">inner</span><span class="p">():</span>
-        <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">scope</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">yield</span> <span class="n">scope</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">yield</span> <span class="n">Scope</span><span class="p">()</span>
@@ -2433,24 +2487,31 @@ is provided the default level is <code>info</code>.</p></div>
             
   <div class="item">
     <div class="name def" id="sentry_sdk.Hub.push_scope">
-    <p>def <span class="ident">push_scope</span>(</p><p>self)</p>
+    <p>def <span class="ident">push_scope</span>(</p><p>self, callback=None)</p>
     </div>
     
 
     
   
     <div class="desc"><p>Pushes a new layer on the scope stack. Returns a context manager
-that should be used to pop the scope again.</p></div>
+that should be used to pop the scope again.  Alternatively a callback
+can be provided that is executed in the context of the scope.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.push_scope', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.push_scope" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Pushes a new layer on the scope stack. Returns a context manager</span>
-<span class="sd">    that should be used to pop the scope again.&quot;&quot;&quot;</span>
+<span class="sd">    that should be used to pop the scope again.  Alternatively a callback</span>
+<span class="sd">    can be provided that is executed in the context of the scope.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="n">new_layer</span> <span class="o">=</span> <span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">scope</span><span class="p">))</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_layer</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_layer</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_layer</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2478,6 +2539,36 @@ with statement can be used on the hub directly.</p></div>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">with</span> <span class="bp">self</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">callback</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.Hub.scope">
+    <p>def <span class="ident">scope</span>(</p><p>self, callback=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Pushes a new scope and yields it for configuration.</p>
+<p>The scope is dropped at the end of the with statement.  Alternatively
+a callback can be provided similar to <code>configure_scope</code>.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.scope', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.Hub.scope" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Pushes a new scope and yields it for configuration.</span>
+<span class="sd">    The scope is dropped at the end of the with statement.  Alternatively</span>
+<span class="sd">    a callback can be provided similar to `configure_scope`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">push_scope</span><span class="p">():</span>
+        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">configure_scope</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2515,6 +2606,7 @@ events that belong to it.</p></div>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">&quot;_level&quot;</span><span class="p">,</span>
         <span class="s2">&quot;_fingerprint&quot;</span><span class="p">,</span>
         <span class="s2">&quot;_transaction&quot;</span><span class="p">,</span>
         <span class="s2">&quot;_user&quot;</span><span class="p">,</span>
@@ -2531,6 +2623,11 @@ events that belong to it.</p></div>
         <span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span> <span class="o">=</span> <span class="p">[]</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+
+    <span class="nd">@_attr_setter</span>
+    <span class="k">def</span> <span class="nf">level</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;When set this overrides the level.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">value</span>
 
     <span class="nd">@_attr_setter</span>
     <span class="k">def</span> <span class="nf">fingerprint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
@@ -2573,6 +2670,7 @@ events that belong to it.</p></div>
 
     <span class="k">def</span> <span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Clears the entire scope.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="bp">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="bp">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="bp">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="bp">None</span>
@@ -2616,6 +2714,9 @@ events that belong to it.</p></div>
         <span class="k">def</span> <span class="nf">_drop</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">cause</span><span class="p">,</span> <span class="n">ty</span><span class="p">):</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">) dropped event (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">cause</span><span class="p">,</span> <span class="n">event</span><span class="p">)</span>
 
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span>
+
         <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;breadcrumbs&quot;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;user&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">event</span><span class="p">[</span><span class="s2">&quot;user&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span>
@@ -2655,6 +2756,7 @@ events that belong to it.</p></div>
     <span class="k">def</span> <span class="nf">__copy__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">rv</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">)</span>
 
+        <span class="n">rv</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span>
         <span class="n">rv</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span>
         <span class="n">rv</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span>
         <span class="n">rv</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span>
@@ -2786,6 +2888,8 @@ invoked with the original exception info triple as second argument.</p></div>
     <span class="sd">&quot;&quot;&quot;Applies the information contained on the scope to the given event.&quot;&quot;&quot;</span>
     <span class="k">def</span> <span class="nf">_drop</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">cause</span><span class="p">,</span> <span class="n">ty</span><span class="p">):</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">) dropped event (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">cause</span><span class="p">,</span> <span class="n">event</span><span class="p">)</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span>
     <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;breadcrumbs&quot;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;user&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;user&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span>
@@ -2835,6 +2939,7 @@ invoked with the original exception info triple as second argument.</p></div>
   <div id="source-sentry_sdk.Scope.clear" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Clears the entire scope.&quot;&quot;&quot;</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="bp">None</span>
@@ -2995,6 +3100,17 @@ invoked with the original exception info triple as second argument.</p></div>
             
   
     <div class="desc"><p>When set this overrides the default fingerprint.</p></div>
+  <div class="source_cont">
+</div>
+
+            </div>
+            <div class="item">
+            <p id="sentry_sdk.Scope.level" class="name">var <span class="ident">level</span></p>
+            
+
+            
+  
+    <div class="desc"><p>When set this overrides the level.</p></div>
   <div class="source_cont">
 </div>
 
