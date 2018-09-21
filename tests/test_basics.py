@@ -157,7 +157,7 @@ def test_breadcrumbs(sentry_init, capture_events):
     assert "user 10" in event["breadcrumbs"][0]["message"]
     assert "user 19" in event["breadcrumbs"][-1]["message"]
 
-    events.clear()
+    del events[:]
 
     for i in range(2):
         add_breadcrumb(
