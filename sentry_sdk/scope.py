@@ -1,3 +1,6 @@
+from copy import copy
+from collections import deque
+
 from sentry_sdk.utils import logger, capture_internal_exceptions
 
 
@@ -84,7 +87,7 @@ class Scope(object):
         self._contexts = {}
         self._extras = {}
 
-        self._breadcrumbs = []
+        self._breadcrumbs = deque()
 
     def add_event_processor(self, func):
         """"Register a scope local event processor on the scope.
@@ -170,7 +173,7 @@ class Scope(object):
         rv._contexts = dict(self._contexts)
         rv._extras = dict(self._extras)
 
-        rv._breadcrumbs = list(self._breadcrumbs)
+        rv._breadcrumbs = copy(self._breadcrumbs)
         rv._event_processors = list(self._event_processors)
         rv._error_processors = list(self._error_processors)
 
