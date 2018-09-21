@@ -139,3 +139,20 @@ def test_push_scope_null_client(sentry_init, capture_events):
             capture_exception(e)
 
     assert len(events) == 0
+
+
+def test_breadcrumbs_overflow(sentry_init, capture_events):
+    sentry_init(max_breadcrumbs=10)
+
+    for i in range(20):
+        add_breadcrumb(
+            category="auth", message="Authenticated user %s" % i, level="info"
+        )
+
+    events = capture_events()
+
+    capture_exception(ValueError())
+
+    event, = events
+
+    assert len(event["breadcrumbs"]) == 10

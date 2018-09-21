@@ -205,8 +205,8 @@ class Hub(with_metaclass(HubMeta)):
             scope._breadcrumbs.append(crumb)
         else:
             logger.info("before breadcrumb dropped breadcrumb (%s)", original_crumb)
-        while len(scope._breadcrumbs) >= client.options["max_breadcrumbs"]:
-            scope._breadcrumbs.popleft()
+        while len(scope._breadcrumbs) > client.options["max_breadcrumbs"]:
+            scope._breadcrumbs.pop(0)
 
     def push_scope(self, callback=None):
         """Pushes a new layer on the scope stack. Returns a context manager
