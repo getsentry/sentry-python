@@ -305,7 +305,7 @@ def frame_from_traceback(tb, with_locals=True):
 
     rv = {
         "filename": abs_path and os.path.basename(abs_path) or None,
-        "abs_path": abs_path,
+        "abs_path": os.path.abspath(abs_path),
         "function": function or "<unknown>",
         "module": module,
         "lineno": tb.tb_lineno,
