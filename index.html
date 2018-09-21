@@ -2118,8 +2118,8 @@ context vars are available.</p>
             <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">crumb</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;before breadcrumb dropped breadcrumb (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">original_crumb</span><span class="p">)</span>
-        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;max_breadcrumbs&quot;</span><span class="p">]:</span>
-            <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
+        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;max_breadcrumbs&quot;</span><span class="p">]:</span>
+            <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Pushes a new layer on the scope stack. Returns a context manager</span>
@@ -2257,8 +2257,8 @@ breadcrumbs that are emitted.</p></div>
         <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">crumb</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;before breadcrumb dropped breadcrumb (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">original_crumb</span><span class="p">)</span>
-    <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;max_breadcrumbs&quot;</span><span class="p">]:</span>
-        <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
+    <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;max_breadcrumbs&quot;</span><span class="p">]:</span>
+        <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 </pre></div>
 
   </div>
