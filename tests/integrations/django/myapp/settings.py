@@ -11,10 +11,6 @@ https://docs.djangoproject.com/en/2.0/ref/settings/
 """
 
 import os
-import sentry_sdk
-
-from sentry_sdk.integrations.django import DjangoIntegration
-
 
 try:
     # Django >= 1.10
@@ -129,7 +125,3 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/2.0/howto/static-files/
 
 STATIC_URL = "/static/"
-
-sentry_sdk.api._init_on_current(
-    integrations=[DjangoIntegration()], send_default_pii=True
-)

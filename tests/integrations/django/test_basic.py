@@ -12,14 +12,19 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
-from sentry_sdk import Hub, last_event_id
+from sentry_sdk import last_event_id
+from sentry_sdk.integrations.django import DjangoIntegration
 
 from tests.integrations.django.myapp.wsgi import application
 
 
+@pytest.fixture(autouse=True)
+def init_django_sentry(sentry_init):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+
+
 @pytest.fixture
-def client(monkeypatch_test_transport):
-    monkeypatch_test_transport(Hub.current.client)
+def client():
     return Client(application)
 
 

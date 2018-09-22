@@ -1,7 +1,14 @@
+import pytest
+
 try:
     from urllib.request import urlopen
 except ImportError:
     from urllib import urlopen
+
+try:
+    from httplib import HTTPConnection
+except ImportError:
+    from http.client import HTTPConnection
 
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.stdlib import StdlibIntegration
@@ -54,4 +61,45 @@ def test_crumb_capture_hint(sentry_init, capture_events):
         "status_code": 200,
         "reason": "OK",
         "extra": "foo",
+    }
+
+
+def test_httplib_misuse(sentry_init, capture_events):
+    """HTTPConnection.getresponse must be called after every call to
+    HTTPConnection.request. However, if somebody does not abide by
+    this contract, we still should handle this gracefully and not
+    send mixed breadcrumbs.
+
+    Test whether our breadcrumbs are coherent when somebody uses HTTPConnection
+    wrongly.
+    """
+
+    sentry_init()
+    events = capture_events()
+
+    conn = HTTPConnection("httpbin.org", 80)
+    conn.request("GET", "/anything/foo")
+
+    with pytest.raises(Exception):
+        # This raises an exception, because we didn't call `getresponse` for
+        # the previous request yet.
+        #
+        # This call should not affect our breadcrumb.
+        conn.request("POST", "/anything/bar")
+
+    response = conn.getresponse()
+    assert response._method == "GET"
+
+    capture_message("Testing!")
+
+    event, = events
+    crumb, = event["breadcrumbs"]
+
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+    assert crumb["data"] == {
+        "url": "http://httpbin.org/anything/foo",
+        "method": "GET",
+        "status_code": 200,
+        "reason": "OK",
     }

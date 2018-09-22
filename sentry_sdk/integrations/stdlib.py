@@ -17,7 +17,9 @@ class StdlibIntegration(Integration):
         real_getresponse = self.httplib_connection_cls.getresponse
 
         def putrequest(self, method, url, *args, **kwargs):
+            rv = real_putrequest(self, method, url, *args, **kwargs)
             self._sentrysdk_data_dict = data = {}
+
             host = self.host
             port = self.port
             default_port = self.default_port
@@ -30,13 +32,15 @@ class StdlibIntegration(Integration):
                     port != default_port and ":%s" % port or "",
                     url,
                 )
+
             data["url"] = real_url
             data["method"] = method
-            return real_putrequest(self, method, url, *args, **kwargs)
+            return rv
 
         def getresponse(self, *args, **kwargs):
             rv = real_getresponse(self, *args, **kwargs)
             data = getattr(self, "_sentrysdk_data_dict", None) or {}
+
             if "status_code" not in data:
                 data["status_code"] = rv.status
                 data["reason"] = rv.reason
