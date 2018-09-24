@@ -8,7 +8,7 @@ import sentry_sdk
 from sentry_sdk._compat import reraise
 from sentry_sdk.transport import Transport
 
-SEMAPHORE = "./checkouts/semaphore/target/debug/semaphore"
+SEMAPHORE = "./semaphore"
 
 if not os.path.isfile(SEMAPHORE):
     SEMAPHORE = None

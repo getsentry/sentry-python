@@ -19,4 +19,4 @@ venv
 .vscode/tags
 .pytest_cache
 .hypothesis
-checkouts
+semaphore
