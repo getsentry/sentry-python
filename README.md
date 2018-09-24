@@ -9,6 +9,7 @@
 [![Build Status](https://travis-ci.com/getsentry/sentry-python.svg?branch=master)](https://travis-ci.com/getsentry/sentry-python)
 
 - [Documentation](https://docs.sentry.io/quickstart/?platform=python)
+- [API Reference](https://getsentry.github.io/sentry-python/)
 
 # License
 
