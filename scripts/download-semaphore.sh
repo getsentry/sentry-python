@@ -1,11 +1,20 @@
-#!/bin/sh
+#!/bin/bash
+
+set -xe
+
+target=semaphore
 
 # Download the latest semaphore release for Travis
 
-curl -s https://api.github.com/repos/getsentry/semaphore/releases/latest \
-    | grep "Linux" \
-    | cut -d : -f 2,3 \
-    | tr -d \" \
-    | wget -i - -O ./semaphore
+output="$(curl -s https://api.github.com/repos/getsentry/semaphore/releases/latest)"
 
-chmod +x ./semaphore
+output="$(echo "$output" \
+    | grep "Linux" \
+    | grep "download" \
+    | cut -d : -f 2,3 \
+    | tr -d , \
+    | tr -d \")"
+
+echo "$output" | wget -i - -O $target
+[ -s $target ]
+chmod +x $target
