@@ -62,6 +62,15 @@ class Transport(object):
         """Forcefully kills the transport."""
         pass
 
+    def copy(self):
+        """Copy the transport.
+
+        The returned transport should behave completely independent from the
+        previous one.  It still may share HTTP connection pools, but not share
+        any state such as internal queues.
+        """
+        return self
+
     def __del__(self):
         try:
             self.kill()
@@ -83,6 +92,7 @@ class HttpTransport(Transport):
         )
         self._disabled_until = None
         self._retry = urllib3.util.Retry()
+        self.options = options
 
     def _send_event(self, event):
         if self._disabled_until is not None:
@@ -142,6 +152,11 @@ class HttpTransport(Transport):
     def kill(self):
         logger.debug("Killing HTTP transport")
         self._worker.kill()
+
+    def copy(self):
+        transport = type(self)(self.options)
+        transport._pool = self._pool
+        return transport
 
 
 class _FunctionTransport(Transport):
