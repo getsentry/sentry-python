@@ -10,10 +10,7 @@ python:
 
 cache:
   pip: true
-  directories:
-    - checkouts/semaphore/target/debug/
-    - ~/.cargo/registry/
-    - ~/.rustup/
+  cargo: true
 
 branches:
   only:
@@ -44,10 +41,8 @@ matrix:
       script: make travis-upload-docs
 
 install:
-  - curl https://sh.rustup.rs -sSf | sh -s -- -y
-  - . $HOME/.cargo/env
   - pip install tox
-  - sh scripts/checkout-semaphore.sh
+  - sh scripts/download-semaphore.sh
 
 script:
   - sh scripts/runtox.sh
