@@ -2,7 +2,7 @@
 import sys
 import os
 
-from hypothesis import given, assume
+from hypothesis import given
 import hypothesis.strategies as st
 
 from sentry_sdk.utils import safe_repr, exceptions_from_error_tuple
