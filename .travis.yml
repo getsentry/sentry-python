@@ -46,7 +46,7 @@ install:
   - sh scripts/download-semaphore.sh
 
 script:
-  - sh scripts/runtox.sh
+  - ./scripts/runtox.sh
   - codecov
 
 notifications:
