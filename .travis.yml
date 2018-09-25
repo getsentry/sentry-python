@@ -47,7 +47,7 @@ install:
 
 script:
   - coverage erase
-  - ./scripts/runtox.sh '' --cov --cov-append --cov-report=
+  - ./scripts/runtox.sh '' --cov=sentry_sdk --cov-append --cov-report=
   - codecov
 
 notifications:
