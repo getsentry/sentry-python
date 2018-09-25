@@ -1,7 +1,7 @@
 import sys
 
 from sentry_sdk import configure_scope
-from sentry_sdk.hub import Hub, _get_client_options, _should_send_default_pii
+from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk._compat import reraise
 from sentry_sdk.utils import (
     AnnotatedValue,
