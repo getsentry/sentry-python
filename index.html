@@ -1077,6 +1077,7 @@ table {
   <ul>
     <li class="mono"><a href="#sentry_sdk.HttpTransport.__init__">__init__</a></li>
     <li class="mono"><a href="#sentry_sdk.HttpTransport.capture_event">capture_event</a></li>
+    <li class="mono"><a href="#sentry_sdk.HttpTransport.copy">copy</a></li>
     <li class="mono"><a href="#sentry_sdk.HttpTransport.kill">kill</a></li>
     <li class="mono"><a href="#sentry_sdk.HttpTransport.shutdown">shutdown</a></li>
   </ul>
@@ -1128,6 +1129,7 @@ table {
   <ul>
     <li class="mono"><a href="#sentry_sdk.Transport.__init__">__init__</a></li>
     <li class="mono"><a href="#sentry_sdk.Transport.capture_event">capture_event</a></li>
+    <li class="mono"><a href="#sentry_sdk.Transport.copy">copy</a></li>
     <li class="mono"><a href="#sentry_sdk.Transport.kill">kill</a></li>
     <li class="mono"><a href="#sentry_sdk.Transport.shutdown">shutdown</a></li>
   </ul>
@@ -1785,6 +1787,7 @@ stderr.</p></div>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="bp">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_retry</span> <span class="o">=</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">Retry</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
 
     <span class="k">def</span> <span class="nf">_send_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
@@ -1844,6 +1847,11 @@ stderr.</p></div>
     <span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Killing HTTP transport&quot;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">transport</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
+        <span class="n">transport</span><span class="o">.</span><span class="n">_pool</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span>
+        <span class="k">return</span> <span class="n">transport</span>
 </pre></div>
 
   </div>
@@ -1864,14 +1872,10 @@ stderr.</p></div>
     <p>def <span class="ident">__init__</span>(</p><p>self, options)</p>
     </div>
     
-    <p class="inheritance">
-     <strong>Inheritance:</strong>
-       <code><a href="#sentry_sdk.Transport">Transport</a></code>.<code><a href="#sentry_sdk.Transport.__init__">__init__</a></code>
-    </p>
 
     
   
-    <div class="desc inherited"><p>Initialize self.  See help(type(self)) for accurate signature.</p></div>
+    <div class="desc"><p>Initialize self.  See help(type(self)) for accurate signature.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.HttpTransport.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.HttpTransport.__init__" class="source">
@@ -1886,6 +1890,7 @@ stderr.</p></div>
     <span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_retry</span> <span class="o">=</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">Retry</span><span class="p">()</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
 </pre></div>
 
   </div>
@@ -1909,6 +1914,33 @@ be sent to sentry.</p></div>
   <div id="source-sentry_sdk.HttpTransport.capture_event" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_send_event</span><span class="p">(</span><span class="n">event</span><span class="p">))</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.HttpTransport.copy">
+    <p>def <span class="ident">copy</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Copy the transport.</p>
+<p>The returned transport should behave completely independent from the
+previous one.  It still may share HTTP connection pools, but not share
+any state such as internal queues.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.HttpTransport.copy', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.HttpTransport.copy" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="n">transport</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
+    <span class="n">transport</span><span class="o">.</span><span class="n">_pool</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span>
+    <span class="k">return</span> <span class="n">transport</span>
 </pre></div>
 
   </div>
@@ -1968,6 +2000,21 @@ of time (eg: not instant).</p></div>
 
   </div>
   
+          <h3>Instance variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.HttpTransport.options" class="name">var <span class="ident">options</span></p>
+            
+    <p class="inheritance">
+     <strong>Inheritance:</strong>
+       <code><a href="#sentry_sdk.Transport">Transport</a></code>.<code><a href="#sentry_sdk.Transport.options">options</a></code>
+    </p>
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
       </div>
       </div>
       
@@ -3180,6 +3227,15 @@ invoked with the original exception info triple as second argument.</p></div>
         <span class="sd">&quot;&quot;&quot;Forcefully kills the transport.&quot;&quot;&quot;</span>
         <span class="k">pass</span>
 
+    <span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Copy the transport.</span>
+
+<span class="sd">        The returned transport should behave completely independent from the</span>
+<span class="sd">        previous one.  It still may share HTTP connection pools, but not share</span>
+<span class="sd">        any state such as internal queues.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
     <span class="k">def</span> <span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
@@ -3243,6 +3299,36 @@ be sent to sentry.</p></div>
 <span class="sd">    be sent to sentry.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.Transport.copy">
+    <p>def <span class="ident">copy</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Copy the transport.</p>
+<p>The returned transport should behave completely independent from the
+previous one.  It still may share HTTP connection pools, but not share
+any state such as internal queues.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Transport.copy', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.Transport.copy" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Copy the transport.</span>
+<span class="sd">    The returned transport should behave completely independent from the</span>
+<span class="sd">    previous one.  It still may share HTTP connection pools, but not share</span>
+<span class="sd">    any state such as internal queues.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="bp">self</span>
 </pre></div>
 
   </div>
