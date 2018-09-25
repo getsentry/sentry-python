@@ -260,11 +260,25 @@ def safe_repr(value):
         rv = repr(value)
         if isinstance(rv, bytes):
             rv = rv.decode("utf-8", "replace")
+
+        # At this point `rv` contains a bunch of literal escape codes, like
+        # this (exaggerated example):
+        #
+        # u"\\x2f"
+        #
+        # But we want to show this string as:
+        #
+        # u"/"
         try:
-            return rv.encode("utf-8").decode("unicode-escape")
+            # unicode-escape does this job, but can only decode latin1. So we
+            # attempt to encode in latin1.
+            return rv.encode("latin1").decode("unicode-escape")
         except Exception:
+            # Since usually strings aren't latin1 this can break. In those
+            # cases we just give up.
             return rv
     except Exception:
+        # If e.g. the call to `repr` already fails
         return u"<broken repr>"
 
 
