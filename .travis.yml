@@ -46,7 +46,8 @@ install:
   - sh scripts/download-semaphore.sh
 
 script:
-  - ./scripts/runtox.sh
+  - coverage erase
+  - ./scripts/runtox.sh '' --cov=sentry_sdk --cov-append --cov-report=
   - codecov
 
 notifications:
