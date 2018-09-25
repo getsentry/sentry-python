@@ -228,15 +228,19 @@ def _make_wsgi_event_processor(environ):
                 request_info["env"] = dict(get_environ(environ))
 
             if "headers" not in request_info:
-                request_info["headers"] = dict(get_headers(environ))
-                if not _should_send_default_pii():
-                    request_info["headers"] = {
-                        k: v
-                        for k, v in request_info["headers"].items()
-                        if k.lower().replace("_", "-")
-                        not in ("set-cookie", "cookie", "authorization")
-                    }
+                request_info["headers"] = _filter_headers(dict(get_headers(environ)))
 
         return event
 
     return event_processor
+
+
+def _filter_headers(headers):
+    if _should_send_default_pii():
+        return headers
+
+    return {
+        k: v
+        for k, v in headers.items()
+        if k.lower().replace("_", "-") not in ("set-cookie", "cookie", "authorization")
+    }
