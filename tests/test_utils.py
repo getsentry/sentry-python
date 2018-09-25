@@ -17,15 +17,8 @@ def test_safe_repr_never_broken_for_strings(x):
     assert u"broken repr" not in r
 
 
-@given(x=any_string)
-def test_safe_repr_never_leaves_escapes_in(x):
-    if isinstance(x, bytes):
-        assume(b"\\u" not in x and b"\\x" not in x)
-    else:
-        assume(u"\\u" not in x and u"\\x" not in x)
-    r = safe_repr(x)
-    assert isinstance(r, text_type)
-    assert u"\\u" not in r and u"\\x" not in r
+def test_safe_repr_regressions():
+    assert "лошадь" in safe_repr(u"лошадь")
 
 
 def test_abs_path():
