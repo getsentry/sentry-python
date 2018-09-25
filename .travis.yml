@@ -46,7 +46,8 @@ install:
   - sh scripts/download-semaphore.sh
 
 script:
-  - sh scripts/runtox.sh
+  - coverage erase
+  - sh scripts/runtox.sh '' --cov --cov-append --cov-report=
   - codecov
 
 notifications:
