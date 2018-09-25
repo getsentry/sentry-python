@@ -19,7 +19,7 @@ def test_safe_repr_never_broken_for_strings(x):
 
 
 def test_safe_repr_regressions():
-    assert "лошадь" in safe_repr(u"лошадь")
+    assert u"лошадь" in safe_repr(u"лошадь")
 
 
 def test_abs_path():
