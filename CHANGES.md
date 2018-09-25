@@ -1,3 +1,8 @@
+# 0.3.5
+
+* Integration for AWS Lambda
+* Fix mojibake when encoding local variable values
+
 # 0.3.4
 
 * Performance improvement when storing breadcrumbs
