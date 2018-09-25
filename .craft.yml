@@ -1,4 +1,5 @@
 ---
+minVersion: '0.5.1'
 github:
   owner: getsentry
   repo: sentry-python
@@ -6,3 +7,7 @@ targets:
   - name: pypi
   - name: github
   - name: gh-pages
+  - name: registry
+    type: sdk
+    config:
+      canonical: pypi:sentry-sdk
