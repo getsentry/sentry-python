@@ -10,5 +10,4 @@ else
     searchstring="$1"
 fi
 
-coverage erase
 exec tox -e $(tox -l | grep $searchstring | tr '\n' ',') -- "${@:2}"
