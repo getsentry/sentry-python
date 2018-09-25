@@ -5,3 +5,4 @@ six==1.11.0
 tox==3.2.1
 Werkzeug==0.14.1
 pytest-localserver==0.4.1
+pytest-cov==2.6.0

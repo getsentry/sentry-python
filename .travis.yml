@@ -42,10 +42,12 @@ matrix:
 
 install:
   - pip install tox
+  - pip install codecov
   - sh scripts/download-semaphore.sh
 
 script:
   - sh scripts/runtox.sh
+  - codecov
 
 notifications:
   webhooks:
