@@ -31,7 +31,6 @@ class TestTransport(Transport):
         for event in self._queue:
             print("EVENT:", json.dumps(event))
 
-
 sentry_sdk.init(
     "http://bogus@example.com/2",
     transport=TestTransport(),
@@ -39,8 +38,9 @@ sentry_sdk.init(
     **{extra_init_args}
 )
 
+
 def test_handler(event, context):
-    exec('''{code}''')
+{code}
 """
 
 
@@ -66,7 +66,8 @@ def run_lambda_function(tmpdir, lambda_client, request, assert_semaphore_accepta
         # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
         tmp.join("test_lambda.py").write(
             LAMBDA_TEMPLATE.format(
-                code=lambda_body, extra_init_args=repr(extra_init_args or {})
+                code="\n".join("    " + x.strip() for x in lambda_body.splitlines()),
+                extra_init_args=repr(extra_init_args or {}),
             )
         )
         tmp.join("setup.cfg").write("[install]\nprefix=")
@@ -126,32 +127,21 @@ def test_basic(run_lambda_function):
     assert exception["type"] == "Exception"
     assert exception["value"] == "something went wrong"
 
-    frame1, frame2 = exception["stacktrace"]["frames"]
+    frame1, = exception["stacktrace"]["frames"]
     assert frame1["filename"] == "test_lambda.py"
     assert frame1["abs_path"] == "/var/task/test_lambda.py"
     assert frame1["function"] == "test_handler"
 
-    assert frame1["in_app"] is frame2["in_app"] is True
+    assert frame1["in_app"] is True
 
     assert exception["mechanism"] == {"type": "aws_lambda", "handled": False}
 
     assert event["extra"]["lambda"]["function_name"].startswith("test_function_")
 
 
-def test_request_body_omitted(run_lambda_function):
-    events, response = run_lambda_function(
-        'raise Exception("something went wrong")\n',
-        payload=b'{"foo": "bar"}',
-        extra_init_args={"request_bodies": "never"},
-    )
-
-    event, = events
-    assert "data" not in event.get("request", {})
-
-
 def test_request_data(run_lambda_function):
     events, _response = run_lambda_function(
-        'sentry_sdk.capture_message("hi")\n' 'return "ok"\n',
+        'sentry_sdk.capture_message("hi")\nreturn "ok"',
         payload=b"""
         {
           "resource": "/asd",
