@@ -77,11 +77,11 @@ def test_error_in_errorhandler(sentry_init, app, capture_events):
     events = capture_events()
 
     @app.route("/error")
-    async def myerror(request):
+    def myerror(request):
         raise ValueError("oh no")
 
     @app.exception(ValueError)
-    async def myhandler(request, exception):
+    def myhandler(request, exception):
         1 / 0
 
     request, response = app.test_client.get("/error")
