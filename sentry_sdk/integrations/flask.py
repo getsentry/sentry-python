@@ -46,8 +46,6 @@ def _push_appctx(*args, **kwargs):
     # have (not the case for CLI for example)
     hub = Hub.current
     hub.push_scope()
-    with hub.configure_scope() as scope:
-        scope.add_event_processor(event_processor)
 
 
 def _pop_appctx(*args, **kwargs):
@@ -59,26 +57,6 @@ def _request_started(sender, **kwargs):
     app = _app_ctx_stack.top.app
     with configure_scope() as scope:
         scope.add_event_processor(_make_request_event_processor(app, weak_request))
-
-
-def event_processor(event, hint):
-    request = getattr(_request_ctx_stack.top, "request", None)
-
-    if request:
-        if "transaction" not in event:
-            try:
-                event["transaction"] = request.url_rule.endpoint
-            except Exception:
-                pass
-
-        with capture_internal_exceptions():
-            FlaskRequestExtractor(request).extract_into_event(event)
-
-    if _should_send_default_pii():
-        with capture_internal_exceptions():
-            _add_user_to_event(event)
-
-    return event
 
 
 class FlaskRequestExtractor(RequestExtractor):
@@ -133,6 +111,10 @@ def _make_request_event_processor(app, weak_request):
 
         with capture_internal_exceptions():
             FlaskRequestExtractor(request).extract_into_event(event)
+
+        if _should_send_default_pii():
+            with capture_internal_exceptions():
+                _add_user_to_event(event)
 
         return event
 
