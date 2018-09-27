@@ -40,3 +40,19 @@ def test_abs_path():
     for frame in frames:
         assert os.path.abspath(frame["abs_path"]) == frame["abs_path"]
         assert os.path.basename(frame["filename"]) == frame["filename"]
+
+
+def test_non_string_variables():
+    """There is some extremely terrible code in the wild that
+    inserts non-strings as variable names into `locals()`."""
+
+    try:
+        locals()[42] = True
+        1 / 0
+    except ZeroDivisionError:
+        exceptions = exceptions_from_error_tuple(sys.exc_info())
+
+    exception, = exceptions
+    assert exception["type"] == "ZeroDivisionError"
+    frame, = exception["stacktrace"]["frames"]
+    assert frame["vars"]["42"] == "True"

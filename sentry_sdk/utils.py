@@ -297,7 +297,7 @@ def object_to_json(obj):
 def extract_locals(frame):
     rv = {}
     for key, value in frame.f_locals.items():
-        rv[key] = object_to_json(value)
+        rv[str(key)] = object_to_json(value)
     return rv
 
 
