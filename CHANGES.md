@@ -1,3 +1,7 @@
+# 0.3.6
+
+* Integration for Sanic
+
 # 0.3.5
 
 * Integration for AWS Lambda
