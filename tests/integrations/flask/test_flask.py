@@ -394,3 +394,33 @@ def test_500(sentry_init, capture_events, app):
 
     event, = events
     assert response.data.decode("utf-8") == "Sentry error: %s" % event["event_id"]
+
+
+def test_error_in_errorhandler(sentry_init, capture_events, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
+    app.debug = False
+    app.testing = False
+
+    @app.route("/")
+    def index():
+        raise ValueError()
+
+    @app.errorhandler(500)
+    def error_handler(err):
+        1 / 0
+
+    events = capture_events()
+
+    client = app.test_client()
+
+    with pytest.raises(ZeroDivisionError):
+        client.get("/")
+
+    event1, event2 = events
+
+    exception, = event1["exception"]["values"]
+    assert exception["type"] == "ValueError"
+
+    exception, = event2["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
