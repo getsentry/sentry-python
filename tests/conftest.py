@@ -33,8 +33,8 @@ def reraise_internal_exceptions(request, monkeypatch):
 def monkeypatch_test_transport(monkeypatch, assert_semaphore_acceptance):
     def check_event(event):
         def check_string_keys(map):
-            assert set(type(x) for x in map) == set([str])
-            for value in map.values():
+            for key, value in map.items():
+                assert isinstance(key, str)
                 if isinstance(value, dict):
                     check_string_keys(value)
 
