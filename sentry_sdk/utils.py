@@ -7,7 +7,13 @@ from contextlib import contextmanager
 from datetime import datetime
 from collections import Mapping, Sequence
 
-from sentry_sdk._compat import urlparse, text_type, implements_str, string_types, number_types
+from sentry_sdk._compat import (
+    urlparse,
+    text_type,
+    implements_str,
+    string_types,
+    number_types,
+)
 
 
 epoch = datetime(1970, 1, 1)

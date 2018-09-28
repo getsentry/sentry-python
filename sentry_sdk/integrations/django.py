@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 import sys
@@ -11,10 +12,16 @@ try:
 except ImportError:
     from django.core.urlresolvers import resolve
 
-from sentry_sdk import Hub, configure_scope
+from sentry_sdk import Hub, configure_scope, add_breadcrumb
 from sentry_sdk.hub import _should_send_default_pii
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+    safe_repr,
+    strip_string,
+)
 from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations._wsgi import RequestExtractor, run_wsgi_app
 
 
@@ -34,6 +41,7 @@ class DjangoIntegration(Integration):
     identifier = "django"
 
     def install(self):
+        install_sql_hook()
         # Patch in our custom middleware.
 
         from django.core.handlers.wsgi import WSGIHandler
@@ -141,3 +149,83 @@ def _set_user_info(request, event):
         user_info["username"] = user.get_username()
     except Exception:
         pass
+
+
+class _FormatConverter(object):
+    def __init__(self, param_mapping):
+        self.param_mapping = param_mapping
+        self.params = []
+
+    def __getitem__(self, val):
+        self.params.append(self.param_mapping.get(val))
+        return "%s"
+
+
+def format_sql(sql, params):
+    rv = []
+
+    if isinstance(params, dict):
+        conv = _FormatConverter(params)
+        if params:
+            sql = sql % conv
+            params = conv.params
+        else:
+            params = ()
+
+    for param in params or ():
+        if param is None:
+            rv.append("NULL")
+        param = strip_string(safe_repr(param))
+        rv.append(param)
+
+    return sql, rv
+
+
+def record_sql(sql, params):
+    real_sql, real_params = format_sql(sql, params)
+
+    if real_params:
+        try:
+            real_sql = real_sql % tuple(real_params)
+        except TypeError:
+            pass
+
+    # maybe category to 'django.%s.%s' % (vendor, alias or
+    #   'default') ?
+
+    add_breadcrumb(message=real_sql, category="query")
+
+
+def install_sql_hook():
+    """If installed this causes Django's queries to be captured."""
+    try:
+        from django.db.backends.utils import CursorWrapper
+    except ImportError:
+        from django.db.backends.util import CursorWrapper
+
+    try:
+        real_execute = CursorWrapper.execute
+        real_executemany = CursorWrapper.executemany
+    except AttributeError:
+        # This won't work on Django versions < 1.6
+        return
+
+    def record_many_sql(sql, param_list):
+        for params in param_list:
+            record_sql(sql, params)
+
+    def execute(self, sql, params=None):
+        try:
+            return real_execute(self, sql, params)
+        finally:
+            record_sql(sql, params)
+
+    def executemany(self, sql, param_list):
+        try:
+            return real_executemany(self, sql, param_list)
+        finally:
+            record_many_sql(sql, param_list)
+
+    CursorWrapper.execute = execute
+    CursorWrapper.executemany = executemany
+    ignore_logger("django.db.backends")
