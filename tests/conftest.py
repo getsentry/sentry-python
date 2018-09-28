@@ -5,7 +5,7 @@ import json
 import pytest
 
 import sentry_sdk
-from sentry_sdk._compat import reraise
+from sentry_sdk._compat import reraise, string_types
 from sentry_sdk.transport import Transport
 
 SEMAPHORE = "./semaphore"
@@ -31,10 +31,18 @@ def reraise_internal_exceptions(request, monkeypatch):
 
 @pytest.fixture
 def monkeypatch_test_transport(monkeypatch, assert_semaphore_acceptance):
+    def check_event(event):
+        def check_string_keys(map):
+            for key, value in map.items():
+                assert isinstance(key, string_types)
+                if isinstance(value, dict):
+                    check_string_keys(value)
+
+        check_string_keys(event)
+        assert_semaphore_acceptance(event)
+
     def inner(client):
-        monkeypatch.setattr(
-            client, "transport", TestTransport(assert_semaphore_acceptance)
-        )
+        monkeypatch.setattr(client, "transport", TestTransport(check_event))
 
     return inner
 
@@ -61,10 +69,9 @@ def _no_errors_in_semaphore_response(obj):
 
 @pytest.fixture
 def assert_semaphore_acceptance(tmpdir):
-    if not SEMAPHORE:
-        return lambda event: None
-
     def inner(event):
+        if not SEMAPHORE:
+            return
         # not dealing with the subprocess API right now
         file = tmpdir.join("event")
         file.write(json.dumps(dict(event)))
@@ -79,7 +86,7 @@ def assert_semaphore_acceptance(tmpdir):
 
 
 @pytest.fixture
-def sentry_init(monkeypatch_test_transport, assert_semaphore_acceptance):
+def sentry_init(monkeypatch_test_transport):
     def inner(*a, **kw):
         sentry_sdk.api._init_on_current(*a, **kw)
         monkeypatch_test_transport(sentry_sdk.Hub.current.client)
