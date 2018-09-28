@@ -15,7 +15,6 @@ DEFAULT_OPTIONS = {
     "in_app_include": [],
     "in_app_exclude": [],
     "default_integrations": True,
-    "repos": {},
     "dist": None,
     "transport": None,
     "sample_rate": 1.0,
