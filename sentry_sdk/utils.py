@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from collections import Mapping, Sequence
 
-from sentry_sdk._compat import urlparse, text_type, implements_str
+from sentry_sdk._compat import urlparse, text_type, implements_str, string_types, number_types
 
 
 epoch = datetime(1970, 1, 1)
@@ -533,6 +533,8 @@ def convert_types(obj):
         return {k: convert_types(v) for k, v in obj.items()}
     if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
         return [convert_types(v) for v in obj]
+    if not isinstance(obj, string_types + number_types):
+        return safe_repr(obj)
     return obj
 
 
