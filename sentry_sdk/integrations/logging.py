@@ -27,7 +27,7 @@ def ignore_logger(name):
 class LoggingIntegration(Integration):
     identifier = "logging"
 
-    def __init__(self, level=logging.INFO, event_level=None):
+    def __init__(self, level=logging.INFO, event_level=logging.ERROR):
         self._handler = SentryHandler(level=level, event_level=event_level)
 
     def install(self):
