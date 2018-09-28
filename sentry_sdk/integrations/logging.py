@@ -12,6 +12,8 @@ from sentry_sdk.utils import (
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 
+DEFAULT_LEVEL = logging.INFO
+DEFAULT_EVENT_LEVEL = logging.ERROR
 
 _IGNORED_LOGGERS = set(["sentry_sdk.errors"])
 
@@ -27,7 +29,7 @@ def ignore_logger(name):
 class LoggingIntegration(Integration):
     identifier = "logging"
 
-    def __init__(self, level=logging.INFO, event_level=logging.ERROR):
+    def __init__(self, level=DEFAULT_LEVEL, event_level=DEFAULT_EVENT_LEVEL):
         self._handler = SentryHandler(level=level, event_level=event_level)
 
     def install(self):
@@ -43,8 +45,8 @@ class LoggingIntegration(Integration):
 
 
 class SentryHandler(logging.Handler, object):
-    def __init__(self, level, event_level):
-        logging.Handler.__init__(self, level)
+    def __init__(self, level=DEFAULT_LEVEL, event_level=DEFAULT_EVENT_LEVEL, **kwargs):
+        logging.Handler.__init__(self, level, **kwargs)
         if event_level is None:
             self._event_level = None
         else:

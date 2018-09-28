@@ -1,8 +1,6 @@
 import pytest
 import logging
 
-import sentry_sdk
-
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 other_logger = logging.getLogger("testfoo")
