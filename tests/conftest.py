@@ -42,9 +42,7 @@ def monkeypatch_test_transport(monkeypatch, assert_semaphore_acceptance):
         assert_semaphore_acceptance(event)
 
     def inner(client):
-        monkeypatch.setattr(
-            client, "transport", TestTransport(check_event)
-        )
+        monkeypatch.setattr(client, "transport", TestTransport(check_event))
 
     return inner
 
