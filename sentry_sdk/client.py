@@ -153,10 +153,12 @@ class Client(object):
         rv = event.get("event_id")
         if rv is None:
             event["event_id"] = rv = uuid.uuid4().hex
-        if self._should_capture(event, hint, scope):
-            event = self._prepare_event(event, hint, scope)
-            if event is not None:
-                self.transport.capture_event(event)
+        if not self._should_capture(event, hint, scope):
+            return
+        event = self._prepare_event(event, hint, scope)
+        if event is None:
+            return
+        self.transport.capture_event(event)
         return rv
 
     def close(self, timeout=None, shutdown_callback=None):
