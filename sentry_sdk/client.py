@@ -73,7 +73,7 @@ class Client(object):
             if event is None:
                 return
 
-        for key in "release", "environment", "server_name", "repos", "dist":
+        for key in "release", "environment", "server_name", "dist":
             if event.get(key) is None:
                 event[key] = self.options[key]
         if event.get("sdk") is None:
