@@ -140,15 +140,17 @@ def _set_user_info(request, event):
     if user is None or not is_authenticated(user):
         return
 
-    try:
-        user_info["email"] = user.email
-    except Exception:
-        pass
+    if "email" not in user_info:
+        try:
+            user_info["email"] = user.email
+        except Exception:
+            pass
 
-    try:
-        user_info["username"] = user.get_username()
-    except Exception:
-        pass
+    if "username" not in user_info:
+        try:
+            user_info["username"] = user.get_username()
+        except Exception:
+            pass
 
 
 class _FormatConverter(object):

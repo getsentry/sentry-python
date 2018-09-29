@@ -216,7 +216,8 @@ def _make_wsgi_event_processor(environ):
 
             if _should_send_default_pii():
                 user_info = event.setdefault("user", {})
-                user_info["ip_address"] = get_client_ip(environ)
+                if "ip_address" not in user_info:
+                    user_info["ip_address"] = get_client_ip(environ)
 
             if "query_string" not in request_info:
                 request_info["query_string"] = environ.get("QUERY_STRING")
