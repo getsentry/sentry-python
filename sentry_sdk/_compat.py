@@ -11,6 +11,7 @@ if PY2:
 
     string_types = (str, text_type)
     number_types = (int, long, float)  # noqa
+    int_types = (int, long)  # noqa
 
     def implements_str(cls):
         cls.__unicode__ = cls.__str__
@@ -32,6 +33,7 @@ else:
     text_type = str
     string_types = (text_type,)
     number_types = (int, float)
+    int_types = (int,)  # noqa
 
     def _identity(x):
         return x

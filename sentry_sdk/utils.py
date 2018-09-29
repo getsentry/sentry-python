@@ -13,6 +13,7 @@ from sentry_sdk._compat import (
     implements_str,
     string_types,
     number_types,
+    int_types,
 )
 
 
@@ -499,10 +500,10 @@ def flatten_metadata(obj):
             rv = []
             meta = {}
             for i, v in enumerate(obj):
-                new_v, meta[i] = inner(v)
+                new_v, meta[str(i)] = inner(v)
                 rv.append(new_v)
-                if meta[i] is None:
-                    del meta[i]
+                if meta[str(i)] is None:
+                    del meta[str(i)]
             return rv, (meta or None)
         if isinstance(obj, AnnotatedValue):
             return obj.value, {"": obj.metadata}
@@ -557,22 +558,77 @@ def strip_databag(obj, remaining_depth=20):
     return obj
 
 
-def strip_string(value, assume_length=None, max_length=512):
+def strip_string(value, max_length=512):
     # TODO: read max_length from config
     if not value:
         return value
-    if assume_length is None:
-        assume_length = len(value)
-
-    if assume_length > max_length:
+    length = len(value)
+    if length > max_length:
         return AnnotatedValue(
             value=value[: max_length - 3] + u"...",
             metadata={
-                "len": assume_length,
+                "len": length,
                 "rem": [["!limit", "x", max_length - 3, max_length]],
             },
         )
-    return value[:max_length]
+    return value
+
+
+def format_and_strip(template, params, strip_string=strip_string):
+    """Format a string containing %s for placeholders and call `strip_string`
+    on each parameter. The string template itself does not have a maximum
+    length.
+
+    TODO: handle other placeholders, not just %s
+    """
+    chunks = template.split(u"%s")
+    if not chunks:
+        raise ValueError("No formatting placeholders found")
+
+    params = list(reversed(params))
+    rv_remarks = []
+    rv_original_length = 0
+    rv_length = 0
+    rv = []
+
+    def realign_remark(remark):
+        return [
+            (rv_length + x if isinstance(x, int_types) and i < 4 else x)
+            for i, x in enumerate(remark)
+        ]
+
+    for chunk in chunks[:-1]:
+        rv.append(chunk)
+        rv_length += len(chunk)
+        rv_original_length += len(chunk)
+        if not params:
+            raise ValueError("Not enough params.")
+        param = params.pop()
+
+        stripped_param = strip_string(param)
+        if isinstance(stripped_param, AnnotatedValue):
+            rv_remarks.extend(
+                realign_remark(remark) for remark in stripped_param.metadata["rem"]
+            )
+            stripped_param = stripped_param.value
+
+        rv_original_length += len(param)
+        rv_length += len(stripped_param)
+        rv.append(stripped_param)
+
+    rv.append(chunks[-1])
+    rv_length += len(chunks[-1])
+    rv_original_length += len(chunks[-1])
+
+    rv = u"".join(rv)
+    assert len(rv) == rv_length
+
+    if not rv_remarks:
+        return rv
+
+    return AnnotatedValue(
+        value=rv, metadata={"len": rv_original_length, "rem": rv_remarks}
+    )
 
 
 try:

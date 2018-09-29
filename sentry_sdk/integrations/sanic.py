@@ -7,6 +7,7 @@ from sentry_sdk._compat import urlparse, reraise
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi import RequestExtractor, _filter_headers
+from sentry_sdk.integrations.logging import ignore_logger
 
 from sanic import Sanic
 from sanic.router import Router
@@ -21,6 +22,11 @@ class SanicIntegration(Integration):
             # Sanic is async. We better have contextvars or we're going to leak
             # state between requests.
             raise RuntimeError("The sanic integration for Sentry requires Python 3.7+")
+
+        # Sanic 0.8 and older creates a logger named "root" and puts a
+        # stringified version of every exception in there (without exc_info),
+        # which our error deduplication can't detect.
+        ignore_logger("root")
 
         old_handle_request = Sanic.handle_request
 
