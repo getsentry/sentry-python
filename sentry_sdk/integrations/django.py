@@ -18,7 +18,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     safe_repr,
-    strip_string,
+    format_and_strip,
 )
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
@@ -165,6 +165,7 @@ def format_sql(sql, params):
     rv = []
 
     if isinstance(params, dict):
+        # convert sql with named parameters to sql with unnamed parameters
         conv = _FormatConverter(params)
         if params:
             sql = sql % conv
@@ -175,7 +176,7 @@ def format_sql(sql, params):
     for param in params or ():
         if param is None:
             rv.append("NULL")
-        param = strip_string(safe_repr(param))
+        param = safe_repr(param)
         rv.append(param)
 
     return sql, rv
@@ -186,8 +187,8 @@ def record_sql(sql, params):
 
     if real_params:
         try:
-            real_sql = real_sql % tuple(real_params)
-        except TypeError:
+            real_sql = format_and_strip(real_sql, real_params)
+        except Exception:
             pass
 
     # maybe category to 'django.%s.%s' % (vendor, alias or

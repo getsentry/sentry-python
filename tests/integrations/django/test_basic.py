@@ -121,4 +121,28 @@ def test_sql_queries(capture_events):
     event, = events
 
     crumb, = event["breadcrumbs"]
+
     assert crumb["message"] == """SELECT count(*) FROM people_person WHERE foo = 123"""
+
+
+@pytest.mark.django_db
+def test_sql_queries_large_params(capture_events):
+    from django.db import connection
+
+    sql = connection.cursor()
+
+    events = capture_events()
+    with pytest.raises(Exception):
+        # table doesn't even exist
+        sql.execute(
+            """SELECT count(*) FROM people_person WHERE foo = %s""", ["x" * 1000]
+        )
+
+    capture_message("HI")
+
+    event, = events
+
+    crumb, = event["breadcrumbs"]
+    assert crumb["message"] == (
+        "SELECT count(*) FROM people_person WHERE foo = '%s..." % ("x" * 508,)
+    )
