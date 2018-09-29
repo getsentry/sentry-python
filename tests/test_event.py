@@ -6,7 +6,7 @@ def test_flatten_metadata():
     assert flatten_metadata({"foo": ["bar"]}) == {"foo": [u"bar"]}
     assert flatten_metadata({"foo": [AnnotatedValue("bar", u"meta")]}) == {
         "foo": [u"bar"],
-        "": {"foo": {0: {"": u"meta"}}},
+        "": {"foo": {"0": {"": u"meta"}}},
     }
 
 
