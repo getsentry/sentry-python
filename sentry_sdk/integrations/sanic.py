@@ -26,6 +26,8 @@ class SanicIntegration(Integration):
         # Sanic 0.8 and older creates a logger named "root" and puts a
         # stringified version of every exception in there (without exc_info),
         # which our error deduplication can't detect.
+        #
+        # https://github.com/huge-success/sanic/issues/1332
         ignore_logger("root")
 
         old_handle_request = Sanic.handle_request
