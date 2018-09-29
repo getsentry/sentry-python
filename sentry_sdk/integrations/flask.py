@@ -135,7 +135,7 @@ def _add_user_to_event(event):
 
         user_info = event.setdefault("user", {})
 
-        if user_info.get("id", None) is None:
+        if "id" not in user_info:
             try:
                 user_info["id"] = user.get_id()
                 # TODO: more configurable user attrs here
