@@ -11,3 +11,6 @@ targets:
     type: sdk
     config:
       canonical: pypi:sentry-sdk
+
+changelog: CHANGES.md
+changelogPolicy: simple
