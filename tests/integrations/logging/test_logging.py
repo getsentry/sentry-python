@@ -1,8 +1,6 @@
 import pytest
 import logging
 
-import sentry_sdk
-
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 other_logger = logging.getLogger("testfoo")
@@ -33,11 +31,8 @@ def test_logging_defaults(integrations, sentry_init, capture_events):
 
     logger.info("bread")
     logger.critical("LOL")
-    assert not events
-
-    sentry_sdk.capture_exception(ValueError())
     event, = events
 
-    assert event["level"] == "error"
+    assert event["level"] == "fatal"
     assert any(crumb["message"] == "bread" for crumb in event["breadcrumbs"])
-    assert any(crumb["message"] == "LOL" for crumb in event["breadcrumbs"])
+    assert not any(crumb["message"] == "LOL" for crumb in event["breadcrumbs"])
