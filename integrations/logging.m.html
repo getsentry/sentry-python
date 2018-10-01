@@ -1040,6 +1040,14 @@ table {
   <div id="sidebar">
     <h1>Index</h1>
     <ul id="index">
+    <li class="set"><h3><a href="#header-variables">Module variables</a></h3>
+      
+  <ul>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.DEFAULT_EVENT_LEVEL">DEFAULT_EVENT_LEVEL</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.DEFAULT_LEVEL">DEFAULT_LEVEL</a></li>
+  </ul>
+
+    </li>
 
     <li class="set"><h3><a href="#header-functions">Functions</a></h3>
       
@@ -1120,6 +1128,8 @@ table {
 <span class="kn">from</span> <span class="nn">sentry_sdk.hub</span> <span class="kn">import</span> <span class="n">Hub</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
 
+<span class="n">DEFAULT_LEVEL</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span>
+<span class="n">DEFAULT_EVENT_LEVEL</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">ERROR</span>
 
 <span class="n">_IGNORED_LOGGERS</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span><span class="s2">&quot;sentry_sdk.errors&quot;</span><span class="p">])</span>
 
@@ -1135,7 +1145,7 @@ table {
 <span class="k">class</span> <span class="nc">LoggingIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
     <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;logging&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="n">SentryHandler</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">event_level</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -1151,8 +1161,8 @@ table {
 
 
 <span class="k">class</span> <span class="nc">SentryHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">,</span> <span class="nb">object</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">event_level</span><span class="p">):</span>
-        <span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">)</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">event_level</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_event_level</span> <span class="o">=</span> <span class="bp">None</span>
         <span class="k">else</span><span class="p">:</span>
@@ -1222,6 +1232,23 @@ table {
   </header>
 
   <section id="section-items">
+    <h2 class="section-title" id="header-variables">Module variables</h2>
+      <div class="item">
+      <p id="sentry_sdk.integrations.logging.DEFAULT_EVENT_LEVEL" class="name">var <span class="ident">DEFAULT_EVENT_LEVEL</span></p>
+      
+  
+  <div class="source_cont">
+</div>
+
+      </div>
+      <div class="item">
+      <p id="sentry_sdk.integrations.logging.DEFAULT_LEVEL" class="name">var <span class="ident">DEFAULT_LEVEL</span></p>
+      
+  
+  <div class="source_cont">
+</div>
+
+      </div>
 
     <h2 class="section-title" id="header-functions">Functions</h2>
       
@@ -1266,7 +1293,7 @@ of this integration.</p></div>
     <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">LoggingIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
     <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;logging&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="n">SentryHandler</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">event_level</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -1307,7 +1334,7 @@ of this integration.</p></div>
             
   <div class="item">
     <div class="name def" id="sentry_sdk.integrations.logging.LoggingIntegration.__init__">
-    <p>def <span class="ident">__init__</span>(</p><p>self, level=20, event_level=None)</p>
+    <p>def <span class="ident">__init__</span>(</p><p>self, level=20, event_level=40)</p>
     </div>
     
 
@@ -1317,7 +1344,7 @@ of this integration.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.LoggingIntegration.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.logging.LoggingIntegration.__init__" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">):</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="n">SentryHandler</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">event_level</span><span class="p">)</span>
 </pre></div>
 
@@ -1371,8 +1398,8 @@ the 'raw' message as determined by record.message is logged.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.logging.SentryHandler" class="source">
     <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">SentryHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">,</span> <span class="nb">object</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">event_level</span><span class="p">):</span>
-        <span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">)</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">event_level</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_event_level</span> <span class="o">=</span> <span class="bp">None</span>
         <span class="k">else</span><span class="p">:</span>
@@ -1453,7 +1480,7 @@ the 'raw' message as determined by record.message is logged.</p></div>
             
   <div class="item">
     <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.__init__">
-    <p>def <span class="ident">__init__</span>(</p><p>self, level, event_level)</p>
+    <p>def <span class="ident">__init__</span>(</p><p>self, level=20, event_level=40, **kwargs)</p>
     </div>
     
 
@@ -1464,8 +1491,8 @@ and the filter list to empty.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.logging.SentryHandler.__init__" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">event_level</span><span class="p">):</span>
-    <span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">)</span>
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">event_level</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_event_level</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="k">else</span><span class="p">:</span>
