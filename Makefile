@@ -39,10 +39,12 @@ travis-upload-docs:
 	$(MAKE) apidocs
 	cd build/apidocs && zip -r gh-pages ./sentry_sdk
 	$(MAKE) install-zeus-cli
-	zeus upload -t "application/zip+docs" build/apidocs/gh-pages.zip
+	zeus upload -t "application/zip+docs" build/apidocs/gh-pages.zip \
+		|| [[ ! "$(TRAVIS_BRANCH)" =~ ^release/ ]]
 .PHONY: travis-upload-docs
 
 travis-upload-dist: dist
 	$(MAKE) install-zeus-cli
-	zeus upload -t "application/zip+wheel" dist/*
+	zeus upload -t "application/zip+wheel" dist/* \
+		|| [[ ! "$(TRAVIS_BRANCH)" =~ ^release/ ]]
 .PHONY: travis-upload-dist
