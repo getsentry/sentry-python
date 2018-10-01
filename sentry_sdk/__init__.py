@@ -24,6 +24,7 @@ uncaught exceptions.  Additionally you can report arbitrary other exceptions:
 """
 from sentry_sdk.api import *  # noqa
 from sentry_sdk.api import __all__  # noqa
+from sentry_sdk.consts import VERSION  # noqa
 
 # modules we consider public
 __all__.append("integrations")
