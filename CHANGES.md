@@ -1,3 +1,12 @@
+# 0.3.7
+
+* Remove `repos` configuration option. There was never a way to make use of
+  this feature.
+* Fix a bug in `last_event_id`.
+* Add Django SQL queries to breadcrumbs.
+* Django integration won't set user attributes if they were already set.
+* Report correct SDK version to Sentry.
+
 # 0.3.6
 
 * Integration for Sanic
