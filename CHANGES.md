@@ -1,4 +1,4 @@
-# 0.3.7
+## 0.3.7
 
 * Remove `repos` configuration option. There was never a way to make use of
   this feature.
@@ -7,23 +7,23 @@
 * Django integration won't set user attributes if they were already set.
 * Report correct SDK version to Sentry.
 
-# 0.3.6
+## 0.3.6
 
 * Integration for Sanic
 
-# 0.3.5
+## 0.3.5
 
 * Integration for AWS Lambda
 * Fix mojibake when encoding local variable values
 
-# 0.3.4
+## 0.3.4
 
 * Performance improvement when storing breadcrumbs
 
-# 0.3.3
+## 0.3.3
 
 * Fix crash when breadcrumbs had to be trunchated
 
-# 0.3.2
+## 0.3.2
 
 * Fixed an issue where some paths where not properly sent as absolute paths
