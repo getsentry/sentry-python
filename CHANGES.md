@@ -1,3 +1,7 @@
+## 0.3.8
+
+* Nicer log level for internal errors.
+
 ## 0.3.7
 
 * Remove `repos` configuration option. There was never a way to make use of
