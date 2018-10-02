@@ -172,7 +172,7 @@ class Hub(with_metaclass(HubMeta)):
     def _capture_internal_exception(self, exc_info):
         """Capture an exception that is likely caused by a bug in the SDK
         itself."""
-        logger.debug("Internal error in sentry_sdk", exc_info=exc_info)
+        logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
     def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
         """Adds a breadcrumb.  The breadcrumbs are a dictionary with the
