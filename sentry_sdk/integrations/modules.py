@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
-from sentry_sdk.api import configure_scope
 from sentry_sdk.integrations import Integration
+from sentry_sdk.scope import add_global_event_processor
 
 _installed_modules = None
 
@@ -26,11 +26,11 @@ def _get_installed_modules():
 class ModulesIntegration(Integration):
     identifier = "modules"
 
-    def install(self):
-        with configure_scope() as scope:
-
-            @scope.add_event_processor
-            def processor(event, hint):
+    @classmethod
+    def install(cls):
+        @add_global_event_processor
+        def processor(event, hint):
+            if cls.current is not None:
                 if "modules" not in event:
                     event["modules"] = dict(_get_installed_modules())
-                return event
+            return event

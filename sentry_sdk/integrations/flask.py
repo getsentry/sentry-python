@@ -25,38 +25,61 @@ from flask.signals import (
 class FlaskIntegration(Integration):
     identifier = "flask"
 
-    def install(self):
-        appcontext_pushed.connect(_push_appctx)
-        appcontext_tearing_down.connect(_pop_appctx)
-        request_started.connect(_request_started)
-        got_request_exception.connect(_capture_exception)
+    @classmethod
+    def install(cls):
+        appcontext_pushed.connect(cls._push_appctx)
+        appcontext_tearing_down.connect(cls._pop_appctx)
+        request_started.connect(cls._request_started)
+        got_request_exception.connect(cls._capture_exception)
 
         old_app = Flask.__call__
 
         def sentry_patched_wsgi_app(self, environ, start_response):
+            if cls.current is None:
+                return old_app(self, environ, start_response)
+
             return run_wsgi_app(
                 lambda *a, **kw: old_app(self, *a, **kw), environ, start_response
             )
 
         Flask.__call__ = sentry_patched_wsgi_app
 
+    @classmethod
+    def _push_appctx(cls, *args, **kwargs):
+        if cls.current is None:
+            return
+        # always want to push scope regardless of whether WSGI app might already
+        # have (not the case for CLI for example)
+        hub = Hub.current
+        hub.push_scope()
 
-def _push_appctx(*args, **kwargs):
-    # always want to push scope regardless of whether WSGI app might already
-    # have (not the case for CLI for example)
-    hub = Hub.current
-    hub.push_scope()
+    @classmethod
+    def _pop_appctx(cls, *args, **kwargs):
+        if cls.current is None:
+            return
 
+        Hub.current.pop_scope_unsafe()
 
-def _pop_appctx(*args, **kwargs):
-    Hub.current.pop_scope_unsafe()
+    @classmethod
+    def _request_started(cls, sender, **kwargs):
+        if cls.current is None:
+            return
 
+        weak_request = weakref.ref(_request_ctx_stack.top.request)
+        app = _app_ctx_stack.top.app
+        with configure_scope() as scope:
+            scope.add_event_processor(_make_request_event_processor(app, weak_request))
 
-def _request_started(sender, **kwargs):
-    weak_request = weakref.ref(_request_ctx_stack.top.request)
-    app = _app_ctx_stack.top.app
-    with configure_scope() as scope:
-        scope.add_event_processor(_make_request_event_processor(app, weak_request))
+    @classmethod
+    def _capture_exception(cls, sender, exception, **kwargs):
+        hub = Hub.current
+        event, hint = event_from_exception(
+            exception,
+            with_locals=hub.client.options["with_locals"],
+            mechanism={"type": "flask", "handled": False},
+        )
+
+        hub.capture_event(event, hint=hint)
 
 
 class FlaskRequestExtractor(RequestExtractor):
@@ -80,17 +103,6 @@ class FlaskRequestExtractor(RequestExtractor):
 
     def size_of_file(self, file):
         return file.content_length
-
-
-def _capture_exception(sender, exception, **kwargs):
-    hub = Hub.current
-    event, hint = event_from_exception(
-        exception,
-        with_locals=hub.client.options["with_locals"],
-        mechanism={"type": "flask", "handled": False},
-    )
-
-    hub.capture_event(event, hint=hint)
 
 
 def _make_request_event_processor(app, weak_request):

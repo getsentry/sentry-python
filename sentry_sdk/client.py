@@ -15,6 +15,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO
+from sentry_sdk.integrations import setup_integrations
 
 
 def get_options(*args, **kwargs):
@@ -58,6 +59,10 @@ class Client(object):
                     request_bodies
                 )
             )
+
+        options["integrations"] = setup_integrations(
+            options["integrations"], with_defaults=options["default_integrations"]
+        )
 
     @property
     def dsn(self):

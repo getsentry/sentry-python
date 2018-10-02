@@ -17,13 +17,17 @@ import __main__ as lambda_bootstrap
 class AwsLambdaIntegration(Integration):
     identifier = "aws_lambda"
 
-    def install(self):
+    @classmethod
+    def install(cls):
         old_make_final_handler = lambda_bootstrap.make_final_handler
 
         def sentry_make_final_handler(*args, **kwargs):
             handler = old_make_final_handler(*args, **kwargs)
 
             def sentry_handler(event, context, *args, **kwargs):
+                if cls.current is None:
+                    return handler(event, context, *args, **kwargs)
+
                 hub = Hub.current
 
                 with hub.push_scope():

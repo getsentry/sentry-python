@@ -5,7 +5,6 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
 from sentry_sdk.transport import Transport, HttpTransport
 from sentry_sdk.client import Client, get_options
-from sentry_sdk.integrations import setup_integrations
 
 
 __all__ = ["Hub", "Scope", "Client", "Transport", "HttpTransport"]
@@ -41,9 +40,6 @@ def _init_on_hub(hub, args, kwargs):
     options = get_options(*args, **kwargs)
     client = Client(options)
     hub.bind_client(client)
-    setup_integrations(
-        options["integrations"] or [], with_defaults=options["default_integrations"]
-    )
     return _InitGuard(client)
 
 

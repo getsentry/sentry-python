@@ -40,7 +40,8 @@ else:
 class DjangoIntegration(Integration):
     identifier = "django"
 
-    def install(self):
+    @classmethod
+    def install(cls):
         install_sql_hook()
         # Patch in our custom middleware.
 
@@ -49,6 +50,9 @@ class DjangoIntegration(Integration):
         old_app = WSGIHandler.__call__
 
         def sentry_patched_wsgi_handler(self, environ, start_response):
+            if cls.current is None:
+                return old_app(self, environ, start_response)
+
             return run_wsgi_app(
                 lambda *a, **kw: old_app(self, *a, **kw), environ, start_response
             )
@@ -62,8 +66,11 @@ class DjangoIntegration(Integration):
         old_get_response = BaseHandler.get_response
 
         def sentry_patched_get_response(self, request):
-            with configure_scope() as scope:
-                scope.add_event_processor(_make_event_processor(weakref.ref(request)))
+            if cls.current is not None:
+                with configure_scope() as scope:
+                    scope.add_event_processor(
+                        _make_event_processor(weakref.ref(request))
+                    )
             return old_get_response(self, request)
 
         BaseHandler.get_response = sentry_patched_get_response

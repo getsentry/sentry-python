@@ -1,7 +1,8 @@
 """This package"""
 from threading import Lock
 
-from sentry_sdk.utils import logger
+from sentry_sdk.hub import Hub
+from sentry_sdk._compat import with_metaclass
 from sentry_sdk.consts import INTEGRATIONS as _installed_integrations
 
 
@@ -38,41 +39,89 @@ def setup_integrations(integrations, with_defaults=True):
     `with_defaults` is set to `True` then all default integrations are added
     unless they were already provided before.
     """
-    integrations = list(integrations)
+    integrations = dict(
+        (integration.identifier, integration) for integration in integrations or ()
+    )
+
     if with_defaults:
         for instance in get_default_integrations():
-            if not any(isinstance(x, type(instance)) for x in integrations):
-                integrations.append(instance)
+            integrations.setdefault(instance.identifier, instance)
 
-    for integration in integrations:
-        integration()
+    for identifier, integration in integrations.items():
+        assert identifier
+        assert identifier == integration.identifier
+
+        with _installer_lock:
+            if identifier in _installed_integrations:
+                continue
+
+            # Make sure the integration has defined `install` as classmethod
+            type(integration).install()
+            _installed_integrations.append(identifier)
+
+    return integrations
 
 
-class Integration(object):
-    """Baseclass for all integrations."""
-
+class IntegrationMeta(type):
     identifier = None
-    """A unique identifying string for the integration.  Integrations must
-    set this as a class attribute.
+    """A unique identifying string for the integration. Integrations must set
+    this as a class attribute.
     """
 
-    def install(self):
-        """An integration must implement all its code here.  When the
-        `setup_integrations` function runs it will invoke this unless the
-        integration was already activated elsewhere.
+    @property
+    def current(self):
+        """
+        Return the integration instance that was passed to the current hub's
+        (`Hub.current`) client.
+
+        This is only available after `Integration.install` has returned.
+
+        If this returns `None` this means that the integration is not enabled
+        for this client and it should not do anything.
+        """
+
+        return self._get_instance_from_hub(Hub.current)
+
+    @property
+    def main(self):
+        """
+        This is the same as `Integration.current` except that it uses
+        `Hub.main` instead of `Hub.current`. This is useful in certain (rare)
+        situations where an integration is only applicable to the main Hub's
+        client.
+        """
+        return self._get_instance_from_hub(Hub.main)
+
+    def install(cls):
+        """
+        Initialize the integration.
+
+        This function is only called once, ever. Configuration is not available
+        at this point, so the only thing to do here is to hook into exception
+        handlers, and perhaps do monkeypatches.
+
+        Inside those hooks `Integration.current` can be used to access the
+        instance again.
         """
         raise NotImplementedError()
 
-    def __call__(self):
-        assert self.identifier
-        with _installer_lock:
-            if self.identifier in _installed_integrations:
-                logger.warning(
-                    "%s integration for Sentry is already "
-                    "configured. Will ignore second configuration.",
-                    self.identifier,
-                )
-                return
+    def _get_instance_from_hub(self, hub):
+        if self.identifier not in _installed_integrations:
+            raise AssertionError("Access options on-demand, not in install()")
 
-            self.install()
-            _installed_integrations.append(self.identifier)
+        hub = Hub.current
+        if hub is None:
+            return
+        client = hub.client
+        if client is None:
+            return
+
+        return client.options["integrations"].get(self.identifier, None)
+
+
+class Integration(with_metaclass(IntegrationMeta)):
+    """Baseclass for all integrations.
+
+    To accept options for an integration, implement your own constructor that
+    saves those options on `self`.
+    """

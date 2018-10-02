@@ -2,22 +2,25 @@ from sentry_sdk import add_breadcrumb
 from sentry_sdk.integrations import Integration
 
 
+try:
+    from httplib import HTTPConnection
+except ImportError:
+    from http.client import HTTPConnection
+
+
 class StdlibIntegration(Integration):
     identifier = "stdlib"
 
-    def __init__(self):
-        try:
-            from httplib import HTTPConnection
-        except ImportError:
-            from http.client import HTTPConnection
-        self.httplib_connection_cls = HTTPConnection
-
-    def install_httplib(self):
-        real_putrequest = self.httplib_connection_cls.putrequest
-        real_getresponse = self.httplib_connection_cls.getresponse
+    @classmethod
+    def install_httplib(cls):
+        real_putrequest = HTTPConnection.putrequest
+        real_getresponse = HTTPConnection.getresponse
 
         def putrequest(self, method, url, *args, **kwargs):
             rv = real_putrequest(self, method, url, *args, **kwargs)
+            if cls.current is None:
+                return rv
+
             self._sentrysdk_data_dict = data = {}
 
             host = self.host
@@ -39,6 +42,9 @@ class StdlibIntegration(Integration):
 
         def getresponse(self, *args, **kwargs):
             rv = real_getresponse(self, *args, **kwargs)
+            if cls.current is None:
+                return rv
+
             data = getattr(self, "_sentrysdk_data_dict", None) or {}
 
             if "status_code" not in data:
@@ -52,8 +58,9 @@ class StdlibIntegration(Integration):
             )
             return rv
 
-        self.httplib_connection_cls.putrequest = putrequest
-        self.httplib_connection_cls.getresponse = getresponse
+        HTTPConnection.putrequest = putrequest
+        HTTPConnection.getresponse = getresponse
 
-    def install(self):
-        self.install_httplib()
+    @classmethod
+    def install(cls):
+        cls.install_httplib()
