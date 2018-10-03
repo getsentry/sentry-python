@@ -1,3 +1,7 @@
+## 0.3.9
+
+* Bugfixes for AWS Lambda integration: Using Zappa did not catch any exceptions.
+
 ## 0.3.8
 
 * Nicer log level for internal errors.

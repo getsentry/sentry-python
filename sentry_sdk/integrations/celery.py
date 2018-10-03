@@ -11,7 +11,7 @@ from sentry_sdk.integrations import Integration
 class CeleryIntegration(Integration):
     identifier = "celery"
 
-    @classmethod
+    @staticmethod
     def setup_once():
         task_prerun.connect(_handle_task_prerun, weak=False)
         task_postrun.connect(_handle_task_postrun, weak=False)
