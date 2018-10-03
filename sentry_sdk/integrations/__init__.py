@@ -57,8 +57,11 @@ def setup_integrations(integrations, with_defaults=True):
                     type(integration).setup_once()
                 except NotImplementedError:
                     if getattr(integration, "install", None) is not None:
-                        logger.warn("Integration %s: The install method is "
-                                    "deprecated. Use `setup_once`.", identifier)
+                        logger.warn(
+                            "Integration %s: The install method is "
+                            "deprecated. Use `setup_once`.",
+                            identifier,
+                        )
                         integration.install()
                     else:
                         raise

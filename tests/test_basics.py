@@ -176,21 +176,22 @@ def test_breadcrumbs(sentry_init, capture_events):
 
 
 def test_integration_scoping():
-    logger = logging.getLogger('test_basics')
+    logger = logging.getLogger("test_basics")
     events = []
     logging_integration = LoggingIntegration(event_level=logging.WARNING)
 
     # This client uses the logging integration
-    client_with_logging = Client(transport=events.append,
-                                 default_integrations=False,
-                                 integrations=[logging_integration])
+    client_with_logging = Client(
+        transport=events.append,
+        default_integrations=False,
+        integrations=[logging_integration],
+    )
     Hub.current.bind_client(client_with_logging)
-    logger.warning('This is a warning')
+    logger.warning("This is a warning")
 
     # This client does not
-    client_without_logging = Client(transport=events.append,
-                                    default_integrations=False)
+    client_without_logging = Client(transport=events.append, default_integrations=False)
     Hub.current.bind_client(client_without_logging)
-    logger.warning('This is not a warning')
+    logger.warning("This is not a warning")
 
     assert len(events) == 1
