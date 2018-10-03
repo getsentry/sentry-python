@@ -2,8 +2,7 @@
 from threading import Lock
 from collections import namedtuple
 
-from sentry_sdk.hub import Hub
-from sentry_sdk._compat import with_metaclass, iteritems
+from sentry_sdk._compat import iteritems
 
 
 _installer_lock = Lock()
@@ -64,13 +63,15 @@ IntegrationAttachment = namedtuple(
 )
 
 
-class IntegrationMeta(type):
-    identifier = None
-    """A unique identifying string for the integration. Integrations must set
-    this as a class attribute.
+class Integration(object):
+    """Baseclass for all integrations.
+
+    To accept options for an integration, implement your own constructor that
+    saves those options on `self`.
     """
 
-    def install(cls):
+    @staticmethod
+    def install():
         """
         Initialize the integration.
 
@@ -82,42 +83,3 @@ class IntegrationMeta(type):
         instance again.
         """
         raise NotImplementedError()
-
-    @property
-    def current_attachment(self):
-        """Returns the integration attachment for the current hub."""
-        return self.attachment_from_hub(Hub.current)
-
-    @property
-    def is_active(self):
-        """A faster shortcut for `current_attachment is not None`."""
-        hub = Hub.current
-        return (
-            self.identifier in _installed_integrations
-            and hub.client is not None
-            and hub.client.integrations.get(self.identifier) is not None
-        )
-
-    def attachment_from_hub(self, hub):
-        # If an integration is not installed at all we will never return
-        # an attachment for it.  This *should not* happen.
-        if self.identifier not in _installed_integrations:
-            return None
-
-        client = hub.client
-        if client is None:
-            return
-
-        integration = client.integrations.get(self.identifier, None)
-        if integration is None:
-            return
-
-        return IntegrationAttachment(hub=hub, integration=integration, client=client)
-
-
-class Integration(with_metaclass(IntegrationMeta)):
-    """Baseclass for all integrations.
-
-    To accept options for an integration, implement your own constructor that
-    saves those options on `self`.
-    """

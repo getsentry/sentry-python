@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 import weakref
 
-from sentry_sdk.hub import _should_send_default_pii
+from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi import RequestExtractor, run_wsgi_app
@@ -34,7 +34,7 @@ class FlaskIntegration(Integration):
         old_app = Flask.__call__
 
         def sentry_patched_wsgi_app(self, environ, start_response):
-            if not cls.is_active:
+            if Hub.current.get_integration(cls) is None:
                 return old_app(self, environ, start_response)
 
             return run_wsgi_app(
@@ -45,28 +45,27 @@ class FlaskIntegration(Integration):
 
     @classmethod
     def _push_appctx(cls, *args, **kwargs):
-        atch = cls.current_attachment
-        if atch is None:
-            return
-        # always want to push scope regardless of whether WSGI app might already
-        # have (not the case for CLI for example)
-        atch.hub.push_scope()
+        hub = Hub.current
+        if hub.get_integration(cls) is not None:
+            # always want to push scope regardless of whether WSGI app might already
+            # have (not the case for CLI for example)
+            hub.push_scope()
 
     @classmethod
     def _pop_appctx(cls, *args, **kwargs):
-        atch = cls.current_attachment
-        if atch is not None:
-            atch.hub.pop_scope_unsafe()
+        hub = Hub.current
+        if hub.get_integration(cls) is not None:
+            hub.pop_scope_unsafe()
 
     @classmethod
     def _request_started(cls, sender, **kwargs):
-        atch = cls.current_attachment
-        if atch is None:
+        hub = Hub.current
+        if hub.get_integration(cls) is None:
             return
 
         weak_request = weakref.ref(_request_ctx_stack.top.request)
         app = _app_ctx_stack.top.app
-        with atch.hub.configure_scope() as scope:
+        with hub.configure_scope() as scope:
             scope.add_event_processor(_make_request_event_processor(app, weak_request))
 
     @classmethod

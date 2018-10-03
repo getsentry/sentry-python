@@ -1,6 +1,6 @@
 import sys
 
-from sentry_sdk import Hub
+from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 
@@ -20,15 +20,16 @@ class ExcepthookIntegration(Integration):
 
 def _make_excepthook(old_excepthook):
     def sentry_sdk_excepthook(exctype, value, traceback):
-        atch = ExcepthookIntegration.current_attachment
-        if atch is not None:
+        hub = Hub.current
+        integration = hub.get_integration(ExcepthookIntegration)
+        if integration is not None:
             with capture_internal_exceptions():
                 event, hint = event_from_exception(
                     (exctype, value, traceback),
-                    with_locals=atch.client.options["with_locals"],
+                    with_locals=hub.client.options["with_locals"],
                     mechanism={"type": "excepthook", "handled": False},
                 )
-                atch.hub.capture_event(event, hint=hint)
+                hub.capture_event(event, hint=hint)
 
         return old_excepthook(exctype, value, traceback)
 

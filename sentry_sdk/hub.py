@@ -3,7 +3,7 @@ import copy
 from datetime import datetime
 from contextlib import contextmanager
 
-from sentry_sdk._compat import with_metaclass
+from sentry_sdk._compat import with_metaclass, string_types
 from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     exc_info_from_error,
@@ -100,6 +100,20 @@ class Hub(with_metaclass(HubMeta)):
         """
         with self:
             return callback()
+
+    def get_integration(self, name_or_class):
+        """Returns the integration for this hub by name or class.  If there
+        is no client bound or the client does not have that integration
+        then `None` is returned.
+
+        If the return value is not `None` the hub is guaranteed to have a
+        client attached.
+        """
+        if not isinstance(name_or_class, string_types):
+            name_or_class = name_or_class.identifier
+        client = self._stack[-1][0]
+        if client is not None:
+            return client.integrations.get(name_or_class)
 
     @property
     def client(self):

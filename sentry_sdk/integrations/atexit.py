@@ -37,7 +37,8 @@ class AtexitIntegration(Integration):
         @atexit.register
         def _shutdown():
             logger.debug("atexit: got shutdown signal")
-            atch = AtexitIntegration.attachment_from_hub(Hub.main)
-            if atch is not None:
+            hub = Hub.main
+            integration = hub.get_integration(AtexitIntegration)
+            if integration is not None:
                 logger.debug("atexit: shutting down client")
-                atch.client.close(shutdown_callback=atch.integration.callback)
+                hub.client.close(shutdown_callback=integration.callback)

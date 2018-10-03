@@ -1,9 +1,9 @@
 from __future__ import absolute_import
-from __future__ import print_function
 
 import logging
 import datetime
 
+from sentry_sdk.hub import Hub
 from sentry_sdk.utils import (
     to_string,
     event_from_exception,
@@ -36,9 +36,9 @@ class LoggingIntegration(Integration):
         old_callhandlers = logging.Logger.callHandlers
 
         def sentry_patched_callhandlers(self, record):
-            atch = cls.current_attachment
-            if atch is not None:
-                atch.integration._handler.handle(record)
+            integration = Hub.current.get_integration(LoggingIntegration)
+            if integration is not None:
+                integration._handler.handle(record)
             return old_callhandlers(self, record)
 
         logging.Logger.callHandlers = sentry_patched_callhandlers
@@ -73,8 +73,9 @@ class SentryHandler(logging.Handler, object):
         if not self.can_record(record):
             return
 
-        atch = LoggingIntegration.current_attachment
-        if atch is None:
+        hub = Hub.current
+        integration = hub.get_integration(LoggingIntegration)
+        if integration is None:
             return
 
         if self._should_create_event(record):
@@ -84,7 +85,7 @@ class SentryHandler(logging.Handler, object):
                 if record.exc_info is not None and record.exc_info[0] is not None:
                     event, hint = event_from_exception(
                         record.exc_info,
-                        with_locals=atch.client.options["with_locals"],
+                        with_locals=hub.client.options["with_locals"],
                         mechanism={"type": "logging", "handled": True},
                     )
                 else:
@@ -97,10 +98,10 @@ class SentryHandler(logging.Handler, object):
                     "params": record.args,
                 }
 
-                atch.hub.capture_event(event, hint=hint)
+                hub.capture_event(event, hint=hint)
 
         with capture_internal_exceptions():
-            atch.hub.add_breadcrumb(
+            hub.add_breadcrumb(
                 self._breadcrumb_from_record(record), hint={"log_record": record}
             )
 

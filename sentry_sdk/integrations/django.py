@@ -12,7 +12,7 @@ try:
 except ImportError:
     from django.core.urlresolvers import resolve
 
-from sentry_sdk import Hub, configure_scope, add_breadcrumb
+from sentry_sdk import Hub
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -50,7 +50,7 @@ class DjangoIntegration(Integration):
         old_app = WSGIHandler.__call__
 
         def sentry_patched_wsgi_handler(self, environ, start_response):
-            if not cls.is_active:
+            if Hub.current.get_integration(cls) is None:
                 return old_app(self, environ, start_response)
 
             return run_wsgi_app(
@@ -66,8 +66,10 @@ class DjangoIntegration(Integration):
         old_get_response = BaseHandler.get_response
 
         def sentry_patched_get_response(self, request):
-            if not cls.is_active:
-                with configure_scope() as scope:
+            hub = Hub.current
+            integration = hub.get_integration(cls)
+            if integration is not None:
+                with hub.configure_scope() as scope:
                     scope.add_event_processor(
                         _make_event_processor(weakref.ref(request))
                     )
@@ -106,14 +108,15 @@ def _make_event_processor(weak_request):
 
 
 def _got_request_exception(request=None, **kwargs):
-    atch = DjangoIntegration.current_attachment
-    if atch is not None:
+    hub = Hub.current
+    integration = hub.get_integration(DjangoIntegration)
+    if integration is not None:
         event, hint = event_from_exception(
             sys.exc_info(),
-            with_locals=atch.client.options["with_locals"],
+            with_locals=hub.client.options["with_locals"],
             mechanism={"type": "django", "handled": False},
         )
-        atch.hub.capture_event(event, hint=hint)
+        hub.capture_event(event, hint=hint)
 
 
 class DjangoRequestExtractor(RequestExtractor):
@@ -192,7 +195,8 @@ def format_sql(sql, params):
 
 
 def record_sql(sql, params):
-    if not DjangoIntegration.is_active:
+    hub = Hub.current
+    if hub.get_integration(DjangoIntegration) is None:
         return
     real_sql, real_params = format_sql(sql, params)
 
@@ -202,7 +206,7 @@ def record_sql(sql, params):
         except Exception:
             pass
 
-    add_breadcrumb(message=real_sql, category="query")
+    hub.add_breadcrumb(message=real_sql, category="query")
 
 
 def install_sql_hook():

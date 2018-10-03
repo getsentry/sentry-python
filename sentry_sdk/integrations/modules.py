@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 
@@ -30,7 +31,7 @@ class ModulesIntegration(Integration):
     def install(cls):
         @add_global_event_processor
         def processor(event, hint):
-            if cls.is_active:
+            if Hub.current.get_integration(cls) is not None:
                 if "modules" not in event:
                     event["modules"] = dict(_get_installed_modules())
             return event

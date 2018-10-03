@@ -1,4 +1,4 @@
-from sentry_sdk import add_breadcrumb
+from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 
 
@@ -18,7 +18,7 @@ class StdlibIntegration(Integration):
 
         def putrequest(self, method, url, *args, **kwargs):
             rv = real_putrequest(self, method, url, *args, **kwargs)
-            if not cls.is_active:
+            if Hub.current.get_integration(cls) is None:
                 return rv
 
             self._sentrysdk_data_dict = data = {}
@@ -42,7 +42,8 @@ class StdlibIntegration(Integration):
 
         def getresponse(self, *args, **kwargs):
             rv = real_getresponse(self, *args, **kwargs)
-            if not cls.is_active:
+            hub = Hub.current
+            if hub.get_integration(cls) is None:
                 return rv
 
             data = getattr(self, "_sentrysdk_data_dict", None) or {}
@@ -50,7 +51,7 @@ class StdlibIntegration(Integration):
             if "status_code" not in data:
                 data["status_code"] = rv.status
                 data["reason"] = rv.reason
-            add_breadcrumb(
+            hub.add_breadcrumb(
                 type="http",
                 category="httplib",
                 data=data,
