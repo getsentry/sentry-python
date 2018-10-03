@@ -31,8 +31,8 @@ class LoggingIntegration(Integration):
     def __init__(self, level=DEFAULT_LEVEL, event_level=DEFAULT_EVENT_LEVEL):
         self._handler = SentryHandler(level=level, event_level=event_level)
 
-    @classmethod
-    def setup_once(cls):
+    @staticmethod
+    def setup_once():
         old_callhandlers = logging.Logger.callHandlers
 
         def sentry_patched_callhandlers(self, record):

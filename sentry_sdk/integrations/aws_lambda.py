@@ -17,8 +17,8 @@ import runtime as lambda_runtime
 class AwsLambdaIntegration(Integration):
     identifier = "aws_lambda"
 
-    @classmethod
-    def setup_once(cls):
+    @staticmethod
+    def setup_once():
         old_make_final_handler = lambda_bootstrap.make_final_handler
 
         def sentry_make_final_handler(*args, **kwargs):
@@ -26,7 +26,7 @@ class AwsLambdaIntegration(Integration):
 
             def sentry_handler(event, context, *args, **kwargs):
                 hub = Hub.current
-                integration = hub.get_integration(cls)
+                integration = hub.get_integration(AwsLambdaIntegration)
                 if integration is None:
                     return handler(event, context, *args, **kwargs)
 
@@ -58,7 +58,7 @@ class AwsLambdaIntegration(Integration):
         def sentry_report_done(*args, **kwargs):
             with capture_internal_exceptions():
                 hub = Hub.current
-                integration = hub.get_integration(cls)
+                integration = hub.get_integration(AwsLambdaIntegration)
                 if integration is not None:
                     # Flush out the event queue before AWS kills the
                     # process. This is not threadsafe.

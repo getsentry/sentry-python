@@ -17,8 +17,8 @@ from sanic.handlers import ErrorHandler
 class SanicIntegration(Integration):
     identifier = "sanic"
 
-    @classmethod
-    def setup_once(cls):
+    @staticmethod
+    def setup_once():
         if sys.version_info < (3, 7):
             # Sanic is async. We better have contextvars or we're going to leak
             # state between requests.
@@ -35,7 +35,7 @@ class SanicIntegration(Integration):
 
         async def sentry_handle_request(self, request, *args, **kwargs):
             hub = Hub.current
-            if hub.get_integration(cls) is None:
+            if hub.get_integration(SanicIntegration) is None:
                 response = old_handle_request(self, request, *args, **kwargs)
             else:
                 weak_request = weakref.ref(request)
@@ -55,7 +55,7 @@ class SanicIntegration(Integration):
         def sentry_router_get(self, request):
             rv = old_router_get(self, request)
             hub = Hub.current
-            if hub.get_integration(cls) is not None:
+            if hub.get_integration(SanicIntegration) is not None:
                 with capture_internal_exceptions():
                     with hub.configure_scope() as scope:
                         scope.transaction = rv[0].__name__
@@ -69,7 +69,7 @@ class SanicIntegration(Integration):
             _capture_exception(exception)
             old_error_handler = old_error_handler_lookup(self, exception)
 
-            if Hub.current.get_integration(cls) is None:
+            if Hub.current.get_integration(SanicIntegration) is None:
                 return old_error_handler
 
             async def sentry_wrapped_error_handler(request, exception):

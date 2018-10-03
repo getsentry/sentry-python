@@ -40,8 +40,8 @@ else:
 class DjangoIntegration(Integration):
     identifier = "django"
 
-    @classmethod
-    def setup_once(cls):
+    @staticmethod
+    def setup_once():
         install_sql_hook()
         # Patch in our custom middleware.
 
@@ -50,7 +50,7 @@ class DjangoIntegration(Integration):
         old_app = WSGIHandler.__call__
 
         def sentry_patched_wsgi_handler(self, environ, start_response):
-            if Hub.current.get_integration(cls) is None:
+            if Hub.current.get_integration(DjangoIntegration) is None:
                 return old_app(self, environ, start_response)
 
             return run_wsgi_app(
@@ -67,7 +67,7 @@ class DjangoIntegration(Integration):
 
         def sentry_patched_get_response(self, request):
             hub = Hub.current
-            integration = hub.get_integration(cls)
+            integration = hub.get_integration(DjangoIntegration)
             if integration is not None:
                 with hub.configure_scope() as scope:
                     scope.add_event_processor(
@@ -209,7 +209,7 @@ def record_sql(sql, params):
     hub.add_breadcrumb(message=real_sql, category="query")
 
 
-def setup_once_sql_hook():
+def install_sql_hook():
     """If installed this causes Django's queries to be captured."""
     try:
         from django.db.backends.utils import CursorWrapper

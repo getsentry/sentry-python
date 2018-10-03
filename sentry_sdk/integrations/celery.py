@@ -12,45 +12,45 @@ class CeleryIntegration(Integration):
     identifier = "celery"
 
     @classmethod
-    def setup_once(cls):
-        task_prerun.connect(cls._handle_task_prerun, weak=False)
-        task_postrun.connect(cls._handle_task_postrun, weak=False)
-        task_failure.connect(cls._process_failure_signal, weak=False)
+    def setup_once():
+        task_prerun.connect(_handle_task_prerun, weak=False)
+        task_postrun.connect(_handle_task_postrun, weak=False)
+        task_failure.connect(_process_failure_signal, weak=False)
 
-    @classmethod
-    def _process_failure_signal(cls, sender, task_id, einfo, **kw):
-        hub = Hub.current
-        integration = hub.get_integration(cls)
-        if integration is None:
-            return
 
-        if hasattr(sender, "throws") and isinstance(einfo.exception, sender.throws):
-            return
+def _process_failure_signal(sender, task_id, einfo, **kw):
+    hub = Hub.current
+    integration = hub.get_integration(CeleryIntegration)
+    if integration is None:
+        return
 
-        if isinstance(einfo.exception, SoftTimeLimitExceeded):
-            with hub.push_scope() as scope:
-                scope.fingerprint = [
-                    "celery",
-                    "SoftTimeLimitExceeded",
-                    getattr(sender, "name", sender),
-                ]
-                _capture_event(hub, einfo.exc_info)
-        else:
+    if hasattr(sender, "throws") and isinstance(einfo.exception, sender.throws):
+        return
+
+    if isinstance(einfo.exception, SoftTimeLimitExceeded):
+        with hub.push_scope() as scope:
+            scope.fingerprint = [
+                "celery",
+                "SoftTimeLimitExceeded",
+                getattr(sender, "name", sender),
+            ]
             _capture_event(hub, einfo.exc_info)
+    else:
+        _capture_event(hub, einfo.exc_info)
 
-    @classmethod
-    def _handle_task_prerun(cls, sender, task, **kw):
-        hub = Hub.current
-        if hub.get_integration(cls) is not None:
-            scope = hub.push_scope()
-            with capture_internal_exceptions():
-                scope.transaction = task.name
 
-    @classmethod
-    def _handle_task_postrun(cls, sender, task_id, task, **kw):
-        hub = Hub.current
-        if hub.get_integration(cls) is not None:
-            hub.pop_scope_unsafe()
+def _handle_task_prerun(sender, task, **kw):
+    hub = Hub.current
+    if hub.get_integration(CeleryIntegration) is not None:
+        scope = hub.push_scope()
+        with capture_internal_exceptions():
+            scope.transaction = task.name
+
+
+def _handle_task_postrun(sender, task_id, task, **kw):
+    hub = Hub.current
+    if hub.get_integration(CeleryIntegration) is not None:
+        hub.pop_scope_unsafe()
 
 
 def _capture_event(hub, exc_info):

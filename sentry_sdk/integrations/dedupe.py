@@ -10,11 +10,11 @@ class DedupeIntegration(Integration):
     def __init__(self):
         self._last_seen = ContextVar("last-seen")
 
-    @classmethod
-    def setup_once(cls):
+    @staticmethod
+    def setup_once():
         @add_global_event_processor
         def processor(event, hint):
-            integration = Hub.current.get_integration(cls)
+            integration = Hub.current.get_integration(DedupeIntegration)
             if integration is not None:
                 exc_info = hint.get("exc_info", None)
                 if exc_info is not None:
