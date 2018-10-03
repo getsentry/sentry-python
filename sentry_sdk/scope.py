@@ -160,7 +160,7 @@ class Scope(object):
                     return _drop(event, processor, "error processor")
                 event = new_event
 
-        for processor in chain(self._event_processors, global_event_processors):
+        for processor in chain(global_event_processors, self._event_processors):
             new_event = event
             with capture_internal_exceptions():
                 new_event = processor(event, hint)

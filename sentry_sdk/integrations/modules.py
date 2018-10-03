@@ -30,7 +30,7 @@ class ModulesIntegration(Integration):
     def install(cls):
         @add_global_event_processor
         def processor(event, hint):
-            if cls.current is not None:
+            if cls.is_active:
                 if "modules" not in event:
                     event["modules"] = dict(_get_installed_modules())
             return event

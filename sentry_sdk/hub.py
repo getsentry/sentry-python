@@ -16,12 +16,6 @@ from sentry_sdk.utils import (
 _local = ContextVar("sentry_current_hub")
 
 
-def _get_client_options():
-    hub = Hub.current
-    if hub and hub.client:
-        return hub.client.options
-
-
 def _should_send_default_pii():
     client = Hub.current.client
     if not client:

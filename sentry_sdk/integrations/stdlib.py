@@ -18,7 +18,7 @@ class StdlibIntegration(Integration):
 
         def putrequest(self, method, url, *args, **kwargs):
             rv = real_putrequest(self, method, url, *args, **kwargs)
-            if cls.current is None:
+            if not cls.is_active:
                 return rv
 
             self._sentrysdk_data_dict = data = {}
@@ -42,7 +42,7 @@ class StdlibIntegration(Integration):
 
         def getresponse(self, *args, **kwargs):
             rv = real_getresponse(self, *args, **kwargs)
-            if cls.current is None:
+            if not cls.is_active:
                 return rv
 
             data = getattr(self, "_sentrysdk_data_dict", None) or {}

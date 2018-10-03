@@ -1,7 +1,7 @@
 import json
 import sys
 
-from sentry_sdk.hub import Hub, _should_send_default_pii, _get_client_options
+from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -44,8 +44,8 @@ class RequestExtractor(object):
         self.request = request
 
     def extract_into_event(self, event):
-        client_options = _get_client_options()
-        if client_options is None:
+        client = Hub.current.client
+        if client is None:
             return
 
         content_length = self.content_length()
@@ -55,7 +55,7 @@ class RequestExtractor(object):
         if _should_send_default_pii():
             request_info["cookies"] = dict(self.cookies())
 
-        bodies = client_options["request_bodies"]
+        bodies = client.options["request_bodies"]
         if (
             bodies == "never"
             or (bodies == "small" and content_length > 10 ** 3)

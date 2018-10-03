@@ -32,15 +32,12 @@ class AtexitIntegration(Integration):
             callback = default_shutdown_callback
         self.callback = callback
 
-    @classmethod
-    def install(cls):
+    @staticmethod
+    def install():
         @atexit.register
         def _shutdown():
-            if cls.main is None:
-                return
-
-            main_client = Hub.main.client
             logger.debug("atexit: got shutdown signal")
-            if main_client is not None:
+            atch = AtexitIntegration.attachment_from_hub(Hub.main)
+            if atch is not None:
                 logger.debug("atexit: shutting down client")
-                main_client.close(shutdown_callback=cls.main.callback)
+                atch.client.close(shutdown_callback=atch.integration.callback)

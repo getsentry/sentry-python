@@ -60,7 +60,7 @@ class Client(object):
                 )
             )
 
-        options["integrations"] = setup_integrations(
+        self.integrations = setup_integrations(
             options["integrations"], with_defaults=options["default_integrations"]
         )
 
@@ -82,7 +82,9 @@ class Client(object):
             if event.get(key) is None:
                 event[key] = self.options[key]
         if event.get("sdk") is None:
-            event["sdk"] = SDK_INFO
+            sdk_info = dict(SDK_INFO)
+            sdk_info["integrations"] = sorted(self.integrations.keys())
+            event["sdk"] = sdk_info
 
         if event.get("platform") is None:
             event["platform"] = "python"

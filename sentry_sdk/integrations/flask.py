@@ -2,7 +2,6 @@ from __future__ import absolute_import
 
 import weakref
 
-from sentry_sdk import Hub, configure_scope
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
@@ -35,7 +34,7 @@ class FlaskIntegration(Integration):
         old_app = Flask.__call__
 
         def sentry_patched_wsgi_app(self, environ, start_response):
-            if cls.current is None:
+            if not cls.is_active:
                 return old_app(self, environ, start_response)
 
             return run_wsgi_app(
@@ -46,40 +45,41 @@ class FlaskIntegration(Integration):
 
     @classmethod
     def _push_appctx(cls, *args, **kwargs):
-        if cls.current is None:
+        atch = cls.current_attachment
+        if atch is None:
             return
         # always want to push scope regardless of whether WSGI app might already
         # have (not the case for CLI for example)
-        hub = Hub.current
-        hub.push_scope()
+        atch.hub.push_scope()
 
     @classmethod
     def _pop_appctx(cls, *args, **kwargs):
-        if cls.current is None:
-            return
-
-        Hub.current.pop_scope_unsafe()
+        atch = cls.current_attachment
+        if atch is not None:
+            atch.hub.pop_scope_unsafe()
 
     @classmethod
     def _request_started(cls, sender, **kwargs):
-        if cls.current is None:
+        atch = cls.current_attachment
+        if atch is None:
             return
 
         weak_request = weakref.ref(_request_ctx_stack.top.request)
         app = _app_ctx_stack.top.app
-        with configure_scope() as scope:
+        with atch.hub.configure_scope() as scope:
             scope.add_event_processor(_make_request_event_processor(app, weak_request))
 
     @classmethod
     def _capture_exception(cls, sender, exception, **kwargs):
-        hub = Hub.current
+        atch = cls.current_attachment
+        if atch is None:
+            return
         event, hint = event_from_exception(
             exception,
-            with_locals=hub.client.options["with_locals"],
+            with_locals=atch.client.options["with_locals"],
             mechanism={"type": "flask", "handled": False},
         )
-
-        hub.capture_event(event, hint=hint)
+        atch.hub.capture_event(event, hint=hint)
 
 
 class FlaskRequestExtractor(RequestExtractor):

@@ -9,7 +9,6 @@ from sentry_sdk.utils import (
     event_from_exception,
     capture_internal_exceptions,
 )
-from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 
 DEFAULT_LEVEL = logging.INFO
@@ -37,8 +36,9 @@ class LoggingIntegration(Integration):
         old_callhandlers = logging.Logger.callHandlers
 
         def sentry_patched_callhandlers(self, record):
-            if cls.current is not None:
-                cls.current._handler.handle(record)
+            atch = cls.current_attachment
+            if atch is not None:
+                atch.integration._handler.handle(record)
             return old_callhandlers(self, record)
 
         logging.Logger.callHandlers = sentry_patched_callhandlers
@@ -73,8 +73,8 @@ class SentryHandler(logging.Handler, object):
         if not self.can_record(record):
             return
 
-        hub = Hub.current
-        if hub.client is None:
+        atch = LoggingIntegration.current_attachment
+        if atch is None:
             return
 
         if self._should_create_event(record):
@@ -84,7 +84,7 @@ class SentryHandler(logging.Handler, object):
                 if record.exc_info is not None and record.exc_info[0] is not None:
                     event, hint = event_from_exception(
                         record.exc_info,
-                        with_locals=hub.client.options["with_locals"],
+                        with_locals=atch.client.options["with_locals"],
                         mechanism={"type": "logging", "handled": True},
                     )
                 else:
@@ -97,10 +97,10 @@ class SentryHandler(logging.Handler, object):
                     "params": record.args,
                 }
 
-                hub.capture_event(event, hint=hint)
+                atch.hub.capture_event(event, hint=hint)
 
         with capture_internal_exceptions():
-            hub.add_breadcrumb(
+            atch.hub.add_breadcrumb(
                 self._breadcrumb_from_record(record), hint={"log_record": record}
             )
 

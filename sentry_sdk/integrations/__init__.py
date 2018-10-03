@@ -1,16 +1,17 @@
 """This package"""
 from threading import Lock
+from collections import namedtuple
 
 from sentry_sdk.hub import Hub
-from sentry_sdk._compat import with_metaclass
-from sentry_sdk.consts import INTEGRATIONS as _installed_integrations
+from sentry_sdk._compat import with_metaclass, iteritems
 
 
 _installer_lock = Lock()
+_installed_integrations = set()
 
 
-def get_default_integrations():
-    """Returns an iterator of default integration instances.
+def iter_default_integrations():
+    """Returns an iterator of default integration classes.
 
     This returns the following default integration:
 
@@ -26,12 +27,12 @@ def get_default_integrations():
     from sentry_sdk.integrations.atexit import AtexitIntegration
     from sentry_sdk.integrations.modules import ModulesIntegration
 
-    yield LoggingIntegration()
-    yield StdlibIntegration()
-    yield ExcepthookIntegration()
-    yield DedupeIntegration()
-    yield AtexitIntegration()
-    yield ModulesIntegration()
+    yield LoggingIntegration
+    yield StdlibIntegration
+    yield ExcepthookIntegration
+    yield DedupeIntegration
+    yield AtexitIntegration
+    yield ModulesIntegration
 
 
 def setup_integrations(integrations, with_defaults=True):
@@ -44,22 +45,23 @@ def setup_integrations(integrations, with_defaults=True):
     )
 
     if with_defaults:
-        for instance in get_default_integrations():
-            integrations.setdefault(instance.identifier, instance)
+        for integration_cls in iter_default_integrations():
+            if integration_cls.identifier not in integrations:
+                instance = integration_cls()
+                integrations[instance.identifier] = instance
 
-    for identifier, integration in integrations.items():
-        assert identifier
-        assert identifier == integration.identifier
-
+    for identifier, integration in iteritems(integrations):
         with _installer_lock:
-            if identifier in _installed_integrations:
-                continue
-
-            # Make sure the integration has defined `install` as classmethod
-            type(integration).install()
-            _installed_integrations.append(identifier)
+            if identifier not in _installed_integrations:
+                type(integration).install()
+                _installed_integrations.add(identifier)
 
     return integrations
+
+
+IntegrationAttachment = namedtuple(
+    "IntegrationAttachment", ["integration", "client", "hub"]
+)
 
 
 class IntegrationMeta(type):
@@ -67,30 +69,6 @@ class IntegrationMeta(type):
     """A unique identifying string for the integration. Integrations must set
     this as a class attribute.
     """
-
-    @property
-    def current(self):
-        """
-        Return the integration instance that was passed to the current hub's
-        (`Hub.current`) client.
-
-        This is only available after `Integration.install` has returned.
-
-        If this returns `None` this means that the integration is not enabled
-        for this client and it should not do anything.
-        """
-
-        return self._get_instance_from_hub(Hub.current)
-
-    @property
-    def main(self):
-        """
-        This is the same as `Integration.current` except that it uses
-        `Hub.main` instead of `Hub.current`. This is useful in certain (rare)
-        situations where an integration is only applicable to the main Hub's
-        client.
-        """
-        return self._get_instance_from_hub(Hub.main)
 
     def install(cls):
         """
@@ -105,18 +83,36 @@ class IntegrationMeta(type):
         """
         raise NotImplementedError()
 
-    def _get_instance_from_hub(self, hub):
-        if self.identifier not in _installed_integrations:
-            raise AssertionError("Access options on-demand, not in install()")
+    @property
+    def current_attachment(self):
+        """Returns the integration attachment for the current hub."""
+        return self.attachment_from_hub(Hub.current)
 
+    @property
+    def is_active(self):
+        """A faster shortcut for `current_attachment is not None`."""
         hub = Hub.current
-        if hub is None:
-            return
+        return (
+            self.identifier in _installed_integrations
+            and hub.client is not None
+            and hub.client.integrations.get(self.identifier) is not None
+        )
+
+    def attachment_from_hub(self, hub):
+        # If an integration is not installed at all we will never return
+        # an attachment for it.  This *should not* happen.
+        if self.identifier not in _installed_integrations:
+            return None
+
         client = hub.client
         if client is None:
             return
 
-        return client.options["integrations"].get(self.identifier, None)
+        integration = client.integrations.get(self.identifier, None)
+        if integration is None:
+            return
+
+        return IntegrationAttachment(hub=hub, integration=integration, client=client)
 
 
 class Integration(with_metaclass(IntegrationMeta)):

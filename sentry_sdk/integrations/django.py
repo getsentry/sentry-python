@@ -50,7 +50,7 @@ class DjangoIntegration(Integration):
         old_app = WSGIHandler.__call__
 
         def sentry_patched_wsgi_handler(self, environ, start_response):
-            if cls.current is None:
+            if not cls.is_active:
                 return old_app(self, environ, start_response)
 
             return run_wsgi_app(
@@ -66,7 +66,7 @@ class DjangoIntegration(Integration):
         old_get_response = BaseHandler.get_response
 
         def sentry_patched_get_response(self, request):
-            if cls.current is not None:
+            if not cls.is_active:
                 with configure_scope() as scope:
                     scope.add_event_processor(
                         _make_event_processor(weakref.ref(request))
@@ -106,14 +106,14 @@ def _make_event_processor(weak_request):
 
 
 def _got_request_exception(request=None, **kwargs):
-    hub = Hub.current
-    event, hint = event_from_exception(
-        sys.exc_info(),
-        with_locals=hub.client.options["with_locals"],
-        mechanism={"type": "django", "handled": False},
-    )
-
-    hub.capture_event(event, hint=hint)
+    atch = DjangoIntegration.current_attachment
+    if atch is not None:
+        event, hint = event_from_exception(
+            sys.exc_info(),
+            with_locals=atch.client.options["with_locals"],
+            mechanism={"type": "django", "handled": False},
+        )
+        atch.hub.capture_event(event, hint=hint)
 
 
 class DjangoRequestExtractor(RequestExtractor):
@@ -192,6 +192,8 @@ def format_sql(sql, params):
 
 
 def record_sql(sql, params):
+    if not DjangoIntegration.is_active:
+        return
     real_sql, real_params = format_sql(sql, params)
 
     if real_params:
@@ -199,9 +201,6 @@ def record_sql(sql, params):
             real_sql = format_and_strip(real_sql, real_params)
         except Exception:
             pass
-
-    # maybe category to 'django.%s.%s' % (vendor, alias or
-    #   'default') ?
 
     add_breadcrumb(message=real_sql, category="query")
 

@@ -11,9 +11,6 @@ from sentry_sdk.integrations import Integration
 class CeleryIntegration(Integration):
     identifier = "celery"
 
-    def __init__(self):
-        pass
-
     @classmethod
     def install(cls):
         task_prerun.connect(cls._handle_task_prerun, weak=False)
@@ -22,50 +19,45 @@ class CeleryIntegration(Integration):
 
     @classmethod
     def _process_failure_signal(cls, sender, task_id, einfo, **kw):
-        if cls.current is None:
+        atch = cls.current_attachment
+        if atch is None:
             return
 
         if hasattr(sender, "throws") and isinstance(einfo.exception, sender.throws):
             return
 
-        hub = Hub.current
         if isinstance(einfo.exception, SoftTimeLimitExceeded):
-            with hub.push_scope():
-                with hub.configure_scope() as scope:
-                    scope.fingerprint = [
-                        "celery",
-                        "SoftTimeLimitExceeded",
-                        getattr(sender, "name", sender),
-                    ]
-
-                _capture_event(hub, einfo.exc_info)
+            with atch.hub.push_scope() as scope:
+                scope.fingerprint = [
+                    "celery",
+                    "SoftTimeLimitExceeded",
+                    getattr(sender, "name", sender),
+                ]
+                _capture_event(atch, einfo.exc_info)
         else:
-            _capture_event(hub, einfo.exc_info)
+            _capture_event(atch, einfo.exc_info)
 
     @classmethod
     def _handle_task_prerun(cls, sender, task, **kw):
-        if cls.current is None:
+        atch = cls.current_attachment
+        if atch is None:
             return
 
         with capture_internal_exceptions():
-            hub = Hub.current
-            hub.push_scope()
-            with hub.configure_scope() as scope:
+            with atch.hub.push_scope() as scope:
                 scope.transaction = task.name
 
     @classmethod
     def _handle_task_postrun(cls, sender, task_id, task, **kw):
-        if cls.current is None:
-            return
+        atch = cls.current_attachment
+        if atch is not None:
+            atch.hub.pop_scope_unsafe()
 
-        Hub.current.pop_scope_unsafe()
 
-
-def _capture_event(hub, exc_info):
+def _capture_event(atch, exc_info):
     event, hint = event_from_exception(
         exc_info,
-        with_locals=hub.client.options["with_locals"],
+        with_locals=atch.client.options["with_locals"],
         mechanism={"type": "celery", "handled": False},
     )
-
-    hub.capture_event(event, hint=hint)
+    atch.hub.capture_event(event, hint=hint)

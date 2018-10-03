@@ -13,12 +13,12 @@ class DedupeIntegration(Integration):
     def install(cls):
         @add_global_event_processor
         def processor(event, hint):
-            self = cls.current
-            if self is not None:
+            atch = cls.current_attachment
+            if atch is not None:
                 exc_info = hint.get("exc_info", None)
                 if exc_info is not None:
                     exc = exc_info[1]
-                    if self._last_seen.get(None) is exc:
+                    if atch.integration._last_seen.get(None) is exc:
                         return
-                    self._last_seen.set(exc)
+                    atch.integration._last_seen.set(exc)
             return event
