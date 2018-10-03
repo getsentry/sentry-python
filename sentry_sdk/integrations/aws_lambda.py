@@ -12,6 +12,7 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi import _filter_headers
 
 import __main__ as lambda_bootstrap
+import runtime as lambda_runtime
 
 
 class AwsLambdaIntegration(Integration):
@@ -46,19 +47,29 @@ class AwsLambdaIntegration(Integration):
 
                         hub.capture_event(event, hint=hint)
                         reraise(*exc_info)
-                    finally:
-                        client = hub.client
-                        # Flush out the event queue before AWS kills the
-                        # process. This is not threadsafe.
-                        if client is not None:
-                            # make new transport with empty queue
-                            new_transport = client.transport.copy()
-                            client.close()
-                            client.transport = new_transport
 
             return sentry_handler
 
         lambda_bootstrap.make_final_handler = sentry_make_final_handler
+
+        old_report_done = lambda_runtime.report_done
+
+        def sentry_report_done(*args, **kwargs):
+            with capture_internal_exceptions():
+                hub = Hub.current
+                if hub is not None:
+                    client = hub.client
+                    # Flush out the event queue before AWS kills the
+                    # process. This is not threadsafe.
+                    if client is not None:
+                        # make new transport with empty queue
+                        new_transport = client.transport.copy()
+                        client.close()
+                        client.transport = new_transport
+
+            return old_report_done(*args, **kwargs)
+
+        lambda_runtime.report_done = sentry_report_done
 
 
 def _make_request_event_processor(aws_event, aws_context):
