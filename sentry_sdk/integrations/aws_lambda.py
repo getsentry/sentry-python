@@ -18,7 +18,7 @@ class AwsLambdaIntegration(Integration):
     identifier = "aws_lambda"
 
     @classmethod
-    def install(cls):
+    def setup_once(cls):
         old_make_final_handler = lambda_bootstrap.make_final_handler
 
         def sentry_make_final_handler(*args, **kwargs):

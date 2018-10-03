@@ -11,7 +11,7 @@ class DedupeIntegration(Integration):
         self._last_seen = ContextVar("last-seen")
 
     @classmethod
-    def install(cls):
+    def setup_once(cls):
         @add_global_event_processor
         def processor(event, hint):
             integration = Hub.current.get_integration(cls)

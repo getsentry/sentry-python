@@ -12,7 +12,7 @@ class StdlibIntegration(Integration):
     identifier = "stdlib"
 
     @classmethod
-    def install_httplib(cls):
+    def setup_once_httplib(cls):
         real_putrequest = HTTPConnection.putrequest
         real_getresponse = HTTPConnection.getresponse
 
@@ -63,5 +63,5 @@ class StdlibIntegration(Integration):
         HTTPConnection.getresponse = getresponse
 
     @classmethod
-    def install(cls):
+    def setup_once(cls):
         cls.install_httplib()

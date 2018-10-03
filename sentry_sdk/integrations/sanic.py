@@ -18,7 +18,7 @@ class SanicIntegration(Integration):
     identifier = "sanic"
 
     @classmethod
-    def install(cls):
+    def setup_once(cls):
         if sys.version_info < (3, 7):
             # Sanic is async. We better have contextvars or we're going to leak
             # state between requests.

@@ -25,7 +25,7 @@ class FlaskIntegration(Integration):
     identifier = "flask"
 
     @classmethod
-    def install(cls):
+    def setup_once(cls):
         appcontext_pushed.connect(cls._push_appctx)
         appcontext_tearing_down.connect(cls._pop_appctx)
         request_started.connect(cls._request_started)

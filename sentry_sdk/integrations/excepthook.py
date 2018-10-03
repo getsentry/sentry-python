@@ -9,7 +9,7 @@ class ExcepthookIntegration(Integration):
     identifier = "excepthook"
 
     @staticmethod
-    def install():
+    def setup_once():
         if hasattr(sys, "ps1"):
             # Disable the excepthook for interactive Python shells, otherwise
             # every typo gets sent to Sentry.

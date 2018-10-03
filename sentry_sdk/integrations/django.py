@@ -41,7 +41,7 @@ class DjangoIntegration(Integration):
     identifier = "django"
 
     @classmethod
-    def install(cls):
+    def setup_once(cls):
         install_sql_hook()
         # Patch in our custom middleware.
 
@@ -209,7 +209,7 @@ def record_sql(sql, params):
     hub.add_breadcrumb(message=real_sql, category="query")
 
 
-def install_sql_hook():
+def setup_once_sql_hook():
     """If installed this causes Django's queries to be captured."""
     try:
         from django.db.backends.utils import CursorWrapper

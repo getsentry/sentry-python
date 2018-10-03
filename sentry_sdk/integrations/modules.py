@@ -28,7 +28,7 @@ class ModulesIntegration(Integration):
     identifier = "modules"
 
     @classmethod
-    def install(cls):
+    def setup_once(cls):
         @add_global_event_processor
         def processor(event, hint):
             if Hub.current.get_integration(cls) is not None:

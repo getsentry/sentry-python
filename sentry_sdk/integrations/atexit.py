@@ -33,7 +33,7 @@ class AtexitIntegration(Integration):
         self.callback = callback
 
     @staticmethod
-    def install():
+    def setup_once():
         @atexit.register
         def _shutdown():
             logger.debug("atexit: got shutdown signal")

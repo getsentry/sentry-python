@@ -3,6 +3,7 @@ from threading import Lock
 from collections import namedtuple
 
 from sentry_sdk._compat import iteritems
+from sentry_sdk.utils import logger
 
 
 _installer_lock = Lock()
@@ -52,7 +53,15 @@ def setup_integrations(integrations, with_defaults=True):
     for identifier, integration in iteritems(integrations):
         with _installer_lock:
             if identifier not in _installed_integrations:
-                type(integration).install()
+                try:
+                    type(integration).setup_once()
+                except NotImplementedError:
+                    if getattr(integration, "install", None) is not None:
+                        logger.warn("Integration %s: The install method is "
+                                    "deprecated. Use `setup_once`.", identifier)
+                        integration.install()
+                    else:
+                        raise
                 _installed_integrations.add(identifier)
 
     return integrations
@@ -70,8 +79,11 @@ class Integration(object):
     saves those options on `self`.
     """
 
+    install = None
+    """Legacy method, do not implement."""
+
     @staticmethod
-    def install():
+    def setup_once():
         """
         Initialize the integration.
 

@@ -12,7 +12,7 @@ class CeleryIntegration(Integration):
     identifier = "celery"
 
     @classmethod
-    def install(cls):
+    def setup_once(cls):
         task_prerun.connect(cls._handle_task_prerun, weak=False)
         task_postrun.connect(cls._handle_task_postrun, weak=False)
         task_failure.connect(cls._process_failure_signal, weak=False)
