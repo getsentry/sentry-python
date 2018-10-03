@@ -69,6 +69,9 @@ class SanicIntegration(Integration):
             _capture_exception(exception)
             old_error_handler = old_error_handler_lookup(self, exception)
 
+            if old_error_handler is None:
+                return None
+
             if Hub.current.get_integration(SanicIntegration) is None:
                 return old_error_handler
 
