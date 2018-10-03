@@ -42,7 +42,7 @@ def _process_failure_signal(sender, task_id, einfo, **kw):
 def _handle_task_prerun(sender, task, **kw):
     hub = Hub.current
     if hub.get_integration(CeleryIntegration) is not None:
-        scope = hub.push_scope()
+        scope = hub.push_scope().__enter__()
         with capture_internal_exceptions():
             scope.transaction = task.name
 
