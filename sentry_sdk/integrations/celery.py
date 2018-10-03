@@ -41,19 +41,15 @@ class CeleryIntegration(Integration):
     @classmethod
     def _handle_task_prerun(cls, sender, task, **kw):
         hub = Hub.current
-        integration = hub.get_integration(cls)
-        if integration is None:
-            return
-
-        with hub.push_scope() as scope:
-            with capture_internal_exceptions():
-                scope.transaction = task.name
+        if hub.get_integration(cls) is not None:
+            with hub.push_scope() as scope:
+                with capture_internal_exceptions():
+                    scope.transaction = task.name
 
     @classmethod
     def _handle_task_postrun(cls, sender, task_id, task, **kw):
         hub = Hub.current
-        integration = hub.get_integration(cls)
-        if integration is not None:
+        if hub.get_integration(cls) is not None:
             hub.pop_scope_unsafe()
 
 

@@ -70,15 +70,15 @@ class FlaskIntegration(Integration):
 
     @classmethod
     def _capture_exception(cls, sender, exception, **kwargs):
-        atch = cls.current_attachment
-        if atch is None:
+        hub = Hub.current
+        if hub.get_integration(cls) is None:
             return
         event, hint = event_from_exception(
             exception,
-            with_locals=atch.client.options["with_locals"],
+            with_locals=hub.client.options["with_locals"],
             mechanism={"type": "flask", "handled": False},
         )
-        atch.hub.capture_event(event, hint=hint)
+        hub.capture_event(event, hint=hint)
 
 
 class FlaskRequestExtractor(RequestExtractor):
