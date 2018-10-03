@@ -5,12 +5,13 @@ import shutil
 import subprocess
 import sys
 import uuid
+from textwrap import dedent
 
 import pytest
 
 boto3 = pytest.importorskip("boto3")
 
-LAMBDA_TEMPLATE = """
+LAMBDA_PRELUDE = """
 from __future__ import print_function
 
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
@@ -31,16 +32,12 @@ class TestTransport(Transport):
         for event in self._queue:
             print("EVENT:", json.dumps(event))
 
-sentry_sdk.init(
-    "http://bogus@example.com/2",
-    transport=TestTransport(),
-    integrations=[AwsLambdaIntegration()],
-    **{extra_init_args}
-)
-
-
-def test_handler(event, context):
-{code}
+def init_sdk(**extra_init_args):
+    sentry_sdk.init(
+        transport=TestTransport(),
+        integrations=[AwsLambdaIntegration()],
+        **extra_init_args
+    )
 """
 
 
@@ -59,17 +56,13 @@ def lambda_client():
 
 @pytest.fixture(params=["python3.6", "python2.7"])
 def run_lambda_function(tmpdir, lambda_client, request, assert_semaphore_acceptance):
-    def inner(lambda_body, payload, extra_init_args=None):
+    def inner(code, payload):
+        runtime = request.param
         tmpdir.ensure_dir("lambda_tmp").remove()
         tmp = tmpdir.ensure_dir("lambda_tmp")
 
         # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
-        tmp.join("test_lambda.py").write(
-            LAMBDA_TEMPLATE.format(
-                code="\n".join("    " + x.strip() for x in lambda_body.splitlines()),
-                extra_init_args=repr(extra_init_args or {}),
-            )
-        )
+        tmp.join("test_lambda.py").write(code)
         tmp.join("setup.cfg").write("[install]\nprefix=")
         subprocess.check_call([sys.executable, "setup.py", "sdist", "-d", str(tmpdir)])
         subprocess.check_call("pip install ../*.tar.gz -t .", cwd=str(tmp), shell=True)
@@ -79,7 +72,7 @@ def run_lambda_function(tmpdir, lambda_client, request, assert_semaphore_accepta
 
         lambda_client.create_function(
             FunctionName=fn_name,
-            Runtime=request.param,
+            Runtime=runtime,
             Role=os.environ["AWS_IAM_ROLE"],
             Handler="test_lambda.test_handler",
             Code={"ZipFile": tmpdir.join("ball.zip").read(mode="rb")},
@@ -116,7 +109,15 @@ def run_lambda_function(tmpdir, lambda_client, request, assert_semaphore_accepta
 
 def test_basic(run_lambda_function):
     events, response = run_lambda_function(
-        'raise Exception("something went wrong")\n', b'{"foo": "bar"}'
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk()
+        def test_handler(event, context):
+            raise Exception("something went wrong")
+        """
+        ),
+        b'{"foo": "bar"}',
     )
 
     assert response["FunctionError"] == "Unhandled"
@@ -139,9 +140,41 @@ def test_basic(run_lambda_function):
     assert event["extra"]["lambda"]["function_name"].startswith("test_function_")
 
 
+def test_initialization_order(run_lambda_function):
+    """Zappa lazily imports our code, so by the time we monkeypatch the handler
+    as seen by AWS already runs. At this point at least draining the queue
+    should work."""
+
+    events, _response = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+            def test_handler(event, context):
+                init_sdk()
+                sentry_sdk.capture_exception(Exception("something went wrong"))
+        """
+        ),
+        b'{"foo": "bar"}',
+    )
+
+    event, = events
+    assert event["level"] == "error"
+    exception, = event["exception"]["values"]
+    assert exception["type"] == "Exception"
+    assert exception["value"] == "something went wrong"
+
+
 def test_request_data(run_lambda_function):
     events, _response = run_lambda_function(
-        'sentry_sdk.capture_message("hi")\nreturn "ok"',
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk()
+        def test_handler(event, context):
+            sentry_sdk.capture_message("hi")
+            return "ok"
+        """
+        ),
         payload=b"""
         {
           "resource": "/asd",
