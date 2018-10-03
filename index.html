@@ -2137,7 +2137,7 @@ context vars are available.</p>
     <span class="k">def</span> <span class="nf">_capture_internal_exception</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Capture an exception that is likely caused by a bug in the SDK</span>
 <span class="sd">        itself.&quot;&quot;&quot;</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Internal error in sentry_sdk&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="n">exc_info</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Internal error in sentry_sdk&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="n">exc_info</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">add_breadcrumb</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">crumb</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Adds a breadcrumb.  The breadcrumbs are a dictionary with the</span>
