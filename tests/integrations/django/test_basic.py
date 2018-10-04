@@ -61,7 +61,10 @@ def test_request_captured(sentry_init, client, capture_events):
 
 
 def test_transaction_with_class_view(sentry_init, client, capture_events):
-    sentry_init(integrations=[DjangoIntegration(transaction_style="function_name")], send_default_pii=True)
+    sentry_init(
+        integrations=[DjangoIntegration(transaction_style="function_name")],
+        send_default_pii=True,
+    )
     events = capture_events()
     content, status, headers = client.head(reverse("classbased"))
     assert status.lower() == "200 ok"
