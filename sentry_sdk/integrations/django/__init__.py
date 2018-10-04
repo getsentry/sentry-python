@@ -46,7 +46,7 @@ class DjangoIntegration(Integration):
 
     transaction_style = None
 
-    def __init__(self, transaction_style="function_name"):
+    def __init__(self, transaction_style="url"):
         TRANSACTION_STYLE_VALUES = ("function_name", "url")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
