@@ -1,8 +1,5 @@
 import pytest
 
-django = pytest.importorskip("django")
-
-
 from werkzeug.test import Client
 from django.core.management import execute_from_command_line
 
