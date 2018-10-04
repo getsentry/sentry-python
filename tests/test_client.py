@@ -17,7 +17,7 @@ class EventCaptured(Exception):
 
 class _TestTransport(Transport):
     def capture_event(self, event):
-        raise EventCaptured()
+        raise EventCaptured(event)
 
 
 def test_transport_option(monkeypatch):
@@ -58,6 +58,64 @@ def test_ignore_errors():
     e(ZeroDivisionError())
     e(MyDivisionError())
     pytest.raises(EventCaptured, lambda: e(ValueError()))
+
+
+def test_with_locals_enabled():
+    events = []
+    hub = Hub(Client(with_locals=True, transport=events.append))
+    try:
+        1 / 0
+    except Exception:
+        hub.capture_exception()
+
+    event, = events
+
+    assert all(
+        frame["vars"]
+        for frame in event["exception"]["values"][0]["stacktrace"]["frames"]
+    )
+
+
+def test_with_locals_disabled():
+    events = []
+    hub = Hub(Client(with_locals=False, transport=events.append))
+    try:
+        1 / 0
+    except Exception:
+        hub.capture_exception()
+
+    event, = events
+
+    assert all(
+        "vars" not in frame
+        for frame in event["exception"]["values"][0]["stacktrace"]["frames"]
+    )
+
+
+def test_attach_stacktrace_enabled():
+    events = []
+    hub = Hub(Client(attach_stacktrace=True, transport=events.append))
+    try:
+        1 / 0
+    except Exception:
+        hub.capture_exception()
+
+    event, = events
+    exception, = event["exception"]["values"]
+    assert exception["stacktrace"]["frames"]
+
+
+def test_attach_stacktrace_disabled():
+    events = []
+    hub = Hub(Client(attach_stacktrace=False, transport=events.append))
+    try:
+        1 / 0
+    except Exception:
+        hub.capture_exception()
+
+    event, = events
+    exception, = event["exception"]["values"]
+    assert "stacktrace" not in event["exception"]["values"][0]
 
 
 def test_capture_event_works():

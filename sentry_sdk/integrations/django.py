@@ -102,7 +102,7 @@ def _got_request_exception(request=None, **kwargs):
     hub = Hub.current
     event, hint = event_from_exception(
         sys.exc_info(),
-        with_locals=hub.client.options["with_locals"],
+        client_options=hub.client.options,
         mechanism={"type": "django", "handled": False},
     )
 

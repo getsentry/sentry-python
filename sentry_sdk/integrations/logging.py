@@ -84,7 +84,7 @@ class SentryHandler(logging.Handler, object):
                 if record.exc_info is not None and record.exc_info[0] is not None:
                     event, hint = event_from_exception(
                         record.exc_info,
-                        with_locals=hub.client.options["with_locals"],
+                        client_options=hub.client.options,
                         mechanism={"type": "logging", "handled": True},
                     )
                 else:
