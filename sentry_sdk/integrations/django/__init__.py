@@ -23,6 +23,10 @@ from sentry_sdk.utils import (
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations._wsgi import RequestExtractor, run_wsgi_app
+from sentry_sdk.integrations.django.transactions import (
+    LEGACY_RESOLVER,
+    transaction_from_function,
+)
 
 
 if DJANGO_VERSION < (1, 10):
@@ -39,6 +43,17 @@ else:
 
 class DjangoIntegration(Integration):
     identifier = "django"
+
+    transaction_style = None
+
+    def __init__(self, transaction_style="function_name"):
+        TRANSACTION_STYLE_VALUES = ("function_name", "url")
+        if transaction_style not in TRANSACTION_STYLE_VALUES:
+            raise ValueError(
+                "Invalid value for transaction_style: %s (must be in %s)"
+                % (transaction_style, TRANSACTION_STYLE_VALUES)
+            )
+        self.transaction_style = transaction_style
 
     def install(self):
         install_sql_hook()
@@ -60,10 +75,13 @@ class DjangoIntegration(Integration):
         from django.core.handlers.base import BaseHandler
 
         old_get_response = BaseHandler.get_response
+        integration = self
 
         def sentry_patched_get_response(self, request):
             with configure_scope() as scope:
-                scope.add_event_processor(_make_event_processor(weakref.ref(request)))
+                scope.add_event_processor(
+                    _make_event_processor(weakref.ref(request), integration)
+                )
             return old_get_response(self, request)
 
         BaseHandler.get_response = sentry_patched_get_response
@@ -71,7 +89,7 @@ class DjangoIntegration(Integration):
         signals.got_request_exception.connect(_got_request_exception)
 
 
-def _make_event_processor(weak_request):
+def _make_event_processor(weak_request, integration):
     def event_processor(event, hint):
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
@@ -82,7 +100,12 @@ def _make_event_processor(weak_request):
 
         if "transaction" not in event:
             try:
-                event["transaction"] = resolve(request.path).func.__name__
+                if integration.transaction_style == "function_name":
+                    event["transaction"] = transaction_from_function(
+                        resolve(request.path).func
+                    )
+                elif integration.transaction_style == "url":
+                    event["transaction"] = LEGACY_RESOLVER.resolve(request.path)
             except Exception:
                 pass
 

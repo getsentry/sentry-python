@@ -18,17 +18,13 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from tests.integrations.django.myapp.wsgi import application
 
 
-@pytest.fixture(autouse=True)
-def init_django_sentry(sentry_init):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
-
-
 @pytest.fixture
 def client():
     return Client(application)
 
 
-def test_view_exceptions(client, capture_exceptions, capture_events):
+def test_view_exceptions(sentry_init, client, capture_exceptions, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     exceptions = capture_exceptions()
     events = capture_events()
     client.get(reverse("view_exc"))
@@ -40,7 +36,8 @@ def test_view_exceptions(client, capture_exceptions, capture_events):
     assert event["exception"]["values"][0]["mechanism"]["type"] == "django"
 
 
-def test_middleware_exceptions(client, capture_exceptions):
+def test_middleware_exceptions(sentry_init, client, capture_exceptions):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     exceptions = capture_exceptions()
     client.get(reverse("middleware_exc"))
 
@@ -48,13 +45,14 @@ def test_middleware_exceptions(client, capture_exceptions):
     assert isinstance(error, ZeroDivisionError)
 
 
-def test_request_captured(client, capture_events):
+def test_request_captured(sentry_init, client, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     events = capture_events()
     content, status, headers = client.get(reverse("message"))
     assert b"".join(content) == b"ok"
 
     event, = events
-    assert event["transaction"] == "message"
+    assert event["transaction"] == "tests.integrations.django.myapp.views.message"
     assert event["request"] == {
         "cookies": {},
         "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
@@ -65,8 +63,23 @@ def test_request_captured(client, capture_events):
     }
 
 
+def test_transaction_with_class_view(sentry_init, client, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    events = capture_events()
+    content, status, headers = client.head(reverse("classbased"))
+    assert status.lower() == "200 ok"
+
+    event, = events
+
+    assert (
+        event["transaction"] == "tests.integrations.django.myapp.views.ClassBasedView"
+    )
+    assert event["message"] == "hi"
+
+
 @pytest.mark.django_db
-def test_user_captured(client, capture_events):
+def test_user_captured(sentry_init, client, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     events = capture_events()
     content, status, headers = client.get(reverse("mylogin"))
     assert b"".join(content) == b"ok"
@@ -81,12 +94,14 @@ def test_user_captured(client, capture_events):
     assert event["user"] == {"email": "lennon@thebeatles.com", "username": "john"}
 
 
-def test_404(client):
+def test_404(sentry_init, client):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     content, status, headers = client.get("/404")
     assert status.lower() == "404 not found"
 
 
-def test_500(client):
+def test_500(sentry_init, client):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     old_event_id = last_event_id()
     content, status, headers = client.get("/view-exc")
     assert status.lower() == "500 internal server error"
@@ -106,7 +121,8 @@ def test_management_command_raises():
 
 
 @pytest.mark.django_db
-def test_sql_queries(capture_events):
+def test_sql_queries(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     from django.db import connection
 
     sql = connection.cursor()
@@ -126,7 +142,8 @@ def test_sql_queries(capture_events):
 
 
 @pytest.mark.django_db
-def test_sql_queries_large_params(capture_events):
+def test_sql_queries_large_params(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     from django.db import connection
 
     sql = connection.cursor()
@@ -146,3 +163,25 @@ def test_sql_queries_large_params(capture_events):
     assert crumb["message"] == (
         "SELECT count(*) FROM people_person WHERE foo = '%s..." % ("x" * 508,)
     )
+
+
+@pytest.mark.parametrize(
+    "transaction_style,expected_transaction",
+    [
+        ("function_name", "tests.integrations.django.myapp.views.message"),
+        ("url", "/message"),
+    ],
+)
+def test_transaction_style(
+    sentry_init, client, capture_events, transaction_style, expected_transaction
+):
+    sentry_init(
+        integrations=[DjangoIntegration(transaction_style=transaction_style)],
+        send_default_pii=True,
+    )
+    events = capture_events()
+    content, status, headers = client.get(reverse("message"))
+    assert b"".join(content) == b"ok"
+
+    event, = events
+    assert event["transaction"] == expected_transaction

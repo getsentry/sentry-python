@@ -47,6 +47,27 @@ def test_has_context(sentry_init, app, capture_events):
     assert event["request"]["url"] == "http://localhost/message"
 
 
+@pytest.mark.parametrize(
+    "transaction_style,expected_transaction", [("endpoint", "hi"), ("url", "/message")]
+)
+def test_transaction_style(
+    sentry_init, app, capture_events, transaction_style, expected_transaction
+):
+    sentry_init(
+        integrations=[
+            flask_sentry.FlaskIntegration(transaction_style=transaction_style)
+        ]
+    )
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.get("/message")
+    assert response.status_code == 200
+
+    event, = events
+    assert event["transaction"] == expected_transaction
+
+
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("testing", (True, False))
 def test_errors(sentry_init, capture_exceptions, capture_events, app, debug, testing):
