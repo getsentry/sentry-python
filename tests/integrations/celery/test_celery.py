@@ -20,7 +20,7 @@ def test_simple(capture_events, celery):
 
     @celery.task(name="dummy_task")
     def dummy_task(x, y):
-        foo = 42
+        foo = 42  # noqa
         return x / y
 
     dummy_task.delay(1, 2)

@@ -86,7 +86,7 @@ class DjangoIntegration(Integration):
             if integration is not None:
                 with hub.configure_scope() as scope:
                     scope.add_event_processor(
-                        _make_event_processor(weakref.ref(request))
+                        _make_event_processor(weakref.ref(request), integration)
                     )
             return old_get_response(self, request)
 
