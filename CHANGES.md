@@ -1,3 +1,10 @@
+## 0.3.10
+
+* Set transactions for Django like in Raven. Which transaction behavior is used
+  can be configured.
+* Fix a bug which would omit frame local variables from stacktraces in Celery.
+* New option: `attach_stacktrace`
+
 ## 0.3.9
 
 * Bugfixes for AWS Lambda integration: Using Zappa did not catch any exceptions.
