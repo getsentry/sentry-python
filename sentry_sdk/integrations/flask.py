@@ -25,10 +25,21 @@ from flask.signals import (
 class FlaskIntegration(Integration):
     identifier = "flask"
 
+    transaction_style = None
+
+    def __init__(self, transaction_style="endpoint"):
+        TRANSACTION_STYLE_VALUES = ("endpoint", "url")
+        if transaction_style not in TRANSACTION_STYLE_VALUES:
+            raise ValueError(
+                "Invalid value for transaction_style: %s (must be in %s)"
+                % (transaction_style, TRANSACTION_STYLE_VALUES)
+            )
+        self.transaction_style = transaction_style
+
     def install(self):
-        appcontext_pushed.connect(_push_appctx)
-        appcontext_tearing_down.connect(_pop_appctx)
-        request_started.connect(_request_started)
+        appcontext_pushed.connect(self._push_appctx)
+        appcontext_tearing_down.connect(self._pop_appctx)
+        request_started.connect(self._request_started)
         got_request_exception.connect(_capture_exception)
 
         old_app = Flask.__call__
@@ -40,23 +51,52 @@ class FlaskIntegration(Integration):
 
         Flask.__call__ = sentry_patched_wsgi_app
 
+    def _push_appctx(self, *args, **kwargs):
+        # always want to push scope regardless of whether WSGI app might already
+        # have (not the case for CLI for example)
+        hub = Hub.current
+        hub.push_scope()
 
-def _push_appctx(*args, **kwargs):
-    # always want to push scope regardless of whether WSGI app might already
-    # have (not the case for CLI for example)
-    hub = Hub.current
-    hub.push_scope()
+    def _pop_appctx(self, *args, **kwargs):
+        Hub.current.pop_scope_unsafe()
 
+    def _request_started(self, sender, **kwargs):
+        weak_request = weakref.ref(_request_ctx_stack.top.request)
+        app = _app_ctx_stack.top.app
+        with configure_scope() as scope:
+            scope.add_event_processor(
+                self._make_request_event_processor(app, weak_request)
+            )
 
-def _pop_appctx(*args, **kwargs):
-    Hub.current.pop_scope_unsafe()
+    def _make_request_event_processor(self, app, weak_request):
+        def inner(event, hint):
+            request = weak_request()
 
+            # if the request is gone we are fine not logging the data from
+            # it.  This might happen if the processor is pushed away to
+            # another thread.
+            if request is None:
+                return event
 
-def _request_started(sender, **kwargs):
-    weak_request = weakref.ref(_request_ctx_stack.top.request)
-    app = _app_ctx_stack.top.app
-    with configure_scope() as scope:
-        scope.add_event_processor(_make_request_event_processor(app, weak_request))
+            if "transaction" not in event:
+                try:
+                    if self.transaction_style == "endpoint":
+                        event["transaction"] = request.url_rule.endpoint
+                    elif self.transaction_style == "url":
+                        event["transaction"] = request.url_rule.rule
+                except Exception:
+                    pass
+
+            with capture_internal_exceptions():
+                FlaskRequestExtractor(request).extract_into_event(event)
+
+            if _should_send_default_pii():
+                with capture_internal_exceptions():
+                    _add_user_to_event(event)
+
+            return event
+
+        return inner
 
 
 class FlaskRequestExtractor(RequestExtractor):
@@ -91,34 +131,6 @@ def _capture_exception(sender, exception, **kwargs):
     )
 
     hub.capture_event(event, hint=hint)
-
-
-def _make_request_event_processor(app, weak_request):
-    def inner(event, hint):
-        request = weak_request()
-
-        # if the request is gone we are fine not logging the data from
-        # it.  This might happen if the processor is pushed away to
-        # another thread.
-        if request is None:
-            return event
-
-        if "transaction" not in event:
-            try:
-                event["transaction"] = request.url_rule.endpoint
-            except Exception:
-                pass
-
-        with capture_internal_exceptions():
-            FlaskRequestExtractor(request).extract_into_event(event)
-
-        if _should_send_default_pii():
-            with capture_internal_exceptions():
-                _add_user_to_event(event)
-
-        return event
-
-    return inner
 
 
 def _add_user_to_event(event):
