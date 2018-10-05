@@ -161,9 +161,7 @@ class Hub(with_metaclass(HubMeta)):
         else:
             exc_info = exc_info_from_error(error)
 
-        event, hint = event_from_exception(
-            exc_info, with_locals=client.options["with_locals"]
-        )
+        event, hint = event_from_exception(exc_info, client_options=client.options)
         try:
             return self.capture_event(event, hint=hint)
         except Exception:

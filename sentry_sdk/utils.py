@@ -348,7 +348,7 @@ def get_errno(exc_value):
 
 
 def single_exception_from_error_tuple(
-    exc_type, exc_value, tb, with_locals=True, mechanism=None
+    exc_type, exc_value, tb, client_options=None, mechanism=None
 ):
     errno = get_errno(exc_value)
     if errno is not None:
@@ -356,22 +356,31 @@ def single_exception_from_error_tuple(
         mechanism_meta = mechanism.setdefault("meta", {})
         mechanism_meta.setdefault("errno", {"code": errno})
 
-    return {
+    rv = {
         "module": get_type_module(exc_type),
         "type": get_type_name(exc_type),
         "value": safe_str(exc_value),
-        "stacktrace": stacktrace_from_traceback(tb, with_locals),
         "mechanism": mechanism,
     }
 
+    if client_options is None or client_options["attach_stacktrace"]:
+        if client_options is None:
+            with_locals = True
+        else:
+            with_locals = client_options["with_locals"]
 
-def exceptions_from_error_tuple(exc_info, with_locals=True, mechanism=None):
+        rv["stacktrace"] = stacktrace_from_traceback(tb, with_locals)
+
+    return rv
+
+
+def exceptions_from_error_tuple(exc_info, client_options=None, mechanism=None):
     exc_type, exc_value, tb = exc_info
     rv = []
     while exc_type is not None:
         rv.append(
             single_exception_from_error_tuple(
-                exc_type, exc_value, tb, with_locals, mechanism
+                exc_type, exc_value, tb, client_options, mechanism
             )
         )
         cause = getattr(exc_value, "__cause__", None)
@@ -450,14 +459,16 @@ def exc_info_from_error(error):
     return exc_type, exc_value, tb
 
 
-def event_from_exception(exc_info, with_locals=False, processors=None, mechanism=None):
+def event_from_exception(exc_info, client_options=None, mechanism=None):
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
     return (
         {
             "level": "error",
             "exception": {
-                "values": exceptions_from_error_tuple(exc_info, with_locals, mechanism)
+                "values": exceptions_from_error_tuple(
+                    exc_info, client_options, mechanism
+                )
             },
         },
         hint,

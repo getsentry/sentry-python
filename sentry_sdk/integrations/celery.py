@@ -45,7 +45,7 @@ class CeleryIntegration(Integration):
     def _capture_event(self, hub, exc_info):
         event, hint = event_from_exception(
             exc_info,
-            with_locals=hub.client.options["with_locals"],
+            client_options=hub.client.options,
             mechanism={"type": "celery", "handled": False},
         )
 

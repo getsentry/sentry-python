@@ -126,7 +126,7 @@ def _capture_exception(sender, exception, **kwargs):
     hub = Hub.current
     event, hint = event_from_exception(
         exception,
-        with_locals=hub.client.options["with_locals"],
+        client_options=hub.client.options,
         mechanism={"type": "flask", "handled": False},
     )
 

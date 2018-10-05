@@ -26,6 +26,7 @@ DEFAULT_OPTIONS = {
     "before_send": None,
     "before_breadcrumb": None,
     "debug": False,
+    "attach_stacktrace": True,
 }
 
 
