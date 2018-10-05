@@ -43,7 +43,7 @@ class AwsLambdaIntegration(Integration):
                         exc_info = sys.exc_info()
                         event, hint = event_from_exception(
                             exc_info,
-                            with_locals=hub.client.options["with_locals"],
+                            client_options=hub.client.options,
                             mechanism={"type": "aws_lambda", "handled": False},
                         )
                         hub.capture_event(event, hint=hint)

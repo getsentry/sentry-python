@@ -100,7 +100,7 @@ def _capture_exception(exception):
     with capture_internal_exceptions():
         event, hint = event_from_exception(
             exception,
-            with_locals=hub.client.options["with_locals"],
+            client_options=hub.client.options,
             mechanism={"type": "sanic", "handled": False},
         )
         hub.capture_event(event, hint=hint)

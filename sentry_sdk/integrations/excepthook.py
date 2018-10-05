@@ -27,6 +27,7 @@ def _make_excepthook(old_excepthook):
                 event, hint = event_from_exception(
                     (exctype, value, traceback),
                     with_locals=hub.client.options["with_locals"],
+                    client_options=hub.client.options,
                     mechanism={"type": "excepthook", "handled": False},
                 )
                 hub.capture_event(event, hint=hint)

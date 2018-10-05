@@ -1,5 +1,7 @@
 from __future__ import absolute_import
 
+import sys
+
 from celery.signals import task_failure, task_prerun, task_postrun
 from celery.exceptions import SoftTimeLimitExceeded
 
@@ -19,6 +21,9 @@ class CeleryIntegration(Integration):
 
 
 def _process_failure_signal(sender, task_id, einfo, **kw):
+    # einfo from celery is not reliable
+    exc_info = sys.exc_info()
+
     hub = Hub.current
     integration = hub.get_integration(CeleryIntegration)
     if integration is None:
@@ -34,9 +39,9 @@ def _process_failure_signal(sender, task_id, einfo, **kw):
                 "SoftTimeLimitExceeded",
                 getattr(sender, "name", sender),
             ]
-            _capture_event(hub, einfo.exc_info)
+            _capture_event(hub, exc_info)
     else:
-        _capture_event(hub, einfo.exc_info)
+        _capture_event(hub, exc_info)
 
 
 def _handle_task_prerun(sender, task, **kw):

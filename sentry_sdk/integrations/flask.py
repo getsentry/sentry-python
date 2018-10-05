@@ -24,6 +24,17 @@ from flask.signals import (
 class FlaskIntegration(Integration):
     identifier = "flask"
 
+    transaction_style = None
+
+    def __init__(self, transaction_style="endpoint"):
+        TRANSACTION_STYLE_VALUES = ("endpoint", "url")
+        if transaction_style not in TRANSACTION_STYLE_VALUES:
+            raise ValueError(
+                "Invalid value for transaction_style: %s (must be in %s)"
+                % (transaction_style, TRANSACTION_STYLE_VALUES)
+            )
+        self.transaction_style = transaction_style
+
     @staticmethod
     def setup_once():
         appcontext_pushed.connect(_push_appctx)
@@ -60,25 +71,16 @@ def _pop_appctx(*args, **kwargs):
 
 def _request_started(sender, **kwargs):
     hub = Hub.current
-    if hub.get_integration(FlaskIntegration) is None:
+    integration = hub.get_integration(FlaskIntegration)
+    if integration is None:
         return
 
     weak_request = weakref.ref(_request_ctx_stack.top.request)
     app = _app_ctx_stack.top.app
     with hub.configure_scope() as scope:
-        scope.add_event_processor(_make_request_event_processor(app, weak_request))
-
-
-def _capture_exception(sender, exception, **kwargs):
-    hub = Hub.current
-    if hub.get_integration(FlaskIntegration) is None:
-        return
-    event, hint = event_from_exception(
-        exception,
-        with_locals=hub.client.options["with_locals"],
-        mechanism={"type": "flask", "handled": False},
-    )
-    hub.capture_event(event, hint=hint)
+        scope.add_event_processor(
+            _make_request_event_processor(app, weak_request, integration)
+        )
 
 
 class FlaskRequestExtractor(RequestExtractor):
@@ -104,7 +106,7 @@ class FlaskRequestExtractor(RequestExtractor):
         return file.content_length
 
 
-def _make_request_event_processor(app, weak_request):
+def _make_request_event_processor(app, weak_request, integration):
     def inner(event, hint):
         request = weak_request()
 
@@ -116,7 +118,10 @@ def _make_request_event_processor(app, weak_request):
 
         if "transaction" not in event:
             try:
-                event["transaction"] = request.url_rule.endpoint
+                if integration.transaction_style == "endpoint":
+                    event["transaction"] = request.url_rule.endpoint
+                elif integration.transaction_style == "url":
+                    event["transaction"] = request.url_rule.rule
             except Exception:
                 pass
 
@@ -130,6 +135,19 @@ def _make_request_event_processor(app, weak_request):
         return event
 
     return inner
+
+
+def _capture_exception(sender, exception, **kwargs):
+    hub = Hub.current
+    if hub.get_integration(FlaskIntegration) is None:
+        return
+    event, hint = event_from_exception(
+        exception,
+        client_options=hub.client.options,
+        mechanism={"type": "flask", "handled": False},
+    )
+
+    hub.capture_event(event, hint=hint)
 
 
 def _add_user_to_event(event):

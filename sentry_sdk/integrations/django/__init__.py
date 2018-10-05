@@ -23,6 +23,10 @@ from sentry_sdk.utils import (
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations._wsgi import RequestExtractor, run_wsgi_app
+from sentry_sdk.integrations.django.transactions import (
+    LEGACY_RESOLVER,
+    transaction_from_function,
+)
 
 
 if DJANGO_VERSION < (1, 10):
@@ -39,6 +43,17 @@ else:
 
 class DjangoIntegration(Integration):
     identifier = "django"
+
+    transaction_style = None
+
+    def __init__(self, transaction_style="url"):
+        TRANSACTION_STYLE_VALUES = ("function_name", "url")
+        if transaction_style not in TRANSACTION_STYLE_VALUES:
+            raise ValueError(
+                "Invalid value for transaction_style: %s (must be in %s)"
+                % (transaction_style, TRANSACTION_STYLE_VALUES)
+            )
+        self.transaction_style = transaction_style
 
     @staticmethod
     def setup_once():
@@ -80,7 +95,7 @@ class DjangoIntegration(Integration):
         signals.got_request_exception.connect(_got_request_exception)
 
 
-def _make_event_processor(weak_request):
+def _make_event_processor(weak_request, integration):
     def event_processor(event, hint):
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
@@ -91,7 +106,12 @@ def _make_event_processor(weak_request):
 
         if "transaction" not in event:
             try:
-                event["transaction"] = resolve(request.path).func.__name__
+                if integration.transaction_style == "function_name":
+                    event["transaction"] = transaction_from_function(
+                        resolve(request.path).func
+                    )
+                elif integration.transaction_style == "url":
+                    event["transaction"] = LEGACY_RESOLVER.resolve(request.path)
             except Exception:
                 pass
 
@@ -113,7 +133,7 @@ def _got_request_exception(request=None, **kwargs):
     if integration is not None:
         event, hint = event_from_exception(
             sys.exc_info(),
-            with_locals=hub.client.options["with_locals"],
+            client_options=hub.client.options,
             mechanism={"type": "django", "handled": False},
         )
         hub.capture_event(event, hint=hint)
