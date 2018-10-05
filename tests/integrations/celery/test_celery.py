@@ -20,6 +20,7 @@ def test_simple(capture_events, celery):
 
     @celery.task(name="dummy_task")
     def dummy_task(x, y):
+        foo = 42
         return x / y
 
     dummy_task.delay(1, 2)
@@ -29,9 +30,8 @@ def test_simple(capture_events, celery):
 
     exception, = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
-
-    event, = events
-    assert event["exception"]["values"][0]["mechanism"]["type"] == "celery"
+    assert exception["mechanism"]["type"] == "celery"
+    assert exception["stacktrace"]["frames"][1]["vars"]["foo"] == "42"
 
 
 def test_ignore_expected(capture_events, celery):
