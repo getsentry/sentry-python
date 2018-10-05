@@ -1,5 +1,7 @@
 from __future__ import absolute_import
 
+import sys
+
 from celery.signals import task_failure, task_prerun, task_postrun
 from celery.exceptions import SoftTimeLimitExceeded
 
@@ -20,6 +22,9 @@ class CeleryIntegration(Integration):
         task_failure.connect(self._process_failure_signal, weak=False)
 
     def _process_failure_signal(self, sender, task_id, einfo, **kw):
+        # einfo from celery is not reliable
+        exc_info = sys.exc_info()
+
         if hasattr(sender, "throws") and isinstance(einfo.exception, sender.throws):
             return
 
@@ -33,9 +38,9 @@ class CeleryIntegration(Integration):
                         getattr(sender, "name", sender),
                     ]
 
-                self._capture_event(hub, einfo.exc_info)
+                self._capture_event(hub, exc_info)
         else:
-            self._capture_event(hub, einfo.exc_info)
+            self._capture_event(hub, exc_info)
 
     def _capture_event(self, hub, exc_info):
         event, hint = event_from_exception(

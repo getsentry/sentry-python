@@ -27,6 +27,7 @@ urlpatterns = [
     path("middleware-exc", views.message, name="middleware_exc"),
     path("message", views.message, name="message"),
     path("mylogin", views.mylogin, name="mylogin"),
+    path("classbased", views.ClassBasedView.as_view(), name="classbased"),
 ]
 
 handler500 = views.handler500
