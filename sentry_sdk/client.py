@@ -11,6 +11,7 @@ from sentry_sdk.utils import (
     handle_in_app,
     get_type_name,
     capture_internal_exceptions,
+    current_stacktrace,
     logger,
 )
 from sentry_sdk.transport import make_transport
@@ -72,6 +73,14 @@ class Client(object):
             event = scope.apply_to_event(event, hint)
             if event is None:
                 return
+
+        if (
+            "exception" not in event
+            and "stacktrace" not in event
+            and self.options["attach_stacktrace"]
+        ):
+            with capture_internal_exceptions():
+                event["stacktrace"] = current_stacktrace()
 
         for key in "release", "environment", "server_name", "dist":
             if event.get(key) is None:
