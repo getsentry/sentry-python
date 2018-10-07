@@ -29,6 +29,9 @@ class TestTransport(Transport):
 
     def shutdown(self, timeout, callback=None):
         # Delay event output like this to test proper shutdown
+        # Note that AWS Lambda trunchates the log output to 4kb, so you better
+        # pray that your events are smaller than that or else tests start
+        # failing.
         for event in self._queue:
             print("EVENT:", json.dumps(event))
 
