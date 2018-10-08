@@ -1,7 +1,7 @@
 import socket
 
 
-VERSION = "0.3.9"
+VERSION = "0.3.10"
 DEFAULT_SERVER_NAME = socket.gethostname() if hasattr(socket, "gethostname") else None
 DEFAULT_OPTIONS = {
     "dsn": None,
@@ -26,7 +26,7 @@ DEFAULT_OPTIONS = {
     "before_send": None,
     "before_breadcrumb": None,
     "debug": False,
-    "attach_stacktrace": True,
+    "attach_stacktrace": False,
 }
 
 

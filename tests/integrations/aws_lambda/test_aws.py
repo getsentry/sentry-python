@@ -29,6 +29,9 @@ class TestTransport(Transport):
 
     def shutdown(self, timeout, callback=None):
         # Delay event output like this to test proper shutdown
+        # Note that AWS Lambda trunchates the log output to 4kb, so you better
+        # pray that your events are smaller than that or else tests start
+        # failing.
         for event in self._queue:
             print("EVENT:", json.dumps(event))
 
@@ -61,10 +64,17 @@ def run_lambda_function(tmpdir, lambda_client, request, assert_semaphore_accepta
         tmpdir.ensure_dir("lambda_tmp").remove()
         tmp = tmpdir.ensure_dir("lambda_tmp")
 
-        # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
         tmp.join("test_lambda.py").write(code)
+
+        # Check file for valid syntax first, and that the integration does not
+        # crash when not running in Lambda (but rather a local deployment tool
+        # such as chalice's)
+        subprocess.check_call([sys.executable, str(tmp.join("test_lambda.py"))])
+
         tmp.join("setup.cfg").write("[install]\nprefix=")
         subprocess.check_call([sys.executable, "setup.py", "sdist", "-d", str(tmpdir)])
+
+        # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
         subprocess.check_call("pip install ../*.tar.gz -t .", cwd=str(tmp), shell=True)
         shutil.make_archive(tmpdir.join("ball"), "zip", str(tmp))
 

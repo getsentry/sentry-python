@@ -6,12 +6,10 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
+    logger,
 )
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi import _filter_headers
-
-import __main__ as lambda_bootstrap
-import runtime as lambda_runtime
 
 
 class AwsLambdaIntegration(Integration):
@@ -19,6 +17,17 @@ class AwsLambdaIntegration(Integration):
 
     @staticmethod
     def setup_once():
+        import __main__ as lambda_bootstrap
+
+        if not hasattr(lambda_bootstrap, "make_final_handler"):
+            logger.warn(
+                "Not running in AWS Lambda environment, "
+                "AwsLambdaIntegration disabled"
+            )
+            return
+
+        import runtime as lambda_runtime
+
         old_make_final_handler = lambda_bootstrap.make_final_handler
 
         def sentry_make_final_handler(*args, **kwargs):

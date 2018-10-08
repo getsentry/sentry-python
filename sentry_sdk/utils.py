@@ -162,17 +162,26 @@ def get_type_module(cls):
         return mod
 
 
+def should_hide_frame(frame):
+    try:
+        mod = frame.f_globals["__name__"]
+        return mod.startswith("sentry_sdk.")
+    except (AttributeError, KeyError):
+        pass
+
+    for flag_name in "__traceback_hide__", "__tracebackhide__":
+        try:
+            if frame.f_locals[flag_name]:
+                return True
+        except Exception:
+            pass
+
+    return False
+
+
 def iter_stacks(tb):
     while tb is not None:
-        skip = False
-        for flag_name in "__traceback_hide__", "__tracebackhide__":
-            try:
-                if tb.tb_frame.f_locals[flag_name]:
-                    skip = True
-            except Exception:
-                pass
-
-        if not skip:
+        if not should_hide_frame(tb.tb_frame):
             yield tb
         tb = tb.tb_next
 
@@ -242,19 +251,6 @@ def get_source_context(frame, tb_lineno):
     return [], None, []
 
 
-def skip_internal_frames(frame):
-    tb = frame
-    while tb is not None:
-        try:
-            mod = tb.tb_frame.f_globals["__name__"]
-            if not mod.startswith("sentry_sdk."):
-                break
-        except (AttributeError, KeyError):
-            pass
-        tb = tb.tb_next
-    return tb
-
-
 def safe_str(value):
     try:
         return text_type(value)
@@ -308,8 +304,7 @@ def extract_locals(frame):
     return rv
 
 
-def frame_from_traceback(tb, with_locals=True):
-    frame = tb.tb_frame
+def serialize_frame(frame, tb_lineno=None, with_locals=True):
     f_code = getattr(frame, "f_code", None)
     if f_code:
         abs_path = frame.f_code.co_filename
@@ -322,14 +317,17 @@ def frame_from_traceback(tb, with_locals=True):
     except Exception:
         module = None
 
-    pre_context, context_line, post_context = get_source_context(frame, tb.tb_lineno)
+    if tb_lineno is None:
+        tb_lineno = frame.f_lineno
+
+    pre_context, context_line, post_context = get_source_context(frame, tb_lineno)
 
     rv = {
         "filename": abs_path and os.path.basename(abs_path) or None,
         "abs_path": os.path.abspath(abs_path),
         "function": function or "<unknown>",
         "module": module,
-        "lineno": tb.tb_lineno,
+        "lineno": tb_lineno,
         "pre_context": pre_context,
         "context_line": context_line,
         "post_context": post_context,
@@ -339,8 +337,30 @@ def frame_from_traceback(tb, with_locals=True):
     return rv
 
 
-def stacktrace_from_traceback(tb, with_locals=True):
-    return {"frames": [frame_from_traceback(tb, with_locals) for tb in iter_stacks(tb)]}
+def stacktrace_from_traceback(tb=None, with_locals=True):
+    return {
+        "frames": [
+            serialize_frame(
+                tb.tb_frame, tb_lineno=tb.tb_lineno, with_locals=with_locals
+            )
+            for tb in iter_stacks(tb)
+        ]
+    }
+
+
+def current_stacktrace(with_locals=True):
+    __tracebackhide__ = True
+    frames = []
+
+    f = sys._getframe()
+    while f is not None:
+        if not should_hide_frame(f):
+            frames.append(serialize_frame(f, with_locals=with_locals))
+        f = f.f_back
+
+    frames.reverse()
+
+    return {"frames": frames}
 
 
 def get_errno(exc_value):
@@ -356,22 +376,18 @@ def single_exception_from_error_tuple(
         mechanism_meta = mechanism.setdefault("meta", {})
         mechanism_meta.setdefault("errno", {"code": errno})
 
-    rv = {
+    if client_options is None:
+        with_locals = True
+    else:
+        with_locals = client_options["with_locals"]
+
+    return {
         "module": get_type_module(exc_type),
         "type": get_type_name(exc_type),
         "value": safe_str(exc_value),
         "mechanism": mechanism,
+        "stacktrace": stacktrace_from_traceback(tb, with_locals),
     }
-
-    if client_options is None or client_options["attach_stacktrace"]:
-        if client_options is None:
-            with_locals = True
-        else:
-            with_locals = client_options["with_locals"]
-
-        rv["stacktrace"] = stacktrace_from_traceback(tb, with_locals)
-
-    return rv
 
 
 def exceptions_from_error_tuple(exc_info, client_options=None, mechanism=None):
@@ -452,9 +468,6 @@ def exc_info_from_error(error):
                 tb = None
                 exc_value = error
                 exc_type = type(error)
-
-    if tb is not None:
-        tb = skip_internal_frames(tb)
 
     return exc_type, exc_value, tb
 

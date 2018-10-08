@@ -95,27 +95,27 @@ def test_with_locals_disabled():
 def test_attach_stacktrace_enabled():
     events = []
     hub = Hub(Client(attach_stacktrace=True, transport=events.append))
-    try:
-        1 / 0
-    except Exception:
-        hub.capture_exception()
+
+    def foo():
+        bar()
+
+    def bar():
+        hub.capture_message("HI")
+
+    foo()
 
     event, = events
-    exception, = event["exception"]["values"]
-    assert exception["stacktrace"]["frames"]
+    functions = [x["function"] for x in event["stacktrace"]["frames"]]
+    assert functions[-2:] == ["foo", "bar"]
 
 
 def test_attach_stacktrace_disabled():
     events = []
     hub = Hub(Client(attach_stacktrace=False, transport=events.append))
-    try:
-        1 / 0
-    except Exception:
-        hub.capture_exception()
+    hub.capture_message("HI")
 
     event, = events
-    exception, = event["exception"]["values"]
-    assert "stacktrace" not in event["exception"]["values"][0]
+    assert "stacktrace" not in event
 
 
 def test_capture_event_works():
