@@ -1,3 +1,7 @@
+## 0.3.11
+
+* Fix issue with certain deployment tools and the AWS Lambda integration.
+
 ## 0.3.10
 
 * Set transactions for Django like in Raven. Which transaction behavior is used
