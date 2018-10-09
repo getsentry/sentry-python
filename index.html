@@ -1095,6 +1095,7 @@ table {
     <li class="mono"><a href="#sentry_sdk.Hub.capture_exception">capture_exception</a></li>
     <li class="mono"><a href="#sentry_sdk.Hub.capture_message">capture_message</a></li>
     <li class="mono"><a href="#sentry_sdk.Hub.configure_scope">configure_scope</a></li>
+    <li class="mono"><a href="#sentry_sdk.Hub.get_integration">get_integration</a></li>
     <li class="mono"><a href="#sentry_sdk.Hub.last_event_id">last_event_id</a></li>
     <li class="mono"><a href="#sentry_sdk.Hub.pop_scope_unsafe">pop_scope_unsafe</a></li>
     <li class="mono"><a href="#sentry_sdk.Hub.push_scope">push_scope</a></li>
@@ -1385,13 +1386,18 @@ is provided the default level is <code>info</code>.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.init', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.init" class="source">
-    <div class="codehilite"><pre><span></span><span class="nd">@public</span>
-<span class="k">def</span> <span class="nf">init</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">init</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Initializes the SDK and optionally integrations.</span>
 
 <span class="sd">    This takes the same arguments as the client constructor.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="n">_init_on_hub</span><span class="p">(</span><span class="n">Hub</span><span class="o">.</span><span class="n">main</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">global</span> <span class="n">_initial_client</span>
+    <span class="n">client</span> <span class="o">=</span> <span class="n">Client</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="n">Hub</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">bind_client</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
+    <span class="n">rv</span> <span class="o">=</span> <span class="n">_InitGuard</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">_initial_client</span> <span class="o">=</span> <span class="n">weakref</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">rv</span>
 </pre></div>
 
   </div>
@@ -1493,6 +1499,10 @@ argument.</p></div>
                 <span class="p">)</span>
             <span class="p">)</span>
 
+        <span class="bp">self</span><span class="o">.</span><span class="n">integrations</span> <span class="o">=</span> <span class="n">setup_integrations</span><span class="p">(</span>
+            <span class="n">options</span><span class="p">[</span><span class="s2">&quot;integrations&quot;</span><span class="p">],</span> <span class="n">with_defaults</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;default_integrations&quot;</span><span class="p">]</span>
+        <span class="p">)</span>
+
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">dsn</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Returns the configured DSN as string.&quot;&quot;&quot;</span>
@@ -1508,18 +1518,27 @@ argument.</p></div>
                 <span class="k">return</span>
 
         <span class="k">if</span> <span class="p">(</span>
-            <span class="s2">&quot;exception&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">event</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;attach_stacktrace&quot;</span><span class="p">]</span>
+            <span class="ow">and</span> <span class="s2">&quot;exception&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">event</span>
             <span class="ow">and</span> <span class="s2">&quot;stacktrace&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">event</span>
-            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;attach_stacktrace&quot;</span><span class="p">]</span>
+            <span class="ow">and</span> <span class="s2">&quot;threads&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">event</span>
         <span class="p">):</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;stacktrace&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">current_stacktrace</span><span class="p">()</span>
+                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;stacktrace&quot;</span><span class="p">:</span> <span class="n">current_stacktrace</span><span class="p">(),</span>
+                        <span class="s2">&quot;crashed&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+                        <span class="s2">&quot;current&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span>
+                    <span class="p">}</span>
+                <span class="p">]</span>
 
         <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="s2">&quot;release&quot;</span><span class="p">,</span> <span class="s2">&quot;environment&quot;</span><span class="p">,</span> <span class="s2">&quot;server_name&quot;</span><span class="p">,</span> <span class="s2">&quot;dist&quot;</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="n">event</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sdk&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="n">event</span><span class="p">[</span><span class="s2">&quot;sdk&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">SDK_INFO</span>
+            <span class="n">sdk_info</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">SDK_INFO</span><span class="p">)</span>
+            <span class="n">sdk_info</span><span class="p">[</span><span class="s2">&quot;integrations&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+            <span class="n">event</span><span class="p">[</span><span class="s2">&quot;sdk&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sdk_info</span>
 
         <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;platform&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">event</span><span class="p">[</span><span class="s2">&quot;platform&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;python&quot;</span>
@@ -1659,6 +1678,9 @@ argument.</p></div>
                 <span class="n">request_bodies</span>
             <span class="p">)</span>
         <span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">integrations</span> <span class="o">=</span> <span class="n">setup_integrations</span><span class="p">(</span>
+        <span class="n">options</span><span class="p">[</span><span class="s2">&quot;integrations&quot;</span><span class="p">],</span> <span class="n">with_defaults</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;default_integrations&quot;</span><span class="p">]</span>
+    <span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1761,6 +1783,16 @@ stderr.</p></div>
             
   
     <div class="desc"><p>Returns the configured DSN as string.</p></div>
+  <div class="source_cont">
+</div>
+
+            </div>
+            <div class="item">
+            <p id="sentry_sdk.Client.integrations" class="name">var <span class="ident">integrations</span></p>
+            
+
+            
+  
   <div class="source_cont">
 </div>
 
@@ -2079,6 +2111,41 @@ context vars are available.</p>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">with</span> <span class="bp">self</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">callback</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the integration for this hub by name or class.  If there</span>
+<span class="sd">        is no client bound or the client does not have that integration</span>
+<span class="sd">        then `None` is returned.</span>
+
+<span class="sd">        If the return value is not `None` the hub is guaranteed to have a</span>
+<span class="sd">        client attached.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">,</span> <span class="n">string_types</span><span class="p">):</span>
+            <span class="n">name_or_class</span> <span class="o">=</span> <span class="n">name_or_class</span><span class="o">.</span><span class="n">identifier</span>
+        <span class="n">client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">rv</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">rv</span>
+
+        <span class="n">initial_client</span> <span class="o">=</span> <span class="n">_initial_client</span>
+        <span class="k">if</span> <span class="n">initial_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">initial_client</span> <span class="o">=</span> <span class="n">initial_client</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">initial_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
+            <span class="ow">and</span> <span class="n">initial_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">client</span>
+            <span class="ow">and</span> <span class="n">initial_client</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
+        <span class="p">):</span>
+            <span class="n">warning</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">&quot;Integration </span><span class="si">%r</span><span class="s2"> attempted to run but it was only &quot;</span>
+                <span class="s2">&quot;enabled on init() but not the client that &quot;</span>
+                <span class="s2">&quot;was bound to the current flow.  Earlier versions of &quot;</span>
+                <span class="s2">&quot;the SDK would consider these integrations enabled but &quot;</span>
+                <span class="s2">&quot;this is no longer the case.&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">name_or_class</span><span class="p">,)</span>
+            <span class="p">)</span>
+            <span class="n">warn</span><span class="p">(</span><span class="ne">Warning</span><span class="p">(</span><span class="n">warning</span><span class="p">),</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">warning</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">client</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -2492,6 +2559,61 @@ is provided the default level is <code>info</code>.</p></div>
   
             
   <div class="item">
+    <div class="name def" id="sentry_sdk.Hub.get_integration">
+    <p>def <span class="ident">get_integration</span>(</p><p>self, name_or_class)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Returns the integration for this hub by name or class.  If there
+is no client bound or the client does not have that integration
+then <code>None</code> is returned.</p>
+<p>If the return value is not <code>None</code> the hub is guaranteed to have a
+client attached.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.get_integration', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.Hub.get_integration" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Returns the integration for this hub by name or class.  If there</span>
+<span class="sd">    is no client bound or the client does not have that integration</span>
+<span class="sd">    then `None` is returned.</span>
+<span class="sd">    If the return value is not `None` the hub is guaranteed to have a</span>
+<span class="sd">    client attached.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">,</span> <span class="n">string_types</span><span class="p">):</span>
+        <span class="n">name_or_class</span> <span class="o">=</span> <span class="n">name_or_class</span><span class="o">.</span><span class="n">identifier</span>
+    <span class="n">client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">rv</span>
+    <span class="n">initial_client</span> <span class="o">=</span> <span class="n">_initial_client</span>
+    <span class="k">if</span> <span class="n">initial_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">initial_client</span> <span class="o">=</span> <span class="n">initial_client</span><span class="p">()</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">initial_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
+        <span class="ow">and</span> <span class="n">initial_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">client</span>
+        <span class="ow">and</span> <span class="n">initial_client</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
+    <span class="p">):</span>
+        <span class="n">warning</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;Integration </span><span class="si">%r</span><span class="s2"> attempted to run but it was only &quot;</span>
+            <span class="s2">&quot;enabled on init() but not the client that &quot;</span>
+            <span class="s2">&quot;was bound to the current flow.  Earlier versions of &quot;</span>
+            <span class="s2">&quot;the SDK would consider these integrations enabled but &quot;</span>
+            <span class="s2">&quot;this is no longer the case.&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">name_or_class</span><span class="p">,)</span>
+        <span class="p">)</span>
+        <span class="n">warn</span><span class="p">(</span><span class="ne">Warning</span><span class="p">(</span><span class="n">warning</span><span class="p">),</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">warning</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
     <div class="name def" id="sentry_sdk.Hub.last_event_id">
     <p>def <span class="ident">last_event_id</span>(</p><p>self)</p>
     </div>
@@ -2800,7 +2922,8 @@ events that belong to it.</p></div>
                     <span class="k">return</span> <span class="n">_drop</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">processor</span><span class="p">,</span> <span class="s2">&quot;error processor&quot;</span><span class="p">)</span>
                 <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>
 
-        <span class="k">for</span> <span class="n">processor</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">processor</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">(</span><span class="n">global_event_processors</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span><span class="p">):</span>
+            <span class="n">new_event</span> <span class="o">=</span> <span class="n">event</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
                 <span class="n">new_event</span> <span class="o">=</span> <span class="n">processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">new_event</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
@@ -2966,7 +3089,8 @@ invoked with the original exception info triple as second argument.</p></div>
             <span class="k">if</span> <span class="n">new_event</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">_drop</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">processor</span><span class="p">,</span> <span class="s2">&quot;error processor&quot;</span><span class="p">)</span>
             <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>
-    <span class="k">for</span> <span class="n">processor</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">processor</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">(</span><span class="n">global_event_processors</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span><span class="p">):</span>
+        <span class="n">new_event</span> <span class="o">=</span> <span class="n">event</span>
         <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
             <span class="n">new_event</span> <span class="o">=</span> <span class="n">processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">new_event</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>

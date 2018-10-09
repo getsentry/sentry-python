@@ -1041,6 +1041,13 @@ table {
     <h1>Index</h1>
     <ul id="index">
 
+    <li class="set"><h3><a href="#header-functions">Functions</a></h3>
+      
+  <ul>
+    <li class="mono"><a href="#sentry_sdk.integrations.stdlib.install_httplib">install_httplib</a></li>
+  </ul>
+
+    </li>
 
     <li class="set"><h3><a href="#header-classes">Classes</a></h3>
       <ul>
@@ -1049,9 +1056,7 @@ table {
         
           
   <ul>
-    <li class="mono"><a href="#sentry_sdk.integrations.stdlib.StdlibIntegration.__init__">__init__</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.stdlib.StdlibIntegration.install">install</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.stdlib.StdlibIntegration.install_httplib">install_httplib</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.stdlib.StdlibIntegration.setup_once">setup_once</a></li>
   </ul>
 
         </li>
@@ -1074,65 +1079,70 @@ table {
   
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.stdlib', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.stdlib" class="source">
-    <div class="codehilite"><pre><span></span><span class="kn">from</span> <span class="nn">sentry_sdk</span> <span class="kn">import</span> <span class="n">add_breadcrumb</span>
+    <div class="codehilite"><pre><span></span><span class="kn">from</span> <span class="nn">sentry_sdk.hub</span> <span class="kn">import</span> <span class="n">Hub</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
+
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">httplib</span> <span class="kn">import</span> <span class="n">HTTPConnection</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">http.client</span> <span class="kn">import</span> <span class="n">HTTPConnection</span>
 
 
 <span class="k">class</span> <span class="nc">StdlibIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
     <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;stdlib&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">httplib</span> <span class="kn">import</span> <span class="n">HTTPConnection</span>
-        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">http.client</span> <span class="kn">import</span> <span class="n">HTTPConnection</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">httplib_connection_cls</span> <span class="o">=</span> <span class="n">HTTPConnection</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="n">install_httplib</span><span class="p">()</span>
 
-    <span class="k">def</span> <span class="nf">install_httplib</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="n">real_putrequest</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">httplib_connection_cls</span><span class="o">.</span><span class="n">putrequest</span>
-        <span class="n">real_getresponse</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">httplib_connection_cls</span><span class="o">.</span><span class="n">getresponse</span>
 
-        <span class="k">def</span> <span class="nf">putrequest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-            <span class="n">rv</span> <span class="o">=</span> <span class="n">real_putrequest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_sentrysdk_data_dict</span> <span class="o">=</span> <span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="k">def</span> <span class="nf">install_httplib</span><span class="p">():</span>
+    <span class="n">real_putrequest</span> <span class="o">=</span> <span class="n">HTTPConnection</span><span class="o">.</span><span class="n">putrequest</span>
+    <span class="n">real_getresponse</span> <span class="o">=</span> <span class="n">HTTPConnection</span><span class="o">.</span><span class="n">getresponse</span>
 
-            <span class="n">host</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">host</span>
-            <span class="n">port</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">port</span>
-            <span class="n">default_port</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_port</span>
-
-            <span class="n">real_url</span> <span class="o">=</span> <span class="n">url</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">real_url</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s2">&quot;http://&quot;</span><span class="p">,</span> <span class="s2">&quot;https://&quot;</span><span class="p">)):</span>
-                <span class="n">real_url</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">://</span><span class="si">%s%s%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
-                    <span class="n">default_port</span> <span class="o">==</span> <span class="mi">443</span> <span class="ow">and</span> <span class="s2">&quot;https&quot;</span> <span class="ow">or</span> <span class="s2">&quot;http&quot;</span><span class="p">,</span>
-                    <span class="n">host</span><span class="p">,</span>
-                    <span class="n">port</span> <span class="o">!=</span> <span class="n">default_port</span> <span class="ow">and</span> <span class="s2">&quot;:</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">port</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
-                    <span class="n">url</span><span class="p">,</span>
-                <span class="p">)</span>
-
-            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">real_url</span>
-            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">method</span>
+    <span class="k">def</span> <span class="nf">putrequest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">real_putrequest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">StdlibIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">rv</span>
 
-        <span class="k">def</span> <span class="nf">getresponse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-            <span class="n">rv</span> <span class="o">=</span> <span class="n">real_getresponse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-            <span class="n">data</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_sentrysdk_data_dict&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sentrysdk_data_dict</span> <span class="o">=</span> <span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
 
-            <span class="k">if</span> <span class="s2">&quot;status_code&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
-                <span class="n">data</span><span class="p">[</span><span class="s2">&quot;status_code&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">status</span>
-                <span class="n">data</span><span class="p">[</span><span class="s2">&quot;reason&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">reason</span>
-            <span class="n">add_breadcrumb</span><span class="p">(</span>
-                <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;http&quot;</span><span class="p">,</span>
-                <span class="n">category</span><span class="o">=</span><span class="s2">&quot;httplib&quot;</span><span class="p">,</span>
-                <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span>
-                <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;httplib_response&quot;</span><span class="p">:</span> <span class="n">rv</span><span class="p">},</span>
+        <span class="n">host</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">host</span>
+        <span class="n">port</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">port</span>
+        <span class="n">default_port</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_port</span>
+
+        <span class="n">real_url</span> <span class="o">=</span> <span class="n">url</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">real_url</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s2">&quot;http://&quot;</span><span class="p">,</span> <span class="s2">&quot;https://&quot;</span><span class="p">)):</span>
+            <span class="n">real_url</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">://</span><span class="si">%s%s%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">default_port</span> <span class="o">==</span> <span class="mi">443</span> <span class="ow">and</span> <span class="s2">&quot;https&quot;</span> <span class="ow">or</span> <span class="s2">&quot;http&quot;</span><span class="p">,</span>
+                <span class="n">host</span><span class="p">,</span>
+                <span class="n">port</span> <span class="o">!=</span> <span class="n">default_port</span> <span class="ow">and</span> <span class="s2">&quot;:</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">port</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+                <span class="n">url</span><span class="p">,</span>
             <span class="p">)</span>
+
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">real_url</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">method</span>
+        <span class="k">return</span> <span class="n">rv</span>
+
+    <span class="k">def</span> <span class="nf">getresponse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">real_getresponse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+        <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">StdlibIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">rv</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">httplib_connection_cls</span><span class="o">.</span><span class="n">putrequest</span> <span class="o">=</span> <span class="n">putrequest</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">httplib_connection_cls</span><span class="o">.</span><span class="n">getresponse</span> <span class="o">=</span> <span class="n">getresponse</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_sentrysdk_data_dict&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
 
-    <span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">install_httplib</span><span class="p">()</span>
+        <span class="k">if</span> <span class="s2">&quot;status_code&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;status_code&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">status</span>
+            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;reason&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">reason</span>
+        <span class="n">hub</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span>
+            <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;http&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;httplib&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;httplib_response&quot;</span><span class="p">:</span> <span class="n">rv</span><span class="p">}</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">rv</span>
+
+    <span class="n">HTTPConnection</span><span class="o">.</span><span class="n">putrequest</span> <span class="o">=</span> <span class="n">putrequest</span>
+    <span class="n">HTTPConnection</span><span class="o">.</span><span class="n">getresponse</span> <span class="o">=</span> <span class="n">getresponse</span>
 </pre></div>
 
   </div>
@@ -1141,6 +1151,72 @@ table {
 
   <section id="section-items">
 
+    <h2 class="section-title" id="header-functions">Functions</h2>
+      
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.stdlib.install_httplib">
+    <p>def <span class="ident">install_httplib</span>(</p><p>)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.stdlib.install_httplib', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.stdlib.install_httplib" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">install_httplib</span><span class="p">():</span>
+    <span class="n">real_putrequest</span> <span class="o">=</span> <span class="n">HTTPConnection</span><span class="o">.</span><span class="n">putrequest</span>
+    <span class="n">real_getresponse</span> <span class="o">=</span> <span class="n">HTTPConnection</span><span class="o">.</span><span class="n">getresponse</span>
+
+    <span class="k">def</span> <span class="nf">putrequest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">real_putrequest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">StdlibIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">rv</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sentrysdk_data_dict</span> <span class="o">=</span> <span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="n">host</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">host</span>
+        <span class="n">port</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">port</span>
+        <span class="n">default_port</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_port</span>
+
+        <span class="n">real_url</span> <span class="o">=</span> <span class="n">url</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">real_url</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s2">&quot;http://&quot;</span><span class="p">,</span> <span class="s2">&quot;https://&quot;</span><span class="p">)):</span>
+            <span class="n">real_url</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">://</span><span class="si">%s%s%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">default_port</span> <span class="o">==</span> <span class="mi">443</span> <span class="ow">and</span> <span class="s2">&quot;https&quot;</span> <span class="ow">or</span> <span class="s2">&quot;http&quot;</span><span class="p">,</span>
+                <span class="n">host</span><span class="p">,</span>
+                <span class="n">port</span> <span class="o">!=</span> <span class="n">default_port</span> <span class="ow">and</span> <span class="s2">&quot;:</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">port</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+                <span class="n">url</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">real_url</span>
+        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">method</span>
+        <span class="k">return</span> <span class="n">rv</span>
+
+    <span class="k">def</span> <span class="nf">getresponse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">real_getresponse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+        <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">StdlibIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">rv</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_sentrysdk_data_dict&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+
+        <span class="k">if</span> <span class="s2">&quot;status_code&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;status_code&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">status</span>
+            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;reason&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">reason</span>
+        <span class="n">hub</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span>
+            <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;http&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;httplib&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;httplib_response&quot;</span><span class="p">:</span> <span class="n">rv</span><span class="p">}</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">rv</span>
+
+    <span class="n">HTTPConnection</span><span class="o">.</span><span class="n">putrequest</span> <span class="o">=</span> <span class="n">putrequest</span>
+    <span class="n">HTTPConnection</span><span class="o">.</span><span class="n">getresponse</span> <span class="o">=</span> <span class="n">getresponse</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
 
     <h2 class="section-title" id="header-classes">Classes</h2>
       
@@ -1148,65 +1224,18 @@ table {
       <p id="sentry_sdk.integrations.stdlib.StdlibIntegration" class="name">class <span class="ident">StdlibIntegration</span></p>
       
   
-    <div class="desc"><p>Baseclass for all integrations.</p></div>
+    <div class="desc"><p>Baseclass for all integrations.</p>
+<p>To accept options for an integration, implement your own constructor that
+saves those options on <code>self</code>.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.stdlib.StdlibIntegration', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.stdlib.StdlibIntegration" class="source">
     <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">StdlibIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
     <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;stdlib&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">httplib</span> <span class="kn">import</span> <span class="n">HTTPConnection</span>
-        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">http.client</span> <span class="kn">import</span> <span class="n">HTTPConnection</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">httplib_connection_cls</span> <span class="o">=</span> <span class="n">HTTPConnection</span>
-
-    <span class="k">def</span> <span class="nf">install_httplib</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="n">real_putrequest</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">httplib_connection_cls</span><span class="o">.</span><span class="n">putrequest</span>
-        <span class="n">real_getresponse</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">httplib_connection_cls</span><span class="o">.</span><span class="n">getresponse</span>
-
-        <span class="k">def</span> <span class="nf">putrequest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-            <span class="n">rv</span> <span class="o">=</span> <span class="n">real_putrequest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_sentrysdk_data_dict</span> <span class="o">=</span> <span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
-
-            <span class="n">host</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">host</span>
-            <span class="n">port</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">port</span>
-            <span class="n">default_port</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_port</span>
-
-            <span class="n">real_url</span> <span class="o">=</span> <span class="n">url</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">real_url</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s2">&quot;http://&quot;</span><span class="p">,</span> <span class="s2">&quot;https://&quot;</span><span class="p">)):</span>
-                <span class="n">real_url</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">://</span><span class="si">%s%s%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
-                    <span class="n">default_port</span> <span class="o">==</span> <span class="mi">443</span> <span class="ow">and</span> <span class="s2">&quot;https&quot;</span> <span class="ow">or</span> <span class="s2">&quot;http&quot;</span><span class="p">,</span>
-                    <span class="n">host</span><span class="p">,</span>
-                    <span class="n">port</span> <span class="o">!=</span> <span class="n">default_port</span> <span class="ow">and</span> <span class="s2">&quot;:</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">port</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
-                    <span class="n">url</span><span class="p">,</span>
-                <span class="p">)</span>
-
-            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">real_url</span>
-            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">method</span>
-            <span class="k">return</span> <span class="n">rv</span>
-
-        <span class="k">def</span> <span class="nf">getresponse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-            <span class="n">rv</span> <span class="o">=</span> <span class="n">real_getresponse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-            <span class="n">data</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_sentrysdk_data_dict&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
-
-            <span class="k">if</span> <span class="s2">&quot;status_code&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
-                <span class="n">data</span><span class="p">[</span><span class="s2">&quot;status_code&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">status</span>
-                <span class="n">data</span><span class="p">[</span><span class="s2">&quot;reason&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">reason</span>
-            <span class="n">add_breadcrumb</span><span class="p">(</span>
-                <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;http&quot;</span><span class="p">,</span>
-                <span class="n">category</span><span class="o">=</span><span class="s2">&quot;httplib&quot;</span><span class="p">,</span>
-                <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span>
-                <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;httplib_response&quot;</span><span class="p">:</span> <span class="n">rv</span><span class="p">},</span>
-            <span class="p">)</span>
-            <span class="k">return</span> <span class="n">rv</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">httplib_connection_cls</span><span class="o">.</span><span class="n">putrequest</span> <span class="o">=</span> <span class="n">putrequest</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">httplib_connection_cls</span><span class="o">.</span><span class="n">getresponse</span> <span class="o">=</span> <span class="n">getresponse</span>
-
-    <span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">install_httplib</span><span class="p">()</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="n">install_httplib</span><span class="p">()</span>
 </pre></div>
 
   </div>
@@ -1231,114 +1260,8 @@ table {
 </div>
 
             </div>
-          <h3>Static methods</h3>
-            
-  <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.stdlib.StdlibIntegration.__init__">
-    <p>def <span class="ident">__init__</span>(</p><p>self)</p>
-    </div>
-    
-
-    
-  
-    <div class="desc"><p>Initialize self.  See help(type(self)) for accurate signature.</p></div>
-  <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.stdlib.StdlibIntegration.__init__', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.stdlib.StdlibIntegration.__init__" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-    <span class="k">try</span><span class="p">:</span>
-        <span class="kn">from</span> <span class="nn">httplib</span> <span class="kn">import</span> <span class="n">HTTPConnection</span>
-    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-        <span class="kn">from</span> <span class="nn">http.client</span> <span class="kn">import</span> <span class="n">HTTPConnection</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">httplib_connection_cls</span> <span class="o">=</span> <span class="n">HTTPConnection</span>
-</pre></div>
-
-  </div>
-</div>
-
-  </div>
-  
-            
-  <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.stdlib.StdlibIntegration.install">
-    <p>def <span class="ident">install</span>(</p><p>self)</p>
-    </div>
-    
-
-    
-  
-    <div class="desc"><p>An integration must implement all its code here.  When the
-<code>setup_integrations</code> function runs it will invoke this unless the
-integration was already activated elsewhere.</p></div>
-  <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.stdlib.StdlibIntegration.install', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.stdlib.StdlibIntegration.install" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">install_httplib</span><span class="p">()</span>
-</pre></div>
-
-  </div>
-</div>
-
-  </div>
-  
-            
-  <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.stdlib.StdlibIntegration.install_httplib">
-    <p>def <span class="ident">install_httplib</span>(</p><p>self)</p>
-    </div>
-    
-
-    
-  
-  <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.stdlib.StdlibIntegration.install_httplib', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.stdlib.StdlibIntegration.install_httplib" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">install_httplib</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-    <span class="n">real_putrequest</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">httplib_connection_cls</span><span class="o">.</span><span class="n">putrequest</span>
-    <span class="n">real_getresponse</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">httplib_connection_cls</span><span class="o">.</span><span class="n">getresponse</span>
-    <span class="k">def</span> <span class="nf">putrequest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="n">rv</span> <span class="o">=</span> <span class="n">real_putrequest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_sentrysdk_data_dict</span> <span class="o">=</span> <span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="n">host</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">host</span>
-        <span class="n">port</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">port</span>
-        <span class="n">default_port</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_port</span>
-        <span class="n">real_url</span> <span class="o">=</span> <span class="n">url</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">real_url</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s2">&quot;http://&quot;</span><span class="p">,</span> <span class="s2">&quot;https://&quot;</span><span class="p">)):</span>
-            <span class="n">real_url</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">://</span><span class="si">%s%s%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
-                <span class="n">default_port</span> <span class="o">==</span> <span class="mi">443</span> <span class="ow">and</span> <span class="s2">&quot;https&quot;</span> <span class="ow">or</span> <span class="s2">&quot;http&quot;</span><span class="p">,</span>
-                <span class="n">host</span><span class="p">,</span>
-                <span class="n">port</span> <span class="o">!=</span> <span class="n">default_port</span> <span class="ow">and</span> <span class="s2">&quot;:</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">port</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
-                <span class="n">url</span><span class="p">,</span>
-            <span class="p">)</span>
-        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">real_url</span>
-        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">method</span>
-        <span class="k">return</span> <span class="n">rv</span>
-    <span class="k">def</span> <span class="nf">getresponse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="n">rv</span> <span class="o">=</span> <span class="n">real_getresponse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="n">data</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_sentrysdk_data_dict&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
-        <span class="k">if</span> <span class="s2">&quot;status_code&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
-            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;status_code&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">status</span>
-            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;reason&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">reason</span>
-        <span class="n">add_breadcrumb</span><span class="p">(</span>
-            <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;http&quot;</span><span class="p">,</span>
-            <span class="n">category</span><span class="o">=</span><span class="s2">&quot;httplib&quot;</span><span class="p">,</span>
-            <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span>
-            <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;httplib_response&quot;</span><span class="p">:</span> <span class="n">rv</span><span class="p">},</span>
-        <span class="p">)</span>
-        <span class="k">return</span> <span class="n">rv</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">httplib_connection_cls</span><span class="o">.</span><span class="n">putrequest</span> <span class="o">=</span> <span class="n">putrequest</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">httplib_connection_cls</span><span class="o">.</span><span class="n">getresponse</span> <span class="o">=</span> <span class="n">getresponse</span>
-</pre></div>
-
-  </div>
-</div>
-
-  </div>
-  
-          <h3>Instance variables</h3>
             <div class="item">
-            <p id="sentry_sdk.integrations.stdlib.StdlibIntegration.httplib_connection_cls" class="name">var <span class="ident">httplib_connection_cls</span></p>
+            <p id="sentry_sdk.integrations.stdlib.StdlibIntegration.install" class="name">var <span class="ident">install</span></p>
             
 
             
@@ -1347,6 +1270,35 @@ integration was already activated elsewhere.</p></div>
 </div>
 
             </div>
+          <h3>Static methods</h3>
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.stdlib.StdlibIntegration.setup_once">
+    <p>def <span class="ident">setup_once</span>(</p><p>)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Initialize the integration.</p>
+<p>This function is only called once, ever. Configuration is not available
+at this point, so the only thing to do here is to hook into exception
+handlers, and perhaps do monkeypatches.</p>
+<p>Inside those hooks <code>Integration.current</code> can be used to access the
+instance again.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.stdlib.StdlibIntegration.setup_once', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.stdlib.StdlibIntegration.setup_once" class="source">
+    <div class="codehilite"><pre><span></span><span class="nd">@staticmethod</span>
+<span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+    <span class="n">install_httplib</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
       </div>
       </div>
 

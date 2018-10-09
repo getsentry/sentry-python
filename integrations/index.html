@@ -1044,7 +1044,7 @@ table {
     <li class="set"><h3><a href="#header-functions">Functions</a></h3>
       
   <ul>
-    <li class="mono"><a href="#sentry_sdk.integrations.get_default_integrations">get_default_integrations</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.iter_default_integrations">iter_default_integrations</a></li>
     <li class="mono"><a href="#sentry_sdk.integrations.setup_integrations">setup_integrations</a></li>
   </ul>
 
@@ -1057,9 +1057,13 @@ table {
         
           
   <ul>
-    <li class="mono"><a href="#sentry_sdk.integrations.Integration.install">install</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.Integration.setup_once">setup_once</a></li>
   </ul>
 
+        </li>
+        <li class="mono">
+        <span class="class_name"><a href="#sentry_sdk.integrations.IntegrationAttachment">IntegrationAttachment</a></span>
+        
         </li>
       </ul>
     </li>
@@ -1093,16 +1097,18 @@ table {
   <div id="source-sentry_sdk.integrations" class="source">
     <div class="codehilite"><pre><span></span><span class="sd">&quot;&quot;&quot;This package&quot;&quot;&quot;</span>
 <span class="kn">from</span> <span class="nn">threading</span> <span class="kn">import</span> <span class="n">Lock</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">namedtuple</span>
 
+<span class="kn">from</span> <span class="nn">sentry_sdk._compat</span> <span class="kn">import</span> <span class="n">iteritems</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">logger</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="kn">import</span> <span class="n">INTEGRATIONS</span> <span class="k">as</span> <span class="n">_installed_integrations</span>
 
 
 <span class="n">_installer_lock</span> <span class="o">=</span> <span class="n">Lock</span><span class="p">()</span>
+<span class="n">_installed_integrations</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
 
 
-<span class="k">def</span> <span class="nf">get_default_integrations</span><span class="p">():</span>
-    <span class="sd">&quot;&quot;&quot;Returns an iterator of default integration instances.</span>
+<span class="k">def</span> <span class="nf">iter_default_integrations</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;Returns an iterator of default integration classes.</span>
 
 <span class="sd">    This returns the following default integration:</span>
 
@@ -1118,12 +1124,12 @@ table {
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.atexit</span> <span class="kn">import</span> <span class="n">AtexitIntegration</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.modules</span> <span class="kn">import</span> <span class="n">ModulesIntegration</span>
 
-    <span class="k">yield</span> <span class="n">LoggingIntegration</span><span class="p">()</span>
-    <span class="k">yield</span> <span class="n">StdlibIntegration</span><span class="p">()</span>
-    <span class="k">yield</span> <span class="n">ExcepthookIntegration</span><span class="p">()</span>
-    <span class="k">yield</span> <span class="n">DedupeIntegration</span><span class="p">()</span>
-    <span class="k">yield</span> <span class="n">AtexitIntegration</span><span class="p">()</span>
-    <span class="k">yield</span> <span class="n">ModulesIntegration</span><span class="p">()</span>
+    <span class="k">yield</span> <span class="n">LoggingIntegration</span>
+    <span class="k">yield</span> <span class="n">StdlibIntegration</span>
+    <span class="k">yield</span> <span class="n">ExcepthookIntegration</span>
+    <span class="k">yield</span> <span class="n">DedupeIntegration</span>
+    <span class="k">yield</span> <span class="n">AtexitIntegration</span>
+    <span class="k">yield</span> <span class="n">ModulesIntegration</span>
 
 
 <span class="k">def</span> <span class="nf">setup_integrations</span><span class="p">(</span><span class="n">integrations</span><span class="p">,</span> <span class="n">with_defaults</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
@@ -1131,44 +1137,64 @@ table {
 <span class="sd">    `with_defaults` is set to `True` then all default integrations are added</span>
 <span class="sd">    unless they were already provided before.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">integrations</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">integrations</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">with_defaults</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">instance</span> <span class="ow">in</span> <span class="n">get_default_integrations</span><span class="p">():</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">instance</span><span class="p">))</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">integrations</span><span class="p">):</span>
-                <span class="n">integrations</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">instance</span><span class="p">)</span>
+    <span class="n">integrations</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">integration</span><span class="o">.</span><span class="n">identifier</span><span class="p">,</span> <span class="n">integration</span><span class="p">)</span> <span class="k">for</span> <span class="n">integration</span> <span class="ow">in</span> <span class="n">integrations</span> <span class="ow">or</span> <span class="p">()</span>
+    <span class="p">)</span>
 
-    <span class="k">for</span> <span class="n">integration</span> <span class="ow">in</span> <span class="n">integrations</span><span class="p">:</span>
-        <span class="n">integration</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">with_defaults</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">integration_cls</span> <span class="ow">in</span> <span class="n">iter_default_integrations</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">integration_cls</span><span class="o">.</span><span class="n">identifier</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">integrations</span><span class="p">:</span>
+                <span class="n">instance</span> <span class="o">=</span> <span class="n">integration_cls</span><span class="p">()</span>
+                <span class="n">integrations</span><span class="p">[</span><span class="n">instance</span><span class="o">.</span><span class="n">identifier</span><span class="p">]</span> <span class="o">=</span> <span class="n">instance</span>
+
+    <span class="k">for</span> <span class="n">identifier</span><span class="p">,</span> <span class="n">integration</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">integrations</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">_installer_lock</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">identifier</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_installed_integrations</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="nb">type</span><span class="p">(</span><span class="n">integration</span><span class="p">)</span><span class="o">.</span><span class="n">setup_once</span><span class="p">()</span>
+                <span class="k">except</span> <span class="ne">NotImplementedError</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">integration</span><span class="p">,</span> <span class="s2">&quot;install&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                            <span class="s2">&quot;Integration </span><span class="si">%s</span><span class="s2">: The install method is &quot;</span>
+                            <span class="s2">&quot;deprecated. Use `setup_once`.&quot;</span><span class="p">,</span>
+                            <span class="n">identifier</span><span class="p">,</span>
+                        <span class="p">)</span>
+                        <span class="n">integration</span><span class="o">.</span><span class="n">install</span><span class="p">()</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">raise</span>
+                <span class="n">_installed_integrations</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">identifier</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">integrations</span>
+
+
+<span class="n">IntegrationAttachment</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span>
+    <span class="s2">&quot;IntegrationAttachment&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;integration&quot;</span><span class="p">,</span> <span class="s2">&quot;client&quot;</span><span class="p">,</span> <span class="s2">&quot;hub&quot;</span><span class="p">]</span>
+<span class="p">)</span>
 
 
 <span class="k">class</span> <span class="nc">Integration</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Baseclass for all integrations.&quot;&quot;&quot;</span>
+    <span class="sd">&quot;&quot;&quot;Baseclass for all integrations.</span>
 
-    <span class="n">identifier</span> <span class="o">=</span> <span class="bp">None</span>
-    <span class="sd">&quot;&quot;&quot;A unique identifying string for the integration.  Integrations must</span>
-<span class="sd">    set this as a class attribute.</span>
+<span class="sd">    To accept options for an integration, implement your own constructor that</span>
+<span class="sd">    saves those options on `self`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;An integration must implement all its code here.  When the</span>
-<span class="sd">        `setup_integrations` function runs it will invoke this unless the</span>
-<span class="sd">        integration was already activated elsewhere.</span>
+    <span class="n">install</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="sd">&quot;&quot;&quot;Legacy method, do not implement.&quot;&quot;&quot;</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the integration.</span>
+
+<span class="sd">        This function is only called once, ever. Configuration is not available</span>
+<span class="sd">        at this point, so the only thing to do here is to hook into exception</span>
+<span class="sd">        handlers, and perhaps do monkeypatches.</span>
+
+<span class="sd">        Inside those hooks `Integration.current` can be used to access the</span>
+<span class="sd">        instance again.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
-
-    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">identifier</span>
-        <span class="k">with</span> <span class="n">_installer_lock</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">identifier</span> <span class="ow">in</span> <span class="n">_installed_integrations</span><span class="p">:</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> integration for Sentry is already &quot;</span>
-                    <span class="s2">&quot;configured. Will ignore second configuration.&quot;</span><span class="p">,</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">identifier</span><span class="p">,</span>
-                <span class="p">)</span>
-                <span class="k">return</span>
-
-            <span class="bp">self</span><span class="o">.</span><span class="n">install</span><span class="p">()</span>
-            <span class="n">_installed_integrations</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">identifier</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1180,14 +1206,14 @@ table {
     <h2 class="section-title" id="header-functions">Functions</h2>
       
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.get_default_integrations">
-    <p>def <span class="ident">get_default_integrations</span>(</p><p>)</p>
+    <div class="name def" id="sentry_sdk.integrations.iter_default_integrations">
+    <p>def <span class="ident">iter_default_integrations</span>(</p><p>)</p>
     </div>
     
 
     
   
-    <div class="desc"><p>Returns an iterator of default integration instances.</p>
+    <div class="desc"><p>Returns an iterator of default integration classes.</p>
 <p>This returns the following default integration:</p>
 <ul>
 <li><code>LoggingIntegration</code></li>
@@ -1196,10 +1222,10 @@ table {
 <li><code>AtexitIntegration</code></li>
 </ul></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.get_default_integrations', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.get_default_integrations" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">get_default_integrations</span><span class="p">():</span>
-    <span class="sd">&quot;&quot;&quot;Returns an iterator of default integration instances.</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.iter_default_integrations', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.iter_default_integrations" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">iter_default_integrations</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;Returns an iterator of default integration classes.</span>
 
 <span class="sd">    This returns the following default integration:</span>
 
@@ -1215,12 +1241,12 @@ table {
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.atexit</span> <span class="kn">import</span> <span class="n">AtexitIntegration</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.modules</span> <span class="kn">import</span> <span class="n">ModulesIntegration</span>
 
-    <span class="k">yield</span> <span class="n">LoggingIntegration</span><span class="p">()</span>
-    <span class="k">yield</span> <span class="n">StdlibIntegration</span><span class="p">()</span>
-    <span class="k">yield</span> <span class="n">ExcepthookIntegration</span><span class="p">()</span>
-    <span class="k">yield</span> <span class="n">DedupeIntegration</span><span class="p">()</span>
-    <span class="k">yield</span> <span class="n">AtexitIntegration</span><span class="p">()</span>
-    <span class="k">yield</span> <span class="n">ModulesIntegration</span><span class="p">()</span>
+    <span class="k">yield</span> <span class="n">LoggingIntegration</span>
+    <span class="k">yield</span> <span class="n">StdlibIntegration</span>
+    <span class="k">yield</span> <span class="n">ExcepthookIntegration</span>
+    <span class="k">yield</span> <span class="n">DedupeIntegration</span>
+    <span class="k">yield</span> <span class="n">AtexitIntegration</span>
+    <span class="k">yield</span> <span class="n">ModulesIntegration</span>
 </pre></div>
 
   </div>
@@ -1248,14 +1274,34 @@ unless they were already provided before.</p></div>
 <span class="sd">    `with_defaults` is set to `True` then all default integrations are added</span>
 <span class="sd">    unless they were already provided before.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">integrations</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">integrations</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">with_defaults</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">instance</span> <span class="ow">in</span> <span class="n">get_default_integrations</span><span class="p">():</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">instance</span><span class="p">))</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">integrations</span><span class="p">):</span>
-                <span class="n">integrations</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">instance</span><span class="p">)</span>
+    <span class="n">integrations</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">integration</span><span class="o">.</span><span class="n">identifier</span><span class="p">,</span> <span class="n">integration</span><span class="p">)</span> <span class="k">for</span> <span class="n">integration</span> <span class="ow">in</span> <span class="n">integrations</span> <span class="ow">or</span> <span class="p">()</span>
+    <span class="p">)</span>
 
-    <span class="k">for</span> <span class="n">integration</span> <span class="ow">in</span> <span class="n">integrations</span><span class="p">:</span>
-        <span class="n">integration</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">with_defaults</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">integration_cls</span> <span class="ow">in</span> <span class="n">iter_default_integrations</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">integration_cls</span><span class="o">.</span><span class="n">identifier</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">integrations</span><span class="p">:</span>
+                <span class="n">instance</span> <span class="o">=</span> <span class="n">integration_cls</span><span class="p">()</span>
+                <span class="n">integrations</span><span class="p">[</span><span class="n">instance</span><span class="o">.</span><span class="n">identifier</span><span class="p">]</span> <span class="o">=</span> <span class="n">instance</span>
+
+    <span class="k">for</span> <span class="n">identifier</span><span class="p">,</span> <span class="n">integration</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">integrations</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">_installer_lock</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">identifier</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_installed_integrations</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="nb">type</span><span class="p">(</span><span class="n">integration</span><span class="p">)</span><span class="o">.</span><span class="n">setup_once</span><span class="p">()</span>
+                <span class="k">except</span> <span class="ne">NotImplementedError</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">integration</span><span class="p">,</span> <span class="s2">&quot;install&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                            <span class="s2">&quot;Integration </span><span class="si">%s</span><span class="s2">: The install method is &quot;</span>
+                            <span class="s2">&quot;deprecated. Use `setup_once`.&quot;</span><span class="p">,</span>
+                            <span class="n">identifier</span><span class="p">,</span>
+                        <span class="p">)</span>
+                        <span class="n">integration</span><span class="o">.</span><span class="n">install</span><span class="p">()</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">raise</span>
+                <span class="n">_installed_integrations</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">identifier</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">integrations</span>
 </pre></div>
 
   </div>
@@ -1270,38 +1316,35 @@ unless they were already provided before.</p></div>
       <p id="sentry_sdk.integrations.Integration" class="name">class <span class="ident">Integration</span></p>
       
   
-    <div class="desc"><p>Baseclass for all integrations.</p></div>
+    <div class="desc"><p>Baseclass for all integrations.</p>
+<p>To accept options for an integration, implement your own constructor that
+saves those options on <code>self</code>.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.Integration', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.Integration" class="source">
     <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">Integration</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Baseclass for all integrations.&quot;&quot;&quot;</span>
+    <span class="sd">&quot;&quot;&quot;Baseclass for all integrations.</span>
 
-    <span class="n">identifier</span> <span class="o">=</span> <span class="bp">None</span>
-    <span class="sd">&quot;&quot;&quot;A unique identifying string for the integration.  Integrations must</span>
-<span class="sd">    set this as a class attribute.</span>
+<span class="sd">    To accept options for an integration, implement your own constructor that</span>
+<span class="sd">    saves those options on `self`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;An integration must implement all its code here.  When the</span>
-<span class="sd">        `setup_integrations` function runs it will invoke this unless the</span>
-<span class="sd">        integration was already activated elsewhere.</span>
+    <span class="n">install</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="sd">&quot;&quot;&quot;Legacy method, do not implement.&quot;&quot;&quot;</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the integration.</span>
+
+<span class="sd">        This function is only called once, ever. Configuration is not available</span>
+<span class="sd">        at this point, so the only thing to do here is to hook into exception</span>
+<span class="sd">        handlers, and perhaps do monkeypatches.</span>
+
+<span class="sd">        Inside those hooks `Integration.current` can be used to access the</span>
+<span class="sd">        instance again.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
-
-    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">identifier</span>
-        <span class="k">with</span> <span class="n">_installer_lock</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">identifier</span> <span class="ow">in</span> <span class="n">_installed_integrations</span><span class="p">:</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> integration for Sentry is already &quot;</span>
-                    <span class="s2">&quot;configured. Will ignore second configuration.&quot;</span><span class="p">,</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">identifier</span><span class="p">,</span>
-                <span class="p">)</span>
-                <span class="k">return</span>
-
-            <span class="bp">self</span><span class="o">.</span><span class="n">install</span><span class="p">()</span>
-            <span class="n">_installed_integrations</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">identifier</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1316,13 +1359,12 @@ unless they were already provided before.</p></div>
           </ul>
           <h3>Class variables</h3>
             <div class="item">
-            <p id="sentry_sdk.integrations.Integration.identifier" class="name">var <span class="ident">identifier</span></p>
+            <p id="sentry_sdk.integrations.Integration.install" class="name">var <span class="ident">install</span></p>
             
 
             
   
-    <div class="desc"><p>A unique identifying string for the integration.  Integrations must
-set this as a class attribute.</p></div>
+    <div class="desc"><p>Legacy method, do not implement.</p></div>
   <div class="source_cont">
 </div>
 
@@ -1330,23 +1372,31 @@ set this as a class attribute.</p></div>
           <h3>Static methods</h3>
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.Integration.install">
-    <p>def <span class="ident">install</span>(</p><p>self)</p>
+    <div class="name def" id="sentry_sdk.integrations.Integration.setup_once">
+    <p>def <span class="ident">setup_once</span>(</p><p>)</p>
     </div>
     
 
     
   
-    <div class="desc"><p>An integration must implement all its code here.  When the
-<code>setup_integrations</code> function runs it will invoke this unless the
-integration was already activated elsewhere.</p></div>
+    <div class="desc"><p>Initialize the integration.</p>
+<p>This function is only called once, ever. Configuration is not available
+at this point, so the only thing to do here is to hook into exception
+handlers, and perhaps do monkeypatches.</p>
+<p>Inside those hooks <code>Integration.current</code> can be used to access the
+instance again.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.Integration.install', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.Integration.install" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;An integration must implement all its code here.  When the</span>
-<span class="sd">    `setup_integrations` function runs it will invoke this unless the</span>
-<span class="sd">    integration was already activated elsewhere.</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.Integration.setup_once', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.Integration.setup_once" class="source">
+    <div class="codehilite"><pre><span></span><span class="nd">@staticmethod</span>
+<span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Initialize the integration.</span>
+<span class="sd">    This function is only called once, ever. Configuration is not available</span>
+<span class="sd">    at this point, so the only thing to do here is to hook into exception</span>
+<span class="sd">    handlers, and perhaps do monkeypatches.</span>
+<span class="sd">    Inside those hooks `Integration.current` can be used to access the</span>
+<span class="sd">    instance again.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
 </pre></div>
@@ -1356,6 +1406,59 @@ integration was already activated elsewhere.</p></div>
 
   </div>
   
+      </div>
+      </div>
+      
+      <div class="item">
+      <p id="sentry_sdk.integrations.IntegrationAttachment" class="name">class <span class="ident">IntegrationAttachment</span></p>
+      
+  
+    <div class="desc"><p>IntegrationAttachment(integration, client, hub)</p></div>
+  <div class="source_cont">
+</div>
+
+
+      <div class="class">
+          <h3>Ancestors (in MRO)</h3>
+          <ul class="class_list">
+          <li><a href="#sentry_sdk.integrations.IntegrationAttachment">IntegrationAttachment</a></li>
+          <li>builtins.tuple</li>
+          <li>builtins.object</li>
+          </ul>
+          <h3>Instance variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.integrations.IntegrationAttachment.client" class="name">var <span class="ident">client</span></p>
+            
+
+            
+  
+    <div class="desc"><p>Alias for field number 1</p></div>
+  <div class="source_cont">
+</div>
+
+            </div>
+            <div class="item">
+            <p id="sentry_sdk.integrations.IntegrationAttachment.hub" class="name">var <span class="ident">hub</span></p>
+            
+
+            
+  
+    <div class="desc"><p>Alias for field number 2</p></div>
+  <div class="source_cont">
+</div>
+
+            </div>
+            <div class="item">
+            <p id="sentry_sdk.integrations.IntegrationAttachment.integration" class="name">var <span class="ident">integration</span></p>
+            
+
+            
+  
+    <div class="desc"><p>Alias for field number 0</p></div>
+  <div class="source_cont">
+</div>
+
+            </div>
       </div>
       </div>
 

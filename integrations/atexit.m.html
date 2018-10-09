@@ -1057,7 +1057,7 @@ table {
           
   <ul>
     <li class="mono"><a href="#sentry_sdk.integrations.atexit.AtexitIntegration.__init__">__init__</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.atexit.AtexitIntegration.install">install</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.atexit.AtexitIntegration.setup_once">setup_once</a></li>
   </ul>
 
         </li>
@@ -1114,14 +1114,16 @@ table {
             <span class="n">callback</span> <span class="o">=</span> <span class="n">default_shutdown_callback</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">callback</span> <span class="o">=</span> <span class="n">callback</span>
 
-    <span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
         <span class="nd">@atexit.register</span>
         <span class="k">def</span> <span class="nf">_shutdown</span><span class="p">():</span>
-            <span class="n">main_client</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">client</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: got shutdown signal&quot;</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">main_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">main</span>
+            <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AtexitIntegration</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: shutting down client&quot;</span><span class="p">)</span>
-                <span class="n">main_client</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">shutdown_callback</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">callback</span><span class="p">)</span>
+                <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">shutdown_callback</span><span class="o">=</span><span class="n">integration</span><span class="o">.</span><span class="n">callback</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1173,7 +1175,9 @@ are still pending and the process is waiting for them to flush out.</p></div>
       <p id="sentry_sdk.integrations.atexit.AtexitIntegration" class="name">class <span class="ident">AtexitIntegration</span></p>
       
   
-    <div class="desc"><p>Baseclass for all integrations.</p></div>
+    <div class="desc"><p>Baseclass for all integrations.</p>
+<p>To accept options for an integration, implement your own constructor that
+saves those options on <code>self</code>.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.atexit.AtexitIntegration', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.atexit.AtexitIntegration" class="source">
@@ -1185,14 +1189,16 @@ are still pending and the process is waiting for them to flush out.</p></div>
             <span class="n">callback</span> <span class="o">=</span> <span class="n">default_shutdown_callback</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">callback</span> <span class="o">=</span> <span class="n">callback</span>
 
-    <span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
         <span class="nd">@atexit.register</span>
         <span class="k">def</span> <span class="nf">_shutdown</span><span class="p">():</span>
-            <span class="n">main_client</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">client</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: got shutdown signal&quot;</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">main_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">main</span>
+            <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AtexitIntegration</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: shutting down client&quot;</span><span class="p">)</span>
-                <span class="n">main_client</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">shutdown_callback</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">callback</span><span class="p">)</span>
+                <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">shutdown_callback</span><span class="o">=</span><span class="n">integration</span><span class="o">.</span><span class="n">callback</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1209,6 +1215,16 @@ are still pending and the process is waiting for them to flush out.</p></div>
           <h3>Class variables</h3>
             <div class="item">
             <p id="sentry_sdk.integrations.atexit.AtexitIntegration.identifier" class="name">var <span class="ident">identifier</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
+            <div class="item">
+            <p id="sentry_sdk.integrations.atexit.AtexitIntegration.install" class="name">var <span class="ident">install</span></p>
             
 
             
@@ -1244,27 +1260,32 @@ are still pending and the process is waiting for them to flush out.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.atexit.AtexitIntegration.install">
-    <p>def <span class="ident">install</span>(</p><p>self)</p>
+    <div class="name def" id="sentry_sdk.integrations.atexit.AtexitIntegration.setup_once">
+    <p>def <span class="ident">setup_once</span>(</p><p>)</p>
     </div>
     
 
     
   
-    <div class="desc"><p>An integration must implement all its code here.  When the
-<code>setup_integrations</code> function runs it will invoke this unless the
-integration was already activated elsewhere.</p></div>
+    <div class="desc"><p>Initialize the integration.</p>
+<p>This function is only called once, ever. Configuration is not available
+at this point, so the only thing to do here is to hook into exception
+handlers, and perhaps do monkeypatches.</p>
+<p>Inside those hooks <code>Integration.current</code> can be used to access the
+instance again.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.atexit.AtexitIntegration.install', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.atexit.AtexitIntegration.install" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.atexit.AtexitIntegration.setup_once', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.atexit.AtexitIntegration.setup_once" class="source">
+    <div class="codehilite"><pre><span></span><span class="nd">@staticmethod</span>
+<span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
     <span class="nd">@atexit.register</span>
     <span class="k">def</span> <span class="nf">_shutdown</span><span class="p">():</span>
-        <span class="n">main_client</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">client</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: got shutdown signal&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">main_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">main</span>
+        <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AtexitIntegration</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: shutting down client&quot;</span><span class="p">)</span>
-            <span class="n">main_client</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">shutdown_callback</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">callback</span><span class="p">)</span>
+            <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">shutdown_callback</span><span class="o">=</span><span class="n">integration</span><span class="o">.</span><span class="n">callback</span><span class="p">)</span>
 </pre></div>
 
   </div>

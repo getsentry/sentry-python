@@ -1049,7 +1049,7 @@ table {
         
           
   <ul>
-    <li class="mono"><a href="#sentry_sdk.integrations.excepthook.ExcepthookIntegration.install">install</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.excepthook.ExcepthookIntegration.setup_once">setup_once</a></li>
   </ul>
 
         </li>
@@ -1074,7 +1074,7 @@ table {
   <div id="source-sentry_sdk.integrations.excepthook" class="source">
     <div class="codehilite"><pre><span></span><span class="kn">import</span> <span class="nn">sys</span>
 
-<span class="kn">from</span> <span class="nn">sentry_sdk</span> <span class="kn">import</span> <span class="n">Hub</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.hub</span> <span class="kn">import</span> <span class="n">Hub</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">capture_internal_exceptions</span><span class="p">,</span> <span class="n">event_from_exception</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
 
@@ -1082,7 +1082,8 @@ table {
 <span class="k">class</span> <span class="nc">ExcepthookIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
     <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;excepthook&quot;</span>
 
-    <span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
         <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">sys</span><span class="p">,</span> <span class="s2">&quot;ps1&quot;</span><span class="p">):</span>
             <span class="c1"># Disable the excepthook for interactive Python shells, otherwise</span>
             <span class="c1"># every typo gets sent to Sentry.</span>
@@ -1093,14 +1094,16 @@ table {
 
 <span class="k">def</span> <span class="nf">_make_excepthook</span><span class="p">(</span><span class="n">old_excepthook</span><span class="p">):</span>
     <span class="k">def</span> <span class="nf">sentry_sdk_excepthook</span><span class="p">(</span><span class="n">exctype</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">):</span>
-        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-            <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-            <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
-                <span class="p">(</span><span class="n">exctype</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">),</span>
-                <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
-                <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;excepthook&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">},</span>
-            <span class="p">)</span>
-            <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
+        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+        <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">ExcepthookIntegration</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+                <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
+                    <span class="p">(</span><span class="n">exctype</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">),</span>
+                    <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
+                    <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;excepthook&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">},</span>
+                <span class="p">)</span>
+                <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">old_excepthook</span><span class="p">(</span><span class="n">exctype</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">)</span>
 
@@ -1120,14 +1123,17 @@ table {
       <p id="sentry_sdk.integrations.excepthook.ExcepthookIntegration" class="name">class <span class="ident">ExcepthookIntegration</span></p>
       
   
-    <div class="desc"><p>Baseclass for all integrations.</p></div>
+    <div class="desc"><p>Baseclass for all integrations.</p>
+<p>To accept options for an integration, implement your own constructor that
+saves those options on <code>self</code>.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.excepthook.ExcepthookIntegration', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.excepthook.ExcepthookIntegration" class="source">
     <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">ExcepthookIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
     <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;excepthook&quot;</span>
 
-    <span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
         <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">sys</span><span class="p">,</span> <span class="s2">&quot;ps1&quot;</span><span class="p">):</span>
             <span class="c1"># Disable the excepthook for interactive Python shells, otherwise</span>
             <span class="c1"># every typo gets sent to Sentry.</span>
@@ -1158,23 +1164,37 @@ table {
 </div>
 
             </div>
+            <div class="item">
+            <p id="sentry_sdk.integrations.excepthook.ExcepthookIntegration.install" class="name">var <span class="ident">install</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
           <h3>Static methods</h3>
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.excepthook.ExcepthookIntegration.install">
-    <p>def <span class="ident">install</span>(</p><p>self)</p>
+    <div class="name def" id="sentry_sdk.integrations.excepthook.ExcepthookIntegration.setup_once">
+    <p>def <span class="ident">setup_once</span>(</p><p>)</p>
     </div>
     
 
     
   
-    <div class="desc"><p>An integration must implement all its code here.  When the
-<code>setup_integrations</code> function runs it will invoke this unless the
-integration was already activated elsewhere.</p></div>
+    <div class="desc"><p>Initialize the integration.</p>
+<p>This function is only called once, ever. Configuration is not available
+at this point, so the only thing to do here is to hook into exception
+handlers, and perhaps do monkeypatches.</p>
+<p>Inside those hooks <code>Integration.current</code> can be used to access the
+instance again.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.excepthook.ExcepthookIntegration.install', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.excepthook.ExcepthookIntegration.install" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.excepthook.ExcepthookIntegration.setup_once', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.excepthook.ExcepthookIntegration.setup_once" class="source">
+    <div class="codehilite"><pre><span></span><span class="nd">@staticmethod</span>
+<span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
     <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">sys</span><span class="p">,</span> <span class="s2">&quot;ps1&quot;</span><span class="p">):</span>
         <span class="c1"># Disable the excepthook for interactive Python shells, otherwise</span>
         <span class="c1"># every typo gets sent to Sentry.</span>
