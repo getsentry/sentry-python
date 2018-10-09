@@ -1,7 +1,15 @@
 from copy import copy
 from collections import deque
+from itertools import chain
 
 from sentry_sdk.utils import logger, capture_internal_exceptions
+
+
+global_event_processors = []
+
+
+def add_global_event_processor(processor):
+    global_event_processors.append(processor)
 
 
 def _attr_setter(fn):
@@ -152,7 +160,8 @@ class Scope(object):
                     return _drop(event, processor, "error processor")
                 event = new_event
 
-        for processor in self._event_processors:
+        for processor in chain(global_event_processors, self._event_processors):
+            new_event = event
             with capture_internal_exceptions():
                 new_event = processor(event, hint)
             if new_event is None:

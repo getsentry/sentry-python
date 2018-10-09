@@ -2,8 +2,8 @@ import sys
 import weakref
 from inspect import isawaitable
 
-from sentry_sdk import Hub, push_scope, configure_scope
 from sentry_sdk._compat import urlparse, reraise
+from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi import RequestExtractor, _filter_headers
@@ -17,7 +17,8 @@ from sanic.handlers import ErrorHandler
 class SanicIntegration(Integration):
     identifier = "sanic"
 
-    def install(self):
+    @staticmethod
+    def setup_once():
         if sys.version_info < (3, 7):
             # Sanic is async. We better have contextvars or we're going to leak
             # state between requests.
@@ -33,14 +34,19 @@ class SanicIntegration(Integration):
         old_handle_request = Sanic.handle_request
 
         async def sentry_handle_request(self, request, *args, **kwargs):
-            weak_request = weakref.ref(request)
-
-            with push_scope() as scope:
-                scope.add_event_processor(_make_request_processor(weak_request))
+            hub = Hub.current
+            if hub.get_integration(SanicIntegration) is None:
                 response = old_handle_request(self, request, *args, **kwargs)
-                if isawaitable(response):
-                    response = await response
-                return response
+            else:
+                weak_request = weakref.ref(request)
+
+                with hub.push_scope() as scope:
+                    scope.add_event_processor(_make_request_processor(weak_request))
+                    response = old_handle_request(self, request, *args, **kwargs)
+                    if isawaitable(response):
+                        response = await response
+
+            return response
 
         Sanic.handle_request = sentry_handle_request
 
@@ -48,9 +54,11 @@ class SanicIntegration(Integration):
 
         def sentry_router_get(self, request):
             rv = old_router_get(self, request)
-            with capture_internal_exceptions():
-                with configure_scope() as scope:
-                    scope.transaction = rv[0].__name__
+            hub = Hub.current
+            if hub.get_integration(SanicIntegration) is not None:
+                with capture_internal_exceptions():
+                    with hub.configure_scope() as scope:
+                        scope.transaction = rv[0].__name__
             return rv
 
         Router.get = sentry_router_get
@@ -63,6 +71,9 @@ class SanicIntegration(Integration):
 
             if old_error_handler is None:
                 return None
+
+            if Hub.current.get_integration(SanicIntegration) is None:
+                return old_error_handler
 
             async def sentry_wrapped_error_handler(request, exception):
                 try:
@@ -81,14 +92,17 @@ class SanicIntegration(Integration):
 
 
 def _capture_exception(exception):
+    hub = Hub.current
+    integration = hub.get_integration(SanicIntegration)
+    if integration is None:
+        return
+
     with capture_internal_exceptions():
-        hub = Hub.current
         event, hint = event_from_exception(
             exception,
             client_options=hub.client.options,
             mechanism={"type": "sanic", "handled": False},
         )
-
         hub.capture_event(event, hint=hint)
 
 

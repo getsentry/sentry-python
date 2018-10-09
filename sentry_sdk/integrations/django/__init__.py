@@ -12,7 +12,7 @@ try:
 except ImportError:
     from django.core.urlresolvers import resolve
 
-from sentry_sdk import Hub, configure_scope, add_breadcrumb
+from sentry_sdk import Hub
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -55,7 +55,8 @@ class DjangoIntegration(Integration):
             )
         self.transaction_style = transaction_style
 
-    def install(self):
+    @staticmethod
+    def setup_once():
         install_sql_hook()
         # Patch in our custom middleware.
 
@@ -64,6 +65,9 @@ class DjangoIntegration(Integration):
         old_app = WSGIHandler.__call__
 
         def sentry_patched_wsgi_handler(self, environ, start_response):
+            if Hub.current.get_integration(DjangoIntegration) is None:
+                return old_app(self, environ, start_response)
+
             return run_wsgi_app(
                 lambda *a, **kw: old_app(self, *a, **kw), environ, start_response
             )
@@ -75,13 +79,15 @@ class DjangoIntegration(Integration):
         from django.core.handlers.base import BaseHandler
 
         old_get_response = BaseHandler.get_response
-        integration = self
 
         def sentry_patched_get_response(self, request):
-            with configure_scope() as scope:
-                scope.add_event_processor(
-                    _make_event_processor(weakref.ref(request), integration)
-                )
+            hub = Hub.current
+            integration = hub.get_integration(DjangoIntegration)
+            if integration is not None:
+                with hub.configure_scope() as scope:
+                    scope.add_event_processor(
+                        _make_event_processor(weakref.ref(request), integration)
+                    )
             return old_get_response(self, request)
 
         BaseHandler.get_response = sentry_patched_get_response
@@ -123,13 +129,14 @@ def _make_event_processor(weak_request, integration):
 
 def _got_request_exception(request=None, **kwargs):
     hub = Hub.current
-    event, hint = event_from_exception(
-        sys.exc_info(),
-        client_options=hub.client.options,
-        mechanism={"type": "django", "handled": False},
-    )
-
-    hub.capture_event(event, hint=hint)
+    integration = hub.get_integration(DjangoIntegration)
+    if integration is not None:
+        event, hint = event_from_exception(
+            sys.exc_info(),
+            client_options=hub.client.options,
+            mechanism={"type": "django", "handled": False},
+        )
+        hub.capture_event(event, hint=hint)
 
 
 class DjangoRequestExtractor(RequestExtractor):
@@ -208,6 +215,9 @@ def format_sql(sql, params):
 
 
 def record_sql(sql, params):
+    hub = Hub.current
+    if hub.get_integration(DjangoIntegration) is None:
+        return
     real_sql, real_params = format_sql(sql, params)
 
     if real_params:
@@ -216,10 +226,7 @@ def record_sql(sql, params):
         except Exception:
             pass
 
-    # maybe category to 'django.%s.%s' % (vendor, alias or
-    #   'default') ?
-
-    add_breadcrumb(message=real_sql, category="query")
+    hub.add_breadcrumb(message=real_sql, category="query")
 
 
 def install_sql_hook():

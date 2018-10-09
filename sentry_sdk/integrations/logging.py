@@ -1,15 +1,14 @@
 from __future__ import absolute_import
-from __future__ import print_function
 
 import logging
 import datetime
 
+from sentry_sdk.hub import Hub
 from sentry_sdk.utils import (
     to_string,
     event_from_exception,
     capture_internal_exceptions,
 )
-from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 
 DEFAULT_LEVEL = logging.INFO
@@ -32,13 +31,19 @@ class LoggingIntegration(Integration):
     def __init__(self, level=DEFAULT_LEVEL, event_level=DEFAULT_EVENT_LEVEL):
         self._handler = SentryHandler(level=level, event_level=event_level)
 
-    def install(self):
-        handler = self._handler
-
+    @staticmethod
+    def setup_once():
         old_callhandlers = logging.Logger.callHandlers
 
         def sentry_patched_callhandlers(self, record):
-            handler.handle(record)
+            # This check is done twice, once also here before we even get
+            # the integration.  Otherwise we have a high chance of getting
+            # into a recursion error when the integration is resolved
+            # (this also is slower).
+            if record.name not in _IGNORED_LOGGERS:
+                integration = Hub.current.get_integration(LoggingIntegration)
+                if integration is not None:
+                    integration._handler.handle(record)
             return old_callhandlers(self, record)
 
         logging.Logger.callHandlers = sentry_patched_callhandlers
@@ -74,7 +79,8 @@ class SentryHandler(logging.Handler, object):
             return
 
         hub = Hub.current
-        if hub.client is None:
+        integration = hub.get_integration(LoggingIntegration)
+        if integration is None:
             return
 
         if self._should_create_event(record):

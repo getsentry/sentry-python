@@ -1,6 +1,5 @@
 import sys
 
-from sentry_sdk import configure_scope
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk._compat import reraise
 from sentry_sdk.utils import (
@@ -16,7 +15,8 @@ from sentry_sdk.integrations._wsgi import _filter_headers
 class AwsLambdaIntegration(Integration):
     identifier = "aws_lambda"
 
-    def install(self):
+    @staticmethod
+    def setup_once():
         import __main__ as lambda_bootstrap
 
         if not hasattr(lambda_bootstrap, "make_final_handler"):
@@ -35,14 +35,16 @@ class AwsLambdaIntegration(Integration):
 
             def sentry_handler(event, context, *args, **kwargs):
                 hub = Hub.current
+                integration = hub.get_integration(AwsLambdaIntegration)
+                if integration is None:
+                    return handler(event, context, *args, **kwargs)
 
-                with hub.push_scope():
+                with hub.push_scope() as scope:
                     with capture_internal_exceptions():
-                        with configure_scope() as scope:
-                            scope.transaction = context.function_name
-                            scope.add_event_processor(
-                                _make_request_event_processor(event, context)
-                            )
+                        scope.transaction = context.function_name
+                        scope.add_event_processor(
+                            _make_request_event_processor(event, context)
+                        )
 
                     try:
                         return handler(event, context, *args, **kwargs)
@@ -53,7 +55,6 @@ class AwsLambdaIntegration(Integration):
                             client_options=hub.client.options,
                             mechanism={"type": "aws_lambda", "handled": False},
                         )
-
                         hub.capture_event(event, hint=hint)
                         reraise(*exc_info)
 
@@ -66,15 +67,14 @@ class AwsLambdaIntegration(Integration):
         def sentry_report_done(*args, **kwargs):
             with capture_internal_exceptions():
                 hub = Hub.current
-                if hub is not None:
-                    client = hub.client
+                integration = hub.get_integration(AwsLambdaIntegration)
+                if integration is not None:
                     # Flush out the event queue before AWS kills the
                     # process. This is not threadsafe.
-                    if client is not None:
-                        # make new transport with empty queue
-                        new_transport = client.transport.copy()
-                        client.close()
-                        client.transport = new_transport
+                    # make new transport with empty queue
+                    new_transport = hub.client.transport.copy()
+                    hub.client.close()
+                    hub.client.transport = new_transport
 
             return old_report_done(*args, **kwargs)
 

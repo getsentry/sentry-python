@@ -2,8 +2,7 @@ from __future__ import absolute_import
 
 import weakref
 
-from sentry_sdk import Hub, configure_scope
-from sentry_sdk.hub import _should_send_default_pii
+from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi import RequestExtractor, run_wsgi_app
@@ -36,67 +35,52 @@ class FlaskIntegration(Integration):
             )
         self.transaction_style = transaction_style
 
-    def install(self):
-        appcontext_pushed.connect(self._push_appctx)
-        appcontext_tearing_down.connect(self._pop_appctx)
-        request_started.connect(self._request_started)
+    @staticmethod
+    def setup_once():
+        appcontext_pushed.connect(_push_appctx)
+        appcontext_tearing_down.connect(_pop_appctx)
+        request_started.connect(_request_started)
         got_request_exception.connect(_capture_exception)
 
         old_app = Flask.__call__
 
         def sentry_patched_wsgi_app(self, environ, start_response):
+            if Hub.current.get_integration(FlaskIntegration) is None:
+                return old_app(self, environ, start_response)
+
             return run_wsgi_app(
                 lambda *a, **kw: old_app(self, *a, **kw), environ, start_response
             )
 
         Flask.__call__ = sentry_patched_wsgi_app
 
-    def _push_appctx(self, *args, **kwargs):
+
+def _push_appctx(*args, **kwargs):
+    hub = Hub.current
+    if hub.get_integration(FlaskIntegration) is not None:
         # always want to push scope regardless of whether WSGI app might already
         # have (not the case for CLI for example)
-        hub = Hub.current
         hub.push_scope()
 
-    def _pop_appctx(self, *args, **kwargs):
-        Hub.current.pop_scope_unsafe()
 
-    def _request_started(self, sender, **kwargs):
-        weak_request = weakref.ref(_request_ctx_stack.top.request)
-        app = _app_ctx_stack.top.app
-        with configure_scope() as scope:
-            scope.add_event_processor(
-                self._make_request_event_processor(app, weak_request)
-            )
+def _pop_appctx(*args, **kwargs):
+    hub = Hub.current
+    if hub.get_integration(FlaskIntegration) is not None:
+        hub.pop_scope_unsafe()
 
-    def _make_request_event_processor(self, app, weak_request):
-        def inner(event, hint):
-            request = weak_request()
 
-            # if the request is gone we are fine not logging the data from
-            # it.  This might happen if the processor is pushed away to
-            # another thread.
-            if request is None:
-                return event
+def _request_started(sender, **kwargs):
+    hub = Hub.current
+    integration = hub.get_integration(FlaskIntegration)
+    if integration is None:
+        return
 
-            if "transaction" not in event:
-                try:
-                    if self.transaction_style == "endpoint":
-                        event["transaction"] = request.url_rule.endpoint
-                    elif self.transaction_style == "url":
-                        event["transaction"] = request.url_rule.rule
-                except Exception:
-                    pass
-
-            with capture_internal_exceptions():
-                FlaskRequestExtractor(request).extract_into_event(event)
-
-            if _should_send_default_pii():
-                with capture_internal_exceptions():
-                    _add_user_to_event(event)
-
-            return event
-
-        return inner
+    weak_request = weakref.ref(_request_ctx_stack.top.request)
+    app = _app_ctx_stack.top.app
+    with hub.configure_scope() as scope:
+        scope.add_event_processor(
+            _make_request_event_processor(app, weak_request, integration)
+        )
 
 
 class FlaskRequestExtractor(RequestExtractor):
@@ -122,8 +106,41 @@ class FlaskRequestExtractor(RequestExtractor):
         return file.content_length
 
 
+def _make_request_event_processor(app, weak_request, integration):
+    def inner(event, hint):
+        request = weak_request()
+
+        # if the request is gone we are fine not logging the data from
+        # it.  This might happen if the processor is pushed away to
+        # another thread.
+        if request is None:
+            return event
+
+        if "transaction" not in event:
+            try:
+                if integration.transaction_style == "endpoint":
+                    event["transaction"] = request.url_rule.endpoint
+                elif integration.transaction_style == "url":
+                    event["transaction"] = request.url_rule.rule
+            except Exception:
+                pass
+
+        with capture_internal_exceptions():
+            FlaskRequestExtractor(request).extract_into_event(event)
+
+        if _should_send_default_pii():
+            with capture_internal_exceptions():
+                _add_user_to_event(event)
+
+        return event
+
+    return inner
+
+
 def _capture_exception(sender, exception, **kwargs):
     hub = Hub.current
+    if hub.get_integration(FlaskIntegration) is None:
+        return
     event, hint = event_from_exception(
         exception,
         client_options=hub.client.options,

@@ -1,10 +1,13 @@
 import sys
 import copy
+import weakref
 from datetime import datetime
 from contextlib import contextmanager
+from warnings import warn
 
-from sentry_sdk._compat import with_metaclass
+from sentry_sdk._compat import with_metaclass, string_types
 from sentry_sdk.scope import Scope
+from sentry_sdk.client import Client
 from sentry_sdk.utils import (
     exc_info_from_error,
     event_from_exception,
@@ -14,12 +17,7 @@ from sentry_sdk.utils import (
 
 
 _local = ContextVar("sentry_current_hub")
-
-
-def _get_client_options():
-    hub = Hub.current
-    if hub and hub.client:
-        return hub.client.options
+_initial_client = None
 
 
 def _should_send_default_pii():
@@ -27,6 +25,33 @@ def _should_send_default_pii():
     if not client:
         return False
     return client.options["send_default_pii"]
+
+
+class _InitGuard(object):
+    def __init__(self, client):
+        self._client = client
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        c = self._client
+        if c is not None:
+            c.close()
+
+
+def init(*args, **kwargs):
+    """Initializes the SDK and optionally integrations.
+
+    This takes the same arguments as the client constructor.
+    """
+    global _initial_client
+    client = Client(*args, **kwargs)
+    Hub.main.bind_client(client)
+    rv = _InitGuard(client)
+    if client is not None:
+        _initial_client = weakref.ref(client)
+    return rv
 
 
 class HubMeta(type):
@@ -106,6 +131,41 @@ class Hub(with_metaclass(HubMeta)):
         """
         with self:
             return callback()
+
+    def get_integration(self, name_or_class):
+        """Returns the integration for this hub by name or class.  If there
+        is no client bound or the client does not have that integration
+        then `None` is returned.
+
+        If the return value is not `None` the hub is guaranteed to have a
+        client attached.
+        """
+        if not isinstance(name_or_class, string_types):
+            name_or_class = name_or_class.identifier
+        client = self._stack[-1][0]
+        if client is not None:
+            rv = client.integrations.get(name_or_class)
+            if rv is not None:
+                return rv
+
+        initial_client = _initial_client
+        if initial_client is not None:
+            initial_client = initial_client()
+
+        if (
+            initial_client is not None
+            and initial_client is not client
+            and initial_client.integrations.get(name_or_class) is not None
+        ):
+            warning = (
+                "Integration %r attempted to run but it was only "
+                "enabled on init() but not the client that "
+                "was bound to the current flow.  Earlier versions of "
+                "the SDK would consider these integrations enabled but "
+                "this is no longer the case." % (name_or_class,)
+            )
+            warn(Warning(warning), stacklevel=3)
+            logger.warning(warning)
 
     @property
     def client(self):

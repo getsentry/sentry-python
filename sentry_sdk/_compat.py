@@ -12,6 +12,7 @@ if PY2:
     string_types = (str, text_type)
     number_types = (int, long, float)  # noqa
     int_types = (int, long)  # noqa
+    iteritems = lambda x: x.iteritems()
 
     def implements_str(cls):
         cls.__unicode__ = cls.__str__
@@ -34,6 +35,7 @@ else:
     string_types = (text_type,)
     number_types = (int, float)
     int_types = (int,)  # noqa
+    iteritems = lambda x: x.items()
 
     def _identity(x):
         return x

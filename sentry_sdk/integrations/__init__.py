@@ -1,15 +1,17 @@
 """This package"""
 from threading import Lock
+from collections import namedtuple
 
+from sentry_sdk._compat import iteritems
 from sentry_sdk.utils import logger
-from sentry_sdk.consts import INTEGRATIONS as _installed_integrations
 
 
 _installer_lock = Lock()
+_installed_integrations = set()
 
 
-def get_default_integrations():
-    """Returns an iterator of default integration instances.
+def iter_default_integrations():
+    """Returns an iterator of default integration classes.
 
     This returns the following default integration:
 
@@ -25,12 +27,12 @@ def get_default_integrations():
     from sentry_sdk.integrations.atexit import AtexitIntegration
     from sentry_sdk.integrations.modules import ModulesIntegration
 
-    yield LoggingIntegration()
-    yield StdlibIntegration()
-    yield ExcepthookIntegration()
-    yield DedupeIntegration()
-    yield AtexitIntegration()
-    yield ModulesIntegration()
+    yield LoggingIntegration
+    yield StdlibIntegration
+    yield ExcepthookIntegration
+    yield DedupeIntegration
+    yield AtexitIntegration
+    yield ModulesIntegration
 
 
 def setup_integrations(integrations, with_defaults=True):
@@ -38,41 +40,61 @@ def setup_integrations(integrations, with_defaults=True):
     `with_defaults` is set to `True` then all default integrations are added
     unless they were already provided before.
     """
-    integrations = list(integrations)
-    if with_defaults:
-        for instance in get_default_integrations():
-            if not any(isinstance(x, type(instance)) for x in integrations):
-                integrations.append(instance)
+    integrations = dict(
+        (integration.identifier, integration) for integration in integrations or ()
+    )
 
-    for integration in integrations:
-        integration()
+    if with_defaults:
+        for integration_cls in iter_default_integrations():
+            if integration_cls.identifier not in integrations:
+                instance = integration_cls()
+                integrations[instance.identifier] = instance
+
+    for identifier, integration in iteritems(integrations):
+        with _installer_lock:
+            if identifier not in _installed_integrations:
+                try:
+                    type(integration).setup_once()
+                except NotImplementedError:
+                    if getattr(integration, "install", None) is not None:
+                        logger.warn(
+                            "Integration %s: The install method is "
+                            "deprecated. Use `setup_once`.",
+                            identifier,
+                        )
+                        integration.install()
+                    else:
+                        raise
+                _installed_integrations.add(identifier)
+
+    return integrations
+
+
+IntegrationAttachment = namedtuple(
+    "IntegrationAttachment", ["integration", "client", "hub"]
+)
 
 
 class Integration(object):
-    """Baseclass for all integrations."""
+    """Baseclass for all integrations.
 
-    identifier = None
-    """A unique identifying string for the integration.  Integrations must
-    set this as a class attribute.
+    To accept options for an integration, implement your own constructor that
+    saves those options on `self`.
     """
 
-    def install(self):
-        """An integration must implement all its code here.  When the
-        `setup_integrations` function runs it will invoke this unless the
-        integration was already activated elsewhere.
+    install = None
+    """Legacy method, do not implement."""
+
+    @staticmethod
+    def setup_once():
+        """
+        Initialize the integration.
+
+        This function is only called once, ever. Configuration is not available
+        at this point, so the only thing to do here is to hook into exception
+        handlers, and perhaps do monkeypatches.
+
+        Inside those hooks `Integration.current` can be used to access the
+        instance again.
         """
         raise NotImplementedError()
-
-    def __call__(self):
-        assert self.identifier
-        with _installer_lock:
-            if self.identifier in _installed_integrations:
-                logger.warning(
-                    "%s integration for Sentry is already "
-                    "configured. Will ignore second configuration.",
-                    self.identifier,
-                )
-                return
-
-            self.install()
-            _installed_integrations.append(self.identifier)

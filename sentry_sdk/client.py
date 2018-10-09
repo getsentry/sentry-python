@@ -16,6 +16,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO
+from sentry_sdk.integrations import setup_integrations
 
 
 def get_options(*args, **kwargs):
@@ -60,6 +61,10 @@ class Client(object):
                 )
             )
 
+        self.integrations = setup_integrations(
+            options["integrations"], with_defaults=options["default_integrations"]
+        )
+
     @property
     def dsn(self):
         """Returns the configured DSN as string."""
@@ -93,7 +98,9 @@ class Client(object):
             if event.get(key) is None:
                 event[key] = self.options[key]
         if event.get("sdk") is None:
-            event["sdk"] = SDK_INFO
+            sdk_info = dict(SDK_INFO)
+            sdk_info["integrations"] = sorted(self.integrations.keys())
+            event["sdk"] = sdk_info
 
         if event.get("platform") is None:
             event["platform"] = "python"

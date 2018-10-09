@@ -1,14 +1,16 @@
 import inspect
 from contextlib import contextmanager
 
-from sentry_sdk.hub import Hub
+from sentry_sdk.hub import Hub, init
 from sentry_sdk.scope import Scope
 from sentry_sdk.transport import Transport, HttpTransport
-from sentry_sdk.client import Client, get_options
-from sentry_sdk.integrations import setup_integrations
+from sentry_sdk.client import Client
 
 
-__all__ = ["Hub", "Scope", "Client", "Transport", "HttpTransport"]
+__all__ = ["Hub", "Scope", "Client", "Transport", "HttpTransport", "init"]
+
+
+_initial_client = None
 
 
 def public(f):
@@ -22,45 +24,6 @@ def hubmethod(f):
         inspect.getdoc(getattr(Hub, f.__name__)),
     )
     return public(f)
-
-
-class _InitGuard(object):
-    def __init__(self, client):
-        self._client = client
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, tb):
-        c = self._client
-        if c is not None:
-            c.close()
-
-
-def _init_on_hub(hub, args, kwargs):
-    options = get_options(*args, **kwargs)
-    client = Client(options)
-    hub.bind_client(client)
-    setup_integrations(
-        options["integrations"] or [], with_defaults=options["default_integrations"]
-    )
-    return _InitGuard(client)
-
-
-@public
-def init(*args, **kwargs):
-    """Initializes the SDK and optionally integrations.
-
-    This takes the same arguments as the client constructor.
-    """
-    return _init_on_hub(Hub.main, args, kwargs)
-
-
-def _init_on_current(*args, **kwargs):
-    # This function only exists to support unittests.  Do not call it as
-    # initializing integrations on anything but the main hub is not going
-    # to yield the results you expect.
-    return _init_on_hub(Hub.current, args, kwargs)
 
 
 @hubmethod
