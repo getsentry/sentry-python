@@ -88,7 +88,9 @@ def assert_semaphore_acceptance(tmpdir):
 @pytest.fixture
 def sentry_init(monkeypatch_test_transport):
     def inner(*a, **kw):
-        sentry_sdk.api._init_on_current(*a, **kw)
+        hub = sentry_sdk.Hub.current
+        client = sentry_sdk.Client(*a, **kw)
+        hub.bind_client(client)
         monkeypatch_test_transport(sentry_sdk.Hub.current.client)
 
     return inner
