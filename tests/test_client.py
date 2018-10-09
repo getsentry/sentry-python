@@ -105,7 +105,8 @@ def test_attach_stacktrace_enabled():
     foo()
 
     event, = events
-    functions = [x["function"] for x in event["stacktrace"]["frames"]]
+    thread, = event["threads"]
+    functions = [x["function"] for x in thread["stacktrace"]["frames"]]
     assert functions[-2:] == ["foo", "bar"]
 
 
@@ -115,7 +116,7 @@ def test_attach_stacktrace_disabled():
     hub.capture_message("HI")
 
     event, = events
-    assert "stacktrace" not in event
+    assert "threads" not in event
 
 
 def test_capture_event_works():
