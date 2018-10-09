@@ -44,6 +44,8 @@ def setup_integrations(integrations, with_defaults=True):
         (integration.identifier, integration) for integration in integrations or ()
     )
 
+    logger.debug("Setting up integrations (with default = %s)", with_defaults)
+
     if with_defaults:
         for integration_cls in iter_default_integrations():
             if integration_cls.identifier not in integrations:
@@ -53,6 +55,9 @@ def setup_integrations(integrations, with_defaults=True):
     for identifier, integration in iteritems(integrations):
         with _installer_lock:
             if identifier not in _installed_integrations:
+                logger.debug(
+                    "Setting up previously not enabled integration %s", identifier
+                )
                 try:
                     type(integration).setup_once()
                 except NotImplementedError:
@@ -66,6 +71,9 @@ def setup_integrations(integrations, with_defaults=True):
                     else:
                         raise
                 _installed_integrations.add(identifier)
+
+    for identifier in integrations:
+        logger.debug("Enabling integration %s", identifier)
 
     return integrations
 
