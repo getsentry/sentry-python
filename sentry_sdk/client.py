@@ -75,12 +75,19 @@ class Client(object):
                 return
 
         if (
-            "exception" not in event
+            self.options["attach_stacktrace"]
+            and "exception" not in event
             and "stacktrace" not in event
-            and self.options["attach_stacktrace"]
+            and "threads" not in event
         ):
             with capture_internal_exceptions():
-                event["stacktrace"] = current_stacktrace()
+                event["threads"] = [
+                    {
+                        "stacktrace": current_stacktrace(),
+                        "crashed": False,
+                        "current": True,
+                    }
+                ]
 
         for key in "release", "environment", "server_name", "dist":
             if event.get(key) is None:
