@@ -36,9 +36,14 @@ class LoggingIntegration(Integration):
         old_callhandlers = logging.Logger.callHandlers
 
         def sentry_patched_callhandlers(self, record):
-            integration = Hub.current.get_integration(LoggingIntegration)
-            if integration is not None:
-                integration._handler.handle(record)
+            # This check is done twice, once also here before we even get
+            # the integration.  Otherwise we have a high chance of getting
+            # into a recursion error when the integration is resolved
+            # (this also is slower).
+            if record.name not in _IGNORED_LOGGERS:
+                integration = Hub.current.get_integration(LoggingIntegration)
+                if integration is not None:
+                    integration._handler.handle(record)
             return old_callhandlers(self, record)
 
         logging.Logger.callHandlers = sentry_patched_callhandlers

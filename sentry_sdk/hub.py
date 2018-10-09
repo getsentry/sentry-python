@@ -157,16 +157,15 @@ class Hub(with_metaclass(HubMeta)):
             and initial_client is not client
             and initial_client.integrations.get(name_or_class) is not None
         ):
-            warn(
-                Warning(
-                    "Integration %r attempted to run but it was only "
-                    "enabled on init() but not the client that "
-                    "was bound to the current flow.  Earlier versions of "
-                    "the SDK would consider these integrations enabled but "
-                    "this is no longer the case." % (name_or_class,)
-                ),
-                stacklevel=3,
+            warning = (
+                "Integration %r attempted to run but it was only "
+                "enabled on init() but not the client that "
+                "was bound to the current flow.  Earlier versions of "
+                "the SDK would consider these integrations enabled but "
+                "this is no longer the case." % (name_or_class,)
             )
+            warn(Warning(warning), stacklevel=3)
+            logger.warning(warning)
 
     @property
     def client(self):
