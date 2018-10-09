@@ -1,5 +1,4 @@
 import inspect
-import weakref
 from contextlib import contextmanager
 
 from sentry_sdk.hub import Hub, init
