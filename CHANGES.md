@@ -1,3 +1,8 @@
+## 0.4.0
+
+* Changed how integrations are initialized. Integrations are now
+  configured and enabled per-client.
+
 ## 0.3.11
 
 * Fix issue with certain deployment tools and the AWS Lambda integration.
