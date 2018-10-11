@@ -306,9 +306,13 @@ def extract_locals(frame):
 
 def filename_for_module(module, abs_path):
     try:
+        if abs_path.endswith(".pyc"):
+            abs_path = abs_path[:-1]
+
         base_module = module.split(".", 1)[0]
         if base_module == module:
             return os.path.basename(abs_path)
+
         base_module_path = sys.modules[base_module].__file__
         return abs_path.split(base_module_path.rsplit(os.sep, 2)[0], 1)[-1].lstrip(
             os.sep
