@@ -1393,7 +1393,7 @@ is provided the default level is <code>info</code>.</p></div>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">global</span> <span class="n">_initial_client</span>
     <span class="n">client</span> <span class="o">=</span> <span class="n">Client</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-    <span class="n">Hub</span><span class="o">.</span><span class="n">main</span><span class="o">.</span><span class="n">bind_client</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
+    <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">bind_client</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
     <span class="n">rv</span> <span class="o">=</span> <span class="n">_InitGuard</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="n">_initial_client</span> <span class="o">=</span> <span class="n">weakref</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
