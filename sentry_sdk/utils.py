@@ -304,6 +304,23 @@ def extract_locals(frame):
     return rv
 
 
+def filename_for_module(module, abs_path):
+    try:
+        if abs_path.endswith(".pyc"):
+            abs_path = abs_path[:-1]
+
+        base_module = module.split(".", 1)[0]
+        if base_module == module:
+            return os.path.basename(abs_path)
+
+        base_module_path = sys.modules[base_module].__file__
+        return abs_path.split(base_module_path.rsplit(os.sep, 2)[0], 1)[-1].lstrip(
+            os.sep
+        )
+    except Exception:
+        return abs_path
+
+
 def serialize_frame(frame, tb_lineno=None, with_locals=True):
     f_code = getattr(frame, "f_code", None)
     if f_code:
@@ -323,8 +340,8 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
     pre_context, context_line, post_context = get_source_context(frame, tb_lineno)
 
     rv = {
-        "filename": abs_path and os.path.basename(abs_path) or None,
-        "abs_path": os.path.abspath(abs_path),
+        "filename": filename_for_module(module, abs_path) or None,
+        "abs_path": os.path.abspath(abs_path) if abs_path else None,
         "function": function or "<unknown>",
         "module": module,
         "lineno": tb_lineno,

@@ -12,6 +12,7 @@ from sentry_sdk.utils import (
     exceptions_from_error_tuple,
     format_and_strip,
     strip_string,
+    filename_for_module,
 )
 from sentry_sdk._compat import text_type
 
@@ -41,12 +42,13 @@ def test_abs_path():
         exceptions = exceptions_from_error_tuple(sys.exc_info())
 
     exception, = exceptions
-    frames = exception["stacktrace"]["frames"]
-    assert len(frames) == 2
+    frame1, frame2 = frames = exception["stacktrace"]["frames"]
 
     for frame in frames:
         assert os.path.abspath(frame["abs_path"]) == frame["abs_path"]
-        assert os.path.basename(frame["filename"]) == frame["filename"]
+
+    assert frame1["filename"] == "tests/test_utils.py"
+    assert frame2["filename"] == "test.py"
 
 
 def test_non_string_variables():
@@ -96,3 +98,16 @@ def test_format_and_strip():
         "len": 14,
         "rem": [["!limit", "x", 3, 6], ["!limit", "x", 9, 12]],
     }
+
+
+def test_filename():
+    x = filename_for_module
+
+    assert x("bogus", "bogus") == "bogus"
+
+    assert x("os", os.__file__) == "os.py"
+    assert x("pytest", pytest.__file__) == "pytest.py"
+
+    import sentry_sdk.utils
+
+    assert x("sentry_sdk.utils", sentry_sdk.utils.__file__) == "sentry_sdk/utils.py"
