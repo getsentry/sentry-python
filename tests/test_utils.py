@@ -12,7 +12,7 @@ from sentry_sdk.utils import (
     exceptions_from_error_tuple,
     format_and_strip,
     strip_string,
-    filename_from_abs_path,
+    filename_for_module,
 )
 from sentry_sdk._compat import text_type
 
@@ -101,14 +101,13 @@ def test_format_and_strip():
 
 
 def test_filename():
-    def x(path):
-        return filename_from_abs_path(os.path.abspath(path))
+    x = filename_for_module
 
-    assert x("bogus") == "bogus"
+    assert x("bogus", "bogus") == "bogus"
 
-    assert x(os.__file__) == "os.py"
-    assert x(pytest.__file__) == "pytest.py"
+    assert x("os", os.__file__) == "os.py"
+    assert x("pytest", pytest.__file__) == "pytest.py"
 
     import sentry_sdk.utils
 
-    assert x(sentry_sdk.utils.__file__) == "sentry_sdk/utils.py"
+    assert x("sentry_sdk.utils", sentry_sdk.utils.__file__) == "sentry_sdk/utils.py"

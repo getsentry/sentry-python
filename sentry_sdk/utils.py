@@ -304,39 +304,23 @@ def extract_locals(frame):
     return rv
 
 
-def _get_sanitized_sys_path():
-    for path in sys.path:
-        try:
-            yield os.path.abspath(str(path))
-        except Exception:
-            pass
-
-
-_SANITIZED_SYS_PATH = frozenset(_get_sanitized_sys_path())
-
-
-def filename_from_abs_path(abs_path):
+def filename_for_module(module, abs_path):
     try:
-        prefix = abs_path
-        while prefix:
-            if prefix in _SANITIZED_SYS_PATH:
-                return abs_path[len(prefix) :].lstrip(os.sep)
-            new_prefix = prefix.rsplit(os.sep, 1)[0]
-            if new_prefix == prefix:
-                break
-            prefix = new_prefix
+        base_module = module.split(".", 1)[0]
+        if base_module == module:
+            return os.path.basename(abs_path)
+        base_module_path = sys.modules[base_module].__file__
+        return abs_path.split(base_module_path.rsplit(os.sep, 2)[0], 1)[-1].lstrip(
+            os.sep
+        )
     except Exception:
-        pass
-
-    return abs_path
+        return abs_path
 
 
 def serialize_frame(frame, tb_lineno=None, with_locals=True):
     f_code = getattr(frame, "f_code", None)
     if f_code:
         abs_path = frame.f_code.co_filename
-        if abs_path:
-            abs_path = os.path.abspath(abs_path)
         function = frame.f_code.co_name
     else:
         abs_path = None
@@ -352,8 +336,8 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
     pre_context, context_line, post_context = get_source_context(frame, tb_lineno)
 
     rv = {
-        "filename": filename_from_abs_path(abs_path) or None,
-        "abs_path": abs_path,
+        "filename": filename_for_module(module, abs_path) or None,
+        "abs_path": os.path.abspath(abs_path) if abs_path else None,
         "function": function or "<unknown>",
         "module": module,
         "lineno": tb_lineno,
