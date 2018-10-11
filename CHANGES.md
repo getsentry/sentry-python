@@ -1,3 +1,8 @@
+## 0.4.1
+
+* Fix bug that would only show filenames in stacktraces but not the parent
+  directories.
+
 ## 0.4.0
 
 * Changed how integrations are initialized. Integrations are now
