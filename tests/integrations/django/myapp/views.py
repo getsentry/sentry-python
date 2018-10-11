@@ -32,3 +32,8 @@ class ClassBasedView(ListView):
     def head(self, *args, **kwargs):
         sentry_sdk.capture_message("hi")
         return HttpResponse("")
+
+
+def post_echo(request):
+    sentry_sdk.capture_message("hi")
+    return HttpResponse(request.body)

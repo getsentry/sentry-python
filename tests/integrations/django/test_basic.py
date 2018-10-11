@@ -185,3 +185,33 @@ def test_transaction_style(
 
     event, = events
     assert event["transaction"] == expected_transaction
+
+
+def test_request_body(sentry_init, client, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+    events = capture_events()
+    content, status, headers = client.post(
+        reverse("post_echo"), data=b"heyooo", content_type="text/plain"
+    )
+    assert status.lower() == "200 ok"
+    assert b"".join(content) == b"heyooo"
+
+    event, = events
+
+    assert event["message"] == "hi"
+    assert event["request"]["data"] == ""
+    assert event[""]["request"]["data"][""] == {"len": 6, "rem": [["!raw", "x", 0, 6]]}
+
+    del events[:]
+
+    content, status, headers = client.post(
+        reverse("post_echo"), data=b'{"hey": 42}', content_type="application/json"
+    )
+    assert status.lower() == "200 ok"
+    assert b"".join(content) == b'{"hey": 42}'
+
+    event, = events
+
+    assert event["message"] == "hi"
+    assert event["request"]["data"] == {"hey": 42}
+    assert "" not in event
