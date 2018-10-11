@@ -47,7 +47,7 @@ def init(*args, **kwargs):
     """
     global _initial_client
     client = Client(*args, **kwargs)
-    Hub.main.bind_client(client)
+    Hub.current.bind_client(client)
     rv = _InitGuard(client)
     if client is not None:
         _initial_client = weakref.ref(client)
@@ -317,3 +317,4 @@ class Hub(with_metaclass(HubMeta)):
 
 
 GLOBAL_HUB = Hub()
+_local.set(GLOBAL_HUB)
