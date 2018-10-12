@@ -94,53 +94,63 @@ class HttpTransport(Transport):
         self._retry = urllib3.util.Retry()
         self.options = options
 
+        from sentry_sdk import Hub
+
+        self.hub_cls = Hub
+
     def _send_event(self, event):
         if self._disabled_until is not None:
             if datetime.utcnow() < self._disabled_until:
                 return
             self._disabled_until = None
 
-        with capture_internal_exceptions():
-            body = io.BytesIO()
-            with gzip.GzipFile(fileobj=body, mode="w") as f:
-                f.write(json.dumps(event).encode("utf-8"))
+        body = io.BytesIO()
+        with gzip.GzipFile(fileobj=body, mode="w") as f:
+            f.write(json.dumps(event).encode("utf-8"))
 
-            logger.debug(
-                "Sending %s event [%s] to %s project:%s"
-                % (
-                    event.get("level") or "error",
-                    event["event_id"],
-                    self.parsed_dsn.host,
-                    self.parsed_dsn.project_id,
+        logger.debug(
+            "Sending %s event [%s] to %s project:%s"
+            % (
+                event.get("level") or "error",
+                event["event_id"],
+                self.parsed_dsn.host,
+                self.parsed_dsn.project_id,
+            )
+        )
+        response = self._pool.request(
+            "POST",
+            str(self._auth.store_api_url),
+            body=body.getvalue(),
+            headers={
+                "X-Sentry-Auth": str(self._auth.to_header()),
+                "Content-Type": "application/json",
+                "Content-Encoding": "gzip",
+            },
+        )
+
+        try:
+            if response.status == 429:
+                self._disabled_until = datetime.utcnow() + timedelta(
+                    seconds=self._retry.get_retry_after(response)
                 )
-            )
-            response = self._pool.request(
-                "POST",
-                str(self._auth.store_api_url),
-                body=body.getvalue(),
-                headers={
-                    "X-Sentry-Auth": str(self._auth.to_header()),
-                    "Content-Type": "application/json",
-                    "Content-Encoding": "gzip",
-                },
-            )
+                return
 
-            try:
-                if response.status == 429:
-                    self._disabled_until = datetime.utcnow() + timedelta(
-                        seconds=self._retry.get_retry_after(response)
-                    )
-                    return
+            elif response.status >= 300 or response.status < 200:
+                raise ValueError("Unexpected status code: %s" % response.status)
+        finally:
+            response.close()
 
-                elif response.status >= 300 or response.status < 200:
-                    raise ValueError("Unexpected status code: %s" % response.status)
-            finally:
-                response.close()
-
-            self._disabled_until = None
+        self._disabled_until = None
 
     def capture_event(self, event):
-        self._worker.submit(lambda: self._send_event(event))
+        hub = self.hub_cls.current
+
+        def send_event_wrapper():
+            with hub:
+                with capture_internal_exceptions():
+                    self._send_event(event)
+
+        self._worker.submit(send_event_wrapper)
 
     def shutdown(self, timeout, callback=None):
         logger.debug("Shutting down HTTP transport orderly")

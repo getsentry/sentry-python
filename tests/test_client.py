@@ -1,8 +1,10 @@
 # coding: utf-8
-import time
+import logging
 import pytest
-import sys
 import subprocess
+import sys
+import time
+
 from datetime import datetime
 from textwrap import dedent
 from sentry_sdk import Hub, Client, configure_scope, capture_message, add_breadcrumb
@@ -201,10 +203,14 @@ def test_configure_scope_unavailable(no_sdk, monkeypatch):
     assert not calls
 
 
-def test_transport_works(httpserver, request, capsys):
+@pytest.mark.parametrize("debug", (True, False))
+def test_transport_works(httpserver, request, capsys, caplog, debug):
     httpserver.serve_content("ok", 200)
+    caplog.set_level(logging.DEBUG)
 
-    client = Client("http://foobar@{}/123".format(httpserver.url[len("http://") :]))
+    client = Client(
+        "http://foobar@{}/123".format(httpserver.url[len("http://") :]), debug=debug
+    )
     Hub.current.bind_client(client)
     request.addfinalizer(lambda: Hub.current.bind_client(None))
 
@@ -215,6 +221,8 @@ def test_transport_works(httpserver, request, capsys):
     out, err = capsys.readouterr()
     assert not err and not out
     assert httpserver.requests
+
+    assert any("Sending info event" in record.msg for record in caplog.records) == debug
 
 
 @pytest.mark.tests_internal_exceptions
