@@ -36,17 +36,19 @@ class SanicIntegration(Integration):
         async def sentry_handle_request(self, request, *args, **kwargs):
             hub = Hub.current
             if hub.get_integration(SanicIntegration) is None:
-                response = old_handle_request(self, request, *args, **kwargs)
-            else:
-                weak_request = weakref.ref(request)
+                return old_handle_request(self, request, *args, **kwargs)
 
-                with hub.push_scope() as scope:
+            weak_request = weakref.ref(request)
+
+            with Hub(hub) as hub:
+                with hub.configure_scope() as scope:
                     scope.add_event_processor(_make_request_processor(weak_request))
-                    response = old_handle_request(self, request, *args, **kwargs)
-                    if isawaitable(response):
-                        response = await response
 
-            return response
+                response = old_handle_request(self, request, *args, **kwargs)
+                if isawaitable(response):
+                    response = await response
+
+                return response
 
         Sanic.handle_request = sentry_handle_request
 

@@ -1,11 +1,12 @@
+import random
+import asyncio
+
 import pytest
 
-sanic = pytest.importorskip("sanic")
-
-from sentry_sdk import capture_message
+from sentry_sdk import capture_message, configure_scope
 from sentry_sdk.integrations.sanic import SanicIntegration
 
-from sanic import Sanic, response
+from sanic import Sanic, request, response
 
 
 @pytest.fixture
@@ -67,7 +68,7 @@ def test_errors(sentry_init, app, capture_events):
     assert exception["type"] == "ValueError"
     assert exception["value"] == "oh no"
     assert any(
-        frame["filename"] == "test_sanic.py"
+        frame["filename"].endswith("test_sanic.py")
         for frame in exception["stacktrace"]["frames"]
     )
 
@@ -92,13 +93,55 @@ def test_error_in_errorhandler(sentry_init, app, capture_events):
     exception, = event1["exception"]["values"]
     assert exception["type"] == "ValueError"
     assert any(
-        frame["filename"] == "test_sanic.py"
+        frame["filename"].endswith("test_sanic.py")
         for frame in exception["stacktrace"]["frames"]
     )
 
     exception, = event2["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
     assert any(
-        frame["filename"] == "test_sanic.py"
+        frame["filename"].endswith("test_sanic.py")
         for frame in exception["stacktrace"]["frames"]
     )
+
+
+def test_concurrency(sentry_init, app):
+    sentry_init(integrations=[SanicIntegration()])
+
+    @app.route("/context-check/<i>")
+    async def context_check(request, i):
+        with configure_scope() as scope:
+            scope.set_tag("i", i)
+
+        await asyncio.sleep(random.random())
+
+        with configure_scope() as scope:
+            assert scope._tags["i"] == i
+
+        return response.text("ok")
+
+    async def task(i):
+        responses = []
+
+        await app.handle_request(
+            request.Request(
+                url_bytes=f"http://localhost/context-check/{i}".encode("ascii"),
+                headers={},
+                version="1.1",
+                method="GET",
+                transport=None,
+            ),
+            write_callback=responses.append,
+            stream_callback=responses.append,
+        )
+
+        r, = responses
+        assert r.status == 200
+
+    async def runner():
+        await asyncio.gather(*(task(i) for i in range(1000)))
+
+    asyncio.run(runner())
+
+    with configure_scope() as scope:
+        assert not scope._tags
