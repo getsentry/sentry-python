@@ -142,3 +142,6 @@ def test_concurrency(sentry_init, app):
         await asyncio.gather(*(task(i) for i in range(1000)))
 
     asyncio.run(runner())
+
+    with configure_scope() as scope:
+        assert not scope._tags
