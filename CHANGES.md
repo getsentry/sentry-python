@@ -1,3 +1,9 @@
+## 0.4.2
+
+* Fix a bug in the Sanic integration that would leak data between requests.
+* Fix a bug that would hide all debug logging happening inside of the built-in transport.
+* Fix a bug that would report errors for typos in Django's shell.
+
 ## 0.4.1
 
 * Fix bug that would only show filenames in stacktraces but not the parent
