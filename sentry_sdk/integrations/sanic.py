@@ -68,10 +68,10 @@ class SanicIntegration(Integration):
         old_error_handler_lookup = ErrorHandler.lookup
 
         def sentry_error_handler_lookup(self, exception):
-            _capture_exception(exception)
             old_error_handler = old_error_handler_lookup(self, exception)
 
             if old_error_handler is None:
+                _capture_exception(exception)
                 return None
 
             if Hub.current.get_integration(SanicIntegration) is None:

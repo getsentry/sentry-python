@@ -7,7 +7,7 @@ from sentry_sdk import capture_message, configure_scope
 from sentry_sdk.integrations.sanic import SanicIntegration
 
 from sanic import Sanic, request, response
-
+from sanic.exceptions import InvalidUsage
 
 @pytest.fixture
 def app():
@@ -88,17 +88,70 @@ def test_error_in_errorhandler(sentry_init, app, capture_events):
     request, response = app.test_client.get("/error")
     assert response.status == 500
 
-    event1, event2 = events
+    assert len(events) == 1
 
-    exception, = event1["exception"]["values"]
+    exception, = events[0]["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+    assert any(
+        frame["filename"].endswith("test_sanic.py")
+        for frame in exception["stacktrace"]["frames"]
+    )
+
+
+def test_events_errorhandler_present(sentry_init, app, capture_events):
+    sentry_init(integrations=[SanicIntegration()])
+    events = capture_events()
+
+    @app.websocket("/error")
+    def myerror(request, websocket):
+        return response.json({})
+
+    @app.exception(InvalidUsage)
+    def myhandler(request, exception):
+        return response.json({}, 400)
+
+    request, r = app.test_client.get("/error")
+    assert r.status == 400
+
+    assert not events
+
+
+def test_events_errorhandler_absent(sentry_init, app, capture_events):
+    sentry_init(integrations=[SanicIntegration()])
+    events = capture_events()
+
+    @app.route("/error")
+    def myerror(request):
+        raise ValueError('oh no')
+
+    request, r = app.test_client.get("/error")
+    assert r.status == 500
+
+    assert len(events) == 1
+
+    exception, = events[0]["exception"]["values"]
     assert exception["type"] == "ValueError"
     assert any(
         frame["filename"].endswith("test_sanic.py")
         for frame in exception["stacktrace"]["frames"]
     )
 
-    exception, = event2["exception"]["values"]
-    assert exception["type"] == "ZeroDivisionError"
+
+def test_events_errorhandler_absent_sanic_error(sentry_init, app, capture_events):
+    sentry_init(integrations=[SanicIntegration()])
+    events = capture_events()
+
+    @app.route("/error")
+    def myerror(request):
+        raise InvalidUsage('oh no')
+
+    request, r = app.test_client.get("/error")
+    assert r.status == 400
+
+    assert len(events) == 1
+
+    exception, = events[0]["exception"]["values"]
+    assert exception["type"] == "InvalidUsage"
     assert any(
         frame["filename"].endswith("test_sanic.py")
         for frame in exception["stacktrace"]["frames"]
