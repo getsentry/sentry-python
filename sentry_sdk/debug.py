@@ -9,7 +9,7 @@ from sentry_sdk.client import _client_init_debug
 
 class _HubBasedClientFilter(logging.Filter):
     def filter(self, record):
-        if _client_init_debug.get():
+        if _client_init_debug.get(False):
             return True
         hub = Hub.current
         if hub is not None and hub.client is not None:

@@ -20,7 +20,7 @@ from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 
 
-_client_init_debug = ContextVar("client_init_debug", default=False)
+_client_init_debug = ContextVar("client_init_debug")
 
 
 def get_options(*args, **kwargs):
@@ -54,7 +54,7 @@ class Client(object):
     """
 
     def __init__(self, *args, **kwargs):
-        old_debug = _client_init_debug.get()
+        old_debug = _client_init_debug.get(False)
         try:
             self.options = options = get_options(*args, **kwargs)
             _client_init_debug.set(options["debug"])
