@@ -200,7 +200,10 @@ def test_request_body(sentry_init, client, capture_events):
 
     assert event["message"] == "hi"
     assert event["request"]["data"] == ""
-    assert event[""]["request"]["data"][""] == {"len": 6, "rem": [["!raw", "x", 0, 6]]}
+    assert event["_meta"]["request"]["data"][""] == {
+        "len": 6,
+        "rem": [["!raw", "x", 0, 6]],
+    }
 
     del events[:]
 
