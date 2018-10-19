@@ -5,7 +5,7 @@ from io import BytesIO
 
 flask = pytest.importorskip("flask")
 
-from flask import Flask, request
+from flask import Flask, request, abort
 
 from flask_login import LoginManager, login_user
 
@@ -445,3 +445,18 @@ def test_error_in_errorhandler(sentry_init, capture_events, app):
 
     exception, = event2["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
+
+
+def test_bad_request_not_captured(sentry_init, capture_events, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    events = capture_events()
+
+    @app.route("/")
+    def index():
+        abort(400)
+
+    client = app.test_client()
+
+    client.get("/")
+
+    assert not events

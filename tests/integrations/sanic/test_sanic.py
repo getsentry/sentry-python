@@ -7,6 +7,7 @@ from sentry_sdk import capture_message, configure_scope
 from sentry_sdk.integrations.sanic import SanicIntegration
 
 from sanic import Sanic, request, response
+from sanic.exceptions import abort
 
 
 @pytest.fixture
@@ -71,6 +72,20 @@ def test_errors(sentry_init, app, capture_events):
         frame["filename"].endswith("test_sanic.py")
         for frame in exception["stacktrace"]["frames"]
     )
+
+
+def test_bad_request_not_captured(sentry_init, app, capture_events):
+    sentry_init(integrations=[SanicIntegration()])
+    events = capture_events()
+
+    @app.route("/")
+    def index(request):
+        abort(400)
+
+    request, response = app.test_client.get("/")
+    assert response.status == 400
+
+    assert not events
 
 
 def test_error_in_errorhandler(sentry_init, app, capture_events):

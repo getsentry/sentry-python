@@ -10,6 +10,7 @@ from sentry_sdk.integrations._wsgi import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
 
 from sanic import Sanic
+from sanic.exceptions import SanicException
 from sanic.router import Router
 from sanic.handlers import ErrorHandler
 
@@ -94,6 +95,9 @@ class SanicIntegration(Integration):
 
 
 def _capture_exception(exception):
+    if isinstance(exception, SanicException):
+        return
+
     hub = Hub.current
     integration = hub.get_integration(SanicIntegration)
     if integration is None:
