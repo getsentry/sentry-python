@@ -1,3 +1,7 @@
+## 0.4.3
+
+* Fix a bug that would leak WSGI responses.
+
 ## 0.4.2
 
 * Fix a bug in the Sanic integration that would leak data between requests.
