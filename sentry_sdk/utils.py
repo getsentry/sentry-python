@@ -552,7 +552,7 @@ def flatten_metadata(obj):
 
     obj, meta = inner(obj)
     if meta is not None:
-        obj[""] = meta
+        obj["_meta"] = meta
     return obj
 
 

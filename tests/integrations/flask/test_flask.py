@@ -203,7 +203,7 @@ def test_flask_large_json_request(sentry_init, capture_events, app):
     assert response.status_code == 200
 
     event, = events
-    assert event[""]["request"]["data"]["foo"]["bar"] == {
+    assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
     assert len(event["request"]["data"]["foo"]["bar"]) == 512
@@ -229,7 +229,7 @@ def test_flask_medium_formdata_request(sentry_init, capture_events, app):
     assert response.status_code == 200
 
     event, = events
-    assert event[""]["request"]["data"]["foo"] == {
+    assert event["_meta"]["request"]["data"]["foo"] == {
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
     assert len(event["request"]["data"]["foo"]) == 512
@@ -259,7 +259,7 @@ def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, ap
     assert response.status_code == 200
 
     event, = events
-    assert event[""]["request"]["data"] == {
+    assert event["_meta"]["request"]["data"] == {
         "": {"len": 2000, "rem": [["!config", "x", 0, 2000]]}
     }
     assert not event["request"]["data"]
@@ -285,12 +285,12 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
     assert response.status_code == 200
 
     event, = events
-    assert event[""]["request"]["data"]["foo"] == {
+    assert event["_meta"]["request"]["data"]["foo"] == {
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
     assert len(event["request"]["data"]["foo"]) == 512
 
-    assert event[""]["request"]["data"]["file"] == {
+    assert event["_meta"]["request"]["data"]["file"] == {
         "": {"len": 0, "rem": [["!raw", "x", 0, 0]]}
     }
     assert not event["request"]["data"]["file"]
