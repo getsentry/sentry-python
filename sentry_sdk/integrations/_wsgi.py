@@ -178,34 +178,43 @@ def _capture_exception(hub):
 
 @implements_iterator
 class _ScopePoppingResponse(object):
-    __slots__ = ("_response", "_hub")
+    __slots__ = ("_response", "_iterator", "_hub", "_popped")
 
     def __init__(self, hub, response):
         self._hub = hub
         self._response = response
+        self._iterator = None
+        self._popped = False
 
     def __iter__(self):
         try:
-            self._response = iter(self._response)
+            self._iterator = iter(self._response)
         except Exception:
             reraise(*_capture_exception(self.hub))
         return self
 
     def __next__(self):
+        if self._iterator is None:
+            self.__iter__()
+
         try:
-            return next(self._response)
+            return next(self._iterator)
         except StopIteration:
             raise
         except Exception:
             reraise(*_capture_exception(self.hub))
 
     def close(self):
-        self._hub.pop_scope_unsafe()
-        if hasattr(self._response, "close"):
-            try:
-                self._response.close()
-            except Exception:
-                reraise(*_capture_exception(self.hub))
+        if not self._popped:
+            self._hub.pop_scope_unsafe()
+            self._popped = True
+
+        try:
+            self._response.close()
+        except AttributeError:
+            pass
+        except Exception as e:
+            reraise(*_capture_exception(self.hub))
 
 
 def _make_wsgi_event_processor(environ):
