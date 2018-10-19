@@ -36,19 +36,17 @@ class LoggingIntegration(Integration):
             self._breadcrumb_handler = BreadcrumbHandler(level=level)
 
         if event_level is not None:
-            self._handler = SentryHandler(level=event_level)
+            self._handler = EventHandler(level=event_level)
 
     def _handle_record(self, record):
-        if (
-            self._breadcrumb_handler is None
-            or record.levelno < self._breadcrumb_handler.level
-        ):
-            return
-
         if self._handler is not None and record.levelno >= self._handler.level:
             self._handler.handle(record)
 
-        self._breadcrumb_handler.handle(record)
+        if (
+            self._breadcrumb_handler is not None
+            and record.levelno >= self._breadcrumb_handler.level
+        ):
+            self._breadcrumb_handler.handle(record)
 
     @staticmethod
     def setup_once():
@@ -86,7 +84,7 @@ def _logging_to_event_level(levelname):
     return {"critical": "fatal"}.get(levelname.lower(), levelname.lower())
 
 
-class SentryHandler(logging.Handler, object):
+class EventHandler(logging.Handler, object):
     def emit(self, record):
         with capture_internal_exceptions():
             self.format(record)
@@ -117,6 +115,10 @@ class SentryHandler(logging.Handler, object):
         event["logentry"] = {"message": to_string(record.msg), "params": record.args}
 
         hub.capture_event(event, hint=hint)
+
+
+# Legacy name
+SentryHandler = EventHandler
 
 
 class BreadcrumbHandler(logging.Handler, object):
