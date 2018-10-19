@@ -16,9 +16,11 @@ def iter_default_integrations():
     This returns the following default integration:
 
     - `LoggingIntegration`
+    - `StdlibIntegration`
     - `ExcepthookIntegration`
     - `DedupeIntegration`
     - `AtexitIntegration`
+    - `ModulesIntegration`
     """
     from sentry_sdk.integrations.logging import LoggingIntegration
     from sentry_sdk.integrations.stdlib import StdlibIntegration
