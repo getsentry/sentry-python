@@ -17,6 +17,10 @@ from sentry_sdk.utils import (
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO
 from sentry_sdk.integrations import setup_integrations
+from sentry_sdk.utils import ContextVar
+
+
+_client_init_debug = ContextVar("client_init_debug")
 
 
 def get_options(*args, **kwargs):
@@ -50,20 +54,25 @@ class Client(object):
     """
 
     def __init__(self, *args, **kwargs):
-        self.options = options = get_options(*args, **kwargs)
-        self.transport = make_transport(options)
+        old_debug = _client_init_debug.get(False)
+        try:
+            self.options = options = get_options(*args, **kwargs)
+            _client_init_debug.set(options["debug"])
+            self.transport = make_transport(options)
 
-        request_bodies = ("always", "never", "small", "medium")
-        if options["request_bodies"] not in request_bodies:
-            raise ValueError(
-                "Invalid value for request_bodies. Must be one of {}".format(
-                    request_bodies
+            request_bodies = ("always", "never", "small", "medium")
+            if options["request_bodies"] not in request_bodies:
+                raise ValueError(
+                    "Invalid value for request_bodies. Must be one of {}".format(
+                        request_bodies
+                    )
                 )
-            )
 
-        self.integrations = setup_integrations(
-            options["integrations"], with_defaults=options["default_integrations"]
-        )
+            self.integrations = setup_integrations(
+                options["integrations"], with_defaults=options["default_integrations"]
+            )
+        finally:
+            _client_init_debug.set(old_debug)
 
     @property
     def dsn(self):
