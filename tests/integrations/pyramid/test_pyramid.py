@@ -21,10 +21,13 @@ def hi(request):
 
 @pytest.fixture
 def pyramid_config():
-    with pyramid.testing.testConfig() as config:
+    config = pyramid.testing.setUp()
+    try:
         config.add_route("hi", "/message")
         config.add_view(hi, route_name="hi")
         yield config
+    finally:
+        pyramid.testing.tearDown()
 
 
 @pytest.fixture
