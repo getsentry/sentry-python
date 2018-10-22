@@ -7,7 +7,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
 )
-from sentry_sdk._compat import reraise, implements_iterator
+from sentry_sdk._compat import reraise, implements_iterator, text_type
 
 
 def get_environ(environ):
@@ -123,7 +123,10 @@ class RequestExtractor(object):
     def json(self):
         try:
             if self.is_json():
-                return json.loads(self.raw_data().decode("utf-8"))
+                raw_data = self.raw_data()
+                if not isinstance(raw_data, text_type):
+                    raw_data = raw_data.decode("utf-8")
+                return json.loads(raw_data)
         except ValueError:
             pass
 
