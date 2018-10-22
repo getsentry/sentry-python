@@ -1,3 +1,10 @@
+## 0.5.0
+
+* Fix a bug that would omit several debug logs during SDK initialization.
+* Fix issue that sent a event key `""` Sentry wouldn't understand.
+* **Breaking change:** The `level` and `event_level` options in the logging integration now work separately from each other.
+* Fix a bug in the Sanic integration that would report the exception behind any HTTP error code.
+
 ## 0.4.3
 
 * Fix a bug that would leak WSGI responses.
