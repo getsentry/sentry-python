@@ -39,6 +39,7 @@ def _process_failure_signal(sender, task_id, einfo, **kw):
         return
 
     if isinstance(einfo.exception, SoftTimeLimitExceeded):
+        # TODO: Move this into event processor
         with hub.push_scope() as scope:
             scope.fingerprint = [
                 "celery",
