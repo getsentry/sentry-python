@@ -33,7 +33,7 @@ def test_basic(sentry_init, capture_events, run_job):
     exception, = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
     assert exception["mechanism"]["type"] == "rq"
-    assert exception["stacktrace"]["frames"][3]["vars"]["foo"] == "42"
+    assert exception["stacktrace"]["frames"][-1]["vars"]["foo"] == "42"
 
     assert event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
     assert event["extra"]["rq-job"] == {

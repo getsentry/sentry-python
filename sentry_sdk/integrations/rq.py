@@ -6,7 +6,7 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
-from rq.timeouts import BaseTimeoutException
+from rq.timeouts import JobTimeoutException
 from rq.worker import Worker
 
 
@@ -60,8 +60,8 @@ def _make_event_processor(weak_job):
 
         if "exc_info" in hint:
             with capture_internal_exceptions():
-                if issubclass(hint["exc_info"][0], BaseTimeoutException):
-                    event["fingerprint"] = ["rq", "BaseTimeoutException", job.func_name]
+                if issubclass(hint["exc_info"][0], JobTimeoutException):
+                    event["fingerprint"] = ["rq", "JobTimeoutException", job.func_name]
 
         return event
 
