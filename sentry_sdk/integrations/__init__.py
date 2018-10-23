@@ -21,6 +21,7 @@ def iter_default_integrations():
     - `DedupeIntegration`
     - `AtexitIntegration`
     - `ModulesIntegration`
+    - `ArgvIntegration`
     """
     from sentry_sdk.integrations.logging import LoggingIntegration
     from sentry_sdk.integrations.stdlib import StdlibIntegration
@@ -28,6 +29,7 @@ def iter_default_integrations():
     from sentry_sdk.integrations.dedupe import DedupeIntegration
     from sentry_sdk.integrations.atexit import AtexitIntegration
     from sentry_sdk.integrations.modules import ModulesIntegration
+    from sentry_sdk.integrations.argv import ArgvIntegration
 
     yield LoggingIntegration
     yield StdlibIntegration
@@ -35,6 +37,7 @@ def iter_default_integrations():
     yield DedupeIntegration
     yield AtexitIntegration
     yield ModulesIntegration
+    yield ArgvIntegration
 
 
 def setup_integrations(integrations, with_defaults=True):
