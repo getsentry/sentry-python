@@ -27,6 +27,11 @@ def test_simple(capture_events, celery):
     dummy_task.delay(1, 0)
     event, = events
     assert event["transaction"] == "dummy_task"
+    assert event["extra"]["celery-job"] == {
+        "args": [1, 0],
+        "kwargs": {},
+        "task_name": "dummy_task",
+    }
 
     exception, = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
