@@ -35,28 +35,48 @@ def _process_failure_signal(sender, task_id, einfo, **kw):
     if integration is None:
         return
 
-    if hasattr(sender, "throws") and isinstance(einfo.exception, sender.throws):
-        return
-
-    if isinstance(einfo.exception, SoftTimeLimitExceeded):
-        # TODO: Move this into event processor
-        with hub.push_scope() as scope:
-            scope.fingerprint = [
-                "celery",
-                "SoftTimeLimitExceeded",
-                getattr(sender, "name", sender),
-            ]
-            _capture_event(hub, exc_info)
-    else:
-        _capture_event(hub, exc_info)
+    _capture_event(hub, exc_info)
 
 
-def _handle_task_prerun(sender, task, **kw):
+def _handle_task_prerun(sender, task, args, kwargs, **_):
     hub = Hub.current
     if hub.get_integration(CeleryIntegration) is not None:
         scope = hub.push_scope().__enter__()
+        scope.add_event_processor(_make_event_processor(args, kwargs, task))
+
+
+def _make_event_processor(args, kwargs, task):
+    def event_processor(event, hint):
         with capture_internal_exceptions():
-            scope.transaction = task.name
+            if "transaction" not in event:
+                event["transaction"] = task.name
+
+        with capture_internal_exceptions():
+            extra = event.setdefault("extra", {})
+            extra["celery-job"] = {
+                "task_name": task.name,
+                "args": args,
+                "kwargs": kwargs,
+            }
+
+        if "exc_info" in hint:
+            with capture_internal_exceptions():
+                if issubclass(hint["exc_info"][0], SoftTimeLimitExceeded):
+                    event["fingerprint"] = [
+                        "celery",
+                        "SoftTimeLimitExceeded",
+                        getattr(task, "name", task),
+                    ]
+
+            with capture_internal_exceptions():
+                if hasattr(task, "throws") and isinstance(
+                    hint["exc_info"][1], task.throws
+                ):
+                    return None
+
+        return event
+
+    return event_processor
 
 
 def _handle_task_postrun(sender, task_id, task, **kw):
