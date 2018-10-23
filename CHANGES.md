@@ -4,6 +4,10 @@
 * Fix issue that sent a event key `""` Sentry wouldn't understand.
 * **Breaking change:** The `level` and `event_level` options in the logging integration now work separately from each other.
 * Fix a bug in the Sanic integration that would report the exception behind any HTTP error code.
+* Fix a bug that would spam breadcrumbs in the Celery integration. Ignore logger `celery.worker.job`.
+* Additional attributes on log records are now put into `extra`.
+* Integration for Pyramid.
+* `sys.argv` is put into extra automatically.
 
 ## 0.4.3
 
