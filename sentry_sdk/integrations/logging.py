@@ -77,11 +77,50 @@ def _breadcrumb_from_record(record):
         "category": record.name,
         "message": record.message,
         "timestamp": datetime.datetime.fromtimestamp(record.created),
+        "data": _extra_from_record(record),
     }
 
 
 def _logging_to_event_level(levelname):
     return {"critical": "fatal"}.get(levelname.lower(), levelname.lower())
+
+
+COMMON_RECORD_ATTRS = frozenset(
+    (
+        "args",
+        "created",
+        "data",
+        "exc_info",
+        "exc_text",
+        "filename",
+        "funcName",
+        "levelname",
+        "levelno",
+        "linenno",
+        "lineno",
+        "message",
+        "module",
+        "msecs",
+        "msg",
+        "name",
+        "pathname",
+        "process",
+        "processName",
+        "relativeCreated",
+        "stack",
+        "tags",
+        "thread",
+        "threadName",
+    )
+)
+
+
+def _extra_from_record(record):
+    return {
+        k: v
+        for k, v in vars(record).items()
+        if k not in COMMON_RECORD_ATTRS and not k.startswith("_")
+    }
 
 
 class EventHandler(logging.Handler, object):
@@ -113,6 +152,7 @@ class EventHandler(logging.Handler, object):
         event["level"] = _logging_to_event_level(record.levelname)
         event["logger"] = record.name
         event["logentry"] = {"message": to_string(record.msg), "params": record.args}
+        event["extra"] = _extra_from_record(record)
 
         hub.capture_event(event, hint=hint)
 

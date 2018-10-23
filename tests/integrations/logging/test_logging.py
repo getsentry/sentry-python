@@ -36,3 +36,20 @@ def test_logging_defaults(integrations, sentry_init, capture_events):
     assert event["level"] == "fatal"
     assert any(crumb["message"] == "bread" for crumb in event["breadcrumbs"])
     assert not any(crumb["message"] == "LOL" for crumb in event["breadcrumbs"])
+
+
+def test_logging_extra_data(sentry_init, capture_events):
+    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    events = capture_events()
+
+    logger.info("bread", extra=dict(foo=42))
+    logger.critical("lol", extra=dict(bar=69))
+
+    event, = events
+
+    assert event["level"] == "fatal"
+    assert event["extra"] == {"bar": 69}
+    assert any(
+        crumb["message"] == "bread" and crumb["data"] == {"foo": 42}
+        for crumb in event["breadcrumbs"]
+    )
