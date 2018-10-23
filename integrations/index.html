@@ -1070,6 +1070,7 @@ table {
 
     <li class="set"><h3><a href="#header-submodules">Sub-modules</a></h3>
       <ul>
+        <li class="mono"><a href="argv.m.html">sentry_sdk.integrations.argv</a></li>
         <li class="mono"><a href="atexit.m.html">sentry_sdk.integrations.atexit</a></li>
         <li class="mono"><a href="aws_lambda.m.html">sentry_sdk.integrations.aws_lambda</a></li>
         <li class="mono"><a href="dedupe.m.html">sentry_sdk.integrations.dedupe</a></li>
@@ -1118,6 +1119,7 @@ table {
 <span class="sd">    - `DedupeIntegration`</span>
 <span class="sd">    - `AtexitIntegration`</span>
 <span class="sd">    - `ModulesIntegration`</span>
+<span class="sd">    - `ArgvIntegration`</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.logging</span> <span class="kn">import</span> <span class="n">LoggingIntegration</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.stdlib</span> <span class="kn">import</span> <span class="n">StdlibIntegration</span>
@@ -1125,6 +1127,7 @@ table {
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.dedupe</span> <span class="kn">import</span> <span class="n">DedupeIntegration</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.atexit</span> <span class="kn">import</span> <span class="n">AtexitIntegration</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.modules</span> <span class="kn">import</span> <span class="n">ModulesIntegration</span>
+    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.argv</span> <span class="kn">import</span> <span class="n">ArgvIntegration</span>
 
     <span class="k">yield</span> <span class="n">LoggingIntegration</span>
     <span class="k">yield</span> <span class="n">StdlibIntegration</span>
@@ -1132,6 +1135,7 @@ table {
     <span class="k">yield</span> <span class="n">DedupeIntegration</span>
     <span class="k">yield</span> <span class="n">AtexitIntegration</span>
     <span class="k">yield</span> <span class="n">ModulesIntegration</span>
+    <span class="k">yield</span> <span class="n">ArgvIntegration</span>
 
 
 <span class="k">def</span> <span class="nf">setup_integrations</span><span class="p">(</span><span class="n">integrations</span><span class="p">,</span> <span class="n">with_defaults</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
@@ -1143,6 +1147,8 @@ table {
         <span class="p">(</span><span class="n">integration</span><span class="o">.</span><span class="n">identifier</span><span class="p">,</span> <span class="n">integration</span><span class="p">)</span> <span class="k">for</span> <span class="n">integration</span> <span class="ow">in</span> <span class="n">integrations</span> <span class="ow">or</span> <span class="p">()</span>
     <span class="p">)</span>
 
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Setting up integrations (with default = </span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">with_defaults</span><span class="p">)</span>
+
     <span class="k">if</span> <span class="n">with_defaults</span><span class="p">:</span>
         <span class="k">for</span> <span class="n">integration_cls</span> <span class="ow">in</span> <span class="n">iter_default_integrations</span><span class="p">():</span>
             <span class="k">if</span> <span class="n">integration_cls</span><span class="o">.</span><span class="n">identifier</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">integrations</span><span class="p">:</span>
@@ -1152,6 +1158,9 @@ table {
     <span class="k">for</span> <span class="n">identifier</span><span class="p">,</span> <span class="n">integration</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">integrations</span><span class="p">):</span>
         <span class="k">with</span> <span class="n">_installer_lock</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">identifier</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_installed_integrations</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Setting up previously not enabled integration </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">identifier</span>
+                <span class="p">)</span>
                 <span class="k">try</span><span class="p">:</span>
                     <span class="nb">type</span><span class="p">(</span><span class="n">integration</span><span class="p">)</span><span class="o">.</span><span class="n">setup_once</span><span class="p">()</span>
                 <span class="k">except</span> <span class="ne">NotImplementedError</span><span class="p">:</span>
@@ -1165,6 +1174,9 @@ table {
                     <span class="k">else</span><span class="p">:</span>
                         <span class="k">raise</span>
                 <span class="n">_installed_integrations</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">identifier</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">identifier</span> <span class="ow">in</span> <span class="n">integrations</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Enabling integration </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">identifier</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">integrations</span>
 
@@ -1224,6 +1236,7 @@ table {
 <li><code>DedupeIntegration</code></li>
 <li><code>AtexitIntegration</code></li>
 <li><code>ModulesIntegration</code></li>
+<li><code>ArgvIntegration</code></li>
 </ul></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.iter_default_integrations', this);">Show source &equiv;</a></p>
@@ -1239,6 +1252,7 @@ table {
 <span class="sd">    - `DedupeIntegration`</span>
 <span class="sd">    - `AtexitIntegration`</span>
 <span class="sd">    - `ModulesIntegration`</span>
+<span class="sd">    - `ArgvIntegration`</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.logging</span> <span class="kn">import</span> <span class="n">LoggingIntegration</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.stdlib</span> <span class="kn">import</span> <span class="n">StdlibIntegration</span>
@@ -1246,6 +1260,7 @@ table {
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.dedupe</span> <span class="kn">import</span> <span class="n">DedupeIntegration</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.atexit</span> <span class="kn">import</span> <span class="n">AtexitIntegration</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.modules</span> <span class="kn">import</span> <span class="n">ModulesIntegration</span>
+    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.argv</span> <span class="kn">import</span> <span class="n">ArgvIntegration</span>
 
     <span class="k">yield</span> <span class="n">LoggingIntegration</span>
     <span class="k">yield</span> <span class="n">StdlibIntegration</span>
@@ -1253,6 +1268,7 @@ table {
     <span class="k">yield</span> <span class="n">DedupeIntegration</span>
     <span class="k">yield</span> <span class="n">AtexitIntegration</span>
     <span class="k">yield</span> <span class="n">ModulesIntegration</span>
+    <span class="k">yield</span> <span class="n">ArgvIntegration</span>
 </pre></div>
 
   </div>
@@ -1284,6 +1300,8 @@ unless they were already provided before.</p></div>
         <span class="p">(</span><span class="n">integration</span><span class="o">.</span><span class="n">identifier</span><span class="p">,</span> <span class="n">integration</span><span class="p">)</span> <span class="k">for</span> <span class="n">integration</span> <span class="ow">in</span> <span class="n">integrations</span> <span class="ow">or</span> <span class="p">()</span>
     <span class="p">)</span>
 
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Setting up integrations (with default = </span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">with_defaults</span><span class="p">)</span>
+
     <span class="k">if</span> <span class="n">with_defaults</span><span class="p">:</span>
         <span class="k">for</span> <span class="n">integration_cls</span> <span class="ow">in</span> <span class="n">iter_default_integrations</span><span class="p">():</span>
             <span class="k">if</span> <span class="n">integration_cls</span><span class="o">.</span><span class="n">identifier</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">integrations</span><span class="p">:</span>
@@ -1293,6 +1311,9 @@ unless they were already provided before.</p></div>
     <span class="k">for</span> <span class="n">identifier</span><span class="p">,</span> <span class="n">integration</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">integrations</span><span class="p">):</span>
         <span class="k">with</span> <span class="n">_installer_lock</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">identifier</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_installed_integrations</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Setting up previously not enabled integration </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">identifier</span>
+                <span class="p">)</span>
                 <span class="k">try</span><span class="p">:</span>
                     <span class="nb">type</span><span class="p">(</span><span class="n">integration</span><span class="p">)</span><span class="o">.</span><span class="n">setup_once</span><span class="p">()</span>
                 <span class="k">except</span> <span class="ne">NotImplementedError</span><span class="p">:</span>
@@ -1306,6 +1327,9 @@ unless they were already provided before.</p></div>
                     <span class="k">else</span><span class="p">:</span>
                         <span class="k">raise</span>
                 <span class="n">_installed_integrations</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">identifier</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">identifier</span> <span class="ow">in</span> <span class="n">integrations</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Enabling integration </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">identifier</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">integrations</span>
 </pre></div>
@@ -1469,6 +1493,12 @@ instance again.</p></div>
       </div>
 
     <h2 class="section-title" id="header-submodules">Sub-modules</h2>
+      <div class="item">
+      <p class="name"><a href="argv.m.html">sentry_sdk.integrations.argv</a></p>
+      
+  
+
+      </div>
       <div class="item">
       <p class="name"><a href="atexit.m.html">sentry_sdk.integrations.atexit</a></p>
       

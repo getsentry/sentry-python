@@ -1488,20 +1488,25 @@ argument.</p></div>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span> <span class="o">=</span> <span class="n">get_options</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="n">make_transport</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
+        <span class="n">old_debug</span> <span class="o">=</span> <span class="n">_client_init_debug</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span> <span class="o">=</span> <span class="n">get_options</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="n">_client_init_debug</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;debug&quot;</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="n">make_transport</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
 
-        <span class="n">request_bodies</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;always&quot;</span><span class="p">,</span> <span class="s2">&quot;never&quot;</span><span class="p">,</span> <span class="s2">&quot;small&quot;</span><span class="p">,</span> <span class="s2">&quot;medium&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;request_bodies&quot;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">request_bodies</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">&quot;Invalid value for request_bodies. Must be one of {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
-                    <span class="n">request_bodies</span>
+            <span class="n">request_bodies</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;always&quot;</span><span class="p">,</span> <span class="s2">&quot;never&quot;</span><span class="p">,</span> <span class="s2">&quot;small&quot;</span><span class="p">,</span> <span class="s2">&quot;medium&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;request_bodies&quot;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">request_bodies</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;Invalid value for request_bodies. Must be one of {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="n">request_bodies</span>
+                    <span class="p">)</span>
                 <span class="p">)</span>
-            <span class="p">)</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">integrations</span> <span class="o">=</span> <span class="n">setup_integrations</span><span class="p">(</span>
-            <span class="n">options</span><span class="p">[</span><span class="s2">&quot;integrations&quot;</span><span class="p">],</span> <span class="n">with_defaults</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;default_integrations&quot;</span><span class="p">]</span>
-        <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">integrations</span> <span class="o">=</span> <span class="n">setup_integrations</span><span class="p">(</span>
+                <span class="n">options</span><span class="p">[</span><span class="s2">&quot;integrations&quot;</span><span class="p">],</span> <span class="n">with_defaults</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;default_integrations&quot;</span><span class="p">]</span>
+            <span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">_client_init_debug</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">old_debug</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">dsn</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -1669,18 +1674,23 @@ argument.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Client.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Client.__init__" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span> <span class="o">=</span> <span class="n">get_options</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="n">make_transport</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
-    <span class="n">request_bodies</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;always&quot;</span><span class="p">,</span> <span class="s2">&quot;never&quot;</span><span class="p">,</span> <span class="s2">&quot;small&quot;</span><span class="p">,</span> <span class="s2">&quot;medium&quot;</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;request_bodies&quot;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">request_bodies</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="s2">&quot;Invalid value for request_bodies. Must be one of {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
-                <span class="n">request_bodies</span>
+    <span class="n">old_debug</span> <span class="o">=</span> <span class="n">_client_init_debug</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span> <span class="o">=</span> <span class="n">get_options</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">_client_init_debug</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;debug&quot;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="n">make_transport</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
+        <span class="n">request_bodies</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;always&quot;</span><span class="p">,</span> <span class="s2">&quot;never&quot;</span><span class="p">,</span> <span class="s2">&quot;small&quot;</span><span class="p">,</span> <span class="s2">&quot;medium&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;request_bodies&quot;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">request_bodies</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Invalid value for request_bodies. Must be one of {}&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">request_bodies</span>
+                <span class="p">)</span>
             <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">integrations</span> <span class="o">=</span> <span class="n">setup_integrations</span><span class="p">(</span>
+            <span class="n">options</span><span class="p">[</span><span class="s2">&quot;integrations&quot;</span><span class="p">],</span> <span class="n">with_defaults</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;default_integrations&quot;</span><span class="p">]</span>
         <span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">integrations</span> <span class="o">=</span> <span class="n">setup_integrations</span><span class="p">(</span>
-        <span class="n">options</span><span class="p">[</span><span class="s2">&quot;integrations&quot;</span><span class="p">],</span> <span class="n">with_defaults</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;default_integrations&quot;</span><span class="p">]</span>
-    <span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">_client_init_debug</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">old_debug</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1783,26 +1793,6 @@ stderr.</p></div>
             
   
     <div class="desc"><p>Returns the configured DSN as string.</p></div>
-  <div class="source_cont">
-</div>
-
-            </div>
-            <div class="item">
-            <p id="sentry_sdk.Client.integrations" class="name">var <span class="ident">integrations</span></p>
-            
-
-            
-  
-  <div class="source_cont">
-</div>
-
-            </div>
-            <div class="item">
-            <p id="sentry_sdk.Client.transport" class="name">var <span class="ident">transport</span></p>
-            
-
-            
-  
   <div class="source_cont">
 </div>
 

@@ -1043,6 +1043,7 @@ table {
     <li class="set"><h3><a href="#header-variables">Module variables</a></h3>
       
   <ul>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.COMMON_RECORD_ATTRS">COMMON_RECORD_ATTRS</a></li>
     <li class="mono"><a href="#sentry_sdk.integrations.logging.DEFAULT_EVENT_LEVEL">DEFAULT_EVENT_LEVEL</a></li>
     <li class="mono"><a href="#sentry_sdk.integrations.logging.DEFAULT_LEVEL">DEFAULT_LEVEL</a></li>
   </ul>
@@ -1060,6 +1061,56 @@ table {
     <li class="set"><h3><a href="#header-classes">Classes</a></h3>
       <ul>
         <li class="mono">
+        <span class="class_name"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler">BreadcrumbHandler</a></span>
+        
+          
+  <ul>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler.__init__">__init__</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler.acquire">acquire</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler.addFilter">addFilter</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler.close">close</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler.createLock">createLock</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler.emit">emit</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler.filter">filter</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler.flush">flush</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler.format">format</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler.get_name">get_name</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler.handle">handle</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler.handleError">handleError</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler.release">release</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler.removeFilter">removeFilter</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler.setFormatter">setFormatter</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler.setLevel">setLevel</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler.set_name">set_name</a></li>
+  </ul>
+
+        </li>
+        <li class="mono">
+        <span class="class_name"><a href="#sentry_sdk.integrations.logging.EventHandler">SentryHandler</a></span>
+        
+          
+  <ul>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.__init__">__init__</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.acquire">acquire</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.addFilter">addFilter</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.close">close</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.createLock">createLock</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.emit">emit</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.filter">filter</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.flush">flush</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.format">format</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.get_name">get_name</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.handle">handle</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.handleError">handleError</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.release">release</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.removeFilter">removeFilter</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.setFormatter">setFormatter</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.setLevel">setLevel</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.set_name">set_name</a></li>
+  </ul>
+
+        </li>
+        <li class="mono">
         <span class="class_name"><a href="#sentry_sdk.integrations.logging.LoggingIntegration">LoggingIntegration</a></span>
         
           
@@ -1070,28 +1121,27 @@ table {
 
         </li>
         <li class="mono">
-        <span class="class_name"><a href="#sentry_sdk.integrations.logging.SentryHandler">SentryHandler</a></span>
+        <span class="class_name"><a href="#sentry_sdk.integrations.logging.EventHandler">SentryHandler</a></span>
         
           
   <ul>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.__init__">__init__</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.acquire">acquire</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.addFilter">addFilter</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.can_record">can_record</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.close">close</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.createLock">createLock</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.emit">emit</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.filter">filter</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.flush">flush</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.format">format</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.get_name">get_name</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.handle">handle</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.handleError">handleError</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.release">release</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.removeFilter">removeFilter</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.setFormatter">setFormatter</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.setLevel">setLevel</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.logging.SentryHandler.set_name">set_name</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.__init__">__init__</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.acquire">acquire</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.addFilter">addFilter</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.close">close</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.createLock">createLock</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.emit">emit</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.filter">filter</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.flush">flush</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.format">format</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.get_name">get_name</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.handle">handle</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.handleError">handleError</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.release">release</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.removeFilter">removeFilter</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.setFormatter">setFormatter</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.setLevel">setLevel</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.EventHandler.set_name">set_name</a></li>
   </ul>
 
         </li>
@@ -1145,7 +1195,24 @@ table {
     <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;logging&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="n">SentryHandler</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">event_level</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span> <span class="o">=</span> <span class="bp">None</span>
+
+        <span class="k">if</span> <span class="n">level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span> <span class="o">=</span> <span class="n">BreadcrumbHandler</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">event_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="n">EventHandler</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">event_level</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_handle_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">levelno</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span><span class="o">.</span><span class="n">level</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span><span class="o">.</span><span class="n">handle</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
+            <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">levelno</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span><span class="o">.</span><span class="n">level</span>
+        <span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span><span class="o">.</span><span class="n">handle</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
@@ -1159,39 +1226,77 @@ table {
             <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span><span class="p">:</span>
                 <span class="n">integration</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                    <span class="n">integration</span><span class="o">.</span><span class="n">_handler</span><span class="o">.</span><span class="n">handle</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+                    <span class="n">integration</span><span class="o">.</span><span class="n">_handle_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">old_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
 
         <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span> <span class="o">=</span> <span class="n">sentry_patched_callhandlers</span>
 
 
-<span class="k">class</span> <span class="nc">SentryHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">,</span> <span class="nb">object</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">event_level</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_event_level</span> <span class="o">=</span> <span class="bp">None</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_event_level</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">_checkLevel</span><span class="p">(</span><span class="n">event_level</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span>
 
+
+<span class="k">def</span> <span class="nf">_breadcrumb_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;ty&quot;</span><span class="p">:</span> <span class="s2">&quot;log&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">),</span>
+        <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+        <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">message</span><span class="p">,</span>
+        <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">fromtimestamp</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">created</span><span class="p">),</span>
+        <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="n">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span> <span class="nf">_logging_to_event_level</span><span class="p">(</span><span class="n">levelname</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;critical&quot;</span><span class="p">:</span> <span class="s2">&quot;fatal&quot;</span><span class="p">}</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">levelname</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="n">levelname</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
+
+
+<span class="n">COMMON_RECORD_ATTRS</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
+    <span class="p">(</span>
+        <span class="s2">&quot;args&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;created&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;data&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;exc_info&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;exc_text&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;filename&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;funcName&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;levelname&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;levelno&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;linenno&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;lineno&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;message&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;module&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;msecs&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;msg&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;name&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;pathname&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;process&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;processName&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;relativeCreated&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;stack&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;tags&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;thread&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;threadName&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="n">k</span><span class="p">:</span> <span class="n">v</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">vars</span><span class="p">(</span><span class="n">record</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">COMMON_RECORD_ATTRS</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)</span>
+    <span class="p">}</span>
+
+
+<span class="k">class</span> <span class="nc">EventHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">,</span> <span class="nb">object</span><span class="p">):</span>
     <span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
         <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">can_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span>
-
-    <span class="k">def</span> <span class="nf">_breadcrumb_from_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-        <span class="k">return</span> <span class="p">{</span>
-            <span class="s2">&quot;ty&quot;</span><span class="p">:</span> <span class="s2">&quot;log&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">),</span>
-            <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-            <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">message</span><span class="p">,</span>
-            <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">fromtimestamp</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">created</span><span class="p">),</span>
-        <span class="p">}</span>
-
     <span class="k">def</span> <span class="nf">_emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
             <span class="k">return</span>
 
         <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
@@ -1199,38 +1304,45 @@ table {
         <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span>
 
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_create_event</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
-            <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-                <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
-                <span class="c1"># exc_info might be None or (None, None, None)</span>
-                <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                    <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
-                        <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">,</span>
-                        <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
-                        <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;logging&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">},</span>
-                    <span class="p">)</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
-
-                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">)</span>
-                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
-                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logentry&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-                    <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">to_string</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="p">),</span>
-                    <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">,</span>
-                <span class="p">}</span>
-
-                <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
-
-        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-            <span class="n">hub</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;log_record&quot;</span><span class="p">:</span> <span class="n">record</span><span class="p">}</span>
+        <span class="c1"># exc_info might be None or (None, None, None)</span>
+        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
+                <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">,</span>
+                <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
+                <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;logging&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">},</span>
             <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
 
-    <span class="k">def</span> <span class="nf">_logging_to_event_level</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">levelname</span><span class="p">):</span>
-        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;critical&quot;</span><span class="p">:</span> <span class="s2">&quot;fatal&quot;</span><span class="p">}</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">levelname</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="n">levelname</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">)</span>
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logentry&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">to_string</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="p">),</span> <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">}</span>
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;extra&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_should_create_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">levelno</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_level</span>
+        <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
+
+
+<span class="c1"># Legacy name</span>
+<span class="n">SentryHandler</span> <span class="o">=</span> <span class="n">EventHandler</span>
+
+
+<span class="k">class</span> <span class="nc">BreadcrumbHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">,</span> <span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+            <span class="k">return</span>
+
+        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+        <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="n">hub</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span><span class="n">_breadcrumb_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;log_record&quot;</span><span class="p">:</span> <span class="n">record</span><span class="p">})</span>
 </pre></div>
 
   </div>
@@ -1239,6 +1351,14 @@ table {
 
   <section id="section-items">
     <h2 class="section-title" id="header-variables">Module variables</h2>
+      <div class="item">
+      <p id="sentry_sdk.integrations.logging.COMMON_RECORD_ATTRS" class="name">var <span class="ident">COMMON_RECORD_ATTRS</span></p>
+      
+  
+  <div class="source_cont">
+</div>
+
+      </div>
       <div class="item">
       <p id="sentry_sdk.integrations.logging.DEFAULT_EVENT_LEVEL" class="name">var <span class="ident">DEFAULT_EVENT_LEVEL</span></p>
       
@@ -1289,138 +1409,7 @@ of this integration.</p></div>
     <h2 class="section-title" id="header-classes">Classes</h2>
       
       <div class="item">
-      <p id="sentry_sdk.integrations.logging.LoggingIntegration" class="name">class <span class="ident">LoggingIntegration</span></p>
-      
-  
-    <div class="desc"><p>Baseclass for all integrations.</p>
-<p>To accept options for an integration, implement your own constructor that
-saves those options on <code>self</code>.</p></div>
-  <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.LoggingIntegration', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.LoggingIntegration" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">LoggingIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
-    <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;logging&quot;</span>
-
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="n">SentryHandler</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">event_level</span><span class="p">)</span>
-
-    <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
-        <span class="n">old_callhandlers</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span>
-
-        <span class="k">def</span> <span class="nf">sentry_patched_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-            <span class="c1"># This check is done twice, once also here before we even get</span>
-            <span class="c1"># the integration.  Otherwise we have a high chance of getting</span>
-            <span class="c1"># into a recursion error when the integration is resolved</span>
-            <span class="c1"># (this also is slower).</span>
-            <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span><span class="p">:</span>
-                <span class="n">integration</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                    <span class="n">integration</span><span class="o">.</span><span class="n">_handler</span><span class="o">.</span><span class="n">handle</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">old_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
-
-        <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span> <span class="o">=</span> <span class="n">sentry_patched_callhandlers</span>
-</pre></div>
-
-  </div>
-</div>
-
-
-      <div class="class">
-          <h3>Ancestors (in MRO)</h3>
-          <ul class="class_list">
-          <li><a href="#sentry_sdk.integrations.logging.LoggingIntegration">LoggingIntegration</a></li>
-          <li>sentry_sdk.integrations.Integration</li>
-          <li>builtins.object</li>
-          </ul>
-          <h3>Class variables</h3>
-            <div class="item">
-            <p id="sentry_sdk.integrations.logging.LoggingIntegration.identifier" class="name">var <span class="ident">identifier</span></p>
-            
-
-            
-  
-  <div class="source_cont">
-</div>
-
-            </div>
-            <div class="item">
-            <p id="sentry_sdk.integrations.logging.LoggingIntegration.install" class="name">var <span class="ident">install</span></p>
-            
-
-            
-  
-  <div class="source_cont">
-</div>
-
-            </div>
-          <h3>Static methods</h3>
-            
-  <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.LoggingIntegration.__init__">
-    <p>def <span class="ident">__init__</span>(</p><p>self, level=20, event_level=40)</p>
-    </div>
-    
-
-    
-  
-    <div class="desc"><p>Initialize self.  See help(type(self)) for accurate signature.</p></div>
-  <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.LoggingIntegration.__init__', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.LoggingIntegration.__init__" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">):</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="n">SentryHandler</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">event_level</span><span class="p">)</span>
-</pre></div>
-
-  </div>
-</div>
-
-  </div>
-  
-            
-  <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.LoggingIntegration.setup_once">
-    <p>def <span class="ident">setup_once</span>(</p><p>)</p>
-    </div>
-    
-
-    
-  
-    <div class="desc"><p>Initialize the integration.</p>
-<p>This function is only called once, ever. Configuration is not available
-at this point, so the only thing to do here is to hook into exception
-handlers, and perhaps do monkeypatches.</p>
-<p>Inside those hooks <code>Integration.current</code> can be used to access the
-instance again.</p></div>
-  <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.LoggingIntegration.setup_once', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.LoggingIntegration.setup_once" class="source">
-    <div class="codehilite"><pre><span></span><span class="nd">@staticmethod</span>
-<span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
-    <span class="n">old_callhandlers</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span>
-    <span class="k">def</span> <span class="nf">sentry_patched_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-        <span class="c1"># This check is done twice, once also here before we even get</span>
-        <span class="c1"># the integration.  Otherwise we have a high chance of getting</span>
-        <span class="c1"># into a recursion error when the integration is resolved</span>
-        <span class="c1"># (this also is slower).</span>
-        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span><span class="p">:</span>
-            <span class="n">integration</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="n">integration</span><span class="o">.</span><span class="n">_handler</span><span class="o">.</span><span class="n">handle</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">old_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
-    <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span> <span class="o">=</span> <span class="n">sentry_patched_callhandlers</span>
-</pre></div>
-
-  </div>
-</div>
-
-  </div>
-  
-      </div>
-      </div>
-      
-      <div class="item">
-      <p id="sentry_sdk.integrations.logging.SentryHandler" class="name">class <span class="ident">SentryHandler</span></p>
+      <p id="sentry_sdk.integrations.logging.BreadcrumbHandler" class="name">class <span class="ident">BreadcrumbHandler</span></p>
       
   
     <div class="desc"><p>Handler instances dispatch logging events to specific destinations.</p>
@@ -1429,35 +1418,16 @@ interface. Handlers can optionally use Formatter instances to format
 records as desired. By default, no formatter is specified; in this case,
 the 'raw' message as determined by record.message is logged.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">SentryHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">,</span> <span class="nb">object</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">event_level</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_event_level</span> <span class="o">=</span> <span class="bp">None</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_event_level</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">_checkLevel</span><span class="p">(</span><span class="n">event_level</span><span class="p">)</span>
-
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">BreadcrumbHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">,</span> <span class="nb">object</span><span class="p">):</span>
     <span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
         <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">can_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span>
-
-    <span class="k">def</span> <span class="nf">_breadcrumb_from_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-        <span class="k">return</span> <span class="p">{</span>
-            <span class="s2">&quot;ty&quot;</span><span class="p">:</span> <span class="s2">&quot;log&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">),</span>
-            <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-            <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">message</span><span class="p">,</span>
-            <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">fromtimestamp</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">created</span><span class="p">),</span>
-        <span class="p">}</span>
-
     <span class="k">def</span> <span class="nf">_emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
             <span class="k">return</span>
 
         <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
@@ -1465,38 +1435,7 @@ the 'raw' message as determined by record.message is logged.</p></div>
         <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span>
 
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_create_event</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
-            <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-                <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
-                <span class="c1"># exc_info might be None or (None, None, None)</span>
-                <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                    <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
-                        <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">,</span>
-                        <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
-                        <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;logging&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">},</span>
-                    <span class="p">)</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
-
-                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">)</span>
-                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
-                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logentry&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-                    <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">to_string</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="p">),</span>
-                    <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">,</span>
-                <span class="p">}</span>
-
-                <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
-
-        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-            <span class="n">hub</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;log_record&quot;</span><span class="p">:</span> <span class="n">record</span><span class="p">}</span>
-            <span class="p">)</span>
-
-    <span class="k">def</span> <span class="nf">_logging_to_event_level</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">levelname</span><span class="p">):</span>
-        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;critical&quot;</span><span class="p">:</span> <span class="s2">&quot;fatal&quot;</span><span class="p">}</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">levelname</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="n">levelname</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
-
-    <span class="k">def</span> <span class="nf">_should_create_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">levelno</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_level</span>
+        <span class="n">hub</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span><span class="n">_breadcrumb_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;log_record&quot;</span><span class="p">:</span> <span class="n">record</span><span class="p">})</span>
 </pre></div>
 
   </div>
@@ -1506,7 +1445,7 @@ the 'raw' message as determined by record.message is logged.</p></div>
       <div class="class">
           <h3>Ancestors (in MRO)</h3>
           <ul class="class_list">
-          <li><a href="#sentry_sdk.integrations.logging.SentryHandler">SentryHandler</a></li>
+          <li><a href="#sentry_sdk.integrations.logging.BreadcrumbHandler">BreadcrumbHandler</a></li>
           <li>logging.Handler</li>
           <li>logging.Filterer</li>
           <li>builtins.object</li>
@@ -1514,8 +1453,8 @@ the 'raw' message as determined by record.message is logged.</p></div>
           <h3>Static methods</h3>
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.__init__">
-    <p>def <span class="ident">__init__</span>(</p><p>self, level=20, event_level=40, **kwargs)</p>
+    <div class="name def" id="sentry_sdk.integrations.logging.BreadcrumbHandler.__init__">
+    <p>def <span class="ident">__init__</span>(</p><p>self, level=0)</p>
     </div>
     
 
@@ -1524,14 +1463,20 @@ the 'raw' message as determined by record.message is logged.</p></div>
     <div class="desc"><p>Initializes the instance - basically setting the formatter to None
 and the filter list to empty.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.__init__', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.__init__" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-    <span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">event_level</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_event_level</span> <span class="o">=</span> <span class="bp">None</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_event_level</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">_checkLevel</span><span class="p">(</span><span class="n">event_level</span><span class="p">)</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.__init__', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.__init__" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">NOTSET</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Initializes the instance - basically setting the formatter to None</span>
+<span class="sd">    and the filter list to empty.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Filterer</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">level</span> <span class="o">=</span> <span class="n">_checkLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">formatter</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="c1"># Add the handler to the global _handlerList (for cleanup on shutdown)</span>
+    <span class="n">_addHandlerRef</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">createLock</span><span class="p">()</span>
 </pre></div>
 
   </div>
@@ -1541,7 +1486,7 @@ and the filter list to empty.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.acquire">
+    <div class="name def" id="sentry_sdk.integrations.logging.BreadcrumbHandler.acquire">
     <p>def <span class="ident">acquire</span>(</p><p>self)</p>
     </div>
     
@@ -1550,8 +1495,8 @@ and the filter list to empty.</p></div>
   
     <div class="desc"><p>Acquire the I/O thread lock.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.acquire', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.acquire" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.acquire', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.acquire" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">acquire</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Acquire the I/O thread lock.</span>
@@ -1567,7 +1512,7 @@ and the filter list to empty.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.addFilter">
+    <div class="name def" id="sentry_sdk.integrations.logging.BreadcrumbHandler.addFilter">
     <p>def <span class="ident">addFilter</span>(</p><p>self, filter)</p>
     </div>
     
@@ -1576,8 +1521,8 @@ and the filter list to empty.</p></div>
   
     <div class="desc"><p>Add the specified filter to this handler.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.addFilter', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.addFilter" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.addFilter', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.addFilter" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">addFilter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">filter</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Add the specified filter to this handler.</span>
@@ -1593,28 +1538,7 @@ and the filter list to empty.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.can_record">
-    <p>def <span class="ident">can_record</span>(</p><p>self, record)</p>
-    </div>
-    
-
-    
-  
-  <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.can_record', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.can_record" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">can_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span>
-</pre></div>
-
-  </div>
-</div>
-
-  </div>
-  
-            
-  <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.close">
+    <div class="name def" id="sentry_sdk.integrations.logging.BreadcrumbHandler.close">
     <p>def <span class="ident">close</span>(</p><p>self)</p>
     </div>
     
@@ -1627,8 +1551,8 @@ _handlers, which is used for handler lookup by name. Subclasses
 should ensure that this gets called from overridden close()
 methods.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.close', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.close" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.close', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.close" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Tidy up any resources used by the handler.</span>
@@ -1653,7 +1577,7 @@ methods.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.createLock">
+    <div class="name def" id="sentry_sdk.integrations.logging.BreadcrumbHandler.createLock">
     <p>def <span class="ident">createLock</span>(</p><p>self)</p>
     </div>
     
@@ -1662,8 +1586,8 @@ methods.</p></div>
   
     <div class="desc"><p>Acquire a thread lock for serializing access to the underlying I/O.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.createLock', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.createLock" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.createLock', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.createLock" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">createLock</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Acquire a thread lock for serializing access to the underlying I/O.</span>
@@ -1681,7 +1605,7 @@ methods.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.emit">
+    <div class="name def" id="sentry_sdk.integrations.logging.BreadcrumbHandler.emit">
     <p>def <span class="ident">emit</span>(</p><p>self, record)</p>
     </div>
     
@@ -1692,8 +1616,8 @@ methods.</p></div>
 <p>This version is intended to be implemented by subclasses and so
 raises a NotImplementedError.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.emit', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.emit" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.emit', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.emit" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
     <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
@@ -1707,7 +1631,7 @@ raises a NotImplementedError.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.filter">
+    <div class="name def" id="sentry_sdk.integrations.logging.BreadcrumbHandler.filter">
     <p>def <span class="ident">filter</span>(</p><p>self, record)</p>
     </div>
     
@@ -1721,8 +1645,8 @@ is to be dropped, else non-zero.</p>
 <p>.. versionchanged:: 3.2</p>
 <p>Allow filters to be just callables.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.filter', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.filter" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.filter', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.filter" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Determine if a record is loggable by consulting all the filters.</span>
@@ -1751,7 +1675,7 @@ is to be dropped, else non-zero.</p>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.flush">
+    <div class="name def" id="sentry_sdk.integrations.logging.BreadcrumbHandler.flush">
     <p>def <span class="ident">flush</span>(</p><p>self)</p>
     </div>
     
@@ -1762,8 +1686,8 @@ is to be dropped, else non-zero.</p>
 <p>This version does nothing and is intended to be implemented by
 subclasses.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.flush', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.flush" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.flush', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.flush" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Ensure all logging output has been flushed.</span>
@@ -1780,7 +1704,7 @@ subclasses.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.format">
+    <div class="name def" id="sentry_sdk.integrations.logging.BreadcrumbHandler.format">
     <p>def <span class="ident">format</span>(</p><p>self, record)</p>
     </div>
     
@@ -1791,8 +1715,8 @@ subclasses.</p></div>
 <p>If a formatter is set, use it. Otherwise, use the default formatter
 for the module.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.format', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.format" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.format', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.format" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Format the specified record.</span>
@@ -1813,7 +1737,7 @@ for the module.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.get_name">
+    <div class="name def" id="sentry_sdk.integrations.logging.BreadcrumbHandler.get_name">
     <p>def <span class="ident">get_name</span>(</p><p>self)</p>
     </div>
     
@@ -1821,8 +1745,8 @@ for the module.</p></div>
     
   
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.get_name', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.get_name" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.get_name', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.get_name" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">get_name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span>
 </pre></div>
@@ -1834,7 +1758,7 @@ for the module.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.handle">
+    <div class="name def" id="sentry_sdk.integrations.logging.BreadcrumbHandler.handle">
     <p>def <span class="ident">handle</span>(</p><p>self, record)</p>
     </div>
     
@@ -1847,8 +1771,8 @@ Wrap the actual emission of the record with acquisition/release of
 the I/O thread lock. Returns whether the filter passed the record for
 emission.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.handle', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.handle" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.handle', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.handle" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">handle</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Conditionally emit the specified logging record.</span>
@@ -1874,7 +1798,7 @@ emission.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.handleError">
+    <div class="name def" id="sentry_sdk.integrations.logging.BreadcrumbHandler.handleError">
     <p>def <span class="ident">handleError</span>(</p><p>self, record)</p>
     </div>
     
@@ -1890,8 +1814,8 @@ the logging system, they are more interested in application errors.
 You could, however, replace this with a custom handler if you wish.
 The record which was being processed is passed in to this method.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.handleError', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.handleError" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.handleError', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.handleError" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">handleError</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Handle errors which occur during an emit() call.</span>
@@ -1944,7 +1868,7 @@ The record which was being processed is passed in to this method.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.release">
+    <div class="name def" id="sentry_sdk.integrations.logging.BreadcrumbHandler.release">
     <p>def <span class="ident">release</span>(</p><p>self)</p>
     </div>
     
@@ -1953,8 +1877,8 @@ The record which was being processed is passed in to this method.</p></div>
   
     <div class="desc"><p>Release the I/O thread lock.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.release', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.release" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.release', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.release" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">release</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Release the I/O thread lock.</span>
@@ -1970,7 +1894,7 @@ The record which was being processed is passed in to this method.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.removeFilter">
+    <div class="name def" id="sentry_sdk.integrations.logging.BreadcrumbHandler.removeFilter">
     <p>def <span class="ident">removeFilter</span>(</p><p>self, filter)</p>
     </div>
     
@@ -1979,8 +1903,8 @@ The record which was being processed is passed in to this method.</p></div>
   
     <div class="desc"><p>Remove the specified filter from this handler.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.removeFilter', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.removeFilter" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.removeFilter', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.removeFilter" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">removeFilter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">filter</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Remove the specified filter from this handler.</span>
@@ -1996,7 +1920,7 @@ The record which was being processed is passed in to this method.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.setFormatter">
+    <div class="name def" id="sentry_sdk.integrations.logging.BreadcrumbHandler.setFormatter">
     <p>def <span class="ident">setFormatter</span>(</p><p>self, fmt)</p>
     </div>
     
@@ -2005,8 +1929,8 @@ The record which was being processed is passed in to this method.</p></div>
   
     <div class="desc"><p>Set the formatter for this handler.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.setFormatter', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.setFormatter" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.setFormatter', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.setFormatter" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">setFormatter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fmt</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Set the formatter for this handler.</span>
@@ -2021,7 +1945,7 @@ The record which was being processed is passed in to this method.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.setLevel">
+    <div class="name def" id="sentry_sdk.integrations.logging.BreadcrumbHandler.setLevel">
     <p>def <span class="ident">setLevel</span>(</p><p>self, level)</p>
     </div>
     
@@ -2030,8 +1954,8 @@ The record which was being processed is passed in to this method.</p></div>
   
     <div class="desc"><p>Set the logging level of this handler.  level must be an int or a str.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.setLevel', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.setLevel" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.setLevel', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.setLevel" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">setLevel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Set the logging level of this handler.  level must be an int or a str.</span>
@@ -2046,7 +1970,7 @@ The record which was being processed is passed in to this method.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.logging.SentryHandler.set_name">
+    <div class="name def" id="sentry_sdk.integrations.logging.BreadcrumbHandler.set_name">
     <p>def <span class="ident">set_name</span>(</p><p>self, name)</p>
     </div>
     
@@ -2054,8 +1978,8 @@ The record which was being processed is passed in to this method.</p></div>
     
   
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.SentryHandler.set_name', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.logging.SentryHandler.set_name" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.set_name', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.set_name" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">set_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
     <span class="n">_acquireLock</span><span class="p">()</span>
     <span class="k">try</span><span class="p">:</span>
@@ -2075,8 +1999,1403 @@ The record which was being processed is passed in to this method.</p></div>
   
           <h3>Instance variables</h3>
             <div class="item">
-            <p id="sentry_sdk.integrations.logging.SentryHandler.name" class="name">var <span class="ident">name</span></p>
+            <p id="sentry_sdk.integrations.logging.BreadcrumbHandler.name" class="name">var <span class="ident">name</span></p>
             
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
+      </div>
+      </div>
+      
+      <div class="item">
+      <p id="sentry_sdk.integrations.logging.EventHandler" class="name">class <span class="ident">EventHandler</span></p>
+      
+  
+    <div class="desc"><p>Handler instances dispatch logging events to specific destinations.</p>
+<p>The base handler class. Acts as a placeholder which defines the Handler
+interface. Handlers can optionally use Formatter instances to format
+records as desired. By default, no formatter is specified; in this case,
+the 'raw' message as determined by record.message is logged.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">EventHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">,</span> <span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+            <span class="k">return</span>
+
+        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+        <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="c1"># exc_info might be None or (None, None, None)</span>
+        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
+                <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">,</span>
+                <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
+                <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;logging&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">},</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
+
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">)</span>
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logentry&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">to_string</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="p">),</span> <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">}</span>
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;extra&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+        <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+
+      <div class="class">
+          <h3>Ancestors (in MRO)</h3>
+          <ul class="class_list">
+          <li><a href="#sentry_sdk.integrations.logging.EventHandler">SentryHandler</a></li>
+          <li>logging.Handler</li>
+          <li>logging.Filterer</li>
+          <li>builtins.object</li>
+          </ul>
+          <h3>Static methods</h3>
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.__init__">
+    <p>def <span class="ident">__init__</span>(</p><p>self, level=0)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Initializes the instance - basically setting the formatter to None
+and the filter list to empty.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.__init__', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.__init__" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">NOTSET</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Initializes the instance - basically setting the formatter to None</span>
+<span class="sd">    and the filter list to empty.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Filterer</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">level</span> <span class="o">=</span> <span class="n">_checkLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">formatter</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="c1"># Add the handler to the global _handlerList (for cleanup on shutdown)</span>
+    <span class="n">_addHandlerRef</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">createLock</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.acquire">
+    <p>def <span class="ident">acquire</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Acquire the I/O thread lock.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.acquire', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.acquire" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">acquire</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Acquire the I/O thread lock.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">lock</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span><span class="o">.</span><span class="n">acquire</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.addFilter">
+    <p>def <span class="ident">addFilter</span>(</p><p>self, filter)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Add the specified filter to this handler.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.addFilter', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.addFilter" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">addFilter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">filter</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Add the specified filter to this handler.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">filter</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">filter</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.close">
+    <p>def <span class="ident">close</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Tidy up any resources used by the handler.</p>
+<p>This version removes the handler from an internal map of handlers,
+_handlers, which is used for handler lookup by name. Subclasses
+should ensure that this gets called from overridden close()
+methods.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.close', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.close" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Tidy up any resources used by the handler.</span>
+<span class="sd">    This version removes the handler from an internal map of handlers,</span>
+<span class="sd">    _handlers, which is used for handler lookup by name. Subclasses</span>
+<span class="sd">    should ensure that this gets called from overridden close()</span>
+<span class="sd">    methods.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#get the module data lock, as we&#39;re updating a shared structure.</span>
+    <span class="n">_acquireLock</span><span class="p">()</span>
+    <span class="k">try</span><span class="p">:</span>    <span class="c1">#unlikely to raise an exception, but you never know...</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="ow">in</span> <span class="n">_handlers</span><span class="p">:</span>
+            <span class="k">del</span> <span class="n">_handlers</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">]</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">_releaseLock</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.createLock">
+    <p>def <span class="ident">createLock</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Acquire a thread lock for serializing access to the underlying I/O.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.createLock', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.createLock" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">createLock</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Acquire a thread lock for serializing access to the underlying I/O.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">threading</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">RLock</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span> <span class="c1">#pragma: no cover</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span> <span class="o">=</span> <span class="bp">None</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.emit">
+    <p>def <span class="ident">emit</span>(</p><p>self, record)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Do whatever it takes to actually log the specified logging record.</p>
+<p>This version is intended to be implemented by subclasses and so
+raises a NotImplementedError.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.emit', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.emit" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+    <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.filter">
+    <p>def <span class="ident">filter</span>(</p><p>self, record)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Determine if a record is loggable by consulting all the filters.</p>
+<p>The default is to allow the record to be logged; any filter can veto
+this and the record is then dropped. Returns a zero value if a record
+is to be dropped, else non-zero.</p>
+<p>.. versionchanged:: 3.2</p>
+<p>Allow filters to be just callables.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.filter', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.filter" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Determine if a record is loggable by consulting all the filters.</span>
+<span class="sd">    The default is to allow the record to be logged; any filter can veto</span>
+<span class="sd">    this and the record is then dropped. Returns a zero value if a record</span>
+<span class="sd">    is to be dropped, else non-zero.</span>
+<span class="sd">    .. versionchanged:: 3.2</span>
+<span class="sd">       Allow filters to be just callables.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">rv</span> <span class="o">=</span> <span class="bp">True</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="s1">&#39;filter&#39;</span><span class="p">):</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">record</span><span class="p">)</span> <span class="c1"># assume callable - will raise if not</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">rv</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="k">break</span>
+    <span class="k">return</span> <span class="n">rv</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.flush">
+    <p>def <span class="ident">flush</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Ensure all logging output has been flushed.</p>
+<p>This version does nothing and is intended to be implemented by
+subclasses.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.flush', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.flush" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Ensure all logging output has been flushed.</span>
+<span class="sd">    This version does nothing and is intended to be implemented by</span>
+<span class="sd">    subclasses.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.format">
+    <p>def <span class="ident">format</span>(</p><p>self, record)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Format the specified record.</p>
+<p>If a formatter is set, use it. Otherwise, use the default formatter
+for the module.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.format', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.format" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Format the specified record.</span>
+<span class="sd">    If a formatter is set, use it. Otherwise, use the default formatter</span>
+<span class="sd">    for the module.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">formatter</span><span class="p">:</span>
+        <span class="n">fmt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">formatter</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">fmt</span> <span class="o">=</span> <span class="n">_defaultFormatter</span>
+    <span class="k">return</span> <span class="n">fmt</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.get_name">
+    <p>def <span class="ident">get_name</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.get_name', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.get_name" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">get_name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.handle">
+    <p>def <span class="ident">handle</span>(</p><p>self, record)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Conditionally emit the specified logging record.</p>
+<p>Emission depends on filters which may have been added to the handler.
+Wrap the actual emission of the record with acquisition/release of
+the I/O thread lock. Returns whether the filter passed the record for
+emission.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.handle', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.handle" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">handle</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Conditionally emit the specified logging record.</span>
+<span class="sd">    Emission depends on filters which may have been added to the handler.</span>
+<span class="sd">    Wrap the actual emission of the record with acquisition/release of</span>
+<span class="sd">    the I/O thread lock. Returns whether the filter passed the record for</span>
+<span class="sd">    emission.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">rv</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">acquire</span><span class="p">()</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">release</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">rv</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.handleError">
+    <p>def <span class="ident">handleError</span>(</p><p>self, record)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Handle errors which occur during an emit() call.</p>
+<p>This method should be called from handlers when an exception is
+encountered during an emit() call. If raiseExceptions is false,
+exceptions get silently ignored. This is what is mostly wanted
+for a logging system - most users will not care about errors in
+the logging system, they are more interested in application errors.
+You could, however, replace this with a custom handler if you wish.
+The record which was being processed is passed in to this method.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.handleError', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.handleError" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">handleError</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Handle errors which occur during an emit() call.</span>
+<span class="sd">    This method should be called from handlers when an exception is</span>
+<span class="sd">    encountered during an emit() call. If raiseExceptions is false,</span>
+<span class="sd">    exceptions get silently ignored. This is what is mostly wanted</span>
+<span class="sd">    for a logging system - most users will not care about errors in</span>
+<span class="sd">    the logging system, they are more interested in application errors.</span>
+<span class="sd">    You could, however, replace this with a custom handler if you wish.</span>
+<span class="sd">    The record which was being processed is passed in to this method.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">raiseExceptions</span> <span class="ow">and</span> <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">:</span>  <span class="c1"># see issue 13807</span>
+        <span class="n">t</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">tb</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;--- Logging error ---</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="n">traceback</span><span class="o">.</span><span class="n">print_exception</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">tb</span><span class="p">,</span> <span class="bp">None</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;Call stack:</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="c1"># Walk the stack frame up until we&#39;re out of logging,</span>
+            <span class="c1"># so as to print the calling context.</span>
+            <span class="n">frame</span> <span class="o">=</span> <span class="n">tb</span><span class="o">.</span><span class="n">tb_frame</span>
+            <span class="k">while</span> <span class="p">(</span><span class="n">frame</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">frame</span><span class="o">.</span><span class="n">f_code</span><span class="o">.</span><span class="n">co_filename</span><span class="p">)</span> <span class="o">==</span>
+                   <span class="n">__path__</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+                <span class="n">frame</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">f_back</span>
+            <span class="k">if</span> <span class="n">frame</span><span class="p">:</span>
+                <span class="n">traceback</span><span class="o">.</span><span class="n">print_stack</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="nb">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># couldn&#39;t find the right stack frame, for some reason</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;Logged from file </span><span class="si">%s</span><span class="s1">, line </span><span class="si">%s</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span>
+                                 <span class="n">record</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">lineno</span><span class="p">))</span>
+            <span class="c1"># Issue 18671: output logging message and arguments</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;Message: </span><span class="si">%r</span><span class="se">\n</span><span class="s1">&#39;</span>
+                                 <span class="s1">&#39;Arguments: </span><span class="si">%s</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="p">,</span>
+                                                      <span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;Unable to print the message and arguments&#39;</span>
+                                 <span class="s1">&#39; - possible formatting error.</span><span class="se">\n</span><span class="s1">Use the&#39;</span>
+                                 <span class="s1">&#39; traceback above to help find the error.</span><span class="se">\n</span><span class="s1">&#39;</span>
+                                <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span> <span class="c1">#pragma: no cover</span>
+            <span class="k">pass</span>    <span class="c1"># see issue 5971</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">del</span> <span class="n">t</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">tb</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.release">
+    <p>def <span class="ident">release</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Release the I/O thread lock.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.release', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.release" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">release</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Release the I/O thread lock.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">lock</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span><span class="o">.</span><span class="n">release</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.removeFilter">
+    <p>def <span class="ident">removeFilter</span>(</p><p>self, filter)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Remove the specified filter from this handler.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.removeFilter', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.removeFilter" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">removeFilter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">filter</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Remove the specified filter from this handler.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">filter</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="nb">filter</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.setFormatter">
+    <p>def <span class="ident">setFormatter</span>(</p><p>self, fmt)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set the formatter for this handler.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.setFormatter', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.setFormatter" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">setFormatter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fmt</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Set the formatter for this handler.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">formatter</span> <span class="o">=</span> <span class="n">fmt</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.setLevel">
+    <p>def <span class="ident">setLevel</span>(</p><p>self, level)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set the logging level of this handler.  level must be an int or a str.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.setLevel', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.setLevel" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">setLevel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Set the logging level of this handler.  level must be an int or a str.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">level</span> <span class="o">=</span> <span class="n">_checkLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.set_name">
+    <p>def <span class="ident">set_name</span>(</p><p>self, name)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.set_name', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.set_name" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">set_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="n">_acquireLock</span><span class="p">()</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="ow">in</span> <span class="n">_handlers</span><span class="p">:</span>
+            <span class="k">del</span> <span class="n">_handlers</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="k">if</span> <span class="n">name</span><span class="p">:</span>
+            <span class="n">_handlers</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">_releaseLock</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+          <h3>Instance variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.integrations.logging.EventHandler.name" class="name">var <span class="ident">name</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
+      </div>
+      </div>
+      
+      <div class="item">
+      <p id="sentry_sdk.integrations.logging.LoggingIntegration" class="name">class <span class="ident">LoggingIntegration</span></p>
+      
+  
+    <div class="desc"><p>Baseclass for all integrations.</p>
+<p>To accept options for an integration, implement your own constructor that
+saves those options on <code>self</code>.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.LoggingIntegration', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.LoggingIntegration" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">LoggingIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
+    <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;logging&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span> <span class="o">=</span> <span class="bp">None</span>
+
+        <span class="k">if</span> <span class="n">level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span> <span class="o">=</span> <span class="n">BreadcrumbHandler</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">event_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="n">EventHandler</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">event_level</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_handle_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">levelno</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span><span class="o">.</span><span class="n">level</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span><span class="o">.</span><span class="n">handle</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
+            <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">levelno</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span><span class="o">.</span><span class="n">level</span>
+        <span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span><span class="o">.</span><span class="n">handle</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="n">old_callhandlers</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span>
+
+        <span class="k">def</span> <span class="nf">sentry_patched_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+            <span class="c1"># This check is done twice, once also here before we even get</span>
+            <span class="c1"># the integration.  Otherwise we have a high chance of getting</span>
+            <span class="c1"># into a recursion error when the integration is resolved</span>
+            <span class="c1"># (this also is slower).</span>
+            <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span><span class="p">:</span>
+                <span class="n">integration</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                    <span class="n">integration</span><span class="o">.</span><span class="n">_handle_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">old_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
+
+        <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span> <span class="o">=</span> <span class="n">sentry_patched_callhandlers</span>
+</pre></div>
+
+  </div>
+</div>
+
+
+      <div class="class">
+          <h3>Ancestors (in MRO)</h3>
+          <ul class="class_list">
+          <li><a href="#sentry_sdk.integrations.logging.LoggingIntegration">LoggingIntegration</a></li>
+          <li>sentry_sdk.integrations.Integration</li>
+          <li>builtins.object</li>
+          </ul>
+          <h3>Class variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.integrations.logging.LoggingIntegration.identifier" class="name">var <span class="ident">identifier</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
+            <div class="item">
+            <p id="sentry_sdk.integrations.logging.LoggingIntegration.install" class="name">var <span class="ident">install</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
+          <h3>Static methods</h3>
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.LoggingIntegration.__init__">
+    <p>def <span class="ident">__init__</span>(</p><p>self, level=20, event_level=40)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Initialize self.  See help(type(self)) for accurate signature.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.LoggingIntegration.__init__', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.LoggingIntegration.__init__" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="k">if</span> <span class="n">level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span> <span class="o">=</span> <span class="n">BreadcrumbHandler</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">event_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="n">EventHandler</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">event_level</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.LoggingIntegration.setup_once">
+    <p>def <span class="ident">setup_once</span>(</p><p>)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Initialize the integration.</p>
+<p>This function is only called once, ever. Configuration is not available
+at this point, so the only thing to do here is to hook into exception
+handlers, and perhaps do monkeypatches.</p>
+<p>Inside those hooks <code>Integration.current</code> can be used to access the
+instance again.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.LoggingIntegration.setup_once', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.LoggingIntegration.setup_once" class="source">
+    <div class="codehilite"><pre><span></span><span class="nd">@staticmethod</span>
+<span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+    <span class="n">old_callhandlers</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span>
+    <span class="k">def</span> <span class="nf">sentry_patched_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># This check is done twice, once also here before we even get</span>
+        <span class="c1"># the integration.  Otherwise we have a high chance of getting</span>
+        <span class="c1"># into a recursion error when the integration is resolved</span>
+        <span class="c1"># (this also is slower).</span>
+        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span><span class="p">:</span>
+            <span class="n">integration</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="n">integration</span><span class="o">.</span><span class="n">_handle_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">old_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span> <span class="o">=</span> <span class="n">sentry_patched_callhandlers</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+      </div>
+      </div>
+      
+      <div class="item">
+      <p id="sentry_sdk.integrations.logging.EventHandler" class="name">class <span class="ident">SentryHandler</span></p>
+      
+  
+    <div class="desc"><p>Handler instances dispatch logging events to specific destinations.</p>
+<p>The base handler class. Acts as a placeholder which defines the Handler
+interface. Handlers can optionally use Formatter instances to format
+records as desired. By default, no formatter is specified; in this case,
+the 'raw' message as determined by record.message is logged.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">EventHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">,</span> <span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+            <span class="k">return</span>
+
+        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+        <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="c1"># exc_info might be None or (None, None, None)</span>
+        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
+                <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">,</span>
+                <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
+                <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;logging&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">},</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
+
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">)</span>
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logentry&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">to_string</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="p">),</span> <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">}</span>
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;extra&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+        <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+
+      <div class="class">
+          <h3>Ancestors (in MRO)</h3>
+          <ul class="class_list">
+          <li><a href="#sentry_sdk.integrations.logging.EventHandler">SentryHandler</a></li>
+          <li>logging.Handler</li>
+          <li>logging.Filterer</li>
+          <li>builtins.object</li>
+          </ul>
+          <h3>Static methods</h3>
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.__init__">
+    <p>def <span class="ident">__init__</span>(</p><p>self, level=0)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Initializes the instance - basically setting the formatter to None
+and the filter list to empty.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.__init__', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.__init__" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">NOTSET</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Initializes the instance - basically setting the formatter to None</span>
+<span class="sd">    and the filter list to empty.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Filterer</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">level</span> <span class="o">=</span> <span class="n">_checkLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">formatter</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="c1"># Add the handler to the global _handlerList (for cleanup on shutdown)</span>
+    <span class="n">_addHandlerRef</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">createLock</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.acquire">
+    <p>def <span class="ident">acquire</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Acquire the I/O thread lock.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.acquire', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.acquire" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">acquire</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Acquire the I/O thread lock.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">lock</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span><span class="o">.</span><span class="n">acquire</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.addFilter">
+    <p>def <span class="ident">addFilter</span>(</p><p>self, filter)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Add the specified filter to this handler.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.addFilter', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.addFilter" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">addFilter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">filter</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Add the specified filter to this handler.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">filter</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">filter</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.close">
+    <p>def <span class="ident">close</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Tidy up any resources used by the handler.</p>
+<p>This version removes the handler from an internal map of handlers,
+_handlers, which is used for handler lookup by name. Subclasses
+should ensure that this gets called from overridden close()
+methods.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.close', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.close" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Tidy up any resources used by the handler.</span>
+<span class="sd">    This version removes the handler from an internal map of handlers,</span>
+<span class="sd">    _handlers, which is used for handler lookup by name. Subclasses</span>
+<span class="sd">    should ensure that this gets called from overridden close()</span>
+<span class="sd">    methods.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#get the module data lock, as we&#39;re updating a shared structure.</span>
+    <span class="n">_acquireLock</span><span class="p">()</span>
+    <span class="k">try</span><span class="p">:</span>    <span class="c1">#unlikely to raise an exception, but you never know...</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="ow">in</span> <span class="n">_handlers</span><span class="p">:</span>
+            <span class="k">del</span> <span class="n">_handlers</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">]</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">_releaseLock</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.createLock">
+    <p>def <span class="ident">createLock</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Acquire a thread lock for serializing access to the underlying I/O.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.createLock', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.createLock" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">createLock</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Acquire a thread lock for serializing access to the underlying I/O.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">threading</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">RLock</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span> <span class="c1">#pragma: no cover</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span> <span class="o">=</span> <span class="bp">None</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.emit">
+    <p>def <span class="ident">emit</span>(</p><p>self, record)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Do whatever it takes to actually log the specified logging record.</p>
+<p>This version is intended to be implemented by subclasses and so
+raises a NotImplementedError.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.emit', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.emit" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+    <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.filter">
+    <p>def <span class="ident">filter</span>(</p><p>self, record)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Determine if a record is loggable by consulting all the filters.</p>
+<p>The default is to allow the record to be logged; any filter can veto
+this and the record is then dropped. Returns a zero value if a record
+is to be dropped, else non-zero.</p>
+<p>.. versionchanged:: 3.2</p>
+<p>Allow filters to be just callables.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.filter', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.filter" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Determine if a record is loggable by consulting all the filters.</span>
+<span class="sd">    The default is to allow the record to be logged; any filter can veto</span>
+<span class="sd">    this and the record is then dropped. Returns a zero value if a record</span>
+<span class="sd">    is to be dropped, else non-zero.</span>
+<span class="sd">    .. versionchanged:: 3.2</span>
+<span class="sd">       Allow filters to be just callables.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">rv</span> <span class="o">=</span> <span class="bp">True</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="s1">&#39;filter&#39;</span><span class="p">):</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">record</span><span class="p">)</span> <span class="c1"># assume callable - will raise if not</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">rv</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="k">break</span>
+    <span class="k">return</span> <span class="n">rv</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.flush">
+    <p>def <span class="ident">flush</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Ensure all logging output has been flushed.</p>
+<p>This version does nothing and is intended to be implemented by
+subclasses.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.flush', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.flush" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Ensure all logging output has been flushed.</span>
+<span class="sd">    This version does nothing and is intended to be implemented by</span>
+<span class="sd">    subclasses.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.format">
+    <p>def <span class="ident">format</span>(</p><p>self, record)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Format the specified record.</p>
+<p>If a formatter is set, use it. Otherwise, use the default formatter
+for the module.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.format', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.format" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Format the specified record.</span>
+<span class="sd">    If a formatter is set, use it. Otherwise, use the default formatter</span>
+<span class="sd">    for the module.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">formatter</span><span class="p">:</span>
+        <span class="n">fmt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">formatter</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">fmt</span> <span class="o">=</span> <span class="n">_defaultFormatter</span>
+    <span class="k">return</span> <span class="n">fmt</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.get_name">
+    <p>def <span class="ident">get_name</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.get_name', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.get_name" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">get_name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.handle">
+    <p>def <span class="ident">handle</span>(</p><p>self, record)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Conditionally emit the specified logging record.</p>
+<p>Emission depends on filters which may have been added to the handler.
+Wrap the actual emission of the record with acquisition/release of
+the I/O thread lock. Returns whether the filter passed the record for
+emission.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.handle', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.handle" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">handle</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Conditionally emit the specified logging record.</span>
+<span class="sd">    Emission depends on filters which may have been added to the handler.</span>
+<span class="sd">    Wrap the actual emission of the record with acquisition/release of</span>
+<span class="sd">    the I/O thread lock. Returns whether the filter passed the record for</span>
+<span class="sd">    emission.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">rv</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">acquire</span><span class="p">()</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">release</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">rv</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.handleError">
+    <p>def <span class="ident">handleError</span>(</p><p>self, record)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Handle errors which occur during an emit() call.</p>
+<p>This method should be called from handlers when an exception is
+encountered during an emit() call. If raiseExceptions is false,
+exceptions get silently ignored. This is what is mostly wanted
+for a logging system - most users will not care about errors in
+the logging system, they are more interested in application errors.
+You could, however, replace this with a custom handler if you wish.
+The record which was being processed is passed in to this method.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.handleError', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.handleError" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">handleError</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Handle errors which occur during an emit() call.</span>
+<span class="sd">    This method should be called from handlers when an exception is</span>
+<span class="sd">    encountered during an emit() call. If raiseExceptions is false,</span>
+<span class="sd">    exceptions get silently ignored. This is what is mostly wanted</span>
+<span class="sd">    for a logging system - most users will not care about errors in</span>
+<span class="sd">    the logging system, they are more interested in application errors.</span>
+<span class="sd">    You could, however, replace this with a custom handler if you wish.</span>
+<span class="sd">    The record which was being processed is passed in to this method.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">raiseExceptions</span> <span class="ow">and</span> <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">:</span>  <span class="c1"># see issue 13807</span>
+        <span class="n">t</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">tb</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;--- Logging error ---</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="n">traceback</span><span class="o">.</span><span class="n">print_exception</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">tb</span><span class="p">,</span> <span class="bp">None</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;Call stack:</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="c1"># Walk the stack frame up until we&#39;re out of logging,</span>
+            <span class="c1"># so as to print the calling context.</span>
+            <span class="n">frame</span> <span class="o">=</span> <span class="n">tb</span><span class="o">.</span><span class="n">tb_frame</span>
+            <span class="k">while</span> <span class="p">(</span><span class="n">frame</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">frame</span><span class="o">.</span><span class="n">f_code</span><span class="o">.</span><span class="n">co_filename</span><span class="p">)</span> <span class="o">==</span>
+                   <span class="n">__path__</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+                <span class="n">frame</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">f_back</span>
+            <span class="k">if</span> <span class="n">frame</span><span class="p">:</span>
+                <span class="n">traceback</span><span class="o">.</span><span class="n">print_stack</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="nb">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># couldn&#39;t find the right stack frame, for some reason</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;Logged from file </span><span class="si">%s</span><span class="s1">, line </span><span class="si">%s</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span>
+                                 <span class="n">record</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">lineno</span><span class="p">))</span>
+            <span class="c1"># Issue 18671: output logging message and arguments</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;Message: </span><span class="si">%r</span><span class="se">\n</span><span class="s1">&#39;</span>
+                                 <span class="s1">&#39;Arguments: </span><span class="si">%s</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="p">,</span>
+                                                      <span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;Unable to print the message and arguments&#39;</span>
+                                 <span class="s1">&#39; - possible formatting error.</span><span class="se">\n</span><span class="s1">Use the&#39;</span>
+                                 <span class="s1">&#39; traceback above to help find the error.</span><span class="se">\n</span><span class="s1">&#39;</span>
+                                <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span> <span class="c1">#pragma: no cover</span>
+            <span class="k">pass</span>    <span class="c1"># see issue 5971</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">del</span> <span class="n">t</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">tb</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.release">
+    <p>def <span class="ident">release</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Release the I/O thread lock.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.release', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.release" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">release</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Release the I/O thread lock.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">lock</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span><span class="o">.</span><span class="n">release</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.removeFilter">
+    <p>def <span class="ident">removeFilter</span>(</p><p>self, filter)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Remove the specified filter from this handler.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.removeFilter', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.removeFilter" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">removeFilter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">filter</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Remove the specified filter from this handler.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">filter</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="nb">filter</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.setFormatter">
+    <p>def <span class="ident">setFormatter</span>(</p><p>self, fmt)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set the formatter for this handler.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.setFormatter', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.setFormatter" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">setFormatter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fmt</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Set the formatter for this handler.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">formatter</span> <span class="o">=</span> <span class="n">fmt</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.setLevel">
+    <p>def <span class="ident">setLevel</span>(</p><p>self, level)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Set the logging level of this handler.  level must be an int or a str.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.setLevel', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.setLevel" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">setLevel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Set the logging level of this handler.  level must be an int or a str.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">level</span> <span class="o">=</span> <span class="n">_checkLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.logging.EventHandler.set_name">
+    <p>def <span class="ident">set_name</span>(</p><p>self, name)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.set_name', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.logging.EventHandler.set_name" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">set_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="n">_acquireLock</span><span class="p">()</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="ow">in</span> <span class="n">_handlers</span><span class="p">:</span>
+            <span class="k">del</span> <span class="n">_handlers</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="k">if</span> <span class="n">name</span><span class="p">:</span>
+            <span class="n">_handlers</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">_releaseLock</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+          <h3>Instance variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.integrations.logging.EventHandler.name" class="name">var <span class="ident">name</span></p>
+            
+    <p class="inheritance">
+     <strong>Inheritance:</strong>
+       <code><a href="#sentry_sdk.integrations.logging.EventHandler">SentryHandler</a></code>.<code><a href="#sentry_sdk.integrations.logging.EventHandler.name">name</a></code>
+    </p>
 
             
   
