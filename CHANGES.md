@@ -1,3 +1,7 @@
+## 0.5.1
+
+* Integration for Redis Queue (RQ)
+
 ## 0.5.0
 
 * Fix a bug that would omit several debug logs during SDK initialization.
