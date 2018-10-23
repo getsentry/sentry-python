@@ -8,6 +8,7 @@ from celery.exceptions import SoftTimeLimitExceeded
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations.logging import ignore_logger
 
 
 class CeleryIntegration(Integration):
@@ -18,6 +19,11 @@ class CeleryIntegration(Integration):
         task_prerun.connect(_handle_task_prerun, weak=False)
         task_postrun.connect(_handle_task_postrun, weak=False)
         task_failure.connect(_process_failure_signal, weak=False)
+
+        # This logger logs every status of every task that ran on the worker.
+        # Meaning that every task's breadcrumbs are full of stuff like "Task
+        # <foo> raised unexpected <bar>".
+        ignore_logger("celery.worker.job")
 
 
 def _process_failure_signal(sender, task_id, einfo, **kw):
