@@ -20,7 +20,7 @@ class AwsLambdaIntegration(Integration):
         import __main__ as lambda_bootstrap
 
         if not hasattr(lambda_bootstrap, "make_final_handler"):
-            logger.warn(
+            logger.warning(
                 "Not running in AWS Lambda environment, "
                 "AwsLambdaIntegration disabled"
             )
