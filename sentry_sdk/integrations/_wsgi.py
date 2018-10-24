@@ -216,7 +216,7 @@ class _ScopePoppingResponse(object):
             self._response.close()
         except AttributeError:
             pass
-        except Exception as e:
+        except Exception:
             reraise(*_capture_exception(self.hub))
 
 
