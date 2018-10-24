@@ -1,7 +1,7 @@
 import socket
 
 
-VERSION = "0.5.0"
+VERSION = "0.5.1"
 DEFAULT_SERVER_NAME = socket.gethostname() if hasattr(socket, "gethostname") else None
 DEFAULT_OPTIONS = {
     "dsn": None,
