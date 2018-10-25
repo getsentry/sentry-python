@@ -160,7 +160,6 @@ def test_files_and_form(sentry_init, capture_events, route, get_client):
     }
     assert len(event["request"]["data"]["foo"]) == 512
 
-    # TODO: wrong filesize reported due to usage of BytesIO. Use more realistic input
     assert event["_meta"]["request"]["data"]["file"] == {
         "": {"len": 0, "rem": [["!raw", "x", 0, 0]]}
     }
