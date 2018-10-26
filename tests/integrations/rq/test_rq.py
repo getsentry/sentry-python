@@ -1,34 +1,50 @@
 from sentry_sdk.integrations.rq import RqIntegration
 
 import pytest
+import multiprocessing
 
 from fakeredis import FakeStrictRedis
-from rq import SimpleWorker, Queue
+import rq
 
-
-@pytest.fixture
-def run_job():
-    queue = Queue(connection=FakeStrictRedis())
-    worker = SimpleWorker([queue], connection=queue.connection)
-
-    def inner(fn, *a, **kw):
-        job = queue.enqueue(fn, *a, **kw)
-        worker.work(burst=True)
-        return job
-
-    return inner
+from sentry_sdk import Hub
 
 
 def crashing_job(foo):
     1 / 0
 
 
-def test_basic(sentry_init, capture_events, run_job):
+@pytest.mark.parametrize("worker_cls", [rq.SimpleWorker, rq.Worker])
+def test_basic(sentry_init, worker_cls):
+
     sentry_init(integrations=[RqIntegration()])
 
-    events = capture_events()
-    run_job(crashing_job, foo=42)
-    event, = events
+    events = multiprocessing.Queue()
+
+    def capture_event(event):
+        events.put_nowait(event)
+
+    Hub.current.client.transport.capture_event = capture_event
+
+    shutdown_called = multiprocessing.Queue()
+
+    def shutdown(timeout, callback=None):
+        shutdown_called.put_nowait(1)
+        callback(0, timeout)
+
+    Hub.current.client.transport.shutdown = shutdown
+
+    queue = rq.Queue(connection=FakeStrictRedis())
+    worker = worker_cls([queue], connection=queue.connection)
+
+    queue.enqueue(crashing_job, foo=42)
+    worker.work(burst=True)
+
+    event = events.get_nowait()
+    assert events.empty()
+
+    if worker_cls is rq.Worker:
+        assert shutdown_called.get_nowait() == 1
+    assert shutdown_called.empty()
 
     exception, = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
