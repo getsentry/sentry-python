@@ -1,6 +1,5 @@
 from sentry_sdk.integrations.rq import RqIntegration
 
-import pytest
 import multiprocessing
 
 from fakeredis import FakeStrictRedis
@@ -13,39 +12,17 @@ def crashing_job(foo):
     1 / 0
 
 
-@pytest.mark.parametrize("worker_cls", [rq.SimpleWorker, rq.Worker])
-def test_basic(sentry_init, worker_cls):
-
+def test_basic(sentry_init, capture_events):
     sentry_init(integrations=[RqIntegration()])
-
-    events = multiprocessing.Queue()
-
-    def capture_event(event):
-        events.put_nowait(event)
-
-    Hub.current.client.transport.capture_event = capture_event
-
-    shutdown_called = multiprocessing.Queue()
-
-    def shutdown(timeout, callback=None):
-        shutdown_called.put_nowait(1)
-        if callback is not None:
-            callback(0, timeout)
-
-    Hub.current.client.transport.shutdown = shutdown
+    events = capture_events()
 
     queue = rq.Queue(connection=FakeStrictRedis())
-    worker = worker_cls([queue], connection=queue.connection)
+    worker = rq.SimpleWorker([queue], connection=queue.connection)
 
     queue.enqueue(crashing_job, foo=42)
     worker.work(burst=True)
 
-    event = events.get_nowait()
-    assert events.empty()
-
-    if worker_cls is rq.Worker:
-        assert shutdown_called.get_nowait() == 1
-    assert shutdown_called.empty()
+    event, = events
 
     exception, = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
@@ -60,3 +37,30 @@ def test_basic(sentry_init, worker_cls):
         "job_id": event["extra"]["rq-job"]["job_id"],
         "kwargs": {"foo": 42},
     }
+
+
+def test_transport_shutdown(sentry_init):
+    sentry_init(integrations=[RqIntegration()])
+    events = multiprocessing.Queue()
+
+    def capture_event(event):
+        events.put_nowait(event)
+
+    def shutdown(timeout, callback=None):
+        events.put_nowait("shutdown")
+
+    Hub.current.client.transport.capture_event = capture_event
+    Hub.current.client.transport.shutdown = shutdown
+
+    queue = rq.Queue(connection=FakeStrictRedis())
+    worker = rq.Worker([queue], connection=queue.connection)
+
+    queue.enqueue(crashing_job, foo=42)
+    worker.work(burst=True)
+
+    event = events.get_nowait()
+    exception, = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+
+    assert events.get_nowait() == "shutdown"
+    assert events.empty()

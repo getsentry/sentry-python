@@ -27,16 +27,18 @@ class RqIntegration(Integration):
 
             with hub.push_scope() as scope:
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
-                try:
-                    return old_perform_job(self, job, *args, **kwargs)
-                finally:
-                    if self.is_horse:
-                        # We're inside of a forked process and RQ is
-                        # about to call `os._exit`. Make sure that our
-                        # events get sent out.
-                        #
-                        # Closing the client should not affect other events
-                        hub.client.close()
+                rv = old_perform_job(self, job, *args, **kwargs)
+
+            if self.is_horse:
+                # We're inside of a forked process and RQ is
+                # about to call `os._exit`. Make sure that our
+                # events get sent out.
+                #
+                # Closing the client should not affect other jobs since
+                # we're in a different process
+                hub.client.close()
+
+            return rv
 
         Worker.perform_job = sentry_patched_perform_job
 
