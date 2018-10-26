@@ -29,7 +29,8 @@ def test_basic(sentry_init, worker_cls):
 
     def shutdown(timeout, callback=None):
         shutdown_called.put_nowait(1)
-        callback(0, timeout)
+        if callback is not None:
+            callback(0, timeout)
 
     Hub.current.client.transport.shutdown = shutdown
 
