@@ -1,6 +1,7 @@
 from sentry_sdk.integrations.rq import RqIntegration
 
-import multiprocessing
+import os
+import json
 
 from fakeredis import FakeStrictRedis
 import rq
@@ -41,13 +42,17 @@ def test_basic(sentry_init, capture_events):
 
 def test_transport_shutdown(sentry_init):
     sentry_init(integrations=[RqIntegration()])
-    events = multiprocessing.Queue()
+
+    events_r, events_w = os.pipe()
+    events_r = os.fdopen(events_r, "rb", 0)
+    events_w = os.fdopen(events_w, "wb", 0)
 
     def capture_event(event):
-        events.put_nowait(event)
+        events_w.write(json.dumps(event).encode("utf-8"))
+        events_w.write(b"\n")
 
     def shutdown(timeout, callback=None):
-        events.put_nowait("shutdown")
+        events_w.write(b"shutdown\n")
 
     Hub.current.client.transport.capture_event = capture_event
     Hub.current.client.transport.shutdown = shutdown
@@ -58,9 +63,10 @@ def test_transport_shutdown(sentry_init):
     queue.enqueue(crashing_job, foo=42)
     worker.work(burst=True)
 
-    event = events.get_nowait()
+    event = events_r.readline()
+    shutdown = events_r.readline()
+    event = json.loads(event)
+    assert shutdown == b"shutdown\n"
+
     exception, = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
-
-    assert events.get_nowait() == "shutdown"
-    assert events.empty()
