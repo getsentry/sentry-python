@@ -39,6 +39,18 @@ matrix:
       name: Build documentation
       install: false
       script: make travis-upload-docs
+    - # The OS X VM doesn't have any Python support at all
+      # See https://github.com/travis-ci/travis-ci/issues/2312
+      os: osx
+      name: OS X Python 2.7
+      language: generic
+      before_install:
+        - brew install python@2
+        - python2 -m pip install --user virtualenv
+        - /Users/travis/Library/Python/2.7/bin/virtualenv $HOME/osx-py
+        - source $HOME/osx-py/bin/activate
+        - export TRAVIS_PYTHON_VERSION=2.7
+
 
 install:
   - pip install tox

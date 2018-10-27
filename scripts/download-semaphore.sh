@@ -14,7 +14,7 @@ output="$(
 echo "$output"
 
 output="$(echo "$output" \
-    | grep "Linux" \
+    | grep "$(uname -s)" \
     | grep "download" \
     | cut -d : -f 2,3 \
     | tr -d , \
