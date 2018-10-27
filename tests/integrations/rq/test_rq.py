@@ -1,33 +1,28 @@
 from sentry_sdk.integrations.rq import RqIntegration
 
-import pytest
+import os
+import json
 
 from fakeredis import FakeStrictRedis
-from rq import SimpleWorker, Queue
+import rq
 
-
-@pytest.fixture
-def run_job():
-    queue = Queue(connection=FakeStrictRedis())
-    worker = SimpleWorker([queue], connection=queue.connection)
-
-    def inner(fn, *a, **kw):
-        job = queue.enqueue(fn, *a, **kw)
-        worker.work(burst=True)
-        return job
-
-    return inner
+from sentry_sdk import Hub
 
 
 def crashing_job(foo):
     1 / 0
 
 
-def test_basic(sentry_init, capture_events, run_job):
+def test_basic(sentry_init, capture_events):
     sentry_init(integrations=[RqIntegration()])
-
     events = capture_events()
-    run_job(crashing_job, foo=42)
+
+    queue = rq.Queue(connection=FakeStrictRedis())
+    worker = rq.SimpleWorker([queue], connection=queue.connection)
+
+    queue.enqueue(crashing_job, foo=42)
+    worker.work(burst=True)
+
     event, = events
 
     exception, = event["exception"]["values"]
@@ -43,3 +38,35 @@ def test_basic(sentry_init, capture_events, run_job):
         "job_id": event["extra"]["rq-job"]["job_id"],
         "kwargs": {"foo": 42},
     }
+
+
+def test_transport_shutdown(sentry_init):
+    sentry_init(integrations=[RqIntegration()])
+
+    events_r, events_w = os.pipe()
+    events_r = os.fdopen(events_r, "rb", 0)
+    events_w = os.fdopen(events_w, "wb", 0)
+
+    def capture_event(event):
+        events_w.write(json.dumps(event).encode("utf-8"))
+        events_w.write(b"\n")
+
+    def shutdown(timeout, callback=None):
+        events_w.write(b"shutdown\n")
+
+    Hub.current.client.transport.capture_event = capture_event
+    Hub.current.client.transport.shutdown = shutdown
+
+    queue = rq.Queue(connection=FakeStrictRedis())
+    worker = rq.Worker([queue], connection=queue.connection)
+
+    queue.enqueue(crashing_job, foo=42)
+    worker.work(burst=True)
+
+    event = events_r.readline()
+    shutdown = events_r.readline()
+    event = json.loads(event.decode("utf-8"))
+    assert shutdown == b"shutdown\n"
+
+    exception, = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
