@@ -42,15 +42,14 @@ matrix:
     - # The OS X VM doesn't have any Python support at all
       # See https://github.com/travis-ci/travis-ci/issues/2312
       os: osx
-      name: OS X Python 3.7
+      name: OS X Python 2.7
       language: generic
       before_install:
-        - brew update
-        - brew upgrade python
-        - python3 -m pip install --user virtualenv
-        - /Users/travis/Library/Python/3.7/bin/virtualenv $HOME/osx-py
+        - brew install python@2
+        - python2 -m pip install --user virtualenv
+        - /Users/travis/Library/Python/2.7/bin/virtualenv $HOME/osx-py
         - source $HOME/osx-py/bin/activate
-        - export TRAVIS_PYTHON_VERSION=3.7
+        - export TRAVIS_PYTHON_VERSION=2.7
 
 
 install:
