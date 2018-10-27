@@ -65,7 +65,7 @@ def test_transport_shutdown(sentry_init):
 
     event = events_r.readline()
     shutdown = events_r.readline()
-    event = json.loads(event)
+    event = json.loads(event.decode("utf-8"))
     assert shutdown == b"shutdown\n"
 
     exception, = event["exception"]["values"]
