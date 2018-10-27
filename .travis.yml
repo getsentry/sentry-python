@@ -44,7 +44,6 @@ matrix:
       os: osx
       name: OS X Python 3.7
       language: generic
-      env: TOXENV=test
       before_install:
         - brew update
         - brew upgrade python
