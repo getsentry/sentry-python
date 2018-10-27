@@ -50,6 +50,14 @@ matrix:
         - /Users/travis/Library/Python/2.7/bin/virtualenv $HOME/osx-py
         - source $HOME/osx-py/bin/activate
         - export TRAVIS_PYTHON_VERSION=2.7
+    - os: windows
+      name: Windows Python 2.7
+      language: generic
+      before_install:
+        - python2 -m pip install --user virtualenv
+        - python2 -m virtualenv ~/windows-py
+        - source ~/windows-py/bin/activate
+        - export TRAVIS_PYTHON_VERSION=2.7
 
 
 install:
