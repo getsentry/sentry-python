@@ -1,4 +1,7 @@
 import logging
+
+import pytest
+
 from sentry_sdk import (
     Client,
     push_scope,
@@ -142,6 +145,32 @@ def test_push_scope_null_client(sentry_init, capture_events):
             capture_exception(e)
 
     assert len(events) == 0
+
+
+@pytest.mark.parametrize('null_client', (True, False))
+def test_push_scope_callback(sentry_init, null_client, capture_events):
+    sentry_init()
+
+    if null_client:
+        Hub.current.bind_client(None)
+
+    outer_scope = Hub.current._stack[-1][1]
+
+    calls = []
+
+    @push_scope
+    def _(scope):
+        assert scope is Hub.current._stack[-1][1]
+        assert scope is not outer_scope
+        calls.append(1)
+
+    # push_scope always needs to execute the callback regardless of
+    # client state, because that actually runs usercode in it, not
+    # just scope config code
+    assert calls == [1]
+
+    # Assert scope gets popped correctly
+    assert Hub.current._stack[-1][1] is outer_scope
 
 
 def test_breadcrumbs(sentry_init, capture_events):

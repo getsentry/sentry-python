@@ -271,21 +271,24 @@ class Hub(with_metaclass(HubMeta)):
         that should be used to pop the scope again.  Alternatively a callback
         can be provided that is executed in the context of the scope.
         """
+        if callback is not None:
+            with self.push_scope() as scope:
+                callback(scope)
+            return
+
         client, scope = self._stack[-1]
         new_layer = (client, copy.copy(scope))
         self._stack.append(new_layer)
 
-        if callback is not None:
-            if client is not None:
-                callback(scope)
-        else:
-            return _ScopeManager(self, new_layer)
+        return _ScopeManager(self, new_layer)
+
+    scope = push_scope
 
     def pop_scope_unsafe(self):
         """Pops a scope layer from the stack. Try to use the context manager
         `push_scope()` instead."""
         rv = self._stack.pop()
-        assert self._stack
+        assert self._stack, "stack must have at least one layer"
         return rv
 
     def configure_scope(self, callback=None):
@@ -304,16 +307,6 @@ class Hub(with_metaclass(HubMeta)):
                 yield Scope()
 
         return inner()
-
-    def scope(self, callback=None):
-        """Pushes a new scope and yields it for configuration.
-
-        The scope is dropped at the end of the with statement.  Alternatively
-        a callback can be provided similar to `configure_scope`.
-        """
-        with self.push_scope():
-            client, scope = self._stack[-1]
-            return self.configure_scope(callback)
 
 
 GLOBAL_HUB = Hub()
