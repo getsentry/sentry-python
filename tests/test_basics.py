@@ -147,7 +147,7 @@ def test_push_scope_null_client(sentry_init, capture_events):
     assert len(events) == 0
 
 
-@pytest.mark.parametrize('null_client', (True, False))
+@pytest.mark.parametrize("null_client", (True, False))
 def test_push_scope_callback(sentry_init, null_client, capture_events):
     sentry_init()
 
