@@ -5,7 +5,7 @@ from datetime import datetime
 
 from sentry_sdk._compat import string_types
 from sentry_sdk.utils import (
-    strip_event,
+    strip_event_mut,
     flatten_metadata,
     convert_types,
     handle_in_app,
@@ -129,7 +129,7 @@ class Client(object):
         # Postprocess the event in the very end so that annotated types do
         # generally not surface in before_send
         if event is not None:
-            event = strip_event(event)
+            strip_event_mut(event)
             event = flatten_metadata(event)
             event = convert_types(event)
 

@@ -556,22 +556,35 @@ def flatten_metadata(obj):
     return obj
 
 
-def strip_event(event):
-    old_frames = event.get("stacktrace", {}).get("frames", None)
-    if old_frames:
-        event["stacktrace"]["frames"] = [strip_frame(frame) for frame in old_frames]
+def strip_event_mut(event):
+    strip_stacktrace_mut(event.get("stacktrace", None))
+    exception = event.get("exception", None)
+    if exception:
+        for exception in exception.get("values", None) or ():
+            strip_stacktrace_mut(exception.get("stacktrace", None))
 
-    old_request_data = event.get("request", {}).get("data", None)
-    if old_request_data:
-        event["request"]["data"] = strip_databag(old_request_data)
-
-    return event
+    strip_request_mut(event.get("request", None))
 
 
-def strip_frame(frame):
+def strip_stacktrace_mut(stacktrace):
+    if not stacktrace:
+        return
+    for frame in stacktrace.get("frames", None) or ():
+        strip_frame_mut(frame)
+
+
+def strip_request_mut(request):
+    if not request:
+        return
+    data = request.get("data", None)
+    if not data:
+        return
+    request["data"] = strip_databag(data)
+
+
+def strip_frame_mut(frame):
     if "vars" in frame:
         frame["vars"] = strip_databag(frame["vars"])
-    return frame
 
 
 def convert_types(obj):
