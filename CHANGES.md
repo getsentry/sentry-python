@@ -1,3 +1,9 @@
+## 0.5.2
+
+* Fix bug where events sent through the RQ integration were sometimes lost.
+* Remove a deprecation warning about usage of `logger.warn`.
+* Fix bug where large frame local variables would lead to the event being rejected by Sentry.
+
 ## 0.5.1
 
 * Integration for Redis Queue (RQ)
