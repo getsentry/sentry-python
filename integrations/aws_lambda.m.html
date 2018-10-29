@@ -1094,7 +1094,7 @@ table {
         <span class="kn">import</span> <span class="nn">__main__</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">lambda_bootstrap</span><span class="p">,</span> <span class="s2">&quot;make_final_handler&quot;</span><span class="p">):</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                 <span class="s2">&quot;Not running in AWS Lambda environment, &quot;</span>
                 <span class="s2">&quot;AwsLambdaIntegration disabled&quot;</span>
             <span class="p">)</span>
@@ -1230,7 +1230,7 @@ saves those options on <code>self</code>.</p></div>
         <span class="kn">import</span> <span class="nn">__main__</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">lambda_bootstrap</span><span class="p">,</span> <span class="s2">&quot;make_final_handler&quot;</span><span class="p">):</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                 <span class="s2">&quot;Not running in AWS Lambda environment, &quot;</span>
                 <span class="s2">&quot;AwsLambdaIntegration disabled&quot;</span>
             <span class="p">)</span>
@@ -1346,7 +1346,7 @@ instance again.</p></div>
 <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
     <span class="kn">import</span> <span class="nn">__main__</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">lambda_bootstrap</span><span class="p">,</span> <span class="s2">&quot;make_final_handler&quot;</span><span class="p">):</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
             <span class="s2">&quot;Not running in AWS Lambda environment, &quot;</span>
             <span class="s2">&quot;AwsLambdaIntegration disabled&quot;</span>
         <span class="p">)</span>

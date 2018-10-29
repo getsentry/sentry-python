@@ -1563,7 +1563,7 @@ argument.</p></div>
         <span class="c1"># Postprocess the event in the very end so that annotated types do</span>
         <span class="c1"># generally not surface in before_send</span>
         <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="n">event</span> <span class="o">=</span> <span class="n">strip_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+            <span class="n">strip_event_mut</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
             <span class="n">event</span> <span class="o">=</span> <span class="n">flatten_metadata</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
             <span class="n">event</span> <span class="o">=</span> <span class="n">convert_types</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
 
