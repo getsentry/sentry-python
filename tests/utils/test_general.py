@@ -47,7 +47,7 @@ def test_abs_path():
     for frame in frames:
         assert os.path.abspath(frame["abs_path"]) == frame["abs_path"]
 
-    assert frame1["filename"] == "tests/test_utils.py"
+    assert frame1["filename"] == "tests/utils/test_general.py"
     assert frame2["filename"] == "test.py"
 
 
