@@ -25,9 +25,11 @@ class RqIntegration(Integration):
             if integration is None:
                 return old_perform_job(self, job, *args, **kwargs)
 
-            with hub.push_scope() as scope:
-                scope.add_event_processor(_make_event_processor(weakref.ref(job)))
-                rv = old_perform_job(self, job, *args, **kwargs)
+            with Hub(hub) as hub:
+                with hub.configure_scope() as scope:
+                    scope.add_event_processor(
+                        _make_event_processor(weakref.ref(job)))
+                    rv = old_perform_job(self, job, *args, **kwargs)
 
             if self.is_horse:
                 # We're inside of a forked process and RQ is
