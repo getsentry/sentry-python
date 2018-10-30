@@ -13,4 +13,4 @@
 
 # License
 
-Licensed under the MIT, see `LICENSE`
+Licensed under the BSD license, see `LICENSE`
