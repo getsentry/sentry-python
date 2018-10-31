@@ -86,8 +86,7 @@ class _ScopeManager(object):
 
     def __enter__(self):
         scope = self._layer[1]
-        if scope is None:
-            scope = Scope()
+        assert scope is not None
         return scope
 
     def __exit__(self, exc_type, exc_value, tb):
