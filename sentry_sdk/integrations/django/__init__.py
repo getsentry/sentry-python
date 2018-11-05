@@ -60,6 +60,9 @@ class DjangoIntegration(Integration):
         install_sql_hook()
         # Patch in our custom middleware.
 
+        # logs an error for every 500
+        ignore_logger("django.server")
+
         from django.core.handlers.wsgi import WSGIHandler
 
         old_app = WSGIHandler.__call__

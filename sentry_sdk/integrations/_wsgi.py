@@ -14,7 +14,11 @@ def get_environ(environ):
     """
     Returns our whitelisted environment variables.
     """
-    for key in ("REMOTE_ADDR", "SERVER_NAME", "SERVER_PORT"):
+    keys = ("SERVER_NAME", "SERVER_PORT")
+    if _should_send_default_pii():
+        keys += ("REMOTE_ADDR",)
+
+    for key in keys:
         if key in environ:
             yield key, environ[key]
 
