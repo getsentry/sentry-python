@@ -2268,21 +2268,24 @@ context vars are available.</p>
 <span class="sd">        that should be used to pop the scope again.  Alternatively a callback</span>
 <span class="sd">        can be provided that is executed in the context of the scope.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
+                <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
+            <span class="k">return</span>
+
         <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="n">new_layer</span> <span class="o">=</span> <span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">scope</span><span class="p">))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_layer</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_layer</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_layer</span><span class="p">)</span>
+
+    <span class="n">scope</span> <span class="o">=</span> <span class="n">push_scope</span>
 
     <span class="k">def</span> <span class="nf">pop_scope_unsafe</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Pops a scope layer from the stack. Try to use the context manager</span>
 <span class="sd">        `push_scope()` instead.&quot;&quot;&quot;</span>
         <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
-        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">,</span> <span class="s2">&quot;stack must have at least one layer&quot;</span>
         <span class="k">return</span> <span class="n">rv</span>
 
     <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
@@ -2301,16 +2304,6 @@ context vars are available.</p>
                 <span class="k">yield</span> <span class="n">Scope</span><span class="p">()</span>
 
         <span class="k">return</span> <span class="n">inner</span><span class="p">()</span>
-
-    <span class="k">def</span> <span class="nf">scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Pushes a new scope and yields it for configuration.</span>
-
-<span class="sd">        The scope is dropped at the end of the with statement.  Alternatively</span>
-<span class="sd">        a callback can be provided similar to `configure_scope`.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">push_scope</span><span class="p">():</span>
-            <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">configure_scope</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2670,7 +2663,7 @@ client attached.</p></div>
     <span class="sd">&quot;&quot;&quot;Pops a scope layer from the stack. Try to use the context manager</span>
 <span class="sd">    `push_scope()` instead.&quot;&quot;&quot;</span>
     <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
-    <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span>
+    <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">,</span> <span class="s2">&quot;stack must have at least one layer&quot;</span>
     <span class="k">return</span> <span class="n">rv</span>
 </pre></div>
 
@@ -2699,14 +2692,14 @@ can be provided that is executed in the context of the scope.</p></div>
 <span class="sd">    that should be used to pop the scope again.  Alternatively a callback</span>
 <span class="sd">    can be provided that is executed in the context of the scope.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
+            <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
+        <span class="k">return</span>
     <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="n">new_layer</span> <span class="o">=</span> <span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">scope</span><span class="p">))</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_layer</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_layer</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_layer</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2750,20 +2743,25 @@ with statement can be used on the hub directly.</p></div>
 
     
   
-    <div class="desc"><p>Pushes a new scope and yields it for configuration.</p>
-<p>The scope is dropped at the end of the with statement.  Alternatively
-a callback can be provided similar to <code>configure_scope</code>.</p></div>
+    <div class="desc"><p>Pushes a new layer on the scope stack. Returns a context manager
+that should be used to pop the scope again.  Alternatively a callback
+can be provided that is executed in the context of the scope.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.scope', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.scope" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Pushes a new scope and yields it for configuration.</span>
-<span class="sd">    The scope is dropped at the end of the with statement.  Alternatively</span>
-<span class="sd">    a callback can be provided similar to `configure_scope`.</span>
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Pushes a new layer on the scope stack. Returns a context manager</span>
+<span class="sd">    that should be used to pop the scope again.  Alternatively a callback</span>
+<span class="sd">    can be provided that is executed in the context of the scope.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">push_scope</span><span class="p">():</span>
-        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">configure_scope</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
+            <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
+        <span class="k">return</span>
+    <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">new_layer</span> <span class="o">=</span> <span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">scope</span><span class="p">))</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_layer</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_layer</span><span class="p">)</span>
 </pre></div>
 
   </div>
