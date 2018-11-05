@@ -1,3 +1,9 @@
+## 0.5.3
+
+* Fix bug where using `push_scope` with a callback would not pop the scope.
+* Fix crash when initializing the SDK in `push_scope`.
+* Fix bug where IP addresses were sent when `send_default_pii=False`.
+
 ## 0.5.2
 
 * Fix bug where events sent through the RQ integration were sometimes lost.
