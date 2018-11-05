@@ -90,7 +90,16 @@ class _ScopeManager(object):
         return scope
 
     def __exit__(self, exc_type, exc_value, tb):
-        assert self._hub.pop_scope_unsafe() == self._layer, "popped wrong scope"
+        layer = self._hub.pop_scope_unsafe()
+        assert layer[1] == self._layer[1], "popped wrong scope"
+        if layer[0] != self._layer[0]:
+            warning = (
+                "init() called inside of pushed scope. This might be entirely "
+                "legitimate but usually occurs when initializing the SDK inside "
+                "a request handler or task/job function. Try to initialize the "
+                "SDK as early as possible instead."
+            )
+            logger.warning(warning)
 
 
 class Hub(with_metaclass(HubMeta)):

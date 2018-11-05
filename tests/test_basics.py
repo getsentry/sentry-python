@@ -224,3 +224,16 @@ def test_integration_scoping():
     logger.warning("This is not a warning")
 
     assert len(events) == 1
+
+
+def test_client_initialized_within_scope(sentry_init, capture_events, caplog):
+    caplog.set_level(logging.WARNING)
+
+    sentry_init(debug=True)
+
+    with push_scope():
+        sentry_init()
+
+    record, = (x for x in caplog.records if x.levelname == "WARNING")
+
+    assert record.msg.startswith("init() called inside of pushed scope.")
