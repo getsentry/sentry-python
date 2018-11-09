@@ -5,7 +5,6 @@ import logging
 
 from contextlib import contextmanager
 from datetime import datetime
-from collections import Mapping, Sequence
 
 from sentry_sdk._compat import (
     urlparse,
@@ -14,13 +13,22 @@ from sentry_sdk._compat import (
     string_types,
     number_types,
     int_types,
+    PY2
 )
 
+if PY2:
+    # Importing ABCs from collections is deprecated, and will stop working in 3.8
+    # https://github.com/python/cpython/blob/master/Lib/collections/__init__.py#L49
+    from collections import Mapping, Sequence
+else:
+    # New in 3.3
+    # https://docs.python.org/3/library/collections.abc.html
+    from collections.abc import Mapping, Sequence
 
 epoch = datetime(1970, 1, 1)
 
 
-# The logger is created here but initializde in the debug support module
+# The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
 
 
