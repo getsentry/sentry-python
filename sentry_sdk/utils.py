@@ -13,7 +13,7 @@ from sentry_sdk._compat import (
     string_types,
     number_types,
     int_types,
-    PY2
+    PY2,
 )
 
 if PY2:
