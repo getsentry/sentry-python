@@ -1,3 +1,8 @@
+## 0.5.4
+
+* Fix deprecation warning in relation to the `collections` stdlib module.
+* Fix bug that would crash Django and Flask when streaming responses are failing halfway through.
+
 ## 0.5.3
 
 * Fix bug where using `push_scope` with a callback would not pop the scope.
