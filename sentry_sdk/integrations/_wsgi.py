@@ -197,7 +197,7 @@ class _ScopePoppingResponse(object):
         try:
             self._iterator = iter(self._response)
         except Exception:
-            reraise(*_capture_exception(self.hub))
+            reraise(*_capture_exception(self._hub))
         return self
 
     def __next__(self):
@@ -209,7 +209,7 @@ class _ScopePoppingResponse(object):
         except StopIteration:
             raise
         except Exception:
-            reraise(*_capture_exception(self.hub))
+            reraise(*_capture_exception(self._hub))
 
     def close(self):
         if not self._popped:
@@ -221,7 +221,7 @@ class _ScopePoppingResponse(object):
         except AttributeError:
             pass
         except Exception:
-            reraise(*_capture_exception(self.hub))
+            reraise(*_capture_exception(self._hub))
 
 
 def _make_wsgi_event_processor(environ):
