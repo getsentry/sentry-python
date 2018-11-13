@@ -3,7 +3,7 @@ import uuid
 import random
 from datetime import datetime
 
-from sentry_sdk._compat import string_types
+from sentry_sdk._compat import string_types, text_type
 from sentry_sdk.utils import (
     strip_event_mut,
     flatten_metadata,
@@ -104,8 +104,8 @@ class Client(object):
                 ]
 
         for key in "release", "environment", "server_name", "dist":
-            if event.get(key) is None:
-                event[key] = self.options[key]
+            if event.get(key) is None and self.options[key] is not None:
+                event[key] = text_type(self.options[key]).strip()
         if event.get("sdk") is None:
             sdk_info = dict(SDK_INFO)
             sdk_info["integrations"] = sorted(self.integrations.keys())
