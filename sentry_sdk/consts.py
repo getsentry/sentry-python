@@ -27,6 +27,7 @@ DEFAULT_OPTIONS = {
     "before_breadcrumb": None,
     "debug": False,
     "attach_stacktrace": False,
+    "ca_certs": None,
 }
 
 

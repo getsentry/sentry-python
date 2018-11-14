@@ -18,12 +18,16 @@ except ImportError:
     from urllib import getproxies
 
 
-def _make_pool(parsed_dsn, http_proxy, https_proxy):
+def _make_pool(parsed_dsn, http_proxy, https_proxy, ca_certs):
     proxy = https_proxy if parsed_dsn == "https" else http_proxy
     if not proxy:
         proxy = getproxies().get(parsed_dsn.scheme)
 
-    opts = {"num_pools": 2, "cert_reqs": "CERT_REQUIRED", "ca_certs": certifi.where()}
+    opts = {
+        "num_pools": 2,
+        "cert_reqs": "CERT_REQUIRED",
+        "ca_certs": ca_certs or certifi.where(),
+    }
 
     if proxy:
         return urllib3.ProxyManager(proxy, **opts)
@@ -89,6 +93,7 @@ class HttpTransport(Transport):
             self.parsed_dsn,
             http_proxy=options["http_proxy"],
             https_proxy=options["https_proxy"],
+            ca_certs=options["ca_certs"],
         )
         self._disabled_until = None
         self._retry = urllib3.util.Retry()
