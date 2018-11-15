@@ -1,3 +1,8 @@
+## 0.5.5
+
+* New client option `ca_certs`.
+* Fix crash with Django and psycopg2.
+
 ## 0.5.4
 
 * Fix deprecation warning in relation to the `collections` stdlib module.
