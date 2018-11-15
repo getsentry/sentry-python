@@ -142,6 +142,52 @@ def test_sql_queries(sentry_init, capture_events):
 
 
 @pytest.mark.django_db
+def test_sql_dict_query_params(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    from django.db import connection
+
+    sql = connection.cursor()
+
+    events = capture_events()
+    with pytest.raises(Exception):
+        # table doesn't even exist
+        sql.execute(
+            """SELECT count(*) FROM people_person WHERE foo = %(my_foo)s""",
+            {"my_foo": 10},
+        )
+
+    capture_message("HI")
+
+    event, = events
+
+    crumb, = event["breadcrumbs"]
+    assert crumb["message"] == ("SELECT count(*) FROM people_person WHERE foo = 10")
+
+
+@pytest.mark.django_db
+def test_sql_psycopg2_string_composition(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    from django.db import connection
+    from psycopg2 import sql as psycopg2_sql
+
+    sql = connection.cursor()
+
+    events = capture_events()
+    with pytest.raises(Exception):
+        # table doesn't even exist
+        sql.execute(
+            psycopg2_sql.SQL("SELECT %(my_param)s FROM people_person"), {"my_param": 10}
+        )
+
+    capture_message("HI")
+
+    event, = events
+
+    crumb, = event["breadcrumbs"]
+    assert crumb["message"] == ("SELECT 10 FROM people_person")
+
+
+@pytest.mark.django_db
 def test_sql_queries_large_params(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     from django.db import connection

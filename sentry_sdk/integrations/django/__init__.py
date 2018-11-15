@@ -8,6 +8,21 @@ from django import VERSION as DJANGO_VERSION
 from django.core import signals
 
 try:
+    import psycopg2.sql
+
+    def sql_to_string(sql):
+        if isinstance(sql, psycopg2.sql.SQL):
+            return sql.string
+        return sql
+
+
+except ImportError:
+
+    def sql_to_string(sql):
+        return sql
+
+
+try:
     from django.urls import resolve
 except ImportError:
     from django.core.urlresolvers import resolve
@@ -203,6 +218,7 @@ def format_sql(sql, params):
         # convert sql with named parameters to sql with unnamed parameters
         conv = _FormatConverter(params)
         if params:
+            sql = sql_to_string(sql)
             sql = sql % conv
             params = conv.params
         else:
