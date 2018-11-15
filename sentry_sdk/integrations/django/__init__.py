@@ -18,8 +18,6 @@ except ImportError:
     def sql_to_string(sql):
         return sql
 
-import psycopg2.sql
-
 try:
     from django.urls import resolve
 except ImportError:
