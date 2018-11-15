@@ -14,9 +14,13 @@ try:
         if isinstance(sql, psycopg2.sql.SQL):
             return sql.string
         return sql
+
+
 except ImportError:
+
     def sql_to_string(sql):
         return sql
+
 
 try:
     from django.urls import resolve
