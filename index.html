@@ -1538,8 +1538,8 @@ argument.</p></div>
                 <span class="p">]</span>
 
         <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="s2">&quot;release&quot;</span><span class="p">,</span> <span class="s2">&quot;environment&quot;</span><span class="p">,</span> <span class="s2">&quot;server_name&quot;</span><span class="p">,</span> <span class="s2">&quot;dist&quot;</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="n">event</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="n">event</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">text_type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">])</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sdk&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">sdk_info</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">SDK_INFO</span><span class="p">)</span>
             <span class="n">sdk_info</span><span class="p">[</span><span class="s2">&quot;integrations&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
@@ -1819,6 +1819,7 @@ stderr.</p></div>
             <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="p">,</span>
             <span class="n">http_proxy</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;http_proxy&quot;</span><span class="p">],</span>
             <span class="n">https_proxy</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;https_proxy&quot;</span><span class="p">],</span>
+            <span class="n">ca_certs</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;ca_certs&quot;</span><span class="p">],</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="bp">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_retry</span> <span class="o">=</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">Retry</span><span class="p">()</span>
@@ -1932,6 +1933,7 @@ stderr.</p></div>
         <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="p">,</span>
         <span class="n">http_proxy</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;http_proxy&quot;</span><span class="p">],</span>
         <span class="n">https_proxy</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;https_proxy&quot;</span><span class="p">],</span>
+        <span class="n">ca_certs</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;ca_certs&quot;</span><span class="p">],</span>
     <span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_retry</span> <span class="o">=</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">Retry</span><span class="p">()</span>
