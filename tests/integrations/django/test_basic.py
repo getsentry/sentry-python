@@ -1,3 +1,5 @@
+import platform
+
 import pytest
 
 from werkzeug.test import Client
@@ -164,6 +166,9 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     assert crumb["message"] == ("SELECT count(*) FROM people_person WHERE foo = 10")
 
 
+@pytest.mark.skipif(
+    platform.python_implementation() == "PyPy", reason="psycopg broken on pypy"
+)
 @pytest.mark.django_db
 def test_sql_psycopg2_string_composition(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
