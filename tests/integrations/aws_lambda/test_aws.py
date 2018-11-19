@@ -57,7 +57,7 @@ def lambda_client():
     )
 
 
-@pytest.fixture(params=["python3.6", "python2.7"])
+@pytest.fixture(params=["python3.6", "python3.7", "python2.7"])
 def run_lambda_function(tmpdir, lambda_client, request, assert_semaphore_acceptance):
     def inner(code, payload):
         runtime = request.param
