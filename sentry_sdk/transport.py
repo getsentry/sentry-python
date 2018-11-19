@@ -136,7 +136,7 @@ class HttpTransport(Transport):
         try:
             if response.status == 429:
                 self._disabled_until = datetime.utcnow() + timedelta(
-                    seconds=self._retry.get_retry_after(response)
+                    seconds=self._retry.get_retry_after(response) or 60
                 )
                 return
 
