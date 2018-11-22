@@ -34,6 +34,28 @@ def test_transport_option(monkeypatch):
     assert str(Client(transport=transport).dsn) == dsn
 
 
+def test_http_proxy(monkeypatch):
+    client = Client("https://foo@sentry.io/123", http_proxy="http://localhost/123")
+    assert client.transport._pool.proxy.scheme == "http"
+
+    client = Client(
+        "https://foo@sentry.io/123",
+        https_proxy="https://localhost/123",
+        http_proxy="http://localhost/123",
+    )
+    assert client.transport._pool.proxy.scheme == "https"
+
+    client = Client("http://foo@sentry.io/123", http_proxy="http://localhost/123")
+    assert client.transport._pool.proxy.scheme == "http"
+
+    client = Client(
+        "http://foo@sentry.io/123",
+        https_proxy="https://localhost/123",
+        http_proxy="http://localhost/123",
+    )
+    assert client.transport._pool.proxy.scheme == "http"
+
+
 def test_simple_transport():
     events = []
     with Hub(Client(transport=events.append)):

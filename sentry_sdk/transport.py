@@ -19,7 +19,8 @@ except ImportError:
 
 
 def _make_pool(parsed_dsn, http_proxy, https_proxy, ca_certs):
-    proxy = https_proxy if parsed_dsn == "https" else http_proxy
+    # Use http_proxy if scheme is https and https_proxy is not set
+    proxy = parsed_dsn.scheme == "https" and https_proxy or http_proxy
     if not proxy:
         proxy = getproxies().get(parsed_dsn.scheme)
 
