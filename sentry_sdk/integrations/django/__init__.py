@@ -189,6 +189,12 @@ def _set_user_info(request, event):
     if user is None or not is_authenticated(user):
         return
 
+    if "id" not in user_info:
+        try:
+            user_info["id"] = str(user.pk)
+        except Exception:
+            pass
+
     if "email" not in user_info:
         try:
             user_info["email"] = user.email

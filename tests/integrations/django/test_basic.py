@@ -93,7 +93,11 @@ def test_user_captured(sentry_init, client, capture_events):
 
     event, = events
 
-    assert event["user"] == {"email": "lennon@thebeatles.com", "username": "john"}
+    assert event["user"] == {
+        "email": "lennon@thebeatles.com",
+        "username": "john",
+        "id": "1",
+    }
 
 
 def test_404(sentry_init, client):
