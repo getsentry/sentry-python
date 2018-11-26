@@ -5,7 +5,8 @@ import weakref
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
-from sentry_sdk.integrations._wsgi import RequestExtractor, run_wsgi_app
+from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.integrations._wsgi_common import RequestExtractor
 
 try:
     import flask_login
@@ -48,8 +49,8 @@ class FlaskIntegration(Integration):
             if Hub.current.get_integration(FlaskIntegration) is None:
                 return old_app(self, environ, start_response)
 
-            return run_wsgi_app(
-                lambda *a, **kw: old_app(self, *a, **kw), environ, start_response
+            return SentryWsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))(
+                environ, start_response
             )
 
         Flask.__call__ = sentry_patched_wsgi_app

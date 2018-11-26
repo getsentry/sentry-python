@@ -3,7 +3,7 @@ import pytest
 
 from sentry_sdk import Hub
 
-from sentry_sdk.integrations._wsgi import run_wsgi_app, _ScopePoppingResponse
+from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware, _ScopePoppingResponse
 
 
 @pytest.fixture
@@ -16,9 +16,7 @@ def crashing_app():
 
 def test_basic(sentry_init, crashing_app, capture_events):
     sentry_init(send_default_pii=True)
-    app = lambda environ, start_response: run_wsgi_app(
-        crashing_app, environ, start_response
-    )
+    app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
     events = capture_events()
 
