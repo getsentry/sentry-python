@@ -1,13 +1,8 @@
 import json
-import sys
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
-from sentry_sdk.utils import (
-    AnnotatedValue,
-    capture_internal_exceptions,
-    event_from_exception,
-)
-from sentry_sdk._compat import reraise, implements_iterator, text_type
+from sentry_sdk.utils import AnnotatedValue
+from sentry_sdk._compat import text_type
 
 
 class RequestExtractor(object):
