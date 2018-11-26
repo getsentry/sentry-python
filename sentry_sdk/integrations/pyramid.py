@@ -11,7 +11,8 @@ from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk._compat import reraise
 
 from sentry_sdk.integrations import Integration
-from sentry_sdk.integrations._wsgi import RequestExtractor, run_wsgi_app
+from sentry_sdk.integrations._wsgi_common import RequestExtractor
+from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 
 
 class PyramidIntegration(Integration):
@@ -62,8 +63,8 @@ class PyramidIntegration(Integration):
             if integration is None:
                 return old_wsgi_call(self, environ, start_response)
 
-            return run_wsgi_app(
-                lambda *a, **kw: old_wsgi_call(self, *a, **kw), environ, start_response
+            return SentryWsgiMiddleware(lambda *a, **kw: old_wsgi_call(self, *a, **kw))(
+                environ, start_response
             )
 
         Router.__call__ = sentry_patched_wsgi_call

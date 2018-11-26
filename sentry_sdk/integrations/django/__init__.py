@@ -37,7 +37,8 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.integrations._wsgi import RequestExtractor, run_wsgi_app
+from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.django.transactions import (
     LEGACY_RESOLVER,
     transaction_from_function,
@@ -86,8 +87,8 @@ class DjangoIntegration(Integration):
             if Hub.current.get_integration(DjangoIntegration) is None:
                 return old_app(self, environ, start_response)
 
-            return run_wsgi_app(
-                lambda *a, **kw: old_app(self, *a, **kw), environ, start_response
+            return SentryWsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))(
+                environ, start_response
             )
 
         WSGIHandler.__call__ = sentry_patched_wsgi_handler

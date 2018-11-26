@@ -6,7 +6,7 @@ from sentry_sdk._compat import urlparse, reraise
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
-from sentry_sdk.integrations._wsgi import RequestExtractor, _filter_headers
+from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
 
 from sanic import Sanic
