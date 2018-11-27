@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 import logging
 
@@ -36,6 +38,7 @@ def test_logging_defaults(integrations, sentry_init, capture_events):
     assert event["level"] == "fatal"
     assert any(crumb["message"] == "bread" for crumb in event["breadcrumbs"])
     assert not any(crumb["message"] == "LOL" for crumb in event["breadcrumbs"])
+    assert "threads" not in event
 
 
 def test_logging_extra_data(sentry_init, capture_events):
@@ -53,3 +56,20 @@ def test_logging_extra_data(sentry_init, capture_events):
         crumb["message"] == "bread" and crumb["data"] == {"foo": 42}
         for crumb in event["breadcrumbs"]
     )
+
+
+@pytest.mark.xfail(sys.version_info[:2] == (3, 4), reason="buggy logging module")
+def test_logging_stack(sentry_init, capture_events):
+    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    events = capture_events()
+
+    logger.error("first", exc_info=True)
+    logger.error("second")
+
+    event_with, event_without, = events
+
+    assert event_with["level"] == "error"
+    assert event_with["threads"][0]["stacktrace"]["frames"]
+
+    assert event_without["level"] == "error"
+    assert "threads" not in event_without

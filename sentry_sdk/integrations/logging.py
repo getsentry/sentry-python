@@ -7,6 +7,7 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.utils import (
     to_string,
     event_from_exception,
+    current_stacktrace,
     capture_internal_exceptions,
 )
 from sentry_sdk.integrations import Integration
@@ -145,6 +146,17 @@ class EventHandler(logging.Handler, object):
                 client_options=hub.client.options,
                 mechanism={"type": "logging", "handled": True},
             )
+        elif record.exc_info and record.exc_info[0] is None:
+            event = {}
+            hint = None
+            with capture_internal_exceptions():
+                event["threads"] = [
+                    {
+                        "stacktrace": current_stacktrace(),
+                        "crashed": False,
+                        "current": True,
+                    }
+                ]
         else:
             event = {}
             hint = None
