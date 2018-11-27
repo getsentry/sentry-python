@@ -12,6 +12,46 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi import _filter_headers
 
 
+def _wrap_handler(handler):
+    def sentry_handler(event, context, *args, **kwargs):
+        hub = Hub.current
+        integration = hub.get_integration(AwsLambdaIntegration)
+        if integration is None:
+            return handler(event, context, *args, **kwargs)
+
+        with hub.push_scope() as scope:
+            with capture_internal_exceptions():
+                scope.transaction = context.function_name
+                scope.add_event_processor(_make_request_event_processor(event, context))
+
+            try:
+                return handler(event, context, *args, **kwargs)
+            except Exception:
+                exc_info = sys.exc_info()
+                event, hint = event_from_exception(
+                    exc_info,
+                    client_options=hub.client.options,
+                    mechanism={"type": "aws_lambda", "handled": False},
+                )
+                hub.capture_event(event, hint=hint)
+                reraise(*exc_info)
+
+    return sentry_handler
+
+
+def _drain_queue():
+    with capture_internal_exceptions():
+        hub = Hub.current
+        integration = hub.get_integration(AwsLambdaIntegration)
+        if integration is not None:
+            # Flush out the event queue before AWS kills the
+            # process. This is not threadsafe.
+            # make new transport with empty queue
+            new_transport = hub.client.transport.copy()
+            hub.client.close()
+            hub.client.transport = new_transport
+
+
 class AwsLambdaIntegration(Integration):
     identifier = "aws_lambda"
 
@@ -19,66 +59,62 @@ class AwsLambdaIntegration(Integration):
     def setup_once():
         import __main__ as lambda_bootstrap
 
-        if not hasattr(lambda_bootstrap, "make_final_handler"):
+        pre_37 = True  # Python 3.6 or 2.7
+
+        if not hasattr(lambda_bootstrap, "handle_http_request"):
+            try:
+                import bootstrap as lambda_bootstrap
+
+                pre_37 = False  # Python 3.7
+            except ImportError:
+                pass
+
+        if not hasattr(lambda_bootstrap, "handle_event_request"):
             logger.warning(
                 "Not running in AWS Lambda environment, "
                 "AwsLambdaIntegration disabled"
             )
             return
 
-        import runtime as lambda_runtime
+        if pre_37:
+            old_handle_event_request = lambda_bootstrap.handle_event_request
 
-        old_make_final_handler = lambda_bootstrap.make_final_handler
+            def sentry_handle_event_request(request_handler, *args, **kwargs):
+                request_handler = _wrap_handler(request_handler)
+                return old_handle_event_request(request_handler, *args, **kwargs)
 
-        def sentry_make_final_handler(*args, **kwargs):
-            handler = old_make_final_handler(*args, **kwargs)
+            lambda_bootstrap.handle_event_request = sentry_handle_event_request
 
-            def sentry_handler(event, context, *args, **kwargs):
-                hub = Hub.current
-                integration = hub.get_integration(AwsLambdaIntegration)
-                if integration is None:
-                    return handler(event, context, *args, **kwargs)
+            old_handle_http_request = lambda_bootstrap.handle_http_request
 
-                with hub.push_scope() as scope:
-                    with capture_internal_exceptions():
-                        scope.transaction = context.function_name
-                        scope.add_event_processor(
-                            _make_request_event_processor(event, context)
-                        )
+            def sentry_handle_http_request(request_handler, *args, **kwargs):
+                request_handler = _wrap_handler(request_handler)
+                return old_handle_http_request(request_handler, *args, **kwargs)
 
-                    try:
-                        return handler(event, context, *args, **kwargs)
-                    except Exception:
-                        exc_info = sys.exc_info()
-                        event, hint = event_from_exception(
-                            exc_info,
-                            client_options=hub.client.options,
-                            mechanism={"type": "aws_lambda", "handled": False},
-                        )
-                        hub.capture_event(event, hint=hint)
-                        reraise(*exc_info)
+            lambda_bootstrap.handle_http_request = sentry_handle_http_request
+        else:
+            old_handle_event_request = lambda_bootstrap.handle_event_request
 
-            return sentry_handler
+            def sentry_handle_event_request(
+                lambda_runtime_client, request_handler, *args, **kwargs
+            ):
+                request_handler = _wrap_handler(request_handler)
+                return old_handle_event_request(
+                    lambda_runtime_client, request_handler, *args, **kwargs
+                )
 
-        lambda_bootstrap.make_final_handler = sentry_make_final_handler
+            lambda_bootstrap.handle_event_request = sentry_handle_event_request
 
-        old_report_done = lambda_runtime.report_done
+        # This is the only function that is called in all Python environments
+        # at the end of the request/response lifecycle. It is the only way to
+        # do it in the Python 3.7 env.
+        old_to_json = lambda_bootstrap.to_json
 
-        def sentry_report_done(*args, **kwargs):
-            with capture_internal_exceptions():
-                hub = Hub.current
-                integration = hub.get_integration(AwsLambdaIntegration)
-                if integration is not None:
-                    # Flush out the event queue before AWS kills the
-                    # process. This is not threadsafe.
-                    # make new transport with empty queue
-                    new_transport = hub.client.transport.copy()
-                    hub.client.close()
-                    hub.client.transport = new_transport
+        def sentry_to_json(*args, **kwargs):
+            _drain_queue()
+            return old_to_json(*args, **kwargs)
 
-            return old_report_done(*args, **kwargs)
-
-        lambda_runtime.report_done = sentry_report_done
+        lambda_bootstrap.to_json = sentry_to_json
 
 
 def _make_request_event_processor(aws_event, aws_context):

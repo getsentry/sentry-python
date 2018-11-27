@@ -34,6 +34,7 @@ class TestTransport(Transport):
         # failing.
         for event in self._queue:
             print("EVENT:", json.dumps(event))
+        del self._queue[:]
 
 def init_sdk(**extra_init_args):
     sentry_sdk.init(
