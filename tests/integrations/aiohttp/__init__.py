@@ -1,3 +1,3 @@
 import pytest
 
-sanic = pytest.importorskip("aiohttp")
+aiohttp = pytest.importorskip("aiohttp")
