@@ -123,8 +123,17 @@ def _make_request_processor(weak_request):
             extractor.extract_into_event(event)
 
             request_info = event["request"]
+            urlparts = urlparse.urlsplit(request.url)
+
+            if "url" not in request_info:
+                request_info["url"] = "%s://%s%s" % (
+                    urlparts.scheme,
+                    urlparts.netloc,
+                    urlparts.path,
+                )
+
             if "query_string" not in request_info:
-                request_info["query_string"] = extractor.urlparts.query
+                request_info["query_string"] = urlparts.query
 
             if "method" not in request_info:
                 request_info["method"] = request.method
@@ -141,21 +150,10 @@ def _make_request_processor(weak_request):
 
 
 class SanicRequestExtractor(RequestExtractor):
-    def __init__(self, request):
-        RequestExtractor.__init__(self, request)
-        self.urlparts = urlparse.urlsplit(self.request.url)
-
     def content_length(self):
         if self.request.body is None:
             return 0
         return len(self.request.body)
-
-    def url(self):
-        return "%s://%s%s" % (
-            self.urlparts.scheme,
-            self.urlparts.netloc,
-            self.urlparts.path,
-        )
 
     def cookies(self):
         return dict(self.request.cookies)
