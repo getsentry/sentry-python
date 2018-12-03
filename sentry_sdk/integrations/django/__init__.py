@@ -159,9 +159,6 @@ def _got_request_exception(request=None, **kwargs):
 
 
 class DjangoRequestExtractor(RequestExtractor):
-    def url(self):
-        return self.request.build_absolute_uri(self.request.path)
-
     def env(self):
         return self.request.META
 

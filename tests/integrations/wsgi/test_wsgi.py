@@ -30,6 +30,7 @@ def test_basic(sentry_init, crashing_app, capture_events):
         "headers": {"Content-Length": "0", "Content-Type": "", "Host": "localhost"},
         "method": "GET",
         "query_string": "",
+        "url": "http://localhost/",
     }
 
 

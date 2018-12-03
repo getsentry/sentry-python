@@ -85,9 +85,6 @@ def _request_started(sender, **kwargs):
 
 
 class FlaskRequestExtractor(RequestExtractor):
-    def url(self):
-        return "%s://%s%s" % (self.request.scheme, self.request.host, self.request.path)
-
     def env(self):
         return self.request.environ
 

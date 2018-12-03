@@ -2,8 +2,49 @@ import sys
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
-from sentry_sdk._compat import reraise, implements_iterator
+from sentry_sdk._compat import PY2, reraise, implements_iterator
 from sentry_sdk.integrations._wsgi_common import _filter_headers
+
+
+if PY2:
+
+    def wsgi_decoding_dance(s, charset="utf-8", errors="replace"):
+        return s.decode(charset, errors)
+
+
+else:
+
+    def wsgi_decoding_dance(s, charset="utf-8", errors="replace"):
+        return s.encode("latin1").decode(charset, errors)
+
+
+def get_host(environ):
+    """Return the host for the given WSGI environment. Yanked from Werkzeug."""
+    if "HTTP_HOST" in environ:
+        rv = environ["HTTP_HOST"]
+        if environ["wsgi.url_scheme"] == "http" and rv.endswith(":80"):
+            rv = rv[:-3]
+        elif environ["wsgi.url_scheme"] == "https" and rv.endswith(":443"):
+            rv = rv[:-4]
+    else:
+        rv = environ["SERVER_NAME"]
+        if (environ["wsgi.url_scheme"], environ["SERVER_PORT"]) not in (
+            ("https", "443"),
+            ("http", "80"),
+        ):
+            rv += ":" + environ["SERVER_PORT"]
+
+    return rv
+
+
+def get_request_url(environ):
+    """Return the absolute URL without query string for the given WSGI
+    environment."""
+    return "%s://%s/%s" % (
+        environ.get("wsgi.url_scheme"),
+        get_host(environ),
+        wsgi_decoding_dance(environ.get("PATH_INFO") or "").lstrip("/"),
+    )
 
 
 class SentryWsgiMiddleware(object):
@@ -138,6 +179,9 @@ def _make_wsgi_event_processor(environ):
                 user_info = event.setdefault("user", {})
                 if "ip_address" not in user_info:
                     user_info["ip_address"] = get_client_ip(environ)
+
+            if "url" not in request_info:
+                request_info["url"] = get_request_url(environ)
 
             if "query_string" not in request_info:
                 request_info["query_string"] = environ.get("QUERY_STRING")

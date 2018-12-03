@@ -16,12 +16,6 @@ class RequestExtractor(object):
 
         content_length = self.content_length()
         request_info = event.setdefault("request", {})
-        try:
-            request_info["url"] = self.url()
-        except Exception:
-            # Django sometimes crashes with KeyError trying to build an
-            # absolute URL
-            pass
 
         if _should_send_default_pii():
             request_info["cookies"] = dict(self.cookies())
@@ -55,9 +49,6 @@ class RequestExtractor(object):
             return int(self.env().get("CONTENT_LENGTH", 0))
         except ValueError:
             return 0
-
-    def url(self):
-        raise NotImplementedError()
 
     def cookies(self):
         raise NotImplementedError()
