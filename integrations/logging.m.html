@@ -1173,6 +1173,7 @@ table {
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">to_string</span><span class="p">,</span>
     <span class="n">event_from_exception</span><span class="p">,</span>
+    <span class="n">current_stacktrace</span><span class="p">,</span>
     <span class="n">capture_internal_exceptions</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
@@ -1219,15 +1220,17 @@ table {
         <span class="n">old_callhandlers</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span>
 
         <span class="k">def</span> <span class="nf">sentry_patched_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-            <span class="c1"># This check is done twice, once also here before we even get</span>
-            <span class="c1"># the integration.  Otherwise we have a high chance of getting</span>
-            <span class="c1"># into a recursion error when the integration is resolved</span>
-            <span class="c1"># (this also is slower).</span>
-            <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span><span class="p">:</span>
-                <span class="n">integration</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                    <span class="n">integration</span><span class="o">.</span><span class="n">_handle_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">old_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">old_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
+            <span class="k">finally</span><span class="p">:</span>
+                <span class="c1"># This check is done twice, once also here before we even get</span>
+                <span class="c1"># the integration.  Otherwise we have a high chance of getting</span>
+                <span class="c1"># into a recursion error when the integration is resolved</span>
+                <span class="c1"># (this also is slower).</span>
+                <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span><span class="p">:</span>
+                    <span class="n">integration</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                        <span class="n">integration</span><span class="o">.</span><span class="n">_handle_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 
         <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span> <span class="o">=</span> <span class="n">sentry_patched_callhandlers</span>
 
@@ -1311,6 +1314,17 @@ table {
                 <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
                 <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;logging&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">},</span>
             <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
+            <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;stacktrace&quot;</span><span class="p">:</span> <span class="n">current_stacktrace</span><span class="p">(),</span>
+                        <span class="s2">&quot;crashed&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+                        <span class="s2">&quot;current&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span>
+                    <span class="p">}</span>
+                <span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
@@ -2045,6 +2059,17 @@ the 'raw' message as determined by record.message is logged.</p></div>
                 <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
                 <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;logging&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">},</span>
             <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
+            <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;stacktrace&quot;</span><span class="p">:</span> <span class="n">current_stacktrace</span><span class="p">(),</span>
+                        <span class="s2">&quot;crashed&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+                        <span class="s2">&quot;current&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span>
+                    <span class="p">}</span>
+                <span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
@@ -2668,15 +2693,17 @@ saves those options on <code>self</code>.</p></div>
         <span class="n">old_callhandlers</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span>
 
         <span class="k">def</span> <span class="nf">sentry_patched_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-            <span class="c1"># This check is done twice, once also here before we even get</span>
-            <span class="c1"># the integration.  Otherwise we have a high chance of getting</span>
-            <span class="c1"># into a recursion error when the integration is resolved</span>
-            <span class="c1"># (this also is slower).</span>
-            <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span><span class="p">:</span>
-                <span class="n">integration</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                    <span class="n">integration</span><span class="o">.</span><span class="n">_handle_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">old_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">old_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
+            <span class="k">finally</span><span class="p">:</span>
+                <span class="c1"># This check is done twice, once also here before we even get</span>
+                <span class="c1"># the integration.  Otherwise we have a high chance of getting</span>
+                <span class="c1"># into a recursion error when the integration is resolved</span>
+                <span class="c1"># (this also is slower).</span>
+                <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span><span class="p">:</span>
+                    <span class="n">integration</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                        <span class="n">integration</span><span class="o">.</span><span class="n">_handle_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 
         <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span> <span class="o">=</span> <span class="n">sentry_patched_callhandlers</span>
 </pre></div>
@@ -2763,15 +2790,17 @@ instance again.</p></div>
 <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
     <span class="n">old_callhandlers</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span>
     <span class="k">def</span> <span class="nf">sentry_patched_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-        <span class="c1"># This check is done twice, once also here before we even get</span>
-        <span class="c1"># the integration.  Otherwise we have a high chance of getting</span>
-        <span class="c1"># into a recursion error when the integration is resolved</span>
-        <span class="c1"># (this also is slower).</span>
-        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span><span class="p">:</span>
-            <span class="n">integration</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="n">integration</span><span class="o">.</span><span class="n">_handle_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">old_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">old_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="c1"># This check is done twice, once also here before we even get</span>
+            <span class="c1"># the integration.  Otherwise we have a high chance of getting</span>
+            <span class="c1"># into a recursion error when the integration is resolved</span>
+            <span class="c1"># (this also is slower).</span>
+            <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span><span class="p">:</span>
+                <span class="n">integration</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                    <span class="n">integration</span><span class="o">.</span><span class="n">_handle_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
     <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span> <span class="o">=</span> <span class="n">sentry_patched_callhandlers</span>
 </pre></div>
 
@@ -2817,6 +2846,17 @@ the 'raw' message as determined by record.message is logged.</p></div>
                 <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
                 <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;logging&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">},</span>
             <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
+            <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;stacktrace&quot;</span><span class="p">:</span> <span class="n">current_stacktrace</span><span class="p">(),</span>
+                        <span class="s2">&quot;crashed&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+                        <span class="s2">&quot;current&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span>
+                    <span class="p">}</span>
+                <span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>

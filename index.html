@@ -1862,7 +1862,7 @@ stderr.</p></div>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="mi">429</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span>
-                    <span class="n">seconds</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_retry</span><span class="o">.</span><span class="n">get_retry_after</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+                    <span class="n">seconds</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_retry</span><span class="o">.</span><span class="n">get_retry_after</span><span class="p">(</span><span class="n">response</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">60</span>
                 <span class="p">)</span>
                 <span class="k">return</span>
 

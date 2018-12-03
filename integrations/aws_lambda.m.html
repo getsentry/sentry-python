@@ -1083,7 +1083,47 @@ table {
     <span class="n">logger</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.integrations._wsgi</span> <span class="kn">import</span> <span class="n">_filter_headers</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.integrations._wsgi_common</span> <span class="kn">import</span> <span class="n">_filter_headers</span>
+
+
+<span class="k">def</span> <span class="nf">_wrap_handler</span><span class="p">(</span><span class="n">handler</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">sentry_handler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+        <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AwsLambdaIntegration</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">handler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">hub</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+                <span class="n">scope</span><span class="o">.</span><span class="n">transaction</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">function_name</span>
+                <span class="n">scope</span><span class="o">.</span><span class="n">add_event_processor</span><span class="p">(</span><span class="n">_make_request_event_processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">))</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">handler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">exc_info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
+                <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
+                    <span class="n">exc_info</span><span class="p">,</span>
+                    <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
+                    <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;aws_lambda&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">},</span>
+                <span class="p">)</span>
+                <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
+                <span class="n">reraise</span><span class="p">(</span><span class="o">*</span><span class="n">exc_info</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sentry_handler</span>
+
+
+<span class="k">def</span> <span class="nf">_drain_queue</span><span class="p">():</span>
+    <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+        <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AwsLambdaIntegration</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="c1"># Flush out the event queue before AWS kills the</span>
+            <span class="c1"># process. This is not threadsafe.</span>
+            <span class="c1"># make new transport with empty queue</span>
+            <span class="n">new_transport</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="n">new_transport</span>
 
 
 <span class="k">class</span> <span class="nc">AwsLambdaIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
@@ -1093,66 +1133,62 @@ table {
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
         <span class="kn">import</span> <span class="nn">__main__</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>
 
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">lambda_bootstrap</span><span class="p">,</span> <span class="s2">&quot;make_final_handler&quot;</span><span class="p">):</span>
+        <span class="n">pre_37</span> <span class="o">=</span> <span class="bp">True</span>  <span class="c1"># Python 3.6 or 2.7</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">lambda_bootstrap</span><span class="p">,</span> <span class="s2">&quot;handle_http_request&quot;</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="kn">import</span> <span class="nn">bootstrap</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>
+
+                <span class="n">pre_37</span> <span class="o">=</span> <span class="bp">False</span>  <span class="c1"># Python 3.7</span>
+            <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+                <span class="k">pass</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">lambda_bootstrap</span><span class="p">,</span> <span class="s2">&quot;handle_event_request&quot;</span><span class="p">):</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                 <span class="s2">&quot;Not running in AWS Lambda environment, &quot;</span>
                 <span class="s2">&quot;AwsLambdaIntegration disabled&quot;</span>
             <span class="p">)</span>
             <span class="k">return</span>
 
-        <span class="kn">import</span> <span class="nn">runtime</span> <span class="kn">as</span> <span class="nn">lambda_runtime</span>
+        <span class="k">if</span> <span class="n">pre_37</span><span class="p">:</span>
+            <span class="n">old_handle_event_request</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span>
 
-        <span class="n">old_make_final_handler</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">make_final_handler</span>
+            <span class="k">def</span> <span class="nf">sentry_handle_event_request</span><span class="p">(</span><span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                <span class="n">request_handler</span> <span class="o">=</span> <span class="n">_wrap_handler</span><span class="p">(</span><span class="n">request_handler</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">old_handle_event_request</span><span class="p">(</span><span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-        <span class="k">def</span> <span class="nf">sentry_make_final_handler</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-            <span class="n">handler</span> <span class="o">=</span> <span class="n">old_make_final_handler</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span> <span class="o">=</span> <span class="n">sentry_handle_event_request</span>
 
-            <span class="k">def</span> <span class="nf">sentry_handler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-                <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-                <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AwsLambdaIntegration</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-                    <span class="k">return</span> <span class="n">handler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="n">old_handle_http_request</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_http_request</span>
 
-                <span class="k">with</span> <span class="n">hub</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
-                    <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-                        <span class="n">scope</span><span class="o">.</span><span class="n">transaction</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">function_name</span>
-                        <span class="n">scope</span><span class="o">.</span><span class="n">add_event_processor</span><span class="p">(</span>
-                            <span class="n">_make_request_event_processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
-                        <span class="p">)</span>
+            <span class="k">def</span> <span class="nf">sentry_handle_http_request</span><span class="p">(</span><span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                <span class="n">request_handler</span> <span class="o">=</span> <span class="n">_wrap_handler</span><span class="p">(</span><span class="n">request_handler</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">old_handle_http_request</span><span class="p">(</span><span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-                    <span class="k">try</span><span class="p">:</span>
-                        <span class="k">return</span> <span class="n">handler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-                    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-                        <span class="n">exc_info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
-                        <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
-                            <span class="n">exc_info</span><span class="p">,</span>
-                            <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
-                            <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;aws_lambda&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">},</span>
-                        <span class="p">)</span>
-                        <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
-                        <span class="n">reraise</span><span class="p">(</span><span class="o">*</span><span class="n">exc_info</span><span class="p">)</span>
+            <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_http_request</span> <span class="o">=</span> <span class="n">sentry_handle_http_request</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">old_handle_event_request</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span>
 
-            <span class="k">return</span> <span class="n">sentry_handler</span>
+            <span class="k">def</span> <span class="nf">sentry_handle_event_request</span><span class="p">(</span>
+                <span class="n">lambda_runtime_client</span><span class="p">,</span> <span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+            <span class="p">):</span>
+                <span class="n">request_handler</span> <span class="o">=</span> <span class="n">_wrap_handler</span><span class="p">(</span><span class="n">request_handler</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">old_handle_event_request</span><span class="p">(</span>
+                    <span class="n">lambda_runtime_client</span><span class="p">,</span> <span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+                <span class="p">)</span>
 
-        <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">make_final_handler</span> <span class="o">=</span> <span class="n">sentry_make_final_handler</span>
+            <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span> <span class="o">=</span> <span class="n">sentry_handle_event_request</span>
 
-        <span class="n">old_report_done</span> <span class="o">=</span> <span class="n">lambda_runtime</span><span class="o">.</span><span class="n">report_done</span>
+        <span class="c1"># This is the only function that is called in all Python environments</span>
+        <span class="c1"># at the end of the request/response lifecycle. It is the only way to</span>
+        <span class="c1"># do it in the Python 3.7 env.</span>
+        <span class="n">old_to_json</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span>
 
-        <span class="k">def</span> <span class="nf">sentry_report_done</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-            <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-                <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-                <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AwsLambdaIntegration</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                    <span class="c1"># Flush out the event queue before AWS kills the</span>
-                    <span class="c1"># process. This is not threadsafe.</span>
-                    <span class="c1"># make new transport with empty queue</span>
-                    <span class="n">new_transport</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-                    <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-                    <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="n">new_transport</span>
+        <span class="k">def</span> <span class="nf">sentry_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="n">_drain_queue</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">old_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-            <span class="k">return</span> <span class="n">old_report_done</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-
-        <span class="n">lambda_runtime</span><span class="o">.</span><span class="n">report_done</span> <span class="o">=</span> <span class="n">sentry_report_done</span>
+        <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span> <span class="o">=</span> <span class="n">sentry_to_json</span>
 
 
 <span class="k">def</span> <span class="nf">_make_request_event_processor</span><span class="p">(</span><span class="n">aws_event</span><span class="p">,</span> <span class="n">aws_context</span><span class="p">):</span>
@@ -1229,66 +1265,62 @@ saves those options on <code>self</code>.</p></div>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
         <span class="kn">import</span> <span class="nn">__main__</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>
 
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">lambda_bootstrap</span><span class="p">,</span> <span class="s2">&quot;make_final_handler&quot;</span><span class="p">):</span>
+        <span class="n">pre_37</span> <span class="o">=</span> <span class="bp">True</span>  <span class="c1"># Python 3.6 or 2.7</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">lambda_bootstrap</span><span class="p">,</span> <span class="s2">&quot;handle_http_request&quot;</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="kn">import</span> <span class="nn">bootstrap</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>
+
+                <span class="n">pre_37</span> <span class="o">=</span> <span class="bp">False</span>  <span class="c1"># Python 3.7</span>
+            <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+                <span class="k">pass</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">lambda_bootstrap</span><span class="p">,</span> <span class="s2">&quot;handle_event_request&quot;</span><span class="p">):</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                 <span class="s2">&quot;Not running in AWS Lambda environment, &quot;</span>
                 <span class="s2">&quot;AwsLambdaIntegration disabled&quot;</span>
             <span class="p">)</span>
             <span class="k">return</span>
 
-        <span class="kn">import</span> <span class="nn">runtime</span> <span class="kn">as</span> <span class="nn">lambda_runtime</span>
+        <span class="k">if</span> <span class="n">pre_37</span><span class="p">:</span>
+            <span class="n">old_handle_event_request</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span>
 
-        <span class="n">old_make_final_handler</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">make_final_handler</span>
+            <span class="k">def</span> <span class="nf">sentry_handle_event_request</span><span class="p">(</span><span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                <span class="n">request_handler</span> <span class="o">=</span> <span class="n">_wrap_handler</span><span class="p">(</span><span class="n">request_handler</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">old_handle_event_request</span><span class="p">(</span><span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-        <span class="k">def</span> <span class="nf">sentry_make_final_handler</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-            <span class="n">handler</span> <span class="o">=</span> <span class="n">old_make_final_handler</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span> <span class="o">=</span> <span class="n">sentry_handle_event_request</span>
 
-            <span class="k">def</span> <span class="nf">sentry_handler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-                <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-                <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AwsLambdaIntegration</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-                    <span class="k">return</span> <span class="n">handler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="n">old_handle_http_request</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_http_request</span>
 
-                <span class="k">with</span> <span class="n">hub</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
-                    <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-                        <span class="n">scope</span><span class="o">.</span><span class="n">transaction</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">function_name</span>
-                        <span class="n">scope</span><span class="o">.</span><span class="n">add_event_processor</span><span class="p">(</span>
-                            <span class="n">_make_request_event_processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
-                        <span class="p">)</span>
+            <span class="k">def</span> <span class="nf">sentry_handle_http_request</span><span class="p">(</span><span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                <span class="n">request_handler</span> <span class="o">=</span> <span class="n">_wrap_handler</span><span class="p">(</span><span class="n">request_handler</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">old_handle_http_request</span><span class="p">(</span><span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-                    <span class="k">try</span><span class="p">:</span>
-                        <span class="k">return</span> <span class="n">handler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-                    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-                        <span class="n">exc_info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
-                        <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
-                            <span class="n">exc_info</span><span class="p">,</span>
-                            <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
-                            <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;aws_lambda&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">},</span>
-                        <span class="p">)</span>
-                        <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
-                        <span class="n">reraise</span><span class="p">(</span><span class="o">*</span><span class="n">exc_info</span><span class="p">)</span>
+            <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_http_request</span> <span class="o">=</span> <span class="n">sentry_handle_http_request</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">old_handle_event_request</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span>
 
-            <span class="k">return</span> <span class="n">sentry_handler</span>
+            <span class="k">def</span> <span class="nf">sentry_handle_event_request</span><span class="p">(</span>
+                <span class="n">lambda_runtime_client</span><span class="p">,</span> <span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+            <span class="p">):</span>
+                <span class="n">request_handler</span> <span class="o">=</span> <span class="n">_wrap_handler</span><span class="p">(</span><span class="n">request_handler</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">old_handle_event_request</span><span class="p">(</span>
+                    <span class="n">lambda_runtime_client</span><span class="p">,</span> <span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+                <span class="p">)</span>
 
-        <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">make_final_handler</span> <span class="o">=</span> <span class="n">sentry_make_final_handler</span>
+            <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span> <span class="o">=</span> <span class="n">sentry_handle_event_request</span>
 
-        <span class="n">old_report_done</span> <span class="o">=</span> <span class="n">lambda_runtime</span><span class="o">.</span><span class="n">report_done</span>
+        <span class="c1"># This is the only function that is called in all Python environments</span>
+        <span class="c1"># at the end of the request/response lifecycle. It is the only way to</span>
+        <span class="c1"># do it in the Python 3.7 env.</span>
+        <span class="n">old_to_json</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span>
 
-        <span class="k">def</span> <span class="nf">sentry_report_done</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-            <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-                <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-                <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AwsLambdaIntegration</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                    <span class="c1"># Flush out the event queue before AWS kills the</span>
-                    <span class="c1"># process. This is not threadsafe.</span>
-                    <span class="c1"># make new transport with empty queue</span>
-                    <span class="n">new_transport</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-                    <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-                    <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="n">new_transport</span>
+        <span class="k">def</span> <span class="nf">sentry_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="n">_drain_queue</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">old_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-            <span class="k">return</span> <span class="n">old_report_done</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-
-        <span class="n">lambda_runtime</span><span class="o">.</span><span class="n">report_done</span> <span class="o">=</span> <span class="n">sentry_report_done</span>
+        <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span> <span class="o">=</span> <span class="n">sentry_to_json</span>
 </pre></div>
 
   </div>
@@ -1345,54 +1377,48 @@ instance again.</p></div>
     <div class="codehilite"><pre><span></span><span class="nd">@staticmethod</span>
 <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
     <span class="kn">import</span> <span class="nn">__main__</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">lambda_bootstrap</span><span class="p">,</span> <span class="s2">&quot;make_final_handler&quot;</span><span class="p">):</span>
+    <span class="n">pre_37</span> <span class="o">=</span> <span class="bp">True</span>  <span class="c1"># Python 3.6 or 2.7</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">lambda_bootstrap</span><span class="p">,</span> <span class="s2">&quot;handle_http_request&quot;</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">import</span> <span class="nn">bootstrap</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>
+            <span class="n">pre_37</span> <span class="o">=</span> <span class="bp">False</span>  <span class="c1"># Python 3.7</span>
+        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+            <span class="k">pass</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">lambda_bootstrap</span><span class="p">,</span> <span class="s2">&quot;handle_event_request&quot;</span><span class="p">):</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
             <span class="s2">&quot;Not running in AWS Lambda environment, &quot;</span>
             <span class="s2">&quot;AwsLambdaIntegration disabled&quot;</span>
         <span class="p">)</span>
         <span class="k">return</span>
-    <span class="kn">import</span> <span class="nn">runtime</span> <span class="kn">as</span> <span class="nn">lambda_runtime</span>
-    <span class="n">old_make_final_handler</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">make_final_handler</span>
-    <span class="k">def</span> <span class="nf">sentry_make_final_handler</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="n">handler</span> <span class="o">=</span> <span class="n">old_make_final_handler</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="k">def</span> <span class="nf">sentry_handler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-            <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-            <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AwsLambdaIntegration</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="k">return</span> <span class="n">handler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-            <span class="k">with</span> <span class="n">hub</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
-                <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-                    <span class="n">scope</span><span class="o">.</span><span class="n">transaction</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">function_name</span>
-                    <span class="n">scope</span><span class="o">.</span><span class="n">add_event_processor</span><span class="p">(</span>
-                        <span class="n">_make_request_event_processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
-                    <span class="p">)</span>
-                <span class="k">try</span><span class="p">:</span>
-                    <span class="k">return</span> <span class="n">handler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-                    <span class="n">exc_info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
-                    <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
-                        <span class="n">exc_info</span><span class="p">,</span>
-                        <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
-                        <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;aws_lambda&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">},</span>
-                    <span class="p">)</span>
-                    <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
-                    <span class="n">reraise</span><span class="p">(</span><span class="o">*</span><span class="n">exc_info</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">sentry_handler</span>
-    <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">make_final_handler</span> <span class="o">=</span> <span class="n">sentry_make_final_handler</span>
-    <span class="n">old_report_done</span> <span class="o">=</span> <span class="n">lambda_runtime</span><span class="o">.</span><span class="n">report_done</span>
-    <span class="k">def</span> <span class="nf">sentry_report_done</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-            <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-            <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AwsLambdaIntegration</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="c1"># Flush out the event queue before AWS kills the</span>
-                <span class="c1"># process. This is not threadsafe.</span>
-                <span class="c1"># make new transport with empty queue</span>
-                <span class="n">new_transport</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-                <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-                <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="n">new_transport</span>
-        <span class="k">return</span> <span class="n">old_report_done</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-    <span class="n">lambda_runtime</span><span class="o">.</span><span class="n">report_done</span> <span class="o">=</span> <span class="n">sentry_report_done</span>
+    <span class="k">if</span> <span class="n">pre_37</span><span class="p">:</span>
+        <span class="n">old_handle_event_request</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span>
+        <span class="k">def</span> <span class="nf">sentry_handle_event_request</span><span class="p">(</span><span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="n">request_handler</span> <span class="o">=</span> <span class="n">_wrap_handler</span><span class="p">(</span><span class="n">request_handler</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">old_handle_event_request</span><span class="p">(</span><span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span> <span class="o">=</span> <span class="n">sentry_handle_event_request</span>
+        <span class="n">old_handle_http_request</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_http_request</span>
+        <span class="k">def</span> <span class="nf">sentry_handle_http_request</span><span class="p">(</span><span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="n">request_handler</span> <span class="o">=</span> <span class="n">_wrap_handler</span><span class="p">(</span><span class="n">request_handler</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">old_handle_http_request</span><span class="p">(</span><span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_http_request</span> <span class="o">=</span> <span class="n">sentry_handle_http_request</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">old_handle_event_request</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span>
+        <span class="k">def</span> <span class="nf">sentry_handle_event_request</span><span class="p">(</span>
+            <span class="n">lambda_runtime_client</span><span class="p">,</span> <span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+        <span class="p">):</span>
+            <span class="n">request_handler</span> <span class="o">=</span> <span class="n">_wrap_handler</span><span class="p">(</span><span class="n">request_handler</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">old_handle_event_request</span><span class="p">(</span>
+                <span class="n">lambda_runtime_client</span><span class="p">,</span> <span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+            <span class="p">)</span>
+        <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span> <span class="o">=</span> <span class="n">sentry_handle_event_request</span>
+    <span class="c1"># This is the only function that is called in all Python environments</span>
+    <span class="c1"># at the end of the request/response lifecycle. It is the only way to</span>
+    <span class="c1"># do it in the Python 3.7 env.</span>
+    <span class="n">old_to_json</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span>
+    <span class="k">def</span> <span class="nf">sentry_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">_drain_queue</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">old_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span> <span class="o">=</span> <span class="n">sentry_to_json</span>
 </pre></div>
 
   </div>
