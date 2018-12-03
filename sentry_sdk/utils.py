@@ -604,6 +604,8 @@ def convert_types(obj):
         return [convert_types(v) for v in obj]
     if not isinstance(obj, string_types + number_types):
         return safe_repr(obj)
+    if isinstance(obj, bytes):
+        return obj.decode("utf-8", "replace")
     return obj
 
 

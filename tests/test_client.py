@@ -1,4 +1,5 @@
 # coding: utf-8
+import json
 import logging
 import pytest
 import subprocess
@@ -281,3 +282,11 @@ def test_scope_initialized_before_client(sentry_init, capture_events):
     event, = events
 
     assert "tags" not in event
+
+
+def test_weird_chars(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+    capture_message(u"föö".encode("latin1"))
+    event, = events
+    assert json.loads(json.dumps(event)) == event
