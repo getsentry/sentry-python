@@ -1,3 +1,13 @@
+## 0.6.0
+
+* Fix bug where a 429 without Retry-After would not be honored.
+* Fix bug where proxy setting would not fall back to `http_proxy` for HTTPs traffic.
+* A WSGI middleware is now available for catching errors and adding context about the current request to them.
+* Using `logging.debug("test", exc_info=True)` will now attach the current stacktrace if no `sys.exc_info` is available.
+* The Python 3.7 runtime for AWS Lambda is now supported.
+* Fix a bug that would drop an event or parts of it when it contained bytes that were not UTF-8 encoded.
+* Logging an exception will no longer add the exception as breadcrumb to the exception's own event.
+
 ## 0.5.5
 
 * New client option `ca_certs`.
