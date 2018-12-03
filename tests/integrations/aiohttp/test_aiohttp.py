@@ -33,7 +33,7 @@ async def test_basic(sentry_init, aiohttp_client, loop, capture_events):
         "Accept": "*/*",
         "Accept-Encoding": "gzip, deflate",
         "Host": host,
-        "User-Agent": "Python/3.7 aiohttp/3.4.4",
+        "User-Agent": request["headers"]["User-Agent"],
     }
 
 
