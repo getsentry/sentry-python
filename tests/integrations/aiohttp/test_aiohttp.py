@@ -35,3 +35,21 @@ async def test_basic(sentry_init, aiohttp_client, loop, capture_events):
         "Host": host,
         "User-Agent": "Python/3.7 aiohttp/3.4.4",
     }
+
+
+async def test_403_not_captured(sentry_init, aiohttp_client, loop, capture_events):
+    sentry_init(integrations=[AioHttpIntegration()])
+
+    async def hello(request):
+        raise web.HTTPForbidden()
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/")
+    assert resp.status == 403
+
+    assert not events
