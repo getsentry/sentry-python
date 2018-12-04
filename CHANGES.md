@@ -1,3 +1,8 @@
+## 0.6.1
+
+* New integration for aiohttp-server.
+* Fix crash when reading hostname in broken WSGI environments.
+
 ## 0.6.0
 
 * Fix bug where a 429 without Retry-After would not be honored.
