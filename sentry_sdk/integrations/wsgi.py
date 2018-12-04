@@ -20,19 +20,22 @@ else:
 
 def get_host(environ):
     """Return the host for the given WSGI environment. Yanked from Werkzeug."""
-    if "HTTP_HOST" in environ:
+    if environ.get("HTTP_HOST"):
         rv = environ["HTTP_HOST"]
         if environ["wsgi.url_scheme"] == "http" and rv.endswith(":80"):
             rv = rv[:-3]
         elif environ["wsgi.url_scheme"] == "https" and rv.endswith(":443"):
             rv = rv[:-4]
-    else:
+    elif environ.get("SERVER_NAME"):
         rv = environ["SERVER_NAME"]
         if (environ["wsgi.url_scheme"], environ["SERVER_PORT"]) not in (
             ("https", "443"),
             ("http", "80"),
         ):
             rv += ":" + environ["SERVER_PORT"]
+    else:
+        # In spite of the WSGI spec, SERVER_NAME might not be present.
+        rv = "unknown"
 
     return rv
 
