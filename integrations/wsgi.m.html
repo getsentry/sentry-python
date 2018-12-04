@@ -1111,19 +1111,22 @@ table {
 
 <span class="k">def</span> <span class="nf">get_host</span><span class="p">(</span><span class="n">environ</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Return the host for the given WSGI environment. Yanked from Werkzeug.&quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="s2">&quot;HTTP_HOST&quot;</span> <span class="ow">in</span> <span class="n">environ</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;HTTP_HOST&quot;</span><span class="p">):</span>
         <span class="n">rv</span> <span class="o">=</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;HTTP_HOST&quot;</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;wsgi.url_scheme&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;http&quot;</span> <span class="ow">and</span> <span class="n">rv</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;:80&quot;</span><span class="p">):</span>
             <span class="n">rv</span> <span class="o">=</span> <span class="n">rv</span><span class="p">[:</span><span class="o">-</span><span class="mi">3</span><span class="p">]</span>
         <span class="k">elif</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;wsgi.url_scheme&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;https&quot;</span> <span class="ow">and</span> <span class="n">rv</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;:443&quot;</span><span class="p">):</span>
             <span class="n">rv</span> <span class="o">=</span> <span class="n">rv</span><span class="p">[:</span><span class="o">-</span><span class="mi">4</span><span class="p">]</span>
-    <span class="k">else</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;SERVER_NAME&quot;</span><span class="p">):</span>
         <span class="n">rv</span> <span class="o">=</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;SERVER_NAME&quot;</span><span class="p">]</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;wsgi.url_scheme&quot;</span><span class="p">],</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;SERVER_PORT&quot;</span><span class="p">])</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span>
             <span class="p">(</span><span class="s2">&quot;https&quot;</span><span class="p">,</span> <span class="s2">&quot;443&quot;</span><span class="p">),</span>
             <span class="p">(</span><span class="s2">&quot;http&quot;</span><span class="p">,</span> <span class="s2">&quot;80&quot;</span><span class="p">),</span>
         <span class="p">):</span>
             <span class="n">rv</span> <span class="o">+=</span> <span class="s2">&quot;:&quot;</span> <span class="o">+</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;SERVER_PORT&quot;</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># In spite of the WSGI spec, SERVER_NAME might not be present.</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
 
     <span class="k">return</span> <span class="n">rv</span>
 
@@ -1357,19 +1360,22 @@ value may be forged from a client.</p></div>
   <div id="source-sentry_sdk.integrations.wsgi.get_host" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">get_host</span><span class="p">(</span><span class="n">environ</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Return the host for the given WSGI environment. Yanked from Werkzeug.&quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="s2">&quot;HTTP_HOST&quot;</span> <span class="ow">in</span> <span class="n">environ</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;HTTP_HOST&quot;</span><span class="p">):</span>
         <span class="n">rv</span> <span class="o">=</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;HTTP_HOST&quot;</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;wsgi.url_scheme&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;http&quot;</span> <span class="ow">and</span> <span class="n">rv</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;:80&quot;</span><span class="p">):</span>
             <span class="n">rv</span> <span class="o">=</span> <span class="n">rv</span><span class="p">[:</span><span class="o">-</span><span class="mi">3</span><span class="p">]</span>
         <span class="k">elif</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;wsgi.url_scheme&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;https&quot;</span> <span class="ow">and</span> <span class="n">rv</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;:443&quot;</span><span class="p">):</span>
             <span class="n">rv</span> <span class="o">=</span> <span class="n">rv</span><span class="p">[:</span><span class="o">-</span><span class="mi">4</span><span class="p">]</span>
-    <span class="k">else</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;SERVER_NAME&quot;</span><span class="p">):</span>
         <span class="n">rv</span> <span class="o">=</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;SERVER_NAME&quot;</span><span class="p">]</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;wsgi.url_scheme&quot;</span><span class="p">],</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;SERVER_PORT&quot;</span><span class="p">])</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span>
             <span class="p">(</span><span class="s2">&quot;https&quot;</span><span class="p">,</span> <span class="s2">&quot;443&quot;</span><span class="p">),</span>
             <span class="p">(</span><span class="s2">&quot;http&quot;</span><span class="p">,</span> <span class="s2">&quot;80&quot;</span><span class="p">),</span>
         <span class="p">):</span>
             <span class="n">rv</span> <span class="o">+=</span> <span class="s2">&quot;:&quot;</span> <span class="o">+</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;SERVER_PORT&quot;</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># In spite of the WSGI spec, SERVER_NAME might not be present.</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
 
     <span class="k">return</span> <span class="n">rv</span>
 </pre></div>
