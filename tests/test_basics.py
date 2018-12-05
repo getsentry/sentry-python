@@ -253,7 +253,7 @@ def test_scope_leaks_cleaned_up(sentry_init, caplog):
 
     record, = (x for x in caplog.records if x.levelname == "WARNING")
 
-    assert record.message == "Leaked 1 scopes."
+    assert record.message.startswith("Leaked 1 scopes:")
 
 
 def test_scope_popped_too_soon(sentry_init, caplog):

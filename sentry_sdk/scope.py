@@ -38,8 +38,8 @@ class Scope(object):
     def __init__(self):
         self._event_processors = []
         self._error_processors = []
-        self._name = None
 
+        self._name = None
         self.clear()
 
     @_attr_setter
@@ -176,6 +176,7 @@ class Scope(object):
         rv = object.__new__(self.__class__)
 
         rv._level = self._level
+        rv._name = self._name
         rv._fingerprint = self._fingerprint
         rv._transaction = self._transaction
         rv._user = self._user
