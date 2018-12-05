@@ -62,6 +62,8 @@ def _push_appctx(*args, **kwargs):
         # always want to push scope regardless of whether WSGI app might already
         # have (not the case for CLI for example)
         hub.push_scope()
+        with hub.configure_scope() as scope:
+            scope._name = "flask"
 
 
 def _pop_appctx(*args, **kwargs):

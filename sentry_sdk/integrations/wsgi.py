@@ -61,6 +61,7 @@ class SentryWsgiMiddleware(object):
         hub.push_scope()
         with capture_internal_exceptions():
             with hub.configure_scope() as scope:
+                scope._name = "wsgi"
                 scope.add_event_processor(_make_wsgi_event_processor(environ))
 
         try:

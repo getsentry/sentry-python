@@ -99,7 +99,11 @@ class _ScopeManager(object):
             )
             return
         elif current_len > self._original_len:
-            logger.warning("Leaked %s scopes.", current_len - self._original_len)
+            logger.warning(
+                "Leaked %s scopes: %s",
+                current_len - self._original_len,
+                self._hub._stack[self._original_len :],
+            )
 
         layer = self._hub._stack[self._original_len - 1]
         del self._hub._stack[self._original_len - 1 :]

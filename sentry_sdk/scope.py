@@ -23,6 +23,7 @@ class Scope(object):
 
     __slots__ = (
         "_level",
+        "_name",
         "_fingerprint",
         "_transaction",
         "_user",
@@ -37,6 +38,7 @@ class Scope(object):
     def __init__(self):
         self._event_processors = []
         self._error_processors = []
+        self._name = None
 
         self.clear()
 
@@ -187,3 +189,10 @@ class Scope(object):
         rv._error_processors = list(self._error_processors)
 
         return rv
+
+    def __repr__(self):
+        return "<%s id=%s name=%s>" % (
+            self.__class__.__name__,
+            hex(id(self)),
+            self._name,
+        )
