@@ -2279,7 +2279,7 @@ context vars are available.</p>
         <span class="n">new_layer</span> <span class="o">=</span> <span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">scope</span><span class="p">))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_layer</span><span class="p">)</span>
 
-        <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_layer</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 
     <span class="n">scope</span> <span class="o">=</span> <span class="n">push_scope</span>
 
@@ -2701,7 +2701,7 @@ can be provided that is executed in the context of the scope.</p></div>
     <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="n">new_layer</span> <span class="o">=</span> <span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">scope</span><span class="p">))</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_layer</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_layer</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2763,7 +2763,7 @@ can be provided that is executed in the context of the scope.</p></div>
     <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="n">new_layer</span> <span class="o">=</span> <span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">scope</span><span class="p">))</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_layer</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_layer</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2802,6 +2802,7 @@ events that belong to it.</p></div>
 
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span>
         <span class="s2">&quot;_level&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;_name&quot;</span><span class="p">,</span>
         <span class="s2">&quot;_fingerprint&quot;</span><span class="p">,</span>
         <span class="s2">&quot;_transaction&quot;</span><span class="p">,</span>
         <span class="s2">&quot;_user&quot;</span><span class="p">,</span>
@@ -2817,6 +2818,7 @@ events that belong to it.</p></div>
         <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span> <span class="o">=</span> <span class="p">[]</span>
 
+        <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
 
     <span class="nd">@_attr_setter</span>
@@ -2953,6 +2955,7 @@ events that belong to it.</p></div>
         <span class="n">rv</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">)</span>
 
         <span class="n">rv</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span>
+        <span class="n">rv</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span>
         <span class="n">rv</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span>
         <span class="n">rv</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span>
         <span class="n">rv</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span>
@@ -2966,6 +2969,13 @@ events that belong to it.</p></div>
         <span class="n">rv</span><span class="o">.</span><span class="n">_error_processors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">rv</span>
+
+    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;&lt;</span><span class="si">%s</span><span class="s2"> id=</span><span class="si">%s</span><span class="s2"> name=</span><span class="si">%s</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+            <span class="nb">hex</span><span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="p">)),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
+        <span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2995,6 +3005,7 @@ events that belong to it.</p></div>
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
 </pre></div>
 
