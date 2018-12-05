@@ -80,9 +80,10 @@ class _HubManager(object):
 
 
 class _ScopeManager(object):
-    def __init__(self, hub, layer):
+    def __init__(self, hub):
         self._hub = hub
-        self._layer = layer
+        self._original_len = len(hub._stack)
+        self._layer = hub._stack[-1]
 
     def __enter__(self):
         scope = self._layer[1]
@@ -90,9 +91,26 @@ class _ScopeManager(object):
         return scope
 
     def __exit__(self, exc_type, exc_value, tb):
-        layer = self._hub.pop_scope_unsafe()
-        assert layer[1] == self._layer[1], "popped wrong scope"
-        if layer[0] != self._layer[0]:
+        current_len = len(self._hub._stack)
+        if current_len < self._original_len:
+            logger.error(
+                "Scope popped too soon. Popped %s scopes too many.",
+                self._original_len - current_len,
+            )
+            return
+        elif current_len > self._original_len:
+            logger.warning("Leaked %s scopes.", current_len - self._original_len)
+
+        layer = self._hub._stack[self._original_len - 1]
+        del self._hub._stack[self._original_len - 1 :]
+
+        if layer[1] != self._layer[1]:
+            logger.error(
+                "Wrong scope found. Meant to pop %s, but popped %s.",
+                layer[1],
+                self._layer[1],
+            )
+        elif layer[0] != self._layer[0]:
             warning = (
                 "init() called inside of pushed scope. This might be entirely "
                 "legitimate but usually occurs when initializing the SDK inside "
@@ -288,7 +306,7 @@ class Hub(with_metaclass(HubMeta)):
         new_layer = (client, copy.copy(scope))
         self._stack.append(new_layer)
 
-        return _ScopeManager(self, new_layer)
+        return _ScopeManager(self)
 
     scope = push_scope
 
