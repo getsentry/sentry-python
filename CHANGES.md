@@ -1,3 +1,7 @@
+## 0.6.2
+
+* Fix crash in AWS Lambda integration when using Zappa. This only silences the error, the underlying bug is still in Zappa.
+
 ## 0.6.1
 
 * New integration for aiohttp-server.
