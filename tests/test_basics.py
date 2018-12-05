@@ -226,7 +226,7 @@ def test_integration_scoping():
     assert len(events) == 1
 
 
-def test_client_initialized_within_scope(sentry_init, capture_events, caplog):
+def test_client_initialized_within_scope(sentry_init, caplog):
     caplog.set_level(logging.WARNING)
 
     sentry_init(debug=True)
@@ -237,3 +237,37 @@ def test_client_initialized_within_scope(sentry_init, capture_events, caplog):
     record, = (x for x in caplog.records if x.levelname == "WARNING")
 
     assert record.msg.startswith("init() called inside of pushed scope.")
+
+
+def test_scope_leaks_cleaned_up(sentry_init, caplog):
+    caplog.set_level(logging.WARNING)
+
+    sentry_init(debug=True)
+
+    old_stack = list(Hub.current._stack)
+
+    with push_scope():
+        push_scope()
+
+    assert Hub.current._stack == old_stack
+
+    record, = (x for x in caplog.records if x.levelname == "WARNING")
+
+    assert record.message.startswith("Leaked 1 scopes:")
+
+
+def test_scope_popped_too_soon(sentry_init, caplog):
+    caplog.set_level(logging.ERROR)
+
+    sentry_init(debug=True)
+
+    old_stack = list(Hub.current._stack)
+
+    with push_scope():
+        Hub.current.pop_scope_unsafe()
+
+    assert Hub.current._stack == old_stack
+
+    record, = (x for x in caplog.records if x.levelname == "ERROR")
+
+    assert record.message == ("Scope popped too soon. Popped 1 scopes too many.")
