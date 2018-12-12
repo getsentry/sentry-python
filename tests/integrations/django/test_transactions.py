@@ -9,10 +9,7 @@ except ImportError:
     # for Django version less than 1.4
     from django.conf.urls.defaults import url, include  # NOQA
 
-from sentry_sdk.integrations.django.transactions import (
-    RavenResolver,
-    transaction_from_function,
-)
+from sentry_sdk.integrations.django.transactions import RavenResolver
 
 
 if django.VERSION < (1, 9):
@@ -53,25 +50,3 @@ def test_legacy_resolver_newstyle_django20_urlconf():
     resolver = RavenResolver()
     result = resolver.resolve("/api/v2/1234/store/", url_conf)
     assert result == "/api/v2/{project_id}/store/"
-
-
-class MyClass:
-    def myfunc():
-        pass
-
-
-def myfunc():
-    pass
-
-
-def test_transaction_from_function():
-    x = transaction_from_function
-    assert x(MyClass) == "tests.integrations.django.test_transactions.MyClass"
-    assert (
-        x(MyClass.myfunc)
-        == "tests.integrations.django.test_transactions.MyClass.myfunc"
-    )
-    assert x(myfunc) == "tests.integrations.django.test_transactions.myfunc"
-    assert x(None) is None
-    assert x(42) is None
-    assert x(lambda: None).endswith("<lambda>")

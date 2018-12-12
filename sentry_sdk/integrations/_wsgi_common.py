@@ -75,12 +75,7 @@ class RequestExtractor(object):
         return self.json()
 
     def is_json(self):
-        mt = (self.env().get("CONTENT_TYPE") or "").split(";", 1)[0]
-        return (
-            mt == "application/json"
-            or (mt.startswith("application/"))
-            and mt.endswith("+json")
-        )
+        return _is_json_content_type(self.env().get("CONTENT_TYPE"))
 
     def json(self):
         try:
@@ -97,6 +92,18 @@ class RequestExtractor(object):
 
     def size_of_file(self, file):
         raise NotImplementedError()
+
+    def env(self):
+        raise NotImplementedError()
+
+
+def _is_json_content_type(ct):
+    mt = (ct or "").split(";", 1)[0]
+    return (
+        mt == "application/json"
+        or (mt.startswith("application/"))
+        and mt.endswith("+json")
+    )
 
 
 def _filter_headers(headers):
