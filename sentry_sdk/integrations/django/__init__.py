@@ -8,21 +8,6 @@ from django import VERSION as DJANGO_VERSION
 from django.core import signals
 
 try:
-    import psycopg2.sql
-
-    def sql_to_string(sql):
-        if isinstance(sql, psycopg2.sql.SQL):
-            return sql.string
-        return sql
-
-
-except ImportError:
-
-    def sql_to_string(sql):
-        return sql
-
-
-try:
     from django.urls import resolve
 except ImportError:
     from django.core.urlresolvers import resolve
@@ -220,7 +205,6 @@ def format_sql(sql, params):
         # convert sql with named parameters to sql with unnamed parameters
         conv = _FormatConverter(params)
         if params:
-            sql = sql_to_string(sql)
             sql = sql % conv
             params = conv.params
         else:
@@ -235,18 +219,21 @@ def format_sql(sql, params):
     return sql, rv
 
 
-def record_sql(sql, params):
+def record_sql(sql, params, cursor=None):
     hub = Hub.current
     if hub.get_integration(DjangoIntegration) is None:
         return
-    real_sql, real_params = format_sql(sql, params)
 
-    if real_params:
-        try:
-            real_sql = format_and_strip(real_sql, real_params)
-        except Exception:
-            pass
+    if cursor and cursor.mogrify:
+        real_sql = cursor.mogrify(sql, params)
+    else:
+        real_sql, real_params = format_sql(sql, params)
 
+        if real_params:
+            try:
+                real_sql = format_and_strip(real_sql, real_params)
+            except Exception:
+                pass
     hub.add_breadcrumb(message=real_sql, category="query")
 
 
@@ -264,21 +251,21 @@ def install_sql_hook():
         # This won't work on Django versions < 1.6
         return
 
-    def record_many_sql(sql, param_list):
+    def record_many_sql(sql, param_list, cursor):
         for params in param_list:
-            record_sql(sql, params)
+            record_sql(sql, params, cursor)
 
     def execute(self, sql, params=None):
         try:
             return real_execute(self, sql, params)
         finally:
-            record_sql(sql, params)
+            record_sql(sql, params, self.cursor)
 
     def executemany(self, sql, param_list):
         try:
             return real_executemany(self, sql, param_list)
         finally:
-            record_many_sql(sql, param_list)
+            record_many_sql(sql, param_list, self.cursor)
 
     CursorWrapper.execute = execute
     CursorWrapper.executemany = executemany
