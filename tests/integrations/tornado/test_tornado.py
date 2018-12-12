@@ -8,6 +8,13 @@ from tornado.web import RequestHandler, Application, HTTPError
 from tornado.testing import AsyncHTTPTestCase
 
 
+class CrashingHandler(RequestHandler):
+    def get(self):
+        with configure_scope() as scope:
+            scope.set_tag("foo", 42)
+        1 / 0
+
+
 class TestBasic(AsyncHTTPTestCase):
     @pytest.fixture(autouse=True)
     def initialize(self, sentry_init, capture_events):
@@ -15,11 +22,6 @@ class TestBasic(AsyncHTTPTestCase):
         self.events = capture_events()
 
     def get_app(self):
-        class CrashingHandler(RequestHandler):
-            def get(self):
-                with configure_scope() as scope:
-                    scope.set_tag("foo", 42)
-                1 / 0
 
         return Application([(r"/hi", CrashingHandler)])
 
@@ -42,6 +44,10 @@ class TestBasic(AsyncHTTPTestCase):
         }
 
         assert event["tags"] == {"foo": 42}
+        assert (
+            event["transaction"]
+            == "tests.integrations.tornado.test_tornado.CrashingHandler.get"
+        )
 
         with configure_scope() as scope:
             assert not scope._tags

@@ -2,7 +2,11 @@ import sys
 import weakref
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
-from sentry_sdk.utils import event_from_exception, capture_internal_exceptions
+from sentry_sdk.utils import (
+    event_from_exception,
+    capture_internal_exceptions,
+    transaction_from_function,
+)
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import (
     RequestExtractor,
@@ -87,6 +91,11 @@ def _make_event_processor(weak_handler):
             return event
 
         request = handler.request
+
+        if "transaction" not in event:
+            with capture_internal_exceptions():
+                method = getattr(handler, handler.request.method.lower())
+                event["transaction"] = transaction_from_function(method)
 
         with capture_internal_exceptions():
             extractor = TornadoRequestExtractor(request)

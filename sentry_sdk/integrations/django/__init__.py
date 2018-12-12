@@ -34,15 +34,13 @@ from sentry_sdk.utils import (
     event_from_exception,
     safe_repr,
     format_and_strip,
+    transaction_from_function,
 )
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
-from sentry_sdk.integrations.django.transactions import (
-    LEGACY_RESOLVER,
-    transaction_from_function,
-)
+from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
 
 
 if DJANGO_VERSION < (1, 10):

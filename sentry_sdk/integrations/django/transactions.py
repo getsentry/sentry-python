@@ -110,34 +110,3 @@ class RavenResolver(object):
 
 
 LEGACY_RESOLVER = RavenResolver()
-
-
-def transaction_from_function(func):
-    # Methods in Python 2
-    try:
-        return "%s.%s.%s" % (
-            func.im_class.__module__,
-            func.im_class.__name__,
-            func.__name__,
-        )
-    except Exception:
-        pass
-
-    func_qualname = (
-        getattr(func, "__qualname__", None) or getattr(func, "__name__", None) or None
-    )
-
-    if not func_qualname:
-        # No idea what it is
-        return None
-
-    # Methods in Python 3
-    # Functions
-    # Classes
-    try:
-        return "%s.%s" % (func.__module__, func_qualname)
-    except Exception:
-        pass
-
-    # Possibly a lambda
-    return func_qualname
