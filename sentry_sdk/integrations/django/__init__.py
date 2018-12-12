@@ -13,6 +13,8 @@ try:
     def sql_to_string(sql):
         if isinstance(sql, psycopg2.sql.SQL):
             return sql.string
+        elif isinstance(sql, psycopg2.sql.Composed):
+            return "".join(x.string for x in sql)
         return sql
 
 
@@ -239,13 +241,14 @@ def record_sql(sql, params):
     hub = Hub.current
     if hub.get_integration(DjangoIntegration) is None:
         return
-    real_sql, real_params = format_sql(sql, params)
+    with capture_internal_exceptions():
+        real_sql, real_params = format_sql(sql, params)
 
-    if real_params:
-        try:
-            real_sql = format_and_strip(real_sql, real_params)
-        except Exception:
-            pass
+        if real_params:
+            try:
+                real_sql = format_and_strip(real_sql, real_params)
+            except Exception:
+                pass
 
     hub.add_breadcrumb(message=real_sql, category="query")
 
