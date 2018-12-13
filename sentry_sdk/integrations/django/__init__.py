@@ -224,17 +224,18 @@ def record_sql(sql, params, cursor=None):
     if hub.get_integration(DjangoIntegration) is None:
         return
 
-    if cursor and cursor.mogrify:
-        real_sql = cursor.mogrify(sql, params)
-    else:
-        real_sql, real_params = format_sql(sql, params)
+    with capture_internal_exceptions():
+        if cursor and hasattr(cursor, "mogrify"):  # psycopg2
+            real_sql = cursor.mogrify(sql, params)
+        else:
+            real_sql, real_params = format_sql(sql, params)
 
-        if real_params:
-            try:
-                real_sql = format_and_strip(real_sql, real_params)
-            except Exception:
-                pass
-    hub.add_breadcrumb(message=real_sql, category="query")
+            if real_params:
+                try:
+                    real_sql = format_and_strip(real_sql, real_params)
+                except Exception:
+                    pass
+        hub.add_breadcrumb(message=real_sql, category="query")
 
 
 def install_sql_hook():
