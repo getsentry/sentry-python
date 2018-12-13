@@ -42,6 +42,7 @@ def _handle_task_prerun(sender, task, args, kwargs, **_):
     hub = Hub.current
     if hub.get_integration(CeleryIntegration) is not None:
         scope = hub.push_scope().__enter__()
+        scope.clear()
         scope.add_event_processor(_make_event_processor(args, kwargs, task))
 
 
