@@ -4,6 +4,7 @@ import pytest
 
 from werkzeug.test import Client
 from django.core.management import execute_from_command_line
+from django.db.utils import OperationalError
 
 
 try:
@@ -134,7 +135,7 @@ def test_sql_queries(sentry_init, capture_events):
     sql = connection.cursor()
 
     events = capture_events()
-    with pytest.raises(Exception):
+    with pytest.raises(OperationalError):
         # table doesn't even exist
         sql.execute("""SELECT count(*) FROM people_person WHERE foo = %s""", [123])
 
@@ -155,7 +156,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     sql = connection.cursor()
 
     events = capture_events()
-    with pytest.raises(Exception):
+    with pytest.raises(OperationalError):
         # table doesn't even exist
         sql.execute(
             """SELECT count(*) FROM people_person WHERE foo = %(my_foo)s""",
@@ -182,8 +183,8 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events):
     sql = connection.cursor()
 
     events = capture_events()
-    with pytest.raises(Exception):
-        # table doesn't even exist
+    with pytest.raises(TypeError):
+        # crashes because we use sqlite
         sql.execute(
             psycopg2_sql.SQL("SELECT %(my_param)s FROM people_person"), {"my_param": 10}
         )
@@ -204,7 +205,7 @@ def test_sql_queries_large_params(sentry_init, capture_events):
     sql = connection.cursor()
 
     events = capture_events()
-    with pytest.raises(Exception):
+    with pytest.raises(OperationalError):
         # table doesn't even exist
         sql.execute(
             """SELECT count(*) FROM people_person WHERE foo = %s""", ["x" * 1000]
