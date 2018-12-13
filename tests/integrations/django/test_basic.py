@@ -157,7 +157,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
 
     events = capture_events()
     with pytest.raises(OperationalError):
-        # table doesn't even exist
+        # This really only works with postgres. sqlite will crash with syntax error
         sql.execute(
             """SELECT count(*) FROM people_person WHERE foo = %(my_foo)s""",
             {"my_foo": 10},
