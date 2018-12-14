@@ -8,7 +8,14 @@ import time
 
 from datetime import datetime
 from textwrap import dedent
-from sentry_sdk import Hub, Client, configure_scope, capture_message, add_breadcrumb
+from sentry_sdk import (
+    Hub,
+    Client,
+    configure_scope,
+    capture_message,
+    add_breadcrumb,
+    capture_exception,
+)
 from sentry_sdk.hub import HubMeta
 from sentry_sdk.transport import Transport
 from sentry_sdk._compat import reraise, text_type
@@ -290,3 +297,19 @@ def test_weird_chars(sentry_init, capture_events):
     capture_message(u"föö".encode("latin1"))
     event, = events
     assert json.loads(json.dumps(event)) == event
+
+
+def test_nan(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    try:
+        nan = float("nan")  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    event, = events
+    frames = event["exception"]["values"][0]["stacktrace"]["frames"]
+    frame, = frames
+    assert frame["vars"]["nan"] == "nan"

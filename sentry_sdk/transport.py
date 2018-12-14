@@ -112,7 +112,7 @@ class HttpTransport(Transport):
 
         body = io.BytesIO()
         with gzip.GzipFile(fileobj=body, mode="w") as f:
-            f.write(json.dumps(event).encode("utf-8"))
+            f.write(json.dumps(event, allow_nan=False).encode("utf-8"))
 
         logger.debug(
             "Sending %s event [%s] to %s project:%s"
