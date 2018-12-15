@@ -254,7 +254,7 @@ def test_error_in_authenticated_userid(
         integrations=[
             PyramidIntegration(),
             LoggingIntegration(event_level=logging.ERROR),
-        ]
+        ],
     )
     logger = logging.getLogger("test_pyramid")
 
