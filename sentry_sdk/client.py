@@ -156,6 +156,9 @@ class Client(object):
         return False
 
     def _should_capture(self, event, hint, scope=None):
+        if scope is not None and not scope._should_capture:
+            return False
+
         if (
             self.options["sample_rate"] < 1.0
             and random.random() >= self.options["sample_rate"]

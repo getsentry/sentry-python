@@ -33,6 +33,7 @@ class Scope(object):
         "_breadcrumbs",
         "_event_processors",
         "_error_processors",
+        "_should_capture",
     )
 
     def __init__(self):
@@ -99,6 +100,8 @@ class Scope(object):
 
         self._breadcrumbs = deque()
 
+        self._should_capture = True
+
     def add_event_processor(self, func):
         """"Register a scope local event processor on the scope.
 
@@ -132,6 +135,9 @@ class Scope(object):
         def _drop(event, cause, ty):
             logger.info("%s (%s) dropped event (%s)", ty, cause, event)
 
+        if not self._should_capture:
+            return
+
         if self._level is not None:
             event["level"] = self._level
 
@@ -154,21 +160,26 @@ class Scope(object):
         if self._contexts:
             event.setdefault("contexts", {}).update(self._contexts)
 
-        exc_info = hint.get("exc_info") if hint is not None else None
-        if exc_info is not None:
-            for processor in self._error_processors:
-                new_event = processor(event, exc_info)
-                if new_event is None:
-                    return _drop(event, processor, "error processor")
-                event = new_event
+        try:
+            self._should_capture = False
 
-        for processor in chain(global_event_processors, self._event_processors):
-            new_event = event
-            with capture_internal_exceptions():
-                new_event = processor(event, hint)
-            if new_event is None:
-                return _drop(event, processor, "event processor")
-            event = new_event
+            exc_info = hint.get("exc_info") if hint is not None else None
+            if exc_info is not None:
+                for processor in self._error_processors:
+                    new_event = processor(event, exc_info)
+                    if new_event is None:
+                        return _drop(event, processor, "error processor")
+                    event = new_event
+
+            for processor in chain(global_event_processors, self._event_processors):
+                new_event = event
+                with capture_internal_exceptions():
+                    new_event = processor(event, hint)
+                if new_event is None:
+                    return _drop(event, processor, "event processor")
+                event = new_event
+        finally:
+            self._should_capture = True
 
         return event
 
@@ -188,6 +199,8 @@ class Scope(object):
         rv._breadcrumbs = copy(self._breadcrumbs)
         rv._event_processors = list(self._event_processors)
         rv._error_processors = list(self._error_processors)
+
+        rv._should_capture = self._should_capture
 
         return rv
 
