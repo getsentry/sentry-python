@@ -23,6 +23,7 @@ if getattr(Request, "authenticated_userid", None):
 
 
 else:
+    # bw-compat for pyramid < 1.5
     from pyramid.security import authenticated_userid
 
 
