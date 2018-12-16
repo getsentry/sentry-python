@@ -16,7 +16,7 @@ from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 
 
-if getattr(Request, 'authenticated_userid', None):
+if getattr(Request, "authenticated_userid", None):
 
     def authenticated_userid(request):
         return request.authenticated_userid
