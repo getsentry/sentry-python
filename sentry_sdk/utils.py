@@ -89,7 +89,7 @@ class Dsn(object):
         if not parts.path:
             raise BadDsn("Missing project ID in DSN")
         try:
-            self.project_id = text_type(int(parts.path[1:]))
+            self.project_id = text_type(parts.path[1:])
         except (ValueError, TypeError):
             raise BadDsn("Invalid project in DSN (%r)" % (parts.path or "")[1:])
 
