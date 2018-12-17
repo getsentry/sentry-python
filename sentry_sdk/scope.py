@@ -1,5 +1,6 @@
 from copy import copy
 from collections import deque
+from functools import wraps
 from itertools import chain
 
 from sentry_sdk.utils import logger, capture_internal_exceptions
@@ -14,6 +15,19 @@ def add_global_event_processor(processor):
 
 def _attr_setter(fn):
     return property(fset=fn, doc=fn.__doc__)
+
+
+def _disable_capture(fn):
+    @wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        if not self._should_capture:
+            return
+        try:
+            self._should_capture = False
+            return fn(self, *args, **kwargs)
+        finally:
+            self._should_capture = True
+    return wrapper
 
 
 class Scope(object):
@@ -129,14 +143,12 @@ class Scope(object):
 
         self._error_processors.append(func)
 
+    @_disable_capture
     def apply_to_event(self, event, hint=None):
         """Applies the information contained on the scope to the given event."""
 
         def _drop(event, cause, ty):
             logger.info("%s (%s) dropped event (%s)", ty, cause, event)
-
-        if not self._should_capture:
-            return
 
         if self._level is not None:
             event["level"] = self._level
@@ -160,26 +172,21 @@ class Scope(object):
         if self._contexts:
             event.setdefault("contexts", {}).update(self._contexts)
 
-        try:
-            self._should_capture = False
-
-            exc_info = hint.get("exc_info") if hint is not None else None
-            if exc_info is not None:
-                for processor in self._error_processors:
-                    new_event = processor(event, exc_info)
-                    if new_event is None:
-                        return _drop(event, processor, "error processor")
-                    event = new_event
-
-            for processor in chain(global_event_processors, self._event_processors):
-                new_event = event
-                with capture_internal_exceptions():
-                    new_event = processor(event, hint)
+        exc_info = hint.get("exc_info") if hint is not None else None
+        if exc_info is not None:
+            for processor in self._error_processors:
+                new_event = processor(event, exc_info)
                 if new_event is None:
-                    return _drop(event, processor, "event processor")
+                    return _drop(event, processor, "error processor")
                 event = new_event
-        finally:
-            self._should_capture = True
+
+        for processor in chain(global_event_processors, self._event_processors):
+            new_event = event
+            with capture_internal_exceptions():
+                new_event = processor(event, hint)
+            if new_event is None:
+                return _drop(event, processor, "event processor")
+            event = new_event
 
         return event
 
