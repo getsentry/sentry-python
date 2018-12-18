@@ -101,10 +101,23 @@ def test_user_captured(sentry_init, client, capture_events):
     }
 
 
-def test_404(sentry_init, client):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
-    content, status, headers = client.get("/404")
-    assert status.lower() == "404 not found"
+def test_custom_error_handler_request_context(sentry_init, client, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+    events = capture_events()
+    content, status, headers = client.post("/404")
+    assert status == "404 Not Found"
+
+    event, = events
+
+    assert event["message"] == "not found"
+    assert event["level"] == "error"
+    assert event["request"] == {
+        "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
+        "headers": {"Content-Length": "0", "Content-Type": "", "Host": "localhost"},
+        "method": "POST",
+        "query_string": "",
+        "url": "http://localhost/404",
+    }
 
 
 def test_500(sentry_init, client):

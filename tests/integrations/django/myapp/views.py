@@ -1,6 +1,6 @@
 from django.contrib.auth import login
 from django.contrib.auth.models import User
-from django.http import HttpResponse, HttpResponseServerError
+from django.http import HttpResponse, HttpResponseServerError, HttpResponseNotFound
 from django.views.generic import ListView
 
 import sentry_sdk
@@ -37,3 +37,8 @@ class ClassBasedView(ListView):
 def post_echo(request):
     sentry_sdk.capture_message("hi")
     return HttpResponse(request.body)
+
+
+def handler404(*args, **kwargs):
+    sentry_sdk.capture_message("not found", level="error")
+    return HttpResponseNotFound("404")
