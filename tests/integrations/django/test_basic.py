@@ -105,7 +105,7 @@ def test_custom_error_handler_request_context(sentry_init, client, capture_event
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
     content, status, headers = client.post("/404")
-    assert status == "404 Not Found"
+    assert status.lower() == "404 not found"
 
     event, = events
 
