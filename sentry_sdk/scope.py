@@ -27,6 +27,7 @@ def _disable_capture(fn):
             return fn(self, *args, **kwargs)
         finally:
             self._should_capture = True
+
     return wrapper
 
 
