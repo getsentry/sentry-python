@@ -2,7 +2,7 @@ import sys
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
-from sentry_sdk._compat import PY2, reraise, implements_iterator
+from sentry_sdk._compat import PY2, reraise
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
 
@@ -133,7 +133,6 @@ def _capture_exception(hub):
     return exc_info
 
 
-@implements_iterator
 class _ScopedResponse(object):
     __slots__ = ("_response", "_hub")
 
