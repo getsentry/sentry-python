@@ -61,15 +61,17 @@ def _push_appctx(*args, **kwargs):
     if hub.get_integration(FlaskIntegration) is not None:
         # always want to push scope regardless of whether WSGI app might already
         # have (not the case for CLI for example)
-        hub.push_scope()
+        scope_manager = hub.push_scope()
+        scope_manager.__enter__()
+        _app_ctx_stack.top.sentry_sdk_scope_manager = scope_manager
         with hub.configure_scope() as scope:
             scope._name = "flask"
 
 
 def _pop_appctx(*args, **kwargs):
-    hub = Hub.current
-    if hub.get_integration(FlaskIntegration) is not None:
-        hub.pop_scope_unsafe()
+    scope_manager = getattr(_app_ctx_stack.top, "sentry_sdk_scope_manager", None)
+    if scope_manager is not None:
+        scope_manager.__exit__(None, None, None)
 
 
 def _request_started(sender, **kwargs):

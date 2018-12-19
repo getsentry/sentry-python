@@ -495,3 +495,15 @@ def test_does_not_leak_scope(sentry_init, capture_events, app):
 
     with configure_scope() as scope:
         assert not scope._tags["request_data"]
+
+
+def test_scoped_test_client(sentry_init, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
+    @app.route("/")
+    def index():
+        return "ok"
+
+    with app.test_client() as client:
+        response = client.get("/")
+        assert response.status_code == 200
