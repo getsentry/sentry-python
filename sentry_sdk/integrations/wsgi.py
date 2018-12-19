@@ -2,7 +2,7 @@ import sys
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
-from sentry_sdk._compat import PY2, reraise, implements_iterator
+from sentry_sdk._compat import PY2, reraise
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
 
@@ -57,21 +57,20 @@ class SentryWsgiMiddleware(object):
         self.app = app
 
     def __call__(self, environ, start_response):
-        hub = Hub.current
-        hub.push_scope()
-        with capture_internal_exceptions():
-            with hub.configure_scope() as scope:
-                scope._name = "wsgi"
-                scope.add_event_processor(_make_wsgi_event_processor(environ))
+        hub = Hub(Hub.current)
 
-        try:
-            rv = self.app(environ, start_response)
-        except Exception:
-            einfo = _capture_exception(hub)
-            hub.pop_scope_unsafe()
-            reraise(*einfo)
+        with hub:
+            with capture_internal_exceptions():
+                with hub.configure_scope() as scope:
+                    scope._name = "wsgi"
+                    scope.add_event_processor(_make_wsgi_event_processor(environ))
 
-        return _ScopePoppingResponse(hub, rv)
+            try:
+                rv = self.app(environ, start_response)
+            except Exception:
+                reraise(*_capture_exception(hub))
+
+        return _ScopedResponse(hub, rv)
 
 
 def _get_environ(environ):
@@ -132,45 +131,35 @@ def _capture_exception(hub):
     return exc_info
 
 
-@implements_iterator
-class _ScopePoppingResponse(object):
-    __slots__ = ("_response", "_iterator", "_hub", "_popped")
+class _ScopedResponse(object):
+    __slots__ = ("_response", "_hub")
 
     def __init__(self, hub, response):
         self._hub = hub
         self._response = response
-        self._iterator = None
-        self._popped = False
 
     def __iter__(self):
-        try:
-            self._iterator = iter(self._response)
-        except Exception:
-            reraise(*_capture_exception(self._hub))
-        return self
+        iterator = iter(self._response)
 
-    def __next__(self):
-        if self._iterator is None:
-            self.__iter__()
+        while True:
+            with self._hub:
+                try:
+                    chunk = next(iterator)
+                except StopIteration:
+                    break
+                except Exception:
+                    reraise(*_capture_exception(self._hub))
 
-        try:
-            return next(self._iterator)
-        except StopIteration:
-            raise
-        except Exception:
-            reraise(*_capture_exception(self._hub))
+            yield chunk
 
     def close(self):
-        if not self._popped:
-            self._hub.pop_scope_unsafe()
-            self._popped = True
-
-        try:
-            self._response.close()
-        except AttributeError:
-            pass
-        except Exception:
-            reraise(*_capture_exception(self._hub))
+        with self._hub:
+            try:
+                self._response.close()
+            except AttributeError:
+                pass
+            except Exception:
+                reraise(*_capture_exception(self._hub))
 
 
 def _make_wsgi_event_processor(environ):

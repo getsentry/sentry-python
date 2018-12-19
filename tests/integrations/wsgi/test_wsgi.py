@@ -1,9 +1,7 @@
 from werkzeug.test import Client
 import pytest
 
-from sentry_sdk import Hub
-
-from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware, _ScopePoppingResponse
+from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 
 
 @pytest.fixture
@@ -32,30 +30,3 @@ def test_basic(sentry_init, crashing_app, capture_events):
         "query_string": "",
         "url": "http://localhost/",
     }
-
-
-def test_calls_close():
-    hub = Hub.current
-    stack_size = len(hub._stack)
-    closes = []
-
-    hub.push_scope()
-
-    class Foo(object):
-        def __iter__(self):
-            yield 1
-            yield 2
-            yield 3
-
-        def close(self):
-            closes.append(1)
-
-    response = _ScopePoppingResponse(hub, Foo())
-    list(response)
-    response.close()
-    response.close()
-    response.close()
-
-    # multiple close calls are just forwarded, but the scope is only popped once
-    assert len(closes) == 3
-    assert len(hub._stack) == stack_size

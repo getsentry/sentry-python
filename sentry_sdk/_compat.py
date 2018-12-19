@@ -21,11 +21,6 @@ if PY2:
 
     exec("def reraise(tp, value, tb=None):\n raise tp, value, tb")
 
-    def implements_iterator(cls):
-        cls.next = cls.__next__
-        del cls.__next__
-        return cls
-
 
 else:
     import urllib.parse as urlparse  # noqa
@@ -39,8 +34,6 @@ else:
 
     def _identity(x):
         return x
-
-    implements_iterator = _identity
 
     def implements_str(x):
         return x
