@@ -5,11 +5,16 @@ from io import BytesIO
 
 flask = pytest.importorskip("flask")
 
-from flask import Flask, request, abort
+from flask import Flask, Response, request, abort, stream_with_context
 
 from flask_login import LoginManager, login_user
 
-from sentry_sdk import capture_message, capture_exception, last_event_id
+from sentry_sdk import (
+    configure_scope,
+    capture_message,
+    capture_exception,
+    last_event_id,
+)
 from sentry_sdk.integrations.logging import LoggingIntegration
 import sentry_sdk.integrations.flask as flask_sentry
 
@@ -71,7 +76,7 @@ def test_transaction_style(
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("testing", (True, False))
 def test_errors(sentry_init, capture_exceptions, capture_events, app, debug, testing):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], debug=True)
 
     app.debug = debug
     app.testing = testing
@@ -460,3 +465,33 @@ def test_bad_request_not_captured(sentry_init, capture_events, app):
     client.get("/")
 
     assert not events
+
+
+def test_does_not_leak_scope(sentry_init, capture_events, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    events = capture_events()
+
+    with configure_scope() as scope:
+        scope.set_tag("request_data", False)
+
+    @app.route("/")
+    def index():
+        with configure_scope() as scope:
+            scope.set_tag("request_data", True)
+
+        def generate():
+            for row in range(1000):
+                with configure_scope() as scope:
+                    assert scope._tags["request_data"]
+
+                yield str(row) + "\n"
+
+        return Response(stream_with_context(generate()), mimetype="text/csv")
+
+    client = app.test_client()
+    response = client.get("/")
+    assert response.data.decode() == "".join(str(row) + "\n" for row in range(1000))
+    assert not events
+
+    with configure_scope() as scope:
+        assert not scope._tags["request_data"]

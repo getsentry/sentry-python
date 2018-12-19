@@ -12,7 +12,7 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
-from sentry_sdk import last_event_id, capture_message
+from sentry_sdk import capture_message
 from sentry_sdk.integrations.django import DjangoIntegration
 
 from tests.integrations.django.myapp.wsgi import application
@@ -107,16 +107,17 @@ def test_404(sentry_init, client):
     assert status.lower() == "404 not found"
 
 
-def test_500(sentry_init, client):
+def test_500(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
-    old_event_id = last_event_id()
+    events = capture_events()
+
     content, status, headers = client.get("/view-exc")
     assert status.lower() == "500 internal server error"
     content = b"".join(content).decode("utf-8")
-    event_id = last_event_id()
+
+    event, = events
+    event_id = event["event_id"]
     assert content == "Sentry error: %s" % event_id
-    assert event_id is not None
-    assert old_event_id != event_id
 
 
 def test_management_command_raises():

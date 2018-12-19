@@ -57,9 +57,9 @@ class SentryWsgiMiddleware(object):
         self.app = app
 
     def __call__(self, environ, start_response):
-        hub = Hub.current
+        hub = Hub(Hub.current)
 
-        with hub.push_scope():
+        with hub:
             with capture_internal_exceptions():
                 with hub.configure_scope() as scope:
                     scope._name = "wsgi"
@@ -68,11 +68,9 @@ class SentryWsgiMiddleware(object):
             try:
                 rv = self.app(environ, start_response)
             except Exception:
-                einfo = _capture_exception(hub)
-                hub.pop_scope_unsafe()
-                reraise(*einfo)
+                reraise(*_capture_exception(hub))
 
-            return _ScopedResponse(Hub(hub), rv)
+        return _ScopedResponse(hub, rv)
 
 
 def _get_environ(environ):
