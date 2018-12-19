@@ -76,6 +76,7 @@ class DjangoIntegration(Integration):
 
         # logs an error for every 500
         ignore_logger("django.server")
+        ignore_logger("django.request")
 
         from django.core.handlers.wsgi import WSGIHandler
 
