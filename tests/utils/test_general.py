@@ -8,7 +8,6 @@ from hypothesis import given
 import hypothesis.strategies as st
 
 from sentry_sdk.utils import (
-    Auth,
     BadDsn,
     Dsn,
     safe_repr,
