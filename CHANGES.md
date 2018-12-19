@@ -1,3 +1,7 @@
+## 0.6.4
+
+* Fix bug that would lead to an `AssertionError: stack must have at least one layer`, at least in testsuites for Flask apps.
+
 ## 0.6.3
 
 * New integration for Tornado
