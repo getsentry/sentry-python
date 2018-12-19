@@ -5,6 +5,7 @@ import sys
 import weakref
 
 from pyramid.httpexceptions import HTTPException
+from pyramid.request import Request
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
@@ -13,6 +14,17 @@ from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+
+
+if getattr(Request, "authenticated_userid", None):
+
+    def authenticated_userid(request):
+        return request.authenticated_userid
+
+
+else:
+    # bw-compat for pyramid < 1.5
+    from pyramid.security import authenticated_userid
 
 
 class PyramidIntegration(Integration):
@@ -142,7 +154,7 @@ def _make_event_processor(weak_request, integration):
             with capture_internal_exceptions():
                 user_info = event.setdefault("user", {})
                 if "id" not in user_info:
-                    user_info["id"] = request.authenticated_userid
+                    user_info["id"] = authenticated_userid(request)
 
         return event
 

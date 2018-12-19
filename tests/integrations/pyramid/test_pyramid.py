@@ -2,8 +2,11 @@ import json
 
 from io import BytesIO
 
+import logging
+
 import pytest
 
+from pyramid.authorization import ACLAuthorizationPolicy
 import pyramid.testing
 
 from pyramid.response import Response
@@ -239,3 +242,32 @@ def test_error_in_errorhandler(
 
     exception, = event2["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
+
+
+def test_error_in_authenticated_userid(
+    sentry_init, pyramid_config, capture_events, route, get_client
+):
+    from sentry_sdk.integrations.logging import LoggingIntegration
+
+    sentry_init(
+        send_default_pii=True,
+        integrations=[
+            PyramidIntegration(),
+            LoggingIntegration(event_level=logging.ERROR),
+        ],
+    )
+    logger = logging.getLogger("test_pyramid")
+
+    class AuthenticationPolicy(object):
+        def authenticated_userid(self, request):
+            logger.error("failed to identify user")
+
+    pyramid_config.set_authorization_policy(ACLAuthorizationPolicy())
+    pyramid_config.set_authentication_policy(AuthenticationPolicy())
+
+    events = capture_events()
+
+    client = get_client()
+    client.get("/message")
+
+    assert len(events) == 1

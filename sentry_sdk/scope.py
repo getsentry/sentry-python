@@ -1,5 +1,6 @@
 from copy import copy
 from collections import deque
+from functools import wraps
 from itertools import chain
 
 from sentry_sdk.utils import logger, capture_internal_exceptions
@@ -14,6 +15,20 @@ def add_global_event_processor(processor):
 
 def _attr_setter(fn):
     return property(fset=fn, doc=fn.__doc__)
+
+
+def _disable_capture(fn):
+    @wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        if not self._should_capture:
+            return
+        try:
+            self._should_capture = False
+            return fn(self, *args, **kwargs)
+        finally:
+            self._should_capture = True
+
+    return wrapper
 
 
 class Scope(object):
@@ -33,6 +48,7 @@ class Scope(object):
         "_breadcrumbs",
         "_event_processors",
         "_error_processors",
+        "_should_capture",
     )
 
     def __init__(self):
@@ -99,6 +115,8 @@ class Scope(object):
 
         self._breadcrumbs = deque()
 
+        self._should_capture = True
+
     def add_event_processor(self, func):
         """"Register a scope local event processor on the scope.
 
@@ -126,6 +144,7 @@ class Scope(object):
 
         self._error_processors.append(func)
 
+    @_disable_capture
     def apply_to_event(self, event, hint=None):
         """Applies the information contained on the scope to the given event."""
 
@@ -188,6 +207,8 @@ class Scope(object):
         rv._breadcrumbs = copy(self._breadcrumbs)
         rv._event_processors = list(self._event_processors)
         rv._error_processors = list(self._error_processors)
+
+        rv._should_capture = self._should_capture
 
         return rv
 
