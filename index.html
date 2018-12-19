@@ -1590,6 +1590,9 @@ argument.</p></div>
         <span class="k">return</span> <span class="bp">False</span>
 
     <span class="k">def</span> <span class="nf">_should_capture</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">scope</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">scope</span><span class="o">.</span><span class="n">_should_capture</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">False</span>
+
         <span class="k">if</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;sample_rate&quot;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">1.0</span>
             <span class="ow">and</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;sample_rate&quot;</span><span class="p">]</span>
@@ -1837,7 +1840,7 @@ stderr.</p></div>
 
         <span class="n">body</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
         <span class="k">with</span> <span class="n">gzip</span><span class="o">.</span><span class="n">GzipFile</span><span class="p">(</span><span class="n">fileobj</span><span class="o">=</span><span class="n">body</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">event</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">allow_nan</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span>
 
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
             <span class="s2">&quot;Sending </span><span class="si">%s</span><span class="s2"> event [</span><span class="si">%s</span><span class="s2">] to </span><span class="si">%s</span><span class="s2"> project:</span><span class="si">%s</span><span class="s2">&quot;</span>
@@ -2812,6 +2815,7 @@ events that belong to it.</p></div>
         <span class="s2">&quot;_breadcrumbs&quot;</span><span class="p">,</span>
         <span class="s2">&quot;_event_processors&quot;</span><span class="p">,</span>
         <span class="s2">&quot;_error_processors&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;_should_capture&quot;</span><span class="p">,</span>
     <span class="p">)</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -2878,6 +2882,8 @@ events that belong to it.</p></div>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>
 
+        <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span> <span class="o">=</span> <span class="bp">True</span>
+
     <span class="k">def</span> <span class="nf">add_event_processor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;&quot;Register a scope local event processor on the scope.</span>
 
@@ -2905,6 +2911,7 @@ events that belong to it.</p></div>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
 
+    <span class="nd">@_disable_capture</span>
     <span class="k">def</span> <span class="nf">apply_to_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Applies the information contained on the scope to the given event.&quot;&quot;&quot;</span>
 
@@ -2967,6 +2974,8 @@ events that belong to it.</p></div>
         <span class="n">rv</span><span class="o">.</span><span class="n">_breadcrumbs</span> <span class="o">=</span> <span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span>
         <span class="n">rv</span><span class="o">.</span><span class="n">_event_processors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span><span class="p">)</span>
         <span class="n">rv</span><span class="o">.</span><span class="n">_error_processors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span><span class="p">)</span>
+
+        <span class="n">rv</span><span class="o">.</span><span class="n">_should_capture</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span>
 
         <span class="k">return</span> <span class="n">rv</span>
 
@@ -3081,7 +3090,7 @@ invoked with the original exception info triple as second argument.</p></div>
             
   <div class="item">
     <div class="name def" id="sentry_sdk.Scope.apply_to_event">
-    <p>def <span class="ident">apply_to_event</span>(</p><p>self, event, hint=None)</p>
+    <p>def <span class="ident">apply_to_event</span>(</p><p>self, *args, **kwargs)</p>
     </div>
     
 
@@ -3091,7 +3100,8 @@ invoked with the original exception info triple as second argument.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Scope.apply_to_event', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Scope.apply_to_event" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">apply_to_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <div class="codehilite"><pre><span></span><span class="nd">@_disable_capture</span>
+<span class="k">def</span> <span class="nf">apply_to_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Applies the information contained on the scope to the given event.&quot;&quot;&quot;</span>
     <span class="k">def</span> <span class="nf">_drop</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">cause</span><span class="p">,</span> <span class="n">ty</span><span class="p">):</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">) dropped event (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">cause</span><span class="p">,</span> <span class="n">event</span><span class="p">)</span>
@@ -3155,6 +3165,7 @@ invoked with the original exception info triple as second argument.</p></div>
     <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span> <span class="o">=</span> <span class="bp">True</span>
 </pre></div>
 
   </div>
