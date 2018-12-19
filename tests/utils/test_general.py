@@ -8,6 +8,9 @@ from hypothesis import given
 import hypothesis.strategies as st
 
 from sentry_sdk.utils import (
+    Auth,
+    BadDsn,
+    Dsn,
     safe_repr,
     exceptions_from_error_tuple,
     format_and_strip,
@@ -111,3 +114,35 @@ def test_filename():
     import sentry_sdk.utils
 
     assert x("sentry_sdk.utils", sentry_sdk.utils.__file__) == "sentry_sdk/utils.py"
+
+
+@pytest.mark.parametrize(
+    "given,expected",
+    [
+        ("https://foobar@sentry.io/123", "https://sentry.io/api/123/store/"),
+        ("https://foobar@sentry.io/bam/123", "https://sentry.io/bam/api/123/store/"),
+        (
+            "https://foobar@sentry.io/bam/baz/123",
+            "https://sentry.io/bam/baz/api/123/store/",
+        ),
+    ],
+)
+def test_parse_dsn_paths(given, expected):
+    dsn = Dsn(given)
+    auth = dsn.to_auth()
+    assert auth.store_api_url == expected
+
+
+@pytest.mark.parametrize(
+    "dsn",
+    [
+        "https://foobar@sentry.io"
+        "https://foobar@sentry.io/"
+        "https://foobar@sentry.io/asdf"
+        "https://foobar@sentry.io/asdf/"
+        "https://foobar@sentry.io/asdf/123/"
+    ],
+)
+def test_parse_invalid_dsn(dsn):
+    with pytest.raises(BadDsn):
+        dsn = Dsn(dsn)
