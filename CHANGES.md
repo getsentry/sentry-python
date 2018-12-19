@@ -1,3 +1,9 @@
+## 0.6.3
+
+* New integration for Tornado
+* Fix request data in Django, Flask and other WSGI frameworks leaking between events.
+* Fix infinite recursion when sending more events in `before_send`.
+
 ## 0.6.2
 
 * Fix crash in AWS Lambda integration when using Zappa. This only silences the error, the underlying bug is still in Zappa.
