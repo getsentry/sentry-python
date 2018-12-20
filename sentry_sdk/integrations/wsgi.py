@@ -163,6 +163,13 @@ class _ScopedResponse(object):
 
 
 def _make_wsgi_event_processor(environ):
+    client_ip = get_client_ip(environ)
+    request_url = get_request_url(environ)
+    query_string = environ.get("QUERY_STRING")
+    method = environ.get("REQUEST_METHOD")
+    env = dict(_get_environ(environ))
+    headers = _filter_headers(dict(_get_headers(environ)))
+
     def event_processor(event, hint):
         with capture_internal_exceptions():
             # if the code below fails halfway through we at least have some data
@@ -171,22 +178,13 @@ def _make_wsgi_event_processor(environ):
             if _should_send_default_pii():
                 user_info = event.setdefault("user", {})
                 if "ip_address" not in user_info:
-                    user_info["ip_address"] = get_client_ip(environ)
+                    user_info.setdefault("ip_address", client_ip)
 
-            if "url" not in request_info:
-                request_info["url"] = get_request_url(environ)
-
-            if "query_string" not in request_info:
-                request_info["query_string"] = environ.get("QUERY_STRING")
-
-            if "method" not in request_info:
-                request_info["method"] = environ.get("REQUEST_METHOD")
-
-            if "env" not in request_info:
-                request_info["env"] = dict(_get_environ(environ))
-
-            if "headers" not in request_info:
-                request_info["headers"] = _filter_headers(dict(_get_headers(environ)))
+            request_info.setdefault("url", request_url)
+            request_info.setdefault("query_string", query_string)
+            request_info.setdefault("method", method)
+            request_info.setdefault("env", env)
+            request_info.setdefault("headers", headers)
 
         return event
 
