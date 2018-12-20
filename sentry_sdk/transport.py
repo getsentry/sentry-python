@@ -89,7 +89,7 @@ class HttpTransport(Transport):
     def __init__(self, options):
         Transport.__init__(self, options)
         self._worker = BackgroundWorker()
-        self._auth = self.parsed_dsn.to_auth("sentry-python/%s" % VERSION)
+        self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
         self._pool = _make_pool(
             self.parsed_dsn,
             http_proxy=options["http_proxy"],
