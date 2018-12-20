@@ -163,6 +163,18 @@ class _ScopedResponse(object):
 
 
 def _make_wsgi_event_processor(environ):
+    # It's a bit unfortunate that we have to extract and parse the request data
+    # from the environ so eagerly, but there are a few good reasons for this.
+    #
+    # We might be in a situation where the scope/hub never gets torn down
+    # properly. In that case we will have an unnecessary strong reference to
+    # all objects in the environ (some of which may take a lot of memory) when
+    # we're really just interested in a few of them.
+    #
+    # Keeping the environment around for longer than the request lifecycle is
+    # also not necessarily something uWSGI can deal with:
+    # https://github.com/unbit/uwsgi/issues/1950
+
     client_ip = get_client_ip(environ)
     request_url = get_request_url(environ)
     query_string = environ.get("QUERY_STRING")
