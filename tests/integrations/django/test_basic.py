@@ -81,7 +81,7 @@ def test_transaction_with_class_view(sentry_init, client, capture_events):
     assert event["message"] == "hi"
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_user_captured(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     events = capture_events()
@@ -164,17 +164,17 @@ def test_management_command_raises():
         execute_from_command_line(["manage.py", "mycrash"])
 
 
-@pytest.mark.django_db
-def test_sql_queries(sentry_init, capture_events):
+@pytest.mark.django_db(transaction=True)
+def test_sql_queries(request, sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     from django.db import connection
 
-    sql = connection.cursor()
-
     events = capture_events()
-    with pytest.raises(OperationalError):
-        # table doesn't even exist
-        sql.execute("""SELECT count(*) FROM people_person WHERE foo = %s""", [123])
+
+    with connection.cursor() as sql:
+        with pytest.raises(OperationalError):
+            # table doesn't even exist
+            sql.execute("""SELECT count(*) FROM people_person WHERE foo = %s""", [123])
 
     capture_message("HI")
 
@@ -185,7 +185,7 @@ def test_sql_queries(sentry_init, capture_events):
     assert crumb["message"] == """SELECT count(*) FROM people_person WHERE foo = 123"""
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_sql_dict_query_params(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     from django.db import connection
@@ -211,7 +211,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
 @pytest.mark.skipif(
     platform.python_implementation() == "PyPy", reason="psycopg broken on pypy"
 )
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_sql_psycopg2_string_composition(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     from django.db import connection
@@ -234,7 +234,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events):
     assert crumb["message"] == ("SELECT 10 FROM people_person")
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_sql_queries_large_params(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     from django.db import connection

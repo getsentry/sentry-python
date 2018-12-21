@@ -211,15 +211,8 @@ def test_configure_scope_available(sentry_init, request, monkeypatch):
     assert calls[0] is Hub.current._stack[-1][1]
 
 
-@pytest.mark.parametrize("no_sdk", (True, False))
-def test_configure_scope_unavailable(no_sdk, monkeypatch):
-    if no_sdk:
-        # Emulate minimal without SDK installation: callbacks are not called
-        monkeypatch.setattr(HubMeta, "current", None)
-        assert not Hub.current
-    else:
-        # Still, no client configured
-        assert Hub.current
+def test_configure_scope_unavailable(monkeypatch):
+    assert Hub.current
 
     calls = []
 

@@ -1,3 +1,4 @@
+import copy
 import os
 import subprocess
 import json
@@ -86,14 +87,26 @@ def assert_semaphore_acceptance(tmpdir):
 
 
 @pytest.fixture
-def sentry_init(monkeypatch_test_transport):
+def sentry_init(monkeypatch_test_transport, monkeypatch):
     def inner(*a, **kw):
         hub = sentry_sdk.Hub.current
         client = sentry_sdk.Client(*a, **kw)
-        hub.bind_client(client)
+        monkeypatch.setattr(hub, "_stack", [(client, sentry_sdk.Scope())])
         monkeypatch_test_transport(sentry_sdk.Hub.current.client)
 
     return inner
+
+
+@pytest.fixture(autouse=True)
+def _assert_no_client(request, monkeypatch):
+    assert sentry_sdk.Hub.current.client is None
+    assert sentry_sdk.Hub.main.client is None
+
+    @request.addfinalizer
+    def _check_no_client():
+        monkeypatch.undo()  # tear down sentry_init
+        assert sentry_sdk.Hub.current.client is None
+        assert sentry_sdk.Hub.main.client is None
 
 
 class TestTransport(Transport):
