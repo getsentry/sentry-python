@@ -1,3 +1,7 @@
+## 0.6.5
+
+* Capture WSGI request data eagerly to save memory and avoid issues with uWSGI.
+
 ## 0.6.4
 
 * Fix bug that would lead to an `AssertionError: stack must have at least one layer`, at least in testsuites for Flask apps.
