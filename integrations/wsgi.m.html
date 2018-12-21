@@ -1254,6 +1254,25 @@ table {
 
 
 <span class="k">def</span> <span class="nf">_make_wsgi_event_processor</span><span class="p">(</span><span class="n">environ</span><span class="p">):</span>
+    <span class="c1"># It&#39;s a bit unfortunate that we have to extract and parse the request data</span>
+    <span class="c1"># from the environ so eagerly, but there are a few good reasons for this.</span>
+    <span class="c1">#</span>
+    <span class="c1"># We might be in a situation where the scope/hub never gets torn down</span>
+    <span class="c1"># properly. In that case we will have an unnecessary strong reference to</span>
+    <span class="c1"># all objects in the environ (some of which may take a lot of memory) when</span>
+    <span class="c1"># we&#39;re really just interested in a few of them.</span>
+    <span class="c1">#</span>
+    <span class="c1"># Keeping the environment around for longer than the request lifecycle is</span>
+    <span class="c1"># also not necessarily something uWSGI can deal with:</span>
+    <span class="c1"># https://github.com/unbit/uwsgi/issues/1950</span>
+
+    <span class="n">client_ip</span> <span class="o">=</span> <span class="n">get_client_ip</span><span class="p">(</span><span class="n">environ</span><span class="p">)</span>
+    <span class="n">request_url</span> <span class="o">=</span> <span class="n">get_request_url</span><span class="p">(</span><span class="n">environ</span><span class="p">)</span>
+    <span class="n">query_string</span> <span class="o">=</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;QUERY_STRING&quot;</span><span class="p">)</span>
+    <span class="n">method</span> <span class="o">=</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;REQUEST_METHOD&quot;</span><span class="p">)</span>
+    <span class="n">env</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_get_environ</span><span class="p">(</span><span class="n">environ</span><span class="p">))</span>
+    <span class="n">headers</span> <span class="o">=</span> <span class="n">_filter_headers</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">_get_headers</span><span class="p">(</span><span class="n">environ</span><span class="p">)))</span>
+
     <span class="k">def</span> <span class="nf">event_processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
         <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
             <span class="c1"># if the code below fails halfway through we at least have some data</span>
@@ -1262,22 +1281,13 @@ table {
             <span class="k">if</span> <span class="n">_should_send_default_pii</span><span class="p">():</span>
                 <span class="n">user_info</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="p">{})</span>
                 <span class="k">if</span> <span class="s2">&quot;ip_address&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">user_info</span><span class="p">:</span>
-                    <span class="n">user_info</span><span class="p">[</span><span class="s2">&quot;ip_address&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_client_ip</span><span class="p">(</span><span class="n">environ</span><span class="p">)</span>
+                    <span class="n">user_info</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;ip_address&quot;</span><span class="p">,</span> <span class="n">client_ip</span><span class="p">)</span>
 
-            <span class="k">if</span> <span class="s2">&quot;url&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">request_info</span><span class="p">:</span>
-                <span class="n">request_info</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_request_url</span><span class="p">(</span><span class="n">environ</span><span class="p">)</span>
-
-            <span class="k">if</span> <span class="s2">&quot;query_string&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">request_info</span><span class="p">:</span>
-                <span class="n">request_info</span><span class="p">[</span><span class="s2">&quot;query_string&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;QUERY_STRING&quot;</span><span class="p">)</span>
-
-            <span class="k">if</span> <span class="s2">&quot;method&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">request_info</span><span class="p">:</span>
-                <span class="n">request_info</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;REQUEST_METHOD&quot;</span><span class="p">)</span>
-
-            <span class="k">if</span> <span class="s2">&quot;env&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">request_info</span><span class="p">:</span>
-                <span class="n">request_info</span><span class="p">[</span><span class="s2">&quot;env&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_get_environ</span><span class="p">(</span><span class="n">environ</span><span class="p">))</span>
-
-            <span class="k">if</span> <span class="s2">&quot;headers&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">request_info</span><span class="p">:</span>
-                <span class="n">request_info</span><span class="p">[</span><span class="s2">&quot;headers&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_filter_headers</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">_get_headers</span><span class="p">(</span><span class="n">environ</span><span class="p">)))</span>
+            <span class="n">request_info</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;url&quot;</span><span class="p">,</span> <span class="n">request_url</span><span class="p">)</span>
+            <span class="n">request_info</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;query_string&quot;</span><span class="p">,</span> <span class="n">query_string</span><span class="p">)</span>
+            <span class="n">request_info</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="n">method</span><span class="p">)</span>
+            <span class="n">request_info</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;env&quot;</span><span class="p">,</span> <span class="n">env</span><span class="p">)</span>
+            <span class="n">request_info</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;headers&quot;</span><span class="p">,</span> <span class="n">headers</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">event</span>
 
