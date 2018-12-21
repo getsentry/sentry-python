@@ -1,6 +1,8 @@
 ## 0.6.5
 
 * Capture WSGI request data eagerly to save memory and avoid issues with uWSGI.
+* Ability to use subpaths in DSN.
+* Ignore `django.request` logger.
 
 ## 0.6.4
 
