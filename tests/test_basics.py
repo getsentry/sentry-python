@@ -7,6 +7,7 @@ from sentry_sdk import (
     push_scope,
     configure_scope,
     capture_exception,
+    capture_message,
     add_breadcrumb,
     last_event_id,
     Hub,
@@ -271,3 +272,32 @@ def test_scope_popped_too_soon(sentry_init, caplog):
     record, = (x for x in caplog.records if x.levelname == "ERROR")
 
     assert record.message == ("Scope popped too soon. Popped 1 scopes too many.")
+
+
+def test_scope_event_processor_order(sentry_init, capture_events):
+    def before_send(event, hint):
+        event["message"] += "baz"
+        return event
+
+    sentry_init(debug=True, before_send=before_send)
+    events = capture_events()
+
+    with push_scope() as scope:
+
+        @scope.add_event_processor
+        def foo(event, hint):
+            event["message"] += "foo"
+            return event
+
+        with push_scope() as scope:
+
+            @scope.add_event_processor
+            def bar(event, hint):
+                event["message"] += "bar"
+                return event
+
+            capture_message("hi")
+
+    event, = events
+
+    assert event["message"] == "hifoobarbaz"

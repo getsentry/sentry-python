@@ -130,14 +130,17 @@ def _make_request_event_processor(aws_event, aws_context):
 
         request = event.setdefault("request", {})
 
-        if "httpMethod" in aws_event and "method" not in request:
+        if "httpMethod" in aws_event:
             request["method"] = aws_event["httpMethod"]
-        if "url" not in request:
-            request["url"] = _get_url(aws_event, aws_context)
-        if "queryStringParameters" in aws_event and "query_string" not in request:
+
+        request["url"] = _get_url(aws_event, aws_context)
+
+        if "queryStringParameters" in aws_event:
             request["query_string"] = aws_event["queryStringParameters"]
-        if "headers" in aws_event and "headers" not in request:
+
+        if "headers" in aws_event:
             request["headers"] = _filter_headers(aws_event["headers"])
+
         if aws_event.get("body", None):
             # Unfortunately couldn't find a way to get structured body from AWS
             # event. Meaning every body is unstructured to us.
@@ -145,10 +148,14 @@ def _make_request_event_processor(aws_event, aws_context):
 
         if _should_send_default_pii():
             user_info = event.setdefault("user", {})
-            if "id" not in user_info:
-                user_info["id"] = aws_event.get("identity", {}).get("userArn")
-            if "ip_address" not in user_info:
-                user_info["ip_address"] = aws_event.get("identity", {}).get("sourceIp")
+
+            id = aws_event.get("identity", {}).get("userArn")
+            if id is not None:
+                user_info["id"] = id
+
+            ip = aws_event.get("identity", {}).get("sourceIp")
+            if ip is not None:
+                user_info["ip_address"] = ip
 
         return event
 

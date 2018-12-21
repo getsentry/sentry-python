@@ -189,14 +189,13 @@ def _make_wsgi_event_processor(environ):
 
             if _should_send_default_pii():
                 user_info = event.setdefault("user", {})
-                if "ip_address" not in user_info:
-                    user_info.setdefault("ip_address", client_ip)
+                user_info["ip_address"] = client_ip
 
-            request_info.setdefault("url", request_url)
-            request_info.setdefault("query_string", query_string)
-            request_info.setdefault("method", method)
-            request_info.setdefault("env", env)
-            request_info.setdefault("headers", headers)
+            request_info["url"] = request_url
+            request_info["query_string"] = query_string
+            request_info["method"] = method
+            request_info["env"] = env
+            request_info["headers"] = headers
 
         return event
 

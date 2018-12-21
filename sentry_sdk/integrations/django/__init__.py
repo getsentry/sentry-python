@@ -122,16 +122,15 @@ def _make_event_processor(weak_request, integration):
         if request is None:
             return event
 
-        if "transaction" not in event:
-            try:
-                if integration.transaction_style == "function_name":
-                    event["transaction"] = transaction_from_function(
-                        resolve(request.path).func
-                    )
-                elif integration.transaction_style == "url":
-                    event["transaction"] = LEGACY_RESOLVER.resolve(request.path)
-            except Exception:
-                pass
+        try:
+            if integration.transaction_style == "function_name":
+                event["transaction"] = transaction_from_function(
+                    resolve(request.path).func
+                )
+            elif integration.transaction_style == "url":
+                event["transaction"] = LEGACY_RESOLVER.resolve(request.path)
+        except Exception:
+            pass
 
         with capture_internal_exceptions():
             DjangoRequestExtractor(request).extract_into_event(event)
@@ -185,23 +184,20 @@ def _set_user_info(request, event):
     if user is None or not is_authenticated(user):
         return
 
-    if "id" not in user_info:
-        try:
-            user_info["id"] = str(user.pk)
-        except Exception:
-            pass
+    try:
+        user_info["id"] = str(user.pk)
+    except Exception:
+        pass
 
-    if "email" not in user_info:
-        try:
-            user_info["email"] = user.email
-        except Exception:
-            pass
+    try:
+        user_info["email"] = user.email
+    except Exception:
+        pass
 
-    if "username" not in user_info:
-        try:
-            user_info["username"] = user.get_username()
-        except Exception:
-            pass
+    try:
+        user_info["username"] = user.get_username()
+    except Exception:
+        pass
 
 
 class _FormatConverter(object):

@@ -56,8 +56,7 @@ def _make_event_processor(weak_job):
         job = weak_job()
         if job is not None:
             with capture_internal_exceptions():
-                if "transaction" not in event:
-                    event["transaction"] = job.func_name
+                event["transaction"] = job.func_name
 
             with capture_internal_exceptions():
                 extra = event.setdefault("extra", {})

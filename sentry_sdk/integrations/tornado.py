@@ -92,10 +92,9 @@ def _make_event_processor(weak_handler):
 
         request = handler.request
 
-        if "transaction" not in event:
-            with capture_internal_exceptions():
-                method = getattr(handler, handler.request.method.lower())
-                event["transaction"] = transaction_from_function(method)
+        with capture_internal_exceptions():
+            method = getattr(handler, handler.request.method.lower())
+            event["transaction"] = transaction_from_function(method)
 
         with capture_internal_exceptions():
             extractor = TornadoRequestExtractor(request)
@@ -103,24 +102,16 @@ def _make_event_processor(weak_handler):
 
             request_info = event["request"]
 
-            if "url" not in request_info:
-                request_info["url"] = "%s://%s%s" % (
-                    request.protocol,
-                    request.host,
-                    request.path,
-                )
+            request_info["url"] = "%s://%s%s" % (
+                request.protocol,
+                request.host,
+                request.path,
+            )
 
-            if "query_string" not in request_info:
-                request_info["query_string"] = request.query
-
-            if "method" not in request_info:
-                request_info["method"] = request.method
-
-            if "env" not in request_info:
-                request_info["env"] = {"REMOTE_ADDR": request.remote_ip}
-
-            if "headers" not in request_info:
-                request_info["headers"] = _filter_headers(dict(request.headers))
+            request_info["query_string"] = request.query
+            request_info["method"] = request.method
+            request_info["env"] = {"REMOTE_ADDR": request.remote_ip}
+            request_info["headers"] = _filter_headers(dict(request.headers))
 
         with capture_internal_exceptions():
             if handler.current_user and _should_send_default_pii():
