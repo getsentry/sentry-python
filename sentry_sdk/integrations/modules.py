@@ -32,6 +32,5 @@ class ModulesIntegration(Integration):
         @add_global_event_processor
         def processor(event, hint):
             if Hub.current.get_integration(ModulesIntegration) is not None:
-                if "modules" not in event:
-                    event["modules"] = dict(_get_installed_modules())
+                event["modules"] = dict(_get_installed_modules())
             return event

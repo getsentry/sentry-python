@@ -66,24 +66,16 @@ def _make_request_processor(weak_request):
 
             request_info = event.setdefault("request", {})
 
-            if "url" not in request_info:
-                request_info["url"] = "%s://%s%s" % (
-                    request.scheme,
-                    request.host,
-                    request.path,
-                )
+            request_info["url"] = "%s://%s%s" % (
+                request.scheme,
+                request.host,
+                request.path,
+            )
 
-            if "query_string" not in request_info:
-                request_info["query_string"] = request.query_string
-
-            if "method" not in request_info:
-                request_info["method"] = request.method
-
-            if "env" not in request_info:
-                request_info["env"] = {"REMOTE_ADDR": request.remote}
-
-            if "headers" not in request_info:
-                request_info["headers"] = _filter_headers(dict(request.headers))
+            request_info["query_string"] = request.query_string
+            request_info["method"] = request.method
+            request_info["env"] = {"REMOTE_ADDR": request.remote}
+            request_info["headers"] = _filter_headers(dict(request.headers))
 
         return event
 

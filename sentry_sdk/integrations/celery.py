@@ -48,8 +48,7 @@ def _handle_task_prerun(sender, task, args, kwargs, **_):
 def _make_event_processor(args, kwargs, task):
     def event_processor(event, hint):
         with capture_internal_exceptions():
-            if "transaction" not in event:
-                event["transaction"] = task.name
+            event["transaction"] = task.name
 
         with capture_internal_exceptions():
             extra = event.setdefault("extra", {})

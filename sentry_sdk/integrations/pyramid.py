@@ -138,14 +138,13 @@ def _make_event_processor(weak_request, integration):
         if request is None:
             return event
 
-        if "transaction" not in event:
-            try:
-                if integration.transaction_style == "route_name":
-                    event["transaction"] = request.matched_route.name
-                elif integration.transaction_style == "route_pattern":
-                    event["transaction"] = request.matched_route.pattern
-            except Exception:
-                pass
+        try:
+            if integration.transaction_style == "route_name":
+                event["transaction"] = request.matched_route.name
+            elif integration.transaction_style == "route_pattern":
+                event["transaction"] = request.matched_route.pattern
+        except Exception:
+            pass
 
         with capture_internal_exceptions():
             PyramidRequestExtractor(request).extract_into_event(event)
@@ -153,8 +152,7 @@ def _make_event_processor(weak_request, integration):
         if _should_send_default_pii():
             with capture_internal_exceptions():
                 user_info = event.setdefault("user", {})
-                if "id" not in user_info:
-                    user_info["id"] = authenticated_userid(request)
+                user_info["id"] = authenticated_userid(request)
 
         return event
 

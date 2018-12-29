@@ -118,14 +118,13 @@ def _make_request_event_processor(app, weak_request, integration):
         if request is None:
             return event
 
-        if "transaction" not in event:
-            try:
-                if integration.transaction_style == "endpoint":
-                    event["transaction"] = request.url_rule.endpoint
-                elif integration.transaction_style == "url":
-                    event["transaction"] = request.url_rule.rule
-            except Exception:
-                pass
+        try:
+            if integration.transaction_style == "endpoint":
+                event["transaction"] = request.url_rule.endpoint
+            elif integration.transaction_style == "url":
+                event["transaction"] = request.url_rule.rule
+        except Exception:
+            pass
 
         with capture_internal_exceptions():
             FlaskRequestExtractor(request).extract_into_event(event)
@@ -166,13 +165,12 @@ def _add_user_to_event(event):
 
         user_info = event.setdefault("user", {})
 
-        if "id" not in user_info:
-            try:
-                user_info["id"] = user.get_id()
-                # TODO: more configurable user attrs here
-            except AttributeError:
-                # might happen if:
-                # - flask_login could not be imported
-                # - flask_login is not configured
-                # - no user is logged in
-                pass
+        try:
+            user_info["id"] = user.get_id()
+            # TODO: more configurable user attrs here
+        except AttributeError:
+            # might happen if:
+            # - flask_login could not be imported
+            # - flask_login is not configured
+            # - no user is logged in
+            pass

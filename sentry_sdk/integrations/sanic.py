@@ -125,24 +125,16 @@ def _make_request_processor(weak_request):
             request_info = event["request"]
             urlparts = urlparse.urlsplit(request.url)
 
-            if "url" not in request_info:
-                request_info["url"] = "%s://%s%s" % (
-                    urlparts.scheme,
-                    urlparts.netloc,
-                    urlparts.path,
-                )
+            request_info["url"] = "%s://%s%s" % (
+                urlparts.scheme,
+                urlparts.netloc,
+                urlparts.path,
+            )
 
-            if "query_string" not in request_info:
-                request_info["query_string"] = urlparts.query
-
-            if "method" not in request_info:
-                request_info["method"] = request.method
-
-            if "env" not in request_info:
-                request_info["env"] = {"REMOTE_ADDR": request.remote_addr}
-
-            if "headers" not in request_info:
-                request_info["headers"] = _filter_headers(dict(request.headers))
+            request_info["query_string"] = urlparts.query
+            request_info["method"] = request.method
+            request_info["env"] = {"REMOTE_ADDR": request.remote_addr}
+            request_info["headers"] = _filter_headers(dict(request.headers))
 
         return event
 
