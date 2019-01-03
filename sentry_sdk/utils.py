@@ -84,17 +84,14 @@ class Dsn(object):
             self.port = self.scheme == "https" and 443 or 80
         self.public_key = parts.username
         if not self.public_key:
-            raise BadDsn("Missing public key")
+            raise BadDsn("Missig public key")
         self.secret_key = parts.password
-
-        path = parts.path.rsplit("/", 1)
-
+        if not parts.path:
+            raise BadDsn("Missing project ID in DSN")
         try:
-            self.project_id = text_type(int(path.pop()))
+            self.project_id = text_type(int(parts.path[1:]))
         except (ValueError, TypeError):
             raise BadDsn("Invalid project in DSN (%r)" % (parts.path or "")[1:])
-
-        self.path = "/".join(path) + "/"
 
     @property
     def netloc(self):
@@ -109,7 +106,6 @@ class Dsn(object):
         return Auth(
             scheme=self.scheme,
             host=self.netloc,
-            path=self.path,
             project_id=self.project_id,
             public_key=self.public_key,
             secret_key=self.secret_key,
@@ -117,12 +113,11 @@ class Dsn(object):
         )
 
     def __str__(self):
-        return "%s://%s%s@%s%s%s" % (
+        return "%s://%s%s@%s/%s" % (
             self.scheme,
             self.public_key,
             self.secret_key and "@" + self.secret_key or "",
             self.netloc,
-            self.path,
             self.project_id,
         )
 
@@ -134,7 +129,6 @@ class Auth(object):
         self,
         scheme,
         host,
-        path,
         project_id,
         public_key,
         secret_key=None,
@@ -143,7 +137,6 @@ class Auth(object):
     ):
         self.scheme = scheme
         self.host = host
-        self.path = path
         self.project_id = project_id
         self.public_key = public_key
         self.secret_key = secret_key
@@ -153,12 +146,7 @@ class Auth(object):
     @property
     def store_api_url(self):
         """Returns the API url for storing events."""
-        return "%s://%s%sapi/%s/store/" % (
-            self.scheme,
-            self.host,
-            self.path,
-            self.project_id,
-        )
+        return "%s://%s/api/%s/store/" % (self.scheme, self.host, self.project_id)
 
     def to_header(self, timestamp=None):
         """Returns the auth header a string."""
