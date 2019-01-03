@@ -134,12 +134,12 @@ class Auth(object):
         self,
         scheme,
         host,
-        path,
         project_id,
         public_key,
         secret_key=None,
         version=7,
         client=None,
+        path="/",
     ):
         self.scheme = scheme
         self.host = host
