@@ -32,6 +32,39 @@ epoch = datetime(1970, 1, 1)
 logger = logging.getLogger("sentry_sdk.errors")
 
 
+class CapturePicker(object):
+    @staticmethod
+    def should_capture(tb):
+        raise NotImplementedError()
+
+
+class OneTimeCapturePicker(CapturePicker):
+    def __init__(self):
+        self.captured = set()
+
+    @staticmethod
+    def hashable_frame(frame):
+        if isinstance(frame, (tuple, list)):
+            frame, lineno = frame
+        else:
+            lineno = getattr(frame, 'f_lineno', None)
+        f_code = getattr(frame, 'f_code', None)
+        if f_code:
+            filename = f_code.co_filename
+            funcname = f_code.co_name
+        else:
+            filename = None
+            funcname = None
+        return (filename, lineno, funcname)
+
+    def should_capture(self, tb):
+        hashable_stack = tuple(self.hashable_frame(frame) for frame in iter_stacks(tb))
+        if hashable_stack in self.captured:
+            return False
+        self.captured.add(hashable_stack)
+        return True
+
+
 def _get_debug_hub():
     # This function is replaced by debug.py
     pass
@@ -375,6 +408,8 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
 
 
 def stacktrace_from_traceback(tb=None, with_locals=True):
+    if isinstance(with_locals, CapturePicker):
+        with_locals = with_locals.should_capture(tb)
     return {
         "frames": [
             serialize_frame(
