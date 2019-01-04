@@ -1106,8 +1106,7 @@ table {
         <span class="nd">@add_global_event_processor</span>
         <span class="k">def</span> <span class="nf">processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">ModulesIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="k">if</span> <span class="s2">&quot;modules&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
-                    <span class="n">event</span><span class="p">[</span><span class="s2">&quot;modules&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_get_installed_modules</span><span class="p">())</span>
+                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;modules&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_get_installed_modules</span><span class="p">())</span>
             <span class="k">return</span> <span class="n">event</span>
 </pre></div>
 
@@ -1138,8 +1137,7 @@ saves those options on <code>self</code>.</p></div>
         <span class="nd">@add_global_event_processor</span>
         <span class="k">def</span> <span class="nf">processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">ModulesIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="k">if</span> <span class="s2">&quot;modules&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
-                    <span class="n">event</span><span class="p">[</span><span class="s2">&quot;modules&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_get_installed_modules</span><span class="p">())</span>
+                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;modules&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_get_installed_modules</span><span class="p">())</span>
             <span class="k">return</span> <span class="n">event</span>
 </pre></div>
 
@@ -1199,8 +1197,7 @@ instance again.</p></div>
     <span class="nd">@add_global_event_processor</span>
     <span class="k">def</span> <span class="nf">processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">ModulesIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="k">if</span> <span class="s2">&quot;modules&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">event</span><span class="p">:</span>
-                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;modules&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_get_installed_modules</span><span class="p">())</span>
+            <span class="n">event</span><span class="p">[</span><span class="s2">&quot;modules&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_get_installed_modules</span><span class="p">())</span>
         <span class="k">return</span> <span class="n">event</span>
 </pre></div>
 

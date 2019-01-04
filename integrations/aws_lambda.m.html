@@ -1204,14 +1204,17 @@ table {
 
         <span class="n">request</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;request&quot;</span><span class="p">,</span> <span class="p">{})</span>
 
-        <span class="k">if</span> <span class="s2">&quot;httpMethod&quot;</span> <span class="ow">in</span> <span class="n">aws_event</span> <span class="ow">and</span> <span class="s2">&quot;method&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">request</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">&quot;httpMethod&quot;</span> <span class="ow">in</span> <span class="n">aws_event</span><span class="p">:</span>
             <span class="n">request</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">aws_event</span><span class="p">[</span><span class="s2">&quot;httpMethod&quot;</span><span class="p">]</span>
-        <span class="k">if</span> <span class="s2">&quot;url&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">request</span><span class="p">:</span>
-            <span class="n">request</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_get_url</span><span class="p">(</span><span class="n">aws_event</span><span class="p">,</span> <span class="n">aws_context</span><span class="p">)</span>
-        <span class="k">if</span> <span class="s2">&quot;queryStringParameters&quot;</span> <span class="ow">in</span> <span class="n">aws_event</span> <span class="ow">and</span> <span class="s2">&quot;query_string&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">request</span><span class="p">:</span>
+
+        <span class="n">request</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_get_url</span><span class="p">(</span><span class="n">aws_event</span><span class="p">,</span> <span class="n">aws_context</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s2">&quot;queryStringParameters&quot;</span> <span class="ow">in</span> <span class="n">aws_event</span><span class="p">:</span>
             <span class="n">request</span><span class="p">[</span><span class="s2">&quot;query_string&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">aws_event</span><span class="p">[</span><span class="s2">&quot;queryStringParameters&quot;</span><span class="p">]</span>
-        <span class="k">if</span> <span class="s2">&quot;headers&quot;</span> <span class="ow">in</span> <span class="n">aws_event</span> <span class="ow">and</span> <span class="s2">&quot;headers&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">request</span><span class="p">:</span>
+
+        <span class="k">if</span> <span class="s2">&quot;headers&quot;</span> <span class="ow">in</span> <span class="n">aws_event</span><span class="p">:</span>
             <span class="n">request</span><span class="p">[</span><span class="s2">&quot;headers&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_filter_headers</span><span class="p">(</span><span class="n">aws_event</span><span class="p">[</span><span class="s2">&quot;headers&quot;</span><span class="p">])</span>
+
         <span class="k">if</span> <span class="n">aws_event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;body&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">):</span>
             <span class="c1"># Unfortunately couldn&#39;t find a way to get structured body from AWS</span>
             <span class="c1"># event. Meaning every body is unstructured to us.</span>
@@ -1219,10 +1222,14 @@ table {
 
         <span class="k">if</span> <span class="n">_should_send_default_pii</span><span class="p">():</span>
             <span class="n">user_info</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="p">{})</span>
-            <span class="k">if</span> <span class="s2">&quot;id&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">user_info</span><span class="p">:</span>
-                <span class="n">user_info</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">aws_event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;identity&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;userArn&quot;</span><span class="p">)</span>
-            <span class="k">if</span> <span class="s2">&quot;ip_address&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">user_info</span><span class="p">:</span>
-                <span class="n">user_info</span><span class="p">[</span><span class="s2">&quot;ip_address&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">aws_event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;identity&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sourceIp&quot;</span><span class="p">)</span>
+
+            <span class="nb">id</span> <span class="o">=</span> <span class="n">aws_event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;identity&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;userArn&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="n">user_info</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">id</span>
+
+            <span class="n">ip</span> <span class="o">=</span> <span class="n">aws_event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;identity&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sourceIp&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">ip</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="n">user_info</span><span class="p">[</span><span class="s2">&quot;ip_address&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ip</span>
 
         <span class="k">return</span> <span class="n">event</span>
 

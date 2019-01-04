@@ -1280,14 +1280,13 @@ table {
 
             <span class="k">if</span> <span class="n">_should_send_default_pii</span><span class="p">():</span>
                 <span class="n">user_info</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="p">{})</span>
-                <span class="k">if</span> <span class="s2">&quot;ip_address&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">user_info</span><span class="p">:</span>
-                    <span class="n">user_info</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;ip_address&quot;</span><span class="p">,</span> <span class="n">client_ip</span><span class="p">)</span>
+                <span class="n">user_info</span><span class="p">[</span><span class="s2">&quot;ip_address&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">client_ip</span>
 
-            <span class="n">request_info</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;url&quot;</span><span class="p">,</span> <span class="n">request_url</span><span class="p">)</span>
-            <span class="n">request_info</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;query_string&quot;</span><span class="p">,</span> <span class="n">query_string</span><span class="p">)</span>
-            <span class="n">request_info</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="n">method</span><span class="p">)</span>
-            <span class="n">request_info</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;env&quot;</span><span class="p">,</span> <span class="n">env</span><span class="p">)</span>
-            <span class="n">request_info</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;headers&quot;</span><span class="p">,</span> <span class="n">headers</span><span class="p">)</span>
+            <span class="n">request_info</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">request_url</span>
+            <span class="n">request_info</span><span class="p">[</span><span class="s2">&quot;query_string&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">query_string</span>
+            <span class="n">request_info</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">method</span>
+            <span class="n">request_info</span><span class="p">[</span><span class="s2">&quot;env&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">env</span>
+            <span class="n">request_info</span><span class="p">[</span><span class="s2">&quot;headers&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">headers</span>
 
         <span class="k">return</span> <span class="n">event</span>
 
