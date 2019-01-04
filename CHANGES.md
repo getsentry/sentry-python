@@ -1,3 +1,7 @@
+## 0.6.6
+
+* Un-break API of internal `Auth` object that we use in Sentry itself.
+
 ## 0.6.5
 
 * Capture WSGI request data eagerly to save memory and avoid issues with uWSGI.
