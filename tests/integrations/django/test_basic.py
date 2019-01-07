@@ -288,3 +288,29 @@ def test_request_body(sentry_init, client, capture_events):
     assert event["message"] == "hi"
     assert event["request"]["data"] == {"hey": 42}
     assert "" not in event
+
+
+def test_template_exception(sentry_init, client, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+    events = capture_events()
+
+    content, status, headers = client.get(reverse("template_exc"))
+    assert status.lower() == "500 internal server error"
+
+    event, = events
+    exception, = event["exception"]["values"]
+
+    frames = [
+        f
+        for f in exception["stacktrace"]["frames"]
+        if not f["filename"].startswith("django/")
+    ]
+    view_frame, template_frame = frames[-2:]
+
+    assert template_frame["context_line"] == "{% invalid template tag %}\n"
+    assert template_frame["pre_context"] == ["5\n", "6\n", "7\n", "8\n", "9\n"]
+
+    assert template_frame["post_context"] == ["11\n", "12\n", "13\n", "14\n", "15\n"]
+    assert template_frame["lineno"] == 10
+    assert template_frame["in_app"]
+    assert template_frame["filename"].endswith("error.html")

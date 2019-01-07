@@ -29,18 +29,21 @@ except ImportError:
 
 from sentry_sdk import Hub
 from sentry_sdk.hub import _should_send_default_pii
+from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     safe_repr,
     format_and_strip,
     transaction_from_function,
+    walk_exception_chain,
 )
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
+from sentry_sdk.integrations.django.templates import get_template_frame_from_exception
 
 
 if DJANGO_VERSION < (1, 10):
@@ -111,6 +114,31 @@ class DjangoIntegration(Integration):
         BaseHandler.get_response = sentry_patched_get_response
 
         signals.got_request_exception.connect(_got_request_exception)
+
+        @add_global_event_processor
+        def process_django_templates(event, hint):
+            if hint.get("exc_info", None) is None:
+                return event
+
+            if "exception" not in event:
+                return event
+
+            exception = event["exception"]
+
+            if "values" not in exception:
+                return event
+
+            for exception, (_, exc_value, _) in zip(
+                exception["values"], walk_exception_chain(hint["exc_info"])
+            ):
+                frame = get_template_frame_from_exception(exc_value)
+                if frame is not None:
+                    frames = exception.setdefault("stacktrace", {}).setdefault(
+                        "frames", []
+                    )
+                    frames.append(frame)
+
+            return event
 
 
 def _make_event_processor(weak_request, integration):
