@@ -427,21 +427,29 @@ def single_exception_from_error_tuple(
     }
 
 
-def exceptions_from_error_tuple(exc_info, client_options=None, mechanism=None):
+def walk_exception_chain(exc_info):
     exc_type, exc_value, tb = exc_info
-    rv = []
+
     while exc_type is not None:
-        rv.append(
-            single_exception_from_error_tuple(
-                exc_type, exc_value, tb, client_options, mechanism
-            )
-        )
+        yield exc_type, exc_value, tb
+
         cause = getattr(exc_value, "__cause__", None)
         if cause is None:
             break
         exc_type = type(cause)
         exc_value = cause
         tb = getattr(cause, "__traceback__", None)
+
+
+def exceptions_from_error_tuple(exc_info, client_options=None, mechanism=None):
+    exc_type, exc_value, tb = exc_info
+    rv = []
+    for exc_type, exc_value, tb in walk_exception_chain(exc_info):
+        rv.append(
+            single_exception_from_error_tuple(
+                exc_type, exc_value, tb, client_options, mechanism
+            )
+        )
     return rv
 
 

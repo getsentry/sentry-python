@@ -29,6 +29,7 @@ urlpatterns = [
     path("mylogin", views.mylogin, name="mylogin"),
     path("classbased", views.ClassBasedView.as_view(), name="classbased"),
     path("post-echo", views.post_echo, name="post_echo"),
+    path("template-exc", views.template_exc, name="template_exc"),
 ]
 
 handler500 = views.handler500

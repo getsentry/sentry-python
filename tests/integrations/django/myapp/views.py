@@ -1,6 +1,7 @@
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.http import HttpResponse, HttpResponseServerError, HttpResponseNotFound
+from django.shortcuts import render_to_response
 from django.views.generic import ListView
 
 import sentry_sdk
@@ -42,3 +43,7 @@ def post_echo(request):
 def handler404(*args, **kwargs):
     sentry_sdk.capture_message("not found", level="error")
     return HttpResponseNotFound("404")
+
+
+def template_exc(*args, **kwargs):
+    return render_to_response("error.html")
