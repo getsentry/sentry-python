@@ -28,6 +28,7 @@ DEFAULT_OPTIONS = {
     "debug": False,
     "attach_stacktrace": False,
     "ca_certs": None,
+    "cert_file": None,
 }
 
 
