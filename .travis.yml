@@ -45,7 +45,7 @@ matrix:
       name: OS X Python 2.7
       language: generic
       before_install:
-        - brew install python@2
+        - HOMEBREW_LOGS=/tmp HOMEBREW_NO_AUTO_UPDATE=yes brew install python@2
         - python2 -m pip install --user virtualenv
         - /Users/travis/Library/Python/2.7/bin/virtualenv $HOME/osx-py
         - source $HOME/osx-py/bin/activate
