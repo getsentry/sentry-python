@@ -16,7 +16,6 @@ from sentry_sdk import (
     add_breadcrumb,
     capture_exception,
 )
-from sentry_sdk.hub import HubMeta
 from sentry_sdk.transport import Transport
 from sentry_sdk._compat import reraise, text_type
 from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
