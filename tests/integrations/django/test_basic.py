@@ -1,4 +1,7 @@
+from __future__ import absolute_import
+
 import platform
+import threading
 
 import pytest
 
@@ -17,6 +20,19 @@ from sentry_sdk import capture_message, capture_exception
 from sentry_sdk.integrations.django import DjangoIntegration
 
 from tests.integrations.django.myapp.wsgi import application
+
+
+@pytest.fixture(autouse=True)
+def django_clear_caches():
+    """Invalidate the connection caches.
+
+    https://github.com/pytest-dev/pytest-django/issues/587
+    """
+    from django.db import connections
+
+    connections._connections = threading.local()
+    # this will clear the cached property
+    connections.__dict__.pop("databases", None)
 
 
 @pytest.fixture
