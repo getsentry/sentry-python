@@ -83,6 +83,12 @@ def test_transaction_with_class_view(sentry_init, client, capture_events):
 
 @pytest.mark.django_db(transaction=True)
 def test_user_captured(sentry_init, client, capture_events):
+
+    # Honestly no idea why pytest-django does not do this
+    from django.core import management
+
+    management.call_command("migrate", noinput=True)
+
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     events = capture_events()
     content, status, headers = client.get(reverse("mylogin"))
