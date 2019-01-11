@@ -85,9 +85,13 @@ def test_transaction_with_class_view(sentry_init, client, capture_events):
 def test_user_captured(sentry_init, client, capture_events):
 
     # Honestly no idea why pytest-django does not do this
+    from django import VERSION
     from django.core import management
 
-    management.call_command("migrate", noinput=True)
+    if VERSION < (2, 0):
+        management.call_command("migrate", noinput=True)
+    else:
+        management.call_command("migrate", no_input=True)
 
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     events = capture_events()
