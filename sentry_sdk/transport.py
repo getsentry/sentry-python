@@ -18,24 +18,6 @@ except ImportError:
     from urllib import getproxies
 
 
-def _make_pool(parsed_dsn, http_proxy, https_proxy, ca_certs):
-    # Use http_proxy if scheme is https and https_proxy is not set
-    proxy = parsed_dsn.scheme == "https" and https_proxy or http_proxy
-    if not proxy:
-        proxy = getproxies().get(parsed_dsn.scheme)
-
-    opts = {
-        "num_pools": 2,
-        "cert_reqs": "CERT_REQUIRED",
-        "ca_certs": ca_certs or certifi.where(),
-    }
-
-    if proxy:
-        return urllib3.ProxyManager(proxy, **opts)
-    else:
-        return urllib3.PoolManager(**opts)
-
-
 class Transport(object):
     """Baseclass for all transports.
 
@@ -90,15 +72,16 @@ class HttpTransport(Transport):
         Transport.__init__(self, options)
         self._worker = BackgroundWorker()
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
-        self._pool = _make_pool(
+        self._disabled_until = None
+        self._retry = urllib3.util.Retry()
+        self.options = options
+
+        self._pool = self._make_pool(
             self.parsed_dsn,
             http_proxy=options["http_proxy"],
             https_proxy=options["https_proxy"],
             ca_certs=options["ca_certs"],
         )
-        self._disabled_until = None
-        self._retry = urllib3.util.Retry()
-        self.options = options
 
         from sentry_sdk import Hub
 
@@ -147,6 +130,26 @@ class HttpTransport(Transport):
             response.close()
 
         self._disabled_until = None
+
+    def _get_pool_options(self, ca_certs):
+        return {
+            "num_pools": 2,
+            "cert_reqs": "CERT_REQUIRED",
+            "ca_certs": ca_certs or certifi.where(),
+        }
+
+    def _make_pool(self, parsed_dsn, http_proxy, https_proxy, ca_certs):
+        # Use http_proxy if scheme is https and https_proxy is not set
+        proxy = parsed_dsn.scheme == "https" and https_proxy or http_proxy
+        if not proxy:
+            proxy = getproxies().get(parsed_dsn.scheme)
+
+        opts = self._get_pool_options(ca_certs)
+
+        if proxy:
+            return urllib3.ProxyManager(proxy, **opts)
+        else:
+            return urllib3.PoolManager(**opts)
 
     def capture_event(self, event):
         hub = self.hub_cls.current
