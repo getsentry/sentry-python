@@ -2,6 +2,11 @@
 
 set -e
 
+if [ "$TRAVIS" = true ] && [ -z "$GITHUB_API_TOKEN" ]; then
+    echo "Not running on external pull request"
+    exit 0;
+fi
+
 target=semaphore
 
 # Download the latest semaphore release for Travis
