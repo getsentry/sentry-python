@@ -41,8 +41,12 @@ def test_strip_exception_vars():
 
 def test_cyclic_data():
     data = {}
-    data["foo"] = data
+    data["is_cyclic"] = data
+
+    other_data = ""
+    data["not_cyclic"] = other_data
+    data["not_cyclic2"] = other_data
 
     data = convert_types(data)
 
-    assert data == {"foo": "<cyclic>"}
+    assert data == {"not_cyclic2": "", "not_cyclic": "", "is_cyclic": "<cyclic>"}
