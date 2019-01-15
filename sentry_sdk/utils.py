@@ -305,12 +305,7 @@ def safe_repr(value):
         return u"<broken repr>"
 
 
-def object_to_json(obj, memo=None):
-    if memo is None:
-        memo = {}
-    if id(obj) in memo:
-        return '<cyclic>'
-    memo[id(obj)] = obj
+def object_to_json(obj):
     def _walk(obj, depth):
         if depth < 4:
             if isinstance(obj, Sequence) and not isinstance(obj, (bytes, text_type)):
@@ -624,19 +619,23 @@ def convert_types(obj, memo=None):
     if memo is None:
         memo = {}
     if id(obj) in memo:
-        return '<cyclic>'
+        return u"<cyclic>"
     memo[id(obj)] = obj
-    if isinstance(obj, datetime):
-        return obj.strftime("%Y-%m-%dT%H:%M:%SZ")
-    if isinstance(obj, Mapping):
-        return {k: convert_types(v, memo) for k, v in obj.items()}
-    if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
-        return [convert_types(v, memo) for v in obj]
-    if not isinstance(obj, string_types + number_types):
-        return safe_repr(obj, memo)
-    if isinstance(obj, bytes):
-        return obj.decode("utf-8", "replace")
-    return obj
+
+    try:
+        if isinstance(obj, datetime):
+            return obj.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if isinstance(obj, Mapping):
+            return {k: convert_types(v, memo) for k, v in obj.items()}
+        if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
+            return [convert_types(v, memo) for v in obj]
+        if not isinstance(obj, string_types + number_types):
+            return safe_repr(obj)
+        if isinstance(obj, bytes):
+            return obj.decode("utf-8", "replace")
+        return obj
+    finally:
+        del memo[id(obj)]
 
 
 def strip_databag(obj, remaining_depth=20):
