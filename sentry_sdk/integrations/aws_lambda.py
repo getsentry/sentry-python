@@ -92,6 +92,17 @@ class AwsLambdaIntegration(Integration):
                 return old_handle_http_request(request_handler, *args, **kwargs)
 
             lambda_bootstrap.handle_http_request = sentry_handle_http_request
+
+            # Patch to_json to drain the queue. This should work even when the
+            # SDK is initialized inside of the handler
+
+            old_to_json = lambda_bootstrap.to_json
+
+            def sentry_to_json(*args, **kwargs):
+                _drain_queue()
+                return old_to_json(*args, **kwargs)
+
+            lambda_bootstrap.to_json = sentry_to_json
         else:
             old_handle_event_request = lambda_bootstrap.handle_event_request
 
@@ -105,16 +116,22 @@ class AwsLambdaIntegration(Integration):
 
             lambda_bootstrap.handle_event_request = sentry_handle_event_request
 
-        # This is the only function that is called in all Python environments
-        # at the end of the request/response lifecycle. It is the only way to
-        # do it in the Python 3.7 env.
-        old_to_json = lambda_bootstrap.to_json
+            # Patch the runtime client to drain the queue. This should work
+            # even when the SDK is initialized inside of the handler
 
-        def sentry_to_json(*args, **kwargs):
-            _drain_queue()
-            return old_to_json(*args, **kwargs)
+            def _wrap_post_function(f):
+                def inner(*args, **kwargs):
+                    _drain_queue()
+                    return f(*args, **kwargs)
 
-        lambda_bootstrap.to_json = sentry_to_json
+                return inner
+
+            lambda_bootstrap.LambdaRuntimeClient.post_invocation_result = _wrap_post_function(
+                lambda_bootstrap.LambdaRuntimeClient.post_invocation_result
+            )
+            lambda_bootstrap.LambdaRuntimeClient.post_invocation_error = _wrap_post_function(
+                lambda_bootstrap.LambdaRuntimeClient.post_invocation_error
+            )
 
 
 def _make_request_event_processor(aws_event, aws_context):
