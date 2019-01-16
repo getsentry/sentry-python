@@ -31,6 +31,8 @@ epoch = datetime(1970, 1, 1)
 # The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
 
+CYCLE_MARKER = object()
+
 
 def _get_debug_hub():
     # This function is replaced by debug.py
@@ -312,9 +314,13 @@ def object_to_json(obj):
                 return [_walk(x, depth + 1) for x in obj]
             if isinstance(obj, Mapping):
                 return {safe_str(k): _walk(v, depth + 1) for k, v in obj.items()}
+
+        if obj is CYCLE_MARKER:
+            return obj
+
         return safe_repr(obj)
 
-    return _walk(obj, 0)
+    return _walk(break_cycles(obj), 0)
 
 
 def extract_locals(frame):
@@ -615,27 +621,37 @@ def strip_frame_mut(frame):
         frame["vars"] = strip_databag(frame["vars"])
 
 
-def convert_types(obj, memo=None):
+def break_cycles(obj, memo=None):
     if memo is None:
         memo = {}
     if id(obj) in memo:
-        return u"<cyclic>"
+        return CYCLE_MARKER
     memo[id(obj)] = obj
 
     try:
-        if isinstance(obj, datetime):
-            return obj.strftime("%Y-%m-%dT%H:%M:%SZ")
         if isinstance(obj, Mapping):
-            return {k: convert_types(v, memo) for k, v in obj.items()}
+            return {k: break_cycles(v, memo) for k, v in obj.items()}
         if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
-            return [convert_types(v, memo) for v in obj]
-        if not isinstance(obj, string_types + number_types):
-            return safe_repr(obj)
-        if isinstance(obj, bytes):
-            return obj.decode("utf-8", "replace")
+            return [break_cycles(v, memo) for v in obj]
         return obj
     finally:
         del memo[id(obj)]
+
+
+def convert_types(obj):
+    if obj is CYCLE_MARKER:
+        return u"<cyclic>"
+    if isinstance(obj, datetime):
+        return obj.strftime("%Y-%m-%dT%H:%M:%SZ")
+    if isinstance(obj, Mapping):
+        return {k: convert_types(v) for k, v in obj.items()}
+    if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
+        return [convert_types(v) for v in obj]
+    if not isinstance(obj, string_types + number_types):
+        return safe_repr(obj)
+    if isinstance(obj, bytes):
+        return obj.decode("utf-8", "replace")
+    return obj
 
 
 def strip_databag(obj, remaining_depth=20):

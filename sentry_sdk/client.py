@@ -12,6 +12,7 @@ from sentry_sdk.utils import (
     get_type_name,
     capture_internal_exceptions,
     current_stacktrace,
+    break_cycles,
     logger,
 )
 from sentry_sdk.transport import make_transport
@@ -118,20 +119,22 @@ class Client(object):
             event, self.options["in_app_exclude"], self.options["in_app_include"]
         )
 
+        # Postprocess the event here so that annotated types do
+        # generally not surface in before_send
+        if event is not None:
+            event = break_cycles(event)
+            strip_event_mut(event)
+            event = flatten_metadata(event)
+            event = convert_types(event)
+
         before_send = self.options["before_send"]
         if before_send is not None:
+            new_event = None
             with capture_internal_exceptions():
                 new_event = before_send(event, hint)
             if new_event is None:
                 logger.info("before send dropped event (%s)", event)
             event = new_event
-
-        # Postprocess the event in the very end so that annotated types do
-        # generally not surface in before_send
-        if event is not None:
-            strip_event_mut(event)
-            event = flatten_metadata(event)
-            event = convert_types(event)
 
         return event
 

@@ -37,16 +37,3 @@ def test_strip_exception_vars():
     event = flatten_metadata(event)
     event = convert_types(event)
     assert len(json.dumps(event)) < 10000
-
-
-def test_cyclic_data():
-    data = {}
-    data["is_cyclic"] = data
-
-    other_data = ""
-    data["not_cyclic"] = other_data
-    data["not_cyclic2"] = other_data
-
-    data = convert_types(data)
-
-    assert data == {"not_cyclic2": "", "not_cyclic": "", "is_cyclic": "<cyclic>"}
