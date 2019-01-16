@@ -357,7 +357,7 @@ def test_databag_stripping(sentry_init, capture_events):
     events = capture_events()
 
     try:
-        a = "A" * 16000
+        a = "A" * 16000  # noqa
         1 / 0
     except Exception:
         capture_exception()
