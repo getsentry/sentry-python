@@ -9,7 +9,7 @@ from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
 import asyncio
-from aiohttp.web import Application, HTTPError
+from aiohttp.web import Application, HTTPException
 
 
 class AioHttpIntegration(Integration):
@@ -42,7 +42,7 @@ class AioHttpIntegration(Integration):
 
                     try:
                         response = await old_handle(self, request)
-                    except HTTPError:
+                    except HTTPException:
                         raise
                     except Exception:
                         reraise(*_capture_exception(hub))
