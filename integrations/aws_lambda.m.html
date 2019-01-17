@@ -1166,6 +1166,17 @@ table {
                 <span class="k">return</span> <span class="n">old_handle_http_request</span><span class="p">(</span><span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
             <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_http_request</span> <span class="o">=</span> <span class="n">sentry_handle_http_request</span>
+
+            <span class="c1"># Patch to_json to drain the queue. This should work even when the</span>
+            <span class="c1"># SDK is initialized inside of the handler</span>
+
+            <span class="n">old_to_json</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span>
+
+            <span class="k">def</span> <span class="nf">sentry_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                <span class="n">_drain_queue</span><span class="p">()</span>
+                <span class="k">return</span> <span class="n">old_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+            <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span> <span class="o">=</span> <span class="n">sentry_to_json</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">old_handle_event_request</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span>
 
@@ -1179,16 +1190,22 @@ table {
 
             <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span> <span class="o">=</span> <span class="n">sentry_handle_event_request</span>
 
-        <span class="c1"># This is the only function that is called in all Python environments</span>
-        <span class="c1"># at the end of the request/response lifecycle. It is the only way to</span>
-        <span class="c1"># do it in the Python 3.7 env.</span>
-        <span class="n">old_to_json</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span>
+            <span class="c1"># Patch the runtime client to drain the queue. This should work</span>
+            <span class="c1"># even when the SDK is initialized inside of the handler</span>
 
-        <span class="k">def</span> <span class="nf">sentry_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-            <span class="n">_drain_queue</span><span class="p">()</span>
-            <span class="k">return</span> <span class="n">old_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">def</span> <span class="nf">_wrap_post_function</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
+                <span class="k">def</span> <span class="nf">inner</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                    <span class="n">_drain_queue</span><span class="p">()</span>
+                    <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-        <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span> <span class="o">=</span> <span class="n">sentry_to_json</span>
+                <span class="k">return</span> <span class="n">inner</span>
+
+            <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">LambdaRuntimeClient</span><span class="o">.</span><span class="n">post_invocation_result</span> <span class="o">=</span> <span class="n">_wrap_post_function</span><span class="p">(</span>
+                <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">LambdaRuntimeClient</span><span class="o">.</span><span class="n">post_invocation_result</span>
+            <span class="p">)</span>
+            <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">LambdaRuntimeClient</span><span class="o">.</span><span class="n">post_invocation_error</span> <span class="o">=</span> <span class="n">_wrap_post_function</span><span class="p">(</span>
+                <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">LambdaRuntimeClient</span><span class="o">.</span><span class="n">post_invocation_error</span>
+            <span class="p">)</span>
 
 
 <span class="k">def</span> <span class="nf">_make_request_event_processor</span><span class="p">(</span><span class="n">aws_event</span><span class="p">,</span> <span class="n">aws_context</span><span class="p">):</span>
@@ -1305,6 +1322,17 @@ saves those options on <code>self</code>.</p></div>
                 <span class="k">return</span> <span class="n">old_handle_http_request</span><span class="p">(</span><span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
             <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_http_request</span> <span class="o">=</span> <span class="n">sentry_handle_http_request</span>
+
+            <span class="c1"># Patch to_json to drain the queue. This should work even when the</span>
+            <span class="c1"># SDK is initialized inside of the handler</span>
+
+            <span class="n">old_to_json</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span>
+
+            <span class="k">def</span> <span class="nf">sentry_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                <span class="n">_drain_queue</span><span class="p">()</span>
+                <span class="k">return</span> <span class="n">old_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+            <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span> <span class="o">=</span> <span class="n">sentry_to_json</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">old_handle_event_request</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span>
 
@@ -1318,16 +1346,22 @@ saves those options on <code>self</code>.</p></div>
 
             <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span> <span class="o">=</span> <span class="n">sentry_handle_event_request</span>
 
-        <span class="c1"># This is the only function that is called in all Python environments</span>
-        <span class="c1"># at the end of the request/response lifecycle. It is the only way to</span>
-        <span class="c1"># do it in the Python 3.7 env.</span>
-        <span class="n">old_to_json</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span>
+            <span class="c1"># Patch the runtime client to drain the queue. This should work</span>
+            <span class="c1"># even when the SDK is initialized inside of the handler</span>
 
-        <span class="k">def</span> <span class="nf">sentry_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-            <span class="n">_drain_queue</span><span class="p">()</span>
-            <span class="k">return</span> <span class="n">old_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">def</span> <span class="nf">_wrap_post_function</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
+                <span class="k">def</span> <span class="nf">inner</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                    <span class="n">_drain_queue</span><span class="p">()</span>
+                    <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-        <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span> <span class="o">=</span> <span class="n">sentry_to_json</span>
+                <span class="k">return</span> <span class="n">inner</span>
+
+            <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">LambdaRuntimeClient</span><span class="o">.</span><span class="n">post_invocation_result</span> <span class="o">=</span> <span class="n">_wrap_post_function</span><span class="p">(</span>
+                <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">LambdaRuntimeClient</span><span class="o">.</span><span class="n">post_invocation_result</span>
+            <span class="p">)</span>
+            <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">LambdaRuntimeClient</span><span class="o">.</span><span class="n">post_invocation_error</span> <span class="o">=</span> <span class="n">_wrap_post_function</span><span class="p">(</span>
+                <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">LambdaRuntimeClient</span><span class="o">.</span><span class="n">post_invocation_error</span>
+            <span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1408,6 +1442,13 @@ instance again.</p></div>
             <span class="n">request_handler</span> <span class="o">=</span> <span class="n">_wrap_handler</span><span class="p">(</span><span class="n">request_handler</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">old_handle_http_request</span><span class="p">(</span><span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_http_request</span> <span class="o">=</span> <span class="n">sentry_handle_http_request</span>
+        <span class="c1"># Patch to_json to drain the queue. This should work even when the</span>
+        <span class="c1"># SDK is initialized inside of the handler</span>
+        <span class="n">old_to_json</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span>
+        <span class="k">def</span> <span class="nf">sentry_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="n">_drain_queue</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">old_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span> <span class="o">=</span> <span class="n">sentry_to_json</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">old_handle_event_request</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span>
         <span class="k">def</span> <span class="nf">sentry_handle_event_request</span><span class="p">(</span>
@@ -1418,14 +1459,19 @@ instance again.</p></div>
                 <span class="n">lambda_runtime_client</span><span class="p">,</span> <span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
             <span class="p">)</span>
         <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span> <span class="o">=</span> <span class="n">sentry_handle_event_request</span>
-    <span class="c1"># This is the only function that is called in all Python environments</span>
-    <span class="c1"># at the end of the request/response lifecycle. It is the only way to</span>
-    <span class="c1"># do it in the Python 3.7 env.</span>
-    <span class="n">old_to_json</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span>
-    <span class="k">def</span> <span class="nf">sentry_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="n">_drain_queue</span><span class="p">()</span>
-        <span class="k">return</span> <span class="n">old_to_json</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-    <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span> <span class="o">=</span> <span class="n">sentry_to_json</span>
+        <span class="c1"># Patch the runtime client to drain the queue. This should work</span>
+        <span class="c1"># even when the SDK is initialized inside of the handler</span>
+        <span class="k">def</span> <span class="nf">_wrap_post_function</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
+            <span class="k">def</span> <span class="nf">inner</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                <span class="n">_drain_queue</span><span class="p">()</span>
+                <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">inner</span>
+        <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">LambdaRuntimeClient</span><span class="o">.</span><span class="n">post_invocation_result</span> <span class="o">=</span> <span class="n">_wrap_post_function</span><span class="p">(</span>
+            <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">LambdaRuntimeClient</span><span class="o">.</span><span class="n">post_invocation_result</span>
+        <span class="p">)</span>
+        <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">LambdaRuntimeClient</span><span class="o">.</span><span class="n">post_invocation_error</span> <span class="o">=</span> <span class="n">_wrap_post_function</span><span class="p">(</span>
+            <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">LambdaRuntimeClient</span><span class="o">.</span><span class="n">post_invocation_error</span>
+        <span class="p">)</span>
 </pre></div>
 
   </div>

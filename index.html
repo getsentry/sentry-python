@@ -1552,20 +1552,22 @@ argument.</p></div>
             <span class="n">event</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;in_app_exclude&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;in_app_include&quot;</span><span class="p">]</span>
         <span class="p">)</span>
 
+        <span class="c1"># Postprocess the event here so that annotated types do</span>
+        <span class="c1"># generally not surface in before_send</span>
+        <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="n">break_cycles</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+            <span class="n">strip_event_mut</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="n">flatten_metadata</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="n">convert_types</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+
         <span class="n">before_send</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;before_send&quot;</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">before_send</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">new_event</span> <span class="o">=</span> <span class="bp">None</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
                 <span class="n">new_event</span> <span class="o">=</span> <span class="n">before_send</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">new_event</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;before send dropped event (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">event</span><span class="p">)</span>
             <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>
-
-        <span class="c1"># Postprocess the event in the very end so that annotated types do</span>
-        <span class="c1"># generally not surface in before_send</span>
-        <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="n">strip_event_mut</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-            <span class="n">event</span> <span class="o">=</span> <span class="n">flatten_metadata</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-            <span class="n">event</span> <span class="o">=</span> <span class="n">convert_types</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">event</span>
 
@@ -1818,15 +1820,16 @@ stderr.</p></div>
         <span class="n">Transport</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span> <span class="o">=</span> <span class="n">BackgroundWorker</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_auth</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">to_auth</span><span class="p">(</span><span class="s2">&quot;sentry.python/</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">VERSION</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span> <span class="o">=</span> <span class="n">_make_pool</span><span class="p">(</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_retry</span> <span class="o">=</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">Retry</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_pool</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="p">,</span>
             <span class="n">http_proxy</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;http_proxy&quot;</span><span class="p">],</span>
             <span class="n">https_proxy</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;https_proxy&quot;</span><span class="p">],</span>
             <span class="n">ca_certs</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;ca_certs&quot;</span><span class="p">],</span>
         <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="bp">None</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_retry</span> <span class="o">=</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">Retry</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
 
         <span class="kn">from</span> <span class="nn">sentry_sdk</span> <span class="kn">import</span> <span class="n">Hub</span>
 
@@ -1875,6 +1878,26 @@ stderr.</p></div>
             <span class="n">response</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="bp">None</span>
+
+    <span class="k">def</span> <span class="nf">_get_pool_options</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ca_certs</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;num_pools&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+            <span class="s2">&quot;cert_reqs&quot;</span><span class="p">:</span> <span class="s2">&quot;CERT_REQUIRED&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;ca_certs&quot;</span><span class="p">:</span> <span class="n">ca_certs</span> <span class="ow">or</span> <span class="n">certifi</span><span class="o">.</span><span class="n">where</span><span class="p">(),</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span> <span class="nf">_make_pool</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parsed_dsn</span><span class="p">,</span> <span class="n">http_proxy</span><span class="p">,</span> <span class="n">https_proxy</span><span class="p">,</span> <span class="n">ca_certs</span><span class="p">):</span>
+        <span class="c1"># Use http_proxy if scheme is https and https_proxy is not set</span>
+        <span class="n">proxy</span> <span class="o">=</span> <span class="n">parsed_dsn</span><span class="o">.</span><span class="n">scheme</span> <span class="o">==</span> <span class="s2">&quot;https&quot;</span> <span class="ow">and</span> <span class="n">https_proxy</span> <span class="ow">or</span> <span class="n">http_proxy</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">proxy</span><span class="p">:</span>
+            <span class="n">proxy</span> <span class="o">=</span> <span class="n">getproxies</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">scheme</span><span class="p">)</span>
+
+        <span class="n">opts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_pool_options</span><span class="p">(</span><span class="n">ca_certs</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">proxy</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">ProxyManager</span><span class="p">(</span><span class="n">proxy</span><span class="p">,</span> <span class="o">**</span><span class="n">opts</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">PoolManager</span><span class="p">(</span><span class="o">**</span><span class="n">opts</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
         <span class="n">hub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hub_cls</span><span class="o">.</span><span class="n">current</span>
@@ -1932,15 +1955,15 @@ stderr.</p></div>
     <span class="n">Transport</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span> <span class="o">=</span> <span class="n">BackgroundWorker</span><span class="p">()</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_auth</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">to_auth</span><span class="p">(</span><span class="s2">&quot;sentry.python/</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">VERSION</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span> <span class="o">=</span> <span class="n">_make_pool</span><span class="p">(</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_retry</span> <span class="o">=</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">Retry</span><span class="p">()</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_pool</span><span class="p">(</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="p">,</span>
         <span class="n">http_proxy</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;http_proxy&quot;</span><span class="p">],</span>
         <span class="n">https_proxy</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;https_proxy&quot;</span><span class="p">],</span>
         <span class="n">ca_certs</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;ca_certs&quot;</span><span class="p">],</span>
     <span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="bp">None</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_retry</span> <span class="o">=</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">Retry</span><span class="p">()</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk</span> <span class="kn">import</span> <span class="n">Hub</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">hub_cls</span> <span class="o">=</span> <span class="n">Hub</span>
 </pre></div>
