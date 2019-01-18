@@ -310,7 +310,9 @@ def safe_repr(value):
 def object_to_json(obj):
     def _walk(obj, depth):
         if depth < 4:
-            if isinstance(obj, Sequence) and not isinstance(obj, (bytes, text_type)):
+            if isinstance(obj, (list, tuple)):
+                # It is not safe to iterate over another sequence types as this may raise errors or
+                # bring undesired side-effects (e.g. Django querysets are executed during iteration)
                 return [_walk(x, depth + 1) for x in obj]
             if isinstance(obj, Mapping):
                 return {safe_str(k): _walk(v, depth + 1) for k, v in obj.items()}

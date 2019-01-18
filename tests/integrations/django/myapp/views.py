@@ -1,7 +1,7 @@
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.http import HttpResponse, HttpResponseServerError, HttpResponseNotFound
-from django.shortcuts import render_to_response
+from django.shortcuts import render
 from django.views.generic import ListView
 
 import sentry_sdk
@@ -45,5 +45,5 @@ def handler404(*args, **kwargs):
     return HttpResponseNotFound("404")
 
 
-def template_exc(*args, **kwargs):
-    return render_to_response("error.html")
+def template_exc(request, *args, **kwargs):
+    return render(request, "error.html")
