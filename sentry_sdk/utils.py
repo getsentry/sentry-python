@@ -310,22 +310,10 @@ def safe_repr(value):
 def object_to_json(obj):
     def _walk(obj, depth):
         if depth < 4:
-            if isinstance(obj, Sequence) and not isinstance(obj, (bytes, text_type)):
-                result = []
-                try:
-                    for x in obj:
-                        result.append(_walk(x, depth + 1))
-                except Exception as e:
-                    return safe_repr(e)
-                return result
+            if isinstance(obj, (list, tuple)):
+                return [_walk(x, depth + 1) for x in obj]
             if isinstance(obj, Mapping):
-                result = {}
-                try:
-                    for k, v in obj.items():
-                        result[safe_str(k)] = _walk(v, depth + 1)
-                except Exception as e:
-                    return safe_repr(e)
-                return result
+                return {safe_str(k): _walk(v, depth + 1) for k, v in obj.items()}
 
         if obj is CYCLE_MARKER:
             return obj
