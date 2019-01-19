@@ -633,7 +633,7 @@ def break_cycles(obj, memo=None):
     try:
         if isinstance(obj, Mapping):
             return {k: break_cycles(v, memo) for k, v in obj.items()}
-        if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
+        if isinstance(obj, (list, tuple)):
             return [break_cycles(v, memo) for v in obj]
         return obj
     finally:
