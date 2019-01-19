@@ -1,3 +1,9 @@
+## 0.6.9
+
+* Second attempt at fixing the bug that was supposed to be fixed in 0.6.8.
+
+  > No longer access arbitrary sequences in local vars due to possible side effects.
+
 ## 0.6.8
 
 * No longer access arbitrary sequences in local vars due to possible side effects.
