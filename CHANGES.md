@@ -1,3 +1,7 @@
+## 0.6.8
+
+* No longer access arbitrary sequences in local vars due to possible side effects.
+
 ## 0.6.7
 
 * Sourcecode Django templates is now displayed in stackframes like Jinja templates in Flask already were.
