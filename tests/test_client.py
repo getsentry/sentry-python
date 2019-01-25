@@ -19,6 +19,7 @@ from sentry_sdk import (
 from sentry_sdk.hub import HubMeta
 from sentry_sdk.transport import Transport
 from sentry_sdk._compat import reraise, text_type
+from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
 
 
 class EventCaptured(Exception):
@@ -365,3 +366,21 @@ def test_databag_stripping(sentry_init, capture_events):
     event, = events
 
     assert len(json.dumps(event)) < 10000
+
+
+@pytest.mark.skipif(not HAS_CHAINED_EXCEPTIONS, reason="Only works on 3.3+")
+def test_chained_exceptions(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    try:
+        try:
+            1 / 0
+        except Exception:
+            1 / 0
+    except Exception:
+        capture_exception()
+
+    event, = events
+
+    assert len(event["exception"]["values"]) == 2

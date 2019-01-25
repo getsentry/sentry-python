@@ -435,18 +435,40 @@ def single_exception_from_error_tuple(
     }
 
 
-def walk_exception_chain(exc_info):
-    exc_type, exc_value, tb = exc_info
+HAS_CHAINED_EXCEPTIONS = hasattr(Exception, "__suppress_context__")
 
-    while exc_type is not None:
-        yield exc_type, exc_value, tb
+if HAS_CHAINED_EXCEPTIONS:
 
-        cause = getattr(exc_value, "__cause__", None)
-        if cause is None:
-            break
-        exc_type = type(cause)
-        exc_value = cause
-        tb = getattr(cause, "__traceback__", None)
+    def walk_exception_chain(exc_info):
+        exc_type, exc_value, tb = exc_info
+
+        seen_exceptions = []
+        seen_exception_ids = set()
+
+        while exc_type is not None and id(exc_value) not in seen_exception_ids:
+            yield exc_type, exc_value, tb
+
+            # Avoid hashing random types we don't know anything
+            # about. Use the list to keep a ref so that the `id` is
+            # not used for another object.
+            seen_exceptions.append(exc_value)
+            seen_exception_ids.add(id(exc_value))
+
+            if exc_value.__suppress_context__:
+                cause = exc_value.__cause__
+            else:
+                cause = exc_value.__context__
+            if cause is None:
+                break
+            exc_type = type(cause)
+            exc_value = cause
+            tb = getattr(cause, "__traceback__", None)
+
+
+else:
+
+    def walk_exception_chain(exc_info):
+        yield exc_info
 
 
 def exceptions_from_error_tuple(exc_info, client_options=None, mechanism=None):
