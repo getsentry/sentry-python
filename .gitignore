@@ -20,3 +20,4 @@ venv
 .pytest_cache
 .hypothesis
 semaphore
+pip-wheel-metadata
