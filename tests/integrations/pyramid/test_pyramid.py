@@ -240,7 +240,7 @@ def test_error_in_errorhandler(
     exception, = event1["exception"]["values"]
     assert exception["type"] == "ValueError"
 
-    exception, = event2["exception"]["values"]
+    exception = event2["exception"]["values"][0]
     assert exception["type"] == "ZeroDivisionError"
 
 
