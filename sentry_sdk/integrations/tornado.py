@@ -1,5 +1,6 @@
 import sys
 import weakref
+from inspect import iscoroutinefunction
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import (
@@ -42,20 +43,36 @@ class TornadoIntegration(Integration):
 
         old_execute = RequestHandler._execute
 
-        @coroutine
-        def sentry_execute_request_handler(self, *args, **kwargs):
-            hub = Hub.current
-            integration = hub.get_integration(TornadoIntegration)
-            if integration is None:
-                return old_execute(self, *args, **kwargs)
+        awaitable = iscoroutinefunction(old_execute)
 
-            weak_handler = weakref.ref(self)
+        if awaitable:
+            async def sentry_execute_request_handler(self, *args, **kwargs):
+                hub = Hub.current
+                integration = hub.get_integration(TornadoIntegration)
+                if integration is None:
+                    return await old_execute(self, *args, **kwargs)
 
-            with Hub(hub) as hub:
-                with hub.configure_scope() as scope:
-                    scope.add_event_processor(_make_event_processor(weak_handler))
-                result = yield from old_execute(self, *args, **kwargs)
-                return result
+                weak_handler = weakref.ref(self)
+
+                with Hub(hub) as hub:
+                    with hub.configure_scope() as scope:
+                        scope.add_event_processor(_make_event_processor(weak_handler))
+                    return await old_execute(self, *args, **kwargs)
+        else:
+            @coroutine
+            def sentry_execute_request_handler(self, *args, **kwargs):
+                hub = Hub.current
+                integration = hub.get_integration(TornadoIntegration)
+                if integration is None:
+                    return old_execute(self, *args, **kwargs)
+
+                weak_handler = weakref.ref(self)
+
+                with Hub(hub) as hub:
+                    with hub.configure_scope() as scope:
+                        scope.add_event_processor(_make_event_processor(weak_handler))
+                    result = yield from old_execute(self, *args, **kwargs)
+                    return result
 
         RequestHandler._execute = sentry_execute_request_handler
 
