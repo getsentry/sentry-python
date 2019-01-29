@@ -2,17 +2,35 @@ import pytest
 
 pytest.importorskip("celery")
 
+from sentry_sdk import Hub, configure_scope
 from sentry_sdk.integrations.celery import CeleryIntegration
 
-from celery import Celery
+from celery import Celery, VERSION
 
 
 @pytest.fixture
-def celery(sentry_init):
-    sentry_init(integrations=[CeleryIntegration()])
-    celery = Celery(__name__)
-    celery.conf.CELERY_ALWAYS_EAGER = True
-    return celery
+def connect_signal(request):
+    def inner(signal, f):
+        signal.connect(f)
+        request.addfinalizer(lambda: signal.disconnect(f))
+
+    return inner
+
+
+@pytest.fixture
+def init_celery(sentry_init):
+    def inner():
+        sentry_init(integrations=[CeleryIntegration()])
+        celery = Celery(__name__)
+        celery.conf.CELERY_ALWAYS_EAGER = True
+        return celery
+
+    return inner
+
+
+@pytest.fixture
+def celery(init_celery):
+    return init_celery()
 
 
 def test_simple(capture_events, celery):
@@ -36,7 +54,7 @@ def test_simple(capture_events, celery):
     exception, = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
     assert exception["mechanism"]["type"] == "celery"
-    assert exception["stacktrace"]["frames"][1]["vars"]["foo"] == "42"
+    assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
 
 
 def test_ignore_expected(capture_events, celery):
@@ -49,3 +67,32 @@ def test_ignore_expected(capture_events, celery):
     dummy_task.delay(1, 2)
     dummy_task.delay(1, 0)
     assert not events
+
+
+def test_broken_prerun(capture_events, init_celery, connect_signal):
+    from celery.signals import task_prerun, task_postrun
+
+    def crash(*args, **kwargs):
+        1 / 0
+
+    # Order here is important to reproduce the bug: In Celery 3, a crashing
+    # prerun would prevent other preruns from running.
+
+    connect_signal(task_prerun, crash)
+    celery = init_celery()
+
+    events = capture_events()
+    assert len(Hub.current._stack) == 1
+
+    @celery.task(name="dummy_task")
+    def dummy_task(x, y):
+        assert len(Hub.current._stack) == 2
+        return x / y
+
+    try:
+        result = dummy_task.delay(2, 2)
+    except ZeroDivisionError:
+        if VERSION >= (4,):
+            raise
+
+    assert len(Hub.current._stack) == 1
