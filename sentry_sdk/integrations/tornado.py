@@ -46,6 +46,8 @@ class TornadoIntegration(Integration):
         awaitable = iscoroutinefunction(old_execute)
 
         if awaitable:
+            # Starting Tornado 6 RequestHandler._execute method is a standard Python coroutine (async/await)
+            # In that case our method should be a coroutine function too
             async def sentry_execute_request_handler(self, *args, **kwargs):
                 hub = Hub.current
                 integration = hub.get_integration(TornadoIntegration)
