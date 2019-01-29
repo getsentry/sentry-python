@@ -2,7 +2,7 @@ import pytest
 
 pytest.importorskip("celery")
 
-from sentry_sdk import Hub, configure_scope
+from sentry_sdk import Hub
 from sentry_sdk.integrations.celery import CeleryIntegration
 
 from celery import Celery, VERSION
@@ -69,8 +69,8 @@ def test_ignore_expected(capture_events, celery):
     assert not events
 
 
-def test_broken_prerun(capture_events, init_celery, connect_signal):
-    from celery.signals import task_prerun, task_postrun
+def test_broken_prerun(init_celery, connect_signal):
+    from celery.signals import task_prerun
 
     def crash(*args, **kwargs):
         1 / 0
@@ -81,7 +81,6 @@ def test_broken_prerun(capture_events, init_celery, connect_signal):
     connect_signal(task_prerun, crash)
     celery = init_celery()
 
-    events = capture_events()
     assert len(Hub.current._stack) == 1
 
     @celery.task(name="dummy_task")
@@ -90,7 +89,7 @@ def test_broken_prerun(capture_events, init_celery, connect_signal):
         return x / y
 
     try:
-        result = dummy_task.delay(2, 2)
+        dummy_task.delay(2, 2)
     except ZeroDivisionError:
         if VERSION >= (4,):
             raise
