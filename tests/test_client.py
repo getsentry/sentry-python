@@ -350,7 +350,7 @@ def test_cyclic_data(sentry_init, capture_events):
     event, = events
 
     data = event["extra"]["foo"]
-    assert data == {"not_cyclic2": "", "not_cyclic": "", "is_cyclic": "<cyclic>"}
+    assert data == {"not_cyclic2": "''", "not_cyclic": "''", "is_cyclic": "<cyclic>"}
 
 
 def test_databag_stripping(sentry_init, capture_events):

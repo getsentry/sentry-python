@@ -15,6 +15,15 @@ from sentry_sdk.utils import (
     ContextVar,
 )
 
+try:
+    import contextvars
+    import asyncio
+    from inspect import isawaitable
+except ImportError:
+    contextvars = None
+    asyncio = None
+    isawaitable = None
+
 
 _local = ContextVar("sentry_current_hub")
 _initial_client = None
@@ -159,8 +168,19 @@ class Hub(with_metaclass(HubMeta)):
         """Runs a callback in the context of the hub.  Alternatively the
         with statement can be used on the hub directly.
         """
-        with self:
-            return callback()
+        if contextvars is not None:
+
+            def runner():
+                with self:
+                    result = callback()
+                    if isawaitable(result):
+                        result = asyncio.create_task(result)
+                    return result
+
+            return contextvars.copy_context().run(runner)
+        else:
+            with self:
+                return callback()
 
     def get_integration(self, name_or_class):
         """Returns the integration for this hub by name or class.  If there

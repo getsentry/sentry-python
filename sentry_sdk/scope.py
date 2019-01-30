@@ -3,7 +3,7 @@ from collections import deque
 from functools import wraps
 from itertools import chain
 
-from sentry_sdk.utils import logger, capture_internal_exceptions
+from sentry_sdk.utils import logger, capture_internal_exceptions, object_to_json
 
 
 global_event_processors = []
@@ -165,7 +165,7 @@ class Scope(object):
             event["fingerprint"] = self._fingerprint
 
         if self._extras:
-            event.setdefault("extra", {}).update(self._extras)
+            event.setdefault("extra", {}).update(object_to_json(self._extras))
 
         if self._tags:
             event.setdefault("tags", {}).update(self._tags)

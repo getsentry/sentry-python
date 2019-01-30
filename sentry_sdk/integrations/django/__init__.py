@@ -5,6 +5,7 @@ import sys
 import weakref
 
 from django import VERSION as DJANGO_VERSION
+from django import models
 from django.core import signals
 
 try:
@@ -139,6 +140,16 @@ class DjangoIntegration(Integration):
                     frames.append(frame)
 
             return event
+
+        @add_global_repr_processor
+        def _django_queryset_repr(value, hint):
+            if isinstance(value, models.QuerySet) and not value._result_cache:
+                return "<%s from %s at 0x%x>" % (
+                    value.__class__.__name__,
+                    value.__module__,
+                    id(value),
+                )
+            return NotImplemented
 
 
 def _make_event_processor(weak_request, integration):
