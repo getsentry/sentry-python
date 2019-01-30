@@ -60,7 +60,9 @@ class TornadoIntegration(Integration):
                     with hub.configure_scope() as scope:
                         scope.add_event_processor(_make_event_processor(weak_handler))
                     return await old_execute(self, *args, **kwargs)
+
         else:
+
             @coroutine
             def sentry_execute_request_handler(self, *args, **kwargs):
                 hub = Hub.current
