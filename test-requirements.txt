@@ -1,7 +1,6 @@
 hypothesis==3.69.9
 pytest==3.7.3
 pytest-xdist==1.23.0
-six==1.11.0
 tox==3.2.1
 Werkzeug==0.14.1
 pytest-localserver==0.4.1
