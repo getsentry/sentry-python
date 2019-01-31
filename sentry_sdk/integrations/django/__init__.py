@@ -143,17 +143,18 @@ class DjangoIntegration(Integration):
 
         @add_global_repr_processor
         def _django_queryset_repr(value, hint):
+            if not isinstance(value, models.QuerySet) or value._result_cache:
+                return NotImplemented
+
             hub = Hub.current
             if hub.get_integration(DjangoIntegration) is None:
                 return NotImplemented
 
-            if isinstance(value, models.QuerySet) and not value._result_cache:
-                return "<%s from %s at 0x%x>" % (
-                    value.__class__.__name__,
-                    value.__module__,
-                    id(value),
-                )
-            return NotImplemented
+            return "<%s from %s at 0x%x>" % (
+                value.__class__.__name__,
+                value.__module__,
+                id(value),
+            )
 
 
 def _make_event_processor(weak_request, integration):
