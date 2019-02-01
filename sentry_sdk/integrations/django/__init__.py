@@ -5,7 +5,7 @@ import sys
 import weakref
 
 from django import VERSION as DJANGO_VERSION
-from django import models
+from django.db import models
 from django.core import signals
 
 try:
