@@ -287,14 +287,8 @@ def safe_str(value):
         return safe_repr(value)
 
 
-def safe_repr(value, memo=None):
-    if memo is None:
-        memo = {}
-    if id(value) in memo:
-        return "<cycle>"
-    memo[id(value)] = value
+def safe_repr(value):
     try:
-
         rv = repr(value)
         if isinstance(rv, bytes):
             rv = rv.decode("utf-8", "replace")
