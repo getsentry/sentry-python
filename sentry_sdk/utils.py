@@ -331,7 +331,7 @@ def object_to_json(obj, remaining_depth=4, memo=None):
             hints = {"memo": memo, "remaining_depth": remaining_depth}
             for processor in global_repr_processors:
                 with capture_internal_exceptions():
-                    result = processor(value, hints)
+                    result = processor(obj, hints)
                     if result is not NotImplemented:
                         return result
 

@@ -32,6 +32,7 @@ from sentry_sdk import Hub
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import (
+    add_global_repr_processor,
     capture_internal_exceptions,
     event_from_exception,
     safe_repr,

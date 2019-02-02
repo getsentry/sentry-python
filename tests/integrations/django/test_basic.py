@@ -3,6 +3,7 @@ import platform
 import pytest
 
 from werkzeug.test import Client
+from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError
 
@@ -12,7 +13,7 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
-from sentry_sdk import capture_message
+from sentry_sdk import capture_message, capture_exception
 from sentry_sdk.integrations.django import DjangoIntegration
 
 from tests.integrations.django.myapp.wsgi import application
@@ -99,6 +100,28 @@ def test_user_captured(sentry_init, client, capture_events):
         "username": "john",
         "id": "1",
     }
+
+
+@pytest.mark.django_db
+def test_queryset_repr(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+    events = capture_events()
+    User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
+
+    try:
+        my_queryset = User.objects.all()
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    event, = events
+
+    exception, = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+    frame, = exception["stacktrace"]["frames"]
+    assert frame["vars"]["my_queryset"].startswith(
+        "<QuerySet from django.db.models.query at"
+    )
 
 
 def test_custom_error_handler_request_context(sentry_init, client, capture_events):
