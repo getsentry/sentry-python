@@ -146,9 +146,10 @@ class DjangoIntegration(Integration):
             if not isinstance(value, models.QuerySet) or value._result_cache:
                 return NotImplemented
 
-            hub = Hub.current
-            if hub.get_integration(DjangoIntegration) is None:
-                return NotImplemented
+            # Do not call Hub.get_integration here. It is intentional that
+            # running under a new hub does not suddenly start executing
+            # querysets. This might be surprising to the user but it's likely
+            # less annoying.
 
             return "<%s from %s at 0x%x>" % (
                 value.__class__.__name__,
