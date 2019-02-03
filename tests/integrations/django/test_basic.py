@@ -109,7 +109,7 @@ def test_queryset_repr(sentry_init, capture_events):
     User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
 
     try:
-        my_queryset = User.objects.all()
+        my_queryset = User.objects.all()  # noqa
         1 / 0
     except Exception:
         capture_exception()
