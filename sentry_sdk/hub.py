@@ -5,7 +5,7 @@ from datetime import datetime
 from contextlib import contextmanager
 from warnings import warn
 
-from sentry_sdk._compat import with_metaclass, string_types
+from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
 from sentry_sdk.utils import (
@@ -15,12 +15,24 @@ from sentry_sdk.utils import (
     ContextVar,
 )
 
+if False:
+    from typing import Union
+    from typing import Any
+    from typing import Optional
+    from typing import Dict
+    from typing import Tuple
+    from typing import List
+    from typing import Callable
+    from contextlib import AbstractContextManager
+    from sentry_sdk.integrations import Integration
+
 
 _local = ContextVar("sentry_current_hub")
 _initial_client = None
 
 
 def _should_send_default_pii():
+    # type: () -> bool
     client = Hub.current.client
     if not client:
         return False
@@ -57,6 +69,7 @@ def init(*args, **kwargs):
 class HubMeta(type):
     @property
     def current(self):
+        # type: () -> Hub
         """Returns the current instance of the hub."""
         rv = _local.get(None)
         if rv is None:
@@ -86,6 +99,7 @@ class _ScopeManager(object):
         self._layer = hub._stack[-1]
 
     def __enter__(self):
+        # type: () -> Scope
         scope = self._layer[1]
         assert scope is not None
         return scope
@@ -124,7 +138,7 @@ class _ScopeManager(object):
             logger.warning(warning)
 
 
-class Hub(with_metaclass(HubMeta)):
+class Hub(with_metaclass(HubMeta)):  # type: ignore
     """The hub wraps the concurrency management of the SDK.  Each thread has
     its own hub but the hub might transfer with the flow of execution if
     context vars are available.
@@ -132,7 +146,10 @@ class Hub(with_metaclass(HubMeta)):
     If the hub is used with a with statement it's temporarily activated.
     """
 
+    _stack = None  # type: List[Tuple[Optional[Client], Scope]]
+
     def __init__(self, client_or_hub=None, scope=None):
+        # type: (Union[Hub, Client], Optional[Any]) -> None
         if isinstance(client_or_hub, Hub):
             hub = client_or_hub
             client, other_scope = hub._stack[-1]
@@ -142,16 +159,24 @@ class Hub(with_metaclass(HubMeta)):
             client = client_or_hub
         if scope is None:
             scope = Scope()
+
         self._stack = [(client, scope)]
-        self._last_event_id = None
-        self._old_hubs = []
+        self._last_event_id = None  # type: Optional[str]
+        self._old_hubs = []  # type: List[Hub]
 
     def __enter__(self):
+        # type: () -> Hub
         self._old_hubs.append(Hub.current)
         _local.set(self)
         return self
 
-    def __exit__(self, exc_type, exc_value, tb):
+    def __exit__(
+        self,
+        exc_type,  # type: Optional[type]
+        exc_value,  # type: Optional[BaseException]
+        tb,  # type: Optional[Any]
+    ):
+        # type: (...) -> None
         old = self._old_hubs.pop()
         _local.set(old)
 
@@ -163,6 +188,7 @@ class Hub(with_metaclass(HubMeta)):
             return callback()
 
     def get_integration(self, name_or_class):
+        # type: (Union[str, Integration]) -> Any
         """Returns the integration for this hub by name or class.  If there
         is no client bound or the client does not have that integration
         then `None` is returned.
@@ -170,11 +196,16 @@ class Hub(with_metaclass(HubMeta)):
         If the return value is not `None` the hub is guaranteed to have a
         client attached.
         """
-        if not isinstance(name_or_class, string_types):
-            name_or_class = name_or_class.identifier
+        if isinstance(name_or_class, str):
+            integration_name = name_or_class
+        elif name_or_class.identifier is not None:
+            integration_name = name_or_class.identifier
+        else:
+            raise ValueError("Integration has no name")
+
         client = self._stack[-1][0]
         if client is not None:
-            rv = client.integrations.get(name_or_class)
+            rv = client.integrations.get(integration_name)
             if rv is not None:
                 return rv
 
@@ -199,6 +230,7 @@ class Hub(with_metaclass(HubMeta)):
 
     @property
     def client(self):
+        # type: () -> Optional[Client]
         """Returns the current client on the hub."""
         return self._stack[-1][0]
 
@@ -212,6 +244,7 @@ class Hub(with_metaclass(HubMeta)):
         self._stack[-1] = (new, top[1])
 
     def capture_event(self, event, hint=None):
+        # type: (Dict[str, Any], Dict[str, Any]) -> Optional[str]
         """Captures an event.  The return value is the ID of the event.
 
         The event is a dictionary following the Sentry v7/v8 protocol
@@ -225,13 +258,15 @@ class Hub(with_metaclass(HubMeta)):
             if rv is not None:
                 self._last_event_id = rv
             return rv
+        return None
 
     def capture_message(self, message, level=None):
+        # type: (str, Optional[Any]) -> Optional[str]
         """Captures a message.  The message is just a string.  If no level
         is provided the default level is `info`.
         """
         if self.client is None:
-            return
+            return None
         if level is None:
             level = "info"
         return self.capture_event({"message": message, "level": level})
@@ -263,6 +298,7 @@ class Hub(with_metaclass(HubMeta)):
         logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
     def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
+        # type: (Dict[str, Any], Dict[str, Any], **Any) -> None
         """Adds a breadcrumb.  The breadcrumbs are a dictionary with the
         data as the sentry v7/v8 protocol expects.  `hint` is an optional
         value that can be used by `before_breadcrumb` to customize the
@@ -273,7 +309,7 @@ class Hub(with_metaclass(HubMeta)):
             logger.info("Dropped breadcrumb because no client bound")
             return
 
-        crumb = dict(crumb or ())
+        crumb = dict(crumb or ())  # type: Dict[str, Any]
         crumb.update(kwargs)
         if not crumb:
             return
@@ -293,18 +329,23 @@ class Hub(with_metaclass(HubMeta)):
             scope._breadcrumbs.append(crumb)
         else:
             logger.info("before breadcrumb dropped breadcrumb (%s)", original_crumb)
-        while len(scope._breadcrumbs) > client.options["max_breadcrumbs"]:
+
+        max_breadcrumbs = client.options["max_breadcrumbs"]  # type: int
+        while len(scope._breadcrumbs) > max_breadcrumbs:
             scope._breadcrumbs.popleft()
 
     def push_scope(self, callback=None):
+        # type: (Optional[Callable]) -> AbstractContextManager
         """Pushes a new layer on the scope stack. Returns a context manager
         that should be used to pop the scope again.  Alternatively a callback
         can be provided that is executed in the context of the scope.
         """
+
+        # The correct return type would be Optional[AbstractContextManager], but that would make this function hard to use.
         if callback is not None:
             with self.push_scope() as scope:
                 callback(scope)
-            return
+            return None  # type: ignore
 
         client, scope = self._stack[-1]
         new_layer = (client, copy.copy(scope))
@@ -322,12 +363,16 @@ class Hub(with_metaclass(HubMeta)):
         return rv
 
     def configure_scope(self, callback=None):
+        # type: (Optional[Callable]) -> AbstractContextManager
         """Reconfigures the scope."""
+
+        # The correct return type would be Optional[AbstractContextManager], but that would make this function hard to use.
         client, scope = self._stack[-1]
         if callback is not None:
             if client is not None:
                 callback(scope)
-            return
+
+            return None  # type: ignore
 
         @contextmanager
         def inner():

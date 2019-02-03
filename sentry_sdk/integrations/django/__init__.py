@@ -4,14 +4,28 @@ from __future__ import absolute_import
 import sys
 import weakref
 
-from django import VERSION as DJANGO_VERSION
-from django.db.models.query import QuerySet
-from django.core import signals
+from django import VERSION as DJANGO_VERSION  # type: ignore
+from django.db.models.query import QuerySet  # type: ignore
+from django.core import signals  # type: ignore
+
+if False:
+    from typing import Any
+    from typing import Dict
+    from typing import Tuple
+    from typing import Union
+    from sentry_sdk.integrations.wsgi import _ScopedResponse
+    from typing import Callable
+    from django.core.handlers.wsgi import WSGIRequest  # type: ignore
+    from django.http.response import HttpResponse  # type: ignore
+    from django.http.request import QueryDict  # type: ignore
+    from django.utils.datastructures import MultiValueDict  # type: ignore
+    from typing import List
 
 try:
-    import psycopg2.sql
+    import psycopg2.sql  # type: ignore
 
     def sql_to_string(sql):
+        # type: (Any) -> str
         if isinstance(sql, psycopg2.sql.SQL):
             return sql.string
         return sql
@@ -20,13 +34,14 @@ try:
 except ImportError:
 
     def sql_to_string(sql):
+        # type: (Any) -> str
         return sql
 
 
 try:
-    from django.urls import resolve
+    from django.urls import resolve  # type: ignore
 except ImportError:
-    from django.core.urlresolvers import resolve
+    from django.core.urlresolvers import resolve  # type: ignore
 
 from sentry_sdk import Hub
 from sentry_sdk.hub import _should_send_default_pii
@@ -51,12 +66,14 @@ from sentry_sdk.integrations.django.templates import get_template_frame_from_exc
 if DJANGO_VERSION < (1, 10):
 
     def is_authenticated(request_user):
+        # type: (Any) -> bool
         return request_user.is_authenticated()
 
 
 else:
 
     def is_authenticated(request_user):
+        # type: (Any) -> bool
         return request_user.is_authenticated
 
 
@@ -66,6 +83,7 @@ class DjangoIntegration(Integration):
     transaction_style = None
 
     def __init__(self, transaction_style="url"):
+        # type: (str) -> None
         TRANSACTION_STYLE_VALUES = ("function_name", "url")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
@@ -76,6 +94,7 @@ class DjangoIntegration(Integration):
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         install_sql_hook()
         # Patch in our custom middleware.
 
@@ -88,6 +107,7 @@ class DjangoIntegration(Integration):
         old_app = WSGIHandler.__call__
 
         def sentry_patched_wsgi_handler(self, environ, start_response):
+            # type: (Any, Dict[str, str], Callable) -> _ScopedResponse
             if Hub.current.get_integration(DjangoIntegration) is None:
                 return old_app(self, environ, start_response)
 
@@ -99,11 +119,12 @@ class DjangoIntegration(Integration):
 
         # patch get_response, because at that point we have the Django request
         # object
-        from django.core.handlers.base import BaseHandler
+        from django.core.handlers.base import BaseHandler  # type: ignore
 
         old_get_response = BaseHandler.get_response
 
         def sentry_patched_get_response(self, request):
+            # type: (Any, WSGIRequest) -> Union[HttpResponse, BaseException]
             hub = Hub.current
             integration = hub.get_integration(DjangoIntegration)
             if integration is not None:
@@ -119,6 +140,7 @@ class DjangoIntegration(Integration):
 
         @add_global_event_processor
         def process_django_templates(event, hint):
+            # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
             if hint.get("exc_info", None) is None:
                 return event
 
@@ -160,7 +182,9 @@ class DjangoIntegration(Integration):
 
 
 def _make_event_processor(weak_request, integration):
+    # type: (Callable[[], WSGIRequest], DjangoIntegration) -> Callable
     def event_processor(event, hint):
+        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.
@@ -191,6 +215,7 @@ def _make_event_processor(weak_request, integration):
 
 
 def _got_request_exception(request=None, **kwargs):
+    # type: (WSGIRequest, **Any) -> None
     hub = Hub.current
     integration = hub.get_integration(DjangoIntegration)
     if integration is not None:
@@ -204,18 +229,23 @@ def _got_request_exception(request=None, **kwargs):
 
 class DjangoRequestExtractor(RequestExtractor):
     def env(self):
+        # type: () -> Dict[str, str]
         return self.request.META
 
     def cookies(self):
+        # type: () -> Dict[str, str]
         return self.request.COOKIES
 
     def raw_data(self):
+        # type: () -> bytes
         return self.request.body
 
     def form(self):
+        # type: () -> QueryDict
         return self.request.POST
 
     def files(self):
+        # type: () -> MultiValueDict
         return self.request.FILES
 
     def size_of_file(self, file):
@@ -223,6 +253,7 @@ class DjangoRequestExtractor(RequestExtractor):
 
 
 def _set_user_info(request, event):
+    # type: (WSGIRequest, Dict[str, Any]) -> None
     user_info = event.setdefault("user", {})
 
     user = getattr(request, "user", None)
@@ -248,15 +279,19 @@ def _set_user_info(request, event):
 
 class _FormatConverter(object):
     def __init__(self, param_mapping):
+        # type: (Dict[str, int]) -> None
+
         self.param_mapping = param_mapping
-        self.params = []
+        self.params = []  # type: List[Any]
 
     def __getitem__(self, val):
+        # type: (str) -> str
         self.params.append(self.param_mapping.get(val))
         return "%s"
 
 
 def format_sql(sql, params):
+    # type: (Any, Any) -> Tuple[str, List[str]]
     rv = []
 
     if isinstance(params, dict):
@@ -279,6 +314,7 @@ def format_sql(sql, params):
 
 
 def record_sql(sql, params):
+    # type: (Any, Any) -> None
     hub = Hub.current
     if hub.get_integration(DjangoIntegration) is None:
         return
@@ -294,11 +330,12 @@ def record_sql(sql, params):
 
 
 def install_sql_hook():
+    # type: () -> None
     """If installed this causes Django's queries to be captured."""
     try:
-        from django.db.backends.utils import CursorWrapper
+        from django.db.backends.utils import CursorWrapper  # type: ignore
     except ImportError:
-        from django.db.backends.util import CursorWrapper
+        from django.db.backends.util import CursorWrapper  # type: ignore
 
     try:
         real_execute = CursorWrapper.execute

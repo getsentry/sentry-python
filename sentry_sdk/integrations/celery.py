@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 import sys
 
-from celery.exceptions import SoftTimeLimitExceeded, Retry
+from celery.exceptions import SoftTimeLimitExceeded, Retry  # type: ignore
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
@@ -16,7 +16,7 @@ class CeleryIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        import celery.app.trace as trace
+        import celery.app.trace as trace  # type: ignore
 
         old_build_tracer = trace.build_tracer
 

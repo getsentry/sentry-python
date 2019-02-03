@@ -21,3 +21,4 @@ venv
 .hypothesis
 semaphore
 pip-wheel-metadata
+.mypy_cache

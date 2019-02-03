@@ -22,12 +22,17 @@ uncaught exceptions.  Additionally you can report arbitrary other exceptions:
     except Exception as e:
         sentry_sdk.capture_exception(e)
 """
+from sentry_sdk.hub import Hub, init
+from sentry_sdk.scope import Scope
+from sentry_sdk.transport import Transport, HttpTransport
+from sentry_sdk.client import Client
+
 from sentry_sdk.api import *  # noqa
-from sentry_sdk.api import __all__  # noqa
+from sentry_sdk.api import __all__ as api_all
+
 from sentry_sdk.consts import VERSION  # noqa
 
-# modules we consider public
-__all__.append("integrations")
+__all__ = api_all + ["Hub", "Scope", "Client", "Transport", "HttpTransport", "init"]
 
 # Initialize the debug support after everything is loaded
 from sentry_sdk.debug import init_debug_support

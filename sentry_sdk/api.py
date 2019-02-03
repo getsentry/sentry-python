@@ -1,16 +1,17 @@
 import inspect
 from contextlib import contextmanager
 
-from sentry_sdk.hub import Hub, init
+from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
-from sentry_sdk.transport import Transport, HttpTransport
-from sentry_sdk.client import Client
 
 
-__all__ = ["Hub", "Scope", "Client", "Transport", "HttpTransport", "init"]
+if False:
+    from typing import Any
+    from typing import Optional
+    from contextlib import AbstractContextManager
 
 
-_initial_client = None
+__all__ = []
 
 
 def public(f):
@@ -35,16 +36,20 @@ def capture_event(event, hint=None):
 
 @hubmethod
 def capture_message(message, level=None):
+    # type: (str, Optional[Any]) -> Optional[str]
     hub = Hub.current
     if hub is not None:
         return hub.capture_message(message, level)
+    return None
 
 
 @hubmethod
 def capture_exception(error=None):
+    # type: (ValueError) -> Optional[str]
     hub = Hub.current
     if hub is not None:
         return hub.capture_exception(error)
+    return None
 
 
 @hubmethod
@@ -56,6 +61,7 @@ def add_breadcrumb(*args, **kwargs):
 
 @hubmethod
 def configure_scope(callback=None):
+    # type: (Optional[Any]) -> Optional[AbstractContextManager]
     hub = Hub.current
     if hub is not None:
         return hub.configure_scope(callback)
@@ -66,10 +72,14 @@ def configure_scope(callback=None):
             yield Scope()
 
         return inner()
+    else:
+        # returned if user provided callback
+        return None
 
 
 @hubmethod
 def push_scope(callback=None):
+    # type: (Optional[Any]) -> Optional[AbstractContextManager]
     hub = Hub.current
     if hub is not None:
         return hub.push_scope(callback)
@@ -80,6 +90,9 @@ def push_scope(callback=None):
             yield Scope()
 
         return inner()
+    else:
+        # returned if user provided callback
+        return None
 
 
 @hubmethod
@@ -91,6 +104,8 @@ def flush(timeout=None, callback=None):
 
 @hubmethod
 def last_event_id():
+    # type: () -> Optional[str]
     hub = Hub.current
     if hub is not None:
         return hub.last_event_id()
+    return None

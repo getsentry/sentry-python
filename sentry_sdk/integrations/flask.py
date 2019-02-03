@@ -7,13 +7,21 @@ from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
+from sentry_sdk.integrations.wsgi import _ScopedResponse
+from typing import Any
+from typing import Dict
+from werkzeug.datastructures import ImmutableTypeConversionDict
+from werkzeug.datastructures import ImmutableMultiDict
+from werkzeug.datastructures import FileStorage
+from typing import Union
+from typing import Callable
 
 try:
-    import flask_login
+    import flask_login  # type: ignore
 except ImportError:
     flask_login = None
 
-from flask import Flask, _request_ctx_stack, _app_ctx_stack
+from flask import Request, Flask, _request_ctx_stack, _app_ctx_stack  # type: ignore
 from flask.signals import (
     appcontext_pushed,
     appcontext_tearing_down,
@@ -28,6 +36,7 @@ class FlaskIntegration(Integration):
     transaction_style = None
 
     def __init__(self, transaction_style="endpoint"):
+        # type: (str) -> None
         TRANSACTION_STYLE_VALUES = ("endpoint", "url")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
@@ -38,6 +47,7 @@ class FlaskIntegration(Integration):
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         appcontext_pushed.connect(_push_appctx)
         appcontext_tearing_down.connect(_pop_appctx)
         request_started.connect(_request_started)
@@ -46,6 +56,7 @@ class FlaskIntegration(Integration):
         old_app = Flask.__call__
 
         def sentry_patched_wsgi_app(self, environ, start_response):
+            # type: (Any, Dict[str, str], Callable) -> _ScopedResponse
             if Hub.current.get_integration(FlaskIntegration) is None:
                 return old_app(self, environ, start_response)
 
@@ -53,10 +64,11 @@ class FlaskIntegration(Integration):
                 environ, start_response
             )
 
-        Flask.__call__ = sentry_patched_wsgi_app
+        Flask.__call__ = sentry_patched_wsgi_app  # type: ignore
 
 
 def _push_appctx(*args, **kwargs):
+    # type: (*Flask, **Any) -> None
     hub = Hub.current
     if hub.get_integration(FlaskIntegration) is not None:
         # always want to push scope regardless of whether WSGI app might already
@@ -69,12 +81,14 @@ def _push_appctx(*args, **kwargs):
 
 
 def _pop_appctx(*args, **kwargs):
+    # type: (*Flask, **Any) -> None
     scope_manager = getattr(_app_ctx_stack.top, "sentry_sdk_scope_manager", None)
     if scope_manager is not None:
         scope_manager.__exit__(None, None, None)
 
 
 def _request_started(sender, **kwargs):
+    # type: (Flask, **Any) -> None
     hub = Hub.current
     integration = hub.get_integration(FlaskIntegration)
     if integration is None:
@@ -84,32 +98,42 @@ def _request_started(sender, **kwargs):
     app = _app_ctx_stack.top.app
     with hub.configure_scope() as scope:
         scope.add_event_processor(
-            _make_request_event_processor(app, weak_request, integration)
+            _make_request_event_processor(  # type: ignore
+                app, weak_request, integration
+            )
         )
 
 
 class FlaskRequestExtractor(RequestExtractor):
     def env(self):
+        # type: () -> Dict[str, str]
         return self.request.environ
 
     def cookies(self):
+        # type: () -> ImmutableTypeConversionDict
         return self.request.cookies
 
     def raw_data(self):
+        # type: () -> bytes
         return self.request.data
 
     def form(self):
+        # type: () -> ImmutableMultiDict
         return self.request.form
 
     def files(self):
+        # type: () -> ImmutableMultiDict
         return self.request.files
 
     def size_of_file(self, file):
+        # type: (FileStorage) -> int
         return file.content_length
 
 
 def _make_request_event_processor(app, weak_request, integration):
+    # type: (Flask, Callable[[], Request], FlaskIntegration) -> Callable
     def inner(event, hint):
+        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         request = weak_request()
 
         # if the request is gone we are fine not logging the data from
@@ -120,9 +144,9 @@ def _make_request_event_processor(app, weak_request, integration):
 
         try:
             if integration.transaction_style == "endpoint":
-                event["transaction"] = request.url_rule.endpoint
+                event["transaction"] = request.url_rule.endpoint  # type: ignore
             elif integration.transaction_style == "url":
-                event["transaction"] = request.url_rule.rule
+                event["transaction"] = request.url_rule.rule  # type: ignore
         except Exception:
             pass
 
@@ -139,6 +163,7 @@ def _make_request_event_processor(app, weak_request, integration):
 
 
 def _capture_exception(sender, exception, **kwargs):
+    # type: (Flask, Union[ValueError, BaseException], **Any) -> None
     hub = Hub.current
     if hub.get_integration(FlaskIntegration) is None:
         return
@@ -152,6 +177,7 @@ def _capture_exception(sender, exception, **kwargs):
 
 
 def _add_user_to_event(event):
+    # type: (Dict[str, Any]) -> None
     if flask_login is None:
         return
 

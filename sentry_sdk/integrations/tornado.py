@@ -16,8 +16,14 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.logging import ignore_logger
 
-from tornado.web import RequestHandler, HTTPError
-from tornado.gen import coroutine
+if False:
+    from tornado.web import RequestHandler, HTTPError  # type: ignore
+    from tornado.gen import coroutine  # type: ignore
+    from typing import Any
+    from typing import List
+    from typing import Optional
+    from typing import Dict
+    from typing import Callable
 
 
 class TornadoIntegration(Integration):
@@ -25,7 +31,8 @@ class TornadoIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        import tornado
+        # type: () -> None
+        import tornado  # type: ignore
 
         tornado_version = getattr(tornado, "version_info", None)
         if tornado_version is None or tornado_version < (5, 0):
@@ -49,6 +56,7 @@ class TornadoIntegration(Integration):
             # Starting Tornado 6 RequestHandler._execute method is a standard Python coroutine (async/await)
             # In that case our method should be a coroutine function too
             async def sentry_execute_request_handler(self, *args, **kwargs):
+                # type: (Any, *List, **Any) -> Any
                 hub = Hub.current
                 integration = hub.get_integration(TornadoIntegration)
                 if integration is None:
@@ -63,7 +71,7 @@ class TornadoIntegration(Integration):
 
         else:
 
-            @coroutine
+            @coroutine  # type: ignore
             def sentry_execute_request_handler(self, *args, **kwargs):
                 hub = Hub.current
                 integration = hub.get_integration(TornadoIntegration)
@@ -83,6 +91,7 @@ class TornadoIntegration(Integration):
         old_log_exception = RequestHandler.log_exception
 
         def sentry_log_exception(self, ty, value, tb, *args, **kwargs):
+            # type: (Any, type, BaseException, Any, *Any, **Any) -> Optional[Any]
             _capture_exception(ty, value, tb)
             return old_log_exception(self, ty, value, tb, *args, **kwargs)
 
@@ -90,6 +99,7 @@ class TornadoIntegration(Integration):
 
 
 def _capture_exception(ty, value, tb):
+    # type: (type, BaseException, Any) -> None
     hub = Hub.current
     if hub.get_integration(TornadoIntegration) is None:
         return
@@ -106,7 +116,9 @@ def _capture_exception(ty, value, tb):
 
 
 def _make_event_processor(weak_handler):
+    # type: (Callable[[], RequestHandler]) -> Callable
     def tornado_processor(event, hint):
+        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         handler = weak_handler()
         if handler is None:
             return event
@@ -145,24 +157,30 @@ def _make_event_processor(weak_handler):
 
 class TornadoRequestExtractor(RequestExtractor):
     def content_length(self):
+        # type: () -> int
         if self.request.body is None:
             return 0
         return len(self.request.body)
 
     def cookies(self):
+        # type: () -> Dict
         return dict(self.request.cookies)
 
     def raw_data(self):
+        # type: () -> bytes
         return self.request.body
 
     def form(self):
+        # type: () -> Optional[Any]
         # TODO: Where to get formdata and nothing else?
         return None
 
     def is_json(self):
+        # type: () -> bool
         return _is_json_content_type(self.request.headers.get("content-type"))
 
     def files(self):
+        # type: () -> Dict
         return {k: v[0] for k, v in self.request.files.items() if v}
 
     def size_of_file(self, file):

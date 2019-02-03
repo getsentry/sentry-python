@@ -4,8 +4,8 @@ import os
 import sys
 import weakref
 
-from pyramid.httpexceptions import HTTPException
-from pyramid.request import Request
+from pyramid.httpexceptions import HTTPException  # type: ignore
+from pyramid.request import Request  # type: ignore
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
@@ -15,16 +15,29 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 
+if False:
+    from pyramid.response import Response  # type: ignore
+    from typing import Any
+    from sentry_sdk.integrations.wsgi import _ScopedResponse
+    from typing import Callable
+    from typing import Dict
+    from typing import Optional
+    from webob.cookies import RequestCookies  # type: ignore
+    from webob.compat import cgi_FieldStorage  # type: ignore
+
+    from sentry_sdk.utils import ExcInfo
+
 
 if getattr(Request, "authenticated_userid", None):
 
     def authenticated_userid(request):
+        # type: (Request) -> Optional[Any]
         return request.authenticated_userid
 
 
 else:
     # bw-compat for pyramid < 1.5
-    from pyramid.security import authenticated_userid
+    from pyramid.security import authenticated_userid  # type: ignore
 
 
 class PyramidIntegration(Integration):
@@ -33,6 +46,7 @@ class PyramidIntegration(Integration):
     transaction_style = None
 
     def __init__(self, transaction_style="route_name"):
+        # type: (str) -> None
         TRANSACTION_STYLE_VALUES = ("route_name", "route_pattern")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
@@ -43,11 +57,13 @@ class PyramidIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        from pyramid.router import Router
+        # type: () -> None
+        from pyramid.router import Router  # type: ignore
 
         old_handle_request = Router.handle_request
 
         def sentry_patched_handle_request(self, request, *args, **kwargs):
+            # type: (Any, Request, *Any, **Any) -> Response
             hub = Hub.current
             integration = hub.get_integration(PyramidIntegration)
             if integration is None:
@@ -70,6 +86,7 @@ class PyramidIntegration(Integration):
         old_wsgi_call = Router.__call__
 
         def sentry_patched_wsgi_call(self, environ, start_response):
+            # type: (Any, Dict[str, str], Callable) -> _ScopedResponse
             hub = Hub.current
             integration = hub.get_integration(PyramidIntegration)
             if integration is None:
@@ -83,7 +100,8 @@ class PyramidIntegration(Integration):
 
 
 def _capture_exception(exc_info, **kwargs):
-    if issubclass(exc_info[0], HTTPException):
+    # type: (ExcInfo, **Any) -> None
+    if exc_info[0] is None or issubclass(exc_info[0], HTTPException):
         return
     hub = Hub.current
     if hub.get_integration(PyramidIntegration) is None:
@@ -102,15 +120,19 @@ class PyramidRequestExtractor(RequestExtractor):
         return self.request.path_url
 
     def env(self):
+        # type: () -> Dict[str, str]
         return self.request.environ
 
     def cookies(self):
+        # type: () -> RequestCookies
         return self.request.cookies
 
     def raw_data(self):
+        # type: () -> str
         return self.request.text
 
     def form(self):
+        # type: () -> Dict[str, str]
         return {
             key: value
             for key, value in self.request.POST.items()
@@ -118,6 +140,7 @@ class PyramidRequestExtractor(RequestExtractor):
         }
 
     def files(self):
+        # type: () -> Dict[str, cgi_FieldStorage]
         return {
             key: value
             for key, value in self.request.POST.items()
@@ -125,6 +148,7 @@ class PyramidRequestExtractor(RequestExtractor):
         }
 
     def size_of_file(self, postdata):
+        # type: (cgi_FieldStorage) -> int
         file = postdata.file
         try:
             return os.fstat(file.fileno()).st_size
@@ -133,7 +157,9 @@ class PyramidRequestExtractor(RequestExtractor):
 
 
 def _make_event_processor(weak_request, integration):
+    # type: (Callable[[], Request], PyramidIntegration) -> Callable
     def event_processor(event, hint):
+        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         request = weak_request()
         if request is None:
             return event

@@ -6,13 +6,21 @@ from collections import namedtuple
 
 from sentry_sdk._compat import iteritems
 from sentry_sdk.utils import logger
+from typing import Iterator
+
+if False:
+    from typing import Dict
+    from typing import List
+    from typing import Set
+    from typing import Type
 
 
 _installer_lock = Lock()
-_installed_integrations = set()
+_installed_integrations = set()  # type: Set[str]
 
 
 def iter_default_integrations():
+    # type: () -> Iterator[Type[Integration]]
     """Returns an iterator of default integration classes.
 
     This returns the following default integration:
@@ -45,6 +53,7 @@ def iter_default_integrations():
 
 
 def setup_integrations(integrations, with_defaults=True):
+    # type: (List[Integration], bool) -> Dict[str, Integration]
     """Given a list of integration instances this installs them all.  When
     `with_defaults` is set to `True` then all default integrations are added
     unless they were already provided before.
@@ -101,6 +110,9 @@ class Integration(object):
 
     install = None
     """Legacy method, do not implement."""
+
+    identifier = None  # type: str
+    """String unique ID of integration type"""
 
     @staticmethod
     def setup_once():
