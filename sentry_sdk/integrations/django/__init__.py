@@ -5,7 +5,7 @@ import sys
 import weakref
 
 from django import VERSION as DJANGO_VERSION
-from django.db import models
+from django.db.models.query import QuerySet
 from django.core import signals
 
 try:
@@ -144,7 +144,7 @@ class DjangoIntegration(Integration):
 
         @add_global_repr_processor
         def _django_queryset_repr(value, hint):
-            if not isinstance(value, models.QuerySet) or value._result_cache:
+            if not isinstance(value, QuerySet) or value._result_cache:
                 return NotImplemented
 
             # Do not call Hub.get_integration here. It is intentional that
