@@ -34,6 +34,13 @@ logger = logging.getLogger("sentry_sdk.errors")
 CYCLE_MARKER = object()
 
 
+global_repr_processors = []
+
+
+def add_global_repr_processor(processor):
+    global_repr_processors.append(processor)
+
+
 def _get_debug_hub():
     # This function is replaced by debug.py
     pass
@@ -307,22 +314,40 @@ def safe_repr(value):
         return u"<broken repr>"
 
 
-def object_to_json(obj):
-    def _walk(obj, depth):
-        if depth < 4:
+def object_to_json(obj, remaining_depth=4, memo=None):
+    if memo is None:
+        memo = Memo()
+    if memo.memoize(obj):
+        return CYCLE_MARKER
+
+    try:
+        if remaining_depth > 0:
+            hints = {"memo": memo, "remaining_depth": remaining_depth}
+            for processor in global_repr_processors:
+                with capture_internal_exceptions():
+                    result = processor(obj, hints)
+                    if result is not NotImplemented:
+                        return result
+
             if isinstance(obj, (list, tuple)):
                 # It is not safe to iterate over another sequence types as this may raise errors or
                 # bring undesired side-effects (e.g. Django querysets are executed during iteration)
-                return [_walk(x, depth + 1) for x in obj]
-            if isinstance(obj, Mapping):
-                return {safe_str(k): _walk(v, depth + 1) for k, v in obj.items()}
+                return [
+                    object_to_json(x, remaining_depth=remaining_depth - 1, memo=memo)
+                    for x in obj
+                ]
 
-        if obj is CYCLE_MARKER:
-            return obj
+            if isinstance(obj, Mapping):
+                return {
+                    safe_str(k): object_to_json(
+                        v, remaining_depth=remaining_depth - 1, memo=memo
+                    )
+                    for k, v in obj.items()
+                }
 
         return safe_repr(obj)
-
-    return _walk(break_cycles(obj), 0)
+    finally:
+        memo.unmemoize(obj)
 
 
 def extract_locals(frame):
@@ -645,23 +670,18 @@ def strip_frame_mut(frame):
         frame["vars"] = strip_databag(frame["vars"])
 
 
-def break_cycles(obj, memo=None):
-    if memo is None:
-        memo = {}
-    if id(obj) in memo:
-        return CYCLE_MARKER
-    memo[id(obj)] = obj
+class Memo(object):
+    def __init__(self):
+        self._inner = {}
 
-    try:
-        if isinstance(obj, Mapping):
-            return {k: break_cycles(v, memo) for k, v in obj.items()}
-        if isinstance(obj, (list, tuple)):
-            # It is not safe to iterate over another sequence types as this may raise errors or
-            # bring undesired side-effects (e.g. Django querysets are executed during iteration)
-            return [break_cycles(v, memo) for v in obj]
-        return obj
-    finally:
-        del memo[id(obj)]
+    def memoize(self, obj):
+        if id(obj) in self._inner:
+            return True
+        self._inner[id(obj)] = obj
+        return False
+
+    def unmemoize(self, obj):
+        self._inner.pop(id(obj), None)
 
 
 def convert_types(obj):

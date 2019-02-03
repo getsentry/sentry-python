@@ -5,6 +5,7 @@ import sys
 import weakref
 
 from django import VERSION as DJANGO_VERSION
+from django.db.models.query import QuerySet
 from django.core import signals
 
 try:
@@ -31,6 +32,7 @@ from sentry_sdk import Hub
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import (
+    add_global_repr_processor,
     capture_internal_exceptions,
     event_from_exception,
     safe_repr,
@@ -139,6 +141,22 @@ class DjangoIntegration(Integration):
                     frames.append(frame)
 
             return event
+
+        @add_global_repr_processor
+        def _django_queryset_repr(value, hint):
+            if not isinstance(value, QuerySet) or value._result_cache:
+                return NotImplemented
+
+            # Do not call Hub.get_integration here. It is intentional that
+            # running under a new hub does not suddenly start executing
+            # querysets. This might be surprising to the user but it's likely
+            # less annoying.
+
+            return u"<%s from %s at 0x%x>" % (
+                value.__class__.__name__,
+                value.__module__,
+                id(value),
+            )
 
 
 def _make_event_processor(weak_request, integration):

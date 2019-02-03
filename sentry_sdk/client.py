@@ -12,7 +12,6 @@ from sentry_sdk.utils import (
     get_type_name,
     capture_internal_exceptions,
     current_stacktrace,
-    break_cycles,
     logger,
 )
 from sentry_sdk.transport import make_transport
@@ -122,7 +121,6 @@ class Client(object):
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
-            event = break_cycles(event)
             strip_event_mut(event)
             event = flatten_metadata(event)
             event = convert_types(event)
