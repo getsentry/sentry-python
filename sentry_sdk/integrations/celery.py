@@ -21,9 +21,11 @@ class CeleryIntegration(Integration):
         old_build_tracer = trace.build_tracer
 
         def sentry_build_tracer(name, task, *args, **kwargs):
-            task.__call__ = _wrap_task_call(task, task.__call__)
-            task.run = _wrap_task_call(task, task.run)
-            return old_build_tracer(name, task, *args, **kwargs)
+            # Need to patch both methods because older celery sometimes
+            # short-circuits to task.run if it thinks it's safe.
+            task.__call__ = _wrap_task_call(task.__call__)
+            task.run = _wrap_task_call(task.run)
+            return _wrap_tracer(task, old_build_tracer(name, task, *args, **kwargs))
 
         trace.build_tracer = sentry_build_tracer
 
@@ -33,28 +35,40 @@ class CeleryIntegration(Integration):
         ignore_logger("celery.worker.job")
 
 
-def _wrap_task_call(self, f):
+def _wrap_tracer(task, f):
+    # Need to wrap tracer for pushing the scope before prerun is sent, and
+    # popping it after postrun is sent.
+    #
+    # This is the reason we don't use signals for hooking in the first place.
+    # Also because in Celery 3, signal dispatch returns early if one handler
+    # crashes.
     def _inner(*args, **kwargs):
         hub = Hub.current
         if hub.get_integration(CeleryIntegration) is None:
             return f(*args, **kwargs)
 
-        with hub.configure_scope() as scope:
-            if scope._name == "celery":
-                return f(*args, **kwargs)
-
         with hub.push_scope() as scope:
             scope._name = "celery"
-            scope.add_event_processor(_make_event_processor(args, kwargs, self))
-            try:
-                return f(*args, **kwargs)
-            except Exception:
-                reraise(*_capture_exception(hub))
+            scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
+
+            return f(*args, **kwargs)
 
     return _inner
 
 
-def _make_event_processor(args, kwargs, task):
+def _wrap_task_call(f):
+    # Need to wrap task call because the exception is caught before we get to
+    # see it. Also celery's reported stacktrace is untrustworthy.
+    def _inner(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except Exception:
+            reraise(*_capture_exception())
+
+    return _inner
+
+
+def _make_event_processor(task, uuid, args, kwargs, request=None):
     def event_processor(event, hint):
         with capture_internal_exceptions():
             event["transaction"] = task.name
@@ -87,12 +101,15 @@ def _make_event_processor(args, kwargs, task):
     return event_processor
 
 
-def _capture_exception(hub):
-    exc_info = sys.exc_info()
-    event, hint = event_from_exception(
-        exc_info,
-        client_options=hub.client.options,
-        mechanism={"type": "celery", "handled": False},
-    )
-    hub.capture_event(event, hint=hint)
+def _capture_exception():
+    hub = Hub.current
+    if hub.get_integration(CeleryIntegration) is not None:
+        exc_info = sys.exc_info()
+        event, hint = event_from_exception(
+            exc_info,
+            client_options=hub.client.options,
+            mechanism={"type": "celery", "handled": False},
+        )
+        hub.capture_event(event, hint=hint)
+
     return exc_info

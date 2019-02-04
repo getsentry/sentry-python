@@ -72,7 +72,11 @@ def test_ignore_expected(capture_events, celery):
 def test_broken_prerun(init_celery, connect_signal):
     from celery.signals import task_prerun
 
+    stack_lengths = []
+
     def crash(*args, **kwargs):
+        # scope should exist in prerun
+        stack_lengths.append(len(Hub.current._stack))
         1 / 0
 
     # Order here is important to reproduce the bug: In Celery 3, a crashing
@@ -85,7 +89,7 @@ def test_broken_prerun(init_celery, connect_signal):
 
     @celery.task(name="dummy_task")
     def dummy_task(x, y):
-        assert len(Hub.current._stack) == 2
+        stack_lengths.append(len(Hub.current._stack))
         return x / y
 
     try:
@@ -95,3 +99,7 @@ def test_broken_prerun(init_celery, connect_signal):
             raise
 
     assert len(Hub.current._stack) == 1
+    if VERSION < (4,):
+        assert stack_lengths == [2]
+    else:
+        assert stack_lengths == [2, 2]
