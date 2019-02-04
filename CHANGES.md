@@ -1,3 +1,13 @@
+## 0.7.0
+
+* Properly display chained exceptions (PEP-3134).
+* Rewrite celery integration to monkeypatch instead of using signals due to
+  bugs in Celery 3's signal handling. The Celery scope is also now available in
+  prerun and postrun signals.
+* Fix Tornado integration to work with Tornado 6.
+* Do not evaluate Django `QuerySet` when trying to capture local variables.
+  Also an internal hook was added to overwrite `repr` for local vars.
+
 ## 0.6.9
 
 * Second attempt at fixing the bug that was supposed to be fixed in 0.6.8.
