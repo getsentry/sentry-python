@@ -203,7 +203,7 @@ class Client(object):
         semantics as `self.flush()`.
         """
         if self.transport is not None:
-            self.transport.flush(timeout=timeout, callback=callback)
+            self.flush(timeout=timeout, callback=callback)
             self.transport.kill()
             self.transport = None
 
