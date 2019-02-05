@@ -37,26 +37,13 @@ class Transport(object):
         """
         raise NotImplementedError()
 
-    def shutdown(self, timeout, callback=None):
-        """Initiates a controlled shutdown that should flush out pending
-        events.  The callback must be invoked with the number of pending
-        events and the timeout if the shutting down would take some period
-        of time (eg: not instant).
-        """
-        self.kill()
+    def flush(self, timeout, callback=None):
+        """Wait `timeout` seconds for the current events to be sent out."""
+        pass
 
     def kill(self):
         """Forcefully kills the transport."""
         pass
-
-    def copy(self):
-        """Copy the transport.
-
-        The returned transport should behave completely independent from the
-        previous one.  It still may share HTTP connection pools, but not share
-        any state such as internal queues.
-        """
-        return self
 
     def __del__(self):
         try:
@@ -161,21 +148,14 @@ class HttpTransport(Transport):
 
         self._worker.submit(send_event_wrapper)
 
-    def shutdown(self, timeout, callback=None):
-        logger.debug("Shutting down HTTP transport orderly")
-        if timeout <= 0:
-            self._worker.kill()
-        else:
-            self._worker.shutdown(timeout, callback)
+    def flush(self, timeout, callback=None):
+        logger.debug("Flushing HTTP transport")
+        if timeout > 0:
+            self._worker.flush(timeout, callback)
 
     def kill(self):
         logger.debug("Killing HTTP transport")
         self._worker.kill()
-
-    def copy(self):
-        transport = type(self)(self.options)
-        transport._pool = self._pool
-        return transport
 
 
 class _FunctionTransport(Transport):
