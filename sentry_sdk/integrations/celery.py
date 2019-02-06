@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 import sys
 
-from celery.exceptions import SoftTimeLimitExceeded
+from celery.exceptions import SoftTimeLimitExceeded, Retry
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
@@ -83,18 +83,21 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
 
         if "exc_info" in hint:
             with capture_internal_exceptions():
+                if isinstance(hint["exc_info"][1], Retry):
+                    return None
+
+                if hasattr(task, "throws") and isinstance(
+                    hint["exc_info"][1], task.throws
+                ):
+                    return None
+
+            with capture_internal_exceptions():
                 if issubclass(hint["exc_info"][0], SoftTimeLimitExceeded):
                     event["fingerprint"] = [
                         "celery",
                         "SoftTimeLimitExceeded",
                         getattr(task, "name", task),
                     ]
-
-            with capture_internal_exceptions():
-                if hasattr(task, "throws") and isinstance(
-                    hint["exc_info"][1], task.throws
-                ):
-                    return None
 
         return event
 

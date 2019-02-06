@@ -103,3 +103,39 @@ def test_broken_prerun(init_celery, connect_signal):
         assert stack_lengths == [2]
     else:
         assert stack_lengths == [2, 2]
+
+
+@pytest.mark.skipif(
+    VERSION in ((4, 2, 0), (4, 2, 1)),
+    reason="https://github.com/celery/celery/issues/4661",
+)
+def test_retry(celery, capture_events):
+    events = capture_events()
+    failures = [True, True, False]
+    runs = []
+
+    @celery.task(name="dummy_task", bind=True)
+    def dummy_task(self):
+        runs.append(1)
+        try:
+            if failures.pop(0):
+                1 / 0
+        except Exception as exc:
+            self.retry(max_retries=2, exc=exc)
+
+    dummy_task.delay()
+
+    assert len(runs) == 3
+    assert not events
+
+    failures = [True, True, True]
+    runs = []
+
+    dummy_task.delay()
+
+    assert len(runs) == 3
+    event, = events
+    exceptions = event["exception"]["values"]
+
+    for e in exceptions:
+        assert e["type"] == "ZeroDivisionError"
