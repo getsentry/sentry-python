@@ -103,8 +103,9 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
 
 def _capture_exception():
     hub = Hub.current
+    exc_info = sys.exc_info()
+
     if hub.get_integration(CeleryIntegration) is not None:
-        exc_info = sys.exc_info()
         event, hint = event_from_exception(
             exc_info,
             client_options=hub.client.options,
