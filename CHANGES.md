@@ -1,3 +1,7 @@
+## 0.7.1
+
+* Fix `UnboundLocalError` crash in Celery integration.
+
 ## 0.7.0
 
 * Properly display chained exceptions (PEP-3134).
