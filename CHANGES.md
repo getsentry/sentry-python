@@ -1,3 +1,7 @@
+## 0.7.2
+
+* Fix `celery.exceptions.Retry` spamming in Celery integration.
+
 ## 0.7.1
 
 * Fix `UnboundLocalError` crash in Celery integration.
