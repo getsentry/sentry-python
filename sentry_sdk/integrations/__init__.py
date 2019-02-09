@@ -30,6 +30,7 @@ def iter_default_integrations():
     from sentry_sdk.integrations.atexit import AtexitIntegration
     from sentry_sdk.integrations.modules import ModulesIntegration
     from sentry_sdk.integrations.argv import ArgvIntegration
+    from sentry_sdk.integrations.threading import ThreadingIntegration
 
     yield LoggingIntegration
     yield StdlibIntegration
@@ -38,6 +39,7 @@ def iter_default_integrations():
     yield AtexitIntegration
     yield ModulesIntegration
     yield ArgvIntegration
+    yield ThreadingIntegration
 
 
 def setup_integrations(integrations, with_defaults=True):
