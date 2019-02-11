@@ -1,4 +1,6 @@
 """This package"""
+from __future__ import absolute_import
+
 from threading import Lock
 from collections import namedtuple
 
