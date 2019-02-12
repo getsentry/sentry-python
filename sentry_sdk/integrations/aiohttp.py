@@ -32,7 +32,7 @@ class AioHttpIntegration(Integration):
             async def inner():
                 hub = Hub.current
                 if hub.get_integration(AioHttpIntegration) is None:
-                    return old_handle(self, request, *args, **kwargs)
+                    return await old_handle(self, request, *args, **kwargs)
 
                 weak_request = weakref.ref(request)
 
