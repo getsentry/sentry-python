@@ -45,11 +45,8 @@ def _drain_queue():
         integration = hub.get_integration(AwsLambdaIntegration)
         if integration is not None:
             # Flush out the event queue before AWS kills the
-            # process. This is not threadsafe.
-            # make new transport with empty queue
-            new_transport = hub.client.transport.copy()
-            hub.client.close()
-            hub.client.transport = new_transport
+            # process.
+            hub.client.flush()
 
 
 class AwsLambdaIntegration(Integration):

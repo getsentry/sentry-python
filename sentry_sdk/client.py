@@ -197,20 +197,29 @@ class Client(object):
         self.transport.capture_event(event)
         return rv
 
-    def close(self, timeout=None, shutdown_callback=None):
-        """Closes the client which shuts down the transport in an
-        orderly manner.
+    def close(self, timeout=None, callback=None):
+        """
+        Close the client and shut down the transport. Arguments have the same
+        semantics as `self.flush()`.
+        """
+        if self.transport is not None:
+            self.flush(timeout=timeout, callback=callback)
+            self.transport.kill()
+            self.transport = None
 
-        The `shutdown_callback` is invoked with two arguments: the number of
-        pending events and the configured shutdown timeout.  For instance the
-        default atexit integration will use this to render out a message on
-        stderr.
+    def flush(self, timeout=None, callback=None):
+        """
+        Wait `timeout` seconds for the current events to be sent. If no
+        `timeout` is provided, the `shutdown_timeout` option value is used.
+
+        The `callback` is invoked with two arguments: the number of pending
+        events and the configured timeout.  For instance the default atexit
+        integration will use this to render out a message on stderr.
         """
         if self.transport is not None:
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
-            self.transport.shutdown(timeout=timeout, callback=shutdown_callback)
-            self.transport = None
+            self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):
         return self

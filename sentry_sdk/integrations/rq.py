@@ -33,10 +33,7 @@ class RqIntegration(Integration):
                 # We're inside of a forked process and RQ is
                 # about to call `os._exit`. Make sure that our
                 # events get sent out.
-                #
-                # Closing the client should not affect other jobs since
-                # we're in a different process
-                hub.client.close()
+                hub.client.flush()
 
             return rv
 
