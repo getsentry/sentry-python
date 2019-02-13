@@ -174,3 +174,20 @@ def _add_user_to_event(event):
             # - flask_login is not configured
             # - no user is logged in
             pass
+
+        # The following attribute accesses are ineffective for the general
+        # Flask-Login case, because the User interface of Flask-Login does not
+        # care about anything but the ID. However, Flask-User (based on
+        # Flask-Login) documents a few optional extra attributes.
+        #
+        # https://github.com/lingthio/Flask-User/blob/a379fa0a281789618c484b459cb41236779b95b1/docs/source/data_models.rst#fixed-data-model-property-names
+
+        try:
+            user_info["email"] = user_info["username"] = user.email
+        except Exception:
+            pass
+
+        try:
+            user_info["username"] = user.username
+        except Exception:
+            pass
