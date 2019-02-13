@@ -27,6 +27,20 @@ class BackgroundWorker(object):
         if not self.is_alive:
             self.start()
 
+    def _timed_queue_join(self, timeout):
+        deadline = time() + timeout
+        queue = self._queue
+        queue.all_tasks_done.acquire()
+        try:
+            while queue.unfinished_tasks:
+                delay = deadline - time()
+                if delay <= 0:
+                    return False
+                queue.all_tasks_done.wait(timeout=delay)
+            return True
+        finally:
+            queue.all_tasks_done.release()
+
     def start(self):
         with self._lock:
             if not self.is_alive:
@@ -53,15 +67,13 @@ class BackgroundWorker(object):
         logger.debug("background worker flushed")
 
     def _wait_flush(self, timeout, callback):
-        event = threading.Event()
-        pending = self._queue.qsize()
-        self._queue.put_nowait(event.set)
-        logger.debug("%d event(s) pending on flush", pending)
-
-        if callback is not None:
-            callback(pending, timeout)
-
-        event.wait(timeout)
+        initial_timeout = min(0.1, timeout)
+        if not self._timed_queue_join(initial_timeout):
+            pending = self._queue.qsize()
+            logger.debug("%d event(s) pending on flush", pending)
+            if callback is not None:
+                callback(pending, timeout)
+            self._timed_queue_join(timeout - initial_timeout)
 
     def submit(self, callback):
         self._ensure_thread()
