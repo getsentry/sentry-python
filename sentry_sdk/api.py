@@ -83,6 +83,13 @@ def push_scope(callback=None):
 
 
 @hubmethod
+def flush(timeout=None, callback=None):
+    hub = Hub.current
+    if hub is not None and hub.client is not None:
+        return hub.client.flush(timeout=timeout, callback=callback)
+
+
+@hubmethod
 def last_event_id():
     hub = Hub.current
     if hub is not None:
