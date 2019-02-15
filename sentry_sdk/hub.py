@@ -338,6 +338,12 @@ class Hub(with_metaclass(HubMeta)):
 
         return inner()
 
+    def flush(self, timeout=None, callback=None):
+        """Alias for self.client.flush"""
+        client, scope = self._stack[-1]
+        if client is not None:
+            return client.flush(timeout=timeout, callback=callback)
+
 
 GLOBAL_HUB = Hub()
 _local.set(GLOBAL_HUB)
