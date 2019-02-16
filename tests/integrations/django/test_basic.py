@@ -128,7 +128,7 @@ def test_user_captured(sentry_init, client, capture_events):
     }
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_queryset_repr(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
