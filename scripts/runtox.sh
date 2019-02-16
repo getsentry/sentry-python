@@ -10,4 +10,4 @@ else
     searchstring="$1"
 fi
 
-exec tox -e $(tox -l | grep $searchstring | tr '\n' ',') -- "${@:2}"
+exec tox -p auto -e $(tox -l | grep $searchstring | tr '\n' ',') -- "${@:2}"
