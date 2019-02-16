@@ -6,7 +6,6 @@ import threading
 import pytest
 
 from werkzeug.test import Client
-from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError
 
@@ -33,6 +32,18 @@ def django_clear_caches():
     connections._connections = threading.local()
     # this will clear the cached property
     connections.__dict__.pop("databases", None)
+
+
+@pytest.fixture
+def setup_app_tables():
+    # Honestly no idea why pytest-django does not do this
+    from django import VERSION
+    from django.core import management
+
+    if VERSION < (2, 0):
+        management.call_command("migrate", noinput=True)
+    else:
+        management.call_command("migrate", no_input=True)
 
 
 @pytest.fixture
@@ -98,16 +109,7 @@ def test_transaction_with_class_view(sentry_init, client, capture_events):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_user_captured(sentry_init, client, capture_events):
-
-    # Honestly no idea why pytest-django does not do this
-    from django import VERSION
-    from django.core import management
-
-    if VERSION < (2, 0):
-        management.call_command("migrate", noinput=True)
-    else:
-        management.call_command("migrate", no_input=True)
+def test_user_captured(sentry_init, client, capture_events, setup_app_tables):
 
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     events = capture_events()
@@ -129,7 +131,9 @@ def test_user_captured(sentry_init, client, capture_events):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_queryset_repr(sentry_init, capture_events):
+def test_queryset_repr(sentry_init, capture_events, setup_app_tables):
+    from django.contrib.auth.models import User
+
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
     User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
