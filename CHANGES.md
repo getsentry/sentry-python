@@ -1,3 +1,15 @@
+## 0.7.3
+
+* Fix crash in AIOHTTP integration when integration was set up but disabled.
+* Flask integration now adds usernames, email addresses based on the protocol
+  Flask-User defines on top of Flask-Login.
+* New threading integration catches exceptions from crashing threads.
+* New method `flush` on hubs and clients. New global `flush` function.
+* Add decorator for serverless functions to fix common problems in those
+  environments.
+* Fix a bug in the logging integration where using explicit handlers required
+  enabling the integration.
+
 ## 0.7.2
 
 * Fix `celery.exceptions.Retry` spamming in Celery integration.
