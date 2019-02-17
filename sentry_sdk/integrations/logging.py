@@ -137,8 +137,7 @@ class EventHandler(logging.Handler, object):
             return
 
         hub = Hub.current
-        integration = hub.get_integration(LoggingIntegration)
-        if integration is None:
+        if hub.client is None:
             return
 
         # exc_info might be None or (None, None, None)
@@ -185,9 +184,6 @@ class BreadcrumbHandler(logging.Handler, object):
         if not _can_record(record):
             return
 
-        hub = Hub.current
-        integration = hub.get_integration(LoggingIntegration)
-        if integration is None:
-            return
-
-        hub.add_breadcrumb(_breadcrumb_from_record(record), hint={"log_record": record})
+        Hub.current.add_breadcrumb(
+            _breadcrumb_from_record(record), hint={"log_record": record}
+        )
