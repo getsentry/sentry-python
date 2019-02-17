@@ -19,8 +19,15 @@ def reraise_internal_exceptions(request, monkeypatch):
     if "tests_internal_exceptions" in request.keywords:
         return
 
+    failures = []
+
     def _capture_internal_exception(exc_info):
-        reraise(*exc_info)
+        failures.append(exc_info)
+
+    @request.addfinalizer
+    def _():
+        for failure in failures:
+            reraise(*exc_info)
 
     monkeypatch.setattr(
         sentry_sdk.Hub.current,

@@ -21,7 +21,7 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from tests.integrations.django.myapp.wsgi import application
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def django_clear_caches():
     """Invalidate the connection caches.
 
@@ -34,8 +34,11 @@ def django_clear_caches():
     connections.__dict__.pop("databases", None)
 
 
-@pytest.fixture
-def setup_app_tables():
+@pytest.fixture(autouse=True)
+def setup_app_tables(request):
+    if request.node.get_closest_marker('django_db') is None:
+        return
+
     # Honestly no idea why pytest-django does not do this
     from django import VERSION
     from django.core import management
@@ -109,9 +112,10 @@ def test_transaction_with_class_view(sentry_init, client, capture_events):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_user_captured(sentry_init, client, capture_events, setup_app_tables):
+def test_user_captured(sentry_init, client, capture_events):
 
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+
     events = capture_events()
     content, status, headers = client.get(reverse("mylogin"))
     assert b"".join(content) == b"ok"
@@ -131,10 +135,11 @@ def test_user_captured(sentry_init, client, capture_events, setup_app_tables):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_queryset_repr(sentry_init, capture_events, setup_app_tables):
+def test_queryset_repr(sentry_init, capture_events):
     from django.contrib.auth.models import User
 
     sentry_init(integrations=[DjangoIntegration()])
+
     events = capture_events()
     User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
 
@@ -196,12 +201,15 @@ def test_management_command_raises():
 
 @pytest.mark.django_db(transaction=True)
 def test_sql_queries(request, sentry_init, capture_events):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     from django.db import connection
+    from django.db.backends.utils import CursorWrapper
+
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
 
     events = capture_events()
 
     with connection.cursor() as sql:
+        assert type(sql) is CursorWrapper
         with pytest.raises(OperationalError):
             # table doesn't even exist
             sql.execute("""SELECT count(*) FROM people_person WHERE foo = %s""", [123])
@@ -209,16 +217,16 @@ def test_sql_queries(request, sentry_init, capture_events):
     capture_message("HI")
 
     event, = events
-
+    assert event['message'] == 'HI'
     crumb, = event["breadcrumbs"]
-
     assert crumb["message"] == """SELECT count(*) FROM people_person WHERE foo = 123"""
 
 
 @pytest.mark.django_db(transaction=True)
 def test_sql_dict_query_params(sentry_init, capture_events):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     from django.db import connection
+
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
 
     sql = connection.cursor()
 
@@ -266,8 +274,9 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events):
 
 @pytest.mark.django_db(transaction=True)
 def test_sql_queries_large_params(sentry_init, capture_events):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     from django.db import connection
+
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
 
     sql = connection.cursor()
 
