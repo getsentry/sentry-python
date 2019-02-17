@@ -6,9 +6,9 @@ except ImportError:
     from urllib import urlopen
 
 try:
-    from httplib import HTTPConnection
+    from httplib import HTTPSConnection
 except ImportError:
-    from http.client import HTTPConnection
+    from http.client import HTTPSConnection
 
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.stdlib import StdlibIntegration
@@ -77,7 +77,7 @@ def test_httplib_misuse(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    conn = HTTPConnection("httpbin.org", 80)
+    conn = HTTPSConnection("httpbin.org", 443)
     conn.request("GET", "/anything/foo")
 
     with pytest.raises(Exception):
@@ -98,7 +98,7 @@ def test_httplib_misuse(sentry_init, capture_events):
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
     assert crumb["data"] == {
-        "url": "http://httpbin.org/anything/foo",
+        "url": "https://httpbin.org/anything/foo",
         "method": "GET",
         "status_code": 200,
         "reason": "OK",
