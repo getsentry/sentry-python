@@ -1303,8 +1303,7 @@ table {
             <span class="k">return</span>
 
         <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-        <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span>
 
         <span class="c1"># exc_info might be None or (None, None, None)</span>
@@ -1351,12 +1350,9 @@ table {
         <span class="k">if</span> <span class="ow">not</span> <span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
             <span class="k">return</span>
 
-        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-        <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="k">return</span>
-
-        <span class="n">hub</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span><span class="n">_breadcrumb_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;log_record&quot;</span><span class="p">:</span> <span class="n">record</span><span class="p">})</span>
+        <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span>
+            <span class="n">_breadcrumb_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;log_record&quot;</span><span class="p">:</span> <span class="n">record</span><span class="p">}</span>
+        <span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1444,12 +1440,9 @@ the 'raw' message as determined by record.message is logged.</p></div>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
             <span class="k">return</span>
 
-        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-        <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="k">return</span>
-
-        <span class="n">hub</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span><span class="n">_breadcrumb_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;log_record&quot;</span><span class="p">:</span> <span class="n">record</span><span class="p">})</span>
+        <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span>
+            <span class="n">_breadcrumb_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;log_record&quot;</span><span class="p">:</span> <span class="n">record</span><span class="p">}</span>
+        <span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2048,8 +2041,7 @@ the 'raw' message as determined by record.message is logged.</p></div>
             <span class="k">return</span>
 
         <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-        <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span>
 
         <span class="c1"># exc_info might be None or (None, None, None)</span>
@@ -2835,8 +2827,7 @@ the 'raw' message as determined by record.message is logged.</p></div>
             <span class="k">return</span>
 
         <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-        <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span>
 
         <span class="c1"># exc_info might be None or (None, None, None)</span>

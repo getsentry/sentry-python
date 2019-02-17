@@ -1119,11 +1119,8 @@ table {
         <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AwsLambdaIntegration</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="c1"># Flush out the event queue before AWS kills the</span>
-            <span class="c1"># process. This is not threadsafe.</span>
-            <span class="c1"># make new transport with empty queue</span>
-            <span class="n">new_transport</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-            <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-            <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="n">new_transport</span>
+            <span class="c1"># process.</span>
+            <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
 
 
 <span class="k">class</span> <span class="nc">AwsLambdaIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>

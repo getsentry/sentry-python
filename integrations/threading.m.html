@@ -3,7 +3,7 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 
-    <title>sentry_sdk.integrations.atexit API documentation</title>
+    <title>sentry_sdk.integrations.threading API documentation</title>
     <meta name="description" content="" />
 
   <link href='http://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300' rel='stylesheet' type='text/css'>
@@ -1041,23 +1041,16 @@ table {
     <h1>Index</h1>
     <ul id="index">
 
-    <li class="set"><h3><a href="#header-functions">Functions</a></h3>
-      
-  <ul>
-    <li class="mono"><a href="#sentry_sdk.integrations.atexit.default_callback">default_callback</a></li>
-  </ul>
-
-    </li>
 
     <li class="set"><h3><a href="#header-classes">Classes</a></h3>
       <ul>
         <li class="mono">
-        <span class="class_name"><a href="#sentry_sdk.integrations.atexit.AtexitIntegration">AtexitIntegration</a></span>
+        <span class="class_name"><a href="#sentry_sdk.integrations.threading.ThreadingIntegration">ThreadingIntegration</a></span>
         
           
   <ul>
-    <li class="mono"><a href="#sentry_sdk.integrations.atexit.AtexitIntegration.__init__">__init__</a></li>
-    <li class="mono"><a href="#sentry_sdk.integrations.atexit.AtexitIntegration.setup_once">setup_once</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.threading.ThreadingIntegration.__init__">__init__</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.threading.ThreadingIntegration.setup_once">setup_once</a></li>
   </ul>
 
         </li>
@@ -1075,55 +1068,75 @@ table {
 
 
   <header id="section-intro">
-  <h1 class="title"><span class="name">sentry_sdk.integrations.atexit</span> module</h1>
+  <h1 class="title"><span class="name">sentry_sdk.integrations.threading</span> module</h1>
   
   
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.atexit', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.atexit" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.threading', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.threading" class="source">
     <div class="codehilite"><pre><span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">absolute_import</span>
 
-<span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">sys</span>
-<span class="kn">import</span> <span class="nn">atexit</span>
 
-<span class="kn">from</span> <span class="nn">sentry_sdk.hub</span> <span class="kn">import</span> <span class="n">Hub</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">logger</span>
+<span class="kn">from</span> <span class="nn">threading</span> <span class="kn">import</span> <span class="n">Thread</span>
+
+<span class="kn">from</span> <span class="nn">sentry_sdk</span> <span class="kn">import</span> <span class="n">Hub</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk._compat</span> <span class="kn">import</span> <span class="n">reraise</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">event_from_exception</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
 
 
-<span class="k">def</span> <span class="nf">default_callback</span><span class="p">(</span><span class="n">pending</span><span class="p">,</span> <span class="n">timeout</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;This is the default shutdown callback that is set on the options.</span>
-<span class="sd">    It prints out a message to stderr that informs the user that some events</span>
-<span class="sd">    are still pending and the process is waiting for them to flush out.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="k">class</span> <span class="nc">ThreadingIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
+    <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;threading&quot;</span>
 
-    <span class="k">def</span> <span class="nf">echo</span><span class="p">(</span><span class="n">msg</span><span class="p">):</span>
-        <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">msg</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
-
-    <span class="n">echo</span><span class="p">(</span><span class="s2">&quot;Sentry is attempting to send </span><span class="si">%i</span><span class="s2"> pending error messages&quot;</span> <span class="o">%</span> <span class="n">pending</span><span class="p">)</span>
-    <span class="n">echo</span><span class="p">(</span><span class="s2">&quot;Waiting up to </span><span class="si">%s</span><span class="s2"> seconds&quot;</span> <span class="o">%</span> <span class="n">timeout</span><span class="p">)</span>
-    <span class="n">echo</span><span class="p">(</span><span class="s2">&quot;Press Ctrl-</span><span class="si">%s</span><span class="s2"> to quit&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;nt&quot;</span> <span class="ow">and</span> <span class="s2">&quot;Break&quot;</span> <span class="ow">or</span> <span class="s2">&quot;C&quot;</span><span class="p">))</span>
-    <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
-
-
-<span class="k">class</span> <span class="nc">AtexitIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
-    <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;atexit&quot;</span>
-
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="n">callback</span> <span class="o">=</span> <span class="n">default_callback</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">callback</span> <span class="o">=</span> <span class="n">callback</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">propagate_hub</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">propagate_hub</span> <span class="o">=</span> <span class="n">propagate_hub</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
-        <span class="nd">@atexit.register</span>
-        <span class="k">def</span> <span class="nf">_shutdown</span><span class="p">():</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: got shutdown signal&quot;</span><span class="p">)</span>
-            <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">main</span>
-            <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AtexitIntegration</span><span class="p">)</span>
+        <span class="n">old_start</span> <span class="o">=</span> <span class="n">Thread</span><span class="o">.</span><span class="n">start</span>
+
+        <span class="k">def</span> <span class="nf">sentry_start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">a</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+            <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+            <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">ThreadingIntegration</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: shutting down client&quot;</span><span class="p">)</span>
-                <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">callback</span><span class="o">=</span><span class="n">integration</span><span class="o">.</span><span class="n">callback</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">integration</span><span class="o">.</span><span class="n">propagate_hub</span><span class="p">:</span>
+                    <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="p">(</span><span class="n">hub</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">hub</span> <span class="o">=</span> <span class="bp">None</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">run</span> <span class="o">=</span> <span class="n">_wrap_run</span><span class="p">(</span><span class="n">hub</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">run</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">old_start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">a</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+
+        <span class="n">Thread</span><span class="o">.</span><span class="n">start</span> <span class="o">=</span> <span class="n">sentry_start</span>
+
+
+<span class="k">def</span> <span class="nf">_wrap_run</span><span class="p">(</span><span class="n">parent_hub</span><span class="p">,</span> <span class="n">old_run</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="o">*</span><span class="n">a</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+        <span class="n">hub</span> <span class="o">=</span> <span class="n">parent_hub</span> <span class="ow">or</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+
+        <span class="k">with</span> <span class="n">hub</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">old_run</span><span class="p">(</span><span class="o">*</span><span class="n">a</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">reraise</span><span class="p">(</span><span class="o">*</span><span class="n">_capture_exception</span><span class="p">())</span>
+
+    <span class="k">return</span> <span class="n">run</span>
+
+
+<span class="k">def</span> <span class="nf">_capture_exception</span><span class="p">():</span>
+    <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+    <span class="n">exc_info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">ThreadingIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
+            <span class="n">exc_info</span><span class="p">,</span>
+            <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
+            <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;threading&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">},</span>
+        <span class="p">)</span>
+        <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">exc_info</span>
 </pre></div>
 
   </div>
@@ -1132,73 +1145,43 @@ table {
 
   <section id="section-items">
 
-    <h2 class="section-title" id="header-functions">Functions</h2>
-      
-  <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.atexit.default_callback">
-    <p>def <span class="ident">default_callback</span>(</p><p>pending, timeout)</p>
-    </div>
-    
-
-    
-  
-    <div class="desc"><p>This is the default shutdown callback that is set on the options.
-It prints out a message to stderr that informs the user that some events
-are still pending and the process is waiting for them to flush out.</p></div>
-  <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.atexit.default_callback', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.atexit.default_callback" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">default_callback</span><span class="p">(</span><span class="n">pending</span><span class="p">,</span> <span class="n">timeout</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;This is the default shutdown callback that is set on the options.</span>
-<span class="sd">    It prints out a message to stderr that informs the user that some events</span>
-<span class="sd">    are still pending and the process is waiting for them to flush out.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-
-    <span class="k">def</span> <span class="nf">echo</span><span class="p">(</span><span class="n">msg</span><span class="p">):</span>
-        <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">msg</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
-
-    <span class="n">echo</span><span class="p">(</span><span class="s2">&quot;Sentry is attempting to send </span><span class="si">%i</span><span class="s2"> pending error messages&quot;</span> <span class="o">%</span> <span class="n">pending</span><span class="p">)</span>
-    <span class="n">echo</span><span class="p">(</span><span class="s2">&quot;Waiting up to </span><span class="si">%s</span><span class="s2"> seconds&quot;</span> <span class="o">%</span> <span class="n">timeout</span><span class="p">)</span>
-    <span class="n">echo</span><span class="p">(</span><span class="s2">&quot;Press Ctrl-</span><span class="si">%s</span><span class="s2"> to quit&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;nt&quot;</span> <span class="ow">and</span> <span class="s2">&quot;Break&quot;</span> <span class="ow">or</span> <span class="s2">&quot;C&quot;</span><span class="p">))</span>
-    <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
-</pre></div>
-
-  </div>
-</div>
-
-  </div>
-  
 
     <h2 class="section-title" id="header-classes">Classes</h2>
       
       <div class="item">
-      <p id="sentry_sdk.integrations.atexit.AtexitIntegration" class="name">class <span class="ident">AtexitIntegration</span></p>
+      <p id="sentry_sdk.integrations.threading.ThreadingIntegration" class="name">class <span class="ident">ThreadingIntegration</span></p>
       
   
     <div class="desc"><p>Baseclass for all integrations.</p>
 <p>To accept options for an integration, implement your own constructor that
 saves those options on <code>self</code>.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.atexit.AtexitIntegration', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.atexit.AtexitIntegration" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">AtexitIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
-    <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;atexit&quot;</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.threading.ThreadingIntegration', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.threading.ThreadingIntegration" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">ThreadingIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
+    <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;threading&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="n">callback</span> <span class="o">=</span> <span class="n">default_callback</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">callback</span> <span class="o">=</span> <span class="n">callback</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">propagate_hub</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">propagate_hub</span> <span class="o">=</span> <span class="n">propagate_hub</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
-        <span class="nd">@atexit.register</span>
-        <span class="k">def</span> <span class="nf">_shutdown</span><span class="p">():</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: got shutdown signal&quot;</span><span class="p">)</span>
-            <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">main</span>
-            <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AtexitIntegration</span><span class="p">)</span>
+        <span class="n">old_start</span> <span class="o">=</span> <span class="n">Thread</span><span class="o">.</span><span class="n">start</span>
+
+        <span class="k">def</span> <span class="nf">sentry_start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">a</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+            <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+            <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">ThreadingIntegration</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: shutting down client&quot;</span><span class="p">)</span>
-                <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">callback</span><span class="o">=</span><span class="n">integration</span><span class="o">.</span><span class="n">callback</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">integration</span><span class="o">.</span><span class="n">propagate_hub</span><span class="p">:</span>
+                    <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="p">(</span><span class="n">hub</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">hub</span> <span class="o">=</span> <span class="bp">None</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">run</span> <span class="o">=</span> <span class="n">_wrap_run</span><span class="p">(</span><span class="n">hub</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">run</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">old_start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">a</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+
+        <span class="n">Thread</span><span class="o">.</span><span class="n">start</span> <span class="o">=</span> <span class="n">sentry_start</span>
 </pre></div>
 
   </div>
@@ -1208,13 +1191,13 @@ saves those options on <code>self</code>.</p></div>
       <div class="class">
           <h3>Ancestors (in MRO)</h3>
           <ul class="class_list">
-          <li><a href="#sentry_sdk.integrations.atexit.AtexitIntegration">AtexitIntegration</a></li>
+          <li><a href="#sentry_sdk.integrations.threading.ThreadingIntegration">ThreadingIntegration</a></li>
           <li>sentry_sdk.integrations.Integration</li>
           <li>builtins.object</li>
           </ul>
           <h3>Class variables</h3>
             <div class="item">
-            <p id="sentry_sdk.integrations.atexit.AtexitIntegration.identifier" class="name">var <span class="ident">identifier</span></p>
+            <p id="sentry_sdk.integrations.threading.ThreadingIntegration.identifier" class="name">var <span class="ident">identifier</span></p>
             
 
             
@@ -1224,7 +1207,7 @@ saves those options on <code>self</code>.</p></div>
 
             </div>
             <div class="item">
-            <p id="sentry_sdk.integrations.atexit.AtexitIntegration.install" class="name">var <span class="ident">install</span></p>
+            <p id="sentry_sdk.integrations.threading.ThreadingIntegration.install" class="name">var <span class="ident">install</span></p>
             
 
             
@@ -1236,8 +1219,8 @@ saves those options on <code>self</code>.</p></div>
           <h3>Static methods</h3>
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.atexit.AtexitIntegration.__init__">
-    <p>def <span class="ident">__init__</span>(</p><p>self, callback=None)</p>
+    <div class="name def" id="sentry_sdk.integrations.threading.ThreadingIntegration.__init__">
+    <p>def <span class="ident">__init__</span>(</p><p>self, propagate_hub=False)</p>
     </div>
     
 
@@ -1245,12 +1228,10 @@ saves those options on <code>self</code>.</p></div>
   
     <div class="desc"><p>Initialize self.  See help(type(self)) for accurate signature.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.atexit.AtexitIntegration.__init__', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.atexit.AtexitIntegration.__init__" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-    <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="n">callback</span> <span class="o">=</span> <span class="n">default_callback</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">callback</span> <span class="o">=</span> <span class="n">callback</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.threading.ThreadingIntegration.__init__', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.threading.ThreadingIntegration.__init__" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">propagate_hub</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">propagate_hub</span> <span class="o">=</span> <span class="n">propagate_hub</span>
 </pre></div>
 
   </div>
@@ -1260,7 +1241,7 @@ saves those options on <code>self</code>.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.atexit.AtexitIntegration.setup_once">
+    <div class="name def" id="sentry_sdk.integrations.threading.ThreadingIntegration.setup_once">
     <p>def <span class="ident">setup_once</span>(</p><p>)</p>
     </div>
     
@@ -1274,18 +1255,22 @@ handlers, and perhaps do monkeypatches.</p>
 <p>Inside those hooks <code>Integration.current</code> can be used to access the
 instance again.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.atexit.AtexitIntegration.setup_once', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.atexit.AtexitIntegration.setup_once" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.threading.ThreadingIntegration.setup_once', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.threading.ThreadingIntegration.setup_once" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@staticmethod</span>
 <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
-    <span class="nd">@atexit.register</span>
-    <span class="k">def</span> <span class="nf">_shutdown</span><span class="p">():</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: got shutdown signal&quot;</span><span class="p">)</span>
-        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">main</span>
-        <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AtexitIntegration</span><span class="p">)</span>
+    <span class="n">old_start</span> <span class="o">=</span> <span class="n">Thread</span><span class="o">.</span><span class="n">start</span>
+    <span class="k">def</span> <span class="nf">sentry_start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">a</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+        <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">ThreadingIntegration</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: shutting down client&quot;</span><span class="p">)</span>
-            <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">callback</span><span class="o">=</span><span class="n">integration</span><span class="o">.</span><span class="n">callback</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">integration</span><span class="o">.</span><span class="n">propagate_hub</span><span class="p">:</span>
+                <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="p">(</span><span class="n">hub</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">hub</span> <span class="o">=</span> <span class="bp">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">run</span> <span class="o">=</span> <span class="n">_wrap_run</span><span class="p">(</span><span class="n">hub</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">run</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">old_start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">a</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+    <span class="n">Thread</span><span class="o">.</span><span class="n">start</span> <span class="o">=</span> <span class="n">sentry_start</span>
 </pre></div>
 
   </div>
@@ -1295,7 +1280,7 @@ instance again.</p></div>
   
           <h3>Instance variables</h3>
             <div class="item">
-            <p id="sentry_sdk.integrations.atexit.AtexitIntegration.callback" class="name">var <span class="ident">callback</span></p>
+            <p id="sentry_sdk.integrations.threading.ThreadingIntegration.propagate_hub" class="name">var <span class="ident">propagate_hub</span></p>
             
 
             

@@ -1050,6 +1050,7 @@ table {
     <li class="mono"><a href="#sentry_sdk.capture_exception">capture_exception</a></li>
     <li class="mono"><a href="#sentry_sdk.capture_message">capture_message</a></li>
     <li class="mono"><a href="#sentry_sdk.configure_scope">configure_scope</a></li>
+    <li class="mono"><a href="#sentry_sdk.flush">flush</a></li>
     <li class="mono"><a href="#sentry_sdk.init">init</a></li>
     <li class="mono"><a href="#sentry_sdk.last_event_id">last_event_id</a></li>
     <li class="mono"><a href="#sentry_sdk.push_scope">push_scope</a></li>
@@ -1067,6 +1068,7 @@ table {
     <li class="mono"><a href="#sentry_sdk.Client.__init__">__init__</a></li>
     <li class="mono"><a href="#sentry_sdk.Client.capture_event">capture_event</a></li>
     <li class="mono"><a href="#sentry_sdk.Client.close">close</a></li>
+    <li class="mono"><a href="#sentry_sdk.Client.flush">flush</a></li>
   </ul>
 
         </li>
@@ -1077,9 +1079,8 @@ table {
   <ul>
     <li class="mono"><a href="#sentry_sdk.HttpTransport.__init__">__init__</a></li>
     <li class="mono"><a href="#sentry_sdk.HttpTransport.capture_event">capture_event</a></li>
-    <li class="mono"><a href="#sentry_sdk.HttpTransport.copy">copy</a></li>
+    <li class="mono"><a href="#sentry_sdk.HttpTransport.flush">flush</a></li>
     <li class="mono"><a href="#sentry_sdk.HttpTransport.kill">kill</a></li>
-    <li class="mono"><a href="#sentry_sdk.HttpTransport.shutdown">shutdown</a></li>
   </ul>
 
         </li>
@@ -1095,6 +1096,7 @@ table {
     <li class="mono"><a href="#sentry_sdk.Hub.capture_exception">capture_exception</a></li>
     <li class="mono"><a href="#sentry_sdk.Hub.capture_message">capture_message</a></li>
     <li class="mono"><a href="#sentry_sdk.Hub.configure_scope">configure_scope</a></li>
+    <li class="mono"><a href="#sentry_sdk.Hub.flush">flush</a></li>
     <li class="mono"><a href="#sentry_sdk.Hub.get_integration">get_integration</a></li>
     <li class="mono"><a href="#sentry_sdk.Hub.last_event_id">last_event_id</a></li>
     <li class="mono"><a href="#sentry_sdk.Hub.pop_scope_unsafe">pop_scope_unsafe</a></li>
@@ -1130,9 +1132,8 @@ table {
   <ul>
     <li class="mono"><a href="#sentry_sdk.Transport.__init__">__init__</a></li>
     <li class="mono"><a href="#sentry_sdk.Transport.capture_event">capture_event</a></li>
-    <li class="mono"><a href="#sentry_sdk.Transport.copy">copy</a></li>
+    <li class="mono"><a href="#sentry_sdk.Transport.flush">flush</a></li>
     <li class="mono"><a href="#sentry_sdk.Transport.kill">kill</a></li>
-    <li class="mono"><a href="#sentry_sdk.Transport.shutdown">shutdown</a></li>
   </ul>
 
         </li>
@@ -1365,6 +1366,32 @@ is provided the default level is <code>info</code>.</p></div>
             <span class="k">yield</span> <span class="n">Scope</span><span class="p">()</span>
 
         <span class="k">return</span> <span class="n">inner</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+      
+  <div class="item">
+    <div class="name def" id="sentry_sdk.flush">
+    <p>def <span class="ident">flush</span>(</p><p>timeout=None, callback=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Alias for <code>Hub.flush</code></p>
+<p>Alias for self.client.flush</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.flush', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.flush" class="source">
+    <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>
+<span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+    <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">hub</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1631,20 +1658,29 @@ argument.</p></div>
         <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">rv</span>
 
-    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">shutdown_callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Closes the client which shuts down the transport in an</span>
-<span class="sd">        orderly manner.</span>
+    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Close the client and shut down the transport. Arguments have the same</span>
+<span class="sd">        semantics as `self.flush()`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="bp">None</span>
 
-<span class="sd">        The `shutdown_callback` is invoked with two arguments: the number of</span>
-<span class="sd">        pending events and the configured shutdown timeout.  For instance the</span>
-<span class="sd">        default atexit integration will use this to render out a message on</span>
-<span class="sd">        stderr.</span>
+    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Wait `timeout` seconds for the current events to be sent. If no</span>
+<span class="sd">        `timeout` is provided, the `shutdown_timeout` option value is used.</span>
+
+<span class="sd">        The `callback` is invoked with two arguments: the number of pending</span>
+<span class="sd">        events and the configured timeout.  For instance the default atexit</span>
+<span class="sd">        integration will use this to render out a message on stderr.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">timeout</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="n">timeout</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;shutdown_timeout&quot;</span><span class="p">]</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">shutdown</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">shutdown_callback</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="bp">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span>
@@ -1754,34 +1790,62 @@ value of this function will be the ID of the captured event.</p></div>
             
   <div class="item">
     <div class="name def" id="sentry_sdk.Client.close">
-    <p>def <span class="ident">close</span>(</p><p>self, timeout=None, shutdown_callback=None)</p>
+    <p>def <span class="ident">close</span>(</p><p>self, timeout=None, callback=None)</p>
     </div>
     
 
     
   
-    <div class="desc"><p>Closes the client which shuts down the transport in an
-orderly manner.</p>
-<p>The <code>shutdown_callback</code> is invoked with two arguments: the number of
-pending events and the configured shutdown timeout.  For instance the
-default atexit integration will use this to render out a message on
-stderr.</p></div>
+    <div class="desc"><p>Close the client and shut down the transport. Arguments have the same
+semantics as <code>self.flush()</code>.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Client.close', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Client.close" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">shutdown_callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Closes the client which shuts down the transport in an</span>
-<span class="sd">    orderly manner.</span>
-<span class="sd">    The `shutdown_callback` is invoked with two arguments: the number of</span>
-<span class="sd">    pending events and the configured shutdown timeout.  For instance the</span>
-<span class="sd">    default atexit integration will use this to render out a message on</span>
-<span class="sd">    stderr.</span>
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Close the client and shut down the transport. Arguments have the same</span>
+<span class="sd">    semantics as `self.flush()`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="bp">None</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.Client.flush">
+    <p>def <span class="ident">flush</span>(</p><p>self, timeout=None, callback=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Wait <code>timeout</code> seconds for the current events to be sent. If no
+<code>timeout</code> is provided, the <code>shutdown_timeout</code> option value is used.</p>
+<p>The <code>callback</code> is invoked with two arguments: the number of pending
+events and the configured timeout.  For instance the default atexit
+integration will use this to render out a message on stderr.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Client.flush', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.Client.flush" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Wait `timeout` seconds for the current events to be sent. If no</span>
+<span class="sd">    `timeout` is provided, the `shutdown_timeout` option value is used.</span>
+<span class="sd">    The `callback` is invoked with two arguments: the number of pending</span>
+<span class="sd">    events and the configured timeout.  For instance the default atexit</span>
+<span class="sd">    integration will use this to render out a message on stderr.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">timeout</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">timeout</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;shutdown_timeout&quot;</span><span class="p">]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">shutdown</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">shutdown_callback</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1908,21 +1972,14 @@ stderr.</p></div>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">send_event_wrapper</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">shutdown</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Shutting down HTTP transport orderly&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">timeout</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">shutdown</span><span class="p">(</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Flushing HTTP transport&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">timeout</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Killing HTTP transport&quot;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
-
-    <span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="n">transport</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
-        <span class="n">transport</span><span class="o">.</span><span class="n">_pool</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span>
-        <span class="k">return</span> <span class="n">transport</span>
 </pre></div>
 
   </div>
@@ -2002,24 +2059,21 @@ be sent to sentry.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.HttpTransport.copy">
-    <p>def <span class="ident">copy</span>(</p><p>self)</p>
+    <div class="name def" id="sentry_sdk.HttpTransport.flush">
+    <p>def <span class="ident">flush</span>(</p><p>self, timeout, callback=None)</p>
     </div>
     
 
     
   
-    <div class="desc"><p>Copy the transport.</p>
-<p>The returned transport should behave completely independent from the
-previous one.  It still may share HTTP connection pools, but not share
-any state such as internal queues.</p></div>
+    <div class="desc"><p>Wait <code>timeout</code> seconds for the current events to be sent out.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.HttpTransport.copy', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.HttpTransport.copy" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-    <span class="n">transport</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
-    <span class="n">transport</span><span class="o">.</span><span class="n">_pool</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span>
-    <span class="k">return</span> <span class="n">transport</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.HttpTransport.flush', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.HttpTransport.flush" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Flushing HTTP transport&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">timeout</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2043,35 +2097,6 @@ any state such as internal queues.</p></div>
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Killing HTTP transport&quot;</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
-</pre></div>
-
-  </div>
-</div>
-
-  </div>
-  
-            
-  <div class="item">
-    <div class="name def" id="sentry_sdk.HttpTransport.shutdown">
-    <p>def <span class="ident">shutdown</span>(</p><p>self, timeout, callback=None)</p>
-    </div>
-    
-
-    
-  
-    <div class="desc"><p>Initiates a controlled shutdown that should flush out pending
-events.  The callback must be invoked with the number of pending
-events and the timeout if the shutting down would take some period
-of time (eg: not instant).</p></div>
-  <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.HttpTransport.shutdown', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.HttpTransport.shutdown" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">shutdown</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Shutting down HTTP transport orderly&quot;</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">timeout</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">shutdown</span><span class="p">(</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2331,6 +2356,12 @@ context vars are available.</p>
                 <span class="k">yield</span> <span class="n">Scope</span><span class="p">()</span>
 
         <span class="k">return</span> <span class="n">inner</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Alias for self.client.flush&quot;&quot;&quot;</span>
+        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">client</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -2587,6 +2618,31 @@ is provided the default level is <code>info</code>.</p></div>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">yield</span> <span class="n">Scope</span><span class="p">()</span>
     <span class="k">return</span> <span class="n">inner</span><span class="p">()</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.Hub.flush">
+    <p>def <span class="ident">flush</span>(</p><p>self, timeout=None, callback=None)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Alias for self.client.flush</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.flush', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.Hub.flush" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Alias for self.client.flush&quot;&quot;&quot;</span>
+    <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">client</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -3409,26 +3465,13 @@ invoked with the original exception info triple as second argument.</p></div>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
 
-    <span class="k">def</span> <span class="nf">shutdown</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Initiates a controlled shutdown that should flush out pending</span>
-<span class="sd">        events.  The callback must be invoked with the number of pending</span>
-<span class="sd">        events and the timeout if the shutting down would take some period</span>
-<span class="sd">        of time (eg: not instant).</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Wait `timeout` seconds for the current events to be sent out.&quot;&quot;&quot;</span>
+        <span class="k">pass</span>
 
     <span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Forcefully kills the transport.&quot;&quot;&quot;</span>
         <span class="k">pass</span>
-
-    <span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Copy the transport.</span>
-
-<span class="sd">        The returned transport should behave completely independent from the</span>
-<span class="sd">        previous one.  It still may share HTTP connection pools, but not share</span>
-<span class="sd">        any state such as internal queues.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span>
 
     <span class="k">def</span> <span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">try</span><span class="p">:</span>
@@ -3502,27 +3545,20 @@ be sent to sentry.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.Transport.copy">
-    <p>def <span class="ident">copy</span>(</p><p>self)</p>
+    <div class="name def" id="sentry_sdk.Transport.flush">
+    <p>def <span class="ident">flush</span>(</p><p>self, timeout, callback=None)</p>
     </div>
     
 
     
   
-    <div class="desc"><p>Copy the transport.</p>
-<p>The returned transport should behave completely independent from the
-previous one.  It still may share HTTP connection pools, but not share
-any state such as internal queues.</p></div>
+    <div class="desc"><p>Wait <code>timeout</code> seconds for the current events to be sent out.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Transport.copy', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.Transport.copy" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Copy the transport.</span>
-<span class="sd">    The returned transport should behave completely independent from the</span>
-<span class="sd">    previous one.  It still may share HTTP connection pools, but not share</span>
-<span class="sd">    any state such as internal queues.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="bp">self</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Transport.flush', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.Transport.flush" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Wait `timeout` seconds for the current events to be sent out.&quot;&quot;&quot;</span>
+    <span class="k">pass</span>
 </pre></div>
 
   </div>
@@ -3546,36 +3582,6 @@ any state such as internal queues.</p></div>
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Forcefully kills the transport.&quot;&quot;&quot;</span>
     <span class="k">pass</span>
-</pre></div>
-
-  </div>
-</div>
-
-  </div>
-  
-            
-  <div class="item">
-    <div class="name def" id="sentry_sdk.Transport.shutdown">
-    <p>def <span class="ident">shutdown</span>(</p><p>self, timeout, callback=None)</p>
-    </div>
-    
-
-    
-  
-    <div class="desc"><p>Initiates a controlled shutdown that should flush out pending
-events.  The callback must be invoked with the number of pending
-events and the timeout if the shutting down would take some period
-of time (eg: not instant).</p></div>
-  <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Transport.shutdown', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.Transport.shutdown" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">shutdown</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Initiates a controlled shutdown that should flush out pending</span>
-<span class="sd">    events.  The callback must be invoked with the number of pending</span>
-<span class="sd">    events and the timeout if the shutting down would take some period</span>
-<span class="sd">    of time (eg: not instant).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
 </pre></div>
 
   </div>

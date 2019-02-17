@@ -1077,7 +1077,9 @@ table {
         <li class="mono"><a href="excepthook.m.html">sentry_sdk.integrations.excepthook</a></li>
         <li class="mono"><a href="logging.m.html">sentry_sdk.integrations.logging</a></li>
         <li class="mono"><a href="modules.m.html">sentry_sdk.integrations.modules</a></li>
+        <li class="mono"><a href="serverless.m.html">sentry_sdk.integrations.serverless</a></li>
         <li class="mono"><a href="stdlib.m.html">sentry_sdk.integrations.stdlib</a></li>
+        <li class="mono"><a href="threading.m.html">sentry_sdk.integrations.threading</a></li>
         <li class="mono"><a href="wsgi.m.html">sentry_sdk.integrations.wsgi</a></li>
       </ul>
     </li>
@@ -1098,6 +1100,8 @@ table {
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations" class="source">
     <div class="codehilite"><pre><span></span><span class="sd">&quot;&quot;&quot;This package&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">absolute_import</span>
+
 <span class="kn">from</span> <span class="nn">threading</span> <span class="kn">import</span> <span class="n">Lock</span>
 <span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">namedtuple</span>
 
@@ -1129,6 +1133,7 @@ table {
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.atexit</span> <span class="kn">import</span> <span class="n">AtexitIntegration</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.modules</span> <span class="kn">import</span> <span class="n">ModulesIntegration</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.argv</span> <span class="kn">import</span> <span class="n">ArgvIntegration</span>
+    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.threading</span> <span class="kn">import</span> <span class="n">ThreadingIntegration</span>
 
     <span class="k">yield</span> <span class="n">LoggingIntegration</span>
     <span class="k">yield</span> <span class="n">StdlibIntegration</span>
@@ -1137,6 +1142,7 @@ table {
     <span class="k">yield</span> <span class="n">AtexitIntegration</span>
     <span class="k">yield</span> <span class="n">ModulesIntegration</span>
     <span class="k">yield</span> <span class="n">ArgvIntegration</span>
+    <span class="k">yield</span> <span class="n">ThreadingIntegration</span>
 
 
 <span class="k">def</span> <span class="nf">setup_integrations</span><span class="p">(</span><span class="n">integrations</span><span class="p">,</span> <span class="n">with_defaults</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
@@ -1262,6 +1268,7 @@ table {
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.atexit</span> <span class="kn">import</span> <span class="n">AtexitIntegration</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.modules</span> <span class="kn">import</span> <span class="n">ModulesIntegration</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.argv</span> <span class="kn">import</span> <span class="n">ArgvIntegration</span>
+    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.threading</span> <span class="kn">import</span> <span class="n">ThreadingIntegration</span>
 
     <span class="k">yield</span> <span class="n">LoggingIntegration</span>
     <span class="k">yield</span> <span class="n">StdlibIntegration</span>
@@ -1270,6 +1277,7 @@ table {
     <span class="k">yield</span> <span class="n">AtexitIntegration</span>
     <span class="k">yield</span> <span class="n">ModulesIntegration</span>
     <span class="k">yield</span> <span class="n">ArgvIntegration</span>
+    <span class="k">yield</span> <span class="n">ThreadingIntegration</span>
 </pre></div>
 
   </div>
@@ -1537,7 +1545,19 @@ instance again.</p></div>
 
       </div>
       <div class="item">
+      <p class="name"><a href="serverless.m.html">sentry_sdk.integrations.serverless</a></p>
+      
+  
+
+      </div>
+      <div class="item">
       <p class="name"><a href="stdlib.m.html">sentry_sdk.integrations.stdlib</a></p>
+      
+  
+
+      </div>
+      <div class="item">
+      <p class="name"><a href="threading.m.html">sentry_sdk.integrations.threading</a></p>
       
   
 
