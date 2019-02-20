@@ -23,7 +23,6 @@ if False:
     from typing import Iterator
     from typing import Tuple
     from typing import Optional
-    from importlib.machinery import SourceFileLoader
     from typing import List
     from typing import Set
     from typing import Type
@@ -252,13 +251,13 @@ def slim_string(value, length=512):
 def get_lines_from_file(
     filename,  # type: str
     lineno,  # type: int
-    loader=None,  # type: SourceFileLoader
+    loader=None,  # type: Any
     module=None,  # type: str
 ):
     # type: (...) -> Tuple[List[str], Optional[str], List[str]]
     context_lines = 5
     source = None
-    if loader is not None and module is not None and hasattr(loader, "get_source"):
+    if loader is not None and hasattr(loader, "get_source"):
         try:
             source_str = loader.get_source(module)
         except (ImportError, IOError):

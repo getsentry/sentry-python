@@ -147,7 +147,7 @@ class Client(object):
                 new_event = before_send(event, hint)
             if new_event is None:
                 logger.info("before send dropped event (%s)", event)
-                event = new_event  # type: ignore
+            event = new_event  # type: ignore
 
         return event
 
