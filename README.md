@@ -8,8 +8,8 @@
 
 [![Build Status](https://travis-ci.com/getsentry/sentry-python.svg?branch=master)](https://travis-ci.com/getsentry/sentry-python)
 
-- [Documentation](https://docs.sentry.io/quickstart/?platform=python)
-- [API Reference](https://getsentry.github.io/sentry-python/)
+- [Documentation](https://docs.sentry.io/quickstart/?platform=python) (to learn about how to use the SDK)
+- [API Reference](https://getsentry.github.io/sentry-python/) (to learn about internals)
 
 # License
 
