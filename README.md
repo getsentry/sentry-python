@@ -16,6 +16,10 @@ To learn about how to use the SDK:
 - [Integrations](https://docs.sentry.io/platforms/python/)
 - [Cheatsheet: Migrating to the new SDK from Raven](https://forum.sentry.io/t/switching-to-sentry-python/4733)
 
+Are you coming from raven-python?
+
+- [Migrating to the new SDK](https://forum.sentry.io/t/switching-to-sentry-python/4733)
+
 To learn about internals:
 
 - [API Reference](https://getsentry.github.io/sentry-python/)
