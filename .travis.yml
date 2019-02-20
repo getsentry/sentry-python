@@ -11,6 +11,8 @@ python:
 cache:
   pip: true
   cargo: true
+  directories:
+    - .tox
 
 branches:
   only:
