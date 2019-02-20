@@ -14,11 +14,10 @@ To learn about how to use the SDK:
 - [Configuration options](https://docs.sentry.io/error-reporting/configuration/?platform=python)
 - [Setting context (tags, user, extra information)](https://docs.sentry.io/enriching-error-data/context/?platform=python)
 - [Integrations](https://docs.sentry.io/platforms/python/)
-- [Cheatsheet: Migrating to the new SDK from Raven](https://forum.sentry.io/t/switching-to-sentry-python/4733)
 
 Are you coming from raven-python?
 
-- [Migrating to the new SDK](https://forum.sentry.io/t/switching-to-sentry-python/4733)
+- [Cheatsheet: Migrating to the new SDK from Raven](https://forum.sentry.io/t/switching-to-sentry-python/4733)
 
 To learn about internals:
 
