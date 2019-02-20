@@ -61,7 +61,7 @@ def add_breadcrumb(*args, **kwargs):
 
 @hubmethod
 def configure_scope(callback=None):
-    # type: (Optional[Any]) -> Optional[AbstractContextManager]
+    # type: (Optional[Any]) -> AbstractContextManager
     hub = Hub.current
     if hub is not None:
         return hub.configure_scope(callback)
@@ -74,12 +74,12 @@ def configure_scope(callback=None):
         return inner()
     else:
         # returned if user provided callback
-        return None
+        return None  # type: ignore
 
 
 @hubmethod
 def push_scope(callback=None):
-    # type: (Optional[Any]) -> Optional[AbstractContextManager]
+    # type: (Optional[Any]) -> AbstractContextManager
     hub = Hub.current
     if hub is not None:
         return hub.push_scope(callback)
@@ -92,7 +92,7 @@ def push_scope(callback=None):
         return inner()
     else:
         # returned if user provided callback
-        return None
+        return None  # type: ignore
 
 
 @hubmethod
