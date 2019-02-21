@@ -96,11 +96,6 @@ def setup_integrations(integrations, with_defaults=True):
     return integrations
 
 
-IntegrationAttachment = namedtuple(
-    "IntegrationAttachment", ["integration", "client", "hub"]
-)
-
-
 class Integration(object):
     """Baseclass for all integrations.
 
