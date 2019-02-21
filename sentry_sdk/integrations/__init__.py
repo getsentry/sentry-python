@@ -2,7 +2,6 @@
 from __future__ import absolute_import
 
 from threading import Lock
-from collections import namedtuple
 
 from sentry_sdk._compat import iteritems
 from sentry_sdk.utils import logger
@@ -14,11 +13,10 @@ _installed_integrations = set()
 
 def _generate_default_integrations_iterator(*import_strings):
     def iter_default_integrations():
-        # type: () -> Iterator[Type[Integration]]
         """Returns an iterator of the default integration classes:
         """
         for import_string in import_strings:
-            module, cls = import_strings.rsplit(".", 1)
+            module, cls = import_string.rsplit(".", 1)
             yield getattr(__import__(module), cls)
 
     for import_string in import_strings:
