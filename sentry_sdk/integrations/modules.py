@@ -3,10 +3,12 @@ from __future__ import absolute_import
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
-from typing import Any
-from typing import Dict
-from typing import Tuple
-from typing import Iterator
+
+if False:
+    from typing import Any
+    from typing import Dict
+    from typing import Tuple
+    from typing import Iterator
 
 _installed_modules = None
 

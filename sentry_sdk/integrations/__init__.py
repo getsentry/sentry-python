@@ -6,9 +6,9 @@ from collections import namedtuple
 
 from sentry_sdk._compat import iteritems
 from sentry_sdk.utils import logger
-from typing import Iterator
 
 if False:
+    from typing import Iterator
     from typing import Dict
     from typing import List
     from typing import Set

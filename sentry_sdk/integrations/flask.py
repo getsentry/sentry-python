@@ -7,14 +7,16 @@ from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
-from sentry_sdk.integrations.wsgi import _ScopedResponse
-from typing import Any
-from typing import Dict
-from werkzeug.datastructures import ImmutableTypeConversionDict
-from werkzeug.datastructures import ImmutableMultiDict
-from werkzeug.datastructures import FileStorage
-from typing import Union
-from typing import Callable
+
+if False:
+    from sentry_sdk.integrations.wsgi import _ScopedResponse
+    from typing import Any
+    from typing import Dict
+    from werkzeug.datastructures import ImmutableTypeConversionDict
+    from werkzeug.datastructures import ImmutableMultiDict
+    from werkzeug.datastructures import FileStorage
+    from typing import Union
+    from typing import Callable
 
 try:
     import flask_login  # type: ignore

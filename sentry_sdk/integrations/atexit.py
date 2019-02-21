@@ -7,8 +7,10 @@ import atexit
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import logger
 from sentry_sdk.integrations import Integration
-from typing import Any
-from typing import Optional
+
+if False:
+    from typing import Any
+    from typing import Optional
 
 
 def default_callback(pending, timeout):
