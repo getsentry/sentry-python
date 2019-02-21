@@ -15,9 +15,11 @@ def _generate_default_integrations_iterator(*import_strings):
     def iter_default_integrations():
         """Returns an iterator of the default integration classes:
         """
+        from importlib import import_module
+
         for import_string in import_strings:
             module, cls = import_string.rsplit(".", 1)
-            yield getattr(__import__(module), cls)
+            yield getattr(import_module(module), cls)
 
     for import_string in import_strings:
         iter_default_integrations.__doc__ += "\n- `{}`".format(import_string)
