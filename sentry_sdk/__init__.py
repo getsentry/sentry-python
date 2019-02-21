@@ -32,7 +32,7 @@ from sentry_sdk.api import __all__ as api_all
 
 from sentry_sdk.consts import VERSION  # noqa
 
-__all__ = api_all + [
+__all__ = api_all + [  # noqa
     "Hub",
     "Scope",
     "Client",

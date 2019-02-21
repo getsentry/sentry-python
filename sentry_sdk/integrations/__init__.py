@@ -2,7 +2,6 @@
 from __future__ import absolute_import
 
 from threading import Lock
-from collections import namedtuple
 
 from sentry_sdk._compat import iteritems
 from sentry_sdk.utils import logger
@@ -13,43 +12,43 @@ if False:
     from typing import List
     from typing import Set
     from typing import Type
+    from typing import Callable
 
 
 _installer_lock = Lock()
 _installed_integrations = set()  # type: Set[str]
 
 
-def iter_default_integrations():
-    # type: () -> Iterator[Type[Integration]]
-    """Returns an iterator of default integration classes.
+def _generate_default_integrations_iterator(*import_strings):
+    # type: (*str) -> Callable[[], Iterator[Type[Integration]]]
+    def iter_default_integrations():
+        # type: () -> Iterator[Type[Integration]]
+        """Returns an iterator of the default integration classes:
+        """
+        for import_string in import_strings:
+            module, cls = import_string.rsplit(".", 1)
+            yield getattr(__import__(module), cls)
 
-    This returns the following default integration:
+    for import_string in import_strings:
+        iter_default_integrations.__doc__ += "\n- `{}`".format(  # type: ignore
+            import_string
+        )
 
-    - `LoggingIntegration`
-    - `StdlibIntegration`
-    - `ExcepthookIntegration`
-    - `DedupeIntegration`
-    - `AtexitIntegration`
-    - `ModulesIntegration`
-    - `ArgvIntegration`
-    """
-    from sentry_sdk.integrations.logging import LoggingIntegration
-    from sentry_sdk.integrations.stdlib import StdlibIntegration
-    from sentry_sdk.integrations.excepthook import ExcepthookIntegration
-    from sentry_sdk.integrations.dedupe import DedupeIntegration
-    from sentry_sdk.integrations.atexit import AtexitIntegration
-    from sentry_sdk.integrations.modules import ModulesIntegration
-    from sentry_sdk.integrations.argv import ArgvIntegration
-    from sentry_sdk.integrations.threading import ThreadingIntegration
+    return iter_default_integrations
 
-    yield LoggingIntegration
-    yield StdlibIntegration
-    yield ExcepthookIntegration
-    yield DedupeIntegration
-    yield AtexitIntegration
-    yield ModulesIntegration
-    yield ArgvIntegration
-    yield ThreadingIntegration
+
+iter_default_integrations = _generate_default_integrations_iterator(
+    "sentry_sdk.integrations.logging.LoggingIntegration",
+    "sentry_sdk.integrations.stdlib.StdlibIntegration",
+    "sentry_sdk.integrations.excepthook.ExcepthookIntegration",
+    "sentry_sdk.integrations.dedupe.DedupeIntegration",
+    "sentry_sdk.integrations.atexit.AtexitIntegration",
+    "sentry_sdk.integrations.modules.ModulesIntegration",
+    "sentry_sdk.integrations.argv.ArgvIntegration",
+    "sentry_sdk.integrations.threading.ThreadingIntegration",
+)
+
+del _generate_default_integrations_iterator
 
 
 def setup_integrations(integrations, with_defaults=True):
