@@ -8,7 +8,13 @@ from sentry_sdk.scope import Scope
 if False:
     from typing import Any
     from typing import Optional
+    from typing import overload
+    from typing import Callable
     from contextlib import AbstractContextManager
+else:
+
+    def overload(x):
+        return x
 
 
 __all__ = []
@@ -59,9 +65,20 @@ def add_breadcrumb(*args, **kwargs):
         return hub.add_breadcrumb(*args, **kwargs)
 
 
-@hubmethod
+@overload  # noqa
+def configure_scope():
+    # type: () -> AbstractContextManager
+    pass
+
+
+@overload  # noqa
+def configure_scope(callback):
+    # type: (Callable) -> None
+    pass
+
+
+@hubmethod  # noqa
 def configure_scope(callback=None):
-    # type: (Optional[Any]) -> AbstractContextManager
     hub = Hub.current
     if hub is not None:
         return hub.configure_scope(callback)
@@ -74,12 +91,23 @@ def configure_scope(callback=None):
         return inner()
     else:
         # returned if user provided callback
-        return None  # type: ignore
+        return None
 
 
-@hubmethod
+@overload  # noqa
+def push_scope():
+    # type: () -> AbstractContextManager
+    pass
+
+
+@overload  # noqa
+def push_scope(callback):
+    # type: (Callable) -> None
+    pass
+
+
+@hubmethod  # noqa
 def push_scope(callback=None):
-    # type: (Optional[Any]) -> AbstractContextManager
     hub = Hub.current
     if hub is not None:
         return hub.push_scope(callback)
@@ -92,7 +120,7 @@ def push_scope(callback=None):
         return inner()
     else:
         # returned if user provided callback
-        return None  # type: ignore
+        return None
 
 
 @hubmethod

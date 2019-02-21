@@ -15,6 +15,7 @@ from sentry_sdk.utils import (
     ContextVar,
 )
 
+
 if False:
     from typing import Union
     from typing import Any
@@ -23,8 +24,13 @@ if False:
     from typing import Tuple
     from typing import List
     from typing import Callable
+    from typing import overload
     from contextlib import AbstractContextManager
     from sentry_sdk.integrations import Integration
+else:
+
+    def overload(x):
+        return x
 
 
 _local = ContextVar("sentry_current_hub")
@@ -334,18 +340,26 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         while len(scope._breadcrumbs) > max_breadcrumbs:
             scope._breadcrumbs.popleft()
 
-    def push_scope(self, callback=None):
-        # type: (Optional[Callable]) -> AbstractContextManager
+    @overload  # noqa
+    def push_scope(self):
+        # type: () -> AbstractContextManager
+        pass
+
+    @overload  # noqa
+    def push_scope(self, callback):
+        # type: (Callable) -> None
+        pass
+
+    def push_scope(self, callback=None):  # noqa
         """Pushes a new layer on the scope stack. Returns a context manager
         that should be used to pop the scope again.  Alternatively a callback
         can be provided that is executed in the context of the scope.
         """
 
-        # The correct return type would be Optional[AbstractContextManager], but that would make this function hard to use.
         if callback is not None:
             with self.push_scope() as scope:
                 callback(scope)
-            return None  # type: ignore
+            return None
 
         client, scope = self._stack[-1]
         new_layer = (client, copy.copy(scope))
@@ -362,17 +376,25 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         assert self._stack, "stack must have at least one layer"
         return rv
 
-    def configure_scope(self, callback=None):
-        # type: (Optional[Callable]) -> AbstractContextManager
+    @overload  # noqa
+    def configure_scope(self):
+        # type: () -> AbstractContextManager
+        pass
+
+    @overload  # noqa
+    def configure_scope(self, callback):
+        # type: (Callable) -> None
+        pass
+
+    def configure_scope(self, callback=None):  # noqa
         """Reconfigures the scope."""
 
-        # The correct return type would be Optional[AbstractContextManager], but that would make this function hard to use.
         client, scope = self._stack[-1]
         if callback is not None:
             if client is not None:
                 callback(scope)
 
-            return None  # type: ignore
+            return None
 
         @contextmanager
         def inner():
