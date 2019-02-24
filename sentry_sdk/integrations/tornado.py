@@ -16,9 +16,10 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.logging import ignore_logger
 
+from tornado.web import RequestHandler, HTTPError  # type: ignore
+from tornado.gen import coroutine  # type: ignore
+
 if False:
-    from tornado.web import RequestHandler, HTTPError  # type: ignore
-    from tornado.gen import coroutine  # type: ignore
     from typing import Any
     from typing import List
     from typing import Optional
