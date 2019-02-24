@@ -10,13 +10,14 @@ def serverless_function(f=None, flush=True):
     def wrapper(f):
         @functools.wraps(f)
         def inner(*args, **kwargs):
-            try:
-                return f(*args, **kwargs)
-            except Exception:
-                _capture_and_reraise()
-            finally:
-                if flush:
-                    _flush_client()
+            with Hub(Hub.current):
+                try:
+                    return f(*args, **kwargs)
+                except Exception:
+                    _capture_and_reraise()
+                finally:
+                    if flush:
+                        _flush_client()
 
         return inner
 
