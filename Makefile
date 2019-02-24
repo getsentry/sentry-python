@@ -28,7 +28,7 @@ lint:
 .PHONY: lint
 
 apidocs:
-	@pip install pdoc pygments
+	@pip install pdoc==0.3.2 pygments
 	@pdoc --overwrite --html --html-dir build/apidocs sentry_sdk
 .PHONY: apidocs
 
