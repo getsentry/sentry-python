@@ -9,10 +9,23 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
 
-from sanic import Sanic
-from sanic.exceptions import SanicException
-from sanic.router import Router
-from sanic.handlers import ErrorHandler
+from sanic import Sanic  # type: ignore
+from sanic.exceptions import SanicException  # type: ignore
+from sanic.router import Router  # type: ignore
+from sanic.handlers import ErrorHandler  # type: ignore
+
+if False:
+    from sanic.request import Request  # type: ignore
+
+    from typing import Any
+    from typing import Callable
+    from typing import Dict
+    from typing import List
+    from typing import Tuple
+    from sanic.exceptions import InvalidUsage
+    from typing import Optional
+    from typing import Union
+    from sanic.request import RequestParameters
 
 
 class SanicIntegration(Integration):
@@ -20,6 +33,7 @@ class SanicIntegration(Integration):
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         if sys.version_info < (3, 7):
             # Sanic is async. We better have contextvars or we're going to leak
             # state between requests.
@@ -35,6 +49,7 @@ class SanicIntegration(Integration):
         old_handle_request = Sanic.handle_request
 
         async def sentry_handle_request(self, request, *args, **kwargs):
+            # type: (Any, Request, *Any, **Any) -> Any
             hub = Hub.current
             if hub.get_integration(SanicIntegration) is None:
                 return old_handle_request(self, request, *args, **kwargs)
@@ -56,6 +71,7 @@ class SanicIntegration(Integration):
         old_router_get = Router.get
 
         def sentry_router_get(self, request):
+            # type: (Any, Request) -> Tuple[Callable, List, Dict[str, str], str]
             rv = old_router_get(self, request)
             hub = Hub.current
             if hub.get_integration(SanicIntegration) is not None:
@@ -69,6 +85,7 @@ class SanicIntegration(Integration):
         old_error_handler_lookup = ErrorHandler.lookup
 
         def sentry_error_handler_lookup(self, exception):
+            # type: (Any, Union[ValueError, InvalidUsage]) -> Optional[Callable]
             _capture_exception(exception)
             old_error_handler = old_error_handler_lookup(self, exception)
 
@@ -79,6 +96,7 @@ class SanicIntegration(Integration):
                 return old_error_handler
 
             async def sentry_wrapped_error_handler(request, exception):
+                # type: (Request, ValueError) -> Any
                 try:
                     response = old_error_handler(request, exception)
                     if isawaitable(response):
@@ -94,7 +112,10 @@ class SanicIntegration(Integration):
         ErrorHandler.lookup = sentry_error_handler_lookup
 
 
-def _capture_exception(exception):
+def _capture_exception(
+    exception  # type: Union[Tuple[type, BaseException, Any], ValueError, InvalidUsage]
+):
+    # type: (...) -> None
     if isinstance(exception, SanicException):
         return
 
@@ -113,7 +134,9 @@ def _capture_exception(exception):
 
 
 def _make_request_processor(weak_request):
+    # type: (Callable[[], Request]) -> Callable
     def sanic_processor(event, hint):
+        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         request = weak_request()
         if request is None:
             return event
@@ -143,6 +166,7 @@ def _make_request_processor(weak_request):
 
 class SanicRequestExtractor(RequestExtractor):
     def content_length(self):
+        # type: () -> int
         if self.request.body is None:
             return 0
         return len(self.request.body)
@@ -151,18 +175,22 @@ class SanicRequestExtractor(RequestExtractor):
         return dict(self.request.cookies)
 
     def raw_data(self):
+        # type: () -> bytes
         return self.request.body
 
     def form(self):
+        # type: () -> RequestParameters
         return self.request.form
 
     def is_json(self):
         raise NotImplementedError()
 
     def json(self):
+        # type: () -> Optional[Any]
         return self.request.json
 
     def files(self):
+        # type: () -> RequestParameters
         return self.request.files
 
     def size_of_file(self, file):

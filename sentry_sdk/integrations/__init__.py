@@ -6,13 +6,23 @@ from threading import Lock
 from sentry_sdk._compat import iteritems
 from sentry_sdk.utils import logger
 
+if False:
+    from typing import Iterator
+    from typing import Dict
+    from typing import List
+    from typing import Set
+    from typing import Type
+    from typing import Callable
+
 
 _installer_lock = Lock()
-_installed_integrations = set()
+_installed_integrations = set()  # type: Set[str]
 
 
 def _generate_default_integrations_iterator(*import_strings):
+    # type: (*str) -> Callable[[], Iterator[Type[Integration]]]
     def iter_default_integrations():
+        # type: () -> Iterator[Type[Integration]]
         """Returns an iterator of the default integration classes:
         """
         from importlib import import_module
@@ -22,7 +32,9 @@ def _generate_default_integrations_iterator(*import_strings):
             yield getattr(import_module(module), cls)
 
     for import_string in import_strings:
-        iter_default_integrations.__doc__ += "\n- `{}`".format(import_string)
+        iter_default_integrations.__doc__ += "\n- `{}`".format(  # type: ignore
+            import_string
+        )
 
     return iter_default_integrations
 
@@ -42,6 +54,7 @@ del _generate_default_integrations_iterator
 
 
 def setup_integrations(integrations, with_defaults=True):
+    # type: (List[Integration], bool) -> Dict[str, Integration]
     """Given a list of integration instances this installs them all.  When
     `with_defaults` is set to `True` then all default integrations are added
     unless they were already provided before.
@@ -93,6 +106,9 @@ class Integration(object):
 
     install = None
     """Legacy method, do not implement."""
+
+    identifier = None  # type: str
+    """String unique ID of integration type"""
 
     @staticmethod
     def setup_once():

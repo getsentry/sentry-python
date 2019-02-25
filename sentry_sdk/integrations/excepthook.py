@@ -4,16 +4,21 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 
+if False:
+    from typing import Callable
+
 
 class ExcepthookIntegration(Integration):
     identifier = "excepthook"
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         sys.excepthook = _make_excepthook(sys.excepthook)
 
 
 def _make_excepthook(old_excepthook):
+    # type: (Callable) -> Callable
     def sentry_sdk_excepthook(exctype, value, traceback):
         hub = Hub.current
         integration = hub.get_integration(ExcepthookIntegration)

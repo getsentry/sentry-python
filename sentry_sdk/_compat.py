@@ -1,5 +1,11 @@
 import sys
 
+if False:
+    from typing import Optional
+    from typing import Tuple
+    from typing import Any
+    from typing import Type
+
 
 PY2 = sys.version_info[0] == 2
 
@@ -27,8 +33,8 @@ else:
     import queue  # noqa
 
     text_type = str
-    string_types = (text_type,)
-    number_types = (int, float)
+    string_types = (text_type,)  # type: Tuple[type]
+    number_types = (int, float)  # type: Tuple[type, type]
     int_types = (int,)  # noqa
     iteritems = lambda x: x.items()
 
@@ -39,6 +45,8 @@ else:
         return x
 
     def reraise(tp, value, tb=None):
+        # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[Any]) -> None
+        assert value is not None
         if value.__traceback__ is not tb:
             raise value.with_traceback(tb)
         raise value
@@ -53,8 +61,9 @@ def with_metaclass(meta, *bases):
 
 
 def check_thread_support():
+    # type: () -> None
     try:
-        from uwsgi import opt
+        from uwsgi import opt  # type: ignore
     except ImportError:
         return
 

@@ -8,6 +8,10 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.utils import logger
 from sentry_sdk.integrations import Integration
 
+if False:
+    from typing import Any
+    from typing import Optional
+
 
 def default_callback(pending, timeout):
     """This is the default shutdown callback that is set on the options.
@@ -28,12 +32,14 @@ class AtexitIntegration(Integration):
     identifier = "atexit"
 
     def __init__(self, callback=None):
+        # type: (Optional[Any]) -> None
         if callback is None:
             callback = default_callback
         self.callback = callback
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         @atexit.register
         def _shutdown():
             logger.debug("atexit: got shutdown signal")
