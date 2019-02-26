@@ -38,6 +38,7 @@ if False:
             "attach_stacktrace": bool,
             "ca_certs": Optional[str],
         },
+        total=False,
     )
 
 

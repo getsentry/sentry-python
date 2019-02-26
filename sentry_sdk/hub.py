@@ -25,7 +25,7 @@ if False:
     from typing import List
     from typing import Callable
     from typing import overload
-    from contextlib import AbstractContextManager
+    from contextlib import ContextManager
     from sentry_sdk.integrations import Integration
 else:
 
@@ -342,12 +342,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     @overload  # noqa
     def push_scope(self):
-        # type: () -> AbstractContextManager
+        # type: () -> ContextManager[Scope]
         pass
 
     @overload  # noqa
     def push_scope(self, callback):
-        # type: (Callable) -> None
+        # type: (Callable[[Scope], None]) -> None
         pass
 
     def push_scope(self, callback=None):  # noqa
@@ -378,12 +378,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     @overload  # noqa
     def configure_scope(self):
-        # type: () -> AbstractContextManager
+        # type: () -> ContextManager[Scope]
         pass
 
     @overload  # noqa
     def configure_scope(self, callback):
-        # type: (Callable) -> None
+        # type: (Callable[[Scope], None]) -> None
         pass
 
     def configure_scope(self, callback=None):  # noqa

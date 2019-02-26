@@ -10,7 +10,7 @@ if False:
     from typing import Optional
     from typing import overload
     from typing import Callable
-    from contextlib import AbstractContextManager
+    from contextlib import ContextManager
 else:
 
     def overload(x):
@@ -67,13 +67,13 @@ def add_breadcrumb(*args, **kwargs):
 
 @overload  # noqa
 def configure_scope():
-    # type: () -> AbstractContextManager
+    # type: () -> ContextManager[Scope]
     pass
 
 
 @overload  # noqa
 def configure_scope(callback):
-    # type: (Callable) -> None
+    # type: (Callable[[Scope], None]) -> None
     pass
 
 
@@ -96,13 +96,13 @@ def configure_scope(callback=None):
 
 @overload  # noqa
 def push_scope():
-    # type: () -> AbstractContextManager
+    # type: () -> ContextManager[Scope]
     pass
 
 
 @overload  # noqa
 def push_scope(callback):
-    # type: (Callable) -> None
+    # type: (Callable[[Scope], None]) -> None
     pass
 
 
