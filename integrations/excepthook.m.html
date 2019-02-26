@@ -1078,16 +1078,21 @@ table {
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">capture_internal_exceptions</span><span class="p">,</span> <span class="n">event_from_exception</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
 
+<span class="k">if</span> <span class="bp">False</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
+
 
 <span class="k">class</span> <span class="nc">ExcepthookIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
     <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;excepthook&quot;</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="c1"># type: () -&gt; None</span>
         <span class="n">sys</span><span class="o">.</span><span class="n">excepthook</span> <span class="o">=</span> <span class="n">_make_excepthook</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">excepthook</span><span class="p">)</span>
 
 
 <span class="k">def</span> <span class="nf">_make_excepthook</span><span class="p">(</span><span class="n">old_excepthook</span><span class="p">):</span>
+    <span class="c1"># type: (Callable) -&gt; Callable</span>
     <span class="k">def</span> <span class="nf">sentry_sdk_excepthook</span><span class="p">(</span><span class="n">exctype</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">):</span>
         <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
         <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">ExcepthookIntegration</span><span class="p">)</span>
@@ -1139,6 +1144,7 @@ saves those options on <code>self</code>.</p></div>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="c1"># type: () -&gt; None</span>
         <span class="n">sys</span><span class="o">.</span><span class="n">excepthook</span> <span class="o">=</span> <span class="n">_make_excepthook</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">excepthook</span><span class="p">)</span>
 </pre></div>
 
@@ -1195,6 +1201,7 @@ instance again.</p></div>
   <div id="source-sentry_sdk.integrations.excepthook.ExcepthookIntegration.setup_once" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@staticmethod</span>
 <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+    <span class="c1"># type: () -&gt; None</span>
     <span class="n">sys</span><span class="o">.</span><span class="n">excepthook</span> <span class="o">=</span> <span class="n">_make_excepthook</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">excepthook</span><span class="p">)</span>
 </pre></div>
 

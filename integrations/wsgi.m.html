@@ -1096,20 +1096,34 @@ table {
 <span class="kn">from</span> <span class="nn">sentry_sdk._compat</span> <span class="kn">import</span> <span class="n">PY2</span><span class="p">,</span> <span class="n">reraise</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations._wsgi_common</span> <span class="kn">import</span> <span class="n">_filter_headers</span>
 
+<span class="k">if</span> <span class="bp">False</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Iterator</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+
+    <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">ExcInfo</span>
+
 
 <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
 
     <span class="k">def</span> <span class="nf">wsgi_decoding_dance</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">charset</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;replace&quot;</span><span class="p">):</span>
+        <span class="c1"># type: (str, str, str) -&gt; str</span>
         <span class="k">return</span> <span class="n">s</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">charset</span><span class="p">,</span> <span class="n">errors</span><span class="p">)</span>
 
 
 <span class="k">else</span><span class="p">:</span>
 
     <span class="k">def</span> <span class="nf">wsgi_decoding_dance</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">charset</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;replace&quot;</span><span class="p">):</span>
+        <span class="c1"># type: (str, str, str) -&gt; str</span>
         <span class="k">return</span> <span class="n">s</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;latin1&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">charset</span><span class="p">,</span> <span class="n">errors</span><span class="p">)</span>
 
 
 <span class="k">def</span> <span class="nf">get_host</span><span class="p">(</span><span class="n">environ</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, str]) -&gt; str</span>
     <span class="sd">&quot;&quot;&quot;Return the host for the given WSGI environment. Yanked from Werkzeug.&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;HTTP_HOST&quot;</span><span class="p">):</span>
         <span class="n">rv</span> <span class="o">=</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;HTTP_HOST&quot;</span><span class="p">]</span>
@@ -1132,6 +1146,7 @@ table {
 
 
 <span class="k">def</span> <span class="nf">get_request_url</span><span class="p">(</span><span class="n">environ</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, str]) -&gt; str</span>
     <span class="sd">&quot;&quot;&quot;Return the absolute URL without query string for the given WSGI</span>
 <span class="sd">    environment.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">://</span><span class="si">%s</span><span class="s2">/</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
@@ -1145,9 +1160,11 @@ table {
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;app&quot;</span><span class="p">,)</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app</span><span class="p">):</span>
+        <span class="c1"># type: (Callable) -&gt; None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">app</span> <span class="o">=</span> <span class="n">app</span>
 
     <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">environ</span><span class="p">,</span> <span class="n">start_response</span><span class="p">):</span>
+        <span class="c1"># type: (Dict[str, str], Callable) -&gt; _ScopedResponse</span>
         <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="p">(</span><span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="p">)</span>
 
         <span class="k">with</span> <span class="n">hub</span><span class="p">:</span>
@@ -1165,12 +1182,13 @@ table {
 
 
 <span class="k">def</span> <span class="nf">_get_environ</span><span class="p">(</span><span class="n">environ</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, str]) -&gt; Iterator[Tuple[str, str]]</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Returns our whitelisted environment variables.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">keys</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;SERVER_NAME&quot;</span><span class="p">,</span> <span class="s2">&quot;SERVER_PORT&quot;</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">_should_send_default_pii</span><span class="p">():</span>
-        <span class="n">keys</span> <span class="o">+=</span> <span class="p">(</span><span class="s2">&quot;REMOTE_ADDR&quot;</span><span class="p">,)</span>
+        <span class="n">keys</span> <span class="o">+=</span> <span class="p">(</span><span class="s2">&quot;REMOTE_ADDR&quot;</span><span class="p">,)</span>  <span class="c1"># type: ignore</span>
 
     <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">environ</span><span class="p">:</span>
@@ -1182,6 +1200,7 @@ table {
 <span class="c1"># We need this function because Django does not give us a &quot;pure&quot; http header</span>
 <span class="c1"># dict. So we might as well use it for all WSGI integrations.</span>
 <span class="k">def</span> <span class="nf">_get_headers</span><span class="p">(</span><span class="n">environ</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, str]) -&gt; Iterator[Tuple[str, str]]</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Returns only proper HTTP headers.</span>
 
@@ -1198,6 +1217,7 @@ table {
 
 
 <span class="k">def</span> <span class="nf">get_client_ip</span><span class="p">(</span><span class="n">environ</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, str]) -&gt; Optional[Any]</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Naively yank the first IP address in an X-Forwarded-For header</span>
 <span class="sd">    and assume this is correct.</span>
@@ -1212,13 +1232,16 @@ table {
 
 
 <span class="k">def</span> <span class="nf">_capture_exception</span><span class="p">(</span><span class="n">hub</span><span class="p">):</span>
-    <span class="n">exc_info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
-    <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
-        <span class="n">exc_info</span><span class="p">,</span>
-        <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
-        <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;wsgi&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">},</span>
-    <span class="p">)</span>
-    <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
+    <span class="c1"># type: (Hub) -&gt; ExcInfo</span>
+    <span class="c1"># Check client here as it might have been unset while streaming response</span>
+    <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">exc_info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
+        <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
+            <span class="n">exc_info</span><span class="p">,</span>
+            <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
+            <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;wsgi&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">},</span>
+        <span class="p">)</span>
+        <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">exc_info</span>
 
 
@@ -1226,10 +1249,12 @@ table {
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;_response&quot;</span><span class="p">,</span> <span class="s2">&quot;_hub&quot;</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hub</span><span class="p">,</span> <span class="n">response</span><span class="p">):</span>
+        <span class="c1"># type: (Hub, List[bytes]) -&gt; None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_hub</span> <span class="o">=</span> <span class="n">hub</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_response</span> <span class="o">=</span> <span class="n">response</span>
 
     <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Iterator[bytes]</span>
         <span class="n">iterator</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_response</span><span class="p">)</span>
 
         <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
@@ -1254,6 +1279,7 @@ table {
 
 
 <span class="k">def</span> <span class="nf">_make_wsgi_event_processor</span><span class="p">(</span><span class="n">environ</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, str]) -&gt; Callable</span>
     <span class="c1"># It&#39;s a bit unfortunate that we have to extract and parse the request data</span>
     <span class="c1"># from the environ so eagerly, but there are a few good reasons for this.</span>
     <span class="c1">#</span>
@@ -1274,6 +1300,7 @@ table {
     <span class="n">headers</span> <span class="o">=</span> <span class="n">_filter_headers</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">_get_headers</span><span class="p">(</span><span class="n">environ</span><span class="p">)))</span>
 
     <span class="k">def</span> <span class="nf">event_processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
+        <span class="c1"># type: (Dict[str, Any], Dict[str, Any]) -&gt; Dict[str, Any]</span>
         <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
             <span class="c1"># if the code below fails halfway through we at least have some data</span>
             <span class="n">request_info</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;request&quot;</span><span class="p">,</span> <span class="p">{})</span>
@@ -1326,6 +1353,7 @@ value may be forged from a client.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.wsgi.get_client_ip', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.wsgi.get_client_ip" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">get_client_ip</span><span class="p">(</span><span class="n">environ</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, str]) -&gt; Optional[Any]</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Naively yank the first IP address in an X-Forwarded-For header</span>
 <span class="sd">    and assume this is correct.</span>
@@ -1358,6 +1386,7 @@ value may be forged from a client.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.wsgi.get_host', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.wsgi.get_host" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">get_host</span><span class="p">(</span><span class="n">environ</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, str]) -&gt; str</span>
     <span class="sd">&quot;&quot;&quot;Return the host for the given WSGI environment. Yanked from Werkzeug.&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;HTTP_HOST&quot;</span><span class="p">):</span>
         <span class="n">rv</span> <span class="o">=</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;HTTP_HOST&quot;</span><span class="p">]</span>
@@ -1399,6 +1428,7 @@ environment.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.wsgi.get_request_url', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.wsgi.get_request_url" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">get_request_url</span><span class="p">(</span><span class="n">environ</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, str]) -&gt; str</span>
     <span class="sd">&quot;&quot;&quot;Return the absolute URL without query string for the given WSGI</span>
 <span class="sd">    environment.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">://</span><span class="si">%s</span><span class="s2">/</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
@@ -1426,6 +1456,7 @@ environment.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.wsgi.wsgi_decoding_dance', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.wsgi.wsgi_decoding_dance" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">wsgi_decoding_dance</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">charset</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;replace&quot;</span><span class="p">):</span>
+    <span class="c1"># type: (str, str, str) -&gt; str</span>
     <span class="k">return</span> <span class="n">s</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;latin1&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">charset</span><span class="p">,</span> <span class="n">errors</span><span class="p">)</span>
 </pre></div>
 
@@ -1448,9 +1479,11 @@ environment.</p></div>
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;app&quot;</span><span class="p">,)</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app</span><span class="p">):</span>
+        <span class="c1"># type: (Callable) -&gt; None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">app</span> <span class="o">=</span> <span class="n">app</span>
 
     <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">environ</span><span class="p">,</span> <span class="n">start_response</span><span class="p">):</span>
+        <span class="c1"># type: (Dict[str, str], Callable) -&gt; _ScopedResponse</span>
         <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="p">(</span><span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="p">)</span>
 
         <span class="k">with</span> <span class="n">hub</span><span class="p">:</span>
@@ -1492,6 +1525,7 @@ environment.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.wsgi.SentryWsgiMiddleware.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.wsgi.SentryWsgiMiddleware.__init__" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app</span><span class="p">):</span>
+    <span class="c1"># type: (Callable) -&gt; None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">app</span> <span class="o">=</span> <span class="n">app</span>
 </pre></div>
 

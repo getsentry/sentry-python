@@ -1078,13 +1078,14 @@ table {
     <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
         <span class="nd">@functools.wraps</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
         <span class="k">def</span> <span class="nf">inner</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-            <span class="k">try</span><span class="p">:</span>
-                <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-                <span class="n">_capture_and_reraise</span><span class="p">()</span>
-            <span class="k">finally</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">flush</span><span class="p">:</span>
-                    <span class="n">_flush_client</span><span class="p">()</span>
+            <span class="k">with</span> <span class="n">Hub</span><span class="p">(</span><span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="n">_capture_and_reraise</span><span class="p">()</span>
+                <span class="k">finally</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">flush</span><span class="p">:</span>
+                        <span class="n">_flush_client</span><span class="p">()</span>
 
         <span class="k">return</span> <span class="n">inner</span>
 
@@ -1137,13 +1138,14 @@ table {
     <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
         <span class="nd">@functools.wraps</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
         <span class="k">def</span> <span class="nf">inner</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-            <span class="k">try</span><span class="p">:</span>
-                <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-                <span class="n">_capture_and_reraise</span><span class="p">()</span>
-            <span class="k">finally</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">flush</span><span class="p">:</span>
-                    <span class="n">_flush_client</span><span class="p">()</span>
+            <span class="k">with</span> <span class="n">Hub</span><span class="p">(</span><span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="n">_capture_and_reraise</span><span class="p">()</span>
+                <span class="k">finally</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">flush</span><span class="p">:</span>
+                        <span class="n">_flush_client</span><span class="p">()</span>
 
         <span class="k">return</span> <span class="n">inner</span>
 

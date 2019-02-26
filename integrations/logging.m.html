@@ -1178,6 +1178,12 @@ table {
 <span class="p">)</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
 
+<span class="k">if</span> <span class="bp">False</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">logging</span> <span class="kn">import</span> <span class="n">LogRecord</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+
 <span class="n">DEFAULT_LEVEL</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span>
 <span class="n">DEFAULT_EVENT_LEVEL</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">ERROR</span>
 
@@ -1185,6 +1191,7 @@ table {
 
 
 <span class="k">def</span> <span class="nf">ignore_logger</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+    <span class="c1"># type: (str) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;This disables the breadcrumb integration for a logger of a specific</span>
 <span class="sd">    name.  This primary use is for some integrations to disable breadcrumbs</span>
 <span class="sd">    of this integration.</span>
@@ -1196,6 +1203,7 @@ table {
     <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;logging&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">):</span>
+        <span class="c1"># type: (int, int) -&gt; None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="bp">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span> <span class="o">=</span> <span class="bp">None</span>
 
@@ -1206,6 +1214,7 @@ table {
             <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="n">EventHandler</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">event_level</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_handle_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (LogRecord) -&gt; None</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">levelno</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span><span class="o">.</span><span class="n">level</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span><span class="o">.</span><span class="n">handle</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 
@@ -1217,9 +1226,11 @@ table {
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
-        <span class="n">old_callhandlers</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span>
+        <span class="c1"># type: () -&gt; None</span>
+        <span class="n">old_callhandlers</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span>  <span class="c1"># type: ignore</span>
 
         <span class="k">def</span> <span class="nf">sentry_patched_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+            <span class="c1"># type: (Any, LogRecord) -&gt; Any</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">old_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
             <span class="k">finally</span><span class="p">:</span>
@@ -1232,14 +1243,16 @@ table {
                     <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                         <span class="n">integration</span><span class="o">.</span><span class="n">_handle_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 
-        <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span> <span class="o">=</span> <span class="n">sentry_patched_callhandlers</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span> <span class="o">=</span> <span class="n">sentry_patched_callhandlers</span>  <span class="c1"># type: ignore</span>
 
 
 <span class="k">def</span> <span class="nf">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+    <span class="c1"># type: (LogRecord) -&gt; bool</span>
     <span class="k">return</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span>
 
 
 <span class="k">def</span> <span class="nf">_breadcrumb_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+    <span class="c1"># type: (LogRecord) -&gt; Dict[str, Any]</span>
     <span class="k">return</span> <span class="p">{</span>
         <span class="s2">&quot;ty&quot;</span><span class="p">:</span> <span class="s2">&quot;log&quot;</span><span class="p">,</span>
         <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">),</span>
@@ -1251,6 +1264,7 @@ table {
 
 
 <span class="k">def</span> <span class="nf">_logging_to_event_level</span><span class="p">(</span><span class="n">levelname</span><span class="p">):</span>
+    <span class="c1"># type: (str) -&gt; str</span>
     <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;critical&quot;</span><span class="p">:</span> <span class="s2">&quot;fatal&quot;</span><span class="p">}</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">levelname</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="n">levelname</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
 
 
@@ -1285,6 +1299,7 @@ table {
 
 
 <span class="k">def</span> <span class="nf">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+    <span class="c1"># type: (LogRecord) -&gt; Dict[str, None]</span>
     <span class="k">return</span> <span class="p">{</span>
         <span class="n">k</span><span class="p">:</span> <span class="n">v</span>
         <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">vars</span><span class="p">(</span><span class="n">record</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
@@ -1294,17 +1309,21 @@ table {
 
 <span class="k">class</span> <span class="nc">EventHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">,</span> <span class="nb">object</span><span class="p">):</span>
     <span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (LogRecord) -&gt; Any</span>
         <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (LogRecord) -&gt; None</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
             <span class="k">return</span>
 
         <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
         <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span>
+
+        <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
 
         <span class="c1"># exc_info might be None or (None, None, None)</span>
         <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
@@ -1326,7 +1345,6 @@ table {
                 <span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
-            <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
 
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">)</span>
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
@@ -1342,11 +1360,13 @@ table {
 
 <span class="k">class</span> <span class="nc">BreadcrumbHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">,</span> <span class="nb">object</span><span class="p">):</span>
     <span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (LogRecord) -&gt; Any</span>
         <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (LogRecord) -&gt; None</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
             <span class="k">return</span>
 
@@ -1403,6 +1423,7 @@ of this integration.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.ignore_logger', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.logging.ignore_logger" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">ignore_logger</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+    <span class="c1"># type: (str) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;This disables the breadcrumb integration for a logger of a specific</span>
 <span class="sd">    name.  This primary use is for some integrations to disable breadcrumbs</span>
 <span class="sd">    of this integration.</span>
@@ -1432,11 +1453,13 @@ the 'raw' message as determined by record.message is logged.</p></div>
   <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler" class="source">
     <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">BreadcrumbHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">,</span> <span class="nb">object</span><span class="p">):</span>
     <span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (LogRecord) -&gt; Any</span>
         <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (LogRecord) -&gt; None</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
             <span class="k">return</span>
 
@@ -1626,6 +1649,7 @@ raises a NotImplementedError.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.BreadcrumbHandler.emit', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.logging.BreadcrumbHandler.emit" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+    <span class="c1"># type: (LogRecord) -&gt; Any</span>
     <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
@@ -2032,17 +2056,21 @@ the 'raw' message as determined by record.message is logged.</p></div>
   <div id="source-sentry_sdk.integrations.logging.EventHandler" class="source">
     <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">EventHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">,</span> <span class="nb">object</span><span class="p">):</span>
     <span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (LogRecord) -&gt; Any</span>
         <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (LogRecord) -&gt; None</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
             <span class="k">return</span>
 
         <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
         <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span>
+
+        <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
 
         <span class="c1"># exc_info might be None or (None, None, None)</span>
         <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
@@ -2064,7 +2092,6 @@ the 'raw' message as determined by record.message is logged.</p></div>
                 <span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
-            <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
 
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">)</span>
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
@@ -2255,6 +2282,7 @@ raises a NotImplementedError.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.emit', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.logging.EventHandler.emit" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+    <span class="c1"># type: (LogRecord) -&gt; Any</span>
     <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
@@ -2661,6 +2689,7 @@ saves those options on <code>self</code>.</p></div>
     <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;logging&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">):</span>
+        <span class="c1"># type: (int, int) -&gt; None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="bp">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span> <span class="o">=</span> <span class="bp">None</span>
 
@@ -2671,6 +2700,7 @@ saves those options on <code>self</code>.</p></div>
             <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="n">EventHandler</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">event_level</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_handle_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (LogRecord) -&gt; None</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">levelno</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span><span class="o">.</span><span class="n">level</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span><span class="o">.</span><span class="n">handle</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 
@@ -2682,9 +2712,11 @@ saves those options on <code>self</code>.</p></div>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
-        <span class="n">old_callhandlers</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span>
+        <span class="c1"># type: () -&gt; None</span>
+        <span class="n">old_callhandlers</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span>  <span class="c1"># type: ignore</span>
 
         <span class="k">def</span> <span class="nf">sentry_patched_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+            <span class="c1"># type: (Any, LogRecord) -&gt; Any</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">old_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
             <span class="k">finally</span><span class="p">:</span>
@@ -2697,7 +2729,7 @@ saves those options on <code>self</code>.</p></div>
                     <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                         <span class="n">integration</span><span class="o">.</span><span class="n">_handle_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 
-        <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span> <span class="o">=</span> <span class="n">sentry_patched_callhandlers</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span> <span class="o">=</span> <span class="n">sentry_patched_callhandlers</span>  <span class="c1"># type: ignore</span>
 </pre></div>
 
   </div>
@@ -2747,6 +2779,7 @@ saves those options on <code>self</code>.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.LoggingIntegration.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.logging.LoggingIntegration.__init__" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">):</span>
+    <span class="c1"># type: (int, int) -&gt; None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="k">if</span> <span class="n">level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
@@ -2780,8 +2813,10 @@ instance again.</p></div>
   <div id="source-sentry_sdk.integrations.logging.LoggingIntegration.setup_once" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@staticmethod</span>
 <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
-    <span class="n">old_callhandlers</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span>
+    <span class="c1"># type: () -&gt; None</span>
+    <span class="n">old_callhandlers</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span>  <span class="c1"># type: ignore</span>
     <span class="k">def</span> <span class="nf">sentry_patched_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (Any, LogRecord) -&gt; Any</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">old_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
         <span class="k">finally</span><span class="p">:</span>
@@ -2793,7 +2828,7 @@ instance again.</p></div>
                 <span class="n">integration</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                     <span class="n">integration</span><span class="o">.</span><span class="n">_handle_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
-    <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span> <span class="o">=</span> <span class="n">sentry_patched_callhandlers</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span> <span class="o">=</span> <span class="n">sentry_patched_callhandlers</span>  <span class="c1"># type: ignore</span>
 </pre></div>
 
   </div>
@@ -2818,17 +2853,21 @@ the 'raw' message as determined by record.message is logged.</p></div>
   <div id="source-sentry_sdk.integrations.logging.EventHandler" class="source">
     <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">EventHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">,</span> <span class="nb">object</span><span class="p">):</span>
     <span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (LogRecord) -&gt; Any</span>
         <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (LogRecord) -&gt; None</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
             <span class="k">return</span>
 
         <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
         <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span>
+
+        <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
 
         <span class="c1"># exc_info might be None or (None, None, None)</span>
         <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
@@ -2850,7 +2889,6 @@ the 'raw' message as determined by record.message is logged.</p></div>
                 <span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
-            <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
 
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">)</span>
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
@@ -3041,6 +3079,7 @@ raises a NotImplementedError.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.EventHandler.emit', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.logging.EventHandler.emit" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+    <span class="c1"># type: (LogRecord) -&gt; Any</span>
     <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>

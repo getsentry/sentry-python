@@ -1204,12 +1204,25 @@ uncaught exceptions.  Additionally you can report arbitrary other exceptions:</p
 <span class="sd">    except Exception as e:</span>
 <span class="sd">        sentry_sdk.capture_exception(e)</span>
 <span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.hub</span> <span class="kn">import</span> <span class="n">Hub</span><span class="p">,</span> <span class="n">init</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.scope</span> <span class="kn">import</span> <span class="n">Scope</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.transport</span> <span class="kn">import</span> <span class="n">Transport</span><span class="p">,</span> <span class="n">HttpTransport</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.client</span> <span class="kn">import</span> <span class="n">Client</span>
+
 <span class="kn">from</span> <span class="nn">sentry_sdk.api</span> <span class="kn">import</span> <span class="o">*</span>  <span class="c1"># noqa</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.api</span> <span class="kn">import</span> <span class="n">__all__</span>  <span class="c1"># noqa</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.api</span> <span class="kn">import</span> <span class="n">__all__</span> <span class="k">as</span> <span class="n">api_all</span>
+
 <span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="kn">import</span> <span class="n">VERSION</span>  <span class="c1"># noqa</span>
 
-<span class="c1"># modules we consider public</span>
-<span class="n">__all__</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;integrations&quot;</span><span class="p">)</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="n">api_all</span> <span class="o">+</span> <span class="p">[</span>  <span class="c1"># noqa</span>
+    <span class="s2">&quot;Hub&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Scope&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Client&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Transport&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;HttpTransport&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;init&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;integrations&quot;</span><span class="p">,</span>
+<span class="p">]</span>
 
 <span class="c1"># Initialize the debug support after everything is loaded</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.debug</span> <span class="kn">import</span> <span class="n">init_debug_support</span>
@@ -1303,9 +1316,11 @@ tuple.</p></div>
   <div id="source-sentry_sdk.capture_exception" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">capture_exception</span><span class="p">(</span><span class="n">error</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="c1"># type: (ValueError) -&gt; Optional[str]</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
     <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">hub</span><span class="o">.</span><span class="n">capture_exception</span><span class="p">(</span><span class="n">error</span><span class="p">)</span>
+    <span class="k">return</span> <span class="bp">None</span>
 </pre></div>
 
   </div>
@@ -1330,9 +1345,11 @@ is provided the default level is <code>info</code>.</p></div>
   <div id="source-sentry_sdk.capture_message" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">capture_message</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="c1"># type: (str, Optional[Any]) -&gt; Optional[str]</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
     <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">hub</span><span class="o">.</span><span class="n">capture_message</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">level</span><span class="p">)</span>
+    <span class="k">return</span> <span class="bp">None</span>
 </pre></div>
 
   </div>
@@ -1354,7 +1371,7 @@ is provided the default level is <code>info</code>.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.configure_scope', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.configure_scope" class="source">
-    <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>
+    <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>  <span class="c1"># noqa</span>
 <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span><span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
     <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
@@ -1366,6 +1383,9 @@ is provided the default level is <code>info</code>.</p></div>
             <span class="k">yield</span> <span class="n">Scope</span><span class="p">()</span>
 
         <span class="k">return</span> <span class="n">inner</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># returned if user provided callback</span>
+        <span class="k">return</span> <span class="bp">None</span>
 </pre></div>
 
   </div>
@@ -1448,9 +1468,11 @@ is provided the default level is <code>info</code>.</p></div>
   <div id="source-sentry_sdk.last_event_id" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">last_event_id</span><span class="p">():</span>
+    <span class="c1"># type: () -&gt; Optional[str]</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
     <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">hub</span><span class="o">.</span><span class="n">last_event_id</span><span class="p">()</span>
+    <span class="k">return</span> <span class="bp">None</span>
 </pre></div>
 
   </div>
@@ -1474,7 +1496,7 @@ can be provided that is executed in the context of the scope.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.push_scope', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.push_scope" class="source">
-    <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>
+    <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>  <span class="c1"># noqa</span>
 <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
     <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
@@ -1486,6 +1508,9 @@ can be provided that is executed in the context of the scope.</p></div>
             <span class="k">yield</span> <span class="n">Scope</span><span class="p">()</span>
 
         <span class="k">return</span> <span class="n">inner</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># returned if user provided callback</span>
+        <span class="k">return</span> <span class="bp">None</span>
 </pre></div>
 
   </div>
@@ -1515,6 +1540,7 @@ argument.</p></div>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="c1"># type: (*str, **ClientOptions) -&gt; None</span>
         <span class="n">old_debug</span> <span class="o">=</span> <span class="n">_client_init_debug</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span> <span class="o">=</span> <span class="n">get_options</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
@@ -1540,7 +1566,13 @@ argument.</p></div>
         <span class="sd">&quot;&quot;&quot;Returns the configured DSN as string.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]</span>
 
-    <span class="k">def</span> <span class="nf">_prepare_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">_prepare_event</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Dict[str, Any]</span>
+        <span class="n">hint</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
+        <span class="n">scope</span><span class="p">,</span>  <span class="c1"># type: Optional[Scope]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; Optional[Dict[str, Any]]</span>
         <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;timestamp&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">event</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span>
 
@@ -1565,8 +1597,8 @@ argument.</p></div>
                 <span class="p">]</span>
 
         <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="s2">&quot;release&quot;</span><span class="p">,</span> <span class="s2">&quot;environment&quot;</span><span class="p">,</span> <span class="s2">&quot;server_name&quot;</span><span class="p">,</span> <span class="s2">&quot;dist&quot;</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="n">event</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">text_type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">])</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>  <span class="c1"># type: ignore</span>
+                <span class="n">event</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">text_type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">])</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>  <span class="c1"># type: ignore</span>
         <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sdk&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">sdk_info</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">SDK_INFO</span><span class="p">)</span>
             <span class="n">sdk_info</span><span class="p">[</span><span class="s2">&quot;integrations&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
@@ -1593,11 +1625,12 @@ argument.</p></div>
                 <span class="n">new_event</span> <span class="o">=</span> <span class="n">before_send</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">new_event</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;before send dropped event (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">event</span><span class="p">)</span>
-            <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>  <span class="c1"># type: ignore</span>
 
         <span class="k">return</span> <span class="n">event</span>
 
-    <span class="k">def</span> <span class="nf">_is_ignored_error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">_is_ignored_error</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
+        <span class="c1"># type: (Dict[str, Any], Dict[str, Any]) -&gt; bool</span>
         <span class="n">exc_info</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exc_info&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">exc_info</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">False</span>
@@ -1617,7 +1650,13 @@ argument.</p></div>
 
         <span class="k">return</span> <span class="bp">False</span>
 
-    <span class="k">def</span> <span class="nf">_should_capture</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">_should_capture</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Dict[str, Any]</span>
+        <span class="n">hint</span><span class="p">,</span>  <span class="c1"># type: Dict[str, Any]</span>
+        <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>  <span class="c1"># type: Scope</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; bool</span>
         <span class="k">if</span> <span class="n">scope</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">scope</span><span class="o">.</span><span class="n">_should_capture</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">False</span>
 
@@ -1633,6 +1672,7 @@ argument.</p></div>
         <span class="k">return</span> <span class="bp">True</span>
 
     <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="c1"># type: (Dict[str, Any], Any, Scope) -&gt; Optional[str]</span>
         <span class="sd">&quot;&quot;&quot;Captures an event.</span>
 
 <span class="sd">        This takes the ready made event and an optoinal hint and scope.  The</span>
@@ -1644,17 +1684,17 @@ argument.</p></div>
 <span class="sd">        value of this function will be the ID of the captured event.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="k">return</span>
+            <span class="k">return</span> <span class="bp">None</span>
         <span class="k">if</span> <span class="n">hint</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">hint</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="n">rv</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;event_id&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">event</span><span class="p">[</span><span class="s2">&quot;event_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span> <span class="o">=</span> <span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">()</span><span class="o">.</span><span class="n">hex</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">):</span>
-            <span class="k">return</span>
-        <span class="n">event</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">None</span>
+        <span class="n">event</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
         <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="k">return</span>
+            <span class="k">return</span> <span class="bp">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">rv</span>
 
@@ -1714,6 +1754,7 @@ argument.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Client.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Client.__init__" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="c1"># type: (*str, **ClientOptions) -&gt; None</span>
     <span class="n">old_debug</span> <span class="o">=</span> <span class="n">_client_init_debug</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span> <span class="o">=</span> <span class="n">get_options</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
@@ -1758,6 +1799,7 @@ value of this function will be the ID of the captured event.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Client.capture_event', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Client.capture_event" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, Any], Any, Scope) -&gt; Optional[str]</span>
     <span class="sd">&quot;&quot;&quot;Captures an event.</span>
 <span class="sd">    This takes the ready made event and an optoinal hint and scope.  The</span>
 <span class="sd">    hint is internally used to further customize the representation of the</span>
@@ -1767,17 +1809,17 @@ value of this function will be the ID of the captured event.</p></div>
 <span class="sd">    value of this function will be the ID of the captured event.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="k">return</span>
+        <span class="k">return</span> <span class="bp">None</span>
     <span class="k">if</span> <span class="n">hint</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
         <span class="n">hint</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">rv</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;event_id&quot;</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;event_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span> <span class="o">=</span> <span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">()</span><span class="o">.</span><span class="n">hex</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">):</span>
-        <span class="k">return</span>
-    <span class="n">event</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">None</span>
+    <span class="n">event</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
     <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="k">return</span>
+        <span class="k">return</span> <span class="bp">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">rv</span>
 </pre></div>
@@ -1880,10 +1922,11 @@ integration will use this to render out a message on stderr.</p></div>
     <span class="sd">&quot;&quot;&quot;The default HTTP transport.&quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+        <span class="c1"># type: (ClientOptions) -&gt; None</span>
         <span class="n">Transport</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span> <span class="o">=</span> <span class="n">BackgroundWorker</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_auth</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">to_auth</span><span class="p">(</span><span class="s2">&quot;sentry.python/</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">VERSION</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Optional[datetime]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_retry</span> <span class="o">=</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">Retry</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
 
@@ -1899,6 +1942,7 @@ integration will use this to render out a message on stderr.</p></div>
         <span class="bp">self</span><span class="o">.</span><span class="n">hub_cls</span> <span class="o">=</span> <span class="n">Hub</span>
 
     <span class="k">def</span> <span class="nf">_send_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="c1"># type: (Dict[str, Any]) -&gt; None</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span><span class="p">:</span>
                 <span class="k">return</span>
@@ -1943,13 +1987,21 @@ integration will use this to render out a message on stderr.</p></div>
         <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="bp">None</span>
 
     <span class="k">def</span> <span class="nf">_get_pool_options</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ca_certs</span><span class="p">):</span>
+        <span class="c1"># type: (Optional[Any]) -&gt; Dict[str, Any]</span>
         <span class="k">return</span> <span class="p">{</span>
             <span class="s2">&quot;num_pools&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
             <span class="s2">&quot;cert_reqs&quot;</span><span class="p">:</span> <span class="s2">&quot;CERT_REQUIRED&quot;</span><span class="p">,</span>
             <span class="s2">&quot;ca_certs&quot;</span><span class="p">:</span> <span class="n">ca_certs</span> <span class="ow">or</span> <span class="n">certifi</span><span class="o">.</span><span class="n">where</span><span class="p">(),</span>
         <span class="p">}</span>
 
-    <span class="k">def</span> <span class="nf">_make_pool</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parsed_dsn</span><span class="p">,</span> <span class="n">http_proxy</span><span class="p">,</span> <span class="n">https_proxy</span><span class="p">,</span> <span class="n">ca_certs</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">_make_pool</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">parsed_dsn</span><span class="p">,</span>  <span class="c1"># type: Dsn</span>
+        <span class="n">http_proxy</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+        <span class="n">https_proxy</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+        <span class="n">ca_certs</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; Union[PoolManager, ProxyManager]</span>
         <span class="c1"># Use http_proxy if scheme is https and https_proxy is not set</span>
         <span class="n">proxy</span> <span class="o">=</span> <span class="n">parsed_dsn</span><span class="o">.</span><span class="n">scheme</span> <span class="o">==</span> <span class="s2">&quot;https&quot;</span> <span class="ow">and</span> <span class="n">https_proxy</span> <span class="ow">or</span> <span class="n">http_proxy</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">proxy</span><span class="p">:</span>
@@ -1963,9 +2015,11 @@ integration will use this to render out a message on stderr.</p></div>
             <span class="k">return</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">PoolManager</span><span class="p">(</span><span class="o">**</span><span class="n">opts</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="c1"># type: (Dict[str, Any]) -&gt; None</span>
         <span class="n">hub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hub_cls</span><span class="o">.</span><span class="n">current</span>
 
         <span class="k">def</span> <span class="nf">send_event_wrapper</span><span class="p">():</span>
+            <span class="c1"># type: () -&gt; None</span>
             <span class="k">with</span> <span class="n">hub</span><span class="p">:</span>
                 <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">_send_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
@@ -1973,11 +2027,13 @@ integration will use this to render out a message on stderr.</p></div>
         <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">send_event_wrapper</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="c1"># type: (float, Optional[Any]) -&gt; None</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Flushing HTTP transport&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">timeout</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; None</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Killing HTTP transport&quot;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
 </pre></div>
@@ -1993,6 +2049,17 @@ integration will use this to render out a message on stderr.</p></div>
           <li><a href="#sentry_sdk.Transport">Transport</a></li>
           <li>builtins.object</li>
           </ul>
+          <h3>Class variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.HttpTransport.parsed_dsn" class="name">var <span class="ident">parsed_dsn</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
           <h3>Static methods</h3>
             
   <div class="item">
@@ -2008,10 +2075,11 @@ integration will use this to render out a message on stderr.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.HttpTransport.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.HttpTransport.__init__" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
+    <span class="c1"># type: (ClientOptions) -&gt; None</span>
     <span class="n">Transport</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span> <span class="o">=</span> <span class="n">BackgroundWorker</span><span class="p">()</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_auth</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">to_auth</span><span class="p">(</span><span class="s2">&quot;sentry.python/</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">VERSION</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Optional[datetime]</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_retry</span> <span class="o">=</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">Retry</span><span class="p">()</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_pool</span><span class="p">(</span>
@@ -2044,8 +2112,10 @@ be sent to sentry.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.HttpTransport.capture_event', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.HttpTransport.capture_event" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, Any]) -&gt; None</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hub_cls</span><span class="o">.</span><span class="n">current</span>
     <span class="k">def</span> <span class="nf">send_event_wrapper</span><span class="p">():</span>
+        <span class="c1"># type: () -&gt; None</span>
         <span class="k">with</span> <span class="n">hub</span><span class="p">:</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_send_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
@@ -2071,6 +2141,7 @@ be sent to sentry.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.HttpTransport.flush', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.HttpTransport.flush" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="c1"># type: (float, Optional[Any]) -&gt; None</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Flushing HTTP transport&quot;</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">timeout</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="p">)</span>
@@ -2095,6 +2166,7 @@ be sent to sentry.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.HttpTransport.kill', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.HttpTransport.kill" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="c1"># type: () -&gt; None</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Killing HTTP transport&quot;</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
 </pre></div>
@@ -2143,7 +2215,7 @@ context vars are available.</p>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">Hub</span><span class="p">(</span><span class="n">with_metaclass</span><span class="p">(</span><span class="n">HubMeta</span><span class="p">)):</span>
+    <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">Hub</span><span class="p">(</span><span class="n">with_metaclass</span><span class="p">(</span><span class="n">HubMeta</span><span class="p">)):</span>  <span class="c1"># type: ignore</span>
     <span class="sd">&quot;&quot;&quot;The hub wraps the concurrency management of the SDK.  Each thread has</span>
 <span class="sd">    its own hub but the hub might transfer with the flow of execution if</span>
 <span class="sd">    context vars are available.</span>
@@ -2151,7 +2223,10 @@ context vars are available.</p>
 <span class="sd">    If the hub is used with a with statement it&#39;s temporarily activated.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
+    <span class="n">_stack</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: List[Tuple[Optional[Client], Scope]]</span>
+
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">client_or_hub</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="c1"># type: (Union[Hub, Client], Optional[Any]) -&gt; None</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">client_or_hub</span><span class="p">,</span> <span class="n">Hub</span><span class="p">):</span>
             <span class="n">hub</span> <span class="o">=</span> <span class="n">client_or_hub</span>
             <span class="n">client</span><span class="p">,</span> <span class="n">other_scope</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
@@ -2161,16 +2236,24 @@ context vars are available.</p>
             <span class="n">client</span> <span class="o">=</span> <span class="n">client_or_hub</span>
         <span class="k">if</span> <span class="n">scope</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">scope</span> <span class="o">=</span> <span class="n">Scope</span><span class="p">()</span>
+
         <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span> <span class="o">=</span> <span class="p">[(</span><span class="n">client</span><span class="p">,</span> <span class="n">scope</span><span class="p">)]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span> <span class="o">=</span> <span class="bp">None</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_old_hubs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Optional[str]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_old_hubs</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># type: List[Hub]</span>
 
     <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Hub</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_old_hubs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="p">)</span>
         <span class="n">_local</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span>
 
-    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">exc_type</span><span class="p">,</span>  <span class="c1"># type: Optional[type]</span>
+        <span class="n">exc_value</span><span class="p">,</span>  <span class="c1"># type: Optional[BaseException]</span>
+        <span class="n">tb</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; None</span>
         <span class="n">old</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_old_hubs</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
         <span class="n">_local</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">old</span><span class="p">)</span>
 
@@ -2182,6 +2265,7 @@ context vars are available.</p>
             <span class="k">return</span> <span class="n">callback</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
+        <span class="c1"># type: (Union[str, Integration]) -&gt; Any</span>
         <span class="sd">&quot;&quot;&quot;Returns the integration for this hub by name or class.  If there</span>
 <span class="sd">        is no client bound or the client does not have that integration</span>
 <span class="sd">        then `None` is returned.</span>
@@ -2189,11 +2273,16 @@ context vars are available.</p>
 <span class="sd">        If the return value is not `None` the hub is guaranteed to have a</span>
 <span class="sd">        client attached.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">,</span> <span class="n">string_types</span><span class="p">):</span>
-            <span class="n">name_or_class</span> <span class="o">=</span> <span class="n">name_or_class</span><span class="o">.</span><span class="n">identifier</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">integration_name</span> <span class="o">=</span> <span class="n">name_or_class</span>
+        <span class="k">elif</span> <span class="n">name_or_class</span><span class="o">.</span><span class="n">identifier</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">integration_name</span> <span class="o">=</span> <span class="n">name_or_class</span><span class="o">.</span><span class="n">identifier</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Integration has no name&quot;</span><span class="p">)</span>
+
         <span class="n">client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="n">rv</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">)</span>
+            <span class="n">rv</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">integration_name</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">rv</span>
 
@@ -2218,6 +2307,7 @@ context vars are available.</p>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">client</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Optional[Client]</span>
         <span class="sd">&quot;&quot;&quot;Returns the current client on the hub.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
 
@@ -2231,6 +2321,7 @@ context vars are available.</p>
         <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">new</span><span class="p">,</span> <span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
 
     <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="c1"># type: (Dict[str, Any], Dict[str, Any]) -&gt; Optional[str]</span>
         <span class="sd">&quot;&quot;&quot;Captures an event.  The return value is the ID of the event.</span>
 
 <span class="sd">        The event is a dictionary following the Sentry v7/v8 protocol</span>
@@ -2244,13 +2335,15 @@ context vars are available.</p>
             <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span> <span class="o">=</span> <span class="n">rv</span>
             <span class="k">return</span> <span class="n">rv</span>
+        <span class="k">return</span> <span class="bp">None</span>
 
     <span class="k">def</span> <span class="nf">capture_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="c1"># type: (str, Optional[Any]) -&gt; Optional[str]</span>
         <span class="sd">&quot;&quot;&quot;Captures a message.  The message is just a string.  If no level</span>
 <span class="sd">        is provided the default level is `info`.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="k">return</span>
+            <span class="k">return</span> <span class="bp">None</span>
         <span class="k">if</span> <span class="n">level</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">level</span> <span class="o">=</span> <span class="s2">&quot;info&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">capture_event</span><span class="p">({</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">message</span><span class="p">,</span> <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="n">level</span><span class="p">})</span>
@@ -2282,6 +2375,7 @@ context vars are available.</p>
         <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Internal error in sentry_sdk&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="n">exc_info</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">add_breadcrumb</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">crumb</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="c1"># type: (Dict[str, Any], Dict[str, Any], **Any) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Adds a breadcrumb.  The breadcrumbs are a dictionary with the</span>
 <span class="sd">        data as the sentry v7/v8 protocol expects.  `hint` is an optional</span>
 <span class="sd">        value that can be used by `before_breadcrumb` to customize the</span>
@@ -2292,7 +2386,7 @@ context vars are available.</p>
             <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Dropped breadcrumb because no client bound&quot;</span><span class="p">)</span>
             <span class="k">return</span>
 
-        <span class="n">crumb</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">crumb</span> <span class="ow">or</span> <span class="p">())</span>
+        <span class="n">crumb</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">crumb</span> <span class="ow">or</span> <span class="p">())</span>  <span class="c1"># type: Dict[str, Any]</span>
         <span class="n">crumb</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">crumb</span><span class="p">:</span>
             <span class="k">return</span>
@@ -2312,18 +2406,31 @@ context vars are available.</p>
             <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">crumb</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;before breadcrumb dropped breadcrumb (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">original_crumb</span><span class="p">)</span>
-        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;max_breadcrumbs&quot;</span><span class="p">]:</span>
+
+        <span class="n">max_breadcrumbs</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;max_breadcrumbs&quot;</span><span class="p">]</span>  <span class="c1"># type: int</span>
+        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">max_breadcrumbs</span><span class="p">:</span>
             <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
 
-    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="nd">@overload</span>  <span class="c1"># noqa</span>
+    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; ContextManager[Scope]</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@overload</span>  <span class="c1"># noqa</span>
+    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">):</span>
+        <span class="c1"># type: (Callable[[Scope], None]) -&gt; None</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>  <span class="c1"># noqa</span>
         <span class="sd">&quot;&quot;&quot;Pushes a new layer on the scope stack. Returns a context manager</span>
 <span class="sd">        that should be used to pop the scope again.  Alternatively a callback</span>
 <span class="sd">        can be provided that is executed in the context of the scope.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+
         <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
                 <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
-            <span class="k">return</span>
+            <span class="k">return</span> <span class="bp">None</span>
 
         <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="n">new_layer</span> <span class="o">=</span> <span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">scope</span><span class="p">))</span>
@@ -2340,13 +2447,25 @@ context vars are available.</p>
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">,</span> <span class="s2">&quot;stack must have at least one layer&quot;</span>
         <span class="k">return</span> <span class="n">rv</span>
 
-    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="nd">@overload</span>  <span class="c1"># noqa</span>
+    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; ContextManager[Scope]</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@overload</span>  <span class="c1"># noqa</span>
+    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">):</span>
+        <span class="c1"># type: (Callable[[Scope], None]) -&gt; None</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>  <span class="c1"># noqa</span>
         <span class="sd">&quot;&quot;&quot;Reconfigures the scope.&quot;&quot;&quot;</span>
+
         <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
-            <span class="k">return</span>
+
+            <span class="k">return</span> <span class="bp">None</span>
 
         <span class="nd">@contextmanager</span>
         <span class="k">def</span> <span class="nf">inner</span><span class="p">():</span>
@@ -2389,6 +2508,7 @@ context vars are available.</p>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.__init__" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">client_or_hub</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="c1"># type: (Union[Hub, Client], Optional[Any]) -&gt; None</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">client_or_hub</span><span class="p">,</span> <span class="n">Hub</span><span class="p">):</span>
         <span class="n">hub</span> <span class="o">=</span> <span class="n">client_or_hub</span>
         <span class="n">client</span><span class="p">,</span> <span class="n">other_scope</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
@@ -2399,8 +2519,8 @@ context vars are available.</p>
     <span class="k">if</span> <span class="n">scope</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
         <span class="n">scope</span> <span class="o">=</span> <span class="n">Scope</span><span class="p">()</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span> <span class="o">=</span> <span class="p">[(</span><span class="n">client</span><span class="p">,</span> <span class="n">scope</span><span class="p">)]</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span> <span class="o">=</span> <span class="bp">None</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_old_hubs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Optional[str]</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_old_hubs</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># type: List[Hub]</span>
 </pre></div>
 
   </div>
@@ -2425,6 +2545,7 @@ breadcrumbs that are emitted.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.add_breadcrumb', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.add_breadcrumb" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">add_breadcrumb</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">crumb</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, Any], Dict[str, Any], **Any) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;Adds a breadcrumb.  The breadcrumbs are a dictionary with the</span>
 <span class="sd">    data as the sentry v7/v8 protocol expects.  `hint` is an optional</span>
 <span class="sd">    value that can be used by `before_breadcrumb` to customize the</span>
@@ -2434,7 +2555,7 @@ breadcrumbs that are emitted.</p></div>
     <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Dropped breadcrumb because no client bound&quot;</span><span class="p">)</span>
         <span class="k">return</span>
-    <span class="n">crumb</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">crumb</span> <span class="ow">or</span> <span class="p">())</span>
+    <span class="n">crumb</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">crumb</span> <span class="ow">or</span> <span class="p">())</span>  <span class="c1"># type: Dict[str, Any]</span>
     <span class="n">crumb</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">crumb</span><span class="p">:</span>
         <span class="k">return</span>
@@ -2450,7 +2571,8 @@ breadcrumbs that are emitted.</p></div>
         <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">crumb</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;before breadcrumb dropped breadcrumb (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">original_crumb</span><span class="p">)</span>
-    <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;max_breadcrumbs&quot;</span><span class="p">]:</span>
+    <span class="n">max_breadcrumbs</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;max_breadcrumbs&quot;</span><span class="p">]</span>  <span class="c1"># type: int</span>
+    <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">max_breadcrumbs</span><span class="p">:</span>
         <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
 </pre></div>
 
@@ -2501,6 +2623,7 @@ Typically the event hint object would contain exception information.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.capture_event', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.capture_event" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, Any], Dict[str, Any]) -&gt; Optional[str]</span>
     <span class="sd">&quot;&quot;&quot;Captures an event.  The return value is the ID of the event.</span>
 <span class="sd">    The event is a dictionary following the Sentry v7/v8 protocol</span>
 <span class="sd">    specification.  Optionally an event hint dict can be passed that</span>
@@ -2513,6 +2636,7 @@ Typically the event hint object would contain exception information.</p></div>
         <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span> <span class="o">=</span> <span class="n">rv</span>
         <span class="k">return</span> <span class="n">rv</span>
+    <span class="k">return</span> <span class="bp">None</span>
 </pre></div>
 
   </div>
@@ -2576,11 +2700,12 @@ is provided the default level is <code>info</code>.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.capture_message', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.capture_message" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">capture_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="c1"># type: (str, Optional[Any]) -&gt; Optional[str]</span>
     <span class="sd">&quot;&quot;&quot;Captures a message.  The message is just a string.  If no level</span>
 <span class="sd">    is provided the default level is `info`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="k">return</span>
+        <span class="k">return</span> <span class="bp">None</span>
     <span class="k">if</span> <span class="n">level</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
         <span class="n">level</span> <span class="o">=</span> <span class="s2">&quot;info&quot;</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">capture_event</span><span class="p">({</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">message</span><span class="p">,</span> <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="n">level</span><span class="p">})</span>
@@ -2604,13 +2729,13 @@ is provided the default level is <code>info</code>.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.configure_scope', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.configure_scope" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>  <span class="c1"># noqa</span>
     <span class="sd">&quot;&quot;&quot;Reconfigures the scope.&quot;&quot;&quot;</span>
     <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
-        <span class="k">return</span>
+        <span class="k">return</span> <span class="bp">None</span>
     <span class="nd">@contextmanager</span>
     <span class="k">def</span> <span class="nf">inner</span><span class="p">():</span>
         <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
@@ -2668,17 +2793,22 @@ client attached.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.get_integration', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.get_integration" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
+    <span class="c1"># type: (Union[str, Integration]) -&gt; Any</span>
     <span class="sd">&quot;&quot;&quot;Returns the integration for this hub by name or class.  If there</span>
 <span class="sd">    is no client bound or the client does not have that integration</span>
 <span class="sd">    then `None` is returned.</span>
 <span class="sd">    If the return value is not `None` the hub is guaranteed to have a</span>
 <span class="sd">    client attached.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">,</span> <span class="n">string_types</span><span class="p">):</span>
-        <span class="n">name_or_class</span> <span class="o">=</span> <span class="n">name_or_class</span><span class="o">.</span><span class="n">identifier</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">integration_name</span> <span class="o">=</span> <span class="n">name_or_class</span>
+    <span class="k">elif</span> <span class="n">name_or_class</span><span class="o">.</span><span class="n">identifier</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">integration_name</span> <span class="o">=</span> <span class="n">name_or_class</span><span class="o">.</span><span class="n">identifier</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Integration has no name&quot;</span><span class="p">)</span>
     <span class="n">client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
     <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="n">rv</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">)</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">integration_name</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">rv</span>
     <span class="n">initial_client</span> <span class="o">=</span> <span class="n">_initial_client</span>
@@ -2770,7 +2900,7 @@ can be provided that is executed in the context of the scope.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.push_scope', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.push_scope" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>  <span class="c1"># noqa</span>
     <span class="sd">&quot;&quot;&quot;Pushes a new layer on the scope stack. Returns a context manager</span>
 <span class="sd">    that should be used to pop the scope again.  Alternatively a callback</span>
 <span class="sd">    can be provided that is executed in the context of the scope.</span>
@@ -2778,7 +2908,7 @@ can be provided that is executed in the context of the scope.</p></div>
     <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
             <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
-        <span class="k">return</span>
+        <span class="k">return</span> <span class="bp">None</span>
     <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="n">new_layer</span> <span class="o">=</span> <span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">scope</span><span class="p">))</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_layer</span><span class="p">)</span>
@@ -2832,7 +2962,7 @@ can be provided that is executed in the context of the scope.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.scope', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.scope" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>  <span class="c1"># noqa</span>
     <span class="sd">&quot;&quot;&quot;Pushes a new layer on the scope stack. Returns a context manager</span>
 <span class="sd">    that should be used to pop the scope again.  Alternatively a callback</span>
 <span class="sd">    can be provided that is executed in the context of the scope.</span>
@@ -2840,7 +2970,7 @@ can be provided that is executed in the context of the scope.</p></div>
     <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
             <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
-        <span class="k">return</span>
+        <span class="k">return</span> <span class="bp">None</span>
     <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="n">new_layer</span> <span class="o">=</span> <span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">scope</span><span class="p">))</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_layer</span><span class="p">)</span>
@@ -2897,8 +3027,8 @@ events that belong to it.</p></div>
     <span class="p">)</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># type: List[Callable]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># type: List[Callable]</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
@@ -2948,21 +3078,23 @@ events that belong to it.</p></div>
         <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Clears the entire scope.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="bp">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="bp">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="bp">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="bp">None</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Any]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Dict]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Any]</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>  <span class="c1"># type: Deque[Dict]</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span> <span class="o">=</span> <span class="bp">True</span>
 
     <span class="k">def</span> <span class="nf">add_event_processor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">):</span>
+        <span class="c1"># type: (Callable) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;&quot;Register a scope local event processor on the scope.</span>
 
 <span class="sd">        This function behaves like `before_send.`</span>
@@ -2970,6 +3102,7 @@ events that belong to it.</p></div>
         <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">add_error_processor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">,</span> <span class="bp">cls</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="c1"># type: (Callable, Optional[type]) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;&quot;Register a scope local error processor on the scope.</span>
 
 <span class="sd">        The error processor works similar to an event processor but is</span>
@@ -2991,10 +3124,13 @@ events that belong to it.</p></div>
 
     <span class="nd">@_disable_capture</span>
     <span class="k">def</span> <span class="nf">apply_to_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="c1"># type: (Dict[str, Any], Dict[str, Any]) -&gt; Optional[Dict[str, Any]]</span>
         <span class="sd">&quot;&quot;&quot;Applies the information contained on the scope to the given event.&quot;&quot;&quot;</span>
 
         <span class="k">def</span> <span class="nf">_drop</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">cause</span><span class="p">,</span> <span class="n">ty</span><span class="p">):</span>
+            <span class="c1"># type: (Dict[str, Any], Callable, str) -&gt; Optional[Any]</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">) dropped event (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">cause</span><span class="p">,</span> <span class="n">event</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">None</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span>
@@ -3037,6 +3173,7 @@ events that belong to it.</p></div>
         <span class="k">return</span> <span class="n">event</span>
 
     <span class="k">def</span> <span class="nf">__copy__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Scope</span>
         <span class="n">rv</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">)</span>
 
         <span class="n">rv</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span>
@@ -3090,8 +3227,8 @@ events that belong to it.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Scope.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Scope.__init__" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># type: List[Callable]</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># type: List[Callable]</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
 </pre></div>
@@ -3117,6 +3254,7 @@ invoked with the original exception info triple as second argument.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Scope.add_error_processor', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Scope.add_error_processor" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">add_error_processor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">,</span> <span class="bp">cls</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="c1"># type: (Callable, Optional[type]) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;&quot;Register a scope local error processor on the scope.</span>
 <span class="sd">    The error processor works similar to an event processor but is</span>
 <span class="sd">    invoked with the original exception info triple as second argument.</span>
@@ -3154,6 +3292,7 @@ invoked with the original exception info triple as second argument.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Scope.add_event_processor', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Scope.add_event_processor" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">add_event_processor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">):</span>
+    <span class="c1"># type: (Callable) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;&quot;Register a scope local event processor on the scope.</span>
 <span class="sd">    This function behaves like `before_send.`</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -3180,9 +3319,12 @@ invoked with the original exception info triple as second argument.</p></div>
   <div id="source-sentry_sdk.Scope.apply_to_event" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@_disable_capture</span>
 <span class="k">def</span> <span class="nf">apply_to_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, Any], Dict[str, Any]) -&gt; Optional[Dict[str, Any]]</span>
     <span class="sd">&quot;&quot;&quot;Applies the information contained on the scope to the given event.&quot;&quot;&quot;</span>
     <span class="k">def</span> <span class="nf">_drop</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">cause</span><span class="p">,</span> <span class="n">ty</span><span class="p">):</span>
+        <span class="c1"># type: (Dict[str, Any], Callable, str) -&gt; Optional[Any]</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">) dropped event (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">cause</span><span class="p">,</span> <span class="n">event</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">None</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span>
     <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;breadcrumbs&quot;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span>
@@ -3234,15 +3376,16 @@ invoked with the original exception info triple as second argument.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Scope.clear', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Scope.clear" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="c1"># type: () -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;Clears the entire scope.&quot;&quot;&quot;</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="bp">None</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span> <span class="o">=</span> <span class="p">{}</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span> <span class="o">=</span> <span class="p">{}</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span> <span class="o">=</span> <span class="p">{}</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Any]</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Dict]</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Any]</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>  <span class="c1"># type: Deque[Dict]</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span> <span class="o">=</span> <span class="bp">True</span>
 </pre></div>
 
@@ -3452,12 +3595,15 @@ invoked with the original exception info triple as second argument.</p></div>
 <span class="sd">    A transport is used to send an event to sentry.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
+    <span class="n">parsed_dsn</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Dsn</span>
+
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="c1"># type: (Optional[ClientOptions]) -&gt; None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
         <span class="k">if</span> <span class="n">options</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="n">Dsn</span><span class="p">(</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">])</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="bp">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: ignore</span>
 
     <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;This gets invoked with the event dictionary when an event should</span>
@@ -3470,10 +3616,12 @@ invoked with the original exception info triple as second argument.</p></div>
         <span class="k">pass</span>
 
     <span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Forcefully kills the transport.&quot;&quot;&quot;</span>
         <span class="k">pass</span>
 
     <span class="k">def</span> <span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; None</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
         <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
@@ -3490,6 +3638,17 @@ invoked with the original exception info triple as second argument.</p></div>
           <li><a href="#sentry_sdk.Transport">Transport</a></li>
           <li>builtins.object</li>
           </ul>
+          <h3>Class variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.Transport.parsed_dsn" class="name">var <span class="ident">parsed_dsn</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
           <h3>Static methods</h3>
             
   <div class="item">
@@ -3505,11 +3664,12 @@ invoked with the original exception info triple as second argument.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Transport.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Transport.__init__" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="c1"># type: (Optional[ClientOptions]) -&gt; None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
     <span class="k">if</span> <span class="n">options</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="n">Dsn</span><span class="p">(</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">])</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: ignore</span>
 </pre></div>
 
   </div>
@@ -3580,6 +3740,7 @@ be sent to sentry.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Transport.kill', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Transport.kill" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="c1"># type: () -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;Forcefully kills the transport.&quot;&quot;&quot;</span>
     <span class="k">pass</span>
 </pre></div>

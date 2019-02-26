@@ -1090,6 +1090,10 @@ table {
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">logger</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
 
+<span class="k">if</span> <span class="bp">False</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+
 
 <span class="k">def</span> <span class="nf">default_callback</span><span class="p">(</span><span class="n">pending</span><span class="p">,</span> <span class="n">timeout</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;This is the default shutdown callback that is set on the options.</span>
@@ -1110,12 +1114,14 @@ table {
     <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;atexit&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="c1"># type: (Optional[Any]) -&gt; None</span>
         <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">callback</span> <span class="o">=</span> <span class="n">default_callback</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">callback</span> <span class="o">=</span> <span class="n">callback</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="c1"># type: () -&gt; None</span>
         <span class="nd">@atexit.register</span>
         <span class="k">def</span> <span class="nf">_shutdown</span><span class="p">():</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: got shutdown signal&quot;</span><span class="p">)</span>
@@ -1185,12 +1191,14 @@ saves those options on <code>self</code>.</p></div>
     <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;atexit&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="c1"># type: (Optional[Any]) -&gt; None</span>
         <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">callback</span> <span class="o">=</span> <span class="n">default_callback</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">callback</span> <span class="o">=</span> <span class="n">callback</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="c1"># type: () -&gt; None</span>
         <span class="nd">@atexit.register</span>
         <span class="k">def</span> <span class="nf">_shutdown</span><span class="p">():</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: got shutdown signal&quot;</span><span class="p">)</span>
@@ -1248,6 +1256,7 @@ saves those options on <code>self</code>.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.atexit.AtexitIntegration.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.atexit.AtexitIntegration.__init__" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="c1"># type: (Optional[Any]) -&gt; None</span>
     <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
         <span class="n">callback</span> <span class="o">=</span> <span class="n">default_callback</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">callback</span> <span class="o">=</span> <span class="n">callback</span>
@@ -1278,6 +1287,7 @@ instance again.</p></div>
   <div id="source-sentry_sdk.integrations.atexit.AtexitIntegration.setup_once" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@staticmethod</span>
 <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+    <span class="c1"># type: () -&gt; None</span>
     <span class="nd">@atexit.register</span>
     <span class="k">def</span> <span class="nf">_shutdown</span><span class="p">():</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: got shutdown signal&quot;</span><span class="p">)</span>

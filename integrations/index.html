@@ -1061,10 +1061,6 @@ table {
   </ul>
 
         </li>
-        <li class="mono">
-        <span class="class_name"><a href="#sentry_sdk.integrations.IntegrationAttachment">IntegrationAttachment</a></span>
-        
-        </li>
       </ul>
     </li>
 
@@ -1103,49 +1099,59 @@ table {
 <span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">absolute_import</span>
 
 <span class="kn">from</span> <span class="nn">threading</span> <span class="kn">import</span> <span class="n">Lock</span>
-<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">namedtuple</span>
 
 <span class="kn">from</span> <span class="nn">sentry_sdk._compat</span> <span class="kn">import</span> <span class="n">iteritems</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">logger</span>
 
+<span class="k">if</span> <span class="bp">False</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Iterator</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Set</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Type</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
+
 
 <span class="n">_installer_lock</span> <span class="o">=</span> <span class="n">Lock</span><span class="p">()</span>
-<span class="n">_installed_integrations</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+<span class="n">_installed_integrations</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>  <span class="c1"># type: Set[str]</span>
 
 
-<span class="k">def</span> <span class="nf">iter_default_integrations</span><span class="p">():</span>
-    <span class="sd">&quot;&quot;&quot;Returns an iterator of default integration classes.</span>
+<span class="k">def</span> <span class="nf">_generate_default_integrations_iterator</span><span class="p">(</span><span class="o">*</span><span class="n">import_strings</span><span class="p">):</span>
+    <span class="c1"># type: (*str) -&gt; Callable[[], Iterator[Type[Integration]]]</span>
+    <span class="k">def</span> <span class="nf">iter_default_integrations</span><span class="p">():</span>
+        <span class="c1"># type: () -&gt; Iterator[Type[Integration]]</span>
+        <span class="sd">&quot;&quot;&quot;Returns an iterator of the default integration classes:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span> <span class="nn">importlib</span> <span class="kn">import</span> <span class="n">import_module</span>
 
-<span class="sd">    This returns the following default integration:</span>
+        <span class="k">for</span> <span class="n">import_string</span> <span class="ow">in</span> <span class="n">import_strings</span><span class="p">:</span>
+            <span class="n">module</span><span class="p">,</span> <span class="bp">cls</span> <span class="o">=</span> <span class="n">import_string</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="k">yield</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">import_module</span><span class="p">(</span><span class="n">module</span><span class="p">),</span> <span class="bp">cls</span><span class="p">)</span>
 
-<span class="sd">    - `LoggingIntegration`</span>
-<span class="sd">    - `StdlibIntegration`</span>
-<span class="sd">    - `ExcepthookIntegration`</span>
-<span class="sd">    - `DedupeIntegration`</span>
-<span class="sd">    - `AtexitIntegration`</span>
-<span class="sd">    - `ModulesIntegration`</span>
-<span class="sd">    - `ArgvIntegration`</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.logging</span> <span class="kn">import</span> <span class="n">LoggingIntegration</span>
-    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.stdlib</span> <span class="kn">import</span> <span class="n">StdlibIntegration</span>
-    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.excepthook</span> <span class="kn">import</span> <span class="n">ExcepthookIntegration</span>
-    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.dedupe</span> <span class="kn">import</span> <span class="n">DedupeIntegration</span>
-    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.atexit</span> <span class="kn">import</span> <span class="n">AtexitIntegration</span>
-    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.modules</span> <span class="kn">import</span> <span class="n">ModulesIntegration</span>
-    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.argv</span> <span class="kn">import</span> <span class="n">ArgvIntegration</span>
-    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.threading</span> <span class="kn">import</span> <span class="n">ThreadingIntegration</span>
+    <span class="k">for</span> <span class="n">import_string</span> <span class="ow">in</span> <span class="n">import_strings</span><span class="p">:</span>
+        <span class="n">iter_default_integrations</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">- `{}`&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>  <span class="c1"># type: ignore</span>
+            <span class="n">import_string</span>
+        <span class="p">)</span>
 
-    <span class="k">yield</span> <span class="n">LoggingIntegration</span>
-    <span class="k">yield</span> <span class="n">StdlibIntegration</span>
-    <span class="k">yield</span> <span class="n">ExcepthookIntegration</span>
-    <span class="k">yield</span> <span class="n">DedupeIntegration</span>
-    <span class="k">yield</span> <span class="n">AtexitIntegration</span>
-    <span class="k">yield</span> <span class="n">ModulesIntegration</span>
-    <span class="k">yield</span> <span class="n">ArgvIntegration</span>
-    <span class="k">yield</span> <span class="n">ThreadingIntegration</span>
+    <span class="k">return</span> <span class="n">iter_default_integrations</span>
+
+
+<span class="n">iter_default_integrations</span> <span class="o">=</span> <span class="n">_generate_default_integrations_iterator</span><span class="p">(</span>
+    <span class="s2">&quot;sentry_sdk.integrations.logging.LoggingIntegration&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;sentry_sdk.integrations.stdlib.StdlibIntegration&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;sentry_sdk.integrations.excepthook.ExcepthookIntegration&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;sentry_sdk.integrations.dedupe.DedupeIntegration&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;sentry_sdk.integrations.atexit.AtexitIntegration&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;sentry_sdk.integrations.modules.ModulesIntegration&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;sentry_sdk.integrations.argv.ArgvIntegration&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;sentry_sdk.integrations.threading.ThreadingIntegration&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="k">del</span> <span class="n">_generate_default_integrations_iterator</span>
 
 
 <span class="k">def</span> <span class="nf">setup_integrations</span><span class="p">(</span><span class="n">integrations</span><span class="p">,</span> <span class="n">with_defaults</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+    <span class="c1"># type: (List[Integration], bool) -&gt; Dict[str, Integration]</span>
     <span class="sd">&quot;&quot;&quot;Given a list of integration instances this installs them all.  When</span>
 <span class="sd">    `with_defaults` is set to `True` then all default integrations are added</span>
 <span class="sd">    unless they were already provided before.</span>
@@ -1188,11 +1194,6 @@ table {
     <span class="k">return</span> <span class="n">integrations</span>
 
 
-<span class="n">IntegrationAttachment</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span>
-    <span class="s2">&quot;IntegrationAttachment&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;integration&quot;</span><span class="p">,</span> <span class="s2">&quot;client&quot;</span><span class="p">,</span> <span class="s2">&quot;hub&quot;</span><span class="p">]</span>
-<span class="p">)</span>
-
-
 <span class="k">class</span> <span class="nc">Integration</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Baseclass for all integrations.</span>
 
@@ -1202,6 +1203,9 @@ table {
 
     <span class="n">install</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="sd">&quot;&quot;&quot;Legacy method, do not implement.&quot;&quot;&quot;</span>
+
+    <span class="n">identifier</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: str</span>
+    <span class="sd">&quot;&quot;&quot;String unique ID of integration type&quot;&quot;&quot;</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
@@ -1234,50 +1238,28 @@ table {
 
     
   
-    <div class="desc"><p>Returns an iterator of default integration classes.</p>
-<p>This returns the following default integration:</p>
+    <div class="desc"><p>Returns an iterator of the default integration classes:</p>
 <ul>
-<li><code>LoggingIntegration</code></li>
-<li><code>StdlibIntegration</code></li>
-<li><code>ExcepthookIntegration</code></li>
-<li><code>DedupeIntegration</code></li>
-<li><code>AtexitIntegration</code></li>
-<li><code>ModulesIntegration</code></li>
-<li><code>ArgvIntegration</code></li>
+<li><a href="logging.m.html#sentry_sdk.integrations.logging.LoggingIntegration"><code>sentry_sdk.integrations.logging.LoggingIntegration</code></a></li>
+<li><a href="stdlib.m.html#sentry_sdk.integrations.stdlib.StdlibIntegration"><code>sentry_sdk.integrations.stdlib.StdlibIntegration</code></a></li>
+<li><a href="excepthook.m.html#sentry_sdk.integrations.excepthook.ExcepthookIntegration"><code>sentry_sdk.integrations.excepthook.ExcepthookIntegration</code></a></li>
+<li><a href="dedupe.m.html#sentry_sdk.integrations.dedupe.DedupeIntegration"><code>sentry_sdk.integrations.dedupe.DedupeIntegration</code></a></li>
+<li><a href="atexit.m.html#sentry_sdk.integrations.atexit.AtexitIntegration"><code>sentry_sdk.integrations.atexit.AtexitIntegration</code></a></li>
+<li><a href="modules.m.html#sentry_sdk.integrations.modules.ModulesIntegration"><code>sentry_sdk.integrations.modules.ModulesIntegration</code></a></li>
+<li><a href="argv.m.html#sentry_sdk.integrations.argv.ArgvIntegration"><code>sentry_sdk.integrations.argv.ArgvIntegration</code></a></li>
+<li><a href="threading.m.html#sentry_sdk.integrations.threading.ThreadingIntegration"><code>sentry_sdk.integrations.threading.ThreadingIntegration</code></a></li>
 </ul></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.iter_default_integrations', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.iter_default_integrations" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">iter_default_integrations</span><span class="p">():</span>
-    <span class="sd">&quot;&quot;&quot;Returns an iterator of default integration classes.</span>
-
-<span class="sd">    This returns the following default integration:</span>
-
-<span class="sd">    - `LoggingIntegration`</span>
-<span class="sd">    - `StdlibIntegration`</span>
-<span class="sd">    - `ExcepthookIntegration`</span>
-<span class="sd">    - `DedupeIntegration`</span>
-<span class="sd">    - `AtexitIntegration`</span>
-<span class="sd">    - `ModulesIntegration`</span>
-<span class="sd">    - `ArgvIntegration`</span>
+    <span class="c1"># type: () -&gt; Iterator[Type[Integration]]</span>
+    <span class="sd">&quot;&quot;&quot;Returns an iterator of the default integration classes:</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.logging</span> <span class="kn">import</span> <span class="n">LoggingIntegration</span>
-    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.stdlib</span> <span class="kn">import</span> <span class="n">StdlibIntegration</span>
-    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.excepthook</span> <span class="kn">import</span> <span class="n">ExcepthookIntegration</span>
-    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.dedupe</span> <span class="kn">import</span> <span class="n">DedupeIntegration</span>
-    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.atexit</span> <span class="kn">import</span> <span class="n">AtexitIntegration</span>
-    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.modules</span> <span class="kn">import</span> <span class="n">ModulesIntegration</span>
-    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.argv</span> <span class="kn">import</span> <span class="n">ArgvIntegration</span>
-    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations.threading</span> <span class="kn">import</span> <span class="n">ThreadingIntegration</span>
-
-    <span class="k">yield</span> <span class="n">LoggingIntegration</span>
-    <span class="k">yield</span> <span class="n">StdlibIntegration</span>
-    <span class="k">yield</span> <span class="n">ExcepthookIntegration</span>
-    <span class="k">yield</span> <span class="n">DedupeIntegration</span>
-    <span class="k">yield</span> <span class="n">AtexitIntegration</span>
-    <span class="k">yield</span> <span class="n">ModulesIntegration</span>
-    <span class="k">yield</span> <span class="n">ArgvIntegration</span>
-    <span class="k">yield</span> <span class="n">ThreadingIntegration</span>
+    <span class="kn">from</span> <span class="nn">importlib</span> <span class="kn">import</span> <span class="n">import_module</span>
+    <span class="k">for</span> <span class="n">import_string</span> <span class="ow">in</span> <span class="n">import_strings</span><span class="p">:</span>
+        <span class="n">module</span><span class="p">,</span> <span class="bp">cls</span> <span class="o">=</span> <span class="n">import_string</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">yield</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">import_module</span><span class="p">(</span><span class="n">module</span><span class="p">),</span> <span class="bp">cls</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1301,6 +1283,7 @@ unless they were already provided before.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.setup_integrations', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.setup_integrations" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">setup_integrations</span><span class="p">(</span><span class="n">integrations</span><span class="p">,</span> <span class="n">with_defaults</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+    <span class="c1"># type: (List[Integration], bool) -&gt; Dict[str, Integration]</span>
     <span class="sd">&quot;&quot;&quot;Given a list of integration instances this installs them all.  When</span>
 <span class="sd">    `with_defaults` is set to `True` then all default integrations are added</span>
 <span class="sd">    unless they were already provided before.</span>
@@ -1371,6 +1354,9 @@ saves those options on <code>self</code>.</p></div>
     <span class="n">install</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="sd">&quot;&quot;&quot;Legacy method, do not implement.&quot;&quot;&quot;</span>
 
+    <span class="n">identifier</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: str</span>
+    <span class="sd">&quot;&quot;&quot;String unique ID of integration type&quot;&quot;&quot;</span>
+
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
         <span class="sd">&quot;&quot;&quot;</span>
@@ -1397,6 +1383,17 @@ saves those options on <code>self</code>.</p></div>
           <li>builtins.object</li>
           </ul>
           <h3>Class variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.integrations.Integration.identifier" class="name">var <span class="ident">identifier</span></p>
+            
+
+            
+  
+    <div class="desc"><p>String unique ID of integration type</p></div>
+  <div class="source_cont">
+</div>
+
+            </div>
             <div class="item">
             <p id="sentry_sdk.integrations.Integration.install" class="name">var <span class="ident">install</span></p>
             
@@ -1445,59 +1442,6 @@ instance again.</p></div>
 
   </div>
   
-      </div>
-      </div>
-      
-      <div class="item">
-      <p id="sentry_sdk.integrations.IntegrationAttachment" class="name">class <span class="ident">IntegrationAttachment</span></p>
-      
-  
-    <div class="desc"><p>IntegrationAttachment(integration, client, hub)</p></div>
-  <div class="source_cont">
-</div>
-
-
-      <div class="class">
-          <h3>Ancestors (in MRO)</h3>
-          <ul class="class_list">
-          <li><a href="#sentry_sdk.integrations.IntegrationAttachment">IntegrationAttachment</a></li>
-          <li>builtins.tuple</li>
-          <li>builtins.object</li>
-          </ul>
-          <h3>Instance variables</h3>
-            <div class="item">
-            <p id="sentry_sdk.integrations.IntegrationAttachment.client" class="name">var <span class="ident">client</span></p>
-            
-
-            
-  
-    <div class="desc"><p>Alias for field number 1</p></div>
-  <div class="source_cont">
-</div>
-
-            </div>
-            <div class="item">
-            <p id="sentry_sdk.integrations.IntegrationAttachment.hub" class="name">var <span class="ident">hub</span></p>
-            
-
-            
-  
-    <div class="desc"><p>Alias for field number 2</p></div>
-  <div class="source_cont">
-</div>
-
-            </div>
-            <div class="item">
-            <p id="sentry_sdk.integrations.IntegrationAttachment.integration" class="name">var <span class="ident">integration</span></p>
-            
-
-            
-  
-    <div class="desc"><p>Alias for field number 0</p></div>
-  <div class="source_cont">
-</div>
-
-            </div>
       </div>
       </div>
 

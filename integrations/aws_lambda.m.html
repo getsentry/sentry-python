@@ -1128,13 +1128,13 @@ table {
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
-        <span class="kn">import</span> <span class="nn">__main__</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>
+        <span class="kn">import</span> <span class="nn">__main__</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>  <span class="c1"># type: ignore</span>
 
         <span class="n">pre_37</span> <span class="o">=</span> <span class="bp">True</span>  <span class="c1"># Python 3.6 or 2.7</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">lambda_bootstrap</span><span class="p">,</span> <span class="s2">&quot;handle_http_request&quot;</span><span class="p">):</span>
             <span class="k">try</span><span class="p">:</span>
-                <span class="kn">import</span> <span class="nn">bootstrap</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>
+                <span class="kn">import</span> <span class="nn">bootstrap</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>  <span class="c1"># type: ignore</span>
 
                 <span class="n">pre_37</span> <span class="o">=</span> <span class="bp">False</span>  <span class="c1"># Python 3.7</span>
             <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
@@ -1177,7 +1177,7 @@ table {
         <span class="k">else</span><span class="p">:</span>
             <span class="n">old_handle_event_request</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span>
 
-            <span class="k">def</span> <span class="nf">sentry_handle_event_request</span><span class="p">(</span>
+            <span class="k">def</span> <span class="nf">sentry_handle_event_request</span><span class="p">(</span>  <span class="c1"># type: ignore</span>
                 <span class="n">lambda_runtime_client</span><span class="p">,</span> <span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
             <span class="p">):</span>
                 <span class="n">request_handler</span> <span class="o">=</span> <span class="n">_wrap_handler</span><span class="p">(</span><span class="n">request_handler</span><span class="p">)</span>
@@ -1284,13 +1284,13 @@ saves those options on <code>self</code>.</p></div>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
-        <span class="kn">import</span> <span class="nn">__main__</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>
+        <span class="kn">import</span> <span class="nn">__main__</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>  <span class="c1"># type: ignore</span>
 
         <span class="n">pre_37</span> <span class="o">=</span> <span class="bp">True</span>  <span class="c1"># Python 3.6 or 2.7</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">lambda_bootstrap</span><span class="p">,</span> <span class="s2">&quot;handle_http_request&quot;</span><span class="p">):</span>
             <span class="k">try</span><span class="p">:</span>
-                <span class="kn">import</span> <span class="nn">bootstrap</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>
+                <span class="kn">import</span> <span class="nn">bootstrap</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>  <span class="c1"># type: ignore</span>
 
                 <span class="n">pre_37</span> <span class="o">=</span> <span class="bp">False</span>  <span class="c1"># Python 3.7</span>
             <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
@@ -1333,7 +1333,7 @@ saves those options on <code>self</code>.</p></div>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">old_handle_event_request</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span>
 
-            <span class="k">def</span> <span class="nf">sentry_handle_event_request</span><span class="p">(</span>
+            <span class="k">def</span> <span class="nf">sentry_handle_event_request</span><span class="p">(</span>  <span class="c1"># type: ignore</span>
                 <span class="n">lambda_runtime_client</span><span class="p">,</span> <span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
             <span class="p">):</span>
                 <span class="n">request_handler</span> <span class="o">=</span> <span class="n">_wrap_handler</span><span class="p">(</span><span class="n">request_handler</span><span class="p">)</span>
@@ -1414,11 +1414,11 @@ instance again.</p></div>
   <div id="source-sentry_sdk.integrations.aws_lambda.AwsLambdaIntegration.setup_once" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@staticmethod</span>
 <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
-    <span class="kn">import</span> <span class="nn">__main__</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>
+    <span class="kn">import</span> <span class="nn">__main__</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>  <span class="c1"># type: ignore</span>
     <span class="n">pre_37</span> <span class="o">=</span> <span class="bp">True</span>  <span class="c1"># Python 3.6 or 2.7</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">lambda_bootstrap</span><span class="p">,</span> <span class="s2">&quot;handle_http_request&quot;</span><span class="p">):</span>
         <span class="k">try</span><span class="p">:</span>
-            <span class="kn">import</span> <span class="nn">bootstrap</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>
+            <span class="kn">import</span> <span class="nn">bootstrap</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>  <span class="c1"># type: ignore</span>
             <span class="n">pre_37</span> <span class="o">=</span> <span class="bp">False</span>  <span class="c1"># Python 3.7</span>
         <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
             <span class="k">pass</span>
@@ -1448,7 +1448,7 @@ instance again.</p></div>
         <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">to_json</span> <span class="o">=</span> <span class="n">sentry_to_json</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">old_handle_event_request</span> <span class="o">=</span> <span class="n">lambda_bootstrap</span><span class="o">.</span><span class="n">handle_event_request</span>
-        <span class="k">def</span> <span class="nf">sentry_handle_event_request</span><span class="p">(</span>
+        <span class="k">def</span> <span class="nf">sentry_handle_event_request</span><span class="p">(</span>  <span class="c1"># type: ignore</span>
             <span class="n">lambda_runtime_client</span><span class="p">,</span> <span class="n">request_handler</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
         <span class="p">):</span>
             <span class="n">request_handler</span> <span class="o">=</span> <span class="n">_wrap_handler</span><span class="p">(</span><span class="n">request_handler</span><span class="p">)</span>
