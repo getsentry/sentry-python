@@ -51,6 +51,12 @@ def get_options(*args, **kwargs):
     if rv["dsn"] is None:
         rv["dsn"] = os.environ.get("SENTRY_DSN")
 
+    if rv["release"] is None:
+        rv["release"] = os.environ.get("SENTRY_RELEASE")
+
+    if rv["environment"] is None:
+        rv["environment"] = os.environ.get("SENTRY_ENVIRONMENT")
+
     return rv  # type: ignore
 
 
