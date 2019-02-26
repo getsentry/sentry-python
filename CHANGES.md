@@ -1,3 +1,11 @@
+## 0.7.4
+
+* Read release and environment from process environment like the Raven SDK
+  does. The keys are called `SENTRY_RELEASE` and `SENTRY_ENVIRONMENT`.
+* Fix a bug in the `serverless` integration where it would not push a new scope
+  for each function call (leaking tags and other things across calls).
+* Experimental support for type hints.
+
 ## 0.7.3
 
 * Fix crash in AIOHTTP integration when integration was set up but disabled.
