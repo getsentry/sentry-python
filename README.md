@@ -21,7 +21,8 @@ Are you coming from raven-python?
 
 To learn about internals:
 
-- [API Reference](https://getsentry.github.io/sentry-python/)
+- [API Reference (using pdoc)](https://getsentry.github.io/sentry-python/)
+- [API Reference (using sphinx)](https://www.pydoc.io/search/?package=sentry-sdk)
 
 # License
 
