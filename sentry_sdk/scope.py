@@ -86,6 +86,7 @@ class Scope(object):
     @_attr_setter
     def user(self, value):
         """When set a specific user is bound to the scope."""
+
         self._user = value
 
     def set_tag(self, key, value):
