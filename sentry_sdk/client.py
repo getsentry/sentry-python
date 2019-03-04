@@ -118,7 +118,7 @@ class Client(object):
             with capture_internal_exceptions():
                 event["threads"] = [
                     {
-                        "stacktrace": current_stacktrace(),
+                        "stacktrace": current_stacktrace(self.options["with_locals"]),
                         "crashed": False,
                         "current": True,
                     }

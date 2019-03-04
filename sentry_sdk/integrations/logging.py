@@ -158,12 +158,13 @@ class EventHandler(logging.Handler, object):
             return
 
         hint = None  # type: Optional[Dict[str, Any]]
+        client_options = hub.client.options
 
         # exc_info might be None or (None, None, None)
         if record.exc_info is not None and record.exc_info[0] is not None:
             event, hint = event_from_exception(
                 record.exc_info,
-                client_options=hub.client.options,
+                client_options=client_options,
                 mechanism={"type": "logging", "handled": True},
             )
         elif record.exc_info and record.exc_info[0] is None:
@@ -172,7 +173,7 @@ class EventHandler(logging.Handler, object):
             with capture_internal_exceptions():
                 event["threads"] = [
                     {
-                        "stacktrace": current_stacktrace(),
+                        "stacktrace": current_stacktrace(client_options["with_locals"]),
                         "crashed": False,
                         "current": True,
                     }

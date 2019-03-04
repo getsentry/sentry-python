@@ -143,6 +143,24 @@ def test_attach_stacktrace_enabled():
     assert functions[-2:] == ["foo", "bar"]
 
 
+def test_attach_stacktrace_enabled_no_locals():
+    events = []
+    hub = Hub(Client(attach_stacktrace=True, with_locals=False, transport=events.append))
+
+    def foo():
+        bar()
+
+    def bar():
+        hub.capture_message("HI")
+
+    foo()
+
+    event, = events
+    thread, = event["threads"]
+    local_vars = [x.get("vars") for x in thread["stacktrace"]["frames"]]
+    assert local_vars[-2:] == [None, None]
+
+
 def test_attach_stacktrace_disabled():
     events = []
     hub = Hub(Client(attach_stacktrace=False, transport=events.append))
