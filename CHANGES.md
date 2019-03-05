@@ -1,3 +1,9 @@
+## 0.7.5
+
+* Fix bug into Tornado integration that would send broken cookies to the server.
+* Fix a bug in the logging integration that would ignore the client
+  option `with_locals`.
+
 ## 0.7.4
 
 * Read release and environment from process environment like the Raven SDK
