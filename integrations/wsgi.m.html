@@ -1457,7 +1457,7 @@ environment.</p></div>
   <div id="source-sentry_sdk.integrations.wsgi.wsgi_decoding_dance" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">wsgi_decoding_dance</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">charset</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;replace&quot;</span><span class="p">):</span>
     <span class="c1"># type: (str, str, str) -&gt; str</span>
-    <span class="k">return</span> <span class="n">s</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;latin1&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">charset</span><span class="p">,</span> <span class="n">errors</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">s</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">charset</span><span class="p">,</span> <span class="n">errors</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1508,9 +1508,20 @@ environment.</p></div>
           <h3>Ancestors (in MRO)</h3>
           <ul class="class_list">
           <li><a href="#sentry_sdk.integrations.wsgi.SentryWsgiMiddleware">SentryWsgiMiddleware</a></li>
-          <li>builtins.object</li>
+          <li>__builtin__.object</li>
           </ul>
-          <h3>Static methods</h3>
+          <h3>Instance variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.integrations.wsgi.SentryWsgiMiddleware.app" class="name">var <span class="ident">app</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
+          <h3>Methods</h3>
             
   <div class="item">
     <div class="name def" id="sentry_sdk.integrations.wsgi.SentryWsgiMiddleware.__init__">
@@ -1520,7 +1531,6 @@ environment.</p></div>
 
     
   
-    <div class="desc"><p>Initialize self.  See help(type(self)) for accurate signature.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.wsgi.SentryWsgiMiddleware.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.wsgi.SentryWsgiMiddleware.__init__" class="source">
@@ -1534,17 +1544,6 @@ environment.</p></div>
 
   </div>
   
-          <h3>Instance variables</h3>
-            <div class="item">
-            <p id="sentry_sdk.integrations.wsgi.SentryWsgiMiddleware.app" class="name">var <span class="ident">app</span></p>
-            
-
-            
-  
-  <div class="source_cont">
-</div>
-
-            </div>
       </div>
       </div>
 

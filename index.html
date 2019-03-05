@@ -1590,7 +1590,7 @@ argument.</p></div>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
                 <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
                     <span class="p">{</span>
-                        <span class="s2">&quot;stacktrace&quot;</span><span class="p">:</span> <span class="n">current_stacktrace</span><span class="p">(),</span>
+                        <span class="s2">&quot;stacktrace&quot;</span><span class="p">:</span> <span class="n">current_stacktrace</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;with_locals&quot;</span><span class="p">]),</span>
                         <span class="s2">&quot;crashed&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
                         <span class="s2">&quot;current&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span>
                     <span class="p">}</span>
@@ -1737,9 +1737,21 @@ argument.</p></div>
           <h3>Ancestors (in MRO)</h3>
           <ul class="class_list">
           <li><a href="#sentry_sdk.Client">Client</a></li>
-          <li>builtins.object</li>
+          <li>__builtin__.object</li>
           </ul>
-          <h3>Static methods</h3>
+          <h3>Instance variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.Client.dsn" class="name">var <span class="ident">dsn</span></p>
+            
+
+            
+  
+    <div class="desc"><p>Returns the configured DSN as string.</p></div>
+  <div class="source_cont">
+</div>
+
+            </div>
+          <h3>Methods</h3>
             
   <div class="item">
     <div class="name def" id="sentry_sdk.Client.__init__">
@@ -1749,7 +1761,6 @@ argument.</p></div>
 
     
   
-    <div class="desc"><p>Initialize self.  See help(type(self)) for accurate signature.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Client.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Client.__init__" class="source">
@@ -1895,18 +1906,6 @@ integration will use this to render out a message on stderr.</p></div>
 
   </div>
   
-          <h3>Instance variables</h3>
-            <div class="item">
-            <p id="sentry_sdk.Client.dsn" class="name">var <span class="ident">dsn</span></p>
-            
-
-            
-  
-    <div class="desc"><p>Returns the configured DSN as string.</p></div>
-  <div class="source_cont">
-</div>
-
-            </div>
       </div>
       </div>
       
@@ -2047,11 +2046,26 @@ integration will use this to render out a message on stderr.</p></div>
           <ul class="class_list">
           <li><a href="#sentry_sdk.HttpTransport">HttpTransport</a></li>
           <li><a href="#sentry_sdk.Transport">Transport</a></li>
-          <li>builtins.object</li>
+          <li>__builtin__.object</li>
           </ul>
           <h3>Class variables</h3>
             <div class="item">
             <p id="sentry_sdk.HttpTransport.parsed_dsn" class="name">var <span class="ident">parsed_dsn</span></p>
+            
+    <p class="inheritance">
+     <strong>Inheritance:</strong>
+       <code><a href="#sentry_sdk.Transport">Transport</a></code>.<code><a href="#sentry_sdk.Transport.parsed_dsn">parsed_dsn</a></code>
+    </p>
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
+          <h3>Instance variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.HttpTransport.hub_cls" class="name">var <span class="ident">hub_cls</span></p>
             
 
             
@@ -2060,17 +2074,34 @@ integration will use this to render out a message on stderr.</p></div>
 </div>
 
             </div>
-          <h3>Static methods</h3>
+            <div class="item">
+            <p id="sentry_sdk.HttpTransport.options" class="name">var <span class="ident">options</span></p>
+            
+    <p class="inheritance">
+     <strong>Inheritance:</strong>
+       <code><a href="#sentry_sdk.Transport">Transport</a></code>.<code><a href="#sentry_sdk.Transport.options">options</a></code>
+    </p>
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
+          <h3>Methods</h3>
             
   <div class="item">
     <div class="name def" id="sentry_sdk.HttpTransport.__init__">
     <p>def <span class="ident">__init__</span>(</p><p>self, options)</p>
     </div>
     
+    <p class="inheritance">
+     <strong>Inheritance:</strong>
+       <code><a href="#sentry_sdk.Transport">Transport</a></code>.<code><a href="#sentry_sdk.Transport.__init__">__init__</a></code>
+    </p>
 
     
   
-    <div class="desc"><p>Initialize self.  See help(type(self)) for accurate signature.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.HttpTransport.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.HttpTransport.__init__" class="source">
@@ -2103,10 +2134,14 @@ integration will use this to render out a message on stderr.</p></div>
     <p>def <span class="ident">capture_event</span>(</p><p>self, event)</p>
     </div>
     
+    <p class="inheritance">
+     <strong>Inheritance:</strong>
+       <code><a href="#sentry_sdk.Transport">Transport</a></code>.<code><a href="#sentry_sdk.Transport.capture_event">capture_event</a></code>
+    </p>
 
     
   
-    <div class="desc"><p>This gets invoked with the event dictionary when an event should
+    <div class="desc inherited"><p>This gets invoked with the event dictionary when an event should
 be sent to sentry.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.HttpTransport.capture_event', this);">Show source &equiv;</a></p>
@@ -2133,10 +2168,14 @@ be sent to sentry.</p></div>
     <p>def <span class="ident">flush</span>(</p><p>self, timeout, callback=None)</p>
     </div>
     
+    <p class="inheritance">
+     <strong>Inheritance:</strong>
+       <code><a href="#sentry_sdk.Transport">Transport</a></code>.<code><a href="#sentry_sdk.Transport.flush">flush</a></code>
+    </p>
 
     
   
-    <div class="desc"><p>Wait <code>timeout</code> seconds for the current events to be sent out.</p></div>
+    <div class="desc inherited"><p>Wait <code>timeout</code> seconds for the current events to be sent out.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.HttpTransport.flush', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.HttpTransport.flush" class="source">
@@ -2158,10 +2197,14 @@ be sent to sentry.</p></div>
     <p>def <span class="ident">kill</span>(</p><p>self)</p>
     </div>
     
+    <p class="inheritance">
+     <strong>Inheritance:</strong>
+       <code><a href="#sentry_sdk.Transport">Transport</a></code>.<code><a href="#sentry_sdk.Transport.kill">kill</a></code>
+    </p>
 
     
   
-    <div class="desc"><p>Forcefully kills the transport.</p></div>
+    <div class="desc inherited"><p>Forcefully kills the transport.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.HttpTransport.kill', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.HttpTransport.kill" class="source">
@@ -2176,31 +2219,6 @@ be sent to sentry.</p></div>
 
   </div>
   
-          <h3>Instance variables</h3>
-            <div class="item">
-            <p id="sentry_sdk.HttpTransport.hub_cls" class="name">var <span class="ident">hub_cls</span></p>
-            
-
-            
-  
-  <div class="source_cont">
-</div>
-
-            </div>
-            <div class="item">
-            <p id="sentry_sdk.HttpTransport.options" class="name">var <span class="ident">options</span></p>
-            
-    <p class="inheritance">
-     <strong>Inheritance:</strong>
-       <code><a href="#sentry_sdk.Transport">Transport</a></code>.<code><a href="#sentry_sdk.Transport.options">options</a></code>
-    </p>
-
-            
-  
-  <div class="source_cont">
-</div>
-
-            </div>
       </div>
       </div>
       
@@ -2491,9 +2509,21 @@ context vars are available.</p>
           <h3>Ancestors (in MRO)</h3>
           <ul class="class_list">
           <li><a href="#sentry_sdk.Hub">Hub</a></li>
-          <li>builtins.object</li>
+          <li>__builtin__.object</li>
           </ul>
-          <h3>Static methods</h3>
+          <h3>Instance variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.Hub.client" class="name">var <span class="ident">client</span></p>
+            
+
+            
+  
+    <div class="desc"><p>Returns the current client on the hub.</p></div>
+  <div class="source_cont">
+</div>
+
+            </div>
+          <h3>Methods</h3>
             
   <div class="item">
     <div class="name def" id="sentry_sdk.Hub.__init__">
@@ -2503,7 +2533,6 @@ context vars are available.</p>
 
     
   
-    <div class="desc"><p>Initialize self.  See help(type(self)) for accurate signature.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.__init__" class="source">
@@ -2982,18 +3011,6 @@ can be provided that is executed in the context of the scope.</p></div>
 
   </div>
   
-          <h3>Instance variables</h3>
-            <div class="item">
-            <p id="sentry_sdk.Hub.client" class="name">var <span class="ident">client</span></p>
-            
-
-            
-  
-    <div class="desc"><p>Returns the current client on the hub.</p></div>
-  <div class="source_cont">
-</div>
-
-            </div>
       </div>
       </div>
       
@@ -3210,9 +3227,54 @@ events that belong to it.</p></div>
           <h3>Ancestors (in MRO)</h3>
           <ul class="class_list">
           <li><a href="#sentry_sdk.Scope">Scope</a></li>
-          <li>builtins.object</li>
+          <li>__builtin__.object</li>
           </ul>
-          <h3>Static methods</h3>
+          <h3>Instance variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.Scope.fingerprint" class="name">var <span class="ident">fingerprint</span></p>
+            
+
+            
+  
+    <div class="desc"><p>When set this overrides the default fingerprint.</p></div>
+  <div class="source_cont">
+</div>
+
+            </div>
+            <div class="item">
+            <p id="sentry_sdk.Scope.level" class="name">var <span class="ident">level</span></p>
+            
+
+            
+  
+    <div class="desc"><p>When set this overrides the level.</p></div>
+  <div class="source_cont">
+</div>
+
+            </div>
+            <div class="item">
+            <p id="sentry_sdk.Scope.transaction" class="name">var <span class="ident">transaction</span></p>
+            
+
+            
+  
+    <div class="desc"><p>When set this forces a specific transaction name to be set.</p></div>
+  <div class="source_cont">
+</div>
+
+            </div>
+            <div class="item">
+            <p id="sentry_sdk.Scope.user" class="name">var <span class="ident">user</span></p>
+            
+
+            
+  
+    <div class="desc"><p>When set a specific user is bound to the scope.</p></div>
+  <div class="source_cont">
+</div>
+
+            </div>
+          <h3>Methods</h3>
             
   <div class="item">
     <div class="name def" id="sentry_sdk.Scope.__init__">
@@ -3222,7 +3284,6 @@ events that belong to it.</p></div>
 
     
   
-    <div class="desc"><p>Initialize self.  See help(type(self)) for accurate signature.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Scope.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Scope.__init__" class="source">
@@ -3317,44 +3378,16 @@ invoked with the original exception info triple as second argument.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Scope.apply_to_event', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Scope.apply_to_event" class="source">
-    <div class="codehilite"><pre><span></span><span class="nd">@_disable_capture</span>
-<span class="k">def</span> <span class="nf">apply_to_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-    <span class="c1"># type: (Dict[str, Any], Dict[str, Any]) -&gt; Optional[Dict[str, Any]]</span>
-    <span class="sd">&quot;&quot;&quot;Applies the information contained on the scope to the given event.&quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">_drop</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">cause</span><span class="p">,</span> <span class="n">ty</span><span class="p">):</span>
-        <span class="c1"># type: (Dict[str, Any], Callable, str) -&gt; Optional[Any]</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">) dropped event (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">cause</span><span class="p">,</span> <span class="n">event</span><span class="p">)</span>
-        <span class="k">return</span> <span class="bp">None</span>
-    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span>
-    <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;breadcrumbs&quot;</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;user&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;user&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span>
-    <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;transaction&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;transaction&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span>
-    <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;fingerprint&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;fingerprint&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span>
-    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="p">:</span>
-        <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;extra&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">object_to_json</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="p">))</span>
-    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">:</span>
-        <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;tags&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">)</span>
-    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="p">:</span>
-        <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;contexts&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="p">)</span>
-    <span class="n">exc_info</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exc_info&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">hint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="k">else</span> <span class="bp">None</span>
-    <span class="k">if</span> <span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">processor</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span><span class="p">:</span>
-            <span class="n">new_event</span> <span class="o">=</span> <span class="n">processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">new_event</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="k">return</span> <span class="n">_drop</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">processor</span><span class="p">,</span> <span class="s2">&quot;error processor&quot;</span><span class="p">)</span>
-            <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>
-    <span class="k">for</span> <span class="n">processor</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">(</span><span class="n">global_event_processors</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span><span class="p">):</span>
-        <span class="n">new_event</span> <span class="o">=</span> <span class="n">event</span>
-        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-            <span class="n">new_event</span> <span class="o">=</span> <span class="n">processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">new_event</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">_drop</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">processor</span><span class="p">,</span> <span class="s2">&quot;event processor&quot;</span><span class="p">)</span>
-        <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>
-    <span class="k">return</span> <span class="n">event</span>
+    <div class="codehilite"><pre><span></span><span class="nd">@wraps</span><span class="p">(</span><span class="n">fn</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="c1"># type: (Any, *Dict[str, Any], **Any) -&gt; Any</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span> <span class="o">=</span> <span class="bp">False</span>
+        <span class="k">return</span> <span class="n">fn</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span> <span class="o">=</span> <span class="bp">True</span>
 </pre></div>
 
   </div>
@@ -3532,51 +3565,6 @@ invoked with the original exception info triple as second argument.</p></div>
 
   </div>
   
-          <h3>Instance variables</h3>
-            <div class="item">
-            <p id="sentry_sdk.Scope.fingerprint" class="name">var <span class="ident">fingerprint</span></p>
-            
-
-            
-  
-    <div class="desc"><p>When set this overrides the default fingerprint.</p></div>
-  <div class="source_cont">
-</div>
-
-            </div>
-            <div class="item">
-            <p id="sentry_sdk.Scope.level" class="name">var <span class="ident">level</span></p>
-            
-
-            
-  
-    <div class="desc"><p>When set this overrides the level.</p></div>
-  <div class="source_cont">
-</div>
-
-            </div>
-            <div class="item">
-            <p id="sentry_sdk.Scope.transaction" class="name">var <span class="ident">transaction</span></p>
-            
-
-            
-  
-    <div class="desc"><p>When set this forces a specific transaction name to be set.</p></div>
-  <div class="source_cont">
-</div>
-
-            </div>
-            <div class="item">
-            <p id="sentry_sdk.Scope.user" class="name">var <span class="ident">user</span></p>
-            
-
-            
-  
-    <div class="desc"><p>When set a specific user is bound to the scope.</p></div>
-  <div class="source_cont">
-</div>
-
-            </div>
       </div>
       </div>
       
@@ -3636,7 +3624,7 @@ invoked with the original exception info triple as second argument.</p></div>
           <h3>Ancestors (in MRO)</h3>
           <ul class="class_list">
           <li><a href="#sentry_sdk.Transport">Transport</a></li>
-          <li>builtins.object</li>
+          <li>__builtin__.object</li>
           </ul>
           <h3>Class variables</h3>
             <div class="item">
@@ -3649,7 +3637,18 @@ invoked with the original exception info triple as second argument.</p></div>
 </div>
 
             </div>
-          <h3>Static methods</h3>
+          <h3>Instance variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.Transport.options" class="name">var <span class="ident">options</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
+          <h3>Methods</h3>
             
   <div class="item">
     <div class="name def" id="sentry_sdk.Transport.__init__">
@@ -3659,7 +3658,6 @@ invoked with the original exception info triple as second argument.</p></div>
 
     
   
-    <div class="desc"><p>Initialize self.  See help(type(self)) for accurate signature.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Transport.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Transport.__init__" class="source">
@@ -3750,17 +3748,6 @@ be sent to sentry.</p></div>
 
   </div>
   
-          <h3>Instance variables</h3>
-            <div class="item">
-            <p id="sentry_sdk.Transport.options" class="name">var <span class="ident">options</span></p>
-            
-
-            
-  
-  <div class="source_cont">
-</div>
-
-            </div>
       </div>
       </div>
 

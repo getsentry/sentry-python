@@ -1133,9 +1133,6 @@ table {
       <p id="sentry_sdk.integrations.modules.ModulesIntegration" class="name">class <span class="ident">ModulesIntegration</span></p>
       
   
-    <div class="desc"><p>Baseclass for all integrations.</p>
-<p>To accept options for an integration, implement your own constructor that
-saves those options on <code>self</code>.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.modules.ModulesIntegration', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.modules.ModulesIntegration" class="source">
@@ -1162,7 +1159,7 @@ saves those options on <code>self</code>.</p></div>
           <ul class="class_list">
           <li><a href="#sentry_sdk.integrations.modules.ModulesIntegration">ModulesIntegration</a></li>
           <li>sentry_sdk.integrations.Integration</li>
-          <li>builtins.object</li>
+          <li>__builtin__.object</li>
           </ul>
           <h3>Class variables</h3>
             <div class="item">
@@ -1195,12 +1192,6 @@ saves those options on <code>self</code>.</p></div>
 
     
   
-    <div class="desc"><p>Initialize the integration.</p>
-<p>This function is only called once, ever. Configuration is not available
-at this point, so the only thing to do here is to hook into exception
-handlers, and perhaps do monkeypatches.</p>
-<p>Inside those hooks <code>Integration.current</code> can be used to access the
-instance again.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.modules.ModulesIntegration.setup_once', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.modules.ModulesIntegration.setup_once" class="source">
