@@ -145,7 +145,9 @@ def test_attach_stacktrace_enabled():
 
 def test_attach_stacktrace_enabled_no_locals():
     events = []
-    hub = Hub(Client(attach_stacktrace=True, with_locals=False, transport=events.append))
+    hub = Hub(
+        Client(attach_stacktrace=True, with_locals=False, transport=events.append)
+    )
 
     def foo():
         bar()
