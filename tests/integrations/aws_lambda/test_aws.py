@@ -47,13 +47,13 @@ def init_sdk(**extra_init_args):
 
 @pytest.fixture
 def lambda_client():
-    if "AWS_ACCESS_KEY_ID" not in os.environ:
+    if "SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID" not in os.environ:
         pytest.skip("AWS environ vars not set")
 
     return boto3.client(
         "lambda",
-        aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
-        aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
+        aws_access_key_id=os.environ["SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID"],
+        aws_secret_access_key=os.environ["SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY"],
         region_name="us-east-1",
     )
 
@@ -84,7 +84,7 @@ def run_lambda_function(tmpdir, lambda_client, request, assert_semaphore_accepta
         lambda_client.create_function(
             FunctionName=fn_name,
             Runtime=runtime,
-            Role=os.environ["AWS_IAM_ROLE"],
+            Role=os.environ["SENTRY_PYTHON_TEST_AWS_IAM_ROLE"],
             Handler="test_lambda.test_handler",
             Code={"ZipFile": tmpdir.join("ball.zip").read(mode="rb")},
             Description="Created as part of testsuite for getsentry/sentry-python",
