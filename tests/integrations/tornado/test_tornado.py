@@ -18,7 +18,7 @@ class CrashingHandler(RequestHandler):
 class TestBasic(AsyncHTTPTestCase):
     @pytest.fixture(autouse=True)
     def initialize(self, sentry_init, capture_events):
-        sentry_init(integrations=[TornadoIntegration()])
+        sentry_init(integrations=[TornadoIntegration()], send_default_pii=True)
         self.events = capture_events()
 
     def get_app(self):
@@ -26,7 +26,9 @@ class TestBasic(AsyncHTTPTestCase):
         return Application([(r"/hi", CrashingHandler)])
 
     def test_basic(self):
-        response = self.fetch("/hi?foo=bar")
+        response = self.fetch(
+            "/hi?foo=bar", headers={"Cookie": "name=value; name2=value2; name3=value3"}
+        )
         assert response.code == 500
 
         event, = self.events
@@ -37,7 +39,13 @@ class TestBasic(AsyncHTTPTestCase):
         host = request["headers"]["Host"]
         assert event["request"] == {
             "env": {"REMOTE_ADDR": "127.0.0.1"},
-            "headers": {"Accept-Encoding": "gzip", "Connection": "close", "Host": host},
+            "headers": {
+                "Accept-Encoding": "gzip",
+                "Connection": "close",
+                "Host": host,
+                "Cookie": "name=value; name2=value2; name3=value3",
+            },
+            "cookies": {"name": "value", "name2": "value2", "name3": "value3"},
             "method": "GET",
             "query_string": "foo=bar",
             "url": "http://{host}/hi".format(host=host),

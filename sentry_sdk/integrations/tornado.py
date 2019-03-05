@@ -165,7 +165,7 @@ class TornadoRequestExtractor(RequestExtractor):
 
     def cookies(self):
         # type: () -> Dict
-        return dict(self.request.cookies)
+        return {k: v.value for k, v in self.request.cookies.items()}
 
     def raw_data(self):
         # type: () -> bytes
