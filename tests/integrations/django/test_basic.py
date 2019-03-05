@@ -338,7 +338,6 @@ def test_template_exception(sentry_init, client, capture_events):
     filenames = [
         (f.get("function"), f.get("module")) for f in exception["stacktrace"]["frames"]
     ]
-    assert filenames[1] == (u"template_exc", u"tests.integrations.django.myapp.views")
     assert filenames[-3:] == [
         (u"parse", u"django.template.base"),
         (None, None),
