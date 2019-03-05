@@ -157,10 +157,20 @@ class DjangoIntegration(Integration):
             ):
                 frame = get_template_frame_from_exception(exc_value)
                 if frame is not None:
-                    frames = exception.setdefault("stacktrace", {}).setdefault(
-                        "frames", []
-                    )
-                    frames.append(frame)
+                    frames = exception.get("stacktrace", {}).get("frames", [])
+
+                    for i in reversed(range(len(frames))):
+                        f = frames[i]
+                        if (
+                            f.get("function") in ("parse", "render")
+                            and f.get("module") == "django.template.base"
+                        ):
+                            i += 1
+                            break
+                    else:
+                        i = len(frames)
+
+                    frames.insert(i, frame)
 
             return event
 

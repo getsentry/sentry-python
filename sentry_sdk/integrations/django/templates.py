@@ -64,6 +64,7 @@ def _get_template_frame_from_debug(debug):
         "pre_context": pre_context[-5:],
         "post_context": post_context[:5],
         "context_line": context_line,
+        "in_app": True,
     }
 
 

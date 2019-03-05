@@ -334,3 +334,13 @@ def test_template_exception(sentry_init, client, capture_events):
     assert template_frame["lineno"] == 10
     assert template_frame["in_app"]
     assert template_frame["filename"].endswith("error.html")
+
+    filenames = [
+        (f.get("function"), f.get("module")) for f in exception["stacktrace"]["frames"]
+    ]
+    assert filenames[1] == (u"template_exc", u"tests.integrations.django.myapp.views")
+    assert filenames[-3:] == [
+        (u"parse", u"django.template.base"),
+        (None, None),
+        (u"invalid_block_tag", u"django.template.base"),
+    ]
