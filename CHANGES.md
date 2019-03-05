@@ -1,3 +1,9 @@
+## 0.7.6
+
+* Fix a bug where artificial frames for Django templates would not be marked as
+  in-app and would always appear as the innermost frame. Implement a heuristic
+  to show template frame closer to `render` or `parse` invocation.
+
 ## 0.7.5
 
 * Fix bug into Tornado integration that would send broken cookies to the server.
