@@ -84,7 +84,10 @@ class RequestExtractor(object):
 
             return data
 
-        return self.json()
+        if self.is_json():
+            return self.json()
+
+        return None
 
     def is_json(self):
         # type: () -> bool
