@@ -42,7 +42,7 @@ class RequestExtractor(object):
             )
         else:
             parsed_body = self.parsed_body()
-            if parsed_body:
+            if parsed_body is not None:
                 data = parsed_body
             elif self.raw_data():
                 data = AnnotatedValue(

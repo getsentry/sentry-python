@@ -214,6 +214,28 @@ def test_flask_large_json_request(sentry_init, capture_events, app):
     assert len(event["request"]["data"]["foo"]["bar"]) == 512
 
 
+@pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
+def test_flask_empty_json_request(sentry_init, capture_events, app, data):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
+    @app.route("/", methods=["POST"])
+    def index():
+        assert request.json == data
+        assert request.data == json.dumps(data).encode("ascii")
+        assert not request.form
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.post("/", content_type="application/json", data=json.dumps(data))
+    assert response.status_code == 200
+
+    event, = events
+    assert event["request"]["data"] == data
+
+
 def test_flask_medium_formdata_request(sentry_init, capture_events, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
