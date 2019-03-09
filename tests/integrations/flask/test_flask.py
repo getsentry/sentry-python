@@ -507,3 +507,28 @@ def test_scoped_test_client(sentry_init, app):
     with app.test_client() as client:
         response = client.get("/")
         assert response.status_code == 200
+
+
+@pytest.mark.parametrize("exc_cls", [ZeroDivisionError, Exception])
+def test_errorhandler_for_exception_swallows_exception(
+    sentry_init, app, capture_events, exc_cls
+):
+    # In contrast to error handlers for a status code, error
+    # handlers for exceptions can swallow the exception (this is
+    # just how the Flask signal works)
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    events = capture_events()
+
+    @app.route("/")
+    def index():
+        1 / 0
+
+    @app.errorhandler(exc_cls)
+    def zerodivision(e):
+        return "ok"
+
+    with app.test_client() as client:
+        response = client.get("/")
+        assert response.status_code == 200
+
+    assert not events
