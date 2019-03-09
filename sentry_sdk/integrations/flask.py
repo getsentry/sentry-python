@@ -127,6 +127,12 @@ class FlaskRequestExtractor(RequestExtractor):
         # type: () -> ImmutableMultiDict
         return self.request.files
 
+    def is_json(self):
+        return self.request.is_json
+
+    def json(self):
+        return self.request.get_json()
+
     def size_of_file(self, file):
         # type: (FileStorage) -> int
         return file.content_length
