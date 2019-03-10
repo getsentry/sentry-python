@@ -141,19 +141,23 @@ class DjangoIntegration(Integration):
         @add_global_event_processor
         def process_django_templates(event, hint):
             # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-            if hint.get("exc_info", None) is None:
+            exc_info = hint.get("exc_info", None)
+
+            if exc_info is None:
                 return event
 
-            if "exception" not in event:
+            exception = event.get("exception", None)
+
+            if exception is None:
                 return event
 
-            exception = event["exception"]
+            values = exception.get("values", None)
 
-            if "values" not in exception:
+            if values is None:
                 return event
 
             for exception, (_, exc_value, _) in zip(
-                exception["values"], walk_exception_chain(hint["exc_info"])
+                values, walk_exception_chain(exc_info)
             ):
                 frame = get_template_frame_from_exception(exc_value)
                 if frame is not None:
