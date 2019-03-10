@@ -80,10 +80,10 @@ def _process_gnu_backtrace(event, hint):
             if match:
                 additional_frames.append(
                     (
-                        int(match["index"]),
+                        int(match.group("index")),
                         {
-                            "package": match["package"] or None,
-                            "function": match["function"] or None,
+                            "package": match.group("package") or None,
+                            "function": match.group("function") or None,
                         },
                     )
                 )
