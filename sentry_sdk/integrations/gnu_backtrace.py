@@ -16,16 +16,18 @@ HEXVAL_RE = r"[A-Fa-f0-9]+"
 
 
 FRAME_RE = r"""
-^(?P<index>\d+)\.\ 
-(?P<package>""" + MODULE_RE + r""")\(
-  (?P<retval>""" + TYPE_RE + r"""\ )?
-  ((?P<function>""" + TYPE_RE + r""")
+^(?P<index>\d+)\.\s
+(?P<package>{MODULE_RE})\(
+  (?P<retval>{TYPE_RE}\ )?
+  ((?P<function>{TYPE_RE})
     (?P<args>\([^)]*\))?
   )?
-  ((?P<constoffset>\ const)?\+0x(?P<offset>""" + HEXVAL_RE + r"""))?
-\)\ 
-\[0x(?P<retaddr>""" + HEXVAL_RE + r""")\]$
-"""
+  ((?P<constoffset>\ const)?\+0x(?P<offset>{HEXVAL_RE}))?
+\)\s
+\[0x(?P<retaddr>{HEXVAL_RE})\]$
+""".format(
+    MODULE_RE=MODULE_RE, HEXVAL_RE=HEXVAL_RE, TYPE_RE=TYPE_RE
+)
 
 FRAME_RE = re.compile(FRAME_RE, re.MULTILINE | re.VERBOSE)
 
@@ -46,7 +48,7 @@ def _process_gnu_backtrace(event, hint):
     if Hub.current.get_integration(GnuBacktraceIntegration) is None:
         return event
 
-    exc_info = hint.get('exc_info', None)
+    exc_info = hint.get("exc_info", None)
 
     if exc_info is None:
         return event
@@ -66,7 +68,7 @@ def _process_gnu_backtrace(event, hint):
         if not frames:
             continue
 
-        msg = exception.get('value', None)
+        msg = exception.get("value", None)
         if not msg:
             continue
 
@@ -76,13 +78,15 @@ def _process_gnu_backtrace(event, hint):
         for line in msg.splitlines():
             match = FRAME_RE.match(line)
             if match:
-                additional_frames.append((
-                    int(match['index']),
-                    {
-                        "package": match['package'] or None,
-                        "function": match["function"] or None,
-                    }
-                ))
+                additional_frames.append(
+                    (
+                        int(match["index"]),
+                        {
+                            "package": match["package"] or None,
+                            "function": match["function"] or None,
+                        },
+                    )
+                )
             elif additional_frames and line.strip():
                 # If we already started parsing a stacktrace, it must be at the
                 # end of the message and must not contain random garbage lines
@@ -98,6 +102,6 @@ def _process_gnu_backtrace(event, hint):
                 frames.append(frame)
 
             new_msg.append("<stacktrace parsed and removed by GnuBacktraceIntegration>")
-            exception['value'] = '\n'.join(new_msg)
+            exception["value"] = "\n".join(new_msg)
 
     return event
