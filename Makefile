@@ -2,6 +2,17 @@ SHELL = /bin/bash
 
 VENV_PATH = .venv
 
+help:
+	@echo "Thanks for your interest in the Sentry Python SDK!"
+	@echo
+	@echo "make lint: Run linters"
+	@echo "make test: Run basic tests (not testing most integrations)"
+	@echo "make test-all: Run ALL tests (slow, closest to CI)"
+	@echo "make format: Run code formatters (destructive)"
+	@echo
+	@echo "Also make sure to read ./CONTRIBUTING.md"
+	@false
+
 .venv:
 	virtualenv $(VENV_PATH)
 	$(VENV_PATH)/bin/pip install tox
@@ -25,7 +36,7 @@ test-all: .venv
 	@TOXPATH=$(VENV_PATH)/bin/tox sh ./scripts/runtox.sh
 .PHONY: test-all
 
-check: lint
+check: lint test
 .PHONY: check
 
 lint: .venv
