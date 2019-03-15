@@ -14,4 +14,4 @@ else
     searchstring="$1"
 fi
 
-exec $TOXPATH -p auto -e $(tox -l | grep "$searchstring" | tr '\n' ',') -- "${@:2}"
+exec $TOXPATH -p auto -e $($TOXPATH -l | grep "$searchstring" | tr '\n' ',') -- "${@:2}"

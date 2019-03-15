@@ -8,6 +8,31 @@ from tornado.web import RequestHandler, Application, HTTPError
 from tornado.testing import AsyncHTTPTestCase
 
 
+@pytest.fixture
+def tornado_testcase(request):
+    # Take the unittest class provided by tornado and manually call its setUp
+    # and tearDown.
+    #
+    # The pytest plugins for tornado seem too complicated to use, as they for
+    # some reason assume I want to write my tests in async code.
+    def inner(app):
+        class TestBogus(AsyncHTTPTestCase):
+            def get_app(self):
+                return app
+
+            def bogustest(self):
+                # We need to pass a valid test method name to the ctor, so this
+                # is the method. It does nothing.
+                pass
+
+        self = TestBogus("bogustest")
+        self.setUp()
+        request.addfinalizer(self.tearDown)
+        return self
+
+    return inner
+
+
 class CrashingHandler(RequestHandler):
     def get(self):
         with configure_scope() as scope:
@@ -15,108 +40,99 @@ class CrashingHandler(RequestHandler):
         1 / 0
 
 
-class TestBasic(AsyncHTTPTestCase):
-    @pytest.fixture(autouse=True)
-    def initialize(self, sentry_init, capture_events):
-        sentry_init(integrations=[TornadoIntegration()], send_default_pii=True)
-        self.events = capture_events()
+def test_basic(tornado_testcase, sentry_init, capture_events):
+    sentry_init(integrations=[TornadoIntegration()], send_default_pii=True)
+    events = capture_events()
+    client = tornado_testcase(Application([(r"/hi", CrashingHandler)]))
 
-    def get_app(self):
+    response = client.fetch(
+        "/hi?foo=bar", headers={"Cookie": "name=value; name2=value2; name3=value3"}
+    )
+    assert response.code == 500
 
-        return Application([(r"/hi", CrashingHandler)])
+    event, = events
+    exception, = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
 
-    def test_basic(self):
-        response = self.fetch(
-            "/hi?foo=bar", headers={"Cookie": "name=value; name2=value2; name3=value3"}
-        )
-        assert response.code == 500
+    request = event["request"]
+    host = request["headers"]["Host"]
+    assert event["request"] == {
+        "env": {"REMOTE_ADDR": "127.0.0.1"},
+        "headers": {
+            "Accept-Encoding": "gzip",
+            "Connection": "close",
+            "Host": host,
+            "Cookie": "name=value; name2=value2; name3=value3",
+        },
+        "cookies": {"name": "value", "name2": "value2", "name3": "value3"},
+        "method": "GET",
+        "query_string": "foo=bar",
+        "url": "http://{host}/hi".format(host=host),
+    }
 
-        event, = self.events
-        exception, = event["exception"]["values"]
-        assert exception["type"] == "ZeroDivisionError"
+    assert event["tags"] == {"foo": 42}
+    assert (
+        event["transaction"]
+        == "tests.integrations.tornado.test_tornado.CrashingHandler.get"
+    )
 
-        request = event["request"]
-        host = request["headers"]["Host"]
-        assert event["request"] == {
-            "env": {"REMOTE_ADDR": "127.0.0.1"},
-            "headers": {
-                "Accept-Encoding": "gzip",
-                "Connection": "close",
-                "Host": host,
-                "Cookie": "name=value; name2=value2; name3=value3",
-            },
-            "cookies": {"name": "value", "name2": "value2", "name3": "value3"},
-            "method": "GET",
-            "query_string": "foo=bar",
-            "url": "http://{host}/hi".format(host=host),
-        }
-
-        assert event["tags"] == {"foo": 42}
-        assert (
-            event["transaction"]
-            == "tests.integrations.tornado.test_tornado.CrashingHandler.get"
-        )
-
-        with configure_scope() as scope:
-            assert not scope._tags
+    with configure_scope() as scope:
+        assert not scope._tags
 
 
-class Test400NotLogged(AsyncHTTPTestCase):
-    @pytest.fixture(autouse=True)
-    def initialize(self, sentry_init, capture_events):
-        sentry_init(integrations=[TornadoIntegration()])
-        self.events = capture_events()
+def test_400_not_logged(tornado_testcase, sentry_init, capture_events):
+    sentry_init(integrations=[TornadoIntegration()])
+    events = capture_events()
 
-    def get_app(self):
-        class CrashingHandler(RequestHandler):
-            def get(self):
-                raise HTTPError(400, "Oops")
+    class CrashingHandler(RequestHandler):
+        def get(self):
+            raise HTTPError(400, "Oops")
 
-        return Application([(r"/", CrashingHandler)])
+    client = tornado_testcase(Application([(r"/", CrashingHandler)]))
 
-    def test_400_not_logged(self):
-        response = self.fetch("/")
-        assert response.code == 400
+    response = client.fetch("/")
+    assert response.code == 400
 
-        assert not self.events
+    assert not events
 
 
-class TestUserAuth(AsyncHTTPTestCase):
-    @pytest.fixture(autouse=True)
-    def initialize(self, sentry_init, capture_events):
-        sentry_init(integrations=[TornadoIntegration()], send_default_pii=True)
-        self.events = capture_events()
+def test_user_auth(tornado_testcase, sentry_init, capture_events):
+    sentry_init(integrations=[TornadoIntegration()], send_default_pii=True)
+    events = capture_events()
 
-    def get_app(self):
-        class UserHandler(RequestHandler):
-            def get(self):
-                1 / 0
+    class UserHandler(RequestHandler):
+        def get(self):
+            1 / 0
 
-            def get_current_user(self):
-                return 42
+        def get_current_user(self):
+            return 42
 
-        class NoUserHandler(RequestHandler):
-            def get(self):
-                1 / 0
+    class NoUserHandler(RequestHandler):
+        def get(self):
+            1 / 0
 
-        return Application([(r"/auth", UserHandler), (r"/noauth", NoUserHandler)])
+    client = tornado_testcase(
+        Application([(r"/auth", UserHandler), (r"/noauth", NoUserHandler)])
+    )
 
-    def test_has_user(self):
-        response = self.fetch("/auth")
-        assert response.code == 500
+    # has user
+    response = client.fetch("/auth")
+    assert response.code == 500
 
-        event, = self.events
-        exception, = event["exception"]["values"]
-        assert exception["type"] == "ZeroDivisionError"
+    event, = events
+    exception, = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
 
-        assert event["user"] == {"is_authenticated": True}
+    assert event["user"] == {"is_authenticated": True}
 
-    def test_has_no_user(self):
-        response = self.fetch("/noauth")
-        assert response.code == 500
+    events.clear()
 
-        event, = self.events
-        exception, = event["exception"]["values"]
-        assert exception["type"] == "ZeroDivisionError"
+    # has no user
+    response = client.fetch("/noauth")
+    assert response.code == 500
 
-        assert "user" not in event
+    event, = events
+    exception, = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+
+    assert "user" not in event
