@@ -1,3 +1,5 @@
+import sys
+
 import random
 import asyncio
 
@@ -156,7 +158,11 @@ def test_concurrency(sentry_init, app):
     async def runner():
         await asyncio.gather(*(task(i) for i in range(1000)))
 
-    asyncio.run(runner())
+    if sys.version_info < (3, 7):
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(runner())
+    else:
+        asyncio.run(runner())
 
     with configure_scope() as scope:
         assert not scope._tags

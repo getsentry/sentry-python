@@ -867,8 +867,12 @@ def format_and_strip(template, params, strip_string=strip_string):
         value=rv, metadata={"len": rv_original_length, "rem": rv_remarks}
     )
 
-
 try:
+    if not PY2 and sys.version_info < (3, 7):
+        try:
+            import aiocontextvars
+        except ImportError:
+            pass
     from contextvars import ContextVar  # type: ignore
 except ImportError:
     from threading import local

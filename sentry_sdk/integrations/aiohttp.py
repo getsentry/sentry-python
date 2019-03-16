@@ -27,12 +27,11 @@ class AioHttpIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        if sys.version_info < (3, 7):
+        if sys.version_info < (3, 7) and 'aiocontextvars' not in sys.modules:
             # We better have contextvars or we're going to leak state between
             # requests.
-            raise RuntimeError(
-                "The aiohttp integration for Sentry requires Python 3.7+"
-            )
+            raise RuntimeError("The aiohttp integration for Sentry requires Python 3.7+ "
+                               " or aiocontextvars package")
 
         ignore_logger("aiohttp.server")
 
