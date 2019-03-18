@@ -16,16 +16,20 @@ if not os.path.isfile(SEMAPHORE):
 
 @pytest.fixture(autouse=True)
 def reraise_internal_exceptions(request, monkeypatch):
+    errors = []
     if "tests_internal_exceptions" in request.keywords:
         return
 
-    def _capture_internal_exception(exc_info):
-        reraise(*exc_info)
+    def _capture_internal_exception(self, exc_info):
+        errors.append(exc_info)
+
+    @request.addfinalizer
+    def _():
+        for e in errors:
+            reraise(*e)
 
     monkeypatch.setattr(
-        sentry_sdk.Hub.current,
-        "_capture_internal_exception",
-        _capture_internal_exception,
+        sentry_sdk.Hub, "_capture_internal_exception", _capture_internal_exception
     )
 
 

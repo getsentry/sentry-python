@@ -1,8 +1,12 @@
 #!/bin/bash
 set -e
 
-if [ -z "$TOXPATH" ]; then
+if [ -n "$TOXPATH" ]; then
+    true
+elif which tox &> /dev/null; then
     TOXPATH=tox
+else
+    TOXPATH=./.venv/bin/tox
 fi
 
 # Usage: sh scripts/runtox.sh py3.7 <pytest-args>
