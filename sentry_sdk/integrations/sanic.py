@@ -7,7 +7,7 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    CONTEXTVARS_BACKPORT_ENABLED,
+    HAS_REAL_CONTEXTVARS,
 )
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
@@ -38,7 +38,7 @@ class SanicIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        if sys.version_info < (3, 7) and not CONTEXTVARS_BACKPORT_ENABLED:
+        if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between
             # requests.
             raise RuntimeError("The sanic integration for Sentry requires Python 3.7+ "

@@ -9,7 +9,7 @@ from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    CONTEXTVARS_BACKPORT_ENABLED,
+    HAS_REAL_CONTEXTVARS,
 )
 
 from aiohttp.web import Application, HTTPException  # type: ignore
@@ -30,7 +30,7 @@ class AioHttpIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        if sys.version_info < (3, 7) and not CONTEXTVARS_BACKPORT_ENABLED:
+        if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between
             # requests.
             raise RuntimeError("The aiohttp integration for Sentry requires Python 3.7+ "
