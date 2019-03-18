@@ -43,9 +43,6 @@ def test_basic(sentry_init, capture_events):
         capture_exception()
 
     event, = events
-    import pdb
-
-    pdb.set_trace()
     exception, = event["exception"]["values"]
 
     assert exception["value"] == (
