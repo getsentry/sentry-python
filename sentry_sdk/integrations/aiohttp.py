@@ -12,6 +12,7 @@ from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
 )
 
+import asyncio
 from aiohttp.web import Application, HTTPException  # type: ignore
 
 if False:
@@ -65,7 +66,10 @@ class AioHttpIntegration(Integration):
 
                     return response
 
-            return await inner()
+            # Explicitly wrap in task such that current contextvar context is
+            # copied. Just doing `return await inner()` will leak scope data
+            # between requests.
+            return await asyncio.get_event_loop().create_task(inner())
 
         Application._handle = sentry_app_handle
 
