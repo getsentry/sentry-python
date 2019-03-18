@@ -1,7 +1,8 @@
+import json
+
 import pytest
 
 from sentry_sdk import configure_scope
-
 from sentry_sdk.integrations.tornado import TornadoIntegration
 
 from tornado.web import RequestHandler, Application, HTTPError
@@ -136,3 +137,54 @@ def test_user_auth(tornado_testcase, sentry_init, capture_events):
     assert exception["type"] == "ZeroDivisionError"
 
     assert "user" not in event
+
+
+def test_formdata(tornado_testcase, sentry_init, capture_events):
+    sentry_init(integrations=[TornadoIntegration()], send_default_pii=True)
+    events = capture_events()
+
+    class FormdataHandler(RequestHandler):
+        def post(self):
+            raise ValueError(json.dumps(sorted(self.request.body_arguments)))
+
+    client = tornado_testcase(Application([(r"/form", FormdataHandler)]))
+
+    response = client.fetch(
+        "/form?queryarg=1",
+        method="POST",
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        body=b"field1=value1&field2=value2",
+    )
+
+    event, = events
+    exception, = event["exception"]["values"]
+    assert exception["value"] == '["field1", "field2"]'
+    assert event["request"]["data"] == {"field1": ["value1"], "field2": ["value2"]}
+
+
+def test_json(tornado_testcase, sentry_init, capture_events):
+    sentry_init(integrations=[TornadoIntegration()], send_default_pii=True)
+    events = capture_events()
+
+    class FormdataHandler(RequestHandler):
+        def post(self):
+            raise ValueError(json.dumps(sorted(self.request.body_arguments)))
+
+    client = tornado_testcase(Application([(r"/form", FormdataHandler)]))
+
+    response = client.fetch(
+        "/form?queryarg=1",
+        method="POST",
+        headers={"Content-Type": "application/json"},
+        body=b"""
+        {"foo": {"bar": 42}}
+        """,
+    )
+
+    assert response.code == 500
+
+    event, = events
+    exception, = event["exception"]["values"]
+    assert exception["value"] == "[]"
+    assert event
+    assert event["request"]["data"] == {"foo": {"bar": 42}}

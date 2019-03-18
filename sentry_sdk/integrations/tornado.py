@@ -173,8 +173,10 @@ class TornadoRequestExtractor(RequestExtractor):
 
     def form(self):
         # type: () -> Optional[Any]
-        # TODO: Where to get formdata and nothing else?
-        return None
+        return {
+            k: [v.decode("latin1", "replace") for v in vs]
+            for k, vs in self.request.body_arguments.items()
+        }
 
     def is_json(self):
         # type: () -> bool
