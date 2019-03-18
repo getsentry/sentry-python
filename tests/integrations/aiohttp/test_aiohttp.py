@@ -28,7 +28,7 @@ async def test_basic(sentry_init, aiohttp_client, loop, capture_events):
     assert request["env"] == {"REMOTE_ADDR": "127.0.0.1"}
     assert request["method"] == "GET"
     assert request["query_string"] == ""
-    assert request["url"] == f"http://{host}/"
+    assert request["url"] == "http://{host}/".format(host=host)
     assert request["headers"] == {
         "Accept": "*/*",
         "Accept-Encoding": "gzip, deflate",

@@ -142,7 +142,7 @@ def test_concurrency(sentry_init, app):
 
         await app.handle_request(
             request.Request(
-                url_bytes=f"http://localhost/context-check/{i}".encode("ascii"),
+                url_bytes="http://localhost/context-check/{i}".format(i=i).encode("ascii"),
                 headers={},
                 version="1.1",
                 method="GET",
@@ -159,7 +159,8 @@ def test_concurrency(sentry_init, app):
         await asyncio.gather(*(task(i) for i in range(1000)))
 
     if sys.version_info < (3, 7):
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         loop.run_until_complete(runner())
     else:
         asyncio.run(runner())
