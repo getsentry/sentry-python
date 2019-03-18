@@ -142,7 +142,9 @@ def test_concurrency(sentry_init, app):
 
         await app.handle_request(
             request.Request(
-                url_bytes="http://localhost/context-check/{i}".format(i=i).encode("ascii"),
+                url_bytes="http://localhost/context-check/{i}".format(i=i).encode(
+                    "ascii"
+                ),
                 headers={},
                 version="1.1",
                 method="GET",

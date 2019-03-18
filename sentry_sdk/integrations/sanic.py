@@ -41,8 +41,10 @@ class SanicIntegration(Integration):
         if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between
             # requests.
-            raise RuntimeError("The sanic integration for Sentry requires Python 3.7+ "
-                               " or aiocontextvars package")
+            raise RuntimeError(
+                "The sanic integration for Sentry requires Python 3.7+ "
+                " or aiocontextvars package"
+            )
 
         # Sanic 0.8 and older creates a logger named "root" and puts a
         # stringified version of every exception in there (without exc_info),

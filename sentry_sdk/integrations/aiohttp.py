@@ -33,8 +33,10 @@ class AioHttpIntegration(Integration):
         if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between
             # requests.
-            raise RuntimeError("The aiohttp integration for Sentry requires Python 3.7+ "
-                               " or aiocontextvars package")
+            raise RuntimeError(
+                "The aiohttp integration for Sentry requires Python 3.7+ "
+                " or aiocontextvars package"
+            )
 
         ignore_logger("aiohttp.server")
 
