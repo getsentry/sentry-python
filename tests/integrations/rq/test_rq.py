@@ -40,22 +40,10 @@ def test_basic(sentry_init, capture_events):
     }
 
 
-def test_transport_shutdown(sentry_init):
+def test_transport_shutdown(sentry_init, capture_events_forksafe):
     sentry_init(integrations=[RqIntegration()])
 
-    events_r, events_w = os.pipe()
-    events_r = os.fdopen(events_r, "rb", 0)
-    events_w = os.fdopen(events_w, "wb", 0)
-
-    def capture_event(event):
-        events_w.write(json.dumps(event).encode("utf-8"))
-        events_w.write(b"\n")
-
-    def flush(timeout=None, callback=None):
-        events_w.write(b"flush\n")
-
-    Hub.current.client.transport.capture_event = capture_event
-    Hub.current.client.flush = flush
+    events = capture_events_forksafe()
 
     queue = rq.Queue(connection=FakeStrictRedis())
     worker = rq.Worker([queue], connection=queue.connection)
@@ -63,9 +51,9 @@ def test_transport_shutdown(sentry_init):
     queue.enqueue(crashing_job, foo=42)
     worker.work(burst=True)
 
-    event = events_r.readline()
-    event = json.loads(event.decode("utf-8"))
+    event = events.read_event()
+    events.read_flush()
+
     exception, = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
 
-    assert events_r.readline() == b"flush\n"
