@@ -156,6 +156,8 @@ def test_formdata(tornado_testcase, sentry_init, capture_events):
         body=b"field1=value1&field2=value2",
     )
 
+    assert response.code == 500
+
     event, = events
     exception, = event["exception"]["values"]
     assert exception["value"] == '["field1", "field2"]'
