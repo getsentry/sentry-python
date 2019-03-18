@@ -43,6 +43,9 @@ def test_basic(sentry_init, capture_events):
         capture_exception()
 
     event, = events
+    import pdb
+
+    pdb.set_trace()
     exception, = event["exception"]["values"]
 
     assert exception["value"] == (
@@ -57,114 +60,140 @@ def test_basic(sentry_init, capture_events):
             "function": "clone",
             "in_app": True,
             "package": "/lib/x86_64-linux-gnu/libc.so.6",
+            "platform": "native",
         },
-        {"in_app": True, "package": "/lib/x86_64-linux-gnu/libpthread.so.0"},
-        {"in_app": True, "package": "clickhouse-server"},
+        {
+            "in_app": True,
+            "package": "/lib/x86_64-linux-gnu/libpthread.so.0",
+            "platform": "native",
+        },
+        {"in_app": True, "package": "clickhouse-server", "platform": "native"},
         {
             "function": "Poco::ThreadImpl::runnableEntry",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "Poco::PooledThread::run",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "Poco::Net::TCPServerDispatcher::run",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "Poco::Net::TCPServerConnection::start",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "DB::TCPHandler::run",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "DB::TCPHandler::runImpl",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "DB::executeQuery",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
-        {"in_app": True, "package": "clickhouse-server"},
+        {"in_app": True, "package": "clickhouse-server", "platform": "native"},
         {
             "function": "DB::InterpreterFactory::get",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "DB::InterpreterSelectWithUnionQuery::InterpreterSelectWithUnionQuery",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "DB::InterpreterSelectQuery::InterpreterSelectQuery",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "DB::InterpreterSelectQuery::InterpreterSelectQuery",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "DB::InterpreterSelectQuery::executeImpl",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
-        {"in_app": True, "package": "clickhouse-server"},
+        {"in_app": True, "package": "clickhouse-server", "platform": "native"},
         {
             "function": "DB::FilterBlockInputStream::FilterBlockInputStream",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "DB::ExpressionActions::execute",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "DB::ExpressionAction::execute",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "DB::PreparedFunctionImpl::execute",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "DB::NameNotEquals>::executeImpl",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "DB::NameNotEquals>::executeDateOrDateTimeOrEnumOrUUIDWithConstString",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "DB::readDateTimeTextFallback<void>",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "DB::Exception::Exception",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
         {
             "function": "StackTrace::StackTrace",
             "in_app": True,
             "package": "clickhouse-server",
+            "platform": "native",
         },
     ]

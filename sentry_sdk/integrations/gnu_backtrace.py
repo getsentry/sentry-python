@@ -84,6 +84,7 @@ def _process_gnu_backtrace(event, hint):
                         {
                             "package": match.group("package") or None,
                             "function": match.group("function") or None,
+                            "platform": "native",
                         },
                     )
                 )
