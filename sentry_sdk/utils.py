@@ -874,7 +874,7 @@ try:
     from contextvars import ContextVar  # type: ignore
 
     if not PY2 and sys.version_info < (3, 7):
-        import aiocontextvars  # noqa
+        import aiocontextvars  # type: ignore # noqa
 except ImportError:
     HAS_REAL_CONTEXTVARS = False
 
