@@ -4,6 +4,7 @@ from inspect import iscoroutinefunction
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import (
+    HAS_REAL_CONTEXTVARS,
     event_from_exception,
     capture_internal_exceptions,
     transaction_from_function,
@@ -39,11 +40,11 @@ class TornadoIntegration(Integration):
         if tornado_version is None or tornado_version < (5, 0):
             raise RuntimeError("Tornado 5+ required")
 
-        if sys.version_info < (3, 7):
+        if not HAS_REAL_CONTEXTVARS:
             # Tornado is async. We better have contextvars or we're going to leak
             # state between requests.
             raise RuntimeError(
-                "The tornado integration for Sentry requires Python 3.7+"
+                "The tornado integration for Sentry requires Python 3.6+ or the aiocontextvars package"
             )
 
         ignore_logger("tornado.application")
