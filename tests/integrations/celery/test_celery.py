@@ -25,7 +25,10 @@ def init_celery(sentry_init):
     def inner():
         sentry_init(integrations=[CeleryIntegration()])
         celery = Celery(__name__)
-        celery.conf.task_always_eager = True
+        if VERSION < (4,):
+            celery.conf.CELERY_ALWAYS_EAGER = True
+        else:
+            celery.conf.task_always_eager = True
         return celery
 
     return inner
@@ -144,13 +147,15 @@ def test_retry(celery, capture_events):
         assert e["type"] == "ZeroDivisionError"
 
 
+@pytest.mark.skipif(VERSION < (4,), reason="in-memory backend broken")
 def test_transport_shutdown(request, celery, capture_events_forksafe, tmpdir):
     events = capture_events_forksafe()
 
     celery.conf.worker_max_tasks_per_child = 1
     celery.conf.broker_url = "memory://localhost/"
-    celery.conf.task_always_eager = False
+    celery.conf.broker_backend = "memory"
     celery.conf.result_backend = "file://{}".format(tmpdir.mkdir("celery-results"))
+    celery.conf.task_always_eager = False
 
     runs = []
 
@@ -166,13 +171,15 @@ def test_transport_shutdown(request, celery, capture_events_forksafe, tmpdir):
     t.daemon = True
     t.start()
 
-    with pytest.raises(ZeroDivisionError):
+    with pytest.raises(Exception):
+        # Celery 4.1 raises a gibberish exception
         res.wait()
-
-    assert not runs
 
     event = events.read_event()
     exception, = event['exception']['values']
     assert exception['type'] == 'ZeroDivisionError'
 
     events.read_flush()
+
+    # if this is nonempty, the worker never really forked
+    assert not runs
