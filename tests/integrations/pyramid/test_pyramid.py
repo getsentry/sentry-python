@@ -13,7 +13,7 @@ from pyramid.response import Response
 
 from werkzeug.test import Client
 
-from sentry_sdk import capture_message
+from sentry_sdk import capture_message, add_breadcrumb
 from sentry_sdk.integrations.pyramid import PyramidIntegration
 
 
@@ -61,8 +61,11 @@ def test_view_exceptions(
     events = capture_events()
     exceptions = capture_exceptions()
 
+    add_breadcrumb({"message": "hi"})
+
     @route("/errors")
     def errors(request):
+        add_breadcrumb({"message": "hi2"})
         1 / 0
 
     client = get_client()
@@ -73,6 +76,8 @@ def test_view_exceptions(
     assert isinstance(error, ZeroDivisionError)
 
     event, = events
+    breadcrumb, = event["breadcrumbs"]
+    assert breadcrumb["message"] == "hi2"
     assert event["exception"]["values"][0]["mechanism"]["type"] == "pyramid"
 
 

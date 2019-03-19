@@ -38,6 +38,7 @@ class RqIntegration(Integration):
                 return old_perform_job(self, job, *args, **kwargs)
 
             with hub.push_scope() as scope:
+                scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
                 rv = old_perform_job(self, job, *args, **kwargs)
 

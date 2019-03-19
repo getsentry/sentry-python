@@ -49,6 +49,7 @@ def _wrap_tracer(task, f):
 
         with hub.push_scope() as scope:
             scope._name = "celery"
+            scope.clear_breadcrumbs()
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
             return f(*args, **kwargs)
