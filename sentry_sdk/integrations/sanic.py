@@ -4,7 +4,11 @@ from inspect import isawaitable
 
 from sentry_sdk._compat import urlparse, reraise
 from sentry_sdk.hub import Hub
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+    HAS_REAL_CONTEXTVARS,
+)
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
@@ -34,10 +38,13 @@ class SanicIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        if sys.version_info < (3, 7):
-            # Sanic is async. We better have contextvars or we're going to leak
-            # state between requests.
-            raise RuntimeError("The sanic integration for Sentry requires Python 3.7+")
+        if not HAS_REAL_CONTEXTVARS:
+            # We better have contextvars or we're going to leak state between
+            # requests.
+            raise RuntimeError(
+                "The sanic integration for Sentry requires Python 3.7+ "
+                " or aiocontextvars package"
+            )
 
         # Sanic 0.8 and older creates a logger named "root" and puts a
         # stringified version of every exception in there (without exc_info),

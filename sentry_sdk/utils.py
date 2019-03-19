@@ -868,9 +868,16 @@ def format_and_strip(template, params, strip_string=strip_string):
     )
 
 
+HAS_REAL_CONTEXTVARS = True
+
 try:
     from contextvars import ContextVar  # type: ignore
+
+    if not PY2 and sys.version_info < (3, 7):
+        import aiocontextvars  # type: ignore # noqa
 except ImportError:
+    HAS_REAL_CONTEXTVARS = False
+
     from threading import local
 
     class ContextVar(object):  # type: ignore
