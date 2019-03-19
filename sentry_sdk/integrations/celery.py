@@ -122,7 +122,7 @@ def _capture_exception(task, exc_info):
 def _patch_worker_exit():
     # Need to flush queue before worker shutdown because a crashing worker will
     # call os._exit
-    from billiard.pool import Worker
+    from billiard.pool import Worker  # type: ignore
 
     old_workloop = Worker.workloop
 
@@ -134,6 +134,5 @@ def _patch_worker_exit():
                 hub = Hub.current
                 if hub.get_integration(CeleryIntegration) is not None:
                     hub.flush()
-
 
     Worker.workloop = sentry_workloop

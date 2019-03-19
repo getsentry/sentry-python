@@ -1,12 +1,7 @@
 from sentry_sdk.integrations.rq import RqIntegration
 
-import os
-import json
-
 from fakeredis import FakeStrictRedis
 import rq
-
-from sentry_sdk import Hub
 
 
 def crashing_job(foo):
@@ -56,4 +51,3 @@ def test_transport_shutdown(sentry_init, capture_events_forksafe):
 
     exception, = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
-

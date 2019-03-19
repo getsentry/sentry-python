@@ -128,21 +128,24 @@ def capture_events_forksafe(monkeypatch):
         events_w = os.fdopen(events_w, "wb", 0)
 
         test_client = sentry_sdk.Hub.current.client
+
         old_capture_event = test_client.transport.capture_event
 
         def append(event):
             events_w.write(json.dumps(event).encode("utf-8"))
             events_w.write(b"\n")
+            return old_capture_event(event)
 
         def flush(timeout=None, callback=None):
             events_w.write(b"flush\n")
 
         monkeypatch.setattr(test_client.transport, "capture_event", append)
-        monkeypatch.setattr(test_client, 'flush', flush)
+        monkeypatch.setattr(test_client, "flush", flush)
 
         return EventStreamReader(events_r)
 
     return inner
+
 
 class EventStreamReader(object):
     def __init__(self, file):
@@ -152,4 +155,4 @@ class EventStreamReader(object):
         return json.loads(self.file.readline().decode("utf-8"))
 
     def read_flush(self):
-        assert self.file.readline() == b'flush\n'
+        assert self.file.readline() == b"flush\n"

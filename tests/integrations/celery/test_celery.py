@@ -176,8 +176,8 @@ def test_transport_shutdown(request, celery, capture_events_forksafe, tmpdir):
         res.wait()
 
     event = events.read_event()
-    exception, = event['exception']['values']
-    assert exception['type'] == 'ZeroDivisionError'
+    exception, = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
 
     events.read_flush()
 
