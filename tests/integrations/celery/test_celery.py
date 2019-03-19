@@ -1,3 +1,5 @@
+import threading
+
 import pytest
 
 pytest.importorskip("celery")
@@ -6,6 +8,7 @@ from sentry_sdk import Hub
 from sentry_sdk.integrations.celery import CeleryIntegration
 
 from celery import Celery, VERSION
+from celery.bin import worker
 
 
 @pytest.fixture
@@ -22,7 +25,10 @@ def init_celery(sentry_init):
     def inner():
         sentry_init(integrations=[CeleryIntegration()])
         celery = Celery(__name__)
-        celery.conf.CELERY_ALWAYS_EAGER = True
+        if VERSION < (4,):
+            celery.conf.CELERY_ALWAYS_EAGER = True
+        else:
+            celery.conf.task_always_eager = True
         return celery
 
     return inner
@@ -92,11 +98,11 @@ def test_broken_prerun(init_celery, connect_signal):
         stack_lengths.append(len(Hub.current._stack))
         return x / y
 
-    try:
+    if VERSION >= (4,):
         dummy_task.delay(2, 2)
-    except ZeroDivisionError:
-        if VERSION >= (4,):
-            raise
+    else:
+        with pytest.raises(ZeroDivisionError):
+            dummy_task.delay(2, 2)
 
     assert len(Hub.current._stack) == 1
     if VERSION < (4,):
@@ -139,3 +145,41 @@ def test_retry(celery, capture_events):
 
     for e in exceptions:
         assert e["type"] == "ZeroDivisionError"
+
+
+@pytest.mark.skipif(VERSION < (4,), reason="in-memory backend broken")
+def test_transport_shutdown(request, celery, capture_events_forksafe, tmpdir):
+    events = capture_events_forksafe()
+
+    celery.conf.worker_max_tasks_per_child = 1
+    celery.conf.broker_url = "memory://localhost/"
+    celery.conf.broker_backend = "memory"
+    celery.conf.result_backend = "file://{}".format(tmpdir.mkdir("celery-results"))
+    celery.conf.task_always_eager = False
+
+    runs = []
+
+    @celery.task(name="dummy_task", bind=True)
+    def dummy_task(self):
+        runs.append(1)
+        1 / 0
+
+    res = dummy_task.delay()
+
+    w = worker.worker(app=celery)
+    t = threading.Thread(target=w.run)
+    t.daemon = True
+    t.start()
+
+    with pytest.raises(Exception):
+        # Celery 4.1 raises a gibberish exception
+        res.wait()
+
+    event = events.read_event()
+    exception, = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+
+    events.read_flush()
+
+    # if this is nonempty, the worker never really forked
+    assert not runs
