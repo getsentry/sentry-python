@@ -67,6 +67,7 @@ class TornadoIntegration(Integration):
 
                 with Hub(hub) as hub:
                     with hub.configure_scope() as scope:
+                        scope.clear_breadcrumbs()
                         scope.add_event_processor(_make_event_processor(weak_handler))
                     return await old_execute(self, *args, **kwargs)
 

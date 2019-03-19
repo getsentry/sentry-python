@@ -58,6 +58,7 @@ class SanicIntegration(Integration):
 
             with Hub(hub) as hub:
                 with hub.configure_scope() as scope:
+                    scope.clear_breadcrumbs()
                     scope.add_event_processor(_make_request_processor(weak_request))
 
                 response = old_handle_request(self, request, *args, **kwargs)

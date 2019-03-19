@@ -124,9 +124,13 @@ class Scope(object):
         self._contexts = {}  # type: Dict[str, Dict]
         self._extras = {}  # type: Dict[str, Any]
 
-        self._breadcrumbs = deque()  # type: Deque[Dict]
-
+        self.clear_breadcrumbs()
         self._should_capture = True
+
+    def clear_breadcrumbs(self):
+        # type: () -> None
+        """Clears breadcrumb buffer."""
+        self._breadcrumbs = deque()
 
     def add_event_processor(self, func):
         # type: (Callable) -> None

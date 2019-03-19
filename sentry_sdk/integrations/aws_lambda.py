@@ -21,6 +21,7 @@ def _wrap_handler(handler):
 
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
+                scope.clear_breadcrumbs()
                 scope.transaction = context.function_name
                 scope.add_event_processor(_make_request_event_processor(event, context))
 
