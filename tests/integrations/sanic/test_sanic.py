@@ -112,7 +112,7 @@ def test_error_in_errorhandler(sentry_init, app, capture_events):
         for frame in exception["stacktrace"]["frames"]
     )
 
-    exception, = event2["exception"]["values"]
+    exception = event2["exception"]["values"][0]
     assert exception["type"] == "ZeroDivisionError"
     assert any(
         frame["filename"].endswith("test_sanic.py")

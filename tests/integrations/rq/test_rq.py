@@ -51,11 +51,11 @@ def test_transport_shutdown(sentry_init):
         events_w.write(json.dumps(event).encode("utf-8"))
         events_w.write(b"\n")
 
-    def shutdown(timeout, callback=None):
-        events_w.write(b"shutdown\n")
+    def flush(timeout=None, callback=None):
+        events_w.write(b"flush\n")
 
     Hub.current.client.transport.capture_event = capture_event
-    Hub.current.client.transport.shutdown = shutdown
+    Hub.current.client.flush = flush
 
     queue = rq.Queue(connection=FakeStrictRedis())
     worker = rq.Worker([queue], connection=queue.connection)
@@ -64,9 +64,8 @@ def test_transport_shutdown(sentry_init):
     worker.work(burst=True)
 
     event = events_r.readline()
-    shutdown = events_r.readline()
     event = json.loads(event.decode("utf-8"))
-    assert shutdown == b"shutdown\n"
-
     exception, = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
+
+    assert events_r.readline() == b"flush\n"

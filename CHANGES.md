@@ -1,3 +1,91 @@
+## 0.7.6
+
+* Fix a bug where artificial frames for Django templates would not be marked as
+  in-app and would always appear as the innermost frame. Implement a heuristic
+  to show template frame closer to `render` or `parse` invocation.
+
+## 0.7.5
+
+* Fix bug into Tornado integration that would send broken cookies to the server.
+* Fix a bug in the logging integration that would ignore the client
+  option `with_locals`.
+
+## 0.7.4
+
+* Read release and environment from process environment like the Raven SDK
+  does. The keys are called `SENTRY_RELEASE` and `SENTRY_ENVIRONMENT`.
+* Fix a bug in the `serverless` integration where it would not push a new scope
+  for each function call (leaking tags and other things across calls).
+* Experimental support for type hints.
+
+## 0.7.3
+
+* Fix crash in AIOHTTP integration when integration was set up but disabled.
+* Flask integration now adds usernames, email addresses based on the protocol
+  Flask-User defines on top of Flask-Login.
+* New threading integration catches exceptions from crashing threads.
+* New method `flush` on hubs and clients. New global `flush` function.
+* Add decorator for serverless functions to fix common problems in those
+  environments.
+* Fix a bug in the logging integration where using explicit handlers required
+  enabling the integration.
+
+## 0.7.2
+
+* Fix `celery.exceptions.Retry` spamming in Celery integration.
+
+## 0.7.1
+
+* Fix `UnboundLocalError` crash in Celery integration.
+
+## 0.7.0
+
+* Properly display chained exceptions (PEP-3134).
+* Rewrite celery integration to monkeypatch instead of using signals due to
+  bugs in Celery 3's signal handling. The Celery scope is also now available in
+  prerun and postrun signals.
+* Fix Tornado integration to work with Tornado 6.
+* Do not evaluate Django `QuerySet` when trying to capture local variables.
+  Also an internal hook was added to overwrite `repr` for local vars.
+
+## 0.6.9
+
+* Second attempt at fixing the bug that was supposed to be fixed in 0.6.8.
+
+  > No longer access arbitrary sequences in local vars due to possible side effects.
+
+## 0.6.8
+
+* No longer access arbitrary sequences in local vars due to possible side effects.
+
+## 0.6.7
+
+* Sourcecode Django templates is now displayed in stackframes like Jinja templates in Flask already were.
+* Updates to AWS Lambda integration for changes Amazon did to their Python 3.7 runtime.
+* Fix a bug in the AIOHTTP integration that would report 300s and other HTTP status codes as errors.
+* Fix a bug where a crashing `before_send` would crash the SDK and app.
+* Fix a bug where cyclic references in e.g. local variables or `extra` data would crash the SDK.
+
+## 0.6.6
+
+* Un-break API of internal `Auth` object that we use in Sentry itself.
+
+## 0.6.5
+
+* Capture WSGI request data eagerly to save memory and avoid issues with uWSGI.
+* Ability to use subpaths in DSN.
+* Ignore `django.request` logger.
+
+## 0.6.4
+
+* Fix bug that would lead to an `AssertionError: stack must have at least one layer`, at least in testsuites for Flask apps.
+
+## 0.6.3
+
+* New integration for Tornado
+* Fix request data in Django, Flask and other WSGI frameworks leaking between events.
+* Fix infinite recursion when sending more events in `before_send`.
+
 ## 0.6.2
 
 * Fix crash in AWS Lambda integration when using Zappa. This only silences the error, the underlying bug is still in Zappa.

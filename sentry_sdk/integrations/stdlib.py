@@ -3,7 +3,7 @@ from sentry_sdk.integrations import Integration
 
 
 try:
-    from httplib import HTTPConnection
+    from httplib import HTTPConnection  # type: ignore
 except ImportError:
     from http.client import HTTPConnection
 
@@ -13,10 +13,12 @@ class StdlibIntegration(Integration):
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         install_httplib()
 
 
 def install_httplib():
+    # type: () -> None
     real_putrequest = HTTPConnection.putrequest
     real_getresponse = HTTPConnection.getresponse
 

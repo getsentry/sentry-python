@@ -1,5 +1,4 @@
 language: python
-sudo: false
 
 python:
   - "2.7"
@@ -21,10 +20,8 @@ matrix:
   include:
     - python: "3.7"
       dist: xenial
-      sudo: true
     - python: "3.8-dev"
       dist: xenial
-      sudo: true
 
     - name: Linting
       python: "3.6"
@@ -45,12 +42,11 @@ matrix:
       name: OS X Python 2.7
       language: generic
       before_install:
-        - brew install python@2
+        - HOMEBREW_LOGS=/tmp HOMEBREW_NO_AUTO_UPDATE=yes brew install python@2
         - python2 -m pip install --user virtualenv
         - /Users/travis/Library/Python/2.7/bin/virtualenv $HOME/osx-py
         - source $HOME/osx-py/bin/activate
         - export TRAVIS_PYTHON_VERSION=2.7
-
 
 install:
   - pip install tox
@@ -59,8 +55,8 @@ install:
 
 script:
   - coverage erase
-  - ./scripts/runtox.sh '' --cov=sentry_sdk --cov-append --cov-report= --cov-branch
-  - codecov
+  - ./scripts/runtox.sh '' --cov=sentry_sdk --cov-report= --cov-branch
+  - codecov --file .coverage*
 
 notifications:
   webhooks:

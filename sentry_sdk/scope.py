@@ -1,19 +1,44 @@
 from copy import copy
 from collections import deque
+from functools import wraps
 from itertools import chain
 
-from sentry_sdk.utils import logger, capture_internal_exceptions
+from sentry_sdk.utils import logger, capture_internal_exceptions, object_to_json
+
+if False:
+    from typing import Any
+    from typing import Callable
+    from typing import Dict
+    from typing import Optional
+    from typing import Deque
+    from typing import List
 
 
 global_event_processors = []
 
 
 def add_global_event_processor(processor):
+    # type: (Callable) -> None
     global_event_processors.append(processor)
 
 
 def _attr_setter(fn):
     return property(fset=fn, doc=fn.__doc__)
+
+
+def _disable_capture(fn):
+    @wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        # type: (Any, *Dict[str, Any], **Any) -> Any
+        if not self._should_capture:
+            return
+        try:
+            self._should_capture = False
+            return fn(self, *args, **kwargs)
+        finally:
+            self._should_capture = True
+
+    return wrapper
 
 
 class Scope(object):
@@ -33,11 +58,12 @@ class Scope(object):
         "_breadcrumbs",
         "_event_processors",
         "_error_processors",
+        "_should_capture",
     )
 
     def __init__(self):
-        self._event_processors = []
-        self._error_processors = []
+        self._event_processors = []  # type: List[Callable]
+        self._error_processors = []  # type: List[Callable]
 
         self._name = None
         self.clear()
@@ -87,19 +113,23 @@ class Scope(object):
         self._extras.pop(key, None)
 
     def clear(self):
+        # type: () -> None
         """Clears the entire scope."""
         self._level = None
         self._fingerprint = None
         self._transaction = None
         self._user = None
 
-        self._tags = {}
-        self._contexts = {}
-        self._extras = {}
+        self._tags = {}  # type: Dict[str, Any]
+        self._contexts = {}  # type: Dict[str, Dict]
+        self._extras = {}  # type: Dict[str, Any]
 
-        self._breadcrumbs = deque()
+        self._breadcrumbs = deque()  # type: Deque[Dict]
+
+        self._should_capture = True
 
     def add_event_processor(self, func):
+        # type: (Callable) -> None
         """"Register a scope local event processor on the scope.
 
         This function behaves like `before_send.`
@@ -107,6 +137,7 @@ class Scope(object):
         self._event_processors.append(func)
 
     def add_error_processor(self, func, cls=None):
+        # type: (Callable, Optional[type]) -> None
         """"Register a scope local error processor on the scope.
 
         The error processor works similar to an event processor but is
@@ -126,11 +157,15 @@ class Scope(object):
 
         self._error_processors.append(func)
 
+    @_disable_capture
     def apply_to_event(self, event, hint=None):
+        # type: (Dict[str, Any], Dict[str, Any]) -> Optional[Dict[str, Any]]
         """Applies the information contained on the scope to the given event."""
 
         def _drop(event, cause, ty):
+            # type: (Dict[str, Any], Callable, str) -> Optional[Any]
             logger.info("%s (%s) dropped event (%s)", ty, cause, event)
+            return None
 
         if self._level is not None:
             event["level"] = self._level
@@ -146,7 +181,7 @@ class Scope(object):
             event["fingerprint"] = self._fingerprint
 
         if self._extras:
-            event.setdefault("extra", {}).update(self._extras)
+            event.setdefault("extra", {}).update(object_to_json(self._extras))
 
         if self._tags:
             event.setdefault("tags", {}).update(self._tags)
@@ -173,6 +208,7 @@ class Scope(object):
         return event
 
     def __copy__(self):
+        # type: () -> Scope
         rv = object.__new__(self.__class__)
 
         rv._level = self._level
@@ -188,6 +224,8 @@ class Scope(object):
         rv._breadcrumbs = copy(self._breadcrumbs)
         rv._event_processors = list(self._event_processors)
         rv._error_processors = list(self._error_processors)
+
+        rv._should_capture = self._should_capture
 
         return rv
 

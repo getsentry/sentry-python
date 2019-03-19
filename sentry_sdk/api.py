@@ -1,16 +1,23 @@
 import inspect
 from contextlib import contextmanager
 
-from sentry_sdk.hub import Hub, init
+from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
-from sentry_sdk.transport import Transport, HttpTransport
-from sentry_sdk.client import Client
 
 
-__all__ = ["Hub", "Scope", "Client", "Transport", "HttpTransport", "init"]
+if False:
+    from typing import Any
+    from typing import Optional
+    from typing import overload
+    from typing import Callable
+    from contextlib import ContextManager
+else:
+
+    def overload(x):
+        return x
 
 
-_initial_client = None
+__all__ = []
 
 
 def public(f):
@@ -35,16 +42,20 @@ def capture_event(event, hint=None):
 
 @hubmethod
 def capture_message(message, level=None):
+    # type: (str, Optional[Any]) -> Optional[str]
     hub = Hub.current
     if hub is not None:
         return hub.capture_message(message, level)
+    return None
 
 
 @hubmethod
 def capture_exception(error=None):
+    # type: (ValueError) -> Optional[str]
     hub = Hub.current
     if hub is not None:
         return hub.capture_exception(error)
+    return None
 
 
 @hubmethod
@@ -54,7 +65,19 @@ def add_breadcrumb(*args, **kwargs):
         return hub.add_breadcrumb(*args, **kwargs)
 
 
-@hubmethod
+@overload  # noqa
+def configure_scope():
+    # type: () -> ContextManager[Scope]
+    pass
+
+
+@overload  # noqa
+def configure_scope(callback):
+    # type: (Callable[[Scope], None]) -> None
+    pass
+
+
+@hubmethod  # noqa
 def configure_scope(callback=None):
     hub = Hub.current
     if hub is not None:
@@ -66,9 +89,24 @@ def configure_scope(callback=None):
             yield Scope()
 
         return inner()
+    else:
+        # returned if user provided callback
+        return None
 
 
-@hubmethod
+@overload  # noqa
+def push_scope():
+    # type: () -> ContextManager[Scope]
+    pass
+
+
+@overload  # noqa
+def push_scope(callback):
+    # type: (Callable[[Scope], None]) -> None
+    pass
+
+
+@hubmethod  # noqa
 def push_scope(callback=None):
     hub = Hub.current
     if hub is not None:
@@ -80,10 +118,22 @@ def push_scope(callback=None):
             yield Scope()
 
         return inner()
+    else:
+        # returned if user provided callback
+        return None
+
+
+@hubmethod
+def flush(timeout=None, callback=None):
+    hub = Hub.current
+    if hub is not None:
+        return hub.flush(timeout=timeout, callback=callback)
 
 
 @hubmethod
 def last_event_id():
+    # type: () -> Optional[str]
     hub = Hub.current
     if hub is not None:
         return hub.last_event_id()
+    return None

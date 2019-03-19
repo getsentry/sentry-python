@@ -1,5 +1,11 @@
 import sys
 
+if False:
+    from typing import Optional
+    from typing import Tuple
+    from typing import Any
+    from typing import Type
+
 
 PY2 = sys.version_info[0] == 2
 
@@ -21,31 +27,26 @@ if PY2:
 
     exec("def reraise(tp, value, tb=None):\n raise tp, value, tb")
 
-    def implements_iterator(cls):
-        cls.next = cls.__next__
-        del cls.__next__
-        return cls
-
 
 else:
     import urllib.parse as urlparse  # noqa
     import queue  # noqa
 
     text_type = str
-    string_types = (text_type,)
-    number_types = (int, float)
+    string_types = (text_type,)  # type: Tuple[type]
+    number_types = (int, float)  # type: Tuple[type, type]
     int_types = (int,)  # noqa
     iteritems = lambda x: x.items()
 
     def _identity(x):
         return x
 
-    implements_iterator = _identity
-
     def implements_str(x):
         return x
 
     def reraise(tp, value, tb=None):
+        # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[Any]) -> None
+        assert value is not None
         if value.__traceback__ is not tb:
             raise value.with_traceback(tb)
         raise value
@@ -60,8 +61,9 @@ def with_metaclass(meta, *bases):
 
 
 def check_thread_support():
+    # type: () -> None
     try:
-        from uwsgi import opt
+        from uwsgi import opt  # type: ignore
     except ImportError:
         return
 

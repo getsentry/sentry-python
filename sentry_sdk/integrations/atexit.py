@@ -8,8 +8,12 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.utils import logger
 from sentry_sdk.integrations import Integration
 
+if False:
+    from typing import Any
+    from typing import Optional
 
-def default_shutdown_callback(pending, timeout):
+
+def default_callback(pending, timeout):
     """This is the default shutdown callback that is set on the options.
     It prints out a message to stderr that informs the user that some events
     are still pending and the process is waiting for them to flush out.
@@ -28,12 +32,14 @@ class AtexitIntegration(Integration):
     identifier = "atexit"
 
     def __init__(self, callback=None):
+        # type: (Optional[Any]) -> None
         if callback is None:
-            callback = default_shutdown_callback
+            callback = default_callback
         self.callback = callback
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         @atexit.register
         def _shutdown():
             logger.debug("atexit: got shutdown signal")
@@ -41,4 +47,4 @@ class AtexitIntegration(Integration):
             integration = hub.get_integration(AtexitIntegration)
             if integration is not None:
                 logger.debug("atexit: shutting down client")
-                hub.client.close(shutdown_callback=integration.callback)
+                hub.client.close(callback=integration.callback)

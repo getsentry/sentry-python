@@ -45,11 +45,8 @@ def _drain_queue():
         integration = hub.get_integration(AwsLambdaIntegration)
         if integration is not None:
             # Flush out the event queue before AWS kills the
-            # process. This is not threadsafe.
-            # make new transport with empty queue
-            new_transport = hub.client.transport.copy()
-            hub.client.close()
-            hub.client.transport = new_transport
+            # process.
+            hub.client.flush()
 
 
 class AwsLambdaIntegration(Integration):
@@ -57,13 +54,13 @@ class AwsLambdaIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        import __main__ as lambda_bootstrap
+        import __main__ as lambda_bootstrap  # type: ignore
 
         pre_37 = True  # Python 3.6 or 2.7
 
         if not hasattr(lambda_bootstrap, "handle_http_request"):
             try:
-                import bootstrap as lambda_bootstrap
+                import bootstrap as lambda_bootstrap  # type: ignore
 
                 pre_37 = False  # Python 3.7
             except ImportError:
@@ -92,10 +89,21 @@ class AwsLambdaIntegration(Integration):
                 return old_handle_http_request(request_handler, *args, **kwargs)
 
             lambda_bootstrap.handle_http_request = sentry_handle_http_request
+
+            # Patch to_json to drain the queue. This should work even when the
+            # SDK is initialized inside of the handler
+
+            old_to_json = lambda_bootstrap.to_json
+
+            def sentry_to_json(*args, **kwargs):
+                _drain_queue()
+                return old_to_json(*args, **kwargs)
+
+            lambda_bootstrap.to_json = sentry_to_json
         else:
             old_handle_event_request = lambda_bootstrap.handle_event_request
 
-            def sentry_handle_event_request(
+            def sentry_handle_event_request(  # type: ignore
                 lambda_runtime_client, request_handler, *args, **kwargs
             ):
                 request_handler = _wrap_handler(request_handler)
@@ -105,16 +113,22 @@ class AwsLambdaIntegration(Integration):
 
             lambda_bootstrap.handle_event_request = sentry_handle_event_request
 
-        # This is the only function that is called in all Python environments
-        # at the end of the request/response lifecycle. It is the only way to
-        # do it in the Python 3.7 env.
-        old_to_json = lambda_bootstrap.to_json
+            # Patch the runtime client to drain the queue. This should work
+            # even when the SDK is initialized inside of the handler
 
-        def sentry_to_json(*args, **kwargs):
-            _drain_queue()
-            return old_to_json(*args, **kwargs)
+            def _wrap_post_function(f):
+                def inner(*args, **kwargs):
+                    _drain_queue()
+                    return f(*args, **kwargs)
 
-        lambda_bootstrap.to_json = sentry_to_json
+                return inner
+
+            lambda_bootstrap.LambdaRuntimeClient.post_invocation_result = _wrap_post_function(
+                lambda_bootstrap.LambdaRuntimeClient.post_invocation_result
+            )
+            lambda_bootstrap.LambdaRuntimeClient.post_invocation_error = _wrap_post_function(
+                lambda_bootstrap.LambdaRuntimeClient.post_invocation_error
+            )
 
 
 def _make_request_event_processor(aws_event, aws_context):
@@ -130,14 +144,17 @@ def _make_request_event_processor(aws_event, aws_context):
 
         request = event.setdefault("request", {})
 
-        if "httpMethod" in aws_event and "method" not in request:
+        if "httpMethod" in aws_event:
             request["method"] = aws_event["httpMethod"]
-        if "url" not in request:
-            request["url"] = _get_url(aws_event, aws_context)
-        if "queryStringParameters" in aws_event and "query_string" not in request:
+
+        request["url"] = _get_url(aws_event, aws_context)
+
+        if "queryStringParameters" in aws_event:
             request["query_string"] = aws_event["queryStringParameters"]
-        if "headers" in aws_event and "headers" not in request:
+
+        if "headers" in aws_event:
             request["headers"] = _filter_headers(aws_event["headers"])
+
         if aws_event.get("body", None):
             # Unfortunately couldn't find a way to get structured body from AWS
             # event. Meaning every body is unstructured to us.
@@ -145,10 +162,14 @@ def _make_request_event_processor(aws_event, aws_context):
 
         if _should_send_default_pii():
             user_info = event.setdefault("user", {})
-            if "id" not in user_info:
-                user_info["id"] = aws_event.get("identity", {}).get("userArn")
-            if "ip_address" not in user_info:
-                user_info["ip_address"] = aws_event.get("identity", {}).get("sourceIp")
+
+            id = aws_event.get("identity", {}).get("userArn")
+            if id is not None:
+                user_info["id"] = id
+
+            ip = aws_event.get("identity", {}).get("sourceIp")
+            if ip is not None:
+                user_info["ip_address"] = ip
 
         return event
 

@@ -1,8 +1,7 @@
-import platform
-
 import pytest
 
 from werkzeug.test import Client
+from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError
 
@@ -12,7 +11,7 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
-from sentry_sdk import last_event_id, capture_message
+from sentry_sdk import capture_message, capture_exception
 from sentry_sdk.integrations.django import DjangoIntegration
 
 from tests.integrations.django.myapp.wsgi import application
@@ -101,22 +100,58 @@ def test_user_captured(sentry_init, client, capture_events):
     }
 
 
-def test_404(sentry_init, client):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
-    content, status, headers = client.get("/404")
+@pytest.mark.django_db
+def test_queryset_repr(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+    events = capture_events()
+    User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
+
+    try:
+        my_queryset = User.objects.all()  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    event, = events
+
+    exception, = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+    frame, = exception["stacktrace"]["frames"]
+    assert frame["vars"]["my_queryset"].startswith(
+        "<QuerySet from django.db.models.query at"
+    )
+
+
+def test_custom_error_handler_request_context(sentry_init, client, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+    events = capture_events()
+    content, status, headers = client.post("/404")
     assert status.lower() == "404 not found"
 
+    event, = events
 
-def test_500(sentry_init, client):
+    assert event["message"] == "not found"
+    assert event["level"] == "error"
+    assert event["request"] == {
+        "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
+        "headers": {"Content-Length": "0", "Content-Type": "", "Host": "localhost"},
+        "method": "POST",
+        "query_string": "",
+        "url": "http://localhost/404",
+    }
+
+
+def test_500(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
-    old_event_id = last_event_id()
+    events = capture_events()
+
     content, status, headers = client.get("/view-exc")
     assert status.lower() == "500 internal server error"
     content = b"".join(content).decode("utf-8")
-    event_id = last_event_id()
+
+    event, = events
+    event_id = event["event_id"]
     assert content == "Sentry error: %s" % event_id
-    assert event_id is not None
-    assert old_event_id != event_id
 
 
 def test_management_command_raises():
@@ -157,7 +192,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
 
     events = capture_events()
     with pytest.raises(OperationalError):
-        # table doesn't even exist
+        # This really only works with postgres. sqlite will crash with syntax error
         sql.execute(
             """SELECT count(*) FROM people_person WHERE foo = %(my_foo)s""",
             {"my_foo": 10},
@@ -171,9 +206,6 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     assert crumb["message"] == ("SELECT count(*) FROM people_person WHERE foo = 10")
 
 
-@pytest.mark.skipif(
-    platform.python_implementation() == "PyPy", reason="psycopg broken on pypy"
-)
 @pytest.mark.parametrize(
     "query",
     [
@@ -187,7 +219,9 @@ def test_sql_dict_query_params(sentry_init, capture_events):
 def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     from django.db import connection
-    from psycopg2 import sql as psycopg2_sql
+
+    psycopg2 = pytest.importorskip("psycopg2")
+    psycopg2_sql = psycopg2.sql
 
     sql = connection.cursor()
 
@@ -281,3 +315,38 @@ def test_request_body(sentry_init, client, capture_events):
     assert event["message"] == "hi"
     assert event["request"]["data"] == {"hey": 42}
     assert "" not in event
+
+
+def test_template_exception(sentry_init, client, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+    events = capture_events()
+
+    content, status, headers = client.get(reverse("template_exc"))
+    assert status.lower() == "500 internal server error"
+
+    event, = events
+    exception = event["exception"]["values"][0]
+
+    frames = [
+        f
+        for f in exception["stacktrace"]["frames"]
+        if not f["filename"].startswith("django/")
+    ]
+    view_frame, template_frame = frames[-2:]
+
+    assert template_frame["context_line"] == "{% invalid template tag %}\n"
+    assert template_frame["pre_context"] == ["5\n", "6\n", "7\n", "8\n", "9\n"]
+
+    assert template_frame["post_context"] == ["11\n", "12\n", "13\n", "14\n", "15\n"]
+    assert template_frame["lineno"] == 10
+    assert template_frame["in_app"]
+    assert template_frame["filename"].endswith("error.html")
+
+    filenames = [
+        (f.get("function"), f.get("module")) for f in exception["stacktrace"]["frames"]
+    ]
+    assert filenames[-3:] == [
+        (u"parse", u"django.template.base"),
+        (None, None),
+        (u"invalid_block_tag", u"django.template.base"),
+    ]

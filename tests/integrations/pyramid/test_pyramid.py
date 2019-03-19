@@ -2,8 +2,11 @@ import json
 
 from io import BytesIO
 
+import logging
+
 import pytest
 
+from pyramid.authorization import ACLAuthorizationPolicy
 import pyramid.testing
 
 from pyramid.response import Response
@@ -139,6 +142,28 @@ def test_large_json_request(sentry_init, capture_events, route, get_client):
     assert len(event["request"]["data"]["foo"]["bar"]) == 512
 
 
+@pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
+def test_flask_empty_json_request(sentry_init, capture_events, route, get_client, data):
+    sentry_init(integrations=[PyramidIntegration()])
+
+    @route("/")
+    def index(request):
+        assert request.json == data
+        assert request.text == json.dumps(data)
+        assert not request.POST
+        capture_message("hi")
+        return Response("ok")
+
+    events = capture_events()
+
+    client = get_client()
+    response = client.post("/", content_type="application/json", data=json.dumps(data))
+    assert response[1] == "200 OK"
+
+    event, = events
+    assert event["request"]["data"] == data
+
+
 def test_files_and_form(sentry_init, capture_events, route, get_client):
     sentry_init(integrations=[PyramidIntegration()], request_bodies="always")
 
@@ -237,5 +262,34 @@ def test_error_in_errorhandler(
     exception, = event1["exception"]["values"]
     assert exception["type"] == "ValueError"
 
-    exception, = event2["exception"]["values"]
+    exception = event2["exception"]["values"][0]
     assert exception["type"] == "ZeroDivisionError"
+
+
+def test_error_in_authenticated_userid(
+    sentry_init, pyramid_config, capture_events, route, get_client
+):
+    from sentry_sdk.integrations.logging import LoggingIntegration
+
+    sentry_init(
+        send_default_pii=True,
+        integrations=[
+            PyramidIntegration(),
+            LoggingIntegration(event_level=logging.ERROR),
+        ],
+    )
+    logger = logging.getLogger("test_pyramid")
+
+    class AuthenticationPolicy(object):
+        def authenticated_userid(self, request):
+            logger.error("failed to identify user")
+
+    pyramid_config.set_authorization_policy(ACLAuthorizationPolicy())
+    pyramid_config.set_authentication_policy(AuthenticationPolicy())
+
+    events = capture_events()
+
+    client = get_client()
+    client.get("/message")
+
+    assert len(events) == 1

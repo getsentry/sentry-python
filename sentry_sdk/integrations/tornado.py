@@ -1,5 +1,6 @@
 import sys
 import weakref
+from inspect import iscoroutinefunction
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import (
@@ -15,8 +16,15 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.logging import ignore_logger
 
-from tornado.web import RequestHandler, HTTPError
-from tornado.gen import coroutine
+from tornado.web import RequestHandler, HTTPError  # type: ignore
+from tornado.gen import coroutine  # type: ignore
+
+if False:
+    from typing import Any
+    from typing import List
+    from typing import Optional
+    from typing import Dict
+    from typing import Callable
 
 
 class TornadoIntegration(Integration):
@@ -24,7 +32,8 @@ class TornadoIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        import tornado
+        # type: () -> None
+        import tornado  # type: ignore
 
         tornado_version = getattr(tornado, "version_info", None)
         if tornado_version is None or tornado_version < (5, 0):
@@ -42,26 +51,48 @@ class TornadoIntegration(Integration):
 
         old_execute = RequestHandler._execute
 
-        @coroutine
-        def sentry_execute_request_handler(self, *args, **kwargs):
-            hub = Hub.current
-            integration = hub.get_integration(TornadoIntegration)
-            if integration is None:
-                return old_execute(self, *args, **kwargs)
+        awaitable = iscoroutinefunction(old_execute)
 
-            weak_handler = weakref.ref(self)
+        if awaitable:
+            # Starting Tornado 6 RequestHandler._execute method is a standard Python coroutine (async/await)
+            # In that case our method should be a coroutine function too
+            async def sentry_execute_request_handler(self, *args, **kwargs):
+                # type: (Any, *List, **Any) -> Any
+                hub = Hub.current
+                integration = hub.get_integration(TornadoIntegration)
+                if integration is None:
+                    return await old_execute(self, *args, **kwargs)
 
-            with Hub(hub) as hub:
-                with hub.configure_scope() as scope:
-                    scope.add_event_processor(_make_event_processor(weak_handler))
-                result = yield from old_execute(self, *args, **kwargs)
-                return result
+                weak_handler = weakref.ref(self)
+
+                with Hub(hub) as hub:
+                    with hub.configure_scope() as scope:
+                        scope.add_event_processor(_make_event_processor(weak_handler))
+                    return await old_execute(self, *args, **kwargs)
+
+        else:
+
+            @coroutine  # type: ignore
+            def sentry_execute_request_handler(self, *args, **kwargs):
+                hub = Hub.current
+                integration = hub.get_integration(TornadoIntegration)
+                if integration is None:
+                    return old_execute(self, *args, **kwargs)
+
+                weak_handler = weakref.ref(self)
+
+                with Hub(hub) as hub:
+                    with hub.configure_scope() as scope:
+                        scope.add_event_processor(_make_event_processor(weak_handler))
+                    result = yield from old_execute(self, *args, **kwargs)
+                    return result
 
         RequestHandler._execute = sentry_execute_request_handler
 
         old_log_exception = RequestHandler.log_exception
 
         def sentry_log_exception(self, ty, value, tb, *args, **kwargs):
+            # type: (Any, type, BaseException, Any, *Any, **Any) -> Optional[Any]
             _capture_exception(ty, value, tb)
             return old_log_exception(self, ty, value, tb, *args, **kwargs)
 
@@ -69,6 +100,7 @@ class TornadoIntegration(Integration):
 
 
 def _capture_exception(ty, value, tb):
+    # type: (type, BaseException, Any) -> None
     hub = Hub.current
     if hub.get_integration(TornadoIntegration) is None:
         return
@@ -85,17 +117,18 @@ def _capture_exception(ty, value, tb):
 
 
 def _make_event_processor(weak_handler):
+    # type: (Callable[[], RequestHandler]) -> Callable
     def tornado_processor(event, hint):
+        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         handler = weak_handler()
         if handler is None:
             return event
 
         request = handler.request
 
-        if "transaction" not in event:
-            with capture_internal_exceptions():
-                method = getattr(handler, handler.request.method.lower())
-                event["transaction"] = transaction_from_function(method)
+        with capture_internal_exceptions():
+            method = getattr(handler, handler.request.method.lower())
+            event["transaction"] = transaction_from_function(method)
 
         with capture_internal_exceptions():
             extractor = TornadoRequestExtractor(request)
@@ -103,24 +136,16 @@ def _make_event_processor(weak_handler):
 
             request_info = event["request"]
 
-            if "url" not in request_info:
-                request_info["url"] = "%s://%s%s" % (
-                    request.protocol,
-                    request.host,
-                    request.path,
-                )
+            request_info["url"] = "%s://%s%s" % (
+                request.protocol,
+                request.host,
+                request.path,
+            )
 
-            if "query_string" not in request_info:
-                request_info["query_string"] = request.query
-
-            if "method" not in request_info:
-                request_info["method"] = request.method
-
-            if "env" not in request_info:
-                request_info["env"] = {"REMOTE_ADDR": request.remote_ip}
-
-            if "headers" not in request_info:
-                request_info["headers"] = _filter_headers(dict(request.headers))
+            request_info["query_string"] = request.query
+            request_info["method"] = request.method
+            request_info["env"] = {"REMOTE_ADDR": request.remote_ip}
+            request_info["headers"] = _filter_headers(dict(request.headers))
 
         with capture_internal_exceptions():
             if handler.current_user and _should_send_default_pii():
@@ -133,24 +158,32 @@ def _make_event_processor(weak_handler):
 
 class TornadoRequestExtractor(RequestExtractor):
     def content_length(self):
+        # type: () -> int
         if self.request.body is None:
             return 0
         return len(self.request.body)
 
     def cookies(self):
-        return dict(self.request.cookies)
+        # type: () -> Dict
+        return {k: v.value for k, v in self.request.cookies.items()}
 
     def raw_data(self):
+        # type: () -> bytes
         return self.request.body
 
     def form(self):
-        # TODO: Where to get formdata and nothing else?
-        return None
+        # type: () -> Optional[Any]
+        return {
+            k: [v.decode("latin1", "replace") for v in vs]
+            for k, vs in self.request.body_arguments.items()
+        }
 
     def is_json(self):
+        # type: () -> bool
         return _is_json_content_type(self.request.headers.get("content-type"))
 
     def files(self):
+        # type: () -> Dict
         return {k: v[0] for k, v in self.request.files.items() if v}
 
     def size_of_file(self, file):

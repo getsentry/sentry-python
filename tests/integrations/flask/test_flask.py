@@ -5,11 +5,16 @@ from io import BytesIO
 
 flask = pytest.importorskip("flask")
 
-from flask import Flask, request, abort
+from flask import Flask, Response, request, abort, stream_with_context
 
 from flask_login import LoginManager, login_user
 
-from sentry_sdk import capture_message, capture_exception, last_event_id
+from sentry_sdk import (
+    configure_scope,
+    capture_message,
+    capture_exception,
+    last_event_id,
+)
 from sentry_sdk.integrations.logging import LoggingIntegration
 import sentry_sdk.integrations.flask as flask_sentry
 
@@ -71,7 +76,7 @@ def test_transaction_style(
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("testing", (True, False))
 def test_errors(sentry_init, capture_exceptions, capture_events, app, debug, testing):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], debug=True)
 
     app.debug = debug
     app.testing = testing
@@ -207,6 +212,28 @@ def test_flask_large_json_request(sentry_init, capture_events, app):
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
     assert len(event["request"]["data"]["foo"]["bar"]) == 512
+
+
+@pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
+def test_flask_empty_json_request(sentry_init, capture_events, app, data):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
+    @app.route("/", methods=["POST"])
+    def index():
+        assert request.json == data
+        assert request.data == json.dumps(data).encode("ascii")
+        assert not request.form
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.post("/", content_type="application/json", data=json.dumps(data))
+    assert response.status_code == 200
+
+    event, = events
+    assert event["request"]["data"] == data
 
 
 def test_flask_medium_formdata_request(sentry_init, capture_events, app):
@@ -443,7 +470,7 @@ def test_error_in_errorhandler(sentry_init, capture_events, app):
     exception, = event1["exception"]["values"]
     assert exception["type"] == "ValueError"
 
-    exception, = event2["exception"]["values"]
+    exception = event2["exception"]["values"][0]
     assert exception["type"] == "ZeroDivisionError"
 
 
@@ -458,5 +485,72 @@ def test_bad_request_not_captured(sentry_init, capture_events, app):
     client = app.test_client()
 
     client.get("/")
+
+    assert not events
+
+
+def test_does_not_leak_scope(sentry_init, capture_events, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    events = capture_events()
+
+    with configure_scope() as scope:
+        scope.set_tag("request_data", False)
+
+    @app.route("/")
+    def index():
+        with configure_scope() as scope:
+            scope.set_tag("request_data", True)
+
+        def generate():
+            for row in range(1000):
+                with configure_scope() as scope:
+                    assert scope._tags["request_data"]
+
+                yield str(row) + "\n"
+
+        return Response(stream_with_context(generate()), mimetype="text/csv")
+
+    client = app.test_client()
+    response = client.get("/")
+    assert response.data.decode() == "".join(str(row) + "\n" for row in range(1000))
+    assert not events
+
+    with configure_scope() as scope:
+        assert not scope._tags["request_data"]
+
+
+def test_scoped_test_client(sentry_init, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
+    @app.route("/")
+    def index():
+        return "ok"
+
+    with app.test_client() as client:
+        response = client.get("/")
+        assert response.status_code == 200
+
+
+@pytest.mark.parametrize("exc_cls", [ZeroDivisionError, Exception])
+def test_errorhandler_for_exception_swallows_exception(
+    sentry_init, app, capture_events, exc_cls
+):
+    # In contrast to error handlers for a status code, error
+    # handlers for exceptions can swallow the exception (this is
+    # just how the Flask signal works)
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    events = capture_events()
+
+    @app.route("/")
+    def index():
+        1 / 0
+
+    @app.errorhandler(exc_cls)
+    def zerodivision(e):
+        return "ok"
+
+    with app.test_client() as client:
+        response = client.get("/")
+        assert response.status_code == 200
 
     assert not events
