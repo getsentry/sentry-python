@@ -1,7 +1,7 @@
 import functools
 import sys
 
-from sentry_sdk import Hub, configure_scope
+from sentry_sdk.hub import Hub
 from sentry_sdk.utils import event_from_exception
 from sentry_sdk._compat import reraise
 
@@ -10,8 +10,8 @@ def serverless_function(f=None, flush=True):
     def wrapper(f):
         @functools.wraps(f)
         def inner(*args, **kwargs):
-            with Hub(Hub.current):
-                with configure_scope() as scope:
+            with Hub(Hub.current) as hub:
+                with hub.configure_scope() as scope:
                     scope.clear_breadcrumbs()
 
                 try:

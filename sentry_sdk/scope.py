@@ -130,7 +130,7 @@ class Scope(object):
     def clear_breadcrumbs(self):
         # type: () -> None
         """Clears breadcrumb buffer."""
-        self._breadcrumbs = deque()
+        self._breadcrumbs = deque()  # type: Deque[Dict]
 
     def add_event_processor(self, func):
         # type: (Callable) -> None
