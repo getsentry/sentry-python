@@ -1,3 +1,16 @@
+## 0.7.7
+
+* Fix a bug that would not capture request bodies if they were empty JSON
+  arrays, objects or strings.
+* New GNU backtrace integration parses stacktraces from exception messages and
+  appends them to existing stacktrace.
+* Capture Tornado formdata.
+* Support Python 3.6 in Sanic and AIOHTTP integration.
+* Clear breadcrumbs before starting a new request.
+* Fix a bug in the Celery integration that would drop pending events during
+  worker shutdown (particularly an issue when running with `max_tasks_per_child
+  = 1`)
+
 ## 0.7.6
 
 * Fix a bug where artificial frames for Django templates would not be marked as
