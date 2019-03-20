@@ -50,6 +50,7 @@ matrix:
 
 before_script:
  - psql -c 'create database travis_ci_test;' -U postgres
+ - psql -c 'create database test_travis_ci_test;' -U postgres
 
 services:
   - postgresql
