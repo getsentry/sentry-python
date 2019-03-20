@@ -14,9 +14,9 @@ if False:
     from typing import Dict
     from typing import Callable
     from typing import Optional
-    from bottle import FileUpload, FormsDict, LocalRequest
+    from bottle import FileUpload, FormsDict, LocalRequest  # type: ignore
 
-from bottle import Bottle, request as bottle_request
+from bottle import Bottle, request as bottle_request  # type: ignore
 
 
 class BottleIntegration(Integration):
