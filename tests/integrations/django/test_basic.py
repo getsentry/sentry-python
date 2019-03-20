@@ -227,7 +227,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
 
     import psycopg2
 
-    sql = connections['postgres'].cursor()
+    sql = connections["postgres"].cursor()
 
     events = capture_events()
     with pytest.raises(ProgrammingError):
@@ -237,7 +237,8 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
 
     event, = events
     crumb, = event["breadcrumbs"]
-    assert crumb["message"] == ("SELECT 10 FROM \"foobar\"")
+    assert crumb["message"] == ('SELECT 10 FROM "foobar"')
+
 
 @pytest.mark.django_db
 def test_sql_psycopg2_placeholders(sentry_init, capture_events):
@@ -249,26 +250,31 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
 
     import psycopg2
 
-    sql = connections['postgres'].cursor()
+    sql = connections["postgres"].cursor()
 
     events = capture_events()
     with pytest.raises(DataError):
-        names = ['foo', 'bar']
+        names = ["foo", "bar"]
         identifiers = [psycopg2.sql.Identifier(name) for name in names]
-        placeholders = [psycopg2.sql.Placeholder(var) for var in ['first_var', 'second_var']]
-        sql.execute('create table my_test_table (foo text, bar date)')
+        placeholders = [
+            psycopg2.sql.Placeholder(var) for var in ["first_var", "second_var"]
+        ]
+        sql.execute("create table my_test_table (foo text, bar date)")
 
         query = psycopg2.sql.SQL("insert into my_test_table ({}) values ({})").format(
-            psycopg2.sql.SQL(', ').join(identifiers),
-            psycopg2.sql.SQL(', ').join(placeholders))
-        sql.execute(query, {'first_var': 'fizz', 'second_var': 'not a date'})
+            psycopg2.sql.SQL(", ").join(identifiers),
+            psycopg2.sql.SQL(", ").join(placeholders),
+        )
+        sql.execute(query, {"first_var": "fizz", "second_var": "not a date"})
 
     capture_message("HI")
 
     event, = events
     crumb1, crumb2 = event["breadcrumbs"]
     assert crumb1["message"] == ("create table my_test_table (foo text, bar date)")
-    assert crumb2["message"] == ("""insert into my_test_table ("foo", "bar") values ('fizz', 'not a date')""")
+    assert crumb2["message"] == (
+        """insert into my_test_table ("foo", "bar") values ('fizz', 'not a date')"""
+    )
 
 
 @pytest.mark.django_db
