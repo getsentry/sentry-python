@@ -10,6 +10,9 @@
 * Fix a bug in the Celery integration that would drop pending events during
   worker shutdown (particularly an issue when running with `max_tasks_per_child
   = 1`)
+* Fix a bug with `repr`ing locals whose `__repr__` simultaneously changes the
+  WSGI environment or other data that we're also trying to serialize at the
+  same time.
 
 ## 0.7.6
 
