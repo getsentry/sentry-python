@@ -1116,6 +1116,7 @@ table {
     <li class="mono"><a href="#sentry_sdk.Scope.add_event_processor">add_event_processor</a></li>
     <li class="mono"><a href="#sentry_sdk.Scope.apply_to_event">apply_to_event</a></li>
     <li class="mono"><a href="#sentry_sdk.Scope.clear">clear</a></li>
+    <li class="mono"><a href="#sentry_sdk.Scope.clear_breadcrumbs">clear_breadcrumbs</a></li>
     <li class="mono"><a href="#sentry_sdk.Scope.remove_context">remove_context</a></li>
     <li class="mono"><a href="#sentry_sdk.Scope.remove_extra">remove_extra</a></li>
     <li class="mono"><a href="#sentry_sdk.Scope.remove_tag">remove_tag</a></li>
@@ -3106,9 +3107,13 @@ events that belong to it.</p></div>
         <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Dict]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Any]</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>  <span class="c1"># type: Deque[Dict]</span>
-
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear_breadcrumbs</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span> <span class="o">=</span> <span class="bp">True</span>
+
+    <span class="k">def</span> <span class="nf">clear_breadcrumbs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; None</span>
+        <span class="sd">&quot;&quot;&quot;Clears breadcrumb buffer.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>  <span class="c1"># type: Deque[Dict]</span>
 
     <span class="k">def</span> <span class="nf">add_event_processor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">):</span>
         <span class="c1"># type: (Callable) -&gt; None</span>
@@ -3418,8 +3423,32 @@ invoked with the original exception info triple as second argument.</p></div>
     <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Any]</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Dict]</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Any]</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>  <span class="c1"># type: Deque[Dict]</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">clear_breadcrumbs</span><span class="p">()</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span> <span class="o">=</span> <span class="bp">True</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.Scope.clear_breadcrumbs">
+    <p>def <span class="ident">clear_breadcrumbs</span>(</p><p>self)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Clears breadcrumb buffer.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Scope.clear_breadcrumbs', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.Scope.clear_breadcrumbs" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">clear_breadcrumbs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="c1"># type: () -&gt; None</span>
+    <span class="sd">&quot;&quot;&quot;Clears breadcrumb buffer.&quot;&quot;&quot;</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>  <span class="c1"># type: Deque[Dict]</span>
 </pre></div>
 
   </div>

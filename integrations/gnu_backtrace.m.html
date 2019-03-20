@@ -3,7 +3,7 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 
-    <title>sentry_sdk.integrations.serverless API documentation</title>
+    <title>sentry_sdk.integrations.gnu_backtrace API documentation</title>
     <meta name="description" content="" />
 
   <link href='http://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300' rel='stylesheet' type='text/css'>
@@ -1040,15 +1040,31 @@ table {
   <div id="sidebar">
     <h1>Index</h1>
     <ul id="index">
-
-    <li class="set"><h3><a href="#header-functions">Functions</a></h3>
+    <li class="set"><h3><a href="#header-variables">Module variables</a></h3>
       
   <ul>
-    <li class="mono"><a href="#sentry_sdk.integrations.serverless.serverless_function">serverless_function</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.gnu_backtrace.FRAME_RE">FRAME_RE</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.gnu_backtrace.HEXVAL_RE">HEXVAL_RE</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.gnu_backtrace.MODULE_RE">MODULE_RE</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.gnu_backtrace.TYPE_RE">TYPE_RE</a></li>
   </ul>
 
     </li>
 
+
+    <li class="set"><h3><a href="#header-classes">Classes</a></h3>
+      <ul>
+        <li class="mono">
+        <span class="class_name"><a href="#sentry_sdk.integrations.gnu_backtrace.GnuBacktraceIntegration">GnuBacktraceIntegration</a></span>
+        
+          
+  <ul>
+    <li class="mono"><a href="#sentry_sdk.integrations.gnu_backtrace.GnuBacktraceIntegration.setup_once">setup_once</a></li>
+  </ul>
+
+        </li>
+      </ul>
+    </li>
 
     </ul>
   </div>
@@ -1061,61 +1077,119 @@ table {
 
 
   <header id="section-intro">
-  <h1 class="title"><span class="name">sentry_sdk.integrations.serverless</span> module</h1>
+  <h1 class="title"><span class="name">sentry_sdk.integrations.gnu_backtrace</span> module</h1>
   
   
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.serverless', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.serverless" class="source">
-    <div class="codehilite"><pre><span></span><span class="kn">import</span> <span class="nn">functools</span>
-<span class="kn">import</span> <span class="nn">sys</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.gnu_backtrace', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.gnu_backtrace" class="source">
+    <div class="codehilite"><pre><span></span><span class="kn">import</span> <span class="nn">re</span>
 
 <span class="kn">from</span> <span class="nn">sentry_sdk.hub</span> <span class="kn">import</span> <span class="n">Hub</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">event_from_exception</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk._compat</span> <span class="kn">import</span> <span class="n">reraise</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.scope</span> <span class="kn">import</span> <span class="n">add_global_event_processor</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">capture_internal_exceptions</span>
+
+<span class="k">if</span> <span class="bp">False</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
 
 
-<span class="k">def</span> <span class="nf">serverless_function</span><span class="p">(</span><span class="n">f</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
-    <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
-        <span class="nd">@functools.wraps</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
-        <span class="k">def</span> <span class="nf">inner</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-            <span class="k">with</span> <span class="n">Hub</span><span class="p">(</span><span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="p">)</span> <span class="k">as</span> <span class="n">hub</span><span class="p">:</span>
-                <span class="k">with</span> <span class="n">hub</span><span class="o">.</span><span class="n">configure_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
-                    <span class="n">scope</span><span class="o">.</span><span class="n">clear_breadcrumbs</span><span class="p">()</span>
-
-                <span class="k">try</span><span class="p">:</span>
-                    <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-                    <span class="n">_capture_and_reraise</span><span class="p">()</span>
-                <span class="k">finally</span><span class="p">:</span>
-                    <span class="k">if</span> <span class="n">flush</span><span class="p">:</span>
-                        <span class="n">_flush_client</span><span class="p">()</span>
-
-        <span class="k">return</span> <span class="n">inner</span>
-
-    <span class="k">if</span> <span class="n">f</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">wrapper</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">wrapper</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+<span class="n">MODULE_RE</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;[a-zA-Z0-9/._:</span><span class="se">\\</span><span class="s2">-]+&quot;</span>
+<span class="n">TYPE_RE</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;[a-zA-Z0-9._:&lt;&gt;,-]+&quot;</span>
+<span class="n">HEXVAL_RE</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;[A-Fa-f0-9]+&quot;</span>
 
 
-<span class="k">def</span> <span class="nf">_capture_and_reraise</span><span class="p">():</span>
-    <span class="n">exc_info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
-    <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-    <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
-            <span class="n">exc_info</span><span class="p">,</span>
-            <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
-            <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;serverless&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">},</span>
-        <span class="p">)</span>
-        <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
+<span class="n">FRAME_RE</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">^(?P&lt;index&gt;\d+)\.\s</span>
+<span class="s2">(?P&lt;package&gt;{MODULE_RE})\(</span>
+<span class="s2">  (?P&lt;retval&gt;{TYPE_RE}\ )?</span>
+<span class="s2">  ((?P&lt;function&gt;{TYPE_RE})</span>
+<span class="s2">    (?P&lt;args&gt;\([^)]*\))?</span>
+<span class="s2">  )?</span>
+<span class="s2">  ((?P&lt;constoffset&gt;\ const)?\+0x(?P&lt;offset&gt;{HEXVAL_RE}))?</span>
+<span class="s2">\)\s</span>
+<span class="s2">\[0x(?P&lt;retaddr&gt;{HEXVAL_RE})\]$</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+    <span class="n">MODULE_RE</span><span class="o">=</span><span class="n">MODULE_RE</span><span class="p">,</span> <span class="n">HEXVAL_RE</span><span class="o">=</span><span class="n">HEXVAL_RE</span><span class="p">,</span> <span class="n">TYPE_RE</span><span class="o">=</span><span class="n">TYPE_RE</span>
+<span class="p">)</span>
 
-    <span class="n">reraise</span><span class="p">(</span><span class="o">*</span><span class="n">exc_info</span><span class="p">)</span>
+<span class="n">FRAME_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">FRAME_RE</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">MULTILINE</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">_flush_client</span><span class="p">():</span>
-    <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-    <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="n">hub</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+<span class="k">class</span> <span class="nc">GnuBacktraceIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
+    <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;gnu_backtrace&quot;</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="nd">@add_global_event_processor</span>
+        <span class="k">def</span> <span class="nf">process_gnu_backtrace</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
+            <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+                <span class="k">return</span> <span class="n">_process_gnu_backtrace</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_process_gnu_backtrace</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, Any], Dict[str, Any]) -&gt; Dict[str, Any]</span>
+    <span class="k">if</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">GnuBacktraceIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">event</span>
+
+    <span class="n">exc_info</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exc_info&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">exc_info</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">event</span>
+
+    <span class="n">exception</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exception&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">exception</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">event</span>
+
+    <span class="n">values</span> <span class="o">=</span> <span class="n">exception</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;values&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">values</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">event</span>
+
+    <span class="k">for</span> <span class="n">exception</span> <span class="ow">in</span> <span class="n">values</span><span class="p">:</span>
+        <span class="n">frames</span> <span class="o">=</span> <span class="n">exception</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;stacktrace&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;frames&quot;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">frames</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">exception</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">msg</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="n">additional_frames</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">new_msg</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">msg</span><span class="o">.</span><span class="n">splitlines</span><span class="p">():</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">FRAME_RE</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+                <span class="n">additional_frames</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">(</span>
+                        <span class="nb">int</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s2">&quot;index&quot;</span><span class="p">)),</span>
+                        <span class="p">{</span>
+                            <span class="s2">&quot;package&quot;</span><span class="p">:</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s2">&quot;package&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="bp">None</span><span class="p">,</span>
+                            <span class="s2">&quot;function&quot;</span><span class="p">:</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="s2">&quot;function&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="bp">None</span><span class="p">,</span>
+                            <span class="s2">&quot;platform&quot;</span><span class="p">:</span> <span class="s2">&quot;native&quot;</span><span class="p">,</span>
+                        <span class="p">},</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">additional_frames</span> <span class="ow">and</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+                <span class="c1"># If we already started parsing a stacktrace, it must be at the</span>
+                <span class="c1"># end of the message and must not contain random garbage lines</span>
+                <span class="c1"># between the frames</span>
+                <span class="k">del</span> <span class="n">additional_frames</span><span class="p">[:]</span>
+                <span class="k">break</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">new_msg</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">additional_frames</span><span class="p">:</span>
+            <span class="n">additional_frames</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="o">-</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">additional_frames</span><span class="p">:</span>
+                <span class="n">frames</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+
+            <span class="n">new_msg</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;&lt;stacktrace parsed and removed by GnuBacktraceIntegration&gt;&quot;</span><span class="p">)</span>
+            <span class="n">exception</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">new_msg</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">event</span>
 </pre></div>
 
   </div>
@@ -1123,42 +1197,112 @@ table {
   </header>
 
   <section id="section-items">
-
-    <h2 class="section-title" id="header-functions">Functions</h2>
+    <h2 class="section-title" id="header-variables">Module variables</h2>
+      <div class="item">
+      <p id="sentry_sdk.integrations.gnu_backtrace.FRAME_RE" class="name">var <span class="ident">FRAME_RE</span></p>
       
+  
+  <div class="source_cont">
+</div>
+
+      </div>
+      <div class="item">
+      <p id="sentry_sdk.integrations.gnu_backtrace.HEXVAL_RE" class="name">var <span class="ident">HEXVAL_RE</span></p>
+      
+  
+  <div class="source_cont">
+</div>
+
+      </div>
+      <div class="item">
+      <p id="sentry_sdk.integrations.gnu_backtrace.MODULE_RE" class="name">var <span class="ident">MODULE_RE</span></p>
+      
+  
+  <div class="source_cont">
+</div>
+
+      </div>
+      <div class="item">
+      <p id="sentry_sdk.integrations.gnu_backtrace.TYPE_RE" class="name">var <span class="ident">TYPE_RE</span></p>
+      
+  
+  <div class="source_cont">
+</div>
+
+      </div>
+
+
+    <h2 class="section-title" id="header-classes">Classes</h2>
+      
+      <div class="item">
+      <p id="sentry_sdk.integrations.gnu_backtrace.GnuBacktraceIntegration" class="name">class <span class="ident">GnuBacktraceIntegration</span></p>
+      
+  
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.gnu_backtrace.GnuBacktraceIntegration', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.gnu_backtrace.GnuBacktraceIntegration" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">GnuBacktraceIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
+    <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;gnu_backtrace&quot;</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="nd">@add_global_event_processor</span>
+        <span class="k">def</span> <span class="nf">process_gnu_backtrace</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
+            <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+                <span class="k">return</span> <span class="n">_process_gnu_backtrace</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+
+      <div class="class">
+          <h3>Ancestors (in MRO)</h3>
+          <ul class="class_list">
+          <li><a href="#sentry_sdk.integrations.gnu_backtrace.GnuBacktraceIntegration">GnuBacktraceIntegration</a></li>
+          <li>sentry_sdk.integrations.Integration</li>
+          <li>__builtin__.object</li>
+          </ul>
+          <h3>Class variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.integrations.gnu_backtrace.GnuBacktraceIntegration.identifier" class="name">var <span class="ident">identifier</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
+            <div class="item">
+            <p id="sentry_sdk.integrations.gnu_backtrace.GnuBacktraceIntegration.install" class="name">var <span class="ident">install</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
+          <h3>Static methods</h3>
+            
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.serverless.serverless_function">
-    <p>def <span class="ident">serverless_function</span>(</p><p>f=None, flush=True)</p>
+    <div class="name def" id="sentry_sdk.integrations.gnu_backtrace.GnuBacktraceIntegration.setup_once">
+    <p>def <span class="ident">setup_once</span>(</p><p>)</p>
     </div>
     
 
     
   
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.serverless.serverless_function', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.serverless.serverless_function" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">serverless_function</span><span class="p">(</span><span class="n">f</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
-    <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
-        <span class="nd">@functools.wraps</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
-        <span class="k">def</span> <span class="nf">inner</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-            <span class="k">with</span> <span class="n">Hub</span><span class="p">(</span><span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="p">)</span> <span class="k">as</span> <span class="n">hub</span><span class="p">:</span>
-                <span class="k">with</span> <span class="n">hub</span><span class="o">.</span><span class="n">configure_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
-                    <span class="n">scope</span><span class="o">.</span><span class="n">clear_breadcrumbs</span><span class="p">()</span>
-
-                <span class="k">try</span><span class="p">:</span>
-                    <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-                    <span class="n">_capture_and_reraise</span><span class="p">()</span>
-                <span class="k">finally</span><span class="p">:</span>
-                    <span class="k">if</span> <span class="n">flush</span><span class="p">:</span>
-                        <span class="n">_flush_client</span><span class="p">()</span>
-
-        <span class="k">return</span> <span class="n">inner</span>
-
-    <span class="k">if</span> <span class="n">f</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">wrapper</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">wrapper</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.gnu_backtrace.GnuBacktraceIntegration.setup_once', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.gnu_backtrace.GnuBacktraceIntegration.setup_once" class="source">
+    <div class="codehilite"><pre><span></span><span class="nd">@staticmethod</span>
+<span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+    <span class="nd">@add_global_event_processor</span>
+    <span class="k">def</span> <span class="nf">process_gnu_backtrace</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">_process_gnu_backtrace</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1166,7 +1310,8 @@ table {
 
   </div>
   
-
+      </div>
+      </div>
 
   </section>
 

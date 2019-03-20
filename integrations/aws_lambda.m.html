@@ -1095,6 +1095,7 @@ table {
 
         <span class="k">with</span> <span class="n">hub</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+                <span class="n">scope</span><span class="o">.</span><span class="n">clear_breadcrumbs</span><span class="p">()</span>
                 <span class="n">scope</span><span class="o">.</span><span class="n">transaction</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">function_name</span>
                 <span class="n">scope</span><span class="o">.</span><span class="n">add_event_processor</span><span class="p">(</span><span class="n">_make_request_event_processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">))</span>
 

@@ -1170,6 +1170,7 @@ table {
         <span class="k">with</span> <span class="n">hub</span><span class="p">:</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
                 <span class="k">with</span> <span class="n">hub</span><span class="o">.</span><span class="n">configure_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
+                    <span class="n">scope</span><span class="o">.</span><span class="n">clear_breadcrumbs</span><span class="p">()</span>
                     <span class="n">scope</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="s2">&quot;wsgi&quot;</span>
                     <span class="n">scope</span><span class="o">.</span><span class="n">add_event_processor</span><span class="p">(</span><span class="n">_make_wsgi_event_processor</span><span class="p">(</span><span class="n">environ</span><span class="p">))</span>
 
@@ -1489,6 +1490,7 @@ environment.</p></div>
         <span class="k">with</span> <span class="n">hub</span><span class="p">:</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
                 <span class="k">with</span> <span class="n">hub</span><span class="o">.</span><span class="n">configure_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
+                    <span class="n">scope</span><span class="o">.</span><span class="n">clear_breadcrumbs</span><span class="p">()</span>
                     <span class="n">scope</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="s2">&quot;wsgi&quot;</span>
                     <span class="n">scope</span><span class="o">.</span><span class="n">add_event_processor</span><span class="p">(</span><span class="n">_make_wsgi_event_processor</span><span class="p">(</span><span class="n">environ</span><span class="p">))</span>
 
