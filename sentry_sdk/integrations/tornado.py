@@ -1,4 +1,3 @@
-import sys
 import weakref
 from inspect import iscoroutinefunction
 
