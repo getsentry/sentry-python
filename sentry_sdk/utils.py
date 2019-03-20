@@ -376,7 +376,7 @@ def object_to_json(obj, remaining_depth=4, memo=None):
                     safe_str(k): object_to_json(
                         v, remaining_depth=remaining_depth - 1, memo=memo
                     )
-                    for k, v in obj.items()
+                    for k, v in list(obj.items())
                 }
 
         return safe_repr(obj)
