@@ -94,8 +94,16 @@ WSGI_APPLICATION = "tests.django.myapp.wsgi.application"
 
 DATABASES = {
     "default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"},
-    "postgres": {"ENGINE": "django.db.backends.postgresql_psycopg2", "NAME": "travis_ci_test", "USER": "postgres"}
 }
+
+try:
+    DATABASES["postgres"] = {
+        "ENGINE": "django.db.backends.postgresql_psycopg2",
+        "NAME": os.environ["SENTRY_PYTHON_TEST_POSTGRES_NAME"],
+        "USER": os.environ["SENTRY_PYTHON_TEST_POSTGRES_USER"],
+    }
+except KeyError:
+    pass
 
 
 # Password validation

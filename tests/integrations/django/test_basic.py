@@ -189,6 +189,9 @@ def test_sql_dict_query_params(sentry_init, capture_events):
 
     from django.db import connections
 
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
     sql = connections["postgres"].cursor()
 
     events = capture_events()
@@ -202,7 +205,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     event, = events
 
     crumb, = event["breadcrumbs"]
-    assert crumb["message"] == ("b'SELECT count(*) FROM people_person WHERE foo = 10'")
+    assert crumb["message"] == ("SELECT count(*) FROM people_person WHERE foo = 10")
 
 
 @pytest.mark.parametrize(
@@ -218,48 +221,54 @@ def test_sql_dict_query_params(sentry_init, capture_events):
 def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     from django.db import connections
-    psycopg2 = pytest.importorskip("psycopg2")
-    psycopg2_sql = psycopg2.sql
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    import psycopg2
 
     sql = connections['postgres'].cursor()
 
     events = capture_events()
     with pytest.raises(ProgrammingError):
-        sql.execute(query(psycopg2_sql), {"my_param": 10})
+        sql.execute(query(psycopg2.sql), {"my_param": 10})
 
     capture_message("HI")
 
     event, = events
     crumb, = event["breadcrumbs"]
-    assert crumb["message"] == ("b'SELECT 10 FROM \"foobar\"'")
+    assert crumb["message"] == ("SELECT 10 FROM \"foobar\"")
 
 @pytest.mark.django_db
 def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     from django.db import connections
-    psycopg2 = pytest.importorskip("psycopg2")
-    psycopg2_sql = psycopg2.sql
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    import psycopg2
 
     sql = connections['postgres'].cursor()
 
     events = capture_events()
     with pytest.raises(DataError):
         names = ['foo', 'bar']
-        identifiers = [psycopg2_sql.Identifier(name) for name in names]
-        placeholders = [psycopg2_sql.Placeholder(var) for var in ['first_var', 'second_var']]
+        identifiers = [psycopg2.sql.Identifier(name) for name in names]
+        placeholders = [psycopg2.sql.Placeholder(var) for var in ['first_var', 'second_var']]
         sql.execute('create table my_test_table (foo text, bar date)')
 
-        query = psycopg2_sql.SQL("insert into my_test_table ({}) values ({})").format(
-            psycopg2_sql.SQL(', ').join(identifiers),
-            psycopg2_sql.SQL(', ').join(placeholders))
+        query = psycopg2.sql.SQL("insert into my_test_table ({}) values ({})").format(
+            psycopg2.sql.SQL(', ').join(identifiers),
+            psycopg2.sql.SQL(', ').join(placeholders))
         sql.execute(query, {'first_var': 'fizz', 'second_var': 'not a date'})
 
     capture_message("HI")
 
     event, = events
     crumb1, crumb2 = event["breadcrumbs"]
-    assert crumb1["message"] == ("b'create table my_test_table (foo text, bar date)'")
-    assert crumb2["message"] == ("""b'insert into my_test_table ("foo", "bar") values ('fizz', 'not a date')'""")
+    assert crumb1["message"] == ("create table my_test_table (foo text, bar date)")
+    assert crumb2["message"] == ("""insert into my_test_table ("foo", "bar") values ('fizz', 'not a date')""")
 
 
 @pytest.mark.django_db
