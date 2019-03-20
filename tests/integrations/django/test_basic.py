@@ -3,7 +3,7 @@ import pytest
 from werkzeug.test import Client
 from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
-from django.db.utils import OperationalError
+from django.db.utils import OperationalError, ProgrammingError, DataError
 
 
 try:
@@ -186,24 +186,23 @@ def test_sql_queries(sentry_init, capture_events):
 @pytest.mark.django_db
 def test_sql_dict_query_params(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
-    from django.db import connection
 
-    sql = connection.cursor()
+    from django.db import connections
+
+    sql = connections["postgres"].cursor()
 
     events = capture_events()
-    with pytest.raises(OperationalError):
-        # This really only works with postgres. sqlite will crash with syntax error
+    with pytest.raises(ProgrammingError):
         sql.execute(
             """SELECT count(*) FROM people_person WHERE foo = %(my_foo)s""",
             {"my_foo": 10},
         )
 
     capture_message("HI")
-
     event, = events
 
     crumb, = event["breadcrumbs"]
-    assert crumb["message"] == ("SELECT count(*) FROM people_person WHERE foo = 10")
+    assert crumb["message"] == ("b'SELECT count(*) FROM people_person WHERE foo = 10'")
 
 
 @pytest.mark.parametrize(
@@ -212,30 +211,55 @@ def test_sql_dict_query_params(sentry_init, capture_events):
         lambda sql: sql.SQL("SELECT %(my_param)s FROM {mytable}").format(
             mytable=sql.Identifier("foobar")
         ),
-        lambda sql: sql.SQL("SELECT %(my_param)s FROM foobar"),
+        lambda sql: sql.SQL('SELECT %(my_param)s FROM "foobar"'),
     ],
 )
 @pytest.mark.django_db
 def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
-    from django.db import connection
-
+    from django.db import connections
     psycopg2 = pytest.importorskip("psycopg2")
     psycopg2_sql = psycopg2.sql
 
-    sql = connection.cursor()
+    sql = connections['postgres'].cursor()
 
     events = capture_events()
-    with pytest.raises(TypeError):
-        # crashes because we use sqlite
+    with pytest.raises(ProgrammingError):
         sql.execute(query(psycopg2_sql), {"my_param": 10})
 
     capture_message("HI")
 
     event, = events
-
     crumb, = event["breadcrumbs"]
-    assert crumb["message"] == ("SELECT 10 FROM foobar")
+    assert crumb["message"] == ("b'SELECT 10 FROM \"foobar\"'")
+
+@pytest.mark.django_db
+def test_sql_psycopg2_placeholders(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    from django.db import connections
+    psycopg2 = pytest.importorskip("psycopg2")
+    psycopg2_sql = psycopg2.sql
+
+    sql = connections['postgres'].cursor()
+
+    events = capture_events()
+    with pytest.raises(DataError):
+        names = ['foo', 'bar']
+        identifiers = [psycopg2_sql.Identifier(name) for name in names]
+        placeholders = [psycopg2_sql.Placeholder(var) for var in ['first_var', 'second_var']]
+        sql.execute('create table my_test_table (foo text, bar date)')
+
+        query = psycopg2_sql.SQL("insert into my_test_table ({}) values ({})").format(
+            psycopg2_sql.SQL(', ').join(identifiers),
+            psycopg2_sql.SQL(', ').join(placeholders))
+        sql.execute(query, {'first_var': 'fizz', 'second_var': 'not a date'})
+
+    capture_message("HI")
+
+    event, = events
+    crumb1, crumb2 = event["breadcrumbs"]
+    assert crumb1["message"] == ("b'create table my_test_table (foo text, bar date)'")
+    assert crumb2["message"] == ("""b'insert into my_test_table ("foo", "bar") values ('fizz', 'not a date')'""")
 
 
 @pytest.mark.django_db
