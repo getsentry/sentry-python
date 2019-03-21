@@ -7,6 +7,10 @@ python:
   - "3.5"
   - "3.6"
 
+env:
+  - SENTRY_PYTHON_TEST_POSTGRES_USER=postgres
+  - SENTRY_PYTHON_TEST_POSTGRES_NAME=travis_ci_test
+
 cache:
   pip: true
   cargo: true
@@ -47,6 +51,13 @@ matrix:
         - /Users/travis/Library/Python/2.7/bin/virtualenv $HOME/osx-py
         - source $HOME/osx-py/bin/activate
         - export TRAVIS_PYTHON_VERSION=2.7
+
+before_script:
+ - psql -c 'create database travis_ci_test;' -U postgres
+ - psql -c 'create database test_travis_ci_test;' -U postgres
+
+services:
+  - postgresql
 
 install:
   - pip install tox
