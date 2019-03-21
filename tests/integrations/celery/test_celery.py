@@ -112,7 +112,7 @@ def test_broken_prerun(init_celery, connect_signal):
 
 
 @pytest.mark.skipif(
-    (4, 2, 0) <= VERSION < (4, 2, 2),
+    (4, 2, 0) <= VERSION < (4, 2, 3),
     reason="https://github.com/celery/celery/issues/4661",
 )
 def test_retry(celery, capture_events):
