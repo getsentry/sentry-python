@@ -13,7 +13,7 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
 
-from sanic import Sanic  # type: ignore
+from sanic import Sanic, __version__ as VERSION  # type: ignore
 from sanic.exceptions import SanicException  # type: ignore
 from sanic.router import Router  # type: ignore
 from sanic.handlers import ErrorHandler  # type: ignore
@@ -24,11 +24,9 @@ if False:
     from typing import Any
     from typing import Callable
     from typing import Dict
-    from typing import List
-    from typing import Tuple
-    from sanic.exceptions import InvalidUsage
     from typing import Optional
     from typing import Union
+    from typing import Tuple
     from sanic.request import RequestParameters
 
 
@@ -46,12 +44,17 @@ class SanicIntegration(Integration):
                 " or aiocontextvars package"
             )
 
-        # Sanic 0.8 and older creates a logger named "root" and puts a
-        # stringified version of every exception in there (without exc_info),
-        # which our error deduplication can't detect.
-        #
-        # https://github.com/huge-success/sanic/issues/1332
-        ignore_logger("root")
+        if VERSION.startswith("0.8."):
+            # Sanic 0.8 and older creates a logger named "root" and puts a
+            # stringified version of every exception in there (without exc_info),
+            # which our error deduplication can't detect.
+            #
+            # We explicitly check the version here because it is a very
+            # invasive step to ignore this logger and not necessary in newer
+            # versions at all.
+            #
+            # https://github.com/huge-success/sanic/issues/1332
+            ignore_logger("root")
 
         old_handle_request = Sanic.handle_request
 
@@ -79,7 +82,7 @@ class SanicIntegration(Integration):
         old_router_get = Router.get
 
         def sentry_router_get(self, request):
-            # type: (Any, Request) -> Tuple[Callable, List, Dict[str, str], str]
+            # type: (Any, Request) -> Any
             rv = old_router_get(self, request)
             hub = Hub.current
             if hub.get_integration(SanicIntegration) is not None:
@@ -93,7 +96,7 @@ class SanicIntegration(Integration):
         old_error_handler_lookup = ErrorHandler.lookup
 
         def sentry_error_handler_lookup(self, exception):
-            # type: (Any, Union[ValueError, InvalidUsage]) -> Optional[Callable]
+            # type: (Any, Exception) -> Optional[Callable]
             _capture_exception(exception)
             old_error_handler = old_error_handler_lookup(self, exception)
 
@@ -104,13 +107,16 @@ class SanicIntegration(Integration):
                 return old_error_handler
 
             async def sentry_wrapped_error_handler(request, exception):
-                # type: (Request, ValueError) -> Any
+                # type: (Request, Exception) -> Any
                 try:
                     response = old_error_handler(request, exception)
                     if isawaitable(response):
                         response = await response
                     return response
                 except Exception:
+                    # Report errors that occur in Sanic error handler. These
+                    # exceptions will not even show up in Sanic's
+                    # `sanic.exceptions` logger.
                     exc_info = sys.exc_info()
                     _capture_exception(exc_info)
                     reraise(*exc_info)
@@ -120,13 +126,8 @@ class SanicIntegration(Integration):
         ErrorHandler.lookup = sentry_error_handler_lookup
 
 
-def _capture_exception(
-    exception  # type: Union[Tuple[type, BaseException, Any], ValueError, InvalidUsage]
-):
-    # type: (...) -> None
-    if isinstance(exception, SanicException):
-        return
-
+def _capture_exception(exception):
+    # type: (Union[Tuple[Optional[type], Optional[BaseException], Any], BaseException]) -> None
     hub = Hub.current
     integration = hub.get_integration(SanicIntegration)
     if integration is None:
@@ -144,7 +145,14 @@ def _capture_exception(
 def _make_request_processor(weak_request):
     # type: (Callable[[], Request]) -> Callable
     def sanic_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Dict[str, Any], Dict[str, Any]) -> Optional[Dict[str, Any]]
+
+        try:
+            if issubclass(hint["exc_info"][0], SanicException):
+                return None
+        except KeyError:
+            pass
+
         request = weak_request()
         if request is None:
             return event
