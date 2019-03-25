@@ -95,12 +95,14 @@ WSGI_APPLICATION = "tests.django.myapp.wsgi.application"
 DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}
 
 try:
+    import psycopg2  # noqa
+
     DATABASES["postgres"] = {
         "ENGINE": "django.db.backends.postgresql_psycopg2",
         "NAME": os.environ["SENTRY_PYTHON_TEST_POSTGRES_NAME"],
         "USER": os.environ["SENTRY_PYTHON_TEST_POSTGRES_USER"],
     }
-except KeyError:
+except (ImportError, KeyError):
     pass
 
 
