@@ -1,0 +1,79 @@
+# Python package
+# Create and test a Python package on multiple Python versions.
+# Add steps that analyze code, save the dist with the build record, publish to a PyPI-compatible index, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/python
+
+trigger:
+  - "*"
+
+pr: none
+
+resources:
+  containers:
+    - container: postgres
+      image: "postgres:9.6"
+      ports:
+        - 5432:5432
+
+jobs:
+  - job: run_tests
+    displayName: Tests
+    pool:
+      vmImage: "Ubuntu-16.04"
+    services:
+      postgres: postgres
+    strategy:
+      matrix:
+        Python27:
+          python.version: "2.7"
+        Python34:
+          python.version: "3.4"
+        Python35:
+          python.version: "3.5"
+        Python36:
+          python.version: "3.6"
+        Python37:
+          python.version: "3.7"
+        # Python 3.8 and PyPy will be soon added to the base VM image:
+        #   https://github.com/Microsoft/azure-pipelines-tasks/pull/9866
+        Python38:
+          python.version: "3.8-dev"
+        PyPy2:
+          python.version: "pypy2"
+
+    steps:
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: "$(python.version)"
+          architecture: "x64"
+
+      - script: |
+          set -eux
+          docker ps -a
+          docker images -a
+          # FIXME: theoretically we can run psql commands from a docker container, but
+          # name resolution is a bit tricky here
+          sudo apt install -y postgresql-client
+          psql -c 'create database travis_ci_test;' -U postgres -h localhost
+          psql -c 'create database test_travis_ci_test;' -U postgres -h localhost
+        displayName: "Create Postgres users"
+
+      - script: |
+          set -eux
+          python --version
+          pip --version
+          pip install tox
+          pip install codecov
+          sh scripts/download-semaphore.sh
+        displayName: "Install dependencies"
+
+      - script: |
+          set -eux
+          coverage erase
+          ./scripts/runtox.sh '' --cov=sentry_sdk --cov-report= --cov-branch
+          codecov --file .coverage*
+        env:
+          SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
+          SENTRY_PYTHON_TEST_POSTGRES_NAME: travis_ci_test
+          AZURE_PYTHON_VERSION: "$(python.version)"
+        displayName: "Run tests"

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -ex
 
 if [ -n "$TOXPATH" ]; then
     true
@@ -12,10 +12,12 @@ fi
 # Usage: sh scripts/runtox.sh py3.7 <pytest-args>
 # Runs all environments with substring py3.7 and the given arguments for pytest
 
-if [ -z "$1" ] && [ -n "$TRAVIS_PYTHON_VERSION" ]; then
-    searchstring="$(echo py$TRAVIS_PYTHON_VERSION | sed -e 's/pypypy/pypy/g' -e 's/-dev//g')"
-else
+if [ -n "$1" ]; then
     searchstring="$1"
+elif [ -n "$TRAVIS_PYTHON_VERSION" ]; then
+    searchstring="$(echo py$TRAVIS_PYTHON_VERSION | sed -e 's/pypypy/pypy/g' -e 's/-dev//g')"
+elif [ -n "$AZURE_PYTHON_VERSION" ]; then
+    searchstring="$(echo py$AZURE_PYTHON_VERSION)"
 fi
 
 exec $TOXPATH -e $($TOXPATH -l | grep "$searchstring" | tr '\n' ',') -- "${@:2}"
