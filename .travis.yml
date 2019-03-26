@@ -20,6 +20,9 @@ branches:
     - /^release\/.+$/
 
 matrix:
+  allowed_failures:
+    - os: osx
+
   include:
     - python: "3.7"
       dist: xenial
