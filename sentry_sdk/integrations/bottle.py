@@ -1,7 +1,11 @@
 from __future__ import absolute_import
 
 from sentry_sdk.hub import Hub
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception, transaction_from_function
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+    transaction_from_function,
+)
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
@@ -70,9 +74,7 @@ class BottleIntegration(Integration):
                 with hub.configure_scope() as scope:
                     scope._name = "bottle"
                     scope.add_event_processor(
-                        _make_request_event_processor(
-                            app, bottle_request, integration
-                        )
+                        _make_request_event_processor(app, bottle_request, integration)
                     )
                 res = old_handle(self, environ)
 
@@ -149,7 +151,9 @@ def _make_request_event_processor(app, request, integration):
 
         try:
             if integration.transaction_style == "endpoint":
-                event["transaction"] = request.route.name or transaction_from_function(request.route.callback)
+                event["transaction"] = request.route.name or transaction_from_function(
+                    request.route.callback
+                )
             elif integration.transaction_style == "url":
                 event["transaction"] = request.route.rule  # type: ignore
         except Exception:
