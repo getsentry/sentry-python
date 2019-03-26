@@ -83,7 +83,7 @@ def test_transaction_style(
     assert response[1] == "200 OK"
 
     event, = events
-    assert event["transaction"] == expected_transaction
+    assert event["transaction"].endswith(expected_transaction)
 
 
 @pytest.mark.parametrize("debug", (True, False), ids=["debug", "nodebug"])
