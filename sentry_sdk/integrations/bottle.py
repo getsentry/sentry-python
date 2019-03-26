@@ -64,7 +64,7 @@ class BottleIntegration(Integration):
                         event, hint = event_from_exception(
                             exception,
                             client_options=hub.client.options,
-                            mechanism={"type": "bottle", "handled": self.app.catchall},
+                            mechanism={"type": "bottle", "handled": False},
                         )
                         hub.capture_event(event, hint=hint)
                         raise exception

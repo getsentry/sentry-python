@@ -114,7 +114,7 @@ def test_errors(
 
     event, = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "bottle"
-    assert event["exception"]["values"][0]["mechanism"]["handled"] == catchall
+    assert event["exception"]["values"][0]["mechanism"]["handled"] is False
 
 
 def test_large_json_request(sentry_init, capture_events, app, get_client):
