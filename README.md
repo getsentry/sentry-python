@@ -8,6 +8,7 @@
 
 [![PyPi page link -- version](https://img.shields.io/pypi/v/sentry-sdk.svg)](https://pypi.python.org/pypi/sentry-sdk)
 [![Build Status](https://travis-ci.com/getsentry/sentry-python.svg?branch=master)](https://travis-ci.com/getsentry/sentry-python)
+[![PyPi page link -- MIT licence](https://img.shields.io/pypi/l/sentry-sdk.svg)](https://pypi.python.org/pypi/sentry-sdk)
 
 To learn about how to use the SDK:
 
