@@ -6,6 +6,7 @@
 
 # sentry-python - Sentry SDK for Python
 
+[![PyPi page link -- version](https://img.shields.io/pypi/v/sentry-sdk.svg)](https://pypi.python.org/pypi/sentry-sdk)
 [![Build Status](https://travis-ci.com/getsentry/sentry-python.svg?branch=master)](https://travis-ci.com/getsentry/sentry-python)
 
 To learn about how to use the SDK:
