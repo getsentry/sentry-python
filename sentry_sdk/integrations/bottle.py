@@ -141,12 +141,6 @@ def _make_request_event_processor(app, request, integration):
     def inner(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
 
-        # if the request is gone we are fine not logging the data from
-        # it.  This might happen if the processor is pushed away to
-        # another thread.
-        if request is None:
-            return event
-
         try:
             if integration.transaction_style == "endpoint":
                 event["transaction"] = request.route.name or transaction_from_function(request.route.callback)
