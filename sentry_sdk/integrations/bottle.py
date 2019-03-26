@@ -1,7 +1,5 @@
 from __future__ import absolute_import
 
-import types
-
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception, transaction_from_function
 from sentry_sdk.integrations import Integration
@@ -16,7 +14,7 @@ if False:
     from typing import Optional
     from bottle import FileUpload, FormsDict, LocalRequest  # type: ignore
 
-from bottle import Bottle, request as bottle_request  # type: ignore
+from bottle import Bottle, Route, request as bottle_request  # type: ignore
 
 
 class BottleIntegration(Integration):
@@ -38,6 +36,7 @@ class BottleIntegration(Integration):
     def setup_once():
         # type: () -> None
 
+        # monkey patch method Bottle.__call__
         old_app = Bottle.__call__
 
         def sentry_patched_wsgi_app(self, environ, start_response):
@@ -48,61 +47,68 @@ class BottleIntegration(Integration):
             if integration is None:
                 return old_app(self, environ, start_response)
 
-            # monkey patch method self(Bottle).router.match -> (route, args)
-            # to monkey patch route.call
-            old_match = self.router.match
-
-            def patched_match(self, *args, **kwargs):
-                route, route_args = old_match(*args, **kwargs)
-                old_call = route.call
-
-                def patched_call(self, *args, **kwargs):
-                    try:
-                        old_call(*args, **kwargs)
-                    except Exception as exception:
-                        hub = Hub.current
-                        event, hint = event_from_exception(
-                            exception,
-                            client_options=hub.client.options,
-                            mechanism={"type": "bottle", "handled": False},
-                        )
-                        hub.capture_event(event, hint=hint)
-                        raise exception
-
-                route.call = types.MethodType(patched_call, route)
-                return route, route_args
-
-            self.router.match = types.MethodType(patched_match, self.route)
-
-            # monkey patch method self(Bottle)._handle
-            old_handle = self._handle
-
-            def _patched_handle(self, environ):
-                hub = Hub.current
-                # create new scope
-                scope_manager = hub.push_scope()
-
-                with scope_manager:
-                    app = self
-                    with hub.configure_scope() as scope:
-                        scope._name = "bottle"
-                        scope.add_event_processor(
-                            _make_request_event_processor(
-                                app, bottle_request, integration
-                            )
-                        )
-                    res = old_handle(environ)
-
-                # scope cleanup
-                return res
-
-            self._handle = types.MethodType(_patched_handle, self)
-
             return SentryWsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))(
                 environ, start_response
             )
 
         Bottle.__call__ = sentry_patched_wsgi_app  # type: ignore
+
+        # monkey patch method Bottle._handle
+        old_handle = Bottle._handle
+
+        def _patched_handle(self, environ):
+            hub = Hub.current
+            integration = hub.get_integration(BottleIntegration)
+            if integration is None:
+                return old_handle(self, environ)
+
+            # create new scope
+            scope_manager = hub.push_scope()
+
+            with scope_manager:
+                app = self
+                with hub.configure_scope() as scope:
+                    scope._name = "bottle"
+                    scope.add_event_processor(
+                        _make_request_event_processor(
+                            app, bottle_request, integration
+                        )
+                    )
+                res = old_handle(self, environ)
+
+            # scope cleanup
+            return res
+
+        Bottle._handle = _patched_handle
+
+        # monkey patch method Route._make_callback
+        old_make_callback = Route._make_callback
+
+        def patched_make_callback(self, *args, **kwargs):
+            hub = Hub.current
+            integration = hub.get_integration(BottleIntegration)
+            prepared_callback = old_make_callback(self, *args, **kwargs)
+            if integration is None:
+                return prepared_callback
+
+            def wrapped_callback(*args, **kwargs):
+                try:
+                    res = prepared_callback(*args, **kwargs)
+                except Exception as exception:
+                    hub = Hub.current
+                    event, hint = event_from_exception(
+                        exception,
+                        client_options=hub.client.options,
+                        mechanism={"type": "bottle", "handled": False},
+                    )
+                    hub.capture_event(event, hint=hint)
+                    raise exception
+
+                return res
+
+            return wrapped_callback
+
+        Route._make_callback = patched_make_callback
 
 
 class BottleRequestExtractor(RequestExtractor):
