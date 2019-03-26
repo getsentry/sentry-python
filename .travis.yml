@@ -20,7 +20,7 @@ branches:
     - /^release\/.+$/
 
 matrix:
-  allowed_failures:
+  allow_failures:
     - os: osx
 
   include:
