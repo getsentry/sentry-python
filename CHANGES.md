@@ -1,3 +1,8 @@
+## 0.7.8
+
+* Add support for Sanic versions 18 and 19.
+* Fix a bug that causes an SDK crash when using composed SQL from psycopg2.
+
 ## 0.7.7
 
 * Fix a bug that would not capture request bodies if they were empty JSON
