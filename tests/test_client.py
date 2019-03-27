@@ -1,6 +1,7 @@
 # coding: utf-8
 import json
 import logging
+import os
 import pytest
 import subprocess
 import sys
@@ -43,10 +44,26 @@ def test_transport_option(monkeypatch):
     assert str(Client(transport=transport).dsn) == dsn
 
 
-def test_http_proxy(monkeypatch):
-    client = Client("https://foo@sentry.io/123", http_proxy="http://localhost/123")
+def test_proxy_http_use(monkeypatch):
+    client = Client("http://foo@sentry.io/123", http_proxy="http://localhost/123")
     assert client.transport._pool.proxy.scheme == "http"
 
+
+def test_proxy_https_use(monkeypatch):
+    client = Client("https://foo@sentry.io/123", http_proxy="https://localhost/123")
+    assert client.transport._pool.proxy.scheme == "https"
+
+
+def test_proxy_both_select_http(monkeypatch):
+    client = Client(
+        "http://foo@sentry.io/123",
+        https_proxy="https://localhost/123",
+        http_proxy="http://localhost/123",
+    )
+    assert client.transport._pool.proxy.scheme == "http"
+
+
+def test_proxy_both_select_https(monkeypatch):
     client = Client(
         "https://foo@sentry.io/123",
         https_proxy="https://localhost/123",
@@ -54,15 +71,33 @@ def test_http_proxy(monkeypatch):
     )
     assert client.transport._pool.proxy.scheme == "https"
 
-    client = Client("http://foo@sentry.io/123", http_proxy="http://localhost/123")
+
+def test_proxy_http_fallback_http(monkeypatch):
+    client = Client("https://foo@sentry.io/123", http_proxy="http://localhost/123")
     assert client.transport._pool.proxy.scheme == "http"
 
-    client = Client(
-        "http://foo@sentry.io/123",
-        https_proxy="https://localhost/123",
-        http_proxy="http://localhost/123",
-    )
+
+def test_proxy_none_noenv(monkeypatch):
+    client = Client("http://foo@sentry.io/123")
+    assert client.transport._pool.proxy is None
+
+
+def test_proxy_none_httpenv_select(monkeypatch):
+    os.environ["HTTP_PROXY"] = "http://localhost/123"
+    client = Client("http://foo@sentry.io/123")
     assert client.transport._pool.proxy.scheme == "http"
+
+
+def test_proxy_none_httpsenv_select(monkeypatch):
+    os.environ["HTTPS_PROXY"] = "https://localhost/123"
+    client = Client("https://foo@sentry.io/123")
+    assert client.transport._pool.proxy.scheme == "https"
+
+
+def test_proxy_none_httpenv_no_fallback(monkeypatch):
+    os.environ["HTTP_PROXY"] = "http://localhost/123"
+    client = Client("https://foo@sentry.io/123")
+    assert client.transport._pool.proxy is None
 
 
 def test_simple_transport():
