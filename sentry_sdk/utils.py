@@ -349,39 +349,43 @@ def safe_repr(value):
 
 
 def object_to_json(obj, remaining_depth=4, memo=None):
-    if memo is None:
-        memo = Memo()
-    if memo.memoize(obj):
-        return CYCLE_MARKER
+    with capture_internal_exceptions():
+        if memo is None:
+            memo = Memo()
+        if memo.memoize(obj):
+            return CYCLE_MARKER
 
-    try:
-        if remaining_depth > 0:
-            hints = {"memo": memo, "remaining_depth": remaining_depth}
-            for processor in global_repr_processors:
-                with capture_internal_exceptions():
-                    result = processor(obj, hints)
-                    if result is not NotImplemented:
-                        return result
+        try:
+            if remaining_depth > 0:
+                hints = {"memo": memo, "remaining_depth": remaining_depth}
+                for processor in global_repr_processors:
+                    with capture_internal_exceptions():
+                        result = processor(obj, hints)
+                        if result is not NotImplemented:
+                            return result
 
-            if isinstance(obj, (list, tuple)):
-                # It is not safe to iterate over another sequence types as this may raise errors or
-                # bring undesired side-effects (e.g. Django querysets are executed during iteration)
-                return [
-                    object_to_json(x, remaining_depth=remaining_depth - 1, memo=memo)
-                    for x in obj
-                ]
+                if isinstance(obj, (list, tuple)):
+                    # It is not safe to iterate over another sequence types as this may raise errors or
+                    # bring undesired side-effects (e.g. Django querysets are executed during iteration)
+                    return [
+                        object_to_json(
+                            x, remaining_depth=remaining_depth - 1, memo=memo
+                        )
+                        for x in obj
+                    ]
 
-            if isinstance(obj, Mapping):
-                return {
-                    safe_str(k): object_to_json(
-                        v, remaining_depth=remaining_depth - 1, memo=memo
-                    )
-                    for k, v in list(obj.items())
-                }
+                if isinstance(obj, Mapping):
+                    return {
+                        safe_str(k): object_to_json(
+                            v, remaining_depth=remaining_depth - 1, memo=memo
+                        )
+                        for k, v in list(obj.items())
+                    }
 
-        return safe_repr(obj)
-    finally:
-        memo.unmemoize(obj)
+            return safe_repr(obj)
+        finally:
+            memo.unmemoize(obj)
+    return u"<broken repr>"
 
 
 def extract_locals(frame):

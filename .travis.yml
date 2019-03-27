@@ -8,8 +8,7 @@ python:
   - "3.6"
 
 env:
-  - SENTRY_PYTHON_TEST_POSTGRES_USER=postgres
-  - SENTRY_PYTHON_TEST_POSTGRES_NAME=travis_ci_test
+  - SENTRY_PYTHON_TEST_POSTGRES_USER=postgres SENTRY_PYTHON_TEST_POSTGRES_NAME=travis_ci_test
 
 cache:
   pip: true
@@ -21,6 +20,9 @@ branches:
     - /^release\/.+$/
 
 matrix:
+  allow_failures:
+    - os: osx
+
   include:
     - python: "3.7"
       dist: xenial
