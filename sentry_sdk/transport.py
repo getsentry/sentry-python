@@ -157,6 +157,10 @@ class HttpTransport(Transport):
         if not proxy:
             proxy = getproxies().get(parsed_dsn.scheme)
 
+            # maybe fallback to HTTP proxy
+            if parsed_dsn.scheme == "https" and not proxy:
+                proxy = getproxies().get("http")
+
         opts = self._get_pool_options(ca_certs)
 
         if proxy:

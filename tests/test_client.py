@@ -94,10 +94,10 @@ def test_proxy_none_httpsenv_select(monkeypatch):
     assert client.transport._pool.proxy.scheme == "https"
 
 
-def test_proxy_none_httpenv_no_fallback(monkeypatch):
+def test_proxy_none_httpenv_fallback(monkeypatch):
     os.environ["HTTP_PROXY"] = "http://localhost/123"
     client = Client("https://foo@sentry.io/123")
-    assert client.transport._pool.proxy is None
+    assert client.transport._pool.proxy.scheme == "http"
 
 
 def test_simple_transport():
