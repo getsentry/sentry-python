@@ -17,7 +17,7 @@ if [ -n "$1" ]; then
 elif [ -n "$TRAVIS_PYTHON_VERSION" ]; then
     searchstring="$(echo py$TRAVIS_PYTHON_VERSION | sed -e 's/pypypy/pypy/g' -e 's/-dev//g')"
 elif [ -n "$AZURE_PYTHON_VERSION" ]; then
-    searchstring="$(echo py$AZURE_PYTHON_VERSION)"
+    searchstring="$(echo py$AZURE_PYTHON_VERSION | sed -e 's/pypypy/pypy/g' -e 's/-dev//g')"
 fi
 
 exec $TOXPATH -e $($TOXPATH -l | grep "$searchstring" | tr '\n' ',') -- "${@:2}"
