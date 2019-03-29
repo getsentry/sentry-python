@@ -22,7 +22,10 @@ setup(
     zip_safe=False,
     license="BSD",
     install_requires=["urllib3", "certifi"],
-    extras_require={"flask": ["flask>=0.8", "blinker>=1.1"]},
+    extras_require={
+        "flask": ["flask>=0.8", "blinker>=1.1"],
+        "bottle": ["bottle>=0.12.13"],
+    },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Environment :: Web Environment",
