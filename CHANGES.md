@@ -1,3 +1,10 @@
+## 0.7.9
+
+* New integration for the Bottle web framework. Thanks to Stepan Henek!
+* Self-protect against broken mapping implementations and other broken reprs
+  instead of dropping all local vars from a stacktrace. Thanks to Marco
+  Neumann!
+
 ## 0.7.8
 
 * Add support for Sanic versions 18 and 19.
