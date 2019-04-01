@@ -101,7 +101,7 @@ try:
         "ENGINE": "django.db.backends.postgresql_psycopg2",
         "NAME": os.environ["SENTRY_PYTHON_TEST_POSTGRES_NAME"],
         "USER": os.environ["SENTRY_PYTHON_TEST_POSTGRES_USER"],
-        "HOST": 'localhost',
+        "HOST": "localhost",
         "PORT": 5432,
     }
 except (ImportError, KeyError):
