@@ -64,7 +64,7 @@ services:
 install:
   - pip install tox
   - pip install codecov
-  - sh scripts/download-semaphore.sh
+  - bash scripts/download-semaphore.sh
 
 script:
   - coverage erase

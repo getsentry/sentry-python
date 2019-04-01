@@ -1,5 +1,5 @@
 #!/bin/bash
-set -ex
+set -e
 
 if { [ "$TRAVIS" == "true" ] || [ "$TF_BUILD" == "True" ]; } && [ -z "$GITHUB_API_TOKEN" ]; then
     echo "Not running on external pull request"
