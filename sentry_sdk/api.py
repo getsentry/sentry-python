@@ -35,6 +35,7 @@ def hubmethod(f):
 
 @hubmethod
 def capture_event(event, hint=None):
+    # type: (Dict[str, Any], Dict[str, Any]) -> Optional[str]
     hub = Hub.current
     if hub is not None:
         return hub.capture_event(event, hint)
@@ -59,10 +60,11 @@ def capture_exception(error=None):
 
 
 @hubmethod
-def add_breadcrumb(*args, **kwargs):
+def add_breadcrumb(crumb=None, hint=None, **kwargs):
+    # type: (Dict[str, Any], Dict[str, Any], **Any) -> None
     hub = Hub.current
     if hub is not None:
-        return hub.add_breadcrumb(*args, **kwargs)
+        return hub.add_breadcrumb(crumb, hint, **kwargs)
 
 
 @overload  # noqa

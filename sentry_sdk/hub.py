@@ -241,6 +241,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return self._stack[-1][0]
 
     def last_event_id(self):
+        # type: () -> Optional[str]
         """Returns the last event ID."""
         return self._last_event_id
 
