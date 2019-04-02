@@ -279,6 +279,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return self.capture_event({"message": message, "level": level})
 
     def capture_exception(self, error=None):
+        # type: (Optional[BaseException]) -> Optional[str]
         """Captures an exception.
 
         The argument passed can be `None` in which case the last exception

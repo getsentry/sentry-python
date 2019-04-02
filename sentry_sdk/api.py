@@ -52,7 +52,7 @@ def capture_message(message, level=None):
 
 @hubmethod
 def capture_exception(error=None):
-    # type: (ValueError) -> Optional[str]
+    # type: (Optional[BaseException]) -> Optional[str]
     hub = Hub.current
     if hub is not None:
         return hub.capture_exception(error)
