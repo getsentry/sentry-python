@@ -6,7 +6,7 @@ import logging
 pytest.importorskip("bottle")
 
 from io import BytesIO
-from bottle import Bottle, debug as set_debug, abort
+from bottle import Bottle, debug as set_debug, abort, redirect
 from sentry_sdk import capture_message
 
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -417,6 +417,25 @@ def test_bad_request_not_captured(sentry_init, capture_events, app, get_client):
     @app.route("/")
     def index():
         abort(400, "bad request in")
+
+    client = get_client()
+
+    client.get("/")
+
+    assert not events
+
+
+def test_no_exception_on_redirect(sentry_init, capture_events, app, get_client):
+    sentry_init(integrations=[bottle_sentry.BottleIntegration()])
+    events = capture_events()
+
+    @app.route("/")
+    def index():
+        redirect("/here")
+
+    @app.route("/here")
+    def here():
+        return "here"
 
     client = get_client()
 
