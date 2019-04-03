@@ -727,6 +727,7 @@ def strip_event_mut(event):
             strip_stacktrace_mut(exception.get("stacktrace", None))
 
     strip_request_mut(event.get("request", None))
+    strip_breadcrumbs_mut(event.get("breadcrumbs", None))
 
 
 def strip_stacktrace_mut(stacktrace):
@@ -745,6 +746,14 @@ def strip_request_mut(request):
     if not data:
         return
     request["data"] = strip_databag(data)
+
+
+def strip_breadcrumbs_mut(breadcrumbs):
+    if not breadcrumbs:
+        return
+
+    for i in range(len(breadcrumbs)):
+        breadcrumbs[i] = strip_databag(breadcrumbs[i])
 
 
 def strip_frame_mut(frame):
