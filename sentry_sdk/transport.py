@@ -130,7 +130,7 @@ class HttpTransport(Transport):
                 return
 
             elif response.status >= 300 or response.status < 200:
-                raise ValueError("Unexpected status code: %s" % response.status)
+                logger.error("Unexpected status code: %s (body: %s)", response.status, response.data)
         finally:
             response.close()
 
