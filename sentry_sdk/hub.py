@@ -241,6 +241,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return self._stack[-1][0]
 
     def last_event_id(self):
+        # type: () -> Optional[str]
         """Returns the last event ID."""
         return self._last_event_id
 
@@ -278,6 +279,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return self.capture_event({"message": message, "level": level})
 
     def capture_exception(self, error=None):
+        # type: (Optional[BaseException]) -> Optional[str]
         """Captures an exception.
 
         The argument passed can be `None` in which case the last exception
@@ -286,7 +288,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         client = self.client
         if client is None:
-            return
+            return None
         if error is None:
             exc_info = sys.exc_info()
         else:
@@ -297,6 +299,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return self.capture_event(event, hint=hint)
         except Exception:
             self._capture_internal_exception(sys.exc_info())
+
+        return None
 
     def _capture_internal_exception(self, exc_info):
         """Capture an exception that is likely caused by a bug in the SDK
