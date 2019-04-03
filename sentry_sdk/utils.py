@@ -800,36 +800,34 @@ def convert_types(obj):
 
 
 def strip_databag(obj, remaining_depth=20, max_breadth=20):
-    # type: (Any, int) -> Any
+    # type: (Any, int, int) -> Any
     assert not isinstance(obj, bytes), "bytes should have been normalized before"
     if remaining_depth <= 0:
         return AnnotatedValue(None, {"rem": [["!limit", "x"]]})
     if isinstance(obj, text_type):
         return strip_string(obj)
     if isinstance(obj, Mapping):
-        rv = {}
+        rv_dict = {}  # type: Dict[Any, Any]
         for i, (k, v) in enumerate(obj.items()):
             if i >= max_breadth:
-                rv = AnnotatedValue(rv, {"len": max_breadth})
-                break
-            rv[k] = strip_databag(
+                return AnnotatedValue(rv_dict, {"len": max_breadth})
+            rv_dict[k] = strip_databag(
                 v, remaining_depth=remaining_depth - 1, max_breadth=max_breadth
             )
 
-        return rv
+        return rv_dict
     if isinstance(obj, Sequence):
-        rv = []
+        rv_list = []  # type: List[Any]
         for i, v in enumerate(obj):
             if i >= max_breadth:
-                rv = AnnotatedValue(rv, {"len": max_breadth})
-                break
-            rv.append(
+                return AnnotatedValue(rv_list, {"len": max_breadth})
+            rv_list.append(
                 strip_databag(
                     v, remaining_depth=remaining_depth - 1, max_breadth=max_breadth
                 )
             )
 
-        return rv
+        return rv_list
     return obj
 
 
