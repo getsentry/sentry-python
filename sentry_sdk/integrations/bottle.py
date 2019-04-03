@@ -109,10 +109,8 @@ class BottleIntegration(Integration):
 
                 try:
                     res = prepared_callback(*args, **kwargs)
-                except HTTPResponse as exception:
-                    if exception.status == 500:
-                        capture_exception(exception)
-                    raise exception
+                except HTTPResponse:
+                    raise
                 except Exception as exception:
                     capture_exception(exception)
                     raise exception
