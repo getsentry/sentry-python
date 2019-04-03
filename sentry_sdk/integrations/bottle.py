@@ -100,7 +100,6 @@ class BottleIntegration(Integration):
 
             def wrapped_callback(*args, **kwargs):
                 def capture_exception(exception):
-                    hub = Hub.current
                     event, hint = event_from_exception(
                         exception,
                         client_options=hub.client.options,
