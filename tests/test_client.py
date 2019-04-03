@@ -397,6 +397,21 @@ def test_databag_stripping(sentry_init, capture_events):
     assert len(json.dumps(event)) < 10000
 
 
+def test_databag_breadth_stripping(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    try:
+        a = ["a"] * 16000  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    event, = events
+
+    assert len(json.dumps(event)) < 10000
+
+
 @pytest.mark.skipif(not HAS_CHAINED_EXCEPTIONS, reason="Only works on 3.3+")
 def test_chained_exceptions(sentry_init, capture_events):
     sentry_init()

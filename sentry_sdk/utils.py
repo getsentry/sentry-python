@@ -784,7 +784,7 @@ def convert_types(obj):
     return obj
 
 
-def strip_databag(obj, remaining_depth=20):
+def strip_databag(obj, remaining_depth=20, max_breadth=20):
     # type: (Any, int) -> Any
     assert not isinstance(obj, bytes), "bytes should have been normalized before"
     if remaining_depth <= 0:
@@ -792,9 +792,29 @@ def strip_databag(obj, remaining_depth=20):
     if isinstance(obj, text_type):
         return strip_string(obj)
     if isinstance(obj, Mapping):
-        return {k: strip_databag(v, remaining_depth - 1) for k, v in obj.items()}
+        rv = {}
+        for i, (k, v) in enumerate(obj.items()):
+            if i >= max_breadth:
+                rv = AnnotatedValue(rv, {"len": max_breadth})
+                break
+            rv[k] = strip_databag(
+                v, remaining_depth=remaining_depth - 1, max_breadth=max_breadth
+            )
+
+        return rv
     if isinstance(obj, Sequence):
-        return [strip_databag(v, remaining_depth - 1) for v in obj]
+        rv = []
+        for i, v in enumerate(obj):
+            if i >= max_breadth:
+                rv = AnnotatedValue(rv, {"len": max_breadth})
+                break
+            rv.append(
+                strip_databag(
+                    v, remaining_depth=remaining_depth - 1, max_breadth=max_breadth
+                )
+            )
+
+        return rv
     return obj
 
 
