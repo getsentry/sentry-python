@@ -18,7 +18,12 @@ if False:
     from typing import Optional
     from bottle import FileUpload, FormsDict, LocalRequest  # type: ignore
 
-from bottle import Bottle, Route, request as bottle_request  # type: ignore
+from bottle import (
+    Bottle,
+    Route,
+    request as bottle_request,
+    HTTPResponse,
+)  # type: ignore
 
 
 class BottleIntegration(Integration):
@@ -94,16 +99,20 @@ class BottleIntegration(Integration):
                 return prepared_callback
 
             def wrapped_callback(*args, **kwargs):
-                try:
-                    res = prepared_callback(*args, **kwargs)
-                except Exception as exception:
-                    hub = Hub.current
+                def capture_exception(exception):
                     event, hint = event_from_exception(
                         exception,
                         client_options=hub.client.options,
                         mechanism={"type": "bottle", "handled": False},
                     )
                     hub.capture_event(event, hint=hint)
+
+                try:
+                    res = prepared_callback(*args, **kwargs)
+                except HTTPResponse:
+                    raise
+                except Exception as exception:
+                    capture_exception(exception)
                     raise exception
 
                 return res
