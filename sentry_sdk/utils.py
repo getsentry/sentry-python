@@ -709,7 +709,7 @@ def flatten_metadata(obj):
                     del meta[str(i)]
             return list_rv, (meta or None)
         if isinstance(obj, AnnotatedValue):
-            return obj.value, {"": obj.metadata}
+            return (inner(obj.value)[0], {"": obj.metadata})
         return obj, None
 
     obj, meta = inner(obj)
@@ -788,10 +788,14 @@ def convert_types(obj):
         return {k: convert_types(v) for k, v in obj.items()}
     if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
         return [convert_types(v) for v in obj]
+    if isinstance(obj, AnnotatedValue):
+        return AnnotatedValue(convert_types(obj.value), obj.metadata)
+
     if not isinstance(obj, string_types + number_types):
         return safe_repr(obj)
     if isinstance(obj, bytes):
         return obj.decode("utf-8", "replace")
+
     return obj
 
 
