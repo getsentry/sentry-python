@@ -778,10 +778,12 @@ class Memo(object):
 
 def convert_types(obj):
     # type: (Any) -> Any
+    if obj is None:
+        return None
     if obj is CYCLE_MARKER:
         return u"<cyclic>"
     if isinstance(obj, datetime):
-        return obj.strftime("%Y-%m-%dT%H:%M:%SZ")
+        return text_type(obj.strftime("%Y-%m-%dT%H:%M:%SZ"))
     if isinstance(obj, Mapping):
         return {k: convert_types(v) for k, v in obj.items()}
     if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
