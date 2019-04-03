@@ -10,6 +10,7 @@ if False:
     from typing import Optional
     from typing import overload
     from typing import Callable
+    from typing import Dict
     from contextlib import ContextManager
 else:
 
@@ -39,6 +40,7 @@ def capture_event(event, hint=None):
     hub = Hub.current
     if hub is not None:
         return hub.capture_event(event, hint)
+    return None
 
 
 @hubmethod

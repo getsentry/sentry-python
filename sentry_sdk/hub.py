@@ -288,7 +288,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         client = self.client
         if client is None:
-            return
+            return None
         if error is None:
             exc_info = sys.exc_info()
         else:
@@ -299,6 +299,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return self.capture_event(event, hint=hint)
         except Exception:
             self._capture_internal_exception(sys.exc_info())
+
+        return None
 
     def _capture_internal_exception(self, exc_info):
         """Capture an exception that is likely caused by a bug in the SDK
