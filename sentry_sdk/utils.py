@@ -709,7 +709,7 @@ def flatten_metadata(obj):
                     del meta[str(i)]
             return list_rv, (meta or None)
         if isinstance(obj, AnnotatedValue):
-            return obj.value, {"": obj.metadata}
+            return (inner(obj.value)[0], {"": obj.metadata})
         return obj, None
 
     obj, meta = inner(obj)
@@ -727,6 +727,7 @@ def strip_event_mut(event):
             strip_stacktrace_mut(exception.get("stacktrace", None))
 
     strip_request_mut(event.get("request", None))
+    strip_breadcrumbs_mut(event.get("breadcrumbs", None))
 
 
 def strip_stacktrace_mut(stacktrace):
@@ -745,6 +746,14 @@ def strip_request_mut(request):
     if not data:
         return
     request["data"] = strip_databag(data)
+
+
+def strip_breadcrumbs_mut(breadcrumbs):
+    if not breadcrumbs:
+        return
+
+    for i in range(len(breadcrumbs)):
+        breadcrumbs[i] = strip_databag(breadcrumbs[i])
 
 
 def strip_frame_mut(frame):
@@ -769,32 +778,56 @@ class Memo(object):
 
 def convert_types(obj):
     # type: (Any) -> Any
+    if obj is None:
+        return None
     if obj is CYCLE_MARKER:
         return u"<cyclic>"
     if isinstance(obj, datetime):
-        return obj.strftime("%Y-%m-%dT%H:%M:%SZ")
+        return text_type(obj.strftime("%Y-%m-%dT%H:%M:%SZ"))
     if isinstance(obj, Mapping):
         return {k: convert_types(v) for k, v in obj.items()}
     if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
         return [convert_types(v) for v in obj]
+    if isinstance(obj, AnnotatedValue):
+        return AnnotatedValue(convert_types(obj.value), obj.metadata)
+
     if not isinstance(obj, string_types + number_types):
         return safe_repr(obj)
     if isinstance(obj, bytes):
         return obj.decode("utf-8", "replace")
+
     return obj
 
 
-def strip_databag(obj, remaining_depth=20):
-    # type: (Any, int) -> Any
+def strip_databag(obj, remaining_depth=20, max_breadth=20):
+    # type: (Any, int, int) -> Any
     assert not isinstance(obj, bytes), "bytes should have been normalized before"
     if remaining_depth <= 0:
         return AnnotatedValue(None, {"rem": [["!limit", "x"]]})
     if isinstance(obj, text_type):
         return strip_string(obj)
     if isinstance(obj, Mapping):
-        return {k: strip_databag(v, remaining_depth - 1) for k, v in obj.items()}
+        rv_dict = {}  # type: Dict[Any, Any]
+        for i, (k, v) in enumerate(obj.items()):
+            if i >= max_breadth:
+                return AnnotatedValue(rv_dict, {"len": max_breadth})
+            rv_dict[k] = strip_databag(
+                v, remaining_depth=remaining_depth - 1, max_breadth=max_breadth
+            )
+
+        return rv_dict
     if isinstance(obj, Sequence):
-        return [strip_databag(v, remaining_depth - 1) for v in obj]
+        rv_list = []  # type: List[Any]
+        for i, v in enumerate(obj):
+            if i >= max_breadth:
+                return AnnotatedValue(rv_list, {"len": max_breadth})
+            rv_list.append(
+                strip_databag(
+                    v, remaining_depth=remaining_depth - 1, max_breadth=max_breadth
+                )
+            )
+
+        return rv_list
     return obj
 
 
