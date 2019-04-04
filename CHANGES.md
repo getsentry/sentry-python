@@ -1,3 +1,11 @@
+## 0.7.10
+
+* Add more event trimming.
+* Log Sentry's response body in debug mode.
+* Fix a few bad typehints causing issues in IDEs.
+* Fix a bug in the Bottle integration that would report HTTP exceptions (e.g.
+  redirects) as errors.
+
 ## 0.7.9
 
 * New integration for the Bottle web framework. Thanks to Stepan Henek!
