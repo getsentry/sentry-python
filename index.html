@@ -1242,7 +1242,7 @@ uncaught exceptions.  Additionally you can report arbitrary other exceptions:</p
       
   <div class="item">
     <div class="name def" id="sentry_sdk.add_breadcrumb">
-    <p>def <span class="ident">add_breadcrumb</span>(</p><p>*args, **kwargs)</p>
+    <p>def <span class="ident">add_breadcrumb</span>(</p><p>crumb=None, hint=None, **kwargs)</p>
     </div>
     
 
@@ -1257,10 +1257,11 @@ breadcrumbs that are emitted.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.add_breadcrumb', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.add_breadcrumb" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>
-<span class="k">def</span> <span class="nf">add_breadcrumb</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">add_breadcrumb</span><span class="p">(</span><span class="n">crumb</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, Any], Dict[str, Any], **Any) -&gt; None</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
     <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">hub</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">hub</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span><span class="n">crumb</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1288,9 +1289,11 @@ Typically the event hint object would contain exception information.</p></div>
   <div id="source-sentry_sdk.capture_event" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, Any], Dict[str, Any]) -&gt; Optional[str]</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
     <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
+    <span class="k">return</span> <span class="bp">None</span>
 </pre></div>
 
   </div>
@@ -1317,7 +1320,7 @@ tuple.</p></div>
   <div id="source-sentry_sdk.capture_exception" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">capture_exception</span><span class="p">(</span><span class="n">error</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-    <span class="c1"># type: (ValueError) -&gt; Optional[str]</span>
+    <span class="c1"># type: (Optional[BaseException]) -&gt; Optional[str]</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
     <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">hub</span><span class="o">.</span><span class="n">capture_exception</span><span class="p">(</span><span class="n">error</span><span class="p">)</span>
@@ -1615,9 +1618,9 @@ argument.</p></div>
         <span class="c1"># Postprocess the event here so that annotated types do</span>
         <span class="c1"># generally not surface in before_send</span>
         <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="n">convert_types</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
             <span class="n">strip_event_mut</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
             <span class="n">event</span> <span class="o">=</span> <span class="n">flatten_metadata</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-            <span class="n">event</span> <span class="o">=</span> <span class="n">convert_types</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
 
         <span class="n">before_send</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;before_send&quot;</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">before_send</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
@@ -1980,7 +1983,11 @@ integration will use this to render out a message on stderr.</p></div>
                 <span class="k">return</span>
 
             <span class="k">elif</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">&gt;=</span> <span class="mi">300</span> <span class="ow">or</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">&lt;</span> <span class="mi">200</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unexpected status code: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                    <span class="s2">&quot;Unexpected status code: </span><span class="si">%s</span><span class="s2"> (body: </span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span>
+                    <span class="n">response</span><span class="o">.</span><span class="n">status</span><span class="p">,</span>
+                    <span class="n">response</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+                <span class="p">)</span>
         <span class="k">finally</span><span class="p">:</span>
             <span class="n">response</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 
@@ -2331,6 +2338,7 @@ context vars are available.</p>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">last_event_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Optional[str]</span>
         <span class="sd">&quot;&quot;&quot;Returns the last event ID.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span>
 
@@ -2368,6 +2376,7 @@ context vars are available.</p>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">capture_event</span><span class="p">({</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">message</span><span class="p">,</span> <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="n">level</span><span class="p">})</span>
 
     <span class="k">def</span> <span class="nf">capture_exception</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="c1"># type: (Optional[BaseException]) -&gt; Optional[str]</span>
         <span class="sd">&quot;&quot;&quot;Captures an exception.</span>
 
 <span class="sd">        The argument passed can be `None` in which case the last exception</span>
@@ -2376,7 +2385,7 @@ context vars are available.</p>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span>
         <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="k">return</span>
+            <span class="k">return</span> <span class="bp">None</span>
         <span class="k">if</span> <span class="n">error</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">exc_info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
         <span class="k">else</span><span class="p">:</span>
@@ -2387,6 +2396,8 @@ context vars are available.</p>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
         <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
+
+        <span class="k">return</span> <span class="bp">None</span>
 
     <span class="k">def</span> <span class="nf">_capture_internal_exception</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Capture an exception that is likely caused by a bug in the SDK</span>
@@ -2691,6 +2702,7 @@ tuple.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.capture_exception', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.capture_exception" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">capture_exception</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="c1"># type: (Optional[BaseException]) -&gt; Optional[str]</span>
     <span class="sd">&quot;&quot;&quot;Captures an exception.</span>
 <span class="sd">    The argument passed can be `None` in which case the last exception</span>
 <span class="sd">    will be reported, otherwise an exception object or an `exc_info`</span>
@@ -2698,7 +2710,7 @@ tuple.</p></div>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span>
     <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="k">return</span>
+        <span class="k">return</span> <span class="bp">None</span>
     <span class="k">if</span> <span class="n">error</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
         <span class="n">exc_info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
     <span class="k">else</span><span class="p">:</span>
@@ -2708,6 +2720,7 @@ tuple.</p></div>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
     <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
+    <span class="k">return</span> <span class="bp">None</span>
 </pre></div>
 
   </div>
@@ -2879,6 +2892,7 @@ client attached.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.last_event_id', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.last_event_id" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">last_event_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="c1"># type: () -&gt; Optional[str]</span>
     <span class="sd">&quot;&quot;&quot;Returns the last event ID.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span>
 </pre></div>
