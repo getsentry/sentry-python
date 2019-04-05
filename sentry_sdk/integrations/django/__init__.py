@@ -21,22 +21,6 @@ if False:
     from django.utils.datastructures import MultiValueDict  # type: ignore
     from typing import List
 
-try:
-    import psycopg2.sql  # type: ignore
-
-    def sql_to_string(sql):
-        # type: (Any) -> str
-        if isinstance(sql, psycopg2.sql.SQL):
-            return sql.string
-        return sql
-
-
-except ImportError:
-
-    def sql_to_string(sql):
-        # type: (Any) -> str
-        return sql
-
 
 try:
     from django.urls import resolve  # type: ignore
