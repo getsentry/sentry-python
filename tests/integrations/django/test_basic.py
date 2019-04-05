@@ -432,6 +432,7 @@ def test_template_exception(sentry_init, client, capture_events):
 def test_rest_framework_basic(
     sentry_init, client, capture_events, capture_exceptions, type, event_request
 ):
+    pytest.importorskip("rest_framework")
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     exceptions = capture_exceptions()
     events = capture_events()
