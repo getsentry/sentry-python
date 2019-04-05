@@ -4,6 +4,18 @@ from django.http import HttpResponse, HttpResponseServerError, HttpResponseNotFo
 from django.shortcuts import render
 from django.views.generic import ListView
 
+try:
+    from rest_framework.decorators import api_view
+
+    @api_view(["POST"])
+    def rest_framework_exc(request):
+        1 / 0
+
+
+except ImportError:
+    pass
+
+
 import sentry_sdk
 
 

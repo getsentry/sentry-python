@@ -21,22 +21,6 @@ if False:
     from django.utils.datastructures import MultiValueDict  # type: ignore
     from typing import List
 
-try:
-    import psycopg2.sql  # type: ignore
-
-    def sql_to_string(sql):
-        # type: (Any) -> str
-        if isinstance(sql, psycopg2.sql.SQL):
-            return sql.string
-        return sql
-
-
-except ImportError:
-
-    def sql_to_string(sql):
-        # type: (Any) -> str
-        return sql
-
 
 try:
     from django.urls import resolve  # type: ignore
@@ -265,6 +249,12 @@ class DjangoRequestExtractor(RequestExtractor):
     def size_of_file(self, file):
         return file.size
 
+    def parsed_body(self):
+        try:
+            return self.request.data
+        except AttributeError:
+            return RequestExtractor.parsed_body(self)
+
 
 def _set_user_info(request, event):
     # type: (WSGIRequest, Dict[str, Any]) -> None
@@ -332,21 +322,38 @@ def record_sql(sql, params, cursor=None):
     if hub.get_integration(DjangoIntegration) is None:
         return
 
-    with capture_internal_exceptions():
-        if cursor and hasattr(cursor, "mogrify"):  # psycopg2
-            real_sql = cursor.mogrify(sql, params)
-            with capture_internal_exceptions():
+    real_sql = None
+    real_params = None
+
+    try:
+        # Prefer our own SQL formatting logic because it's the only one that
+        # has proper value trimming.
+        real_sql, real_params = format_sql(sql, params)
+        if real_sql:
+            real_sql = format_and_strip(real_sql, real_params)
+    except Exception:
+        pass
+
+    if not real_sql and cursor and hasattr(cursor, "mogrify"):
+        # If formatting failed and we're using psycopg2, it could be that we're
+        # looking at a query that uses Composed objects. Use psycopg2's mogrify
+        # function to format the query. We lose per-parameter trimming but gain
+        # accuracy in formatting.
+        #
+        # This is intentionally the second choice because we assume Composed
+        # queries are not widely used, while per-parameter trimming is
+        # generally highly desirable.
+        try:
+            if cursor and hasattr(cursor, "mogrify"):
+                real_sql = cursor.mogrify(sql, params)
                 if isinstance(real_sql, bytes):
                     real_sql = real_sql.decode(cursor.connection.encoding)
-        else:
-            real_sql, real_params = format_sql(sql, params)
+        except Exception:
+            pass
 
-            if real_params:
-                try:
-                    real_sql = format_and_strip(real_sql, real_params)
-                except Exception:
-                    pass
-        hub.add_breadcrumb(message=real_sql, category="query")
+    if real_sql:
+        with capture_internal_exceptions():
+            hub.add_breadcrumb(message=real_sql, category="query")
 
 
 def install_sql_hook():
