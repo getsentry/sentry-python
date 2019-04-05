@@ -591,7 +591,7 @@ def iter_event_stacktraces(event):
 
 def iter_event_frames(event):
     # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
-    for stacktrace in iter_stacktraces(event):
+    for stacktrace in iter_event_stacktraces(event):
         for frame in stacktrace.get("frames") or ():
             yield frame
 
