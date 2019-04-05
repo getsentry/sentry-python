@@ -225,7 +225,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     if "postgres" not in connections:
         pytest.skip("postgres tests disabled")
 
-    import psycopg2
+    import psycopg2.sql
 
     sql = connections["postgres"].cursor()
 
@@ -248,7 +248,7 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     if "postgres" not in connections:
         pytest.skip("postgres tests disabled")
 
-    import psycopg2
+    import psycopg2.sql
 
     sql = connections["postgres"].cursor()
 
