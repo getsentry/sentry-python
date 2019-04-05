@@ -1,5 +1,6 @@
 # coding: utf-8
 import sys
+import copy
 import os
 
 import pytest
@@ -15,6 +16,7 @@ from sentry_sdk.utils import (
     format_and_strip,
     strip_string,
     filename_for_module,
+    handle_in_app_impl,
 )
 from sentry_sdk._compat import text_type
 
@@ -145,3 +147,24 @@ def test_parse_dsn_paths(given, expected):
 def test_parse_invalid_dsn(dsn):
     with pytest.raises(BadDsn):
         dsn = Dsn(dsn)
+
+
+@pytest.mark.parametrize("empty", [None, []])
+def test_in_app(empty):
+    assert handle_in_app_impl(
+        [{"module": "foo"}, {"module": "bar"}],
+        in_app_include=["foo"],
+        in_app_exclude=empty,
+    ) == [{"module": "foo", "in_app": True}, {"module": "bar"}]
+
+    assert handle_in_app_impl(
+        [{"module": "foo"}, {"module": "bar"}],
+        in_app_include=["foo"],
+        in_app_exclude=["foo"],
+    ) == [{"module": "foo", "in_app": True}, {"module": "bar"}]
+
+    assert handle_in_app_impl(
+        [{"module": "foo"}, {"module": "bar"}],
+        in_app_include=empty,
+        in_app_exclude=["foo"],
+    ) == [{"module": "foo", "in_app": False}, {"module": "bar", "in_app": True}]

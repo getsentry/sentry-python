@@ -579,24 +579,41 @@ def to_string(value):
         return repr(value)[1:-1]
 
 
-def iter_event_frames(event):
+def iter_event_stacktraces(event):
     # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
-    stacktraces = []
     if "stacktrace" in event:
-        stacktraces.append(event["stacktrace"])
+        yield event["stacktrace"]
     if "exception" in event:
         for exception in event["exception"].get("values") or ():
             if "stacktrace" in exception:
-                stacktraces.append(exception["stacktrace"])
-    for stacktrace in stacktraces:
+                yield exception["stacktrace"]
+
+
+def iter_event_frames(event):
+    # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
+    for stacktrace in iter_stacktraces(event):
         for frame in stacktrace.get("frames") or ():
             yield frame
 
 
 def handle_in_app(event, in_app_exclude=None, in_app_include=None):
     # type: (Dict[str, Any], List, List) -> Dict[str, Any]
+    for stacktrace in iter_event_stacktraces(event):
+        handle_in_app_impl(
+            stacktrace.get("frames"),
+            in_app_exclude=in_app_exclude,
+            in_app_include=in_app_include,
+        )
+
+    return event
+
+
+def handle_in_app_impl(frames, in_app_exclude, in_app_include):
+    if not frames:
+        return
+
     any_in_app = False
-    for frame in iter_event_frames(event):
+    for frame in frames:
         in_app = frame.get("in_app")
         if in_app is not None:
             if in_app:
@@ -606,18 +623,18 @@ def handle_in_app(event, in_app_exclude=None, in_app_include=None):
         module = frame.get("module")
         if not module:
             continue
-
-        if _module_in_set(module, in_app_exclude):
-            frame["in_app"] = False
-        if _module_in_set(module, in_app_include):
+        elif _module_in_set(module, in_app_include):
             frame["in_app"] = True
             any_in_app = True
+        elif _module_in_set(module, in_app_exclude):
+            frame["in_app"] = False
 
     if not any_in_app:
-        for frame in iter_event_frames(event):
-            frame["in_app"] = True
+        for frame in frames:
+            if frame.get("in_app") is None:
+                frame["in_app"] = True
 
-    return event
+    return frames
 
 
 def exc_info_from_error(error):
