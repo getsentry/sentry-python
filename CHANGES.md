@@ -5,6 +5,12 @@
 * Fix a few bad typehints causing issues in IDEs.
 * Fix a bug in the Bottle integration that would report HTTP exceptions (e.g.
   redirects) as errors.
+* Fix a bug that would prevent use of `in_app_exclude` without
+  setting `in_app_include`.
+* Fix a bug where request bodies of Django Rest Framework apps were not captured.
+* Suppress errors during SQL breadcrumb capturing in Django
+  integration. Also change order in which formatting strategies
+  are tried.
 
 ## 0.7.9
 
