@@ -265,6 +265,12 @@ class DjangoRequestExtractor(RequestExtractor):
     def size_of_file(self, file):
         return file.size
 
+    def parsed_body(self):
+        try:
+            return self.request.data
+        except AttributeError:
+            return RequestExtractor.parsed_body(self)
+
 
 def _set_user_info(request, event):
     # type: (WSGIRequest, Dict[str, Any]) -> None
