@@ -111,8 +111,9 @@ def test_broken_prerun(init_celery, connect_signal):
         assert stack_lengths == [2, 2]
 
 
-@pytest.mark.skipif(
-    (4, 2, 0) <= VERSION < (4, 2, 3),
+@pytest.mark.xfail(
+    (4, 2, 0) <= VERSION,
+    strict=True,
     reason="https://github.com/celery/celery/issues/4661",
 )
 def test_retry(celery, capture_events):
