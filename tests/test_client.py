@@ -459,3 +459,18 @@ def test_broken_mapping(sentry_init, capture_events):
         event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"]
         == "<broken repr>"
     )
+
+
+def test_errno_errors(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    class Foo(Exception):
+        errno = 69
+
+    capture_exception(Foo())
+
+    event, = events
+
+    exception, = event["exception"]["values"]
+    assert exception["mechanism"]["meta"]["errno"]["number"] == 69

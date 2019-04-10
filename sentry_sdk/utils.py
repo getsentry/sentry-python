@@ -495,8 +495,9 @@ def single_exception_from_error_tuple(
 
     if errno is not None:
         mechanism = mechanism or {}
-        mechanism_meta = mechanism.setdefault("meta", {})
-        mechanism_meta.setdefault("errno", {"code": errno})
+        mechanism.setdefault("meta", {}).setdefault("errno", {}).setdefault(
+            "number", errno
+        )
 
     if client_options is None:
         with_locals = True
