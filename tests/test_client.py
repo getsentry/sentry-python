@@ -52,7 +52,7 @@ def test_transport_option(monkeypatch):
     assert str(Client(transport=transport).dsn) == dsn
 
 
-def test_http_proxy(monkeypatch):
+def test_http_proxy():
     client = Client("https://foo@sentry.io/123", http_proxy="http://localhost/123")
     assert client.transport._pool.proxy.scheme == "http"
 
@@ -181,6 +181,25 @@ def test_attach_stacktrace_disabled():
     assert "threads" not in event
 
 
+@pytest.mark.parametrize("add_stack", [True, False])
+@pytest.mark.parametrize("with_locals", [True, False])
+def test_message_with_stacktrace(add_stack, with_locals):
+    events = []
+    hub = Hub(
+        Client(
+            attach_stacktrace=False, with_locals=with_locals, transport=events.append
+        )
+    )
+
+    hub.capture_message("HI", stacktrace=add_stack)
+
+    event, = events
+    assert ("stacktrace" in event) == add_stack
+    if add_stack:
+        for frame in event["stacktrace"]["frames"]:
+            assert ("vars" in frame) == with_locals
+
+
 def test_capture_event_works():
     c = Client(transport=_TestTransport())
     pytest.raises(EventCaptured, lambda: c.capture_event({}))
@@ -188,7 +207,7 @@ def test_capture_event_works():
 
 
 @pytest.mark.parametrize("num_messages", [10, 20])
-def test_atexit(tmpdir, monkeypatch, num_messages):
+def test_atexit(tmpdir, num_messages):
     app = tmpdir.join("app.py")
     app.write(
         dedent(
@@ -221,7 +240,7 @@ def test_atexit(tmpdir, monkeypatch, num_messages):
     assert output.count(b"HI") == num_messages
 
 
-def test_configure_scope_available(sentry_init, request, monkeypatch):
+def test_configure_scope_available(sentry_init):
     # Test that scope is configured if client is configured
     sentry_init()
 

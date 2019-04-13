@@ -13,6 +13,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     logger,
     ContextVar,
+    current_stacktrace,
 )
 
 
@@ -267,8 +268,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return rv
         return None
 
-    def capture_message(self, message, level=None):
-        # type: (str, Optional[Any]) -> Optional[str]
+    def capture_message(self, message, level=None, stacktrace=False):
+        # type: (str, Optional[Any], bool) -> Optional[str]
         """Captures a message.  The message is just a string.  If no level
         is provided the default level is `info`.
         """
@@ -276,7 +277,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return None
         if level is None:
             level = "info"
-        return self.capture_event({"message": message, "level": level})
+        event = {"message": message, "level": level}
+        if stacktrace is True:
+            event["stacktrace"] = current_stacktrace(self.client.options["with_locals"])
+        return self.capture_event(event)
 
     def capture_exception(self, error=None):
         # type: (Optional[BaseException]) -> Optional[str]
