@@ -106,7 +106,6 @@ COMMON_RECORD_ATTRS = frozenset(
     (
         "args",
         "created",
-        "data",
         "exc_info",
         "exc_text",
         "filename",
