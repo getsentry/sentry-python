@@ -31,10 +31,11 @@ def _generate_default_integrations_iterator(*import_strings):
             module, cls = import_string.rsplit(".", 1)
             yield getattr(import_module(module), cls)
 
-    for import_string in import_strings:
-        iter_default_integrations.__doc__ += "\n- `{}`".format(  # type: ignore
-            import_string
-        )
+    if isinstance(iter_default_integrations.__doc__, str):
+        for import_string in import_strings:
+            iter_default_integrations.__doc__ += "\n- `{}`".format(  # type: ignore
+                import_string
+            )
 
     return iter_default_integrations
 
