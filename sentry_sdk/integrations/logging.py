@@ -134,19 +134,11 @@ COMMON_RECORD_ATTRS = frozenset(
 
 def _extra_from_record(record):
     # type: (LogRecord) -> Dict[str, None]
-    extra = getattr(record, 'data', None)
-    if not isinstance(extra, dict):
-        if extra:
-            extra = {'data': extra}
-        else:
-            extra = {}
-
-    for k, v in vars(record).items():
-        if k in COMMON_RECORD_ATTRS or k.startswith("_"):
-            continue
-        extra[k] = v
-
-    return extra
+    return {
+        k: v
+        for k, v in vars(record).items()
+        if k not in COMMON_RECORD_ATTRS and not k.startswith("_")
+    }
 
 
 class EventHandler(logging.Handler, object):
