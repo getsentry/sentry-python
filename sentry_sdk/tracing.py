@@ -6,6 +6,15 @@ _traceparent_header_format_re = re.compile(
     '(-.*)?[ \t]*$')
 
 
+class _EnvironHeaders(object):
+
+    def __init__(self, environ):
+        self.environ = environ
+
+    def get(self, key):
+        return self.environ.get('HTTP_' + key.replace('-', '_').upper())
+
+
 class SpanContext(object):
 
     def __init__(self, trace_id, span_id, recorded=False, parent=None):
@@ -39,6 +48,10 @@ class SpanContext(object):
             parent=self,
             recorded=self.recorded,
         )
+
+    @classmethod
+    def continue_from_environ(cls, environ):
+        return cls.continue_from_headers(_EnvironHeaders(environ))
 
     @classmethod
     def continue_from_headers(cls, headers):

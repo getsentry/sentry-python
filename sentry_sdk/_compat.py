@@ -83,9 +83,3 @@ def check_thread_support():
                 '(Enable the "enable-threads" flag).'
             )
         )
-
-
-def to_text(value):
-    if isinstance(value, text_type):
-        return value
-    return value.decode('utf-8')
