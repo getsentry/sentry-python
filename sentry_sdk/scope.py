@@ -4,7 +4,6 @@ from functools import wraps
 from itertools import chain
 
 from sentry_sdk.utils import logger, capture_internal_exceptions, object_to_json
-from sentry_sdk.tracing import SpanContext
 
 if False:
     from typing import Any
@@ -202,9 +201,9 @@ class Scope(object):
             event.setdefault("contexts", {}).update(self._contexts)
 
         if self._span is not None:
-            event.setdefault("contexts", {})['trace'] = {
-                'trace_id': self._span.trace_id,
-                'span_id': self._span.span_id,
+            event.setdefault("contexts", {})["trace"] = {
+                "trace_id": self._span.trace_id,
+                "span_id": self._span.span_id,
             }
 
         exc_info = hint.get("exc_info") if hint is not None else None
