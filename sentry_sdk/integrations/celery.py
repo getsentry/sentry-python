@@ -15,6 +15,9 @@ from sentry_sdk.integrations.logging import ignore_logger
 class CeleryIntegration(Integration):
     identifier = "celery"
 
+    def __init__(self, propagate_traces=True):
+        self.propagate_traces = propagate_traces
+
     @staticmethod
     def setup_once():
         import celery.app.trace as trace  # type: ignore
@@ -42,13 +45,15 @@ class CeleryIntegration(Integration):
 def _wrap_apply_async(task, f):
     def apply_async(self, *args, **kwargs):
         hub = Hub.current
-        headers = None
-        for key, value in hub.iter_trace_propagation_headers():
-            if headers is None:
-                headers = dict(kwargs.get("headers") or {})
-            headers[key] = value
-        if headers is not None:
-            kwargs["headers"] = headers
+        integration = hub.get_integration(CeleryIntegration)
+        if integration is not None and integration.propagate_traces:
+            headers = None
+            for key, value in hub.iter_trace_propagation_headers():
+                if headers is None:
+                    headers = dict(kwargs.get("headers") or {})
+                headers[key] = value
+            if headers is not None:
+                kwargs["headers"] = headers
         return f(self, *args, **kwargs)
 
     return apply_async
