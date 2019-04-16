@@ -24,7 +24,6 @@ class SpanContext(object):
 
     @classmethod
     def start_trace(cls, recorded=False):
-        trace_id = uuid.uuid4()
         return cls(
             trace_id=uuid.uuid4().hex,
             span_id=uuid.uuid4().hex[16:],
@@ -47,6 +46,9 @@ class SpanContext(object):
         if parent is None:
             return cls.start_trace()
         return parent.new_span()
+
+    def iter_headers(self):
+        yield 'traceparent', self.to_traceparent()
 
     @classmethod
     def from_traceparent(cls, traceparent):

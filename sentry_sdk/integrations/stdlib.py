@@ -44,9 +44,8 @@ def install_httplib():
                 url,
             )
 
-        traceparent = hub.get_traceparent_for_propagation(url=real_url)
-        if traceparent is not None:
-            self.putheader('traceparent', traceparent)
+        for key, value in hub.iter_trace_propagation_headers(real_url):
+            self.putheader(key, value)
 
         data["url"] = real_url
         data["method"] = method
