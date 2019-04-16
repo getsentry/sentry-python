@@ -6,6 +6,7 @@ from celery.exceptions import SoftTimeLimitExceeded, Retry  # type: ignore
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
+from sentry_sdk.tracing import SpanContext
 from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
@@ -25,6 +26,7 @@ class CeleryIntegration(Integration):
             # short-circuits to task.run if it thinks it's safe.
             task.__call__ = _wrap_task_call(task, task.__call__)
             task.run = _wrap_task_call(task, task.run)
+            task.apply_async = _wrap_apply_async(task, task.apply_async)
             return _wrap_tracer(task, old_build_tracer(name, task, *args, **kwargs))
 
         trace.build_tracer = sentry_build_tracer
@@ -35,6 +37,21 @@ class CeleryIntegration(Integration):
         # Meaning that every task's breadcrumbs are full of stuff like "Task
         # <foo> raised unexpected <bar>".
         ignore_logger("celery.worker.job")
+
+
+def _wrap_apply_async(task, f):
+    def apply_async(self, *args, **kwargs):
+        hub = Hub.current
+        headers = None
+        for key, value in hub.iter_trace_propagation_headers():
+            if headers is None:
+                headers = dict(kwargs.get("headers") or {})
+            headers[key] = value
+        if headers is not None:
+            kwargs["headers"] = headers
+        return f(self, *args, **kwargs)
+
+    return apply_async
 
 
 def _wrap_tracer(task, f):
@@ -52,11 +69,20 @@ def _wrap_tracer(task, f):
         with hub.push_scope() as scope:
             scope._name = "celery"
             scope.clear_breadcrumbs()
+            _continue_trace(args[3]["headers"], scope)
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
             return f(*args, **kwargs)
 
     return _inner
+
+
+def _continue_trace(headers, scope):
+    if headers:
+        span_context = SpanContext.continue_from_headers(headers)
+    else:
+        span_context = SpanContext.start_trace()
+    scope.set_span_context(span_context)
 
 
 def _wrap_task_call(task, f):

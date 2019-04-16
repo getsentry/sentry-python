@@ -4,8 +4,9 @@ import pytest
 
 pytest.importorskip("celery")
 
-from sentry_sdk import Hub
+from sentry_sdk import Hub, configure_scope
 from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.tracing import SpanContext
 
 from celery import Celery, VERSION
 from celery.bin import worker
@@ -47,9 +48,15 @@ def test_simple(capture_events, celery):
         foo = 42  # noqa
         return x / y
 
+    span_context = SpanContext.start_trace()
+    with configure_scope() as scope:
+        scope.set_span_context(span_context)
     dummy_task.delay(1, 2)
     dummy_task.delay(1, 0)
+
     event, = events
+    assert event["contexts"]["trace"]["trace_id"] == span_context.trace_id
+    assert event["contexts"]["trace"]["span_id"] != span_context.span_id
     assert event["transaction"] == "dummy_task"
     assert event["extra"]["celery-job"] == {
         "args": [1, 0],
