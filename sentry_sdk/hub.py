@@ -5,7 +5,7 @@ from datetime import datetime
 from contextlib import contextmanager
 from warnings import warn
 
-from sentry_sdk._compat import with_metaclass
+from sentry_sdk._compat import with_metaclass, urlparse
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
 from sentry_sdk.utils import (
@@ -414,6 +414,30 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         client, scope = self._stack[-1]
         if client is not None:
             return client.flush(timeout=timeout, callback=callback)
+
+    def get_traceparent_for_propagation(self, url=None, host=None):
+        """Given a reference url or host this returns a traceparent header
+        if it should be propagated.
+        """
+        client, scope = self._stack[-1]
+        if scope._span is None:
+            return
+
+        propagate_traces = client and client.options["propagate_traces"] or []
+
+        if url is not None:
+            scheme, host = urlparse.urlsplit(url)[:2]
+        else:
+            scheme = None
+
+        for target in propagate_traces:
+            target_scheme, target_host = urlparse.urlsplit(target)[:2]
+            if (scheme is None or scheme == target_scheme) and target_host == host:
+                break
+        else:
+            return None
+
+        return scope._span.to_traceparent()
 
 
 GLOBAL_HUB = Hub()

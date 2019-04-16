@@ -1,5 +1,6 @@
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
+from sentry_sdk._compat import to_text
 
 
 try:
@@ -24,7 +25,8 @@ def install_httplib():
 
     def putrequest(self, method, url, *args, **kwargs):
         rv = real_putrequest(self, method, url, *args, **kwargs)
-        if Hub.current.get_integration(StdlibIntegration) is None:
+        hub = Hub.current
+        if hub.get_integration(StdlibIntegration) is None:
             return rv
 
         self._sentrysdk_data_dict = data = {}
@@ -41,6 +43,10 @@ def install_httplib():
                 port != default_port and ":%s" % port or "",
                 url,
             )
+
+        traceparent = hub.get_traceparent_for_propagation(url=real_url)
+        if traceparent is not None:
+            self.putheader('traceparent', traceparent)
 
         data["url"] = real_url
         data["method"] = method
