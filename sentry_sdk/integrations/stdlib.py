@@ -43,7 +43,7 @@ def install_httplib():
                 url,
             )
 
-        for key, value in hub.iter_trace_propagation_headers(real_url):
+        for key, value in hub.iter_trace_propagation_headers():
             self.putheader(key, value)
 
         data["url"] = real_url

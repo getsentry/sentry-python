@@ -415,27 +415,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if client is not None:
             return client.flush(timeout=timeout, callback=callback)
 
-    def iter_trace_propagation_headers(self, url=None):
-        """Given a reference url or host returns an iterator of all trace
-        propagation headers that should be added to the request.  If no
-        propagation is enabled for this URL the iterator will be empty.
-
-        If the URL is set to `None` then the `propagate_traces` flag is not
-        checked.
-        """
+    def iter_trace_propagation_headers(self):
         client, scope = self._stack[-1]
         if scope._span is None:
             return
 
-        if url is not None:
-            propagate_traces = client and client.options["propagate_traces"] or []
-            scheme, host = urlparse.urlsplit(url)[:2]
-            for target in propagate_traces:
-                target_scheme, target_host = urlparse.urlsplit(target)[:2]
-                if (scheme is None or scheme == target_scheme) and target_host == host:
-                    break
-            else:
-                return
+        propagate_traces = client and client.options["propagate_traces"]
+        if not propagate_traces:
+            return
 
         for item in scope._span.iter_headers():
             yield item
