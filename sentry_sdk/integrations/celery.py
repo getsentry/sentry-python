@@ -74,7 +74,7 @@ def _wrap_tracer(task, f):
         with hub.push_scope() as scope:
             scope._name = "celery"
             scope.clear_breadcrumbs()
-            _continue_trace(args[3]["headers"], scope)
+            _continue_trace(args[3].get("headers") or {}, scope)
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
             return f(*args, **kwargs)
