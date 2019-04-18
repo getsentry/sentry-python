@@ -365,7 +365,8 @@ def test_template_exception(sentry_init, client, capture_events):
     assert status.lower() == "500 internal server error"
 
     event, = events
-    exception = event["exception"]["values"][0]
+    exception = event["exception"]["values"][-1]
+    assert exception["type"] == "TemplateSyntaxError"
 
     frames = [
         f

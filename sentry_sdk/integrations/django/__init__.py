@@ -141,7 +141,7 @@ class DjangoIntegration(Integration):
                 return event
 
             for exception, (_, exc_value, _) in zip(
-                values, walk_exception_chain(exc_info)
+                reversed(values), walk_exception_chain(exc_info)
             ):
                 frame = get_template_frame_from_exception(exc_value)
                 if frame is not None:
