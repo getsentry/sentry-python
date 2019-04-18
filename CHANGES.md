@@ -1,3 +1,11 @@
+## 0.7.11
+
+* Fix a bug that would send `errno` in an invalid format to the server.
+* Fix import-time crash when running Python with `-O` flag.
+* Fix a bug that would prevent the logging integration from attaching `extra`
+  keys called `data`.
+* Fix order in which exception chains are reported to match Raven behavior.
+
 ## 0.7.10
 
 * Add more event trimming.
