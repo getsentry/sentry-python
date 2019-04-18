@@ -569,6 +569,9 @@ def exceptions_from_error_tuple(
                 exc_type, exc_value, tb, client_options, mechanism
             )
         )
+
+    rv.reverse()
+
     return rv
 
 

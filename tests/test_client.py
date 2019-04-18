@@ -419,7 +419,7 @@ def test_chained_exceptions(sentry_init, capture_events):
 
     try:
         try:
-            1 / 0
+            raise ValueError()
         except Exception:
             1 / 0
     except Exception:
@@ -427,7 +427,13 @@ def test_chained_exceptions(sentry_init, capture_events):
 
     event, = events
 
-    assert len(event["exception"]["values"]) == 2
+    e1, e2 = event["exception"]["values"]
+
+    # This is the order all other SDKs send chained exceptions in. Including
+    # Raven-Python.
+
+    assert e1["type"] == "ValueError"
+    assert e2["type"] == "ZeroDivisionError"
 
 
 @pytest.mark.tests_internal_exceptions
