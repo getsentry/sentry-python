@@ -301,3 +301,28 @@ def test_scope_event_processor_order(sentry_init, capture_events):
     event, = events
 
     assert event["message"] == "hifoobarbaz"
+
+
+def test_local_event_processors_clear(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    with push_scope() as scope:
+        def error_processor(event, exc_info):
+            event.setdefault("test_error", {"x": "y"})
+            return event
+
+        def event_processor(event, exc_info):
+            event.setdefault("test_event", {"a": "b"})
+            return event
+
+        scope.add_error_processor(error_processor)
+        scope.add_event_processor(event_processor)
+
+        scope.clear()
+        capture_exception(ValueError())
+
+    event, = events
+
+    assert "test_error" not in event
+    assert "test_event" not in event

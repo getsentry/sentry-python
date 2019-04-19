@@ -127,6 +127,9 @@ class Scope(object):
         self.clear_breadcrumbs()
         self._should_capture = True
 
+        self._event_processors = []
+        self._error_processors = []
+
     def clear_breadcrumbs(self):
         # type: () -> None
         """Clears breadcrumb buffer."""
