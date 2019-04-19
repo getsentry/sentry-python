@@ -308,6 +308,7 @@ def test_local_event_processors_clear(sentry_init, capture_events):
     events = capture_events()
 
     with push_scope() as scope:
+
         def error_processor(event, exc_info):
             event.setdefault("test_error", {"x": "y"})
             return event
