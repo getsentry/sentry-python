@@ -1,0 +1,317 @@
+import logging
+
+import pytest
+
+pytest.importorskip("falcon")
+
+import falcon
+import falcon.testing
+import sentry_sdk
+import sentry_sdk.integrations.falcon as falcon_sentry
+from sentry_sdk.integrations.logging import LoggingIntegration
+
+
+@pytest.fixture
+def make_app(sentry_init):
+    def inner():
+        class MessageResource:
+            def on_get(self, req, resp):
+                sentry_sdk.capture_message('hi')
+                resp.media = 'hi'
+
+        app = falcon.API()
+        app.add_route('/message', MessageResource())
+
+        return app
+    return inner
+
+
+@pytest.fixture
+def make_client(make_app):
+    def inner():
+        app = make_app()
+        return falcon.testing.TestClient(app)
+    return inner
+
+
+def test_has_context(sentry_init, capture_events, make_client):
+    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+    events = capture_events()
+
+    client = make_client()
+    response = client.simulate_get("/message")
+    assert response.status == falcon.HTTP_200
+
+    event, = events
+    assert event["transaction"] == "/message"  # Falcon URI template
+    assert "data" not in event["request"]
+    assert event["request"]["url"] == "http://falconframework.org/message"
+
+
+@pytest.mark.parametrize(
+    "transaction_style,expected_transaction",
+    [("uri_template", "/message"), ("path", "/message")]
+)
+def test_transaction_style(
+    sentry_init, make_client, capture_events, transaction_style, expected_transaction
+):
+    integration = falcon_sentry.FalconIntegration(
+        transaction_style=transaction_style
+    )
+    sentry_init(integrations=[integration])
+    events = capture_events()
+
+    client = make_client()
+    response = client.simulate_get("/message")
+    assert response.status == falcon.HTTP_200
+
+    event, = events
+    assert event["transaction"] == expected_transaction
+
+
+def test_errors(sentry_init, capture_exceptions, capture_events):
+    sentry_init(integrations=[falcon_sentry.FalconIntegration()], debug=True)
+
+    class ZeroDivisionErrorResource:
+        def on_get(self, req, resp):
+            1 / 0
+
+    app = falcon.API()
+    app.add_route("/", ZeroDivisionErrorResource())
+
+    exceptions = capture_exceptions()
+    events = capture_events()
+
+    client = falcon.testing.TestClient(app)
+
+    try:
+        client.simulate_get("/")
+    except ZeroDivisionError:
+        pass
+
+    exc, = exceptions
+    assert isinstance(exc, ZeroDivisionError)
+
+    event, = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "falcon"
+
+
+def test_falcon_large_json_request(sentry_init, capture_events):
+    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+
+    data = {"foo": {"bar": "a" * 2000}}
+
+    class Resource:
+        def on_post(self, req, resp):
+            assert req.media == data
+            sentry_sdk.capture_message("hi")
+            resp.media = "ok"
+
+    app = falcon.API()
+    app.add_route("/", Resource())
+
+    events = capture_events()
+
+    client = falcon.testing.TestClient(app)
+    response = client.simulate_post("/", json=data)
+    assert response.status == falcon.HTTP_200
+
+    event, = events
+    assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
+        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+    }
+    assert len(event["request"]["data"]["foo"]["bar"]) == 512
+
+
+@pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
+def test_falcon_empty_json_request(sentry_init, capture_events, data):
+    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+
+    class Resource:
+        def on_post(self, req, resp):
+            assert req.media == data
+            sentry_sdk.capture_message("hi")
+            resp.media = "ok"
+
+    app = falcon.API()
+    app.add_route("/", Resource())
+
+    events = capture_events()
+
+    client = falcon.testing.TestClient(app)
+    response = client.simulate_post("/", json=data)
+    assert response.status == falcon.HTTP_200
+
+    event, = events
+    assert event["request"]["data"] == data
+
+
+def test_logging(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            falcon_sentry.FalconIntegration(),
+            LoggingIntegration(event_level="ERROR"),
+        ]
+    )
+
+    logger = logging.getLogger()
+
+    app = falcon.API()
+
+    class Resource:
+        def on_get(self, req, resp):
+            logger.error("hi")
+            resp.media = "ok"
+
+    app.add_route("/", Resource())
+
+    events = capture_events()
+
+    client = falcon.testing.TestClient(app)
+    client.simulate_get("/")
+
+    event, = events
+    assert event["level"] == "error"
+
+
+def test_500(sentry_init, capture_events):
+    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+
+    app = falcon.API()
+
+    class Resource:
+        def on_get(self, req, resp):
+            1 / 0
+
+    app.add_route("/", Resource())
+
+    def http500_handler(ex, req, resp, params):
+        sentry_sdk.capture_exception(ex)
+        resp.media = {
+            "message": "Sentry error: %s" % sentry_sdk.last_event_id()
+        }
+
+    app.add_error_handler(Exception, http500_handler)
+
+    events = capture_events()
+
+    client = falcon.testing.TestClient(app)
+    response = client.simulate_get("/")
+
+    event, = events
+    assert response.json == {"message": "Sentry error: %s" % event["event_id"]}
+
+
+def test_error_in_errorhandler(sentry_init, capture_events):
+    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+
+    app = falcon.API()
+
+    class Resource:
+        def on_get(self, req, resp):
+            raise ValueError()
+
+    app.add_route("/", Resource())
+
+    def http500_handler(ex, req, resp, params):
+        sentry_sdk.capture_exception(ex)
+        1 / 0
+
+    app.add_error_handler(Exception, http500_handler)
+
+    events = capture_events()
+
+    client = falcon.testing.TestClient(app)
+
+    with pytest.raises(ZeroDivisionError):
+        client.simulate_get("/")
+
+    event1, event2 = events
+
+    exception, = event1["exception"]["values"]
+    assert exception["type"] == "ValueError"
+
+    exception = event2["exception"]["values"][-1]
+    assert exception["type"] == "ZeroDivisionError"
+
+
+def test_bad_request_not_captured(sentry_init, capture_events):
+    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+    events = capture_events()
+
+    app = falcon.API()
+
+    class Resource:
+        def on_get(self, req, resp):
+            raise falcon.HTTPBadRequest()
+
+    app.add_route("/", Resource())
+
+    client = falcon.testing.TestClient(app)
+
+    client.simulate_get("/")
+
+    assert not events
+
+
+def test_does_not_leak_scope(sentry_init, capture_events):
+    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+    events = capture_events()
+
+    with sentry_sdk.configure_scope() as scope:
+        scope.set_tag("request_data", False)
+
+    app = falcon.API()
+
+    class Resource:
+        def on_get(self, req, resp):
+            with sentry_sdk.configure_scope() as scope:
+                scope.set_tag("request_data", True)
+
+            def generator():
+                for row in range(1000):
+                    with sentry_sdk.configure_scope() as scope:
+                        assert scope._tags["request_data"]
+
+                    yield (str(row) + "\n").encode()
+
+            resp.stream = generator()
+
+    app.add_route("/", Resource())
+
+    client = falcon.testing.TestClient(app)
+    response = client.simulate_get("/")
+
+    expected_response = "".join(str(row) + "\n" for row in range(1000))
+    assert response.text == expected_response
+    assert not events
+
+    with sentry_sdk.configure_scope() as scope:
+        assert not scope._tags["request_data"]
+
+
+@pytest.mark.parametrize("exc_cls", [ZeroDivisionError, Exception])
+def test_errorhandler_for_exception_swallows_exception(
+    sentry_init, capture_events, exc_cls
+):
+    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+    events = capture_events()
+
+    app = falcon.API()
+
+    class Resource:
+        def on_get(self, req, resp):
+            1 / 0
+
+    app.add_route("/", Resource())
+
+    def exc_handler(ex, req, resp, params):
+        resp.media = "ok"
+
+    app.add_error_handler(exc_cls, exc_handler)
+
+    client = falcon.testing.TestClient(app)
+
+    response = client.simulate_get("/")
+    assert response.status == falcon.HTTP_200
+    assert not events

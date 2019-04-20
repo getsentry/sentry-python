@@ -25,6 +25,7 @@ setup(
     extras_require={
         "flask": ["flask>=0.8", "blinker>=1.1"],
         "bottle": ["bottle>=0.12.13"],
+        "falcon": ["falcon>=1.4"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
