@@ -47,10 +47,11 @@ class SentryFalconMiddleware(object):
             return
 
         with hub.configure_scope() as scope:
+            scope._name = 'falcon'
             scope.add_event_processor(_make_request_event_processor(req, integration))
 
 
-class FalconIntegration(sentry_sdk.integrations.Integration):
+class FalconIntegration(Integration):
     identifier = "falcon"
 
     transaction_style = None
@@ -85,11 +86,8 @@ def _patch_wsgi_app():
         sentry_wrapped = SentryWsgiMiddleware(
             lambda envi, start_resp: original_wsgi_app(self, envi, start_resp)
         )
-        with hub.push_scope() as scope:
-            scope._name = "falcon"
-            resp = sentry_wrapped(env, start_response)
 
-        return resp
+        return sentry_wrapped(env, start_response)
 
     falcon.API.__call__ = sentry_patched_wsgi_app
 
