@@ -172,10 +172,7 @@ def test_falcon_raw_data_request(sentry_init, capture_events):
 
 def test_logging(sentry_init, capture_events):
     sentry_init(
-        integrations=[
-            FalconIntegration(),
-            LoggingIntegration(event_level="ERROR"),
-        ]
+        integrations=[FalconIntegration(), LoggingIntegration(event_level="ERROR")]
     )
 
     logger = logging.getLogger()
@@ -236,7 +233,6 @@ def test_error_in_errorhandler(sentry_init, capture_events):
     app.add_route("/", Resource())
 
     def http500_handler(ex, req, resp, params):
-        sentry_sdk.capture_exception(ex)
         1 / 0
 
     app.add_error_handler(Exception, http500_handler)
@@ -248,13 +244,11 @@ def test_error_in_errorhandler(sentry_init, capture_events):
     with pytest.raises(ZeroDivisionError):
         client.simulate_get("/")
 
-    event1, event2 = events
+    event, = events
 
-    exception, = event1["exception"]["values"]
-    assert exception["type"] == "ValueError"
-
-    exception = event2["exception"]["values"][-1]
-    assert exception["type"] == "ZeroDivisionError"
+    last_ex_values = event["exception"]["values"][-1]
+    assert last_ex_values["type"] == "ZeroDivisionError"
+    assert last_ex_values["stacktrace"]["frames"][-1]["vars"]["ex"] == "ValueError()"
 
 
 def test_bad_request_not_captured(sentry_init, capture_events):
@@ -310,30 +304,3 @@ def test_does_not_leak_scope(sentry_init, capture_events):
 
     with sentry_sdk.configure_scope() as scope:
         assert not scope._tags["request_data"]
-
-
-@pytest.mark.parametrize("exc_cls", [ZeroDivisionError, Exception])
-def test_errorhandler_for_exception_swallows_exception(
-    sentry_init, capture_events, exc_cls
-):
-    sentry_init(integrations=[FalconIntegration()])
-    events = capture_events()
-
-    app = falcon.API()
-
-    class Resource:
-        def on_get(self, req, resp):
-            1 / 0
-
-    app.add_route("/", Resource())
-
-    def exc_handler(ex, req, resp, params):
-        resp.media = "ok"
-
-    app.add_error_handler(exc_cls, exc_handler)
-
-    client = falcon.testing.TestClient(app)
-
-    response = client.simulate_get("/")
-    assert response.status == falcon.HTTP_200
-    assert not events

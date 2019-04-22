@@ -121,7 +121,7 @@ def _patch_handle_exception():
         hub = Hub.current
         integration = hub.get_integration(FalconIntegration)
 
-        if integration is not None and not was_handled:
+        if integration is not None and not _is_falcon_http_error(ex):
             event, hint = event_from_exception(
                 ex,
                 client_options=hub.client.options,
@@ -147,6 +147,10 @@ def _patch_prepare_middleware():
         return original_prepare_middleware(middleware, independent_middleware)
 
     falcon.api_helpers.prepare_middleware = sentry_patched_prepare_middleware
+
+
+def _is_falcon_http_error(ex):
+    return isinstance(ex, (falcon.HTTPError, falcon.http_status.HTTPStatus))
 
 
 def _make_request_event_processor(req, integration):
