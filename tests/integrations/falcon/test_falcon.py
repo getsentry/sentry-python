@@ -162,7 +162,7 @@ def test_falcon_raw_data_request(sentry_init, capture_events):
     events = capture_events()
 
     client = falcon.testing.TestClient(app)
-    response = client.simulate_post("/", body='hi')
+    response = client.simulate_post("/", body="hi")
     assert response.status == falcon.HTTP_200
 
     event, = events
