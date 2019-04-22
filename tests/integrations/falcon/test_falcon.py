@@ -16,13 +16,14 @@ def make_app(sentry_init):
     def inner():
         class MessageResource:
             def on_get(self, req, resp):
-                sentry_sdk.capture_message('hi')
-                resp.media = 'hi'
+                sentry_sdk.capture_message("hi")
+                resp.media = "hi"
 
         app = falcon.API()
-        app.add_route('/message', MessageResource())
+        app.add_route("/message", MessageResource())
 
         return app
+
     return inner
 
 
@@ -31,6 +32,7 @@ def make_client(make_app):
     def inner():
         app = make_app()
         return falcon.testing.TestClient(app)
+
     return inner
 
 
@@ -50,14 +52,12 @@ def test_has_context(sentry_init, capture_events, make_client):
 
 @pytest.mark.parametrize(
     "transaction_style,expected_transaction",
-    [("uri_template", "/message"), ("path", "/message")]
+    [("uri_template", "/message"), ("path", "/message")],
 )
 def test_transaction_style(
     sentry_init, make_client, capture_events, transaction_style, expected_transaction
 ):
-    integration = falcon_sentry.FalconIntegration(
-        transaction_style=transaction_style
-    )
+    integration = falcon_sentry.FalconIntegration(transaction_style=transaction_style)
     sentry_init(integrations=[integration])
     events = capture_events()
 
@@ -187,9 +187,7 @@ def test_500(sentry_init, capture_events):
 
     def http500_handler(ex, req, resp, params):
         sentry_sdk.capture_exception(ex)
-        resp.media = {
-            "message": "Sentry error: %s" % sentry_sdk.last_event_id()
-        }
+        resp.media = {"message": "Sentry error: %s" % sentry_sdk.last_event_id()}
 
     app.add_error_handler(Exception, http500_handler)
 

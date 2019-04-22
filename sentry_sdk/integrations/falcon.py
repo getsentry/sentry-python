@@ -1,5 +1,3 @@
-from typing import Any, Callable, Dict
-
 import falcon
 import falcon.api_helpers
 import sentry_sdk.integrations
@@ -8,9 +6,13 @@ from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
+if False:
+    from typing import Any
+    from typing import Callable
+    from typing import Dict
+
 
 class FalconRequestExtractor(RequestExtractor):
-
     def env(self):
         return self.request.env
 
@@ -45,9 +47,7 @@ class SentryFalconMiddleware(object):
             return
 
         with hub.configure_scope() as scope:
-            scope.add_event_processor(
-                _make_request_event_processor(req, integration)
-            )
+            scope.add_event_processor(_make_request_event_processor(req, integration))
 
 
 class FalconIntegration(sentry_sdk.integrations.Integration):
@@ -128,20 +128,15 @@ def _patch_prepare_middleware():
     original_prepare_middleware = falcon.api_helpers.prepare_middleware
 
     def sentry_patched_prepare_middleware(
-        middleware=None,
-        independent_middleware=False
+        middleware=None, independent_middleware=False
     ):
         hub = Hub.current
         integration = hub.get_integration(FalconIntegration)
         if integration is not None:
             middleware = [SentryFalconMiddleware()] + (middleware or [])
-        return original_prepare_middleware(
-            middleware,
-            independent_middleware,
-        )
+        return original_prepare_middleware(middleware, independent_middleware)
 
-    falcon.api_helpers.prepare_middleware = \
-        sentry_patched_prepare_middleware
+    falcon.api_helpers.prepare_middleware = sentry_patched_prepare_middleware
 
 
 def _make_request_event_processor(req, integration):
