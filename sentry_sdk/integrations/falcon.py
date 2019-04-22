@@ -34,9 +34,14 @@ class FalconRequestExtractor(RequestExtractor):
         return None  # No such concept in Falcon
 
     def json(self):
-        # We don't touch falcon.Request.media as that can raise an exception
-        # on non-JSON requests.
-        return self.request._media
+        try:
+            return self.request.media
+        except falcon.errors.HTTPBadRequest:
+            # NOTE(jmagnusson): We return `falcon.Request._media` here because
+            # falcon 1.4 doesn't do proper type checking in
+            # `falcon.Request.media`. This has been fixed in 2.0.
+            # Relevant code: https://github.com/falconry/falcon/blob/1.4.1/falcon/request.py#L953
+            return self.request._media
 
 
 class SentryFalconMiddleware(object):
@@ -49,7 +54,7 @@ class SentryFalconMiddleware(object):
             return
 
         with hub.configure_scope() as scope:
-            scope._name = 'falcon'
+            scope._name = "falcon"
             scope.add_event_processor(_make_request_event_processor(req, integration))
 
 
