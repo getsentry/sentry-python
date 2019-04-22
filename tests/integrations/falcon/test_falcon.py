@@ -148,6 +148,28 @@ def test_falcon_empty_json_request(sentry_init, capture_events, data):
     assert event["request"]["data"] == data
 
 
+def test_falcon_raw_data_request(sentry_init, capture_events):
+    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+
+    class Resource:
+        def on_post(self, req, resp):
+            sentry_sdk.capture_message("hi")
+            resp.media = "ok"
+
+    app = falcon.API()
+    app.add_route("/", Resource())
+
+    events = capture_events()
+
+    client = falcon.testing.TestClient(app)
+    response = client.simulate_post("/", body='hi')
+    assert response.status == falcon.HTTP_200
+
+    event, = events
+    assert event["request"]["headers"]["Content-Length"] == "2"
+    assert event["request"]["data"] == ""
+
+
 def test_logging(sentry_init, capture_events):
     sentry_init(
         integrations=[

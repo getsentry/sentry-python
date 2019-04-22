@@ -21,17 +21,22 @@ class FalconRequestExtractor(RequestExtractor):
     def cookies(self):
         return self.request.cookies
 
-    def raw_data(self):
-        # As request data can only read once we won't make this available
-        # to Sentry.
-        # TODO(jmagnusson): Figure out if there's a way to support this
-        return None
-
     def form(self):
         return None  # No such concept in Falcon
 
     def files(self):
         return None  # No such concept in Falcon
+
+    def raw_data(self):
+        # As request data can only be read once we won't make this available
+        # to Sentry. Just send back a dummy string in case there was a
+        # content length.
+        # TODO(jmagnusson): Figure out if there's a way to support this
+        content_length = self.content_length()
+        if content_length > 0:
+            return "[REQUEST_CONTAINING_RAW_DATA]"
+        else:
+            return None
 
     def json(self):
         try:
