@@ -9,7 +9,7 @@ pytest.importorskip("falcon")
 import falcon
 import falcon.testing
 import sentry_sdk
-import sentry_sdk.integrations.falcon as falcon_sentry
+from sentry_sdk.integrations.falcon import FalconIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 
@@ -39,7 +39,7 @@ def make_client(make_app):
 
 
 def test_has_context(sentry_init, capture_events, make_client):
-    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+    sentry_init(integrations=[FalconIntegration()])
     events = capture_events()
 
     client = make_client()
@@ -59,7 +59,7 @@ def test_has_context(sentry_init, capture_events, make_client):
 def test_transaction_style(
     sentry_init, make_client, capture_events, transaction_style, expected_transaction
 ):
-    integration = falcon_sentry.FalconIntegration(transaction_style=transaction_style)
+    integration = FalconIntegration(transaction_style=transaction_style)
     sentry_init(integrations=[integration])
     events = capture_events()
 
@@ -72,7 +72,7 @@ def test_transaction_style(
 
 
 def test_errors(sentry_init, capture_exceptions, capture_events):
-    sentry_init(integrations=[falcon_sentry.FalconIntegration()], debug=True)
+    sentry_init(integrations=[FalconIntegration()], debug=True)
 
     class ZeroDivisionErrorResource:
         def on_get(self, req, resp):
@@ -99,7 +99,7 @@ def test_errors(sentry_init, capture_exceptions, capture_events):
 
 
 def test_falcon_large_json_request(sentry_init, capture_events):
-    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+    sentry_init(integrations=[FalconIntegration()])
 
     data = {"foo": {"bar": "a" * 2000}}
 
@@ -127,7 +127,7 @@ def test_falcon_large_json_request(sentry_init, capture_events):
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
 def test_falcon_empty_json_request(sentry_init, capture_events, data):
-    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+    sentry_init(integrations=[FalconIntegration()])
 
     class Resource:
         def on_post(self, req, resp):
@@ -149,7 +149,7 @@ def test_falcon_empty_json_request(sentry_init, capture_events, data):
 
 
 def test_falcon_raw_data_request(sentry_init, capture_events):
-    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+    sentry_init(integrations=[FalconIntegration()])
 
     class Resource:
         def on_post(self, req, resp):
@@ -173,7 +173,7 @@ def test_falcon_raw_data_request(sentry_init, capture_events):
 def test_logging(sentry_init, capture_events):
     sentry_init(
         integrations=[
-            falcon_sentry.FalconIntegration(),
+            FalconIntegration(),
             LoggingIntegration(event_level="ERROR"),
         ]
     )
@@ -199,7 +199,7 @@ def test_logging(sentry_init, capture_events):
 
 
 def test_500(sentry_init, capture_events):
-    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+    sentry_init(integrations=[FalconIntegration()])
 
     app = falcon.API()
 
@@ -225,7 +225,7 @@ def test_500(sentry_init, capture_events):
 
 
 def test_error_in_errorhandler(sentry_init, capture_events):
-    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+    sentry_init(integrations=[FalconIntegration()])
 
     app = falcon.API()
 
@@ -258,7 +258,7 @@ def test_error_in_errorhandler(sentry_init, capture_events):
 
 
 def test_bad_request_not_captured(sentry_init, capture_events):
-    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+    sentry_init(integrations=[FalconIntegration()])
     events = capture_events()
 
     app = falcon.API()
@@ -277,7 +277,7 @@ def test_bad_request_not_captured(sentry_init, capture_events):
 
 
 def test_does_not_leak_scope(sentry_init, capture_events):
-    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+    sentry_init(integrations=[FalconIntegration()])
     events = capture_events()
 
     with sentry_sdk.configure_scope() as scope:
@@ -316,7 +316,7 @@ def test_does_not_leak_scope(sentry_init, capture_events):
 def test_errorhandler_for_exception_swallows_exception(
     sentry_init, capture_events, exc_cls
 ):
-    sentry_init(integrations=[falcon_sentry.FalconIntegration()])
+    sentry_init(integrations=[FalconIntegration()])
     events = capture_events()
 
     app = falcon.API()

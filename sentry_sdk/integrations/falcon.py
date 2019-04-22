@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
-import falcon
-import falcon.api_helpers
+import falcon  # type: ignore
+import falcon.api_helpers  # type: ignore
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
