@@ -98,7 +98,8 @@ def _get_environ(environ):
     """
     keys = ("SERVER_NAME", "SERVER_PORT")
     if _should_send_default_pii():
-        keys += ("REMOTE_ADDR",)  # type: ignore
+        # Add all three headers here to make debugging of proxy setup easier.
+        keys += ("REMOTE_ADDR", "HTTP_X_FORWARDED_FOR", "HTTP_X_REAL_IP")
 
     for key in keys:
         if key in environ:
@@ -129,16 +130,21 @@ def _get_headers(environ):
 def get_client_ip(environ):
     # type: (Dict[str, str]) -> Optional[Any]
     """
-    Naively yank the first IP address in an X-Forwarded-For header
-    and assume this is correct.
-
-    Note: Don't use this in security sensitive situations since this
-    value may be forged from a client.
+    Infer the user IP address from various headers. This cannot be used in
+    security sensitive situations since the value may be forged from a client,
+    but it's good enough for the event payload.
     """
     try:
         return environ["HTTP_X_FORWARDED_FOR"].split(",")[0].strip()
     except (KeyError, IndexError):
-        return environ.get("REMOTE_ADDR")
+        pass
+
+    try:
+        return environ["HTTP_X_REAL_IP"]
+    except KeyError:
+        pass
+
+    return environ.get("REMOTE_ADDR")
 
 
 def _capture_exception(hub):
