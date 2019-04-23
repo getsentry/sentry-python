@@ -5,6 +5,7 @@
 * Fix a bug that would prevent the logging integration from attaching `extra`
   keys called `data`.
 * Fix order in which exception chains are reported to match Raven behavior.
+* New integration for the Falcon web framework. Thanks to Jacob Magnusson!
 
 ## 0.7.10
 
