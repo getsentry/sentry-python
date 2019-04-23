@@ -96,10 +96,10 @@ def _get_environ(environ):
     """
     Returns our whitelisted environment variables.
     """
-    keys = ("SERVER_NAME", "SERVER_PORT")
+    keys = ["SERVER_NAME", "SERVER_PORT"]
     if _should_send_default_pii():
         # Add all three headers here to make debugging of proxy setup easier.
-        keys += ("REMOTE_ADDR", "HTTP_X_FORWARDED_FOR", "HTTP_X_REAL_IP")
+        keys += ["REMOTE_ADDR", "HTTP_X_FORWARDED_FOR", "HTTP_X_REAL_IP"]
 
     for key in keys:
         if key in environ:
