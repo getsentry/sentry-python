@@ -51,13 +51,13 @@ class SpanContext(object):
 
     @classmethod
     def continue_from_headers(cls, headers):
-        parent = cls.from_traceparent(headers.get("traceparent"))
+        parent = cls.from_traceparent(headers.get("sentry-trace"))
         if parent is None:
             return cls.start_trace()
         return parent.new_span()
 
     def iter_headers(self):
-        yield "traceparent", self.to_traceparent()
+        yield "sentry-trace", self.to_traceparent()
 
     @classmethod
     def from_traceparent(cls, traceparent):
