@@ -1129,10 +1129,11 @@ table {
             <span class="n">module</span><span class="p">,</span> <span class="bp">cls</span> <span class="o">=</span> <span class="n">import_string</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
             <span class="k">yield</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">import_module</span><span class="p">(</span><span class="n">module</span><span class="p">),</span> <span class="bp">cls</span><span class="p">)</span>
 
-    <span class="k">for</span> <span class="n">import_string</span> <span class="ow">in</span> <span class="n">import_strings</span><span class="p">:</span>
-        <span class="n">iter_default_integrations</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">- `{}`&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>  <span class="c1"># type: ignore</span>
-            <span class="n">import_string</span>
-        <span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">iter_default_integrations</span><span class="o">.</span><span class="vm">__doc__</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">import_string</span> <span class="ow">in</span> <span class="n">import_strings</span><span class="p">:</span>
+            <span class="n">iter_default_integrations</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">- `{}`&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>  <span class="c1"># type: ignore</span>
+                <span class="n">import_string</span>
+            <span class="p">)</span>
 
     <span class="k">return</span> <span class="n">iter_default_integrations</span>
 
