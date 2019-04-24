@@ -116,13 +116,17 @@ class Client(object):
             and "threads" not in event
         ):
             with capture_internal_exceptions():
-                event["threads"] = [
-                    {
-                        "stacktrace": current_stacktrace(self.options["with_locals"]),
-                        "crashed": False,
-                        "current": True,
-                    }
-                ]
+                event["threads"] = {
+                    "values": [
+                        {
+                            "stacktrace": current_stacktrace(
+                                self.options["with_locals"]
+                            ),
+                            "crashed": False,
+                            "current": True,
+                        }
+                    ]
+                }
 
         for key in "release", "environment", "server_name", "dist":
             if event.get(key) is None and self.options[key] is not None:  # type: ignore

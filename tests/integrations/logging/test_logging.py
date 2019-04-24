@@ -69,7 +69,7 @@ def test_logging_stack(sentry_init, capture_events):
     event_with, event_without, = events
 
     assert event_with["level"] == "error"
-    assert event_with["threads"][0]["stacktrace"]["frames"]
+    assert event_with["threads"]["values"][0]["stacktrace"]["frames"]
 
     assert event_without["level"] == "error"
     assert "threads" not in event_without

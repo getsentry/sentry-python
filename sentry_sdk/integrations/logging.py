@@ -170,13 +170,17 @@ class EventHandler(logging.Handler, object):
             event = {}
             hint = None
             with capture_internal_exceptions():
-                event["threads"] = [
-                    {
-                        "stacktrace": current_stacktrace(client_options["with_locals"]),
-                        "crashed": False,
-                        "current": True,
-                    }
-                ]
+                event["threads"] = {
+                    "values": [
+                        {
+                            "stacktrace": current_stacktrace(
+                                client_options["with_locals"]
+                            ),
+                            "crashed": False,
+                            "current": True,
+                        }
+                    ]
+                }
         else:
             event = {}
 
