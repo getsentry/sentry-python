@@ -100,6 +100,53 @@ def test_proxy_none_httpenv_fallback(monkeypatch):
     assert client.transport._pool.proxy.scheme == "http"
 
 
+def test_proxy_bothselect_bothen(monkeypatch):
+    os.environ["HTTP_PROXY"] = "http://localhost/123"
+    os.environ["HTTPS_PROXY"] = "https://localhost/123"
+    client = Client("https://foo@sentry.io/123", http_proxy="", https_proxy="")
+    assert client.transport._pool.proxy is None
+
+
+def test_proxy_bothavoid_bothenv(monkeypatch):
+    os.environ["HTTP_PROXY"] = "http://localhost/123"
+    os.environ["HTTPS_PROXY"] = "https://localhost/123"
+    client = Client("https://foo@sentry.io/123", http_proxy=None, https_proxy=None)
+    assert client.transport._pool.proxy.scheme == "https"
+
+
+def test_proxy_bothselect_httpenv(monkeypatch):
+    os.environ["HTTP_PROXY"] = "http://localhost/123"
+    client = Client("https://foo@sentry.io/123", http_proxy=None, https_proxy=None)
+    assert client.transport._pool.proxy.scheme == "http"
+
+
+def test_proxy_httpselect_bothenv(monkeypatch):
+    os.environ["HTTP_PROXY"] = "http://localhost/123"
+    os.environ["HTTPS_PROXY"] = "https://localhost/123"
+    client = Client("https://foo@sentry.io/123", http_proxy=None, https_proxy="")
+    assert client.transport._pool.proxy.scheme == "http"
+
+
+def test_proxy_httpsselect_bothenv(monkeypatch):
+    os.environ["HTTP_PROXY"] = "http://localhost/123"
+    os.environ["HTTPS_PROXY"] = "https://localhost/123"
+    client = Client("https://foo@sentry.io/123", http_proxy="", https_proxy=None)
+    assert client.transport._pool.proxy.scheme == "https"
+
+
+def test_proxy_httpselect_httpsenv(monkeypatch):
+    os.environ["HTTPS_PROXY"] = "https://localhost/123"
+    client = Client("https://foo@sentry.io/123", http_proxy=None, https_proxy="")
+    assert client.transport._pool.proxy is None
+
+
+def test_proxy_httpsselect_bothenv_http(monkeypatch):
+    os.environ["HTTP_PROXY"] = "http://localhost/123"
+    os.environ["HTTPS_PROXY"] = "https://localhost/123"
+    client = Client("http://foo@sentry.io/123", http_proxy=None, https_proxy=None)
+    assert client.transport._pool.proxy.scheme == "http"
+
+
 def test_simple_transport():
     events = []
     with Hub(Client(transport=events.append)):

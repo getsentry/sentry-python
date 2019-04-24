@@ -152,14 +152,15 @@ class HttpTransport(Transport):
         ca_certs,  # type: Optional[Any]
     ):
         # type: (...) -> Union[PoolManager, ProxyManager]
-        # Use http_proxy if scheme is https and https_proxy is not set
-        proxy = parsed_dsn.scheme == "https" and https_proxy or http_proxy
-        if not proxy:
-            proxy = getproxies().get(parsed_dsn.scheme)
+        proxy = None
 
-            # maybe fallback to HTTP proxy
-            if parsed_dsn.scheme == "https" and not proxy:
-                proxy = getproxies().get("http")
+        # try HTTPS first
+        if parsed_dsn.scheme == "https" and (https_proxy != ""):
+            proxy = https_proxy or getproxies().get("https")
+
+        # maybe fallback to HTTP proxy
+        if not proxy and (http_proxy != ""):
+            proxy = http_proxy or getproxies().get("http")
 
         opts = self._get_pool_options(ca_certs)
 
