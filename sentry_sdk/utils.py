@@ -349,39 +349,43 @@ def safe_repr(value):
 
 
 def object_to_json(obj, remaining_depth=4, memo=None):
-    if memo is None:
-        memo = Memo()
-    if memo.memoize(obj):
-        return CYCLE_MARKER
+    with capture_internal_exceptions():
+        if memo is None:
+            memo = Memo()
+        if memo.memoize(obj):
+            return CYCLE_MARKER
 
-    try:
-        if remaining_depth > 0:
-            hints = {"memo": memo, "remaining_depth": remaining_depth}
-            for processor in global_repr_processors:
-                with capture_internal_exceptions():
-                    result = processor(obj, hints)
-                    if result is not NotImplemented:
-                        return result
+        try:
+            if remaining_depth > 0:
+                hints = {"memo": memo, "remaining_depth": remaining_depth}
+                for processor in global_repr_processors:
+                    with capture_internal_exceptions():
+                        result = processor(obj, hints)
+                        if result is not NotImplemented:
+                            return result
 
-            if isinstance(obj, (list, tuple)):
-                # It is not safe to iterate over another sequence types as this may raise errors or
-                # bring undesired side-effects (e.g. Django querysets are executed during iteration)
-                return [
-                    object_to_json(x, remaining_depth=remaining_depth - 1, memo=memo)
-                    for x in obj
-                ]
+                if isinstance(obj, (list, tuple)):
+                    # It is not safe to iterate over another sequence types as this may raise errors or
+                    # bring undesired side-effects (e.g. Django querysets are executed during iteration)
+                    return [
+                        object_to_json(
+                            x, remaining_depth=remaining_depth - 1, memo=memo
+                        )
+                        for x in obj
+                    ]
 
-            if isinstance(obj, Mapping):
-                return {
-                    safe_str(k): object_to_json(
-                        v, remaining_depth=remaining_depth - 1, memo=memo
-                    )
-                    for k, v in list(obj.items())
-                }
+                if isinstance(obj, Mapping):
+                    return {
+                        safe_str(k): object_to_json(
+                            v, remaining_depth=remaining_depth - 1, memo=memo
+                        )
+                        for k, v in list(obj.items())
+                    }
 
-        return safe_repr(obj)
-    finally:
-        memo.unmemoize(obj)
+            return safe_repr(obj)
+        finally:
+            memo.unmemoize(obj)
+    return u"<broken repr>"
 
 
 def extract_locals(frame):
@@ -491,8 +495,9 @@ def single_exception_from_error_tuple(
 
     if errno is not None:
         mechanism = mechanism or {}
-        mechanism_meta = mechanism.setdefault("meta", {})
-        mechanism_meta.setdefault("errno", {"code": errno})
+        mechanism.setdefault("meta", {}).setdefault("errno", {}).setdefault(
+            "number", errno
+        )
 
     if client_options is None:
         with_locals = True
@@ -564,6 +569,9 @@ def exceptions_from_error_tuple(
                 exc_type, exc_value, tb, client_options, mechanism
             )
         )
+
+    rv.reverse()
+
     return rv
 
 
@@ -575,24 +583,41 @@ def to_string(value):
         return repr(value)[1:-1]
 
 
-def iter_event_frames(event):
+def iter_event_stacktraces(event):
     # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
-    stacktraces = []
     if "stacktrace" in event:
-        stacktraces.append(event["stacktrace"])
+        yield event["stacktrace"]
     if "exception" in event:
         for exception in event["exception"].get("values") or ():
             if "stacktrace" in exception:
-                stacktraces.append(exception["stacktrace"])
-    for stacktrace in stacktraces:
+                yield exception["stacktrace"]
+
+
+def iter_event_frames(event):
+    # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
+    for stacktrace in iter_event_stacktraces(event):
         for frame in stacktrace.get("frames") or ():
             yield frame
 
 
 def handle_in_app(event, in_app_exclude=None, in_app_include=None):
     # type: (Dict[str, Any], List, List) -> Dict[str, Any]
+    for stacktrace in iter_event_stacktraces(event):
+        handle_in_app_impl(
+            stacktrace.get("frames"),
+            in_app_exclude=in_app_exclude,
+            in_app_include=in_app_include,
+        )
+
+    return event
+
+
+def handle_in_app_impl(frames, in_app_exclude, in_app_include):
+    if not frames:
+        return
+
     any_in_app = False
-    for frame in iter_event_frames(event):
+    for frame in frames:
         in_app = frame.get("in_app")
         if in_app is not None:
             if in_app:
@@ -602,18 +627,18 @@ def handle_in_app(event, in_app_exclude=None, in_app_include=None):
         module = frame.get("module")
         if not module:
             continue
-
-        if _module_in_set(module, in_app_exclude):
-            frame["in_app"] = False
-        if _module_in_set(module, in_app_include):
+        elif _module_in_set(module, in_app_include):
             frame["in_app"] = True
             any_in_app = True
+        elif _module_in_set(module, in_app_exclude):
+            frame["in_app"] = False
 
     if not any_in_app:
-        for frame in iter_event_frames(event):
-            frame["in_app"] = True
+        for frame in frames:
+            if frame.get("in_app") is None:
+                frame["in_app"] = True
 
-    return event
+    return frames
 
 
 def exc_info_from_error(error):
@@ -705,7 +730,7 @@ def flatten_metadata(obj):
                     del meta[str(i)]
             return list_rv, (meta or None)
         if isinstance(obj, AnnotatedValue):
-            return obj.value, {"": obj.metadata}
+            return (inner(obj.value)[0], {"": obj.metadata})
         return obj, None
 
     obj, meta = inner(obj)
@@ -723,6 +748,7 @@ def strip_event_mut(event):
             strip_stacktrace_mut(exception.get("stacktrace", None))
 
     strip_request_mut(event.get("request", None))
+    strip_breadcrumbs_mut(event.get("breadcrumbs", None))
 
 
 def strip_stacktrace_mut(stacktrace):
@@ -741,6 +767,14 @@ def strip_request_mut(request):
     if not data:
         return
     request["data"] = strip_databag(data)
+
+
+def strip_breadcrumbs_mut(breadcrumbs):
+    if not breadcrumbs:
+        return
+
+    for i in range(len(breadcrumbs)):
+        breadcrumbs[i] = strip_databag(breadcrumbs[i])
 
 
 def strip_frame_mut(frame):
@@ -765,32 +799,56 @@ class Memo(object):
 
 def convert_types(obj):
     # type: (Any) -> Any
+    if obj is None:
+        return None
     if obj is CYCLE_MARKER:
         return u"<cyclic>"
     if isinstance(obj, datetime):
-        return obj.strftime("%Y-%m-%dT%H:%M:%SZ")
+        return text_type(obj.strftime("%Y-%m-%dT%H:%M:%SZ"))
     if isinstance(obj, Mapping):
         return {k: convert_types(v) for k, v in obj.items()}
     if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
         return [convert_types(v) for v in obj]
+    if isinstance(obj, AnnotatedValue):
+        return AnnotatedValue(convert_types(obj.value), obj.metadata)
+
     if not isinstance(obj, string_types + number_types):
         return safe_repr(obj)
     if isinstance(obj, bytes):
         return obj.decode("utf-8", "replace")
+
     return obj
 
 
-def strip_databag(obj, remaining_depth=20):
-    # type: (Any, int) -> Any
+def strip_databag(obj, remaining_depth=20, max_breadth=20):
+    # type: (Any, int, int) -> Any
     assert not isinstance(obj, bytes), "bytes should have been normalized before"
     if remaining_depth <= 0:
         return AnnotatedValue(None, {"rem": [["!limit", "x"]]})
     if isinstance(obj, text_type):
         return strip_string(obj)
     if isinstance(obj, Mapping):
-        return {k: strip_databag(v, remaining_depth - 1) for k, v in obj.items()}
+        rv_dict = {}  # type: Dict[Any, Any]
+        for i, (k, v) in enumerate(obj.items()):
+            if i >= max_breadth:
+                return AnnotatedValue(rv_dict, {"len": max_breadth})
+            rv_dict[k] = strip_databag(
+                v, remaining_depth=remaining_depth - 1, max_breadth=max_breadth
+            )
+
+        return rv_dict
     if isinstance(obj, Sequence):
-        return [strip_databag(v, remaining_depth - 1) for v in obj]
+        rv_list = []  # type: List[Any]
+        for i, v in enumerate(obj):
+            if i >= max_breadth:
+                return AnnotatedValue(rv_list, {"len": max_breadth})
+            rv_list.append(
+                strip_databag(
+                    v, remaining_depth=remaining_depth - 1, max_breadth=max_breadth
+                )
+            )
+
+        return rv_list
     return obj
 
 

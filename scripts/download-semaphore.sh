@@ -1,8 +1,7 @@
 #!/bin/bash
-
 set -e
 
-if [ "$TRAVIS" = true ] && [ -z "$GITHUB_API_TOKEN" ]; then
+if { [ "$TRAVIS" == "true" ] || [ "$TF_BUILD" == "True" ]; } && [ -z "$GITHUB_API_TOKEN" ]; then
     echo "Not running on external pull request"
     exit 0;
 fi
@@ -20,11 +19,13 @@ echo "$output"
 
 output="$(echo "$output" \
     | grep "$(uname -s)" \
+    | grep -v "\.zip" \
     | grep "download" \
     | cut -d : -f 2,3 \
     | tr -d , \
     | tr -d \")"
 
+echo "$output"
 echo "$output" | wget -i - -O $target
 [ -s $target ]
 chmod +x $target

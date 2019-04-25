@@ -85,6 +85,7 @@ def assert_semaphore_acceptance(tmpdir):
             ).decode("utf-8")
         )
         _no_errors_in_semaphore_response(output)
+        output.pop("_meta", None)
 
     return inner
 

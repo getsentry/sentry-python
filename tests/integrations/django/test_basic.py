@@ -1,4 +1,5 @@
 import pytest
+import json
 
 from werkzeug.test import Client
 from django.contrib.auth.models import User
@@ -225,7 +226,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     if "postgres" not in connections:
         pytest.skip("postgres tests disabled")
 
-    import psycopg2
+    import psycopg2.sql
 
     sql = connections["postgres"].cursor()
 
@@ -248,7 +249,7 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     if "postgres" not in connections:
         pytest.skip("postgres tests disabled")
 
-    import psycopg2
+    import psycopg2.sql
 
     sql = connections["postgres"].cursor()
 
@@ -364,7 +365,8 @@ def test_template_exception(sentry_init, client, capture_events):
     assert status.lower() == "500 internal server error"
 
     event, = events
-    exception = event["exception"]["values"][0]
+    exception = event["exception"]["values"][-1]
+    assert exception["type"] == "TemplateSyntaxError"
 
     frames = [
         f
@@ -389,3 +391,68 @@ def test_template_exception(sentry_init, client, capture_events):
         (None, None),
         (u"invalid_block_tag", u"django.template.base"),
     ]
+
+
+@pytest.mark.parametrize(
+    "type,event_request",
+    [
+        [
+            "json",
+            {
+                "cookies": {},
+                "data": {"foo": "bar"},
+                "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
+                "headers": {
+                    "Content-Length": "14",
+                    "Content-Type": "application/json",
+                    "Host": "localhost",
+                },
+                "method": "POST",
+                "query_string": "",
+                "url": "http://localhost/rest-framework-exc",
+            },
+        ],
+        [
+            "formdata",
+            {
+                "cookies": {},
+                "data": {"foo": "bar"},
+                "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
+                "headers": {
+                    "Content-Length": "7",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Host": "localhost",
+                },
+                "method": "POST",
+                "query_string": "",
+                "url": "http://localhost/rest-framework-exc",
+            },
+        ],
+    ],
+)
+def test_rest_framework_basic(
+    sentry_init, client, capture_events, capture_exceptions, type, event_request
+):
+    pytest.importorskip("rest_framework")
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    exceptions = capture_exceptions()
+    events = capture_events()
+
+    if type == "json":
+        client.post(
+            reverse("rest_framework_exc"),
+            data=json.dumps({"foo": "bar"}),
+            content_type="application/json",
+        )
+    elif type == "formdata":
+        client.post(reverse("rest_framework_exc"), data={"foo": "bar"})
+    else:
+        assert False
+
+    error, = exceptions
+    assert isinstance(error, ZeroDivisionError)
+
+    event, = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "django"
+
+    assert event["request"] == event_request

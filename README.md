@@ -7,8 +7,21 @@
 # sentry-python - Sentry SDK for Python
 
 [![Build Status](https://travis-ci.com/getsentry/sentry-python.svg?branch=master)](https://travis-ci.com/getsentry/sentry-python)
+[![PyPi page link -- version](https://img.shields.io/pypi/v/sentry-sdk.svg)](https://pypi.python.org/pypi/sentry-sdk)
 
-To learn about how to use the SDK:
+This is the next line of the Python SDK for [Sentry](http://sentry.io/), intended to replace the `raven` package on PyPI.
+
+```python
+from sentry_sdk import init, capture_message
+
+init("mydsn@sentry.io/123")
+
+capture_message("Hello World")  # Will create an event.
+
+raise ValueError()  # Will also create an event.
+```
+
+To learn more about how to use the SDK:
 
 - [Getting started with the new SDK](https://docs.sentry.io/quickstart/?platform=python)
 - [Configuration options](https://docs.sentry.io/error-reporting/configuration/?platform=python)

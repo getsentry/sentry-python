@@ -55,8 +55,8 @@ matrix:
         - export TRAVIS_PYTHON_VERSION=2.7
 
 before_script:
- - psql -c 'create database travis_ci_test;' -U postgres
- - psql -c 'create database test_travis_ci_test;' -U postgres
+  - psql -c 'create database travis_ci_test;' -U postgres
+  - psql -c 'create database test_travis_ci_test;' -U postgres
 
 services:
   - postgresql
@@ -64,7 +64,7 @@ services:
 install:
   - pip install tox
   - pip install codecov
-  - sh scripts/download-semaphore.sh
+  - bash scripts/download-semaphore.sh
 
 script:
   - coverage erase

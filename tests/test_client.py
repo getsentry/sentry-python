@@ -19,8 +19,17 @@ from sentry_sdk import (
 )
 from sentry_sdk.hub import HubMeta
 from sentry_sdk.transport import Transport
-from sentry_sdk._compat import reraise, text_type
+from sentry_sdk._compat import reraise, text_type, PY2
 from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
+
+if PY2:
+    # Importing ABCs from collections is deprecated, and will stop working in 3.8
+    # https://github.com/python/cpython/blob/master/Lib/collections/__init__.py#L49
+    from collections import Mapping
+else:
+    # New in 3.3
+    # https://docs.python.org/3/library/collections.abc.html
+    from collections.abc import Mapping
 
 
 class EventCaptured(Exception):
@@ -470,6 +479,21 @@ def test_databag_stripping(sentry_init, capture_events):
     assert len(json.dumps(event)) < 10000
 
 
+def test_databag_breadth_stripping(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    try:
+        a = ["a"] * 16000  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    event, = events
+
+    assert len(json.dumps(event)) < 10000
+
+
 @pytest.mark.skipif(not HAS_CHAINED_EXCEPTIONS, reason="Only works on 3.3+")
 def test_chained_exceptions(sentry_init, capture_events):
     sentry_init()
@@ -477,7 +501,7 @@ def test_chained_exceptions(sentry_init, capture_events):
 
     try:
         try:
-            1 / 0
+            raise ValueError()
         except Exception:
             1 / 0
     except Exception:
@@ -485,4 +509,56 @@ def test_chained_exceptions(sentry_init, capture_events):
 
     event, = events
 
-    assert len(event["exception"]["values"]) == 2
+    e1, e2 = event["exception"]["values"]
+
+    # This is the order all other SDKs send chained exceptions in. Including
+    # Raven-Python.
+
+    assert e1["type"] == "ValueError"
+    assert e2["type"] == "ZeroDivisionError"
+
+
+@pytest.mark.tests_internal_exceptions
+def test_broken_mapping(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    class C(Mapping):
+        def broken(self, *args, **kwargs):
+            raise Exception("broken")
+
+        __getitem__ = broken
+        __setitem__ = broken
+        __delitem__ = broken
+        __iter__ = broken
+        __len__ = broken
+
+        def __repr__(self):
+            return "broken"
+
+    try:
+        a = C()  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    event, = events
+    assert (
+        event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"]
+        == "<broken repr>"
+    )
+
+
+def test_errno_errors(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    class Foo(Exception):
+        errno = 69
+
+    capture_exception(Foo())
+
+    event, = events
+
+    exception, = event["exception"]["values"]
+    assert exception["mechanism"]["meta"]["errno"]["number"] == 69

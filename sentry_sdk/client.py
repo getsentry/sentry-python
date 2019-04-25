@@ -142,9 +142,9 @@ class Client(object):
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
+            event = convert_types(event)
             strip_event_mut(event)
             event = flatten_metadata(event)
-            event = convert_types(event)
 
         before_send = self.options["before_send"]
         if before_send is not None:

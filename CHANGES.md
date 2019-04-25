@@ -1,3 +1,33 @@
+## 0.7.11
+
+* Fix a bug that would send `errno` in an invalid format to the server.
+* Fix import-time crash when running Python with `-O` flag.
+* Fix a bug that would prevent the logging integration from attaching `extra`
+  keys called `data`.
+* Fix order in which exception chains are reported to match Raven behavior.
+* New integration for the Falcon web framework. Thanks to Jacob Magnusson!
+
+## 0.7.10
+
+* Add more event trimming.
+* Log Sentry's response body in debug mode.
+* Fix a few bad typehints causing issues in IDEs.
+* Fix a bug in the Bottle integration that would report HTTP exceptions (e.g.
+  redirects) as errors.
+* Fix a bug that would prevent use of `in_app_exclude` without
+  setting `in_app_include`.
+* Fix a bug where request bodies of Django Rest Framework apps were not captured.
+* Suppress errors during SQL breadcrumb capturing in Django
+  integration. Also change order in which formatting strategies
+  are tried.
+
+## 0.7.9
+
+* New integration for the Bottle web framework. Thanks to Stepan Henek!
+* Self-protect against broken mapping implementations and other broken reprs
+  instead of dropping all local vars from a stacktrace. Thanks to Marco
+  Neumann!
+
 ## 0.7.8
 
 * Add support for Sanic versions 18 and 19.
