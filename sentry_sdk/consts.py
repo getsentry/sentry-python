@@ -37,6 +37,9 @@ if False:
             "debug": bool,
             "attach_stacktrace": bool,
             "ca_certs": Optional[str],
+            "max_breadth": int,
+            "max_depth": int,
+            "max_string_length": int,
         },
         total=False,
     )
@@ -69,6 +72,9 @@ DEFAULT_OPTIONS = {
     "debug": False,
     "attach_stacktrace": False,
     "ca_certs": None,
+    "max_breadth": 20,
+    "max_depth": 20,
+    "max_string_length": 512,
 }
 
 

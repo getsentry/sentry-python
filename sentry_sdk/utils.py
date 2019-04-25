@@ -6,6 +6,7 @@ import logging
 from contextlib import contextmanager
 from datetime import datetime
 
+from sentry_sdk.consts import DEFAULT_OPTIONS
 from sentry_sdk._compat import (
     urlparse,
     text_type,
@@ -743,6 +744,17 @@ def flatten_metadata(obj):
     return obj
 
 
+def get_client_options():
+    """ Returns Hub.currentclient.options 
+    or the default options
+    """
+    from sentry_sdk.hub import Hub
+    hub = Hub.current
+    if hub.client is not None:
+        return hub.client.options
+    return DEFAULT_OPTIONS
+
+
 def strip_event_mut(event):
     # type: (Dict[str, Any]) -> None
     strip_stacktrace_mut(event.get("stacktrace", None))
@@ -770,21 +782,39 @@ def strip_request_mut(request):
     data = request.get("data", None)
     if not data:
         return
-    request["data"] = strip_databag(data)
+    client_options = get_client_options()
+    request["data"] = strip_databag(
+        data,
+        client_options["max_breadth"],
+        client_options["max_depth"],
+        client_options["max_string_length"],
+    )
 
 
 def strip_breadcrumbs_mut(breadcrumbs):
     if not breadcrumbs:
         return
 
+    client_options = get_client_options()
     for i in range(len(breadcrumbs)):
-        breadcrumbs[i] = strip_databag(breadcrumbs[i])
+        breadcrumbs[i] = strip_databag(
+            breadcrumbs[i],
+            client_options["max_breadth"],
+            client_options["max_depth"],
+            client_options["max_string_length"],
+        )
 
 
 def strip_frame_mut(frame):
     # type: (Dict[str, Any]) -> None
     if "vars" in frame:
-        frame["vars"] = strip_databag(frame["vars"])
+        client_options = get_client_options()
+        frame["vars"] = strip_databag(
+            frame["vars"],
+            client_options["max_breadth"],
+            client_options["max_depth"],
+            client_options["max_string_length"],
+        )
 
 
 class Memo(object):
@@ -824,20 +854,23 @@ def convert_types(obj):
     return obj
 
 
-def strip_databag(obj, remaining_depth=20, max_breadth=20):
+def strip_databag(obj, remaining_depth=20, max_breadth=20, max_string_length=512):
     # type: (Any, int, int) -> Any
     assert not isinstance(obj, bytes), "bytes should have been normalized before"
     if remaining_depth <= 0:
         return AnnotatedValue(None, {"rem": [["!limit", "x"]]})
     if isinstance(obj, text_type):
-        return strip_string(obj)
+        return strip_string(obj, max_string_length)
     if isinstance(obj, Mapping):
         rv_dict = {}  # type: Dict[Any, Any]
         for i, (k, v) in enumerate(obj.items()):
             if i >= max_breadth:
                 return AnnotatedValue(rv_dict, {"len": max_breadth})
             rv_dict[k] = strip_databag(
-                v, remaining_depth=remaining_depth - 1, max_breadth=max_breadth
+                v,
+                remaining_depth=remaining_depth - 1,
+                max_breadth=max_breadth,
+                max_string_length=max_string_length,
             )
 
         return rv_dict
@@ -848,7 +881,10 @@ def strip_databag(obj, remaining_depth=20, max_breadth=20):
                 return AnnotatedValue(rv_list, {"len": max_breadth})
             rv_list.append(
                 strip_databag(
-                    v, remaining_depth=remaining_depth - 1, max_breadth=max_breadth
+                    v,
+                    remaining_depth=remaining_depth - 1,
+                    max_breadth=max_breadth,
+                    max_string_length=max_string_length,
                 )
             )
 
@@ -858,7 +894,6 @@ def strip_databag(obj, remaining_depth=20, max_breadth=20):
 
 def strip_string(value, max_length=512):
     # type: (str, int) -> Union[AnnotatedValue, str]
-    # TODO: read max_length from config
     if not value:
         return value
     length = len(value)
@@ -895,7 +930,9 @@ def format_and_strip(template, params, strip_string=strip_string):
             (rv_length + x if isinstance(x, int_types) and i < 4 else x)
             for i, x in enumerate(remark)
         ]
-
+    
+    client_options = get_client_options()
+    max_string_length = client_options['max_string_length']
     for chunk in chunks[:-1]:
         rv.append(chunk)
         rv_length += len(chunk)
@@ -904,7 +941,7 @@ def format_and_strip(template, params, strip_string=strip_string):
             raise ValueError("Not enough params.")
         param = params.pop()
 
-        stripped_param = strip_string(param)
+        stripped_param = strip_string(param, max_string_length)
         if isinstance(stripped_param, AnnotatedValue):
             rv_remarks.extend(
                 realign_remark(remark) for remark in stripped_param.metadata["rem"]
