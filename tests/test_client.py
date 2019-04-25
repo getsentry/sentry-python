@@ -1,7 +1,6 @@
 # coding: utf-8
 import json
 import logging
-import os
 import pytest
 import subprocess
 import sys
