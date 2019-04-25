@@ -1592,13 +1592,17 @@ argument.</p></div>
             <span class="ow">and</span> <span class="s2">&quot;threads&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">event</span>
         <span class="p">):</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
-                    <span class="p">{</span>
-                        <span class="s2">&quot;stacktrace&quot;</span><span class="p">:</span> <span class="n">current_stacktrace</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;with_locals&quot;</span><span class="p">]),</span>
-                        <span class="s2">&quot;crashed&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
-                        <span class="s2">&quot;current&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span>
-                    <span class="p">}</span>
-                <span class="p">]</span>
+                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;values&quot;</span><span class="p">:</span> <span class="p">[</span>
+                        <span class="p">{</span>
+                            <span class="s2">&quot;stacktrace&quot;</span><span class="p">:</span> <span class="n">current_stacktrace</span><span class="p">(</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;with_locals&quot;</span><span class="p">]</span>
+                            <span class="p">),</span>
+                            <span class="s2">&quot;crashed&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+                            <span class="s2">&quot;current&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span>
+                        <span class="p">}</span>
+                    <span class="p">]</span>
+                <span class="p">}</span>
 
         <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="s2">&quot;release&quot;</span><span class="p">,</span> <span class="s2">&quot;environment&quot;</span><span class="p">,</span> <span class="s2">&quot;server_name&quot;</span><span class="p">,</span> <span class="s2">&quot;dist&quot;</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>  <span class="c1"># type: ignore</span>
@@ -2009,10 +2013,15 @@ integration will use this to render out a message on stderr.</p></div>
         <span class="n">ca_certs</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Union[PoolManager, ProxyManager]</span>
-        <span class="c1"># Use http_proxy if scheme is https and https_proxy is not set</span>
-        <span class="n">proxy</span> <span class="o">=</span> <span class="n">parsed_dsn</span><span class="o">.</span><span class="n">scheme</span> <span class="o">==</span> <span class="s2">&quot;https&quot;</span> <span class="ow">and</span> <span class="n">https_proxy</span> <span class="ow">or</span> <span class="n">http_proxy</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">proxy</span><span class="p">:</span>
-            <span class="n">proxy</span> <span class="o">=</span> <span class="n">getproxies</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">scheme</span><span class="p">)</span>
+        <span class="n">proxy</span> <span class="o">=</span> <span class="bp">None</span>
+
+        <span class="c1"># try HTTPS first</span>
+        <span class="k">if</span> <span class="n">parsed_dsn</span><span class="o">.</span><span class="n">scheme</span> <span class="o">==</span> <span class="s2">&quot;https&quot;</span> <span class="ow">and</span> <span class="p">(</span><span class="n">https_proxy</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>
+            <span class="n">proxy</span> <span class="o">=</span> <span class="n">https_proxy</span> <span class="ow">or</span> <span class="n">getproxies</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;https&quot;</span><span class="p">)</span>
+
+        <span class="c1"># maybe fallback to HTTP proxy</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">proxy</span> <span class="ow">and</span> <span class="p">(</span><span class="n">http_proxy</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>
+            <span class="n">proxy</span> <span class="o">=</span> <span class="n">http_proxy</span> <span class="ow">or</span> <span class="n">getproxies</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;http&quot;</span><span class="p">)</span>
 
         <span class="n">opts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_pool_options</span><span class="p">(</span><span class="n">ca_certs</span><span class="p">)</span>
 

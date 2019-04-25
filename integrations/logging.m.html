@@ -1336,13 +1336,17 @@ table {
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
-                    <span class="p">{</span>
-                        <span class="s2">&quot;stacktrace&quot;</span><span class="p">:</span> <span class="n">current_stacktrace</span><span class="p">(</span><span class="n">client_options</span><span class="p">[</span><span class="s2">&quot;with_locals&quot;</span><span class="p">]),</span>
-                        <span class="s2">&quot;crashed&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
-                        <span class="s2">&quot;current&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span>
-                    <span class="p">}</span>
-                <span class="p">]</span>
+                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;values&quot;</span><span class="p">:</span> <span class="p">[</span>
+                        <span class="p">{</span>
+                            <span class="s2">&quot;stacktrace&quot;</span><span class="p">:</span> <span class="n">current_stacktrace</span><span class="p">(</span>
+                                <span class="n">client_options</span><span class="p">[</span><span class="s2">&quot;with_locals&quot;</span><span class="p">]</span>
+                            <span class="p">),</span>
+                            <span class="s2">&quot;crashed&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+                            <span class="s2">&quot;current&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span>
+                        <span class="p">}</span>
+                    <span class="p">]</span>
+                <span class="p">}</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
 
@@ -2042,13 +2046,17 @@ The record which was being processed is passed in to this method.</p></div>
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
-                    <span class="p">{</span>
-                        <span class="s2">&quot;stacktrace&quot;</span><span class="p">:</span> <span class="n">current_stacktrace</span><span class="p">(</span><span class="n">client_options</span><span class="p">[</span><span class="s2">&quot;with_locals&quot;</span><span class="p">]),</span>
-                        <span class="s2">&quot;crashed&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
-                        <span class="s2">&quot;current&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span>
-                    <span class="p">}</span>
-                <span class="p">]</span>
+                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;values&quot;</span><span class="p">:</span> <span class="p">[</span>
+                        <span class="p">{</span>
+                            <span class="s2">&quot;stacktrace&quot;</span><span class="p">:</span> <span class="n">current_stacktrace</span><span class="p">(</span>
+                                <span class="n">client_options</span><span class="p">[</span><span class="s2">&quot;with_locals&quot;</span><span class="p">]</span>
+                            <span class="p">),</span>
+                            <span class="s2">&quot;crashed&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+                            <span class="s2">&quot;current&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span>
+                        <span class="p">}</span>
+                    <span class="p">]</span>
+                <span class="p">}</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
 
@@ -2794,13 +2802,17 @@ The record which was being processed is passed in to this method.</p></div>
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
-                    <span class="p">{</span>
-                        <span class="s2">&quot;stacktrace&quot;</span><span class="p">:</span> <span class="n">current_stacktrace</span><span class="p">(</span><span class="n">client_options</span><span class="p">[</span><span class="s2">&quot;with_locals&quot;</span><span class="p">]),</span>
-                        <span class="s2">&quot;crashed&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
-                        <span class="s2">&quot;current&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span>
-                    <span class="p">}</span>
-                <span class="p">]</span>
+                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;values&quot;</span><span class="p">:</span> <span class="p">[</span>
+                        <span class="p">{</span>
+                            <span class="s2">&quot;stacktrace&quot;</span><span class="p">:</span> <span class="n">current_stacktrace</span><span class="p">(</span>
+                                <span class="n">client_options</span><span class="p">[</span><span class="s2">&quot;with_locals&quot;</span><span class="p">]</span>
+                            <span class="p">),</span>
+                            <span class="s2">&quot;crashed&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">,</span>
+                            <span class="s2">&quot;current&quot;</span><span class="p">:</span> <span class="bp">True</span><span class="p">,</span>
+                        <span class="p">}</span>
+                    <span class="p">]</span>
+                <span class="p">}</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
 

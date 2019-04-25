@@ -1187,9 +1187,10 @@ table {
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Returns our whitelisted environment variables.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">keys</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;SERVER_NAME&quot;</span><span class="p">,</span> <span class="s2">&quot;SERVER_PORT&quot;</span><span class="p">)</span>
+    <span class="n">keys</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;SERVER_NAME&quot;</span><span class="p">,</span> <span class="s2">&quot;SERVER_PORT&quot;</span><span class="p">]</span>
     <span class="k">if</span> <span class="n">_should_send_default_pii</span><span class="p">():</span>
-        <span class="n">keys</span> <span class="o">+=</span> <span class="p">(</span><span class="s2">&quot;REMOTE_ADDR&quot;</span><span class="p">,)</span>  <span class="c1"># type: ignore</span>
+        <span class="c1"># Add all three headers here to make debugging of proxy setup easier.</span>
+        <span class="n">keys</span> <span class="o">+=</span> <span class="p">[</span><span class="s2">&quot;REMOTE_ADDR&quot;</span><span class="p">,</span> <span class="s2">&quot;HTTP_X_FORWARDED_FOR&quot;</span><span class="p">,</span> <span class="s2">&quot;HTTP_X_REAL_IP&quot;</span><span class="p">]</span>
 
     <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">environ</span><span class="p">:</span>
@@ -1220,16 +1221,21 @@ table {
 <span class="k">def</span> <span class="nf">get_client_ip</span><span class="p">(</span><span class="n">environ</span><span class="p">):</span>
     <span class="c1"># type: (Dict[str, str]) -&gt; Optional[Any]</span>
     <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Naively yank the first IP address in an X-Forwarded-For header</span>
-<span class="sd">    and assume this is correct.</span>
-
-<span class="sd">    Note: Don&#39;t use this in security sensitive situations since this</span>
-<span class="sd">    value may be forged from a client.</span>
+<span class="sd">    Infer the user IP address from various headers. This cannot be used in</span>
+<span class="sd">    security sensitive situations since the value may be forged from a client,</span>
+<span class="sd">    but it&#39;s good enough for the event payload.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;HTTP_X_FORWARDED_FOR&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
     <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">IndexError</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;REMOTE_ADDR&quot;</span><span class="p">)</span>
+        <span class="k">pass</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;HTTP_X_REAL_IP&quot;</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="k">return</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;REMOTE_ADDR&quot;</span><span class="p">)</span>
 
 
 <span class="k">def</span> <span class="nf">_capture_exception</span><span class="p">(</span><span class="n">hub</span><span class="p">):</span>
@@ -1346,26 +1352,30 @@ table {
 
     
   
-    <div class="desc"><p>Naively yank the first IP address in an X-Forwarded-For header
-and assume this is correct.</p>
-<p>Note: Don't use this in security sensitive situations since this
-value may be forged from a client.</p></div>
+    <div class="desc"><p>Infer the user IP address from various headers. This cannot be used in
+security sensitive situations since the value may be forged from a client,
+but it's good enough for the event payload.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.wsgi.get_client_ip', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.wsgi.get_client_ip" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">get_client_ip</span><span class="p">(</span><span class="n">environ</span><span class="p">):</span>
     <span class="c1"># type: (Dict[str, str]) -&gt; Optional[Any]</span>
     <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Naively yank the first IP address in an X-Forwarded-For header</span>
-<span class="sd">    and assume this is correct.</span>
-
-<span class="sd">    Note: Don&#39;t use this in security sensitive situations since this</span>
-<span class="sd">    value may be forged from a client.</span>
+<span class="sd">    Infer the user IP address from various headers. This cannot be used in</span>
+<span class="sd">    security sensitive situations since the value may be forged from a client,</span>
+<span class="sd">    but it&#39;s good enough for the event payload.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;HTTP_X_FORWARDED_FOR&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
     <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">IndexError</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;REMOTE_ADDR&quot;</span><span class="p">)</span>
+        <span class="k">pass</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">environ</span><span class="p">[</span><span class="s2">&quot;HTTP_X_REAL_IP&quot;</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="k">return</span> <span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;REMOTE_ADDR&quot;</span><span class="p">)</span>
 </pre></div>
 
   </div>
