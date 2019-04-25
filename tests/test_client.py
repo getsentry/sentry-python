@@ -147,7 +147,7 @@ def test_attach_stacktrace_enabled():
     foo()
 
     event, = events
-    thread, = event["threads"]
+    thread, = event["threads"]["values"]
     functions = [x["function"] for x in thread["stacktrace"]["frames"]]
     assert functions[-2:] == ["foo", "bar"]
 
@@ -167,9 +167,24 @@ def test_attach_stacktrace_enabled_no_locals():
     foo()
 
     event, = events
-    thread, = event["threads"]
+    thread, = event["threads"]["values"]
     local_vars = [x.get("vars") for x in thread["stacktrace"]["frames"]]
     assert local_vars[-2:] == [None, None]
+
+
+def test_attach_stacktrace_in_app(sentry_init, capture_events):
+    sentry_init(attach_stacktrace=True, in_app_exclude=["_pytest"])
+    events = capture_events()
+
+    capture_message("hi")
+
+    event, = events
+    thread, = event["threads"]["values"]
+    frames = thread["stacktrace"]["frames"]
+    pytest_frames = [f for f in frames if f["module"].startswith("_pytest")]
+    assert pytest_frames
+    assert all(f["in_app"] is False for f in pytest_frames)
+    assert any(f["in_app"] for f in frames)
 
 
 def test_attach_stacktrace_disabled():

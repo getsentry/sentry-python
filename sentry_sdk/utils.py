@@ -587,6 +587,10 @@ def iter_event_stacktraces(event):
     # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
     if "stacktrace" in event:
         yield event["stacktrace"]
+    if "threads" in event:
+        for thread in event["threads"].get("values") or ():
+            if "stacktrace" in thread:
+                yield thread["stacktrace"]
     if "exception" in event:
         for exception in event["exception"].get("values") or ():
             if "stacktrace" in exception:
