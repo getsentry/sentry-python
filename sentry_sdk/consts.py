@@ -42,7 +42,7 @@ if False:
     )
 
 
-VERSION = "0.7.11"
+VERSION = "0.7.12"
 DEFAULT_SERVER_NAME = socket.gethostname() if hasattr(socket, "gethostname") else None
 DEFAULT_OPTIONS = {
     "dsn": None,
