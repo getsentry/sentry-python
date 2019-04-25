@@ -1,3 +1,10 @@
+## 0.7.12
+
+* Read from `X-Real-IP` for user IP address.
+* Fix a bug that would not apply in-app rules for attached callstacks.
+* It's now possible to disable automatic proxy support by passing
+  `http_proxy=""`. Thanks Marco Neumann!
+
 ## 0.7.11
 
 * Fix a bug that would send `errno` in an invalid format to the server.
