@@ -1,7 +1,5 @@
 SHELL = /bin/bash
 
-export PIP_USE_PEP517 := false
-
 VENV_PATH = .venv
 
 help:
