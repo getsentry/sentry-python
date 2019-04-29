@@ -5,7 +5,7 @@ from datetime import datetime
 from contextlib import contextmanager
 from warnings import warn
 
-from sentry_sdk._compat import with_metaclass, urlparse
+from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
 from sentry_sdk.utils import (
