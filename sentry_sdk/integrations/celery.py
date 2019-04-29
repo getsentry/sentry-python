@@ -2,7 +2,12 @@ from __future__ import absolute_import
 
 import sys
 
-from celery.exceptions import SoftTimeLimitExceeded, Retry  # type: ignore
+from celery.exceptions import (  # type: ignore
+    SoftTimeLimitExceeded,
+    Retry,
+    Ignore,
+    Reject,
+)
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
@@ -10,6 +15,9 @@ from sentry_sdk.tracing import SpanContext
 from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
+
+
+CELERY_CONTROL_FLOW_EXCEPTIONS = (Retry, Ignore, Reject)
 
 
 class CeleryIntegration(Integration):
@@ -137,7 +145,7 @@ def _capture_exception(task, exc_info):
 
     if hub.get_integration(CeleryIntegration) is None:
         return
-    if isinstance(exc_info[1], Retry):
+    if isinstance(exc_info[1], CELERY_CONTROL_FLOW_EXCEPTIONS):
         return
     if hasattr(task, "throws") and isinstance(exc_info[1], task.throws):
         return
