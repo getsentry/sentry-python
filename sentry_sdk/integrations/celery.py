@@ -51,7 +51,7 @@ class CeleryIntegration(Integration):
 
 
 def _wrap_apply_async(task, f):
-    def apply_async(self, *args, **kwargs):
+    def apply_async(*args, **kwargs):
         hub = Hub.current
         integration = hub.get_integration(CeleryIntegration)
         if integration is not None and integration.propagate_traces:
@@ -62,7 +62,7 @@ def _wrap_apply_async(task, f):
                 headers[key] = value
             if headers is not None:
                 kwargs["headers"] = headers
-        return f(self, *args, **kwargs)
+        return f(*args, **kwargs)
 
     return apply_async
 

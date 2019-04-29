@@ -40,7 +40,22 @@ def celery(init_celery):
     return init_celery()
 
 
-def test_simple(capture_events, celery):
+@pytest.mark.parametrize(
+    "invocation,expected_context",
+    [
+        [lambda task, x, y: task.delay(x, y), {"args": [1, 0], "kwargs": {}}],
+        [lambda task, x, y: task.apply_async((x, y)), {"args": [1, 0], "kwargs": {}}],
+        [
+            lambda task, x, y: task.apply_async(args=(x, y)),
+            {"args": [1, 0], "kwargs": {}},
+        ],
+        [
+            lambda task, x, y: task.apply_async(kwargs=dict(x=x, y=y)),
+            {"args": [], "kwargs": {"x": 1, "y": 0}},
+        ],
+    ],
+)
+def test_simple(capture_events, celery, invocation, expected_context):
     events = capture_events()
 
     @celery.task(name="dummy_task")
@@ -51,18 +66,17 @@ def test_simple(capture_events, celery):
     span_context = SpanContext.start_trace()
     with configure_scope() as scope:
         scope.set_span_context(span_context)
-    dummy_task.delay(1, 2)
-    dummy_task.delay(1, 0)
+
+    invocation(dummy_task, 1, 2)
+    invocation(dummy_task, 1, 0)
 
     event, = events
     assert event["contexts"]["trace"]["trace_id"] == span_context.trace_id
     assert event["contexts"]["trace"]["span_id"] != span_context.span_id
     assert event["transaction"] == "dummy_task"
-    assert event["extra"]["celery-job"] == {
-        "args": [1, 0],
-        "kwargs": {},
-        "task_name": "dummy_task",
-    }
+    assert event["extra"]["celery-job"] == dict(
+        task_name="dummy_task", **expected_context
+    )
 
     exception, = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
