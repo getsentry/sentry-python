@@ -1,3 +1,8 @@
+## 0.7.13
+
+* Fix a bug where `Ignore` raised in a Celery task would be reported to Sentry.
+* Add experimental support for tracing PoC.
+
 ## 0.7.12
 
 * Read from `X-Real-IP` for user IP address.
