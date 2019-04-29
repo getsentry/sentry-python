@@ -96,9 +96,10 @@ def _request_started(sender, **kwargs):
     if integration is None:
         return
 
-    weak_request = weakref.ref(_request_ctx_stack.top.request)
     app = _app_ctx_stack.top.app
     with hub.configure_scope() as scope:
+        request = _request_ctx_stack.top.request
+        weak_request = weakref.ref(request)
         scope.add_event_processor(
             _make_request_event_processor(  # type: ignore
                 app, weak_request, integration

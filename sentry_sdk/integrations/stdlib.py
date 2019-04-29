@@ -24,7 +24,8 @@ def install_httplib():
 
     def putrequest(self, method, url, *args, **kwargs):
         rv = real_putrequest(self, method, url, *args, **kwargs)
-        if Hub.current.get_integration(StdlibIntegration) is None:
+        hub = Hub.current
+        if hub.get_integration(StdlibIntegration) is None:
             return rv
 
         self._sentrysdk_data_dict = data = {}
@@ -41,6 +42,9 @@ def install_httplib():
                 port != default_port and ":%s" % port or "",
                 url,
             )
+
+        for key, value in hub.iter_trace_propagation_headers():
+            self.putheader(key, value)
 
         data["url"] = real_url
         data["method"] = method

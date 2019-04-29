@@ -415,6 +415,18 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if client is not None:
             return client.flush(timeout=timeout, callback=callback)
 
+    def iter_trace_propagation_headers(self):
+        client, scope = self._stack[-1]
+        if scope._span is None:
+            return
+
+        propagate_traces = client and client.options["propagate_traces"]
+        if not propagate_traces:
+            return
+
+        for item in scope._span.iter_headers():
+            yield item
+
 
 GLOBAL_HUB = Hub()
 _local.set(GLOBAL_HUB)

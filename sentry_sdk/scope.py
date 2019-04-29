@@ -59,6 +59,7 @@ class Scope(object):
         "_event_processors",
         "_error_processors",
         "_should_capture",
+        "_span",
     )
 
     def __init__(self):
@@ -87,6 +88,10 @@ class Scope(object):
     def user(self, value):
         """When set a specific user is bound to the scope."""
         self._user = value
+
+    def set_span_context(self, span_context):
+        """Sets the span context."""
+        self._span = span_context
 
     def set_tag(self, key, value):
         """Sets a tag for a key to a specific value."""
@@ -126,6 +131,8 @@ class Scope(object):
 
         self.clear_breadcrumbs()
         self._should_capture = True
+
+        self._span = None
 
     def clear_breadcrumbs(self):
         # type: () -> None
@@ -193,6 +200,12 @@ class Scope(object):
         if self._contexts:
             event.setdefault("contexts", {}).update(self._contexts)
 
+        if self._span is not None:
+            event.setdefault("contexts", {})["trace"] = {
+                "trace_id": self._span.trace_id,
+                "span_id": self._span.span_id,
+            }
+
         exc_info = hint.get("exc_info") if hint is not None else None
         if exc_info is not None:
             for processor in self._error_processors:
@@ -230,6 +243,7 @@ class Scope(object):
         rv._error_processors = list(self._error_processors)
 
         rv._should_capture = self._should_capture
+        rv._span = self._span
 
         return rv
 

@@ -37,6 +37,7 @@ if False:
             "debug": bool,
             "attach_stacktrace": bool,
             "ca_certs": Optional[str],
+            "propagate_traces": bool,
         },
         total=False,
     )
@@ -69,6 +70,7 @@ DEFAULT_OPTIONS = {
     "debug": False,
     "attach_stacktrace": False,
     "ca_certs": None,
+    "propagate_traces": True,
 }
 
 
