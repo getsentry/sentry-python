@@ -2,12 +2,12 @@ from __future__ import absolute_import
 
 import sys
 
-from celery.exceptions import (
+from celery.exceptions import (  # type: ignore
     SoftTimeLimitExceeded,
     Retry,
     Ignore,
     Reject,
-)  # type: ignore
+)
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
