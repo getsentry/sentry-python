@@ -1,3 +1,8 @@
+## 0.7.14
+
+* Fix crash when using Celery integration (`TypeError` when using
+  `apply_async`).
+
 ## 0.7.13
 
 * Fix a bug where `Ignore` raised in a Celery task would be reported to Sentry.
