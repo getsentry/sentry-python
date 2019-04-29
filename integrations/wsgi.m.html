@@ -1094,6 +1094,7 @@ table {
 <span class="kn">from</span> <span class="nn">sentry_sdk.hub</span> <span class="kn">import</span> <span class="n">Hub</span><span class="p">,</span> <span class="n">_should_send_default_pii</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">capture_internal_exceptions</span><span class="p">,</span> <span class="n">event_from_exception</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk._compat</span> <span class="kn">import</span> <span class="n">PY2</span><span class="p">,</span> <span class="n">reraise</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.tracing</span> <span class="kn">import</span> <span class="n">SpanContext</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations._wsgi_common</span> <span class="kn">import</span> <span class="n">_filter_headers</span>
 
 <span class="k">if</span> <span class="bp">False</span><span class="p">:</span>
@@ -1172,6 +1173,7 @@ table {
                 <span class="k">with</span> <span class="n">hub</span><span class="o">.</span><span class="n">configure_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
                     <span class="n">scope</span><span class="o">.</span><span class="n">clear_breadcrumbs</span><span class="p">()</span>
                     <span class="n">scope</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="s2">&quot;wsgi&quot;</span>
+                    <span class="n">scope</span><span class="o">.</span><span class="n">set_span_context</span><span class="p">(</span><span class="n">SpanContext</span><span class="o">.</span><span class="n">continue_from_environ</span><span class="p">(</span><span class="n">environ</span><span class="p">))</span>
                     <span class="n">scope</span><span class="o">.</span><span class="n">add_event_processor</span><span class="p">(</span><span class="n">_make_wsgi_event_processor</span><span class="p">(</span><span class="n">environ</span><span class="p">))</span>
 
             <span class="k">try</span><span class="p">:</span>
@@ -1502,6 +1504,7 @@ environment.</p></div>
                 <span class="k">with</span> <span class="n">hub</span><span class="o">.</span><span class="n">configure_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
                     <span class="n">scope</span><span class="o">.</span><span class="n">clear_breadcrumbs</span><span class="p">()</span>
                     <span class="n">scope</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="s2">&quot;wsgi&quot;</span>
+                    <span class="n">scope</span><span class="o">.</span><span class="n">set_span_context</span><span class="p">(</span><span class="n">SpanContext</span><span class="o">.</span><span class="n">continue_from_environ</span><span class="p">(</span><span class="n">environ</span><span class="p">))</span>
                     <span class="n">scope</span><span class="o">.</span><span class="n">add_event_processor</span><span class="p">(</span><span class="n">_make_wsgi_event_processor</span><span class="p">(</span><span class="n">environ</span><span class="p">))</span>
 
             <span class="k">try</span><span class="p">:</span>
