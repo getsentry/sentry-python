@@ -16,10 +16,9 @@ class ArgvIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        
         @add_global_event_processor
         def processor(event, hint):
-            
+
             if Hub.current.get_integration(ArgvIntegration) is not None:
                 extra = event.setdefault("extra", {})
                 # If some event processor decided to set extra to e.g. an

@@ -55,13 +55,13 @@ class AwsLambdaIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        import __main__ as lambda_bootstrap  #type: ignore
+        import __main__ as lambda_bootstrap  # type: ignore
 
         pre_37 = True  # Python 3.6 or 2.7
 
         if not hasattr(lambda_bootstrap, "handle_http_request"):
             try:
-                import bootstrap as lambda_bootstrap  #type: ignore
+                import bootstrap as lambda_bootstrap  # type: ignore
 
                 pre_37 = False  # Python 3.7
             except ImportError:
@@ -104,7 +104,7 @@ class AwsLambdaIntegration(Integration):
         else:
             old_handle_event_request = lambda_bootstrap.handle_event_request
 
-            def sentry_handle_event_request(  #type: ignore
+            def sentry_handle_event_request(  # type: ignore
                 lambda_runtime_client, request_handler, *args, **kwargs
             ):
                 request_handler = _wrap_handler(request_handler)

@@ -16,13 +16,12 @@ if False:
 
 
 _installer_lock = Lock()
-_installed_integrations = set()  #type: Set[str]
+_installed_integrations = set()  # type: Set[str]
 
 
 def _generate_default_integrations_iterator(*import_strings):
-    
     def iter_default_integrations():
-        
+
         """Returns an iterator of the default integration classes:
         """
         from importlib import import_module
@@ -33,9 +32,7 @@ def _generate_default_integrations_iterator(*import_strings):
 
     if isinstance(iter_default_integrations.__doc__, str):
         for import_string in import_strings:
-            iter_default_integrations.__doc__ += "\n- `{}`".format(  
-                import_string
-            )
+            iter_default_integrations.__doc__ += "\n- `{}`".format(import_string)
 
     return iter_default_integrations
 
@@ -55,7 +52,7 @@ del _generate_default_integrations_iterator
 
 
 def setup_integrations(integrations, with_defaults=True):
-    
+
     """Given a list of integration instances this installs them all.  When
     `with_defaults` is set to `True` then all default integrations are added
     unless they were already provided before.
@@ -108,7 +105,7 @@ class Integration(object):
     install = None
     """Legacy method, do not implement."""
 
-    identifier = None  #type: str
+    identifier = None  # type: str
     """String unique ID of integration type"""
 
     @staticmethod

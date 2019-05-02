@@ -4,9 +4,9 @@ from __future__ import absolute_import
 import sys
 import weakref
 
-from django import VERSION as DJANGO_VERSION  #type: ignore
-from django.db.models.query import QuerySet  #type: ignore
-from django.core import signals  #type: ignore
+from django import VERSION as DJANGO_VERSION  # type: ignore
+from django.db.models.query import QuerySet  # type: ignore
+from django.core import signals  # type: ignore
 
 if False:
     from typing import Any
@@ -15,17 +15,17 @@ if False:
     from typing import Union
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from typing import Callable
-    from django.core.handlers.wsgi import WSGIRequest  #type: ignore
-    from django.http.response import HttpResponse  #type: ignore
-    from django.http.request import QueryDict  #type: ignore
-    from django.utils.datastructures import MultiValueDict  #type: ignore
+    from django.core.handlers.wsgi import WSGIRequest  # type: ignore
+    from django.http.response import HttpResponse  # type: ignore
+    from django.http.request import QueryDict  # type: ignore
+    from django.utils.datastructures import MultiValueDict  # type: ignore
     from typing import List
 
 
 try:
-    from django.urls import resolve  #type: ignore
+    from django.urls import resolve  # type: ignore
 except ImportError:
-    from django.core.urlresolvers import resolve  #type: ignore
+    from django.core.urlresolvers import resolve  # type: ignore
 
 from sentry_sdk import Hub
 from sentry_sdk.hub import _should_send_default_pii
@@ -50,14 +50,14 @@ from sentry_sdk.integrations.django.templates import get_template_frame_from_exc
 if DJANGO_VERSION < (1, 10):
 
     def is_authenticated(request_user):
-        #type: (Any) -> bool
+        # type: (Any) -> bool
         return request_user.is_authenticated()
 
 
 else:
 
     def is_authenticated(request_user):
-        #type: (Any) -> bool
+        # type: (Any) -> bool
         return request_user.is_authenticated
 
 
@@ -67,7 +67,7 @@ class DjangoIntegration(Integration):
     transaction_style = None
 
     def __init__(self, transaction_style="url"):
-        
+
         TRANSACTION_STYLE_VALUES = ("function_name", "url")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
@@ -78,7 +78,7 @@ class DjangoIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        
+
         install_sql_hook()
         # Patch in our custom middleware.
 
@@ -91,7 +91,7 @@ class DjangoIntegration(Integration):
         old_app = WSGIHandler.__call__
 
         def sentry_patched_wsgi_handler(self, environ, start_response):
-            
+
             if Hub.current.get_integration(DjangoIntegration) is None:
                 return old_app(self, environ, start_response)
 
@@ -103,12 +103,12 @@ class DjangoIntegration(Integration):
 
         # patch get_response, because at that point we have the Django request
         # object
-        from django.core.handlers.base import BaseHandler  #type: ignore
+        from django.core.handlers.base import BaseHandler  # type: ignore
 
         old_get_response = BaseHandler.get_response
 
         def sentry_patched_get_response(self, request):
-            
+
             hub = Hub.current
             integration = hub.get_integration(DjangoIntegration)
             if integration is not None:
@@ -124,7 +124,7 @@ class DjangoIntegration(Integration):
 
         @add_global_event_processor
         def process_django_templates(event, hint):
-            
+
             exc_info = hint.get("exc_info", None)
 
             if exc_info is None:
@@ -180,9 +180,8 @@ class DjangoIntegration(Integration):
 
 
 def _make_event_processor(weak_request, integration):
-    
     def event_processor(event, hint):
-        
+
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.
@@ -213,7 +212,7 @@ def _make_event_processor(weak_request, integration):
 
 
 def _got_request_exception(request=None, **kwargs):
-    
+
     hub = Hub.current
     integration = hub.get_integration(DjangoIntegration)
     if integration is not None:
@@ -227,23 +226,23 @@ def _got_request_exception(request=None, **kwargs):
 
 class DjangoRequestExtractor(RequestExtractor):
     def env(self):
-        
+
         return self.request.META
 
     def cookies(self):
-        
+
         return self.request.COOKIES
 
     def raw_data(self):
-        
+
         return self.request.body
 
     def form(self):
-        
+
         return self.request.POST
 
     def files(self):
-        
+
         return self.request.FILES
 
     def size_of_file(self, file):
@@ -257,7 +256,7 @@ class DjangoRequestExtractor(RequestExtractor):
 
 
 def _set_user_info(request, event):
-    
+
     user_info = event.setdefault("user", {})
 
     user = getattr(request, "user", None)
@@ -283,19 +282,18 @@ def _set_user_info(request, event):
 
 class _FormatConverter(object):
     def __init__(self, param_mapping):
-        
 
         self.param_mapping = param_mapping
-        self.params = []  
+        self.params = []
 
     def __getitem__(self, val):
-        
+
         self.params.append(self.param_mapping.get(val))
         return "%s"
 
 
 def format_sql(sql, params):
-    
+
     rv = []
 
     if isinstance(params, dict):
@@ -317,7 +315,7 @@ def format_sql(sql, params):
 
 
 def record_sql(sql, params, cursor=None):
-    
+
     hub = Hub.current
     if hub.get_integration(DjangoIntegration) is None:
         return
@@ -357,12 +355,12 @@ def record_sql(sql, params, cursor=None):
 
 
 def install_sql_hook():
-    
+
     """If installed this causes Django's queries to be captured."""
     try:
-        from django.db.backends.utils import CursorWrapper  #type: ignore
+        from django.db.backends.utils import CursorWrapper  # type: ignore
     except ImportError:
-        from django.db.backends.util import CursorWrapper  #type: ignore
+        from django.db.backends.util import CursorWrapper  # type: ignore
 
     try:
         real_execute = CursorWrapper.execute

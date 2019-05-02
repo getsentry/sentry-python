@@ -8,23 +8,23 @@ from __future__ import absolute_import
 import re
 
 if False:
-    from django.urls.resolvers import URLResolver  #type: ignore
+    from django.urls.resolvers import URLResolver  # type: ignore
     from typing import Dict
     from typing import List
     from typing import Optional
-    from django.urls.resolvers import URLPattern  
+    from django.urls.resolvers import URLPattern
     from typing import Tuple
     from typing import Union
-    from re import Pattern  #type: ignore
+    from re import Pattern  # type: ignore
 
 try:
-    from django.urls import get_resolver  #type: ignore
+    from django.urls import get_resolver  # type: ignore
 except ImportError:
-    from django.core.urlresolvers import get_resolver  #type: ignore
+    from django.core.urlresolvers import get_resolver  # type: ignore
 
 
 def get_regex(resolver_or_pattern):
-    
+
     """Utility method for django's deprecated resolver.regex"""
     try:
         regex = resolver_or_pattern.regex
@@ -41,10 +41,10 @@ class RavenResolver(object):
     _either_option_matcher = re.compile(r"\[([^\]]+)\|([^\]]+)\]")
     _camel_re = re.compile(r"([A-Z]+)([a-z])")
 
-    _cache = {}  #type: Dict[URLPattern, str]
+    _cache = {}  # type: Dict[URLPattern, str]
 
     def _simplify(self, pattern):
-        
+
         r"""
         Clean up urlpattern regexes into something readable by humans:
 
@@ -81,7 +81,6 @@ class RavenResolver(object):
         return result
 
     def _resolve(self, resolver, path, parents=None):
-        
 
         match = get_regex(resolver).search(path)  # Django < 2.0
 
@@ -118,12 +117,8 @@ class RavenResolver(object):
 
         return None
 
-    def resolve(
-        self,
-        path,  
-        urlconf=None,  
-    ):
-        
+    def resolve(self, path, urlconf=None):
+
         resolver = get_resolver(urlconf)
         match = self._resolve(resolver, path)
         return match or path

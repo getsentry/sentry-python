@@ -16,8 +16,8 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.logging import ignore_logger
 
-from tornado.web import RequestHandler, HTTPError  #type: ignore
-from tornado.gen import coroutine  #type: ignore
+from tornado.web import RequestHandler, HTTPError  # type: ignore
+from tornado.gen import coroutine  # type: ignore
 
 if False:
     from typing import Any
@@ -32,8 +32,8 @@ class TornadoIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        
-        import tornado  #type: ignore
+
+        import tornado  # type: ignore
 
         tornado_version = getattr(tornado, "version_info", None)
         if tornado_version is None or tornado_version < (5, 0):
@@ -57,7 +57,7 @@ class TornadoIntegration(Integration):
             # Starting Tornado 6 RequestHandler._execute method is a standard Python coroutine (async/await)
             # In that case our method should be a coroutine function too
             async def sentry_execute_request_handler(self, *args, **kwargs):
-                
+
                 hub = Hub.current
                 integration = hub.get_integration(TornadoIntegration)
                 if integration is None:
@@ -73,7 +73,7 @@ class TornadoIntegration(Integration):
 
         else:
 
-            @coroutine  
+            @coroutine
             def sentry_execute_request_handler(self, *args, **kwargs):
                 hub = Hub.current
                 integration = hub.get_integration(TornadoIntegration)
@@ -93,7 +93,7 @@ class TornadoIntegration(Integration):
         old_log_exception = RequestHandler.log_exception
 
         def sentry_log_exception(self, ty, value, tb, *args, **kwargs):
-            
+
             _capture_exception(ty, value, tb)
             return old_log_exception(self, ty, value, tb, *args, **kwargs)
 
@@ -101,7 +101,7 @@ class TornadoIntegration(Integration):
 
 
 def _capture_exception(ty, value, tb):
-    
+
     hub = Hub.current
     if hub.get_integration(TornadoIntegration) is None:
         return
@@ -118,9 +118,8 @@ def _capture_exception(ty, value, tb):
 
 
 def _make_event_processor(weak_handler):
-    
     def tornado_processor(event, hint):
-        
+
         handler = weak_handler()
         if handler is None:
             return event
@@ -159,32 +158,32 @@ def _make_event_processor(weak_handler):
 
 class TornadoRequestExtractor(RequestExtractor):
     def content_length(self):
-        
+
         if self.request.body is None:
             return 0
         return len(self.request.body)
 
     def cookies(self):
-        
+
         return {k: v.value for k, v in self.request.cookies.items()}
 
     def raw_data(self):
-        
+
         return self.request.body
 
     def form(self):
-        
+
         return {
             k: [v.decode("latin1", "replace") for v in vs]
             for k, vs in self.request.body_arguments.items()
         }
 
     def is_json(self):
-        
+
         return _is_json_content_type(self.request.headers.get("content-type"))
 
     def files(self):
-        
+
         return {k: v[0] for k, v in self.request.files.items() if v}
 
     def size_of_file(self, file):

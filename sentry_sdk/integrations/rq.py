@@ -6,16 +6,16 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
-from rq.timeouts import JobTimeoutException  #type: ignore
-from rq.worker import Worker  #type: ignore
+from rq.timeouts import JobTimeoutException  # type: ignore
+from rq.worker import Worker  # type: ignore
 
 if False:
     from typing import Any
     from typing import Dict
     from typing import Callable
 
-    from rq.job import Job  #type: ignore
-    from rq.queue import Queue  #type: ignore
+    from rq.job import Job  # type: ignore
+    from rq.queue import Queue  # type: ignore
 
     from sentry_sdk.utils import ExcInfo
 
@@ -25,12 +25,11 @@ class RqIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        
 
         old_perform_job = Worker.perform_job
 
         def sentry_patched_perform_job(self, job, *args, **kwargs):
-            
+
             hub = Hub.current
             integration = hub.get_integration(RqIntegration)
 
@@ -62,9 +61,8 @@ class RqIntegration(Integration):
 
 
 def _make_event_processor(weak_job):
-    
     def event_processor(event, hint):
-        
+
         job = weak_job()
         if job is not None:
             with capture_internal_exceptions():
@@ -91,7 +89,7 @@ def _make_event_processor(weak_job):
 
 
 def _capture_exception(exc_info, **kwargs):
-    
+
     hub = Hub.current
     if hub.get_integration(RqIntegration) is None:
         return

@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 import sys
 
-from celery.exceptions import (  #type: ignore
+from celery.exceptions import (  # type: ignore
     SoftTimeLimitExceeded,
     Retry,
     Ignore,
@@ -28,7 +28,7 @@ class CeleryIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        import celery.app.trace as trace  #type: ignore
+        import celery.app.trace as trace  # type: ignore
 
         old_build_tracer = trace.build_tracer
 
@@ -162,7 +162,7 @@ def _capture_exception(task, exc_info):
 def _patch_worker_exit():
     # Need to flush queue before worker shutdown because a crashing worker will
     # call os._exit
-    from billiard.pool import Worker  #type: ignore
+    from billiard.pool import Worker  # type: ignore
 
     old_workloop = Worker.workloop
 

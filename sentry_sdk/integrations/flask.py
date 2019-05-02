@@ -19,11 +19,11 @@ if False:
     from typing import Callable
 
 try:
-    import flask_login  #type: ignore
+    import flask_login  # type: ignore
 except ImportError:
     flask_login = None
 
-from flask import Request, Flask, _request_ctx_stack, _app_ctx_stack  #type: ignore
+from flask import Request, Flask, _request_ctx_stack, _app_ctx_stack  # type: ignore
 from flask.signals import (
     appcontext_pushed,
     appcontext_tearing_down,
@@ -38,7 +38,7 @@ class FlaskIntegration(Integration):
     transaction_style = None
 
     def __init__(self, transaction_style="endpoint"):
-        
+
         TRANSACTION_STYLE_VALUES = ("endpoint", "url")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
@@ -49,7 +49,7 @@ class FlaskIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        
+
         appcontext_pushed.connect(_push_appctx)
         appcontext_tearing_down.connect(_pop_appctx)
         request_started.connect(_request_started)
@@ -58,7 +58,7 @@ class FlaskIntegration(Integration):
         old_app = Flask.__call__
 
         def sentry_patched_wsgi_app(self, environ, start_response):
-            
+
             if Hub.current.get_integration(FlaskIntegration) is None:
                 return old_app(self, environ, start_response)
 
@@ -66,11 +66,11 @@ class FlaskIntegration(Integration):
                 environ, start_response
             )
 
-        Flask.__call__ = sentry_patched_wsgi_app  
+        Flask.__call__ = sentry_patched_wsgi_app
 
 
 def _push_appctx(*args, **kwargs):
-    
+
     hub = Hub.current
     if hub.get_integration(FlaskIntegration) is not None:
         # always want to push scope regardless of whether WSGI app might already
@@ -83,14 +83,14 @@ def _push_appctx(*args, **kwargs):
 
 
 def _pop_appctx(*args, **kwargs):
-    
+
     scope_manager = getattr(_app_ctx_stack.top, "sentry_sdk_scope_manager", None)
     if scope_manager is not None:
         scope_manager.__exit__(None, None, None)
 
 
 def _request_started(sender, **kwargs):
-    
+
     hub = Hub.current
     integration = hub.get_integration(FlaskIntegration)
     if integration is None:
@@ -101,31 +101,29 @@ def _request_started(sender, **kwargs):
         request = _request_ctx_stack.top.request
         weak_request = weakref.ref(request)
         scope.add_event_processor(
-            _make_request_event_processor(  
-                app, weak_request, integration
-            )
+            _make_request_event_processor(app, weak_request, integration)
         )
 
 
 class FlaskRequestExtractor(RequestExtractor):
     def env(self):
-        
+
         return self.request.environ
 
     def cookies(self):
-        
+
         return self.request.cookies
 
     def raw_data(self):
-        
+
         return self.request.data
 
     def form(self):
-        
+
         return self.request.form
 
     def files(self):
-        
+
         return self.request.files
 
     def is_json(self):
@@ -135,14 +133,13 @@ class FlaskRequestExtractor(RequestExtractor):
         return self.request.get_json()
 
     def size_of_file(self, file):
-        
+
         return file.content_length
 
 
 def _make_request_event_processor(app, weak_request, integration):
-    
     def inner(event, hint):
-        
+
         request = weak_request()
 
         # if the request is gone we are fine not logging the data from
@@ -153,9 +150,9 @@ def _make_request_event_processor(app, weak_request, integration):
 
         try:
             if integration.transaction_style == "endpoint":
-                event["transaction"] = request.url_rule.endpoint  
+                event["transaction"] = request.url_rule.endpoint
             elif integration.transaction_style == "url":
-                event["transaction"] = request.url_rule.rule  
+                event["transaction"] = request.url_rule.rule
         except Exception:
             pass
 
@@ -172,7 +169,7 @@ def _make_request_event_processor(app, weak_request, integration):
 
 
 def _capture_exception(sender, exception, **kwargs):
-    
+
     hub = Hub.current
     if hub.get_integration(FlaskIntegration) is None:
         return
@@ -186,7 +183,7 @@ def _capture_exception(sender, exception, **kwargs):
 
 
 def _add_user_to_event(event):
-    
+
     if flask_login is None:
         return
 

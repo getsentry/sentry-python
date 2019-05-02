@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
-import falcon  #type: ignore
-import falcon.api_helpers  #type: ignore
+import falcon  # type: ignore
+import falcon.api_helpers  # type: ignore
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
@@ -69,7 +69,7 @@ class FalconIntegration(Integration):
     transaction_style = None
 
     def __init__(self, transaction_style="uri_template"):
-        
+
         TRANSACTION_STYLE_VALUES = ("uri_template", "path")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
@@ -80,7 +80,7 @@ class FalconIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        
+
         _patch_wsgi_app()
         _patch_handle_exception()
         _patch_prepare_middleware()
@@ -154,10 +154,8 @@ def _is_falcon_http_error(ex):
 
 
 def _make_request_event_processor(req, integration):
-    
-
     def inner(event, hint):
-        
+
         if integration.transaction_style == "uri_template":
             event["transaction"] = req.uri_template
         elif integration.transaction_style == "path":

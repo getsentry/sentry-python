@@ -16,14 +16,9 @@ if False:
     from typing import Dict
     from typing import Callable
     from typing import Optional
-    from bottle import FileUpload, FormsDict, LocalRequest  #type: ignore
+    from bottle import FileUpload, FormsDict, LocalRequest  # type: ignore
 
-from bottle import (
-    Bottle,
-    Route,
-    request as bottle_request,
-    HTTPResponse,
-)  
+from bottle import Bottle, Route, request as bottle_request, HTTPResponse
 
 
 class BottleIntegration(Integration):
@@ -32,7 +27,7 @@ class BottleIntegration(Integration):
     transaction_style = None
 
     def __init__(self, transaction_style="endpoint"):
-        
+
         TRANSACTION_STYLE_VALUES = ("endpoint", "url")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
@@ -43,13 +38,11 @@ class BottleIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        
 
         # monkey patch method Bottle.__call__
         old_app = Bottle.__call__
 
         def sentry_patched_wsgi_app(self, environ, start_response):
-            
 
             hub = Hub.current
             integration = hub.get_integration(BottleIntegration)
@@ -60,7 +53,7 @@ class BottleIntegration(Integration):
                 environ, start_response
             )
 
-        Bottle.__call__ = sentry_patched_wsgi_app  
+        Bottle.__call__ = sentry_patched_wsgi_app
 
         # monkey patch method Bottle._handle
         old_handle = Bottle._handle
@@ -124,39 +117,37 @@ class BottleIntegration(Integration):
 
 class BottleRequestExtractor(RequestExtractor):
     def env(self):
-        
+
         return self.request.environ
 
     def cookies(self):
-        
+
         return self.request.cookies
 
     def raw_data(self):
-        
+
         return self.request.body.read()
 
     def form(self):
-        
+
         if self.is_json():
             return None
         return self.request.forms.decode()
 
     def files(self):
-        
+
         if self.is_json():
             return None
 
         return self.request.files
 
     def size_of_file(self, file):
-        
+
         return file.content_length
 
 
 def _make_request_event_processor(app, request, integration):
-    
     def inner(event, hint):
-        
 
         try:
             if integration.transaction_style == "endpoint":
@@ -164,7 +155,7 @@ def _make_request_event_processor(app, request, integration):
                     request.route.callback
                 )
             elif integration.transaction_style == "url":
-                event["transaction"] = request.route.rule  
+                event["transaction"] = request.route.rule
         except Exception:
             pass
 

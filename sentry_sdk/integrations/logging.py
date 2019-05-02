@@ -25,7 +25,7 @@ _IGNORED_LOGGERS = set(["sentry_sdk.errors"])
 
 
 def ignore_logger(name):
-    
+
     """This disables the breadcrumb integration for a logger of a specific
     name.  This primary use is for some integrations to disable breadcrumbs
     of this integration.
@@ -37,7 +37,7 @@ class LoggingIntegration(Integration):
     identifier = "logging"
 
     def __init__(self, level=DEFAULT_LEVEL, event_level=DEFAULT_EVENT_LEVEL):
-        
+
         self._handler = None
         self._breadcrumb_handler = None
 
@@ -48,7 +48,7 @@ class LoggingIntegration(Integration):
             self._handler = EventHandler(level=event_level)
 
     def _handle_record(self, record):
-        
+
         if self._handler is not None and record.levelno >= self._handler.level:
             self._handler.handle(record)
 
@@ -60,11 +60,11 @@ class LoggingIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        
-        old_callhandlers = logging.Logger.callHandlers  
+
+        old_callhandlers = logging.Logger.callHandlers
 
         def sentry_patched_callhandlers(self, record):
-            
+
             try:
                 return old_callhandlers(self, record)
             finally:
@@ -77,16 +77,16 @@ class LoggingIntegration(Integration):
                     if integration is not None:
                         integration._handle_record(record)
 
-        logging.Logger.callHandlers = sentry_patched_callhandlers  
+        logging.Logger.callHandlers = sentry_patched_callhandlers
 
 
 def _can_record(record):
-    
+
     return record.name not in _IGNORED_LOGGERS
 
 
 def _breadcrumb_from_record(record):
-    
+
     return {
         "ty": "log",
         "level": _logging_to_event_level(record.levelname),
@@ -98,7 +98,7 @@ def _breadcrumb_from_record(record):
 
 
 def _logging_to_event_level(levelname):
-    
+
     return {"critical": "fatal"}.get(levelname.lower(), levelname.lower())
 
 
@@ -132,7 +132,7 @@ COMMON_RECORD_ATTRS = frozenset(
 
 
 def _extra_from_record(record):
-    
+
     return {
         k: v
         for k, v in vars(record).items()
@@ -142,13 +142,13 @@ def _extra_from_record(record):
 
 class EventHandler(logging.Handler, object):
     def emit(self, record):
-        
+
         with capture_internal_exceptions():
             self.format(record)
             return self._emit(record)
 
     def _emit(self, record):
-        
+
         if not _can_record(record):
             return
 
@@ -156,7 +156,7 @@ class EventHandler(logging.Handler, object):
         if hub.client is None:
             return
 
-        hint = None  
+        hint = None
         client_options = hub.client.options
 
         # exc_info might be None or (None, None, None)
@@ -198,13 +198,13 @@ SentryHandler = EventHandler
 
 class BreadcrumbHandler(logging.Handler, object):
     def emit(self, record):
-        
+
         with capture_internal_exceptions():
             self.format(record)
             return self._emit(record)
 
     def _emit(self, record):
-        
+
         if not _can_record(record):
             return
 

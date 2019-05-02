@@ -44,7 +44,7 @@ class GnuBacktraceIntegration(Integration):
 
 
 def _process_gnu_backtrace(event, hint):
-    
+
     if Hub.current.get_integration(GnuBacktraceIntegration) is None:
         return event
 

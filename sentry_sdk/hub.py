@@ -38,7 +38,7 @@ _initial_client = None
 
 
 def _should_send_default_pii():
-    
+
     client = Hub.current.client
     if not client:
         return False
@@ -75,7 +75,7 @@ def init(*args, **kwargs):
 class HubMeta(type):
     @property
     def current(self):
-        
+
         """Returns the current instance of the hub."""
         rv = _local.get(None)
         if rv is None:
@@ -105,7 +105,7 @@ class _ScopeManager(object):
         self._layer = hub._stack[-1]
 
     def __enter__(self):
-        
+
         scope = self._layer[1]
         assert scope is not None
         return scope
@@ -144,7 +144,7 @@ class _ScopeManager(object):
             logger.warning(warning)
 
 
-class Hub(with_metaclass(HubMeta)):  #type: ignore
+class Hub(with_metaclass(HubMeta)):  # type: ignore
     """The hub wraps the concurrency management of the SDK.  Each thread has
     its own hub but the hub might transfer with the flow of execution if
     context vars are available.
@@ -152,10 +152,10 @@ class Hub(with_metaclass(HubMeta)):  #type: ignore
     If the hub is used with a with statement it's temporarily activated.
     """
 
-    _stack = None  #type: List[Tuple[Optional[Client], Scope]]
+    _stack = None  # type: List[Tuple[Optional[Client], Scope]]
 
     def __init__(self, client_or_hub=None, scope=None):
-        
+
         if isinstance(client_or_hub, Hub):
             hub = client_or_hub
             client, other_scope = hub._stack[-1]
@@ -167,22 +167,17 @@ class Hub(with_metaclass(HubMeta)):  #type: ignore
             scope = Scope()
 
         self._stack = [(client, scope)]
-        self._last_event_id = None  
-        self._old_hubs = []  
+        self._last_event_id = None
+        self._old_hubs = []
 
     def __enter__(self):
-        
+
         self._old_hubs.append(Hub.current)
         _local.set(self)
         return self
 
-    def __exit__(
-        self,
-        exc_type,  
-        exc_value,  
-        tb,  
-    ):
-        
+    def __exit__(self, exc_type, exc_value, tb):
+
         old = self._old_hubs.pop()
         _local.set(old)
 
@@ -194,7 +189,7 @@ class Hub(with_metaclass(HubMeta)):  #type: ignore
             return callback()
 
     def get_integration(self, name_or_class):
-        
+
         """Returns the integration for this hub by name or class.  If there
         is no client bound or the client does not have that integration
         then `None` is returned.
@@ -236,12 +231,12 @@ class Hub(with_metaclass(HubMeta)):  #type: ignore
 
     @property
     def client(self):
-        
+
         """Returns the current client on the hub."""
         return self._stack[-1][0]
 
     def last_event_id(self):
-        
+
         """Returns the last event ID."""
         return self._last_event_id
 
@@ -251,7 +246,7 @@ class Hub(with_metaclass(HubMeta)):  #type: ignore
         self._stack[-1] = (new, top[1])
 
     def capture_event(self, event, hint=None):
-        
+
         """Captures an event.  The return value is the ID of the event.
 
         The event is a dictionary following the Sentry v7/v8 protocol
@@ -268,7 +263,7 @@ class Hub(with_metaclass(HubMeta)):  #type: ignore
         return None
 
     def capture_message(self, message, level=None):
-        
+
         """Captures a message.  The message is just a string.  If no level
         is provided the default level is `info`.
         """
@@ -279,7 +274,7 @@ class Hub(with_metaclass(HubMeta)):  #type: ignore
         return self.capture_event({"message": message, "level": level})
 
     def capture_exception(self, error=None):
-        
+
         """Captures an exception.
 
         The argument passed can be `None` in which case the last exception
@@ -308,7 +303,7 @@ class Hub(with_metaclass(HubMeta)):  #type: ignore
         logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
     def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
-        
+
         """Adds a breadcrumb.  The breadcrumbs are a dictionary with the
         data as the sentry v7/v8 protocol expects.  `hint` is an optional
         value that can be used by `before_breadcrumb` to customize the
@@ -319,7 +314,7 @@ class Hub(with_metaclass(HubMeta)):  #type: ignore
             logger.info("Dropped breadcrumb because no client bound")
             return
 
-        crumb = dict(crumb or ())  
+        crumb = dict(crumb or ())
         crumb.update(kwargs)
         if not crumb:
             return
@@ -340,18 +335,18 @@ class Hub(with_metaclass(HubMeta)):  #type: ignore
         else:
             logger.info("before breadcrumb dropped breadcrumb (%s)", original_crumb)
 
-        max_breadcrumbs = client.options["max_breadcrumbs"]  
+        max_breadcrumbs = client.options["max_breadcrumbs"]
         while len(scope._breadcrumbs) > max_breadcrumbs:
             scope._breadcrumbs.popleft()
 
     @overload  # noqa
     def push_scope(self):
-        
+
         pass
 
     @overload  # noqa
     def push_scope(self, callback):
-        
+
         pass
 
     def push_scope(self, callback=None):  # noqa
@@ -382,12 +377,12 @@ class Hub(with_metaclass(HubMeta)):  #type: ignore
 
     @overload  # noqa
     def configure_scope(self):
-        
+
         pass
 
     @overload  # noqa
     def configure_scope(self, callback):
-        
+
         pass
 
     def configure_scope(self, callback=None):  # noqa

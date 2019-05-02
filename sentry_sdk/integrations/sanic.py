@@ -13,13 +13,13 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
 
-from sanic import Sanic, __version__ as VERSION  #type: ignore
-from sanic.exceptions import SanicException  #type: ignore
-from sanic.router import Router  #type: ignore
-from sanic.handlers import ErrorHandler  #type: ignore
+from sanic import Sanic, __version__ as VERSION  # type: ignore
+from sanic.exceptions import SanicException  # type: ignore
+from sanic.router import Router  # type: ignore
+from sanic.handlers import ErrorHandler  # type: ignore
 
 if False:
-    from sanic.request import Request  #type: ignore
+    from sanic.request import Request  # type: ignore
 
     from typing import Any
     from typing import Callable
@@ -35,7 +35,7 @@ class SanicIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        
+
         if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between
             # requests.
@@ -59,7 +59,7 @@ class SanicIntegration(Integration):
         old_handle_request = Sanic.handle_request
 
         async def sentry_handle_request(self, request, *args, **kwargs):
-            
+
             hub = Hub.current
             if hub.get_integration(SanicIntegration) is None:
                 return old_handle_request(self, request, *args, **kwargs)
@@ -82,7 +82,7 @@ class SanicIntegration(Integration):
         old_router_get = Router.get
 
         def sentry_router_get(self, request):
-            
+
             rv = old_router_get(self, request)
             hub = Hub.current
             if hub.get_integration(SanicIntegration) is not None:
@@ -96,7 +96,7 @@ class SanicIntegration(Integration):
         old_error_handler_lookup = ErrorHandler.lookup
 
         def sentry_error_handler_lookup(self, exception):
-            
+
             _capture_exception(exception)
             old_error_handler = old_error_handler_lookup(self, exception)
 
@@ -107,7 +107,7 @@ class SanicIntegration(Integration):
                 return old_error_handler
 
             async def sentry_wrapped_error_handler(request, exception):
-                
+
                 try:
                     response = old_error_handler(request, exception)
                     if isawaitable(response):
@@ -127,7 +127,7 @@ class SanicIntegration(Integration):
 
 
 def _capture_exception(exception):
-    
+
     hub = Hub.current
     integration = hub.get_integration(SanicIntegration)
     if integration is None:
@@ -143,9 +143,7 @@ def _capture_exception(exception):
 
 
 def _make_request_processor(weak_request):
-    
     def sanic_processor(event, hint):
-        
 
         try:
             if issubclass(hint["exc_info"][0], SanicException):
@@ -182,7 +180,7 @@ def _make_request_processor(weak_request):
 
 class SanicRequestExtractor(RequestExtractor):
     def content_length(self):
-        
+
         if self.request.body is None:
             return 0
         return len(self.request.body)
@@ -191,22 +189,22 @@ class SanicRequestExtractor(RequestExtractor):
         return dict(self.request.cookies)
 
     def raw_data(self):
-        
+
         return self.request.body
 
     def form(self):
-        
+
         return self.request.form
 
     def is_json(self):
         raise NotImplementedError()
 
     def json(self):
-        
+
         return self.request.json
 
     def files(self):
-        
+
         return self.request.files
 
     def size_of_file(self, file):

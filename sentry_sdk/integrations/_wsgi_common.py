@@ -13,16 +13,16 @@ if False:
 
 class RequestExtractor(object):
     def __init__(self, request):
-        
+
         self.request = request
 
     def extract_into_event(self, event):
-        
+
         client = Hub.current.client
         if client is None:
             return
 
-        data = None  
+        data = None
 
         content_length = self.content_length()
         request_info = event.setdefault("request", {})
@@ -55,7 +55,7 @@ class RequestExtractor(object):
         request_info["data"] = data
 
     def content_length(self):
-        
+
         try:
             return int(self.env().get("CONTENT_LENGTH", 0))
         except ValueError:
@@ -71,7 +71,7 @@ class RequestExtractor(object):
         raise NotImplementedError()
 
     def parsed_body(self):
-        
+
         form = self.form()
         files = self.files()
         if form or files:
@@ -87,11 +87,11 @@ class RequestExtractor(object):
         return self.json()
 
     def is_json(self):
-        
+
         return _is_json_content_type(self.env().get("CONTENT_TYPE"))
 
     def json(self):
-        
+
         try:
             if self.is_json():
                 raw_data = self.raw_data()
@@ -114,7 +114,7 @@ class RequestExtractor(object):
 
 
 def _is_json_content_type(ct):
-    
+
     mt = (ct or "").split(";", 1)[0]
     return (
         mt == "application/json"
@@ -124,7 +124,7 @@ def _is_json_content_type(ct):
 
 
 def _filter_headers(headers):
-    
+
     if _should_send_default_pii():
         return headers
 
