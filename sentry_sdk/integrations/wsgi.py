@@ -7,9 +7,6 @@ from sentry_sdk.tracing import SpanContext
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
 
-
-
-
 if PY2:
 
     def wsgi_decoding_dance(s, charset="utf-8", errors="replace"):

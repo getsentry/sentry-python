@@ -9,8 +9,6 @@ from sentry_sdk.utils import logger
 from sentry_sdk.integrations import Integration
 
 
-
-
 def default_callback(pending, timeout):
     """This is the default shutdown callback that is set on the options.
     It prints out a message to stderr that informs the user that some events

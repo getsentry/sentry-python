@@ -9,7 +9,6 @@ from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 
 
-
 try:
     import flask_login  # type: ignore
 except ImportError:

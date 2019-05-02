@@ -6,8 +6,6 @@ from itertools import chain
 from sentry_sdk.utils import logger, capture_internal_exceptions, object_to_json
 
 
-
-
 global_event_processors = []
 
 

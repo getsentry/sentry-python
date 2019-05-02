@@ -7,8 +7,6 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 
 
-
-
 class ArgvIntegration(Integration):
     identifier = "argv"
 

@@ -13,7 +13,6 @@ from sentry_sdk.utils import (
 from sentry_sdk.integrations import Integration
 
 
-
 DEFAULT_LEVEL = logging.INFO
 DEFAULT_EVENT_LEVEL = logging.ERROR
 

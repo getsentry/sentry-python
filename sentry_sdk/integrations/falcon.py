@@ -9,8 +9,6 @@ from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
 
-
-
 class FalconRequestExtractor(RequestExtractor):
     def env(self):
         return self.request.env

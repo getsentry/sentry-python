@@ -21,7 +21,6 @@ if False:
     from webob.compat import cgi_FieldStorage  # type: ignore
 
 
-
 if getattr(Request, "authenticated_userid", None):
 
     def authenticated_userid(request):

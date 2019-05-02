@@ -5,8 +5,6 @@ from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 
 
-
-
 class ExcepthookIntegration(Integration):
     identifier = "excepthook"
 

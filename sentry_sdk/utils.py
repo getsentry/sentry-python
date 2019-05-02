@@ -24,7 +24,6 @@ if False:
     from typing import Set
     from typing import Type
 
-
     ExcInfo = Tuple[
         Optional[Type[BaseException]], Optional[BaseException], Optional[Any]
     ]

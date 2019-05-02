@@ -5,8 +5,6 @@ from sentry_sdk.utils import AnnotatedValue
 from sentry_sdk._compat import text_type
 
 
-
-
 class RequestExtractor(object):
     def __init__(self, request):
 
