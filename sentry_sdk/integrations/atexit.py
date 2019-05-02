@@ -9,8 +9,7 @@ from sentry_sdk.utils import logger
 from sentry_sdk.integrations import Integration
 
 if False:
-    from typing import Any
-    from typing import Optional
+    pass
 
 
 def default_callback(pending, timeout):

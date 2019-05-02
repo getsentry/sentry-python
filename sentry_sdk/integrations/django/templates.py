@@ -1,9 +1,7 @@
 from django.template import TemplateSyntaxError  # type: ignore
 
 if False:
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
+    pass
 
 try:
     # support Django 1.9

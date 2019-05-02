@@ -17,15 +17,9 @@ from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 
 if False:
     from pyramid.response import Response  # type: ignore
-    from typing import Any
-    from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from typing import Callable
-    from typing import Dict
-    from typing import Optional
     from webob.cookies import RequestCookies  # type: ignore
     from webob.compat import cgi_FieldStorage  # type: ignore
 
-    from sentry_sdk.utils import ExcInfo
 
 
 if getattr(Request, "authenticated_userid", None):

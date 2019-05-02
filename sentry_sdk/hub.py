@@ -17,16 +17,10 @@ from sentry_sdk.utils import (
 
 
 if False:
-    from typing import Union
-    from typing import Any
     from typing import Optional
-    from typing import Dict
     from typing import Tuple
     from typing import List
-    from typing import Callable
     from typing import overload
-    from contextlib import ContextManager
-    from sentry_sdk.integrations import Integration
 else:
 
     def overload(x):

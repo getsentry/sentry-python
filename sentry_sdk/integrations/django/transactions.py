@@ -10,11 +10,7 @@ import re
 if False:
     from django.urls.resolvers import URLResolver  # type: ignore
     from typing import Dict
-    from typing import List
-    from typing import Optional
     from django.urls.resolvers import URLPattern
-    from typing import Tuple
-    from typing import Union
     from re import Pattern  # type: ignore
 
 try:

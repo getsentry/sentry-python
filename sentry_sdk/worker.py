@@ -6,10 +6,7 @@ from sentry_sdk._compat import queue, check_thread_support
 from sentry_sdk.utils import logger
 
 if False:
-    from queue import Queue
-    from typing import Any
-    from typing import Optional
-    from typing import Callable
+    pass
 
 
 _TERMINATOR = object()

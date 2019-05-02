@@ -10,16 +10,10 @@ from django.core import signals  # type: ignore
 
 if False:
     from typing import Any
-    from typing import Dict
-    from typing import Tuple
-    from typing import Union
-    from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from typing import Callable
     from django.core.handlers.wsgi import WSGIRequest  # type: ignore
     from django.http.response import HttpResponse  # type: ignore
     from django.http.request import QueryDict  # type: ignore
     from django.utils.datastructures import MultiValueDict  # type: ignore
-    from typing import List
 
 
 try:

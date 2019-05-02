@@ -18,16 +18,12 @@ from sentry_sdk._compat import (
 
 if False:
     from typing import Any
-    from typing import Dict
-    from typing import Union
     from typing import Iterator
     from typing import Tuple
     from typing import Optional
-    from typing import List
     from typing import Set
     from typing import Type
 
-    from sentry_sdk.consts import ClientOptions
 
     ExcInfo = Tuple[
         Optional[Type[BaseException]], Optional[BaseException], Optional[Any]

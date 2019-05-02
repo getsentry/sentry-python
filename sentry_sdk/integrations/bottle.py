@@ -11,11 +11,6 @@ from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 
 if False:
-    from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from typing import Any
-    from typing import Dict
-    from typing import Callable
-    from typing import Optional
     from bottle import FileUpload, FormsDict, LocalRequest  # type: ignore
 
 from bottle import Bottle, Route, request as bottle_request, HTTPResponse

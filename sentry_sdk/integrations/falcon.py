@@ -9,9 +9,7 @@ from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
 if False:
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
+    pass
 
 
 class FalconRequestExtractor(RequestExtractor):

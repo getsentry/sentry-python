@@ -1,10 +1,7 @@
 import sys
 
 if False:
-    from typing import Optional
-    from typing import Tuple
-    from typing import Any
-    from typing import Type
+    pass
 
 
 PY2 = sys.version_info[0] == 2

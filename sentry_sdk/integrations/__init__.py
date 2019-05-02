@@ -7,12 +7,7 @@ from sentry_sdk._compat import iteritems
 from sentry_sdk.utils import logger
 
 if False:
-    from typing import Iterator
-    from typing import Dict
-    from typing import List
     from typing import Set
-    from typing import Type
-    from typing import Callable
 
 
 _installer_lock = Lock()

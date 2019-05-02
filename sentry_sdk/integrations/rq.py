@@ -10,14 +10,11 @@ from rq.timeouts import JobTimeoutException  # type: ignore
 from rq.worker import Worker  # type: ignore
 
 if False:
-    from typing import Any
-    from typing import Dict
-    from typing import Callable
+    pass
 
     from rq.job import Job  # type: ignore
     from rq.queue import Queue  # type: ignore
 
-    from sentry_sdk.utils import ExcInfo
 
 
 class RqIntegration(Integration):

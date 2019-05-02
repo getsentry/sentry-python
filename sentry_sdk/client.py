@@ -20,11 +20,8 @@ from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 
 if False:
-    from sentry_sdk.consts import ClientOptions
-    from sentry_sdk.scope import Scope
     from typing import Any
     from typing import Dict
-    from typing import Optional
 
 
 _client_init_debug = ContextVar("client_init_debug")

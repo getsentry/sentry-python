@@ -13,10 +13,7 @@ from sentry_sdk.utils import (
 from sentry_sdk.integrations import Integration
 
 if False:
-    from logging import LogRecord
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
+    pass
 
 DEFAULT_LEVEL = logging.INFO
 DEFAULT_EVENT_LEVEL = logging.ERROR

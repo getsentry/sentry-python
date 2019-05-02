@@ -7,8 +7,7 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 
 if False:
-    from typing import Any
-    from typing import Dict
+    pass
 
 
 class ArgvIntegration(Integration):

@@ -5,10 +5,7 @@ from sentry_sdk.utils import AnnotatedValue
 from sentry_sdk._compat import text_type
 
 if False:
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
-    from typing import Union
+    pass
 
 
 class RequestExtractor(object):

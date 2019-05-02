@@ -6,12 +6,7 @@ from itertools import chain
 from sentry_sdk.utils import logger, capture_internal_exceptions, object_to_json
 
 if False:
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import Optional
-    from typing import Deque
-    from typing import List
+    pass
 
 
 global_event_processors = []

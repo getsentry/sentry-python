@@ -13,15 +13,7 @@ from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 
 if False:
-    from sentry_sdk.consts import ClientOptions
-    from typing import Type
-    from typing import Any
-    from typing import Optional
-    from typing import Dict
-    from typing import Union
-    from typing import Callable
     from urllib3.poolmanager import PoolManager  # type: ignore
-    from urllib3.poolmanager import ProxyManager
 
 try:
     from urllib.request import getproxies
@@ -53,12 +45,10 @@ class Transport(object):
 
     def flush(self, timeout, callback=None):
         """Wait `timeout` seconds for the current events to be sent out."""
-        pass
 
     def kill(self):
 
         """Forcefully kills the transport."""
-        pass
 
     def __del__(self):
 

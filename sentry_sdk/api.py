@@ -6,12 +6,7 @@ from sentry_sdk.scope import Scope
 
 
 if False:
-    from typing import Any
-    from typing import Optional
     from typing import overload
-    from typing import Callable
-    from typing import Dict
-    from contextlib import ContextManager
 else:
 
     def overload(x):

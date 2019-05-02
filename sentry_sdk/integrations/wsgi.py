@@ -7,15 +7,8 @@ from sentry_sdk.tracing import SpanContext
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
 if False:
-    from typing import Callable
-    from typing import Dict
-    from typing import List
-    from typing import Iterator
-    from typing import Any
-    from typing import Tuple
-    from typing import Optional
+    pass
 
-    from sentry_sdk.utils import ExcInfo
 
 
 if PY2:
