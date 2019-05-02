@@ -4,8 +4,7 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 
-if False:
-    pass
+
 
 
 class ExcepthookIntegration(Integration):

@@ -4,8 +4,7 @@ from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue
 from sentry_sdk._compat import text_type
 
-if False:
-    pass
+
 
 
 class RequestExtractor(object):

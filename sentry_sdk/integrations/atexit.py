@@ -8,8 +8,7 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.utils import logger
 from sentry_sdk.integrations import Integration
 
-if False:
-    pass
+
 
 
 def default_callback(pending, timeout):

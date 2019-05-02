@@ -8,8 +8,7 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 
-if False:
-    pass
+
 
 try:
     import flask_login  # type: ignore

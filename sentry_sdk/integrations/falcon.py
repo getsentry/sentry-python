@@ -8,8 +8,7 @@ from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
-if False:
-    pass
+
 
 
 class FalconRequestExtractor(RequestExtractor):

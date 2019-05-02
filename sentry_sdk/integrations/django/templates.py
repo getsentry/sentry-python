@@ -1,7 +1,6 @@
 from django.template import TemplateSyntaxError  # type: ignore
 
-if False:
-    pass
+
 
 try:
     # support Django 1.9

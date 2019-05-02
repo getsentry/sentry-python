@@ -6,8 +6,7 @@ from sentry_sdk._compat import PY2, reraise
 from sentry_sdk.tracing import SpanContext
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
-if False:
-    pass
+
 
 
 

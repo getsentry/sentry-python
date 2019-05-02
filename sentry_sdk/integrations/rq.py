@@ -9,8 +9,7 @@ from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from rq.timeouts import JobTimeoutException  # type: ignore
 from rq.worker import Worker  # type: ignore
 
-if False:
-    pass
+
 
     from rq.job import Job  # type: ignore
     from rq.queue import Queue  # type: ignore
