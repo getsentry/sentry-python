@@ -10,10 +10,9 @@ from rq.timeouts import JobTimeoutException  # type: ignore
 from rq.worker import Worker  # type: ignore
 
 
-
+if False:
     from rq.job import Job  # type: ignore
     from rq.queue import Queue  # type: ignore
-
 
 
 class RqIntegration(Integration):
