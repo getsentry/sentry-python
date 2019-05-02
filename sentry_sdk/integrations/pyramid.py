@@ -15,11 +15,6 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 
-if False:
-    from pyramid.response import Response  # type: ignore
-    from webob.cookies import RequestCookies  # type: ignore
-    from webob.compat import cgi_FieldStorage  # type: ignore
-
 
 if getattr(Request, "authenticated_userid", None):
 

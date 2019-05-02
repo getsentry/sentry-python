@@ -8,10 +8,8 @@ from __future__ import absolute_import
 import re
 
 if False:
-    from django.urls.resolvers import URLResolver  # type: ignore
     from typing import Dict
-    from django.urls.resolvers import URLPattern
-    from re import Pattern  # type: ignore
+    from django.urls.resolvers import URLPattern  # type: ignore
 
 try:
     from django.urls import get_resolver  # type: ignore

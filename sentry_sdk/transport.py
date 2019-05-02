@@ -12,8 +12,6 @@ from sentry_sdk.consts import VERSION
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 
-if False:
-    from urllib3.poolmanager import PoolManager  # type: ignore
 
 try:
     from urllib.request import getproxies

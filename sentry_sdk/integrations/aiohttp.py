@@ -15,15 +15,6 @@ from sentry_sdk.utils import (
 import asyncio
 from aiohttp.web import Application, HTTPException  # type: ignore
 
-if False:
-    from aiohttp.web_request import Request  # type: ignore
-    from typing import Any
-    from typing import Dict
-    from typing import Tuple
-    from typing import Callable
-
-    from sentry_sdk.utils import ExcInfo
-
 
 class AioHttpIntegration(Integration):
     identifier = "aiohttp"

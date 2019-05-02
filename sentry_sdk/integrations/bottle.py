@@ -10,10 +10,13 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 
-if False:
-    from bottle import FileUpload, FormsDict, LocalRequest  # type: ignore
 
-from bottle import Bottle, Route, request as bottle_request, HTTPResponse
+from bottle import (  # type: ignore
+    Bottle,
+    Route,
+    request as bottle_request,
+    HTTPResponse,
+)
 
 
 class BottleIntegration(Integration):

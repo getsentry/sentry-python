@@ -10,10 +10,6 @@ from django.core import signals  # type: ignore
 
 if False:
     from typing import Any
-    from django.core.handlers.wsgi import WSGIRequest  # type: ignore
-    from django.http.response import HttpResponse  # type: ignore
-    from django.http.request import QueryDict  # type: ignore
-    from django.utils.datastructures import MultiValueDict  # type: ignore
 
 
 try:
@@ -80,7 +76,7 @@ class DjangoIntegration(Integration):
         ignore_logger("django.server")
         ignore_logger("django.request")
 
-        from django.core.handlers.wsgi import WSGIHandler
+        from django.core.handlers.wsgi import WSGIHandler  # type: ignore
 
         old_app = WSGIHandler.__call__
 

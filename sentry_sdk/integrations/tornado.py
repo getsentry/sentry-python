@@ -19,13 +19,6 @@ from sentry_sdk.integrations.logging import ignore_logger
 from tornado.web import RequestHandler, HTTPError  # type: ignore
 from tornado.gen import coroutine  # type: ignore
 
-if False:
-    from typing import Any
-    from typing import List
-    from typing import Optional
-    from typing import Dict
-    from typing import Callable
-
 
 class TornadoIntegration(Integration):
     identifier = "tornado"

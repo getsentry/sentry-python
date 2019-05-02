@@ -18,17 +18,6 @@ from sanic.exceptions import SanicException  # type: ignore
 from sanic.router import Router  # type: ignore
 from sanic.handlers import ErrorHandler  # type: ignore
 
-if False:
-    from sanic.request import Request  # type: ignore
-
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import Optional
-    from typing import Union
-    from typing import Tuple
-    from sanic.request import RequestParameters
-
 
 class SanicIntegration(Integration):
     identifier = "sanic"

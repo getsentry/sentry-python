@@ -14,7 +14,7 @@ try:
 except ImportError:
     flask_login = None
 
-from flask import Request, Flask, _request_ctx_stack, _app_ctx_stack  # type: ignore
+from flask import Flask, _request_ctx_stack, _app_ctx_stack  # type: ignore
 from flask.signals import (
     appcontext_pushed,
     appcontext_tearing_down,
