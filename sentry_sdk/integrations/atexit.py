@@ -32,14 +32,14 @@ class AtexitIntegration(Integration):
     identifier = "atexit"
 
     def __init__(self, callback=None):
-        # type: (Optional[Any]) -> None
+        
         if callback is None:
             callback = default_callback
         self.callback = callback
 
     @staticmethod
     def setup_once():
-        # type: () -> None
+        
         @atexit.register
         def _shutdown():
             logger.debug("atexit: got shutdown signal")

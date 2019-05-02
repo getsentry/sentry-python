@@ -13,12 +13,12 @@ class ExcepthookIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        # type: () -> None
+        
         sys.excepthook = _make_excepthook(sys.excepthook)
 
 
 def _make_excepthook(old_excepthook):
-    # type: (Callable) -> Callable
+    
     def sentry_sdk_excepthook(exctype, value, traceback):
         hub = Hub.current
         integration = hub.get_integration(ExcepthookIntegration)

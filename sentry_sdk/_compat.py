@@ -33,8 +33,8 @@ else:
     import queue  # noqa
 
     text_type = str
-    string_types = (text_type,)  # type: Tuple[type]
-    number_types = (int, float)  # type: Tuple[type, type]
+    string_types = (text_type,)  
+    number_types = (int, float)  
     int_types = (int,)  # noqa
     iteritems = lambda x: x.items()
 
@@ -45,7 +45,7 @@ else:
         return x
 
     def reraise(tp, value, tb=None):
-        # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[Any]) -> None
+        
         assert value is not None
         if value.__traceback__ is not tb:
             raise value.with_traceback(tb)
@@ -61,9 +61,9 @@ def with_metaclass(meta, *bases):
 
 
 def check_thread_support():
-    # type: () -> None
+    
     try:
-        from uwsgi import opt  # type: ignore
+        from uwsgi import opt  #type: ignore
     except ImportError:
         return
 

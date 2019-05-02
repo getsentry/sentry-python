@@ -65,7 +65,7 @@ def _get_debug_hub():
 
 @contextmanager
 def capture_internal_exceptions():
-    # type: () -> Iterator
+    
     try:
         yield
     except Exception:
@@ -79,7 +79,7 @@ def to_timestamp(value):
 
 
 def event_hint_with_exc_info(exc_info=None):
-    # type: (ExcInfo) -> Dict[str, Optional[ExcInfo]]
+    
     """Creates a hint with the exc info filled in."""
     if exc_info is None:
         exc_info = sys.exc_info()
@@ -201,12 +201,12 @@ class Auth(object):
 
 
 def get_type_name(cls):
-    # type: (Any) -> str
+    
     return getattr(cls, "__qualname__", None) or getattr(cls, "__name__", None)
 
 
 def get_type_module(cls):
-    # type: (Any) -> Optional[Any]
+    
     mod = getattr(cls, "__module__", None)
     if mod not in (None, "builtins", "__builtins__"):
         return mod
@@ -214,7 +214,7 @@ def get_type_module(cls):
 
 
 def should_hide_frame(frame):
-    # type: (Any) -> bool
+    
     try:
         mod = frame.f_globals["__name__"]
         return mod.startswith("sentry_sdk.")
@@ -232,7 +232,7 @@ def should_hide_frame(frame):
 
 
 def iter_stacks(tb):
-    # type: (Any) -> Iterator[Any]
+    
     while tb is not None:
         if not should_hide_frame(tb.tb_frame):
             yield tb
@@ -240,7 +240,7 @@ def iter_stacks(tb):
 
 
 def slim_string(value, length=512):
-    # type: (str, int) -> str
+    
     if not value:
         return value
     if len(value) > length:
@@ -249,12 +249,12 @@ def slim_string(value, length=512):
 
 
 def get_lines_from_file(
-    filename,  # type: str
-    lineno,  # type: int
-    loader=None,  # type: Any
-    module=None,  # type: str
+    filename,  
+    lineno,  
+    loader=None,  
+    module=None,  
 ):
-    # type: (...) -> Tuple[List[str], Optional[str], List[str]]
+    
     context_lines = 5
     source = None
     if loader is not None and hasattr(loader, "get_source"):
@@ -293,7 +293,7 @@ def get_lines_from_file(
 
 
 def get_source_context(frame, tb_lineno):
-    # type: (Any, int) -> Tuple[List[str], Optional[str], List[str]]
+    
     try:
         abs_path = frame.f_code.co_filename
     except Exception:
@@ -313,7 +313,7 @@ def get_source_context(frame, tb_lineno):
 
 
 def safe_str(value):
-    # type: (Any) -> str
+    
     try:
         return text_type(value)
     except Exception:
@@ -321,7 +321,7 @@ def safe_str(value):
 
 
 def safe_repr(value):
-    # type: (Any) -> str
+    
     try:
         rv = repr(value)
         if isinstance(rv, bytes):
@@ -389,7 +389,7 @@ def object_to_json(obj, remaining_depth=4, memo=None):
 
 
 def extract_locals(frame):
-    # type: (Any) -> Dict[str, Any]
+    
     rv = {}
     for key, value in frame.f_locals.items():
         rv[str(key)] = object_to_json(value)
@@ -397,7 +397,7 @@ def extract_locals(frame):
 
 
 def filename_for_module(module, abs_path):
-    # type: (str, str) -> str
+    
     try:
         if abs_path.endswith(".pyc"):
             abs_path = abs_path[:-1]
@@ -415,7 +415,7 @@ def filename_for_module(module, abs_path):
 
 
 def serialize_frame(frame, tb_lineno=None, with_locals=True):
-    # type: (Any, int, bool) -> Dict[str, Any]
+    
     f_code = getattr(frame, "f_code", None)
     if f_code:
         abs_path = frame.f_code.co_filename
@@ -449,7 +449,7 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
 
 
 def stacktrace_from_traceback(tb=None, with_locals=True):
-    # type: (Any, bool) -> Dict[str, List[Dict[str, Any]]]
+    
     return {
         "frames": [
             serialize_frame(
@@ -476,18 +476,18 @@ def current_stacktrace(with_locals=True):
 
 
 def get_errno(exc_value):
-    # type: (BaseException) -> Optional[Any]
+    
     return getattr(exc_value, "errno", None)
 
 
 def single_exception_from_error_tuple(
-    exc_type,  # type: Optional[type]
-    exc_value,  # type: Optional[BaseException]
-    tb,  # type: Optional[Any]
-    client_options=None,  # type: Optional[ClientOptions]
-    mechanism=None,  # type: Dict[str, Any]
+    exc_type,  
+    exc_value,  
+    tb,  
+    client_options=None,  
+    mechanism=None,  
 ):
-    # type: (...) -> Dict[str, Any]
+    
     if exc_value is not None:
         errno = get_errno(exc_value)
     else:
@@ -518,11 +518,11 @@ HAS_CHAINED_EXCEPTIONS = hasattr(Exception, "__suppress_context__")
 if HAS_CHAINED_EXCEPTIONS:
 
     def walk_exception_chain(exc_info):
-        # type: (ExcInfo) -> Iterator[ExcInfo]
+        #type: (ExcInfo) -> Iterator[ExcInfo]
         exc_type, exc_value, tb = exc_info
 
         seen_exceptions = []
-        seen_exception_ids = set()  # type: Set[int]
+        seen_exception_ids = set()  #type: Set[int]
 
         while (
             exc_type is not None
@@ -537,7 +537,7 @@ if HAS_CHAINED_EXCEPTIONS:
             seen_exceptions.append(exc_value)
             seen_exception_ids.add(id(exc_value))
 
-            if exc_value.__suppress_context__:  # type: ignore
+            if exc_value.__suppress_context__:  
                 cause = exc_value.__cause__
             else:
                 cause = exc_value.__context__
@@ -551,16 +551,16 @@ if HAS_CHAINED_EXCEPTIONS:
 else:
 
     def walk_exception_chain(exc_info):
-        # type: (ExcInfo) -> Iterator[ExcInfo]
+        #type: (ExcInfo) -> Iterator[ExcInfo]
         yield exc_info
 
 
 def exceptions_from_error_tuple(
-    exc_info,  # type: ExcInfo
-    client_options=None,  # type: Optional[ClientOptions]
-    mechanism=None,  # type: Dict[str, Any]
+    exc_info,  
+    client_options=None,  
+    mechanism=None,  
 ):
-    # type: (...) -> List[Dict[str, Any]]
+    
     exc_type, exc_value, tb = exc_info
     rv = []
     for exc_type, exc_value, tb in walk_exception_chain(exc_info):
@@ -576,7 +576,7 @@ def exceptions_from_error_tuple(
 
 
 def to_string(value):
-    # type: (str) -> str
+    
     try:
         return text_type(value)
     except UnicodeDecodeError:
@@ -584,7 +584,7 @@ def to_string(value):
 
 
 def iter_event_stacktraces(event):
-    # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
+    
     if "stacktrace" in event:
         yield event["stacktrace"]
     if "threads" in event:
@@ -598,14 +598,14 @@ def iter_event_stacktraces(event):
 
 
 def iter_event_frames(event):
-    # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
+    
     for stacktrace in iter_event_stacktraces(event):
         for frame in stacktrace.get("frames") or ():
             yield frame
 
 
 def handle_in_app(event, in_app_exclude=None, in_app_include=None):
-    # type: (Dict[str, Any], List, List) -> Dict[str, Any]
+    
     for stacktrace in iter_event_stacktraces(event):
         handle_in_app_impl(
             stacktrace.get("frames"),
@@ -646,7 +646,7 @@ def handle_in_app_impl(frames, in_app_exclude, in_app_include):
 
 
 def exc_info_from_error(error):
-    # type: (Union[BaseException, ExcInfo]) -> ExcInfo
+    
     if isinstance(error, tuple) and len(error) == 3:
         exc_type, exc_value, tb = error
     elif isinstance(error, BaseException):
@@ -668,11 +668,11 @@ def exc_info_from_error(error):
 
 
 def event_from_exception(
-    exc_info,  # type: Union[BaseException, ExcInfo]
-    client_options=None,  # type: Optional[ClientOptions]
-    mechanism=None,  # type: Dict[str, Any]
+    exc_info,  
+    client_options=None,  
+    mechanism=None,  
 ):
-    # type: (...) -> Tuple[Dict[str, Any], Dict[str, Any]]
+    
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
     return (
@@ -689,7 +689,7 @@ def event_from_exception(
 
 
 def _module_in_set(name, set):
-    # type: (str, Optional[List]) -> bool
+    
     if not set:
         return False
     for item in set or ():
@@ -700,15 +700,15 @@ def _module_in_set(name, set):
 
 class AnnotatedValue(object):
     def __init__(self, value, metadata):
-        # type: (Optional[Any], Dict[str, Any]) -> None
+        
         self.value = value
         self.metadata = metadata
 
 
 def flatten_metadata(obj):
-    # type: (Dict[str, Any]) -> Dict[str, Any]
+    
     def inner(obj):
-        # type: (Any) -> Any
+        
         if isinstance(obj, Mapping):
             dict_rv = {}
             meta = {}
@@ -744,7 +744,7 @@ def flatten_metadata(obj):
 
 
 def strip_event_mut(event):
-    # type: (Dict[str, Any]) -> None
+    
     strip_stacktrace_mut(event.get("stacktrace", None))
     exception = event.get("exception", None)
     if exception:
@@ -756,7 +756,7 @@ def strip_event_mut(event):
 
 
 def strip_stacktrace_mut(stacktrace):
-    # type: (Optional[Dict[str, List[Dict[str, Any]]]]) -> None
+    
     if not stacktrace:
         return
     for frame in stacktrace.get("frames", None) or ():
@@ -764,7 +764,7 @@ def strip_stacktrace_mut(stacktrace):
 
 
 def strip_request_mut(request):
-    # type: (Dict[str, Any]) -> None
+    
     if not request:
         return
     data = request.get("data", None)
@@ -782,7 +782,7 @@ def strip_breadcrumbs_mut(breadcrumbs):
 
 
 def strip_frame_mut(frame):
-    # type: (Dict[str, Any]) -> None
+    
     if "vars" in frame:
         frame["vars"] = strip_databag(frame["vars"])
 
@@ -802,7 +802,7 @@ class Memo(object):
 
 
 def convert_types(obj):
-    # type: (Any) -> Any
+    
     if obj is None:
         return None
     if obj is CYCLE_MARKER:
@@ -825,14 +825,14 @@ def convert_types(obj):
 
 
 def strip_databag(obj, remaining_depth=20, max_breadth=20):
-    # type: (Any, int, int) -> Any
+    
     assert not isinstance(obj, bytes), "bytes should have been normalized before"
     if remaining_depth <= 0:
         return AnnotatedValue(None, {"rem": [["!limit", "x"]]})
     if isinstance(obj, text_type):
         return strip_string(obj)
     if isinstance(obj, Mapping):
-        rv_dict = {}  # type: Dict[Any, Any]
+        rv_dict = {}  
         for i, (k, v) in enumerate(obj.items()):
             if i >= max_breadth:
                 return AnnotatedValue(rv_dict, {"len": max_breadth})
@@ -842,7 +842,7 @@ def strip_databag(obj, remaining_depth=20, max_breadth=20):
 
         return rv_dict
     if isinstance(obj, Sequence):
-        rv_list = []  # type: List[Any]
+        rv_list = []  
         for i, v in enumerate(obj):
             if i >= max_breadth:
                 return AnnotatedValue(rv_list, {"len": max_breadth})
@@ -857,7 +857,7 @@ def strip_databag(obj, remaining_depth=20, max_breadth=20):
 
 
 def strip_string(value, max_length=512):
-    # type: (str, int) -> Union[AnnotatedValue, str]
+    
     # TODO: read max_length from config
     if not value:
         return value
@@ -933,16 +933,16 @@ def format_and_strip(template, params, strip_string=strip_string):
 HAS_REAL_CONTEXTVARS = True
 
 try:
-    from contextvars import ContextVar  # type: ignore
+    from contextvars import ContextVar  #type: ignore
 
     if not PY2 and sys.version_info < (3, 7):
-        import aiocontextvars  # type: ignore # noqa
+        import aiocontextvars  #type: ignore # noqa
 except ImportError:
     HAS_REAL_CONTEXTVARS = False
 
     from threading import local
 
-    class ContextVar(object):  # type: ignore
+    class ContextVar(object):  #type: ignore
         # Super-limited impl of ContextVar
 
         def __init__(self, name):

@@ -13,10 +13,10 @@ from sentry_sdk.utils import (
 )
 
 import asyncio
-from aiohttp.web import Application, HTTPException  # type: ignore
+from aiohttp.web import Application, HTTPException  #type: ignore
 
 if False:
-    from aiohttp.web_request import Request  # type: ignore
+    from aiohttp.web_request import Request  #type: ignore
     from typing import Any
     from typing import Dict
     from typing import Tuple
@@ -30,7 +30,7 @@ class AioHttpIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        # type: () -> None
+        
         if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between
             # requests.
@@ -44,9 +44,9 @@ class AioHttpIntegration(Integration):
         old_handle = Application._handle
 
         async def sentry_app_handle(self, request, *args, **kwargs):
-            # type: (Any, Request, *Any, **Any) -> Any
+            
             async def inner():
-                # type: () -> Any
+                
                 hub = Hub.current
                 if hub.get_integration(AioHttpIntegration) is None:
                     return await old_handle(self, request, *args, **kwargs)
@@ -76,12 +76,12 @@ class AioHttpIntegration(Integration):
 
 
 def _make_request_processor(weak_request):
-    # type: (Callable[[], Request]) -> Callable
+    
     def aiohttp_processor(
-        event,  # type: Dict[str, Any]
-        hint,  # type: Dict[str, Tuple[type, BaseException, Any]]
+        event,  
+        hint,  
     ):
-        # type: (...) -> Dict[str, Any]
+        
         request = weak_request()
         if request is None:
             return event
@@ -109,11 +109,11 @@ def _make_request_processor(weak_request):
 
 
 def _capture_exception(hub):
-    # type: (Hub) -> ExcInfo
+    
     exc_info = sys.exc_info()
     event, hint = event_from_exception(
         exc_info,
-        client_options=hub.client.options,  # type: ignore
+        client_options=hub.client.options,  
         mechanism={"type": "aiohttp", "handled": False},
     )
     hub.capture_event(event, hint=hint)

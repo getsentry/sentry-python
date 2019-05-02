@@ -16,14 +16,14 @@ if False:
     from typing import Dict
     from typing import Callable
     from typing import Optional
-    from bottle import FileUpload, FormsDict, LocalRequest  # type: ignore
+    from bottle import FileUpload, FormsDict, LocalRequest  #type: ignore
 
 from bottle import (
     Bottle,
     Route,
     request as bottle_request,
     HTTPResponse,
-)  # type: ignore
+)  
 
 
 class BottleIntegration(Integration):
@@ -32,7 +32,7 @@ class BottleIntegration(Integration):
     transaction_style = None
 
     def __init__(self, transaction_style="endpoint"):
-        # type: (str) -> None
+        
         TRANSACTION_STYLE_VALUES = ("endpoint", "url")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
@@ -43,13 +43,13 @@ class BottleIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        # type: () -> None
+        
 
         # monkey patch method Bottle.__call__
         old_app = Bottle.__call__
 
         def sentry_patched_wsgi_app(self, environ, start_response):
-            # type: (Any, Dict[str, str], Callable) -> _ScopedResponse
+            
 
             hub = Hub.current
             integration = hub.get_integration(BottleIntegration)
@@ -60,7 +60,7 @@ class BottleIntegration(Integration):
                 environ, start_response
             )
 
-        Bottle.__call__ = sentry_patched_wsgi_app  # type: ignore
+        Bottle.__call__ = sentry_patched_wsgi_app  
 
         # monkey patch method Bottle._handle
         old_handle = Bottle._handle
@@ -124,39 +124,39 @@ class BottleIntegration(Integration):
 
 class BottleRequestExtractor(RequestExtractor):
     def env(self):
-        # type: () -> Dict[str, str]
+        
         return self.request.environ
 
     def cookies(self):
-        # type: () -> Dict[str, str]
+        
         return self.request.cookies
 
     def raw_data(self):
-        # type: () -> bytes
+        
         return self.request.body.read()
 
     def form(self):
-        # type: () -> FormsDict
+        
         if self.is_json():
             return None
         return self.request.forms.decode()
 
     def files(self):
-        # type: () -> Optional[Dict[str, str]]
+        
         if self.is_json():
             return None
 
         return self.request.files
 
     def size_of_file(self, file):
-        # type: (FileUpload) -> int
+        
         return file.content_length
 
 
 def _make_request_event_processor(app, request, integration):
-    # type: (Bottle, LocalRequest, BottleIntegration) -> Callable
+    
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        
 
         try:
             if integration.transaction_style == "endpoint":
@@ -164,7 +164,7 @@ def _make_request_event_processor(app, request, integration):
                     request.route.callback
                 )
             elif integration.transaction_style == "url":
-                event["transaction"] = request.route.rule  # type: ignore
+                event["transaction"] = request.route.rule  
         except Exception:
             pass
 

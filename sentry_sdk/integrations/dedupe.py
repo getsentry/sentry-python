@@ -13,15 +13,15 @@ class DedupeIntegration(Integration):
     identifier = "dedupe"
 
     def __init__(self):
-        # type: () -> None
+        
         self._last_seen = ContextVar("last-seen")
 
     @staticmethod
     def setup_once():
-        # type: () -> None
+        
         @add_global_event_processor
         def processor(event, hint):
-            # type: (Dict[str, Any], Dict[str, Any]) -> Optional[Dict[str, Any]]
+            
             integration = Hub.current.get_integration(DedupeIntegration)
             if integration is not None:
                 exc_info = hint.get("exc_info", None)

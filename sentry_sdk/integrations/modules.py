@@ -14,7 +14,7 @@ _installed_modules = None
 
 
 def _generate_installed_modules():
-    # type: () -> Iterator[Tuple[str, str]]
+    
     try:
         import pkg_resources
     except ImportError:
@@ -25,7 +25,7 @@ def _generate_installed_modules():
 
 
 def _get_installed_modules():
-    # type: () -> Dict[str, str]
+    
     global _installed_modules
     if _installed_modules is None:
         _installed_modules = dict(_generate_installed_modules())
@@ -37,10 +37,10 @@ class ModulesIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        # type: () -> None
+        
         @add_global_event_processor
         def processor(event, hint):
-            # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+            
             if Hub.current.get_integration(ModulesIntegration) is not None:
                 event["modules"] = dict(_get_installed_modules())
             return event

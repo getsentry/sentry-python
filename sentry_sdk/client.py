@@ -31,22 +31,22 @@ _client_init_debug = ContextVar("client_init_debug")
 
 
 def get_options(*args, **kwargs):
-    # type: (*str, **ClientOptions) -> ClientOptions
+    
     if args and (isinstance(args[0], string_types) or args[0] is None):
-        dsn = args[0]  # type: Optional[str]
+        dsn = args[0]  
         args = args[1:]
     else:
         dsn = None
 
     rv = dict(DEFAULT_OPTIONS)
-    options = dict(*args, **kwargs)  # type: ignore
+    options = dict(*args, **kwargs)  
     if dsn is not None and options.get("dsn") is None:
-        options["dsn"] = dsn  # type: ignore
+        options["dsn"] = dsn  
 
     for key, value in options.items():
         if key not in rv:
             raise TypeError("Unknown option %r" % (key,))
-        rv[key] = value  # type: ignore
+        rv[key] = value  
 
     if rv["dsn"] is None:
         rv["dsn"] = os.environ.get("SENTRY_DSN")
@@ -57,7 +57,7 @@ def get_options(*args, **kwargs):
     if rv["environment"] is None:
         rv["environment"] = os.environ.get("SENTRY_ENVIRONMENT")
 
-    return rv  # type: ignore
+    return rv  
 
 
 class Client(object):
@@ -68,7 +68,7 @@ class Client(object):
     """
 
     def __init__(self, *args, **kwargs):
-        # type: (*str, **ClientOptions) -> None
+        
         old_debug = _client_init_debug.get(False)
         try:
             self.options = options = get_options(*args, **kwargs)
@@ -96,11 +96,11 @@ class Client(object):
 
     def _prepare_event(
         self,
-        event,  # type: Dict[str, Any]
-        hint,  # type: Optional[Dict[str, Any]]
-        scope,  # type: Optional[Scope]
+        event,  #type: Dict[str, Any]
+        hint,  
+        scope,  
     ):
-        # type: (...) -> Optional[Dict[str, Any]]
+        
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.utcnow()
 
@@ -129,8 +129,8 @@ class Client(object):
                 }
 
         for key in "release", "environment", "server_name", "dist":
-            if event.get(key) is None and self.options[key] is not None:  # type: ignore
-                event[key] = text_type(self.options[key]).strip()  # type: ignore
+            if event.get(key) is None and self.options[key] is not None:  
+                event[key] = text_type(self.options[key]).strip()  
         if event.get("sdk") is None:
             sdk_info = dict(SDK_INFO)
             sdk_info["integrations"] = sorted(self.integrations.keys())
@@ -157,12 +157,12 @@ class Client(object):
                 new_event = before_send(event, hint)
             if new_event is None:
                 logger.info("before send dropped event (%s)", event)
-            event = new_event  # type: ignore
+            event = new_event  #type: ignore
 
         return event
 
     def _is_ignored_error(self, event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> bool
+        
         exc_info = hint.get("exc_info")
         if exc_info is None:
             return False
@@ -184,11 +184,11 @@ class Client(object):
 
     def _should_capture(
         self,
-        event,  # type: Dict[str, Any]
-        hint,  # type: Dict[str, Any]
-        scope=None,  # type: Scope
+        event,  
+        hint,  
+        scope=None,  
     ):
-        # type: (...) -> bool
+        
         if scope is not None and not scope._should_capture:
             return False
 
@@ -204,7 +204,7 @@ class Client(object):
         return True
 
     def capture_event(self, event, hint=None, scope=None):
-        # type: (Dict[str, Any], Any, Scope) -> Optional[str]
+        
         """Captures an event.
 
         This takes the ready made event and an optoinal hint and scope.  The
@@ -224,7 +224,7 @@ class Client(object):
             event["event_id"] = rv = uuid.uuid4().hex
         if not self._should_capture(event, hint, scope):
             return None
-        event = self._prepare_event(event, hint, scope)  # type: ignore
+        event = self._prepare_event(event, hint, scope)  
         if event is None:
             return None
         self.transport.capture_event(event)

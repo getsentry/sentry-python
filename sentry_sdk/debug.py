@@ -10,7 +10,7 @@ from logging import LogRecord
 
 class _HubBasedClientFilter(logging.Filter):
     def filter(self, record):
-        # type: (LogRecord) -> bool
+        
         if _client_init_debug.get(False):
             return True
         hub = Hub.current

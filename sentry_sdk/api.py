@@ -36,7 +36,7 @@ def hubmethod(f):
 
 @hubmethod
 def capture_event(event, hint=None):
-    # type: (Dict[str, Any], Dict[str, Any]) -> Optional[str]
+    
     hub = Hub.current
     if hub is not None:
         return hub.capture_event(event, hint)
@@ -45,7 +45,7 @@ def capture_event(event, hint=None):
 
 @hubmethod
 def capture_message(message, level=None):
-    # type: (str, Optional[Any]) -> Optional[str]
+    
     hub = Hub.current
     if hub is not None:
         return hub.capture_message(message, level)
@@ -54,7 +54,7 @@ def capture_message(message, level=None):
 
 @hubmethod
 def capture_exception(error=None):
-    # type: (Optional[BaseException]) -> Optional[str]
+    
     hub = Hub.current
     if hub is not None:
         return hub.capture_exception(error)
@@ -63,7 +63,7 @@ def capture_exception(error=None):
 
 @hubmethod
 def add_breadcrumb(crumb=None, hint=None, **kwargs):
-    # type: (Dict[str, Any], Dict[str, Any], **Any) -> None
+    
     hub = Hub.current
     if hub is not None:
         return hub.add_breadcrumb(crumb, hint, **kwargs)
@@ -71,13 +71,13 @@ def add_breadcrumb(crumb=None, hint=None, **kwargs):
 
 @overload  # noqa
 def configure_scope():
-    # type: () -> ContextManager[Scope]
+    
     pass
 
 
 @overload  # noqa
 def configure_scope(callback):
-    # type: (Callable[[Scope], None]) -> None
+    
     pass
 
 
@@ -100,13 +100,13 @@ def configure_scope(callback=None):
 
 @overload  # noqa
 def push_scope():
-    # type: () -> ContextManager[Scope]
+    
     pass
 
 
 @overload  # noqa
 def push_scope(callback):
-    # type: (Callable[[Scope], None]) -> None
+    
     pass
 
 
@@ -136,7 +136,7 @@ def flush(timeout=None, callback=None):
 
 @hubmethod
 def last_event_id():
-    # type: () -> Optional[str]
+    
     hub = Hub.current
     if hub is not None:
         return hub.last_event_id()

@@ -1,4 +1,4 @@
-from django.template import TemplateSyntaxError  # type: ignore
+from django.template import TemplateSyntaxError  #type: ignore
 
 if False:
     from typing import Any
@@ -7,25 +7,25 @@ if False:
 
 try:
     # support Django 1.9
-    from django.template.base import Origin  # type: ignore
+    from django.template.base import Origin  #type: ignore
 except ImportError:
     # backward compatibility
-    from django.template.loader import LoaderOrigin as Origin  # type: ignore
+    from django.template.loader import LoaderOrigin as Origin  #type: ignore
 
 
 def get_template_frame_from_exception(exc_value):
-    # type: (Optional[BaseException]) -> Optional[Dict[str, Any]]
+    
 
     # As of Django 1.9 or so the new template debug thing showed up.
     if hasattr(exc_value, "template_debug"):
-        return _get_template_frame_from_debug(exc_value.template_debug)  # type: ignore
+        return _get_template_frame_from_debug(exc_value.template_debug)  
 
     # As of r16833 (Django) all exceptions may contain a
     # ``django_template_source`` attribute (rather than the legacy
     # ``TemplateSyntaxError.source`` check)
     if hasattr(exc_value, "django_template_source"):
         return _get_template_frame_from_source(
-            exc_value.django_template_source  # type: ignore
+            exc_value.django_template_source  
         )
 
     if isinstance(exc_value, TemplateSyntaxError) and hasattr(exc_value, "source"):
@@ -37,7 +37,7 @@ def get_template_frame_from_exception(exc_value):
 
 
 def _get_template_frame_from_debug(debug):
-    # type: (Dict[str, Any]) -> Dict[str, Any]
+    
     if debug is None:
         return None
 
