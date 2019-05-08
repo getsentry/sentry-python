@@ -427,6 +427,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         for item in scope._span.iter_headers():
             yield item
 
+    @property
+    def shell_active(self):
+        # type: () -> Boolean
+        """Knowledge that we want to exclude errors when the shell is open."""
+        return self.client.options['is_shell_active']
+
 
 GLOBAL_HUB = Hub()
 _local.set(GLOBAL_HUB)

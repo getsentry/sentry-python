@@ -23,7 +23,7 @@ def _make_excepthook(old_excepthook):
         hub = Hub.current
         integration = hub.get_integration(ExcepthookIntegration)
 
-        if integration is not None and _should_send():
+        if integration is not None and _should_send(hub.shell_active):
             with capture_internal_exceptions():
                 event, hint = event_from_exception(
                     (exctype, value, traceback),
@@ -37,7 +37,10 @@ def _make_excepthook(old_excepthook):
     return sentry_sdk_excepthook
 
 
-def _should_send():
+def _should_send(shell_active):
+    if shell_active:
+        return True
+
     if hasattr(sys, "ps1"):
         # Disable the excepthook for interactive Python shells, otherwise
         # every typo gets sent to Sentry.

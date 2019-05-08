@@ -38,6 +38,7 @@ if False:
             "attach_stacktrace": bool,
             "ca_certs": Optional[str],
             "propagate_traces": bool,
+            "is_shell_active": bool
         },
         total=False,
     )
@@ -71,6 +72,7 @@ DEFAULT_OPTIONS = {
     "attach_stacktrace": False,
     "ca_certs": None,
     "propagate_traces": True,
+    "is_shell_active": False,
 }
 
 
