@@ -431,7 +431,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def shell_active(self):
         # type: () -> bool
         """Knowledge that we want to exclude errors when the shell is open."""
-        return self.client.options['is_shell_active']
+        return self.client.options['debug']
 
 
 GLOBAL_HUB = Hub()
