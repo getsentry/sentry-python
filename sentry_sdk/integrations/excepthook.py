@@ -19,7 +19,7 @@ class ExcepthookIntegration(Integration):
         if not isinstance(always_run, bool):
             raise ValueError(
                 "Invalid value for always_run: %s (must be type boolean)"
-                % (always_run)
+                % (always_run,)
             )
         self.always_run = always_run
 
