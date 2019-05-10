@@ -1,3 +1,7 @@
+## 0.7.15
+
+* Add the always_run option in excepthook integration.
+
 ## 0.7.14
 
 * Fix crash when using Celery integration (`TypeError` when using
