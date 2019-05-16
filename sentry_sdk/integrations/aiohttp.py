@@ -6,10 +6,23 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+    HAS_REAL_CONTEXTVARS,
+)
 
 import asyncio
-from aiohttp.web import Application, HTTPException
+from aiohttp.web import Application, HTTPException  # type: ignore
+
+if False:
+    from aiohttp.web_request import Request  # type: ignore
+    from typing import Any
+    from typing import Dict
+    from typing import Tuple
+    from typing import Callable
+
+    from sentry_sdk.utils import ExcInfo
 
 
 class AioHttpIntegration(Integration):
@@ -17,11 +30,13 @@ class AioHttpIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        if sys.version_info < (3, 7):
+        # type: () -> None
+        if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between
             # requests.
             raise RuntimeError(
-                "The aiohttp integration for Sentry requires Python 3.7+"
+                "The aiohttp integration for Sentry requires Python 3.7+ "
+                " or aiocontextvars package"
             )
 
         ignore_logger("aiohttp.server")
@@ -29,7 +44,9 @@ class AioHttpIntegration(Integration):
         old_handle = Application._handle
 
         async def sentry_app_handle(self, request, *args, **kwargs):
+            # type: (Any, Request, *Any, **Any) -> Any
             async def inner():
+                # type: () -> Any
                 hub = Hub.current
                 if hub.get_integration(AioHttpIntegration) is None:
                     return await old_handle(self, request, *args, **kwargs)
@@ -38,6 +55,7 @@ class AioHttpIntegration(Integration):
 
                 with Hub(Hub.current) as hub:
                     with hub.configure_scope() as scope:
+                        scope.clear_breadcrumbs()
                         scope.add_event_processor(_make_request_processor(weak_request))
 
                     try:
@@ -49,13 +67,21 @@ class AioHttpIntegration(Integration):
 
                     return response
 
-            return await asyncio.create_task(inner())
+            # Explicitly wrap in task such that current contextvar context is
+            # copied. Just doing `return await inner()` will leak scope data
+            # between requests.
+            return await asyncio.get_event_loop().create_task(inner())
 
         Application._handle = sentry_app_handle
 
 
 def _make_request_processor(weak_request):
-    def aiohttp_processor(event, hint):
+    # type: (Callable[[], Request]) -> Callable
+    def aiohttp_processor(
+        event,  # type: Dict[str, Any]
+        hint,  # type: Dict[str, Tuple[type, BaseException, Any]]
+    ):
+        # type: (...) -> Dict[str, Any]
         request = weak_request()
         if request is None:
             return event
@@ -83,10 +109,11 @@ def _make_request_processor(weak_request):
 
 
 def _capture_exception(hub):
+    # type: (Hub) -> ExcInfo
     exc_info = sys.exc_info()
     event, hint = event_from_exception(
         exc_info,
-        client_options=hub.client.options,
+        client_options=hub.client.options,  # type: ignore
         mechanism={"type": "aiohttp", "handled": False},
     )
     hub.capture_event(event, hint=hint)

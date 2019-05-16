@@ -12,6 +12,12 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.integrations import Integration
 
+if False:
+    from logging import LogRecord
+    from typing import Any
+    from typing import Dict
+    from typing import Optional
+
 DEFAULT_LEVEL = logging.INFO
 DEFAULT_EVENT_LEVEL = logging.ERROR
 
@@ -19,6 +25,7 @@ _IGNORED_LOGGERS = set(["sentry_sdk.errors"])
 
 
 def ignore_logger(name):
+    # type: (str) -> None
     """This disables the breadcrumb integration for a logger of a specific
     name.  This primary use is for some integrations to disable breadcrumbs
     of this integration.
@@ -30,6 +37,7 @@ class LoggingIntegration(Integration):
     identifier = "logging"
 
     def __init__(self, level=DEFAULT_LEVEL, event_level=DEFAULT_EVENT_LEVEL):
+        # type: (int, int) -> None
         self._handler = None
         self._breadcrumb_handler = None
 
@@ -40,6 +48,7 @@ class LoggingIntegration(Integration):
             self._handler = EventHandler(level=event_level)
 
     def _handle_record(self, record):
+        # type: (LogRecord) -> None
         if self._handler is not None and record.levelno >= self._handler.level:
             self._handler.handle(record)
 
@@ -51,9 +60,11 @@ class LoggingIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        old_callhandlers = logging.Logger.callHandlers
+        # type: () -> None
+        old_callhandlers = logging.Logger.callHandlers  # type: ignore
 
         def sentry_patched_callhandlers(self, record):
+            # type: (Any, LogRecord) -> Any
             try:
                 return old_callhandlers(self, record)
             finally:
@@ -66,14 +77,16 @@ class LoggingIntegration(Integration):
                     if integration is not None:
                         integration._handle_record(record)
 
-        logging.Logger.callHandlers = sentry_patched_callhandlers
+        logging.Logger.callHandlers = sentry_patched_callhandlers  # type: ignore
 
 
 def _can_record(record):
+    # type: (LogRecord) -> bool
     return record.name not in _IGNORED_LOGGERS
 
 
 def _breadcrumb_from_record(record):
+    # type: (LogRecord) -> Dict[str, Any]
     return {
         "ty": "log",
         "level": _logging_to_event_level(record.levelname),
@@ -85,6 +98,7 @@ def _breadcrumb_from_record(record):
 
 
 def _logging_to_event_level(levelname):
+    # type: (str) -> str
     return {"critical": "fatal"}.get(levelname.lower(), levelname.lower())
 
 
@@ -92,7 +106,6 @@ COMMON_RECORD_ATTRS = frozenset(
     (
         "args",
         "created",
-        "data",
         "exc_info",
         "exc_text",
         "filename",
@@ -119,6 +132,7 @@ COMMON_RECORD_ATTRS = frozenset(
 
 
 def _extra_from_record(record):
+    # type: (LogRecord) -> Dict[str, None]
     return {
         k: v
         for k, v in vars(record).items()
@@ -128,40 +142,47 @@ def _extra_from_record(record):
 
 class EventHandler(logging.Handler, object):
     def emit(self, record):
+        # type: (LogRecord) -> Any
         with capture_internal_exceptions():
             self.format(record)
             return self._emit(record)
 
     def _emit(self, record):
+        # type: (LogRecord) -> None
         if not _can_record(record):
             return
 
         hub = Hub.current
-        integration = hub.get_integration(LoggingIntegration)
-        if integration is None:
+        if hub.client is None:
             return
+
+        hint = None  # type: Optional[Dict[str, Any]]
+        client_options = hub.client.options
 
         # exc_info might be None or (None, None, None)
         if record.exc_info is not None and record.exc_info[0] is not None:
             event, hint = event_from_exception(
                 record.exc_info,
-                client_options=hub.client.options,
+                client_options=client_options,
                 mechanism={"type": "logging", "handled": True},
             )
         elif record.exc_info and record.exc_info[0] is None:
             event = {}
             hint = None
             with capture_internal_exceptions():
-                event["threads"] = [
-                    {
-                        "stacktrace": current_stacktrace(),
-                        "crashed": False,
-                        "current": True,
-                    }
-                ]
+                event["threads"] = {
+                    "values": [
+                        {
+                            "stacktrace": current_stacktrace(
+                                client_options["with_locals"]
+                            ),
+                            "crashed": False,
+                            "current": True,
+                        }
+                    ]
+                }
         else:
             event = {}
-            hint = None
 
         event["level"] = _logging_to_event_level(record.levelname)
         event["logger"] = record.name
@@ -177,17 +198,16 @@ SentryHandler = EventHandler
 
 class BreadcrumbHandler(logging.Handler, object):
     def emit(self, record):
+        # type: (LogRecord) -> Any
         with capture_internal_exceptions():
             self.format(record)
             return self._emit(record)
 
     def _emit(self, record):
+        # type: (LogRecord) -> None
         if not _can_record(record):
             return
 
-        hub = Hub.current
-        integration = hub.get_integration(LoggingIntegration)
-        if integration is None:
-            return
-
-        hub.add_breadcrumb(_breadcrumb_from_record(record), hint={"log_record": record})
+        Hub.current.add_breadcrumb(
+            _breadcrumb_from_record(record), hint={"log_record": record}
+        )

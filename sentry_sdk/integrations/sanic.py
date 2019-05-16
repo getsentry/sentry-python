@@ -4,15 +4,30 @@ from inspect import isawaitable
 
 from sentry_sdk._compat import urlparse, reraise
 from sentry_sdk.hub import Hub
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+    HAS_REAL_CONTEXTVARS,
+)
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
 
-from sanic import Sanic
-from sanic.exceptions import SanicException
-from sanic.router import Router
-from sanic.handlers import ErrorHandler
+from sanic import Sanic, __version__ as VERSION  # type: ignore
+from sanic.exceptions import SanicException  # type: ignore
+from sanic.router import Router  # type: ignore
+from sanic.handlers import ErrorHandler  # type: ignore
+
+if False:
+    from sanic.request import Request  # type: ignore
+
+    from typing import Any
+    from typing import Callable
+    from typing import Dict
+    from typing import Optional
+    from typing import Union
+    from typing import Tuple
+    from sanic.request import RequestParameters
 
 
 class SanicIntegration(Integration):
@@ -20,21 +35,31 @@ class SanicIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        if sys.version_info < (3, 7):
-            # Sanic is async. We better have contextvars or we're going to leak
-            # state between requests.
-            raise RuntimeError("The sanic integration for Sentry requires Python 3.7+")
+        # type: () -> None
+        if not HAS_REAL_CONTEXTVARS:
+            # We better have contextvars or we're going to leak state between
+            # requests.
+            raise RuntimeError(
+                "The sanic integration for Sentry requires Python 3.7+ "
+                " or aiocontextvars package"
+            )
 
-        # Sanic 0.8 and older creates a logger named "root" and puts a
-        # stringified version of every exception in there (without exc_info),
-        # which our error deduplication can't detect.
-        #
-        # https://github.com/huge-success/sanic/issues/1332
-        ignore_logger("root")
+        if VERSION.startswith("0.8."):
+            # Sanic 0.8 and older creates a logger named "root" and puts a
+            # stringified version of every exception in there (without exc_info),
+            # which our error deduplication can't detect.
+            #
+            # We explicitly check the version here because it is a very
+            # invasive step to ignore this logger and not necessary in newer
+            # versions at all.
+            #
+            # https://github.com/huge-success/sanic/issues/1332
+            ignore_logger("root")
 
         old_handle_request = Sanic.handle_request
 
         async def sentry_handle_request(self, request, *args, **kwargs):
+            # type: (Any, Request, *Any, **Any) -> Any
             hub = Hub.current
             if hub.get_integration(SanicIntegration) is None:
                 return old_handle_request(self, request, *args, **kwargs)
@@ -43,6 +68,7 @@ class SanicIntegration(Integration):
 
             with Hub(hub) as hub:
                 with hub.configure_scope() as scope:
+                    scope.clear_breadcrumbs()
                     scope.add_event_processor(_make_request_processor(weak_request))
 
                 response = old_handle_request(self, request, *args, **kwargs)
@@ -56,6 +82,7 @@ class SanicIntegration(Integration):
         old_router_get = Router.get
 
         def sentry_router_get(self, request):
+            # type: (Any, Request) -> Any
             rv = old_router_get(self, request)
             hub = Hub.current
             if hub.get_integration(SanicIntegration) is not None:
@@ -69,6 +96,7 @@ class SanicIntegration(Integration):
         old_error_handler_lookup = ErrorHandler.lookup
 
         def sentry_error_handler_lookup(self, exception):
+            # type: (Any, Exception) -> Optional[Callable]
             _capture_exception(exception)
             old_error_handler = old_error_handler_lookup(self, exception)
 
@@ -79,12 +107,16 @@ class SanicIntegration(Integration):
                 return old_error_handler
 
             async def sentry_wrapped_error_handler(request, exception):
+                # type: (Request, Exception) -> Any
                 try:
                     response = old_error_handler(request, exception)
                     if isawaitable(response):
                         response = await response
                     return response
                 except Exception:
+                    # Report errors that occur in Sanic error handler. These
+                    # exceptions will not even show up in Sanic's
+                    # `sanic.exceptions` logger.
                     exc_info = sys.exc_info()
                     _capture_exception(exc_info)
                     reraise(*exc_info)
@@ -95,9 +127,7 @@ class SanicIntegration(Integration):
 
 
 def _capture_exception(exception):
-    if isinstance(exception, SanicException):
-        return
-
+    # type: (Union[Tuple[Optional[type], Optional[BaseException], Any], BaseException]) -> None
     hub = Hub.current
     integration = hub.get_integration(SanicIntegration)
     if integration is None:
@@ -113,7 +143,16 @@ def _capture_exception(exception):
 
 
 def _make_request_processor(weak_request):
+    # type: (Callable[[], Request]) -> Callable
     def sanic_processor(event, hint):
+        # type: (Dict[str, Any], Dict[str, Any]) -> Optional[Dict[str, Any]]
+
+        try:
+            if issubclass(hint["exc_info"][0], SanicException):
+                return None
+        except KeyError:
+            pass
+
         request = weak_request()
         if request is None:
             return event
@@ -143,6 +182,7 @@ def _make_request_processor(weak_request):
 
 class SanicRequestExtractor(RequestExtractor):
     def content_length(self):
+        # type: () -> int
         if self.request.body is None:
             return 0
         return len(self.request.body)
@@ -151,18 +191,22 @@ class SanicRequestExtractor(RequestExtractor):
         return dict(self.request.cookies)
 
     def raw_data(self):
+        # type: () -> bytes
         return self.request.body
 
     def form(self):
+        # type: () -> RequestParameters
         return self.request.form
 
     def is_json(self):
         raise NotImplementedError()
 
     def json(self):
+        # type: () -> Optional[Any]
         return self.request.json
 
     def files(self):
+        # type: () -> RequestParameters
         return self.request.files
 
     def size_of_file(self, file):

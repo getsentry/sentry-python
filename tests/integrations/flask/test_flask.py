@@ -214,6 +214,28 @@ def test_flask_large_json_request(sentry_init, capture_events, app):
     assert len(event["request"]["data"]["foo"]["bar"]) == 512
 
 
+@pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
+def test_flask_empty_json_request(sentry_init, capture_events, app, data):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
+    @app.route("/", methods=["POST"])
+    def index():
+        assert request.json == data
+        assert request.data == json.dumps(data).encode("ascii")
+        assert not request.form
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.post("/", content_type="application/json", data=json.dumps(data))
+    assert response.status_code == 200
+
+    event, = events
+    assert event["request"]["data"] == data
+
+
 def test_flask_medium_formdata_request(sentry_init, capture_events, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
@@ -448,7 +470,7 @@ def test_error_in_errorhandler(sentry_init, capture_events, app):
     exception, = event1["exception"]["values"]
     assert exception["type"] == "ValueError"
 
-    exception = event2["exception"]["values"][0]
+    exception = event2["exception"]["values"][-1]
     assert exception["type"] == "ZeroDivisionError"
 
 
@@ -507,3 +529,28 @@ def test_scoped_test_client(sentry_init, app):
     with app.test_client() as client:
         response = client.get("/")
         assert response.status_code == 200
+
+
+@pytest.mark.parametrize("exc_cls", [ZeroDivisionError, Exception])
+def test_errorhandler_for_exception_swallows_exception(
+    sentry_init, app, capture_events, exc_cls
+):
+    # In contrast to error handlers for a status code, error
+    # handlers for exceptions can swallow the exception (this is
+    # just how the Flask signal works)
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    events = capture_events()
+
+    @app.route("/")
+    def index():
+        1 / 0
+
+    @app.errorhandler(exc_cls)
+    def zerodivision(e):
+        return "ok"
+
+    with app.test_client() as client:
+        response = client.get("/")
+        assert response.status_code == 200
+
+    assert not events

@@ -1,3 +1,5 @@
+import sys
+
 import random
 import asyncio
 
@@ -112,7 +114,7 @@ def test_error_in_errorhandler(sentry_init, app, capture_events):
         for frame in exception["stacktrace"]["frames"]
     )
 
-    exception = event2["exception"]["values"][0]
+    exception = event2["exception"]["values"][-1]
     assert exception["type"] == "ZeroDivisionError"
     assert any(
         frame["filename"].endswith("test_sanic.py")
@@ -140,7 +142,9 @@ def test_concurrency(sentry_init, app):
 
         await app.handle_request(
             request.Request(
-                url_bytes=f"http://localhost/context-check/{i}".encode("ascii"),
+                url_bytes="http://localhost/context-check/{i}".format(i=i).encode(
+                    "ascii"
+                ),
                 headers={},
                 version="1.1",
                 method="GET",
@@ -156,7 +160,12 @@ def test_concurrency(sentry_init, app):
     async def runner():
         await asyncio.gather(*(task(i) for i in range(1000)))
 
-    asyncio.run(runner())
+    if sys.version_info < (3, 7):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(runner())
+    else:
+        asyncio.run(runner())
 
     with configure_scope() as scope:
         assert not scope._tags

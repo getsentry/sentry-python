@@ -1,9 +1,9 @@
-import sys
 import weakref
 from inspect import iscoroutinefunction
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import (
+    HAS_REAL_CONTEXTVARS,
     event_from_exception,
     capture_internal_exceptions,
     transaction_from_function,
@@ -16,8 +16,15 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.logging import ignore_logger
 
-from tornado.web import RequestHandler, HTTPError
-from tornado.gen import coroutine
+from tornado.web import RequestHandler, HTTPError  # type: ignore
+from tornado.gen import coroutine  # type: ignore
+
+if False:
+    from typing import Any
+    from typing import List
+    from typing import Optional
+    from typing import Dict
+    from typing import Callable
 
 
 class TornadoIntegration(Integration):
@@ -25,17 +32,18 @@ class TornadoIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        import tornado
+        # type: () -> None
+        import tornado  # type: ignore
 
         tornado_version = getattr(tornado, "version_info", None)
         if tornado_version is None or tornado_version < (5, 0):
             raise RuntimeError("Tornado 5+ required")
 
-        if sys.version_info < (3, 7):
+        if not HAS_REAL_CONTEXTVARS:
             # Tornado is async. We better have contextvars or we're going to leak
             # state between requests.
             raise RuntimeError(
-                "The tornado integration for Sentry requires Python 3.7+"
+                "The tornado integration for Sentry requires Python 3.6+ or the aiocontextvars package"
             )
 
         ignore_logger("tornado.application")
@@ -49,6 +57,7 @@ class TornadoIntegration(Integration):
             # Starting Tornado 6 RequestHandler._execute method is a standard Python coroutine (async/await)
             # In that case our method should be a coroutine function too
             async def sentry_execute_request_handler(self, *args, **kwargs):
+                # type: (Any, *List, **Any) -> Any
                 hub = Hub.current
                 integration = hub.get_integration(TornadoIntegration)
                 if integration is None:
@@ -58,12 +67,13 @@ class TornadoIntegration(Integration):
 
                 with Hub(hub) as hub:
                     with hub.configure_scope() as scope:
+                        scope.clear_breadcrumbs()
                         scope.add_event_processor(_make_event_processor(weak_handler))
                     return await old_execute(self, *args, **kwargs)
 
         else:
 
-            @coroutine
+            @coroutine  # type: ignore
             def sentry_execute_request_handler(self, *args, **kwargs):
                 hub = Hub.current
                 integration = hub.get_integration(TornadoIntegration)
@@ -83,6 +93,7 @@ class TornadoIntegration(Integration):
         old_log_exception = RequestHandler.log_exception
 
         def sentry_log_exception(self, ty, value, tb, *args, **kwargs):
+            # type: (Any, type, BaseException, Any, *Any, **Any) -> Optional[Any]
             _capture_exception(ty, value, tb)
             return old_log_exception(self, ty, value, tb, *args, **kwargs)
 
@@ -90,6 +101,7 @@ class TornadoIntegration(Integration):
 
 
 def _capture_exception(ty, value, tb):
+    # type: (type, BaseException, Any) -> None
     hub = Hub.current
     if hub.get_integration(TornadoIntegration) is None:
         return
@@ -106,7 +118,9 @@ def _capture_exception(ty, value, tb):
 
 
 def _make_event_processor(weak_handler):
+    # type: (Callable[[], RequestHandler]) -> Callable
     def tornado_processor(event, hint):
+        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         handler = weak_handler()
         if handler is None:
             return event
@@ -145,24 +159,32 @@ def _make_event_processor(weak_handler):
 
 class TornadoRequestExtractor(RequestExtractor):
     def content_length(self):
+        # type: () -> int
         if self.request.body is None:
             return 0
         return len(self.request.body)
 
     def cookies(self):
-        return dict(self.request.cookies)
+        # type: () -> Dict
+        return {k: v.value for k, v in self.request.cookies.items()}
 
     def raw_data(self):
+        # type: () -> bytes
         return self.request.body
 
     def form(self):
-        # TODO: Where to get formdata and nothing else?
-        return None
+        # type: () -> Optional[Any]
+        return {
+            k: [v.decode("latin1", "replace") for v in vs]
+            for k, vs in self.request.body_arguments.items()
+        }
 
     def is_json(self):
+        # type: () -> bool
         return _is_json_content_type(self.request.headers.get("content-type"))
 
     def files(self):
+        # type: () -> Dict
         return {k: v[0] for k, v in self.request.files.items() if v}
 
     def size_of_file(self, file):

@@ -1,11 +1,15 @@
+import threading
+
 import pytest
 
 pytest.importorskip("celery")
 
-from sentry_sdk import Hub
+from sentry_sdk import Hub, configure_scope
 from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.tracing import SpanContext
 
 from celery import Celery, VERSION
+from celery.bin import worker
 
 
 @pytest.fixture
@@ -19,10 +23,13 @@ def connect_signal(request):
 
 @pytest.fixture
 def init_celery(sentry_init):
-    def inner():
-        sentry_init(integrations=[CeleryIntegration()])
+    def inner(propagate_traces=True):
+        sentry_init(integrations=[CeleryIntegration(propagate_traces=propagate_traces)])
         celery = Celery(__name__)
-        celery.conf.CELERY_ALWAYS_EAGER = True
+        if VERSION < (4,):
+            celery.conf.CELERY_ALWAYS_EAGER = True
+        else:
+            celery.conf.task_always_eager = True
         return celery
 
     return inner
@@ -33,7 +40,22 @@ def celery(init_celery):
     return init_celery()
 
 
-def test_simple(capture_events, celery):
+@pytest.mark.parametrize(
+    "invocation,expected_context",
+    [
+        [lambda task, x, y: task.delay(x, y), {"args": [1, 0], "kwargs": {}}],
+        [lambda task, x, y: task.apply_async((x, y)), {"args": [1, 0], "kwargs": {}}],
+        [
+            lambda task, x, y: task.apply_async(args=(x, y)),
+            {"args": [1, 0], "kwargs": {}},
+        ],
+        [
+            lambda task, x, y: task.apply_async(kwargs=dict(x=x, y=y)),
+            {"args": [], "kwargs": {"x": 1, "y": 0}},
+        ],
+    ],
+)
+def test_simple(capture_events, celery, invocation, expected_context):
     events = capture_events()
 
     @celery.task(name="dummy_task")
@@ -41,20 +63,45 @@ def test_simple(capture_events, celery):
         foo = 42  # noqa
         return x / y
 
-    dummy_task.delay(1, 2)
-    dummy_task.delay(1, 0)
+    span_context = SpanContext.start_trace()
+    with configure_scope() as scope:
+        scope.set_span_context(span_context)
+
+    invocation(dummy_task, 1, 2)
+    invocation(dummy_task, 1, 0)
+
     event, = events
+    assert event["contexts"]["trace"]["trace_id"] == span_context.trace_id
+    assert event["contexts"]["trace"]["span_id"] != span_context.span_id
     assert event["transaction"] == "dummy_task"
-    assert event["extra"]["celery-job"] == {
-        "args": [1, 0],
-        "kwargs": {},
-        "task_name": "dummy_task",
-    }
+    assert event["extra"]["celery-job"] == dict(
+        task_name="dummy_task", **expected_context
+    )
 
     exception, = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
     assert exception["mechanism"]["type"] == "celery"
     assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
+
+
+def test_simple_no_propagation(capture_events, init_celery):
+    celery = init_celery(propagate_traces=False)
+    events = capture_events()
+
+    @celery.task(name="dummy_task")
+    def dummy_task():
+        1 / 0
+
+    span_context = SpanContext.start_trace()
+    with configure_scope() as scope:
+        scope.set_span_context(span_context)
+    dummy_task.delay()
+
+    event, = events
+    assert event["contexts"]["trace"]["trace_id"] != span_context.trace_id
+    assert event["transaction"] == "dummy_task"
+    exception, = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
 
 
 def test_ignore_expected(capture_events, celery):
@@ -92,11 +139,11 @@ def test_broken_prerun(init_celery, connect_signal):
         stack_lengths.append(len(Hub.current._stack))
         return x / y
 
-    try:
+    if VERSION >= (4,):
         dummy_task.delay(2, 2)
-    except ZeroDivisionError:
-        if VERSION >= (4,):
-            raise
+    else:
+        with pytest.raises(ZeroDivisionError):
+            dummy_task.delay(2, 2)
 
     assert len(Hub.current._stack) == 1
     if VERSION < (4,):
@@ -105,8 +152,9 @@ def test_broken_prerun(init_celery, connect_signal):
         assert stack_lengths == [2, 2]
 
 
-@pytest.mark.skipif(
-    (4, 2, 0) <= VERSION < (4, 2, 2),
+@pytest.mark.xfail(
+    (4, 2, 0) <= VERSION,
+    strict=True,
     reason="https://github.com/celery/celery/issues/4661",
 )
 def test_retry(celery, capture_events):
@@ -139,3 +187,41 @@ def test_retry(celery, capture_events):
 
     for e in exceptions:
         assert e["type"] == "ZeroDivisionError"
+
+
+@pytest.mark.skipif(VERSION < (4,), reason="in-memory backend broken")
+def test_transport_shutdown(request, celery, capture_events_forksafe, tmpdir):
+    events = capture_events_forksafe()
+
+    celery.conf.worker_max_tasks_per_child = 1
+    celery.conf.broker_url = "memory://localhost/"
+    celery.conf.broker_backend = "memory"
+    celery.conf.result_backend = "file://{}".format(tmpdir.mkdir("celery-results"))
+    celery.conf.task_always_eager = False
+
+    runs = []
+
+    @celery.task(name="dummy_task", bind=True)
+    def dummy_task(self):
+        runs.append(1)
+        1 / 0
+
+    res = dummy_task.delay()
+
+    w = worker.worker(app=celery)
+    t = threading.Thread(target=w.run)
+    t.daemon = True
+    t.start()
+
+    with pytest.raises(Exception):
+        # Celery 4.1 raises a gibberish exception
+        res.wait()
+
+    event = events.read_event()
+    exception, = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+
+    events.read_flush()
+
+    # if this is nonempty, the worker never really forked
+    assert not runs

@@ -1,13 +1,13 @@
 from __future__ import absolute_import
 
-import platform
 import threading
 
 import pytest
+import json
 
 from werkzeug.test import Client
 from django.core.management import execute_from_command_line
-from django.db.utils import OperationalError
+from django.db.utils import OperationalError, ProgrammingError, DataError
 
 
 try:
@@ -36,7 +36,7 @@ def django_clear_caches():
 
 @pytest.fixture(autouse=True)
 def setup_app_tables(request):
-    if request.node.get_closest_marker('django_db') is None:
+    if request.node.get_closest_marker("django_db") is None:
         return
 
     # Honestly no idea why pytest-django does not do this
@@ -217,59 +217,103 @@ def test_sql_queries(request, sentry_init, capture_events):
     capture_message("HI")
 
     event, = events
-    assert event['message'] == 'HI'
+    assert event["message"] == "HI"
     crumb, = event["breadcrumbs"]
     assert crumb["message"] == """SELECT count(*) FROM people_person WHERE foo = 123"""
 
 
 @pytest.mark.django_db(transaction=True)
 def test_sql_dict_query_params(sentry_init, capture_events):
-    from django.db import connection
-
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
 
-    sql = connection.cursor()
+    from django.db import connections
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    sql = connections["postgres"].cursor()
 
     events = capture_events()
-    with pytest.raises(OperationalError):
-        # This really only works with postgres. sqlite will crash with syntax error
+    with pytest.raises(ProgrammingError):
         sql.execute(
             """SELECT count(*) FROM people_person WHERE foo = %(my_foo)s""",
             {"my_foo": 10},
         )
 
     capture_message("HI")
-
     event, = events
 
     crumb, = event["breadcrumbs"]
     assert crumb["message"] == ("SELECT count(*) FROM people_person WHERE foo = 10")
 
 
-@pytest.mark.skipif(
-    platform.python_implementation() == "PyPy", reason="psycopg broken on pypy"
+@pytest.mark.parametrize(
+    "query",
+    [
+        lambda sql: sql.SQL("SELECT %(my_param)s FROM {mytable}").format(
+            mytable=sql.Identifier("foobar")
+        ),
+        lambda sql: sql.SQL('SELECT %(my_param)s FROM "foobar"'),
+    ],
 )
-@pytest.mark.django_db(transaction=True)
-def test_sql_psycopg2_string_composition(sentry_init, capture_events):
+@pytest.mark.django_db
+def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
-    from django.db import connection
-    from psycopg2 import sql as psycopg2_sql
+    from django.db import connections
 
-    sql = connection.cursor()
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    import psycopg2.sql
+
+    sql = connections["postgres"].cursor()
 
     events = capture_events()
-    with pytest.raises(TypeError):
-        # crashes because we use sqlite
-        sql.execute(
-            psycopg2_sql.SQL("SELECT %(my_param)s FROM people_person"), {"my_param": 10}
-        )
+    with pytest.raises(ProgrammingError):
+        sql.execute(query(psycopg2.sql), {"my_param": 10})
 
     capture_message("HI")
 
     event, = events
-
     crumb, = event["breadcrumbs"]
-    assert crumb["message"] == ("SELECT 10 FROM people_person")
+    assert crumb["message"] == ('SELECT 10 FROM "foobar"')
+
+
+@pytest.mark.django_db
+def test_sql_psycopg2_placeholders(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    from django.db import connections
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    import psycopg2.sql
+
+    sql = connections["postgres"].cursor()
+
+    events = capture_events()
+    with pytest.raises(DataError):
+        names = ["foo", "bar"]
+        identifiers = [psycopg2.sql.Identifier(name) for name in names]
+        placeholders = [
+            psycopg2.sql.Placeholder(var) for var in ["first_var", "second_var"]
+        ]
+        sql.execute("create table my_test_table (foo text, bar date)")
+
+        query = psycopg2.sql.SQL("insert into my_test_table ({}) values ({})").format(
+            psycopg2.sql.SQL(", ").join(identifiers),
+            psycopg2.sql.SQL(", ").join(placeholders),
+        )
+        sql.execute(query, {"first_var": "fizz", "second_var": "not a date"})
+
+    capture_message("HI")
+
+    event, = events
+    crumb1, crumb2 = event["breadcrumbs"]
+    assert crumb1["message"] == ("create table my_test_table (foo text, bar date)")
+    assert crumb2["message"] == (
+        """insert into my_test_table ("foo", "bar") values ('fizz', 'not a date')"""
+    )
 
 
 @pytest.mark.django_db(transaction=True)
@@ -360,7 +404,8 @@ def test_template_exception(sentry_init, client, capture_events):
     assert status.lower() == "500 internal server error"
 
     event, = events
-    exception = event["exception"]["values"][0]
+    exception = event["exception"]["values"][-1]
+    assert exception["type"] == "TemplateSyntaxError"
 
     frames = [
         f
@@ -376,3 +421,77 @@ def test_template_exception(sentry_init, client, capture_events):
     assert template_frame["lineno"] == 10
     assert template_frame["in_app"]
     assert template_frame["filename"].endswith("error.html")
+
+    filenames = [
+        (f.get("function"), f.get("module")) for f in exception["stacktrace"]["frames"]
+    ]
+    assert filenames[-3:] == [
+        (u"parse", u"django.template.base"),
+        (None, None),
+        (u"invalid_block_tag", u"django.template.base"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "type,event_request",
+    [
+        [
+            "json",
+            {
+                "cookies": {},
+                "data": {"foo": "bar"},
+                "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
+                "headers": {
+                    "Content-Length": "14",
+                    "Content-Type": "application/json",
+                    "Host": "localhost",
+                },
+                "method": "POST",
+                "query_string": "",
+                "url": "http://localhost/rest-framework-exc",
+            },
+        ],
+        [
+            "formdata",
+            {
+                "cookies": {},
+                "data": {"foo": "bar"},
+                "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
+                "headers": {
+                    "Content-Length": "7",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Host": "localhost",
+                },
+                "method": "POST",
+                "query_string": "",
+                "url": "http://localhost/rest-framework-exc",
+            },
+        ],
+    ],
+)
+def test_rest_framework_basic(
+    sentry_init, client, capture_events, capture_exceptions, type, event_request
+):
+    pytest.importorskip("rest_framework")
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    exceptions = capture_exceptions()
+    events = capture_events()
+
+    if type == "json":
+        client.post(
+            reverse("rest_framework_exc"),
+            data=json.dumps({"foo": "bar"}),
+            content_type="application/json",
+        )
+    elif type == "formdata":
+        client.post(reverse("rest_framework_exc"), data={"foo": "bar"})
+    else:
+        assert False
+
+    error, = exceptions
+    assert isinstance(error, ZeroDivisionError)
+
+    event, = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "django"
+
+    assert event["request"] == event_request

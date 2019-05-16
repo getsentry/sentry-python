@@ -32,5 +32,13 @@ urlpatterns = [
     path("template-exc", views.template_exc, name="template_exc"),
 ]
 
+
+try:
+    urlpatterns.append(
+        path("rest-framework-exc", views.rest_framework_exc, name="rest_framework_exc")
+    )
+except AttributeError:
+    pass
+
 handler500 = views.handler500
 handler404 = views.handler404

@@ -7,9 +7,35 @@
 # sentry-python - Sentry SDK for Python
 
 [![Build Status](https://travis-ci.com/getsentry/sentry-python.svg?branch=master)](https://travis-ci.com/getsentry/sentry-python)
+[![PyPi page link -- version](https://img.shields.io/pypi/v/sentry-sdk.svg)](https://pypi.python.org/pypi/sentry-sdk)
 
-- [Documentation](https://docs.sentry.io/quickstart/?platform=python)
-- [API Reference](https://getsentry.github.io/sentry-python/)
+This is the next line of the Python SDK for [Sentry](http://sentry.io/), intended to replace the `raven` package on PyPI.
+
+```python
+from sentry_sdk import init, capture_message
+
+init("mydsn@sentry.io/123")
+
+capture_message("Hello World")  # Will create an event.
+
+raise ValueError()  # Will also create an event.
+```
+
+To learn more about how to use the SDK:
+
+- [Getting started with the new SDK](https://docs.sentry.io/quickstart/?platform=python)
+- [Configuration options](https://docs.sentry.io/error-reporting/configuration/?platform=python)
+- [Setting context (tags, user, extra information)](https://docs.sentry.io/enriching-error-data/context/?platform=python)
+- [Integrations](https://docs.sentry.io/platforms/python/)
+
+Are you coming from raven-python?
+
+- [Cheatsheet: Migrating to the new SDK from Raven](https://forum.sentry.io/t/switching-to-sentry-python/4733)
+
+To learn about internals:
+
+- [API Reference (using pdoc)](https://getsentry.github.io/sentry-python/)
+- [API Reference (using sphinx)](https://www.pydoc.io/search/?package=sentry-sdk)
 
 # License
 

@@ -16,6 +16,23 @@ from sentry_sdk._compat import (
     PY2,
 )
 
+if False:
+    from typing import Any
+    from typing import Dict
+    from typing import Union
+    from typing import Iterator
+    from typing import Tuple
+    from typing import Optional
+    from typing import List
+    from typing import Set
+    from typing import Type
+
+    from sentry_sdk.consts import ClientOptions
+
+    ExcInfo = Tuple[
+        Optional[Type[BaseException]], Optional[BaseException], Optional[Any]
+    ]
+
 if PY2:
     # Importing ABCs from collections is deprecated, and will stop working in 3.8
     # https://github.com/python/cpython/blob/master/Lib/collections/__init__.py#L49
@@ -48,6 +65,7 @@ def _get_debug_hub():
 
 @contextmanager
 def capture_internal_exceptions():
+    # type: () -> Iterator
     try:
         yield
     except Exception:
@@ -61,6 +79,7 @@ def to_timestamp(value):
 
 
 def event_hint_with_exc_info(exc_info=None):
+    # type: (ExcInfo) -> Dict[str, Optional[ExcInfo]]
     """Creates a hint with the exc info filled in."""
     if exc_info is None:
         exc_info = sys.exc_info()
@@ -182,16 +201,20 @@ class Auth(object):
 
 
 def get_type_name(cls):
+    # type: (Any) -> str
     return getattr(cls, "__qualname__", None) or getattr(cls, "__name__", None)
 
 
 def get_type_module(cls):
+    # type: (Any) -> Optional[Any]
     mod = getattr(cls, "__module__", None)
     if mod not in (None, "builtins", "__builtins__"):
         return mod
+    return None
 
 
 def should_hide_frame(frame):
+    # type: (Any) -> bool
     try:
         mod = frame.f_globals["__name__"]
         return mod.startswith("sentry_sdk.")
@@ -209,6 +232,7 @@ def should_hide_frame(frame):
 
 
 def iter_stacks(tb):
+    # type: (Any) -> Iterator[Any]
     while tb is not None:
         if not should_hide_frame(tb.tb_frame):
             yield tb
@@ -216,6 +240,7 @@ def iter_stacks(tb):
 
 
 def slim_string(value, length=512):
+    # type: (str, int) -> str
     if not value:
         return value
     if len(value) > length:
@@ -223,25 +248,31 @@ def slim_string(value, length=512):
     return value[:length]
 
 
-def get_lines_from_file(filename, lineno, loader=None, module=None):
+def get_lines_from_file(
+    filename,  # type: str
+    lineno,  # type: int
+    loader=None,  # type: Any
+    module=None,  # type: str
+):
+    # type: (...) -> Tuple[List[str], Optional[str], List[str]]
     context_lines = 5
     source = None
     if loader is not None and hasattr(loader, "get_source"):
         try:
-            source = loader.get_source(module)
+            source_str = loader.get_source(module)
         except (ImportError, IOError):
-            source = None
-        if source is not None:
-            source = source.splitlines()
+            source_str = None
+        if source_str is not None:
+            source = source_str.splitlines()
 
     if source is None:
         try:
             source = linecache.getlines(filename)
         except (OSError, IOError):
-            return None, None, None
+            return [], None, []
 
     if not source:
-        return None, None, None
+        return [], None, []
 
     lower_bound = max(0, lineno - context_lines)
     upper_bound = min(lineno + 1 + context_lines, len(source))
@@ -262,6 +293,7 @@ def get_lines_from_file(filename, lineno, loader=None, module=None):
 
 
 def get_source_context(frame, tb_lineno):
+    # type: (Any, int) -> Tuple[List[str], Optional[str], List[str]]
     try:
         abs_path = frame.f_code.co_filename
     except Exception:
@@ -281,6 +313,7 @@ def get_source_context(frame, tb_lineno):
 
 
 def safe_str(value):
+    # type: (Any) -> str
     try:
         return text_type(value)
     except Exception:
@@ -288,6 +321,7 @@ def safe_str(value):
 
 
 def safe_repr(value):
+    # type: (Any) -> str
     try:
         rv = repr(value)
         if isinstance(rv, bytes):
@@ -315,42 +349,47 @@ def safe_repr(value):
 
 
 def object_to_json(obj, remaining_depth=4, memo=None):
-    if memo is None:
-        memo = Memo()
-    if memo.memoize(obj):
-        return CYCLE_MARKER
+    with capture_internal_exceptions():
+        if memo is None:
+            memo = Memo()
+        if memo.memoize(obj):
+            return CYCLE_MARKER
 
-    try:
-        if remaining_depth > 0:
-            hints = {"memo": memo, "remaining_depth": remaining_depth}
-            for processor in global_repr_processors:
-                with capture_internal_exceptions():
-                    result = processor(obj, hints)
-                    if result is not NotImplemented:
-                        return result
+        try:
+            if remaining_depth > 0:
+                hints = {"memo": memo, "remaining_depth": remaining_depth}
+                for processor in global_repr_processors:
+                    with capture_internal_exceptions():
+                        result = processor(obj, hints)
+                        if result is not NotImplemented:
+                            return result
 
-            if isinstance(obj, (list, tuple)):
-                # It is not safe to iterate over another sequence types as this may raise errors or
-                # bring undesired side-effects (e.g. Django querysets are executed during iteration)
-                return [
-                    object_to_json(x, remaining_depth=remaining_depth - 1, memo=memo)
-                    for x in obj
-                ]
+                if isinstance(obj, (list, tuple)):
+                    # It is not safe to iterate over another sequence types as this may raise errors or
+                    # bring undesired side-effects (e.g. Django querysets are executed during iteration)
+                    return [
+                        object_to_json(
+                            x, remaining_depth=remaining_depth - 1, memo=memo
+                        )
+                        for x in obj
+                    ]
 
-            if isinstance(obj, Mapping):
-                return {
-                    safe_str(k): object_to_json(
-                        v, remaining_depth=remaining_depth - 1, memo=memo
-                    )
-                    for k, v in obj.items()
-                }
+                if isinstance(obj, Mapping):
+                    return {
+                        safe_str(k): object_to_json(
+                            v, remaining_depth=remaining_depth - 1, memo=memo
+                        )
+                        for k, v in list(obj.items())
+                    }
 
-        return safe_repr(obj)
-    finally:
-        memo.unmemoize(obj)
+            return safe_repr(obj)
+        finally:
+            memo.unmemoize(obj)
+    return u"<broken repr>"
 
 
 def extract_locals(frame):
+    # type: (Any) -> Dict[str, Any]
     rv = {}
     for key, value in frame.f_locals.items():
         rv[str(key)] = object_to_json(value)
@@ -358,6 +397,7 @@ def extract_locals(frame):
 
 
 def filename_for_module(module, abs_path):
+    # type: (str, str) -> str
     try:
         if abs_path.endswith(".pyc"):
             abs_path = abs_path[:-1]
@@ -375,6 +415,7 @@ def filename_for_module(module, abs_path):
 
 
 def serialize_frame(frame, tb_lineno=None, with_locals=True):
+    # type: (Any, int, bool) -> Dict[str, Any]
     f_code = getattr(frame, "f_code", None)
     if f_code:
         abs_path = frame.f_code.co_filename
@@ -408,6 +449,7 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
 
 
 def stacktrace_from_traceback(tb=None, with_locals=True):
+    # type: (Any, bool) -> Dict[str, List[Dict[str, Any]]]
     return {
         "frames": [
             serialize_frame(
@@ -434,17 +476,28 @@ def current_stacktrace(with_locals=True):
 
 
 def get_errno(exc_value):
+    # type: (BaseException) -> Optional[Any]
     return getattr(exc_value, "errno", None)
 
 
 def single_exception_from_error_tuple(
-    exc_type, exc_value, tb, client_options=None, mechanism=None
+    exc_type,  # type: Optional[type]
+    exc_value,  # type: Optional[BaseException]
+    tb,  # type: Optional[Any]
+    client_options=None,  # type: Optional[ClientOptions]
+    mechanism=None,  # type: Dict[str, Any]
 ):
-    errno = get_errno(exc_value)
+    # type: (...) -> Dict[str, Any]
+    if exc_value is not None:
+        errno = get_errno(exc_value)
+    else:
+        errno = None
+
     if errno is not None:
         mechanism = mechanism or {}
-        mechanism_meta = mechanism.setdefault("meta", {})
-        mechanism_meta.setdefault("errno", {"code": errno})
+        mechanism.setdefault("meta", {}).setdefault("errno", {}).setdefault(
+            "number", errno
+        )
 
     if client_options is None:
         with_locals = True
@@ -465,12 +518,17 @@ HAS_CHAINED_EXCEPTIONS = hasattr(Exception, "__suppress_context__")
 if HAS_CHAINED_EXCEPTIONS:
 
     def walk_exception_chain(exc_info):
+        # type: (ExcInfo) -> Iterator[ExcInfo]
         exc_type, exc_value, tb = exc_info
 
         seen_exceptions = []
-        seen_exception_ids = set()
+        seen_exception_ids = set()  # type: Set[int]
 
-        while exc_type is not None and id(exc_value) not in seen_exception_ids:
+        while (
+            exc_type is not None
+            and exc_value is not None
+            and id(exc_value) not in seen_exception_ids
+        ):
             yield exc_type, exc_value, tb
 
             # Avoid hashing random types we don't know anything
@@ -479,7 +537,7 @@ if HAS_CHAINED_EXCEPTIONS:
             seen_exceptions.append(exc_value)
             seen_exception_ids.add(id(exc_value))
 
-            if exc_value.__suppress_context__:
+            if exc_value.__suppress_context__:  # type: ignore
                 cause = exc_value.__cause__
             else:
                 cause = exc_value.__context__
@@ -493,10 +551,16 @@ if HAS_CHAINED_EXCEPTIONS:
 else:
 
     def walk_exception_chain(exc_info):
+        # type: (ExcInfo) -> Iterator[ExcInfo]
         yield exc_info
 
 
-def exceptions_from_error_tuple(exc_info, client_options=None, mechanism=None):
+def exceptions_from_error_tuple(
+    exc_info,  # type: ExcInfo
+    client_options=None,  # type: Optional[ClientOptions]
+    mechanism=None,  # type: Dict[str, Any]
+):
+    # type: (...) -> List[Dict[str, Any]]
     exc_type, exc_value, tb = exc_info
     rv = []
     for exc_type, exc_value, tb in walk_exception_chain(exc_info):
@@ -505,32 +569,59 @@ def exceptions_from_error_tuple(exc_info, client_options=None, mechanism=None):
                 exc_type, exc_value, tb, client_options, mechanism
             )
         )
+
+    rv.reverse()
+
     return rv
 
 
 def to_string(value):
+    # type: (str) -> str
     try:
         return text_type(value)
     except UnicodeDecodeError:
         return repr(value)[1:-1]
 
 
-def iter_event_frames(event):
-    stacktraces = []
+def iter_event_stacktraces(event):
+    # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
     if "stacktrace" in event:
-        stacktraces.append(event["stacktrace"])
+        yield event["stacktrace"]
+    if "threads" in event:
+        for thread in event["threads"].get("values") or ():
+            if "stacktrace" in thread:
+                yield thread["stacktrace"]
     if "exception" in event:
         for exception in event["exception"].get("values") or ():
             if "stacktrace" in exception:
-                stacktraces.append(exception["stacktrace"])
-    for stacktrace in stacktraces:
+                yield exception["stacktrace"]
+
+
+def iter_event_frames(event):
+    # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
+    for stacktrace in iter_event_stacktraces(event):
         for frame in stacktrace.get("frames") or ():
             yield frame
 
 
 def handle_in_app(event, in_app_exclude=None, in_app_include=None):
+    # type: (Dict[str, Any], List, List) -> Dict[str, Any]
+    for stacktrace in iter_event_stacktraces(event):
+        handle_in_app_impl(
+            stacktrace.get("frames"),
+            in_app_exclude=in_app_exclude,
+            in_app_include=in_app_include,
+        )
+
+    return event
+
+
+def handle_in_app_impl(frames, in_app_exclude, in_app_include):
+    if not frames:
+        return
+
     any_in_app = False
-    for frame in iter_event_frames(event):
+    for frame in frames:
         in_app = frame.get("in_app")
         if in_app is not None:
             if in_app:
@@ -540,24 +631,25 @@ def handle_in_app(event, in_app_exclude=None, in_app_include=None):
         module = frame.get("module")
         if not module:
             continue
-
-        if _module_in_set(module, in_app_exclude):
-            frame["in_app"] = False
-        if _module_in_set(module, in_app_include):
+        elif _module_in_set(module, in_app_include):
             frame["in_app"] = True
             any_in_app = True
+        elif _module_in_set(module, in_app_exclude):
+            frame["in_app"] = False
 
     if not any_in_app:
-        for frame in iter_event_frames(event):
-            frame["in_app"] = True
+        for frame in frames:
+            if frame.get("in_app") is None:
+                frame["in_app"] = True
 
-    return event
+    return frames
 
 
 def exc_info_from_error(error):
+    # type: (Union[BaseException, ExcInfo]) -> ExcInfo
     if isinstance(error, tuple) and len(error) == 3:
         exc_type, exc_value, tb = error
-    else:
+    elif isinstance(error, BaseException):
         tb = getattr(error, "__traceback__", None)
         if tb is not None:
             exc_type = type(error)
@@ -569,10 +661,18 @@ def exc_info_from_error(error):
                 exc_value = error
                 exc_type = type(error)
 
+    else:
+        raise ValueError()
+
     return exc_type, exc_value, tb
 
 
-def event_from_exception(exc_info, client_options=None, mechanism=None):
+def event_from_exception(
+    exc_info,  # type: Union[BaseException, ExcInfo]
+    client_options=None,  # type: Optional[ClientOptions]
+    mechanism=None,  # type: Dict[str, Any]
+):
+    # type: (...) -> Tuple[Dict[str, Any], Dict[str, Any]]
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
     return (
@@ -589,6 +689,7 @@ def event_from_exception(exc_info, client_options=None, mechanism=None):
 
 
 def _module_in_set(name, set):
+    # type: (str, Optional[List]) -> bool
     if not set:
         return False
     for item in set or ():
@@ -599,14 +700,17 @@ def _module_in_set(name, set):
 
 class AnnotatedValue(object):
     def __init__(self, value, metadata):
+        # type: (Optional[Any], Dict[str, Any]) -> None
         self.value = value
         self.metadata = metadata
 
 
 def flatten_metadata(obj):
+    # type: (Dict[str, Any]) -> Dict[str, Any]
     def inner(obj):
+        # type: (Any) -> Any
         if isinstance(obj, Mapping):
-            rv = {}
+            dict_rv = {}
             meta = {}
             for k, v in obj.items():
                 # if we actually have "" keys in our data, throw them away. It's
@@ -614,23 +718,23 @@ def flatten_metadata(obj):
                 if k == "":
                     continue
 
-                rv[k], meta[k] = inner(v)
+                dict_rv[k], meta[k] = inner(v)
                 if meta[k] is None:
                     del meta[k]
-                if rv[k] is None:
-                    del rv[k]
-            return rv, (meta or None)
+                if dict_rv[k] is None:
+                    del dict_rv[k]
+            return dict_rv, (meta or None)
         if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
-            rv = []
+            list_rv = []
             meta = {}
             for i, v in enumerate(obj):
                 new_v, meta[str(i)] = inner(v)
-                rv.append(new_v)
+                list_rv.append(new_v)
                 if meta[str(i)] is None:
                     del meta[str(i)]
-            return rv, (meta or None)
+            return list_rv, (meta or None)
         if isinstance(obj, AnnotatedValue):
-            return obj.value, {"": obj.metadata}
+            return (inner(obj.value)[0], {"": obj.metadata})
         return obj, None
 
     obj, meta = inner(obj)
@@ -640,6 +744,7 @@ def flatten_metadata(obj):
 
 
 def strip_event_mut(event):
+    # type: (Dict[str, Any]) -> None
     strip_stacktrace_mut(event.get("stacktrace", None))
     exception = event.get("exception", None)
     if exception:
@@ -647,9 +752,11 @@ def strip_event_mut(event):
             strip_stacktrace_mut(exception.get("stacktrace", None))
 
     strip_request_mut(event.get("request", None))
+    strip_breadcrumbs_mut(event.get("breadcrumbs", None))
 
 
 def strip_stacktrace_mut(stacktrace):
+    # type: (Optional[Dict[str, List[Dict[str, Any]]]]) -> None
     if not stacktrace:
         return
     for frame in stacktrace.get("frames", None) or ():
@@ -657,6 +764,7 @@ def strip_stacktrace_mut(stacktrace):
 
 
 def strip_request_mut(request):
+    # type: (Dict[str, Any]) -> None
     if not request:
         return
     data = request.get("data", None)
@@ -665,7 +773,16 @@ def strip_request_mut(request):
     request["data"] = strip_databag(data)
 
 
+def strip_breadcrumbs_mut(breadcrumbs):
+    if not breadcrumbs:
+        return
+
+    for i in range(len(breadcrumbs)):
+        breadcrumbs[i] = strip_databag(breadcrumbs[i])
+
+
 def strip_frame_mut(frame):
+    # type: (Dict[str, Any]) -> None
     if "vars" in frame:
         frame["vars"] = strip_databag(frame["vars"])
 
@@ -685,35 +802,62 @@ class Memo(object):
 
 
 def convert_types(obj):
+    # type: (Any) -> Any
+    if obj is None:
+        return None
     if obj is CYCLE_MARKER:
         return u"<cyclic>"
     if isinstance(obj, datetime):
-        return obj.strftime("%Y-%m-%dT%H:%M:%SZ")
+        return text_type(obj.strftime("%Y-%m-%dT%H:%M:%SZ"))
     if isinstance(obj, Mapping):
         return {k: convert_types(v) for k, v in obj.items()}
     if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
         return [convert_types(v) for v in obj]
+    if isinstance(obj, AnnotatedValue):
+        return AnnotatedValue(convert_types(obj.value), obj.metadata)
+
     if not isinstance(obj, string_types + number_types):
         return safe_repr(obj)
     if isinstance(obj, bytes):
         return obj.decode("utf-8", "replace")
+
     return obj
 
 
-def strip_databag(obj, remaining_depth=20):
+def strip_databag(obj, remaining_depth=20, max_breadth=20):
+    # type: (Any, int, int) -> Any
     assert not isinstance(obj, bytes), "bytes should have been normalized before"
     if remaining_depth <= 0:
         return AnnotatedValue(None, {"rem": [["!limit", "x"]]})
     if isinstance(obj, text_type):
         return strip_string(obj)
     if isinstance(obj, Mapping):
-        return {k: strip_databag(v, remaining_depth - 1) for k, v in obj.items()}
+        rv_dict = {}  # type: Dict[Any, Any]
+        for i, (k, v) in enumerate(obj.items()):
+            if i >= max_breadth:
+                return AnnotatedValue(rv_dict, {"len": max_breadth})
+            rv_dict[k] = strip_databag(
+                v, remaining_depth=remaining_depth - 1, max_breadth=max_breadth
+            )
+
+        return rv_dict
     if isinstance(obj, Sequence):
-        return [strip_databag(v, remaining_depth - 1) for v in obj]
+        rv_list = []  # type: List[Any]
+        for i, v in enumerate(obj):
+            if i >= max_breadth:
+                return AnnotatedValue(rv_list, {"len": max_breadth})
+            rv_list.append(
+                strip_databag(
+                    v, remaining_depth=remaining_depth - 1, max_breadth=max_breadth
+                )
+            )
+
+        return rv_list
     return obj
 
 
 def strip_string(value, max_length=512):
+    # type: (str, int) -> Union[AnnotatedValue, str]
     # TODO: read max_length from config
     if not value:
         return value
@@ -786,12 +930,19 @@ def format_and_strip(template, params, strip_string=strip_string):
     )
 
 
+HAS_REAL_CONTEXTVARS = True
+
 try:
-    from contextvars import ContextVar
+    from contextvars import ContextVar  # type: ignore
+
+    if not PY2 and sys.version_info < (3, 7):
+        import aiocontextvars  # type: ignore # noqa
 except ImportError:
+    HAS_REAL_CONTEXTVARS = False
+
     from threading import local
 
-    class ContextVar(object):
+    class ContextVar(object):  # type: ignore
         # Super-limited impl of ContextVar
 
         def __init__(self, name):

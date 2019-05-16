@@ -1,31 +1,43 @@
-from django.template import TemplateSyntaxError
+from django.template import TemplateSyntaxError  # type: ignore
+
+if False:
+    from typing import Any
+    from typing import Dict
+    from typing import Optional
 
 try:
     # support Django 1.9
-    from django.template.base import Origin
+    from django.template.base import Origin  # type: ignore
 except ImportError:
     # backward compatibility
-    from django.template.loader import LoaderOrigin as Origin
+    from django.template.loader import LoaderOrigin as Origin  # type: ignore
 
 
 def get_template_frame_from_exception(exc_value):
+    # type: (Optional[BaseException]) -> Optional[Dict[str, Any]]
+
     # As of Django 1.9 or so the new template debug thing showed up.
     if hasattr(exc_value, "template_debug"):
-        return _get_template_frame_from_debug(exc_value.template_debug)
+        return _get_template_frame_from_debug(exc_value.template_debug)  # type: ignore
 
     # As of r16833 (Django) all exceptions may contain a
     # ``django_template_source`` attribute (rather than the legacy
     # ``TemplateSyntaxError.source`` check)
     if hasattr(exc_value, "django_template_source"):
-        return _get_template_frame_from_source(exc_value.django_template_source)
+        return _get_template_frame_from_source(
+            exc_value.django_template_source  # type: ignore
+        )
 
     if isinstance(exc_value, TemplateSyntaxError) and hasattr(exc_value, "source"):
         source = exc_value.source
         if isinstance(source, (tuple, list)) and isinstance(source[0], Origin):
             return _get_template_frame_from_source(source)
 
+    return None
+
 
 def _get_template_frame_from_debug(debug):
+    # type: (Dict[str, Any]) -> Dict[str, Any]
     if debug is None:
         return None
 
@@ -52,6 +64,7 @@ def _get_template_frame_from_debug(debug):
         "pre_context": pre_context[-5:],
         "post_context": post_context[:5],
         "context_line": context_line,
+        "in_app": True,
     }
 
 

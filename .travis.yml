@@ -1,5 +1,4 @@
 language: python
-sudo: false
 
 python:
   - "2.7"
@@ -7,6 +6,9 @@ python:
   - "3.4"
   - "3.5"
   - "3.6"
+
+env:
+  - SENTRY_PYTHON_TEST_POSTGRES_USER=postgres SENTRY_PYTHON_TEST_POSTGRES_NAME=travis_ci_test
 
 cache:
   pip: true
@@ -18,13 +20,14 @@ branches:
     - /^release\/.+$/
 
 matrix:
+  allow_failures:
+    - os: osx
+
   include:
     - python: "3.7"
       dist: xenial
-      sudo: true
     - python: "3.8-dev"
       dist: xenial
-      sudo: true
 
     - name: Linting
       python: "3.6"
@@ -51,15 +54,22 @@ matrix:
         - source $HOME/osx-py/bin/activate
         - export TRAVIS_PYTHON_VERSION=2.7
 
+before_script:
+  - psql -c 'create database travis_ci_test;' -U postgres
+  - psql -c 'create database test_travis_ci_test;' -U postgres
+
+services:
+  - postgresql
+
 install:
   - pip install tox
   - pip install codecov
-  - sh scripts/download-semaphore.sh
+  - bash scripts/download-semaphore.sh
 
 script:
   - coverage erase
-  - ./scripts/runtox.sh '' --cov=sentry_sdk --cov-append --cov-report= --cov-branch
-  - codecov
+  - ./scripts/runtox.sh '' --cov=sentry_sdk --cov-report= --cov-branch
+  - codecov --file .coverage*
 
 notifications:
   webhooks:

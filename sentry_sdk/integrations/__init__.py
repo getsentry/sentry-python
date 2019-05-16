@@ -2,49 +2,60 @@
 from __future__ import absolute_import
 
 from threading import Lock
-from collections import namedtuple
 
 from sentry_sdk._compat import iteritems
 from sentry_sdk.utils import logger
 
+if False:
+    from typing import Iterator
+    from typing import Dict
+    from typing import List
+    from typing import Set
+    from typing import Type
+    from typing import Callable
+
 
 _installer_lock = Lock()
-_installed_integrations = set()
+_installed_integrations = set()  # type: Set[str]
 
 
-def iter_default_integrations():
-    """Returns an iterator of default integration classes.
+def _generate_default_integrations_iterator(*import_strings):
+    # type: (*str) -> Callable[[], Iterator[Type[Integration]]]
+    def iter_default_integrations():
+        # type: () -> Iterator[Type[Integration]]
+        """Returns an iterator of the default integration classes:
+        """
+        from importlib import import_module
 
-    This returns the following default integration:
+        for import_string in import_strings:
+            module, cls = import_string.rsplit(".", 1)
+            yield getattr(import_module(module), cls)
 
-    - `LoggingIntegration`
-    - `StdlibIntegration`
-    - `ExcepthookIntegration`
-    - `DedupeIntegration`
-    - `AtexitIntegration`
-    - `ModulesIntegration`
-    - `ArgvIntegration`
-    """
-    from sentry_sdk.integrations.logging import LoggingIntegration
-    from sentry_sdk.integrations.stdlib import StdlibIntegration
-    from sentry_sdk.integrations.excepthook import ExcepthookIntegration
-    from sentry_sdk.integrations.dedupe import DedupeIntegration
-    from sentry_sdk.integrations.atexit import AtexitIntegration
-    from sentry_sdk.integrations.modules import ModulesIntegration
-    from sentry_sdk.integrations.argv import ArgvIntegration
-    from sentry_sdk.integrations.threading import ThreadingIntegration
+    if isinstance(iter_default_integrations.__doc__, str):
+        for import_string in import_strings:
+            iter_default_integrations.__doc__ += "\n- `{}`".format(  # type: ignore
+                import_string
+            )
 
-    yield LoggingIntegration
-    yield StdlibIntegration
-    yield ExcepthookIntegration
-    yield DedupeIntegration
-    yield AtexitIntegration
-    yield ModulesIntegration
-    yield ArgvIntegration
-    yield ThreadingIntegration
+    return iter_default_integrations
+
+
+iter_default_integrations = _generate_default_integrations_iterator(
+    "sentry_sdk.integrations.logging.LoggingIntegration",
+    "sentry_sdk.integrations.stdlib.StdlibIntegration",
+    "sentry_sdk.integrations.excepthook.ExcepthookIntegration",
+    "sentry_sdk.integrations.dedupe.DedupeIntegration",
+    "sentry_sdk.integrations.atexit.AtexitIntegration",
+    "sentry_sdk.integrations.modules.ModulesIntegration",
+    "sentry_sdk.integrations.argv.ArgvIntegration",
+    "sentry_sdk.integrations.threading.ThreadingIntegration",
+)
+
+del _generate_default_integrations_iterator
 
 
 def setup_integrations(integrations, with_defaults=True):
+    # type: (List[Integration], bool) -> Dict[str, Integration]
     """Given a list of integration instances this installs them all.  When
     `with_defaults` is set to `True` then all default integrations are added
     unless they were already provided before.
@@ -87,11 +98,6 @@ def setup_integrations(integrations, with_defaults=True):
     return integrations
 
 
-IntegrationAttachment = namedtuple(
-    "IntegrationAttachment", ["integration", "client", "hub"]
-)
-
-
 class Integration(object):
     """Baseclass for all integrations.
 
@@ -101,6 +107,9 @@ class Integration(object):
 
     install = None
     """Legacy method, do not implement."""
+
+    identifier = None  # type: str
+    """String unique ID of integration type"""
 
     @staticmethod
     def setup_once():

@@ -1,3 +1,107 @@
+## 0.7.15
+
+* Add the always_run option in excepthook integration.
+
+## 0.7.14
+
+* Fix crash when using Celery integration (`TypeError` when using
+  `apply_async`).
+
+## 0.7.13
+
+* Fix a bug where `Ignore` raised in a Celery task would be reported to Sentry.
+* Add experimental support for tracing PoC.
+
+## 0.7.12
+
+* Read from `X-Real-IP` for user IP address.
+* Fix a bug that would not apply in-app rules for attached callstacks.
+* It's now possible to disable automatic proxy support by passing
+  `http_proxy=""`. Thanks Marco Neumann!
+
+## 0.7.11
+
+* Fix a bug that would send `errno` in an invalid format to the server.
+* Fix import-time crash when running Python with `-O` flag.
+* Fix a bug that would prevent the logging integration from attaching `extra`
+  keys called `data`.
+* Fix order in which exception chains are reported to match Raven behavior.
+* New integration for the Falcon web framework. Thanks to Jacob Magnusson!
+
+## 0.7.10
+
+* Add more event trimming.
+* Log Sentry's response body in debug mode.
+* Fix a few bad typehints causing issues in IDEs.
+* Fix a bug in the Bottle integration that would report HTTP exceptions (e.g.
+  redirects) as errors.
+* Fix a bug that would prevent use of `in_app_exclude` without
+  setting `in_app_include`.
+* Fix a bug where request bodies of Django Rest Framework apps were not captured.
+* Suppress errors during SQL breadcrumb capturing in Django
+  integration. Also change order in which formatting strategies
+  are tried.
+
+## 0.7.9
+
+* New integration for the Bottle web framework. Thanks to Stepan Henek!
+* Self-protect against broken mapping implementations and other broken reprs
+  instead of dropping all local vars from a stacktrace. Thanks to Marco
+  Neumann!
+
+## 0.7.8
+
+* Add support for Sanic versions 18 and 19.
+* Fix a bug that causes an SDK crash when using composed SQL from psycopg2.
+
+## 0.7.7
+
+* Fix a bug that would not capture request bodies if they were empty JSON
+  arrays, objects or strings.
+* New GNU backtrace integration parses stacktraces from exception messages and
+  appends them to existing stacktrace.
+* Capture Tornado formdata.
+* Support Python 3.6 in Sanic and AIOHTTP integration.
+* Clear breadcrumbs before starting a new request.
+* Fix a bug in the Celery integration that would drop pending events during
+  worker shutdown (particularly an issue when running with `max_tasks_per_child
+  = 1`)
+* Fix a bug with `repr`ing locals whose `__repr__` simultaneously changes the
+  WSGI environment or other data that we're also trying to serialize at the
+  same time.
+
+## 0.7.6
+
+* Fix a bug where artificial frames for Django templates would not be marked as
+  in-app and would always appear as the innermost frame. Implement a heuristic
+  to show template frame closer to `render` or `parse` invocation.
+
+## 0.7.5
+
+* Fix bug into Tornado integration that would send broken cookies to the server.
+* Fix a bug in the logging integration that would ignore the client
+  option `with_locals`.
+
+## 0.7.4
+
+* Read release and environment from process environment like the Raven SDK
+  does. The keys are called `SENTRY_RELEASE` and `SENTRY_ENVIRONMENT`.
+* Fix a bug in the `serverless` integration where it would not push a new scope
+  for each function call (leaking tags and other things across calls).
+* Experimental support for type hints.
+
+## 0.7.3
+
+* Fix crash in AIOHTTP integration when integration was set up but disabled.
+* Flask integration now adds usernames, email addresses based on the protocol
+  Flask-User defines on top of Flask-Login.
+* New threading integration catches exceptions from crashing threads.
+* New method `flush` on hubs and clients. New global `flush` function.
+* Add decorator for serverless functions to fix common problems in those
+  environments.
+* Fix a bug in the logging integration where using explicit handlers required
+  enabling the integration.
+
 ## 0.7.2
 
 * Fix `celery.exceptions.Retry` spamming in Celery integration.

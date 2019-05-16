@@ -3,22 +3,37 @@ import sys
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk._compat import PY2, reraise
+from sentry_sdk.tracing import SpanContext
 from sentry_sdk.integrations._wsgi_common import _filter_headers
+
+if False:
+    from typing import Callable
+    from typing import Dict
+    from typing import List
+    from typing import Iterator
+    from typing import Any
+    from typing import Tuple
+    from typing import Optional
+
+    from sentry_sdk.utils import ExcInfo
 
 
 if PY2:
 
     def wsgi_decoding_dance(s, charset="utf-8", errors="replace"):
+        # type: (str, str, str) -> str
         return s.decode(charset, errors)
 
 
 else:
 
     def wsgi_decoding_dance(s, charset="utf-8", errors="replace"):
+        # type: (str, str, str) -> str
         return s.encode("latin1").decode(charset, errors)
 
 
 def get_host(environ):
+    # type: (Dict[str, str]) -> str
     """Return the host for the given WSGI environment. Yanked from Werkzeug."""
     if environ.get("HTTP_HOST"):
         rv = environ["HTTP_HOST"]
@@ -41,6 +56,7 @@ def get_host(environ):
 
 
 def get_request_url(environ):
+    # type: (Dict[str, str]) -> str
     """Return the absolute URL without query string for the given WSGI
     environment."""
     return "%s://%s/%s" % (
@@ -54,15 +70,19 @@ class SentryWsgiMiddleware(object):
     __slots__ = ("app",)
 
     def __init__(self, app):
+        # type: (Callable) -> None
         self.app = app
 
     def __call__(self, environ, start_response):
+        # type: (Dict[str, str], Callable) -> _ScopedResponse
         hub = Hub(Hub.current)
 
         with hub:
             with capture_internal_exceptions():
                 with hub.configure_scope() as scope:
+                    scope.clear_breadcrumbs()
                     scope._name = "wsgi"
+                    scope.set_span_context(SpanContext.continue_from_environ(environ))
                     scope.add_event_processor(_make_wsgi_event_processor(environ))
 
             try:
@@ -74,12 +94,14 @@ class SentryWsgiMiddleware(object):
 
 
 def _get_environ(environ):
+    # type: (Dict[str, str]) -> Iterator[Tuple[str, str]]
     """
     Returns our whitelisted environment variables.
     """
-    keys = ("SERVER_NAME", "SERVER_PORT")
+    keys = ["SERVER_NAME", "SERVER_PORT"]
     if _should_send_default_pii():
-        keys += ("REMOTE_ADDR",)
+        # Add all three headers here to make debugging of proxy setup easier.
+        keys += ["REMOTE_ADDR", "HTTP_X_FORWARDED_FOR", "HTTP_X_REAL_IP"]
 
     for key in keys:
         if key in environ:
@@ -91,6 +113,7 @@ def _get_environ(environ):
 # We need this function because Django does not give us a "pure" http header
 # dict. So we might as well use it for all WSGI integrations.
 def _get_headers(environ):
+    # type: (Dict[str, str]) -> Iterator[Tuple[str, str]]
     """
     Returns only proper HTTP headers.
 
@@ -107,27 +130,36 @@ def _get_headers(environ):
 
 
 def get_client_ip(environ):
+    # type: (Dict[str, str]) -> Optional[Any]
     """
-    Naively yank the first IP address in an X-Forwarded-For header
-    and assume this is correct.
-
-    Note: Don't use this in security sensitive situations since this
-    value may be forged from a client.
+    Infer the user IP address from various headers. This cannot be used in
+    security sensitive situations since the value may be forged from a client,
+    but it's good enough for the event payload.
     """
     try:
         return environ["HTTP_X_FORWARDED_FOR"].split(",")[0].strip()
     except (KeyError, IndexError):
-        return environ.get("REMOTE_ADDR")
+        pass
+
+    try:
+        return environ["HTTP_X_REAL_IP"]
+    except KeyError:
+        pass
+
+    return environ.get("REMOTE_ADDR")
 
 
 def _capture_exception(hub):
-    exc_info = sys.exc_info()
-    event, hint = event_from_exception(
-        exc_info,
-        client_options=hub.client.options,
-        mechanism={"type": "wsgi", "handled": False},
-    )
-    hub.capture_event(event, hint=hint)
+    # type: (Hub) -> ExcInfo
+    # Check client here as it might have been unset while streaming response
+    if hub.client is not None:
+        exc_info = sys.exc_info()
+        event, hint = event_from_exception(
+            exc_info,
+            client_options=hub.client.options,
+            mechanism={"type": "wsgi", "handled": False},
+        )
+        hub.capture_event(event, hint=hint)
     return exc_info
 
 
@@ -135,10 +167,12 @@ class _ScopedResponse(object):
     __slots__ = ("_response", "_hub")
 
     def __init__(self, hub, response):
+        # type: (Hub, List[bytes]) -> None
         self._hub = hub
         self._response = response
 
     def __iter__(self):
+        # type: () -> Iterator[bytes]
         iterator = iter(self._response)
 
         while True:
@@ -163,6 +197,7 @@ class _ScopedResponse(object):
 
 
 def _make_wsgi_event_processor(environ):
+    # type: (Dict[str, str]) -> Callable
     # It's a bit unfortunate that we have to extract and parse the request data
     # from the environ so eagerly, but there are a few good reasons for this.
     #
@@ -183,6 +218,7 @@ def _make_wsgi_event_processor(environ):
     headers = _filter_headers(dict(_get_headers(environ)))
 
     def event_processor(event, hint):
+        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         with capture_internal_exceptions():
             # if the code below fails halfway through we at least have some data
             request_info = event.setdefault("request", {})

@@ -13,7 +13,7 @@ from pyramid.response import Response
 
 from werkzeug.test import Client
 
-from sentry_sdk import capture_message
+from sentry_sdk import capture_message, add_breadcrumb
 from sentry_sdk.integrations.pyramid import PyramidIntegration
 
 
@@ -61,8 +61,11 @@ def test_view_exceptions(
     events = capture_events()
     exceptions = capture_exceptions()
 
+    add_breadcrumb({"message": "hi"})
+
     @route("/errors")
     def errors(request):
+        add_breadcrumb({"message": "hi2"})
         1 / 0
 
     client = get_client()
@@ -73,6 +76,8 @@ def test_view_exceptions(
     assert isinstance(error, ZeroDivisionError)
 
     event, = events
+    breadcrumb, = event["breadcrumbs"]
+    assert breadcrumb["message"] == "hi2"
     assert event["exception"]["values"][0]["mechanism"]["type"] == "pyramid"
 
 
@@ -140,6 +145,28 @@ def test_large_json_request(sentry_init, capture_events, route, get_client):
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
     assert len(event["request"]["data"]["foo"]["bar"]) == 512
+
+
+@pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
+def test_flask_empty_json_request(sentry_init, capture_events, route, get_client, data):
+    sentry_init(integrations=[PyramidIntegration()])
+
+    @route("/")
+    def index(request):
+        assert request.json == data
+        assert request.text == json.dumps(data)
+        assert not request.POST
+        capture_message("hi")
+        return Response("ok")
+
+    events = capture_events()
+
+    client = get_client()
+    response = client.post("/", content_type="application/json", data=json.dumps(data))
+    assert response[1] == "200 OK"
+
+    event, = events
+    assert event["request"]["data"] == data
 
 
 def test_files_and_form(sentry_init, capture_events, route, get_client):
@@ -240,7 +267,7 @@ def test_error_in_errorhandler(
     exception, = event1["exception"]["values"]
     assert exception["type"] == "ValueError"
 
-    exception = event2["exception"]["values"][0]
+    exception = event2["exception"]["values"][-1]
     assert exception["type"] == "ZeroDivisionError"
 
 
