@@ -38,7 +38,8 @@ epoch = datetime(1970, 1, 1)
 # The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
 
-CYCLE_MARKER = object()
+MAX_STRING_LENGTH = 512
+MAX_FORMAT_PARAM_LENGTH = 128
 
 
 def _get_debug_hub():
@@ -249,7 +250,7 @@ def iter_stacks(tb):
         tb = tb.tb_next
 
 
-def slim_string(value, length=512):
+def slim_string(value, length=MAX_STRING_LENGTH):
     # type: (str, int) -> str
     if not value:
         return value
@@ -682,7 +683,9 @@ def strip_string(value, max_length=512):
     return value
 
 
-def format_and_strip(template, params, strip_string=strip_string):
+def format_and_strip(
+    template, params, strip_string=strip_string, max_length=MAX_FORMAT_PARAM_LENGTH
+):
     """Format a string containing %s for placeholders and call `strip_string`
     on each parameter. The string template itself does not have a maximum
     length.
@@ -713,7 +716,7 @@ def format_and_strip(template, params, strip_string=strip_string):
             raise ValueError("Not enough params.")
         param = params.pop()
 
-        stripped_param = strip_string(param)
+        stripped_param = strip_string(param, max_length=max_length)
         if isinstance(stripped_param, AnnotatedValue):
             rv_remarks.extend(
                 realign_remark(remark) for remark in stripped_param.metadata["rem"]

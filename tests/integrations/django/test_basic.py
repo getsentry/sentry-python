@@ -289,7 +289,8 @@ def test_sql_queries_large_params(sentry_init, capture_events):
     with pytest.raises(OperationalError):
         # table doesn't even exist
         sql.execute(
-            """SELECT count(*) FROM people_person WHERE foo = %s""", ["x" * 1000]
+            """SELECT count(*) FROM people_person WHERE foo = %s and bar IS NULL""",
+            ["x" * 1000],
         )
 
     capture_message("HI")
@@ -298,7 +299,8 @@ def test_sql_queries_large_params(sentry_init, capture_events):
 
     crumb, = event["breadcrumbs"]
     assert crumb["message"] == (
-        "SELECT count(*) FROM people_person WHERE foo = '%s..." % ("x" * 508,)
+        "SELECT count(*) FROM people_person WHERE foo = '%s... and bar IS NULL"
+        % ("x" * 124,)
     )
 
 
