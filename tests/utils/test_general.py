@@ -62,7 +62,7 @@ def test_format_and_strip():
         return format_and_strip(
             template,
             params,
-            strip_string=lambda x: strip_string(x, max_length=max_length),
+            strip_string=lambda x, **_: strip_string(x, max_length=max_length),
         )
 
     max_length = 3
