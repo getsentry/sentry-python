@@ -194,7 +194,7 @@ class Serializer(object):
 
         obj = _flatten_annotated(obj, self.meta_node)
 
-        if max_depth is not None and remaining_depth <= 0:
+        if remaining_depth is not None and remaining_depth <= 0:
             self.meta_node.annotate(rem=[["!limit", "x"]])
             if self.meta_node.is_databag():
                 return _flatten_annotated(strip_string(safe_repr(obj)), self.meta_node)
