@@ -14,6 +14,19 @@ if not os.path.isfile(SEMAPHORE):
     SEMAPHORE = None
 
 
+try:
+    import pytest_benchmark
+except ImportError:
+
+    @pytest.fixture
+    def benchmark():
+        return lambda x: x()
+
+
+else:
+    del pytest_benchmark
+
+
 @pytest.fixture(autouse=True)
 def reraise_internal_exceptions(request, monkeypatch):
     errors = []

@@ -478,34 +478,62 @@ def test_cyclic_data(sentry_init, capture_events):
     assert data == {"not_cyclic2": "", "not_cyclic": "", "is_cyclic": "<cyclic>"}
 
 
-def test_databag_stripping(sentry_init, capture_events):
+def test_databag_depth_stripping(sentry_init, capture_events, benchmark):
     sentry_init()
     events = capture_events()
 
-    try:
-        a = "A" * 16000  # noqa
-        1 / 0
-    except Exception:
-        capture_exception()
+    value = ["a"]
+    for _ in range(100000):
+        value = [value]
 
-    event, = events
+    @benchmark
+    def inner():
+        del events[:]
+        try:
+            a = value  # noqa
+            1 / 0
+        except Exception:
+            capture_exception()
 
-    assert len(json.dumps(event)) < 10000
+        event, = events
+
+        assert len(json.dumps(event)) < 10000
 
 
-def test_databag_breadth_stripping(sentry_init, capture_events):
+def test_databag_string_stripping(sentry_init, capture_events, benchmark):
     sentry_init()
     events = capture_events()
 
-    try:
-        a = ["a"] * 16000  # noqa
-        1 / 0
-    except Exception:
-        capture_exception()
+    @benchmark
+    def inner():
+        del events[:]
+        try:
+            a = "A" * 1000000  # noqa
+            1 / 0
+        except Exception:
+            capture_exception()
 
-    event, = events
+        event, = events
 
-    assert len(json.dumps(event)) < 10000
+        assert len(json.dumps(event)) < 10000
+
+
+def test_databag_breadth_stripping(sentry_init, capture_events, benchmark):
+    sentry_init()
+    events = capture_events()
+
+    @benchmark
+    def inner():
+        del events[:]
+        try:
+            a = ["a"] * 1000000  # noqa
+            1 / 0
+        except Exception:
+            capture_exception()
+
+        event, = events
+
+        assert len(json.dumps(event)) < 10000
 
 
 @pytest.mark.skipif(not HAS_CHAINED_EXCEPTIONS, reason="Only works on 3.3+")
