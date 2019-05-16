@@ -10,9 +10,8 @@ from sentry_sdk._compat import (
     urlparse,
     text_type,
     implements_str,
-    string_types,
-    number_types,
     int_types,
+    iteritems,
     PY2,
 )
 
@@ -33,15 +32,6 @@ if False:
         Optional[Type[BaseException]], Optional[BaseException], Optional[Any]
     ]
 
-if PY2:
-    # Importing ABCs from collections is deprecated, and will stop working in 3.8
-    # https://github.com/python/cpython/blob/master/Lib/collections/__init__.py#L49
-    from collections import Mapping, Sequence
-else:
-    # New in 3.3
-    # https://docs.python.org/3/library/collections.abc.html
-    from collections.abc import Mapping, Sequence
-
 epoch = datetime(1970, 1, 1)
 
 
@@ -49,13 +39,6 @@ epoch = datetime(1970, 1, 1)
 logger = logging.getLogger("sentry_sdk.errors")
 
 CYCLE_MARKER = object()
-
-
-global_repr_processors = []
-
-
-def add_global_repr_processor(processor):
-    global_repr_processors.append(processor)
 
 
 def _get_debug_hub():
@@ -198,6 +181,33 @@ class Auth(object):
         if self.secret_key is not None:
             rv.append(("sentry_secret", self.secret_key))
         return u"Sentry " + u", ".join("%s=%s" % (key, value) for key, value in rv)
+
+
+class LazyMap(object):
+    __slots__ = ("_iterator",)
+
+    def __init__(self, iterator):
+        self._iterator = iterator
+
+    def items(self):
+        return self._iterator
+
+
+class LazySequence(object):
+    __slots__ = ("_iterator",)
+
+    def __init__(self, iterator):
+        self._iterator = iterator
+
+    def __iter__(self):
+        return iter(self._iterator)
+
+
+class AnnotatedValue(object):
+    def __init__(self, value, metadata):
+        # type: (Optional[Any], Dict[str, Any]) -> None
+        self.value = value
+        self.metadata = metadata
 
 
 def get_type_name(cls):
@@ -348,52 +358,9 @@ def safe_repr(value):
         return u"<broken repr>"
 
 
-def object_to_json(obj, remaining_depth=4, memo=None):
-    with capture_internal_exceptions():
-        if memo is None:
-            memo = Memo()
-        if memo.memoize(obj):
-            return CYCLE_MARKER
-
-        try:
-            if remaining_depth > 0:
-                hints = {"memo": memo, "remaining_depth": remaining_depth}
-                for processor in global_repr_processors:
-                    with capture_internal_exceptions():
-                        result = processor(obj, hints)
-                        if result is not NotImplemented:
-                            return result
-
-                if isinstance(obj, (list, tuple)):
-                    # It is not safe to iterate over another sequence types as this may raise errors or
-                    # bring undesired side-effects (e.g. Django querysets are executed during iteration)
-                    return [
-                        object_to_json(
-                            x, remaining_depth=remaining_depth - 1, memo=memo
-                        )
-                        for x in obj
-                    ]
-
-                if isinstance(obj, Mapping):
-                    return {
-                        safe_str(k): object_to_json(
-                            v, remaining_depth=remaining_depth - 1, memo=memo
-                        )
-                        for k, v in list(obj.items())
-                    }
-
-            return safe_repr(obj)
-        finally:
-            memo.unmemoize(obj)
-    return u"<broken repr>"
-
-
 def extract_locals(frame):
-    # type: (Any) -> Dict[str, Any]
-    rv = {}
-    for key, value in frame.f_locals.items():
-        rv[str(key)] = object_to_json(value)
-    return rv
+    # type: (Any) -> LazyMap
+    return LazyMap((str(key), value) for key, value in iteritems(frame.f_locals))
 
 
 def filename_for_module(module, abs_path):
@@ -696,164 +663,6 @@ def _module_in_set(name, set):
         if item == name or name.startswith(item + "."):
             return True
     return False
-
-
-class AnnotatedValue(object):
-    def __init__(self, value, metadata):
-        # type: (Optional[Any], Dict[str, Any]) -> None
-        self.value = value
-        self.metadata = metadata
-
-
-def flatten_metadata(obj):
-    # type: (Dict[str, Any]) -> Dict[str, Any]
-    def inner(obj):
-        # type: (Any) -> Any
-        if isinstance(obj, Mapping):
-            dict_rv = {}
-            meta = {}
-            for k, v in obj.items():
-                # if we actually have "" keys in our data, throw them away. It's
-                # unclear how we would tell them apart from metadata
-                if k == "":
-                    continue
-
-                dict_rv[k], meta[k] = inner(v)
-                if meta[k] is None:
-                    del meta[k]
-                if dict_rv[k] is None:
-                    del dict_rv[k]
-            return dict_rv, (meta or None)
-        if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
-            list_rv = []
-            meta = {}
-            for i, v in enumerate(obj):
-                new_v, meta[str(i)] = inner(v)
-                list_rv.append(new_v)
-                if meta[str(i)] is None:
-                    del meta[str(i)]
-            return list_rv, (meta or None)
-        if isinstance(obj, AnnotatedValue):
-            return (inner(obj.value)[0], {"": obj.metadata})
-        return obj, None
-
-    obj, meta = inner(obj)
-    if meta is not None:
-        obj["_meta"] = meta
-    return obj
-
-
-def strip_event_mut(event):
-    # type: (Dict[str, Any]) -> None
-    strip_stacktrace_mut(event.get("stacktrace", None))
-    exception = event.get("exception", None)
-    if exception:
-        for exception in exception.get("values", None) or ():
-            strip_stacktrace_mut(exception.get("stacktrace", None))
-
-    strip_request_mut(event.get("request", None))
-    strip_breadcrumbs_mut(event.get("breadcrumbs", None))
-
-
-def strip_stacktrace_mut(stacktrace):
-    # type: (Optional[Dict[str, List[Dict[str, Any]]]]) -> None
-    if not stacktrace:
-        return
-    for frame in stacktrace.get("frames", None) or ():
-        strip_frame_mut(frame)
-
-
-def strip_request_mut(request):
-    # type: (Dict[str, Any]) -> None
-    if not request:
-        return
-    data = request.get("data", None)
-    if not data:
-        return
-    request["data"] = strip_databag(data)
-
-
-def strip_breadcrumbs_mut(breadcrumbs):
-    if not breadcrumbs:
-        return
-
-    for i in range(len(breadcrumbs)):
-        breadcrumbs[i] = strip_databag(breadcrumbs[i])
-
-
-def strip_frame_mut(frame):
-    # type: (Dict[str, Any]) -> None
-    if "vars" in frame:
-        frame["vars"] = strip_databag(frame["vars"])
-
-
-class Memo(object):
-    def __init__(self):
-        self._inner = {}
-
-    def memoize(self, obj):
-        if id(obj) in self._inner:
-            return True
-        self._inner[id(obj)] = obj
-        return False
-
-    def unmemoize(self, obj):
-        self._inner.pop(id(obj), None)
-
-
-def convert_types(obj):
-    # type: (Any) -> Any
-    if obj is None:
-        return None
-    if obj is CYCLE_MARKER:
-        return u"<cyclic>"
-    if isinstance(obj, datetime):
-        return text_type(obj.strftime("%Y-%m-%dT%H:%M:%SZ"))
-    if isinstance(obj, Mapping):
-        return {k: convert_types(v) for k, v in obj.items()}
-    if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
-        return [convert_types(v) for v in obj]
-    if isinstance(obj, AnnotatedValue):
-        return AnnotatedValue(convert_types(obj.value), obj.metadata)
-
-    if not isinstance(obj, string_types + number_types):
-        return safe_repr(obj)
-    if isinstance(obj, bytes):
-        return obj.decode("utf-8", "replace")
-
-    return obj
-
-
-def strip_databag(obj, remaining_depth=20, max_breadth=20):
-    # type: (Any, int, int) -> Any
-    assert not isinstance(obj, bytes), "bytes should have been normalized before"
-    if remaining_depth <= 0:
-        return AnnotatedValue(None, {"rem": [["!limit", "x"]]})
-    if isinstance(obj, text_type):
-        return strip_string(obj)
-    if isinstance(obj, Mapping):
-        rv_dict = {}  # type: Dict[Any, Any]
-        for i, (k, v) in enumerate(obj.items()):
-            if i >= max_breadth:
-                return AnnotatedValue(rv_dict, {"len": max_breadth})
-            rv_dict[k] = strip_databag(
-                v, remaining_depth=remaining_depth - 1, max_breadth=max_breadth
-            )
-
-        return rv_dict
-    if isinstance(obj, Sequence):
-        rv_list = []  # type: List[Any]
-        for i, v in enumerate(obj):
-            if i >= max_breadth:
-                return AnnotatedValue(rv_list, {"len": max_breadth})
-            rv_list.append(
-                strip_databag(
-                    v, remaining_depth=remaining_depth - 1, max_breadth=max_breadth
-                )
-            )
-
-        return rv_list
-    return obj
 
 
 def strip_string(value, max_length=512):

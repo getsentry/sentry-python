@@ -475,7 +475,7 @@ def test_cyclic_data(sentry_init, capture_events):
     event, = events
 
     data = event["extra"]["foo"]
-    assert data == {"not_cyclic2": "''", "not_cyclic": "''", "is_cyclic": "<cyclic>"}
+    assert data == {"not_cyclic2": "", "not_cyclic": "", "is_cyclic": "<cyclic>"}
 
 
 def test_databag_stripping(sentry_init, capture_events):
@@ -559,7 +559,7 @@ def test_broken_mapping(sentry_init, capture_events):
     event, = events
     assert (
         event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"]
-        == "<broken repr>"
+        == "<failed to serialize, use init(debug=True) to see error logs>"
     )
 
 
@@ -576,3 +576,24 @@ def test_errno_errors(sentry_init, capture_events):
 
     exception, = event["exception"]["values"]
     assert exception["mechanism"]["meta"]["errno"]["number"] == 69
+
+
+def test_non_string_variables(sentry_init, capture_events):
+    """There is some extremely terrible code in the wild that
+    inserts non-strings as variable names into `locals()`."""
+
+    sentry_init()
+    events = capture_events()
+
+    try:
+        locals()[42] = True
+        1 / 0
+    except ZeroDivisionError:
+        capture_exception()
+
+    event, = events
+
+    exception, = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+    frame, = exception["stacktrace"]["frames"]
+    assert frame["vars"]["42"] == "True"

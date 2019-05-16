@@ -55,22 +55,6 @@ def test_abs_path():
     assert frame2["filename"] == "test.py"
 
 
-def test_non_string_variables():
-    """There is some extremely terrible code in the wild that
-    inserts non-strings as variable names into `locals()`."""
-
-    try:
-        locals()[42] = True
-        1 / 0
-    except ZeroDivisionError:
-        exceptions = exceptions_from_error_tuple(sys.exc_info())
-
-    exception, = exceptions
-    assert exception["type"] == "ZeroDivisionError"
-    frame, = exception["stacktrace"]["frames"]
-    assert frame["vars"]["42"] == "True"
-
-
 def test_format_and_strip():
     max_length = None
 
