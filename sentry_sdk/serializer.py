@@ -10,7 +10,7 @@ from sentry_sdk.utils import (
     strip_string,
 )
 
-from sentry_sdk._compat import text_type, PY2, string_types, number_types
+from sentry_sdk._compat import text_type, PY2, string_types, number_types, iteritems
 
 if False:
     from typing import Any
@@ -210,7 +210,7 @@ class Serializer(object):
 
         if isinstance(obj, (Mapping, LazyMap)):
             rv_dict = {}  # type: Dict[Any, Any]
-            for i, (k, v) in enumerate(obj.items()):
+            for i, (k, v) in enumerate(iteritems(obj)):
                 if max_breadth is not None and i >= max_breadth:
                     self.meta_node.annotate(len=max_breadth)
                     break

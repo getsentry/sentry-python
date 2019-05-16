@@ -2,7 +2,7 @@ import json
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue
-from sentry_sdk._compat import text_type
+from sentry_sdk._compat import text_type, iteritems
 
 if False:
     from typing import Any
@@ -75,8 +75,8 @@ class RequestExtractor(object):
         form = self.form()
         files = self.files()
         if form or files:
-            data = dict(form.items())
-            for k, v in files.items():
+            data = dict(iteritems(form))
+            for k, v in iteritems(files):
                 size = self.size_of_file(v)
                 data[k] = AnnotatedValue(
                     "", {"len": size, "rem": [["!raw", "x", 0, size]]}
@@ -130,6 +130,6 @@ def _filter_headers(headers):
 
     return {
         k: v
-        for k, v in headers.items()
+        for k, v in iteritems(headers)
         if k.lower().replace("_", "-") not in ("set-cookie", "cookie", "authorization")
     }

@@ -11,6 +11,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
 )
 from sentry_sdk.integrations import Integration
+from sentry_sdk._compat import iteritems
 
 if False:
     from logging import LogRecord
@@ -135,7 +136,7 @@ def _extra_from_record(record):
     # type: (LogRecord) -> Dict[str, None]
     return {
         k: v
-        for k, v in vars(record).items()
+        for k, v in iteritems(vars(record))
         if k not in COMMON_RECORD_ATTRS and not k.startswith("_")
     }
 

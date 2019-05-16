@@ -15,6 +15,7 @@ from sentry_sdk.integrations._wsgi_common import (
     _is_json_content_type,
 )
 from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk._compat import iteritems
 
 from tornado.web import RequestHandler, HTTPError  # type: ignore
 from tornado.gen import coroutine  # type: ignore
@@ -166,7 +167,7 @@ class TornadoRequestExtractor(RequestExtractor):
 
     def cookies(self):
         # type: () -> Dict
-        return {k: v.value for k, v in self.request.cookies.items()}
+        return {k: v.value for k, v in iteritems(self.request.cookies)}
 
     def raw_data(self):
         # type: () -> bytes
@@ -176,7 +177,7 @@ class TornadoRequestExtractor(RequestExtractor):
         # type: () -> Optional[Any]
         return {
             k: [v.decode("latin1", "replace") for v in vs]
-            for k, vs in self.request.body_arguments.items()
+            for k, vs in iteritems(self.request.body_arguments)
         }
 
     def is_json(self):
@@ -185,7 +186,7 @@ class TornadoRequestExtractor(RequestExtractor):
 
     def files(self):
         # type: () -> Dict
-        return {k: v[0] for k, v in self.request.files.items() if v}
+        return {k: v[0] for k, v in iteritems(self.request.files) if v}
 
     def size_of_file(self, file):
         return len(file.body or ())

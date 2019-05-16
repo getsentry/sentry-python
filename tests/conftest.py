@@ -5,7 +5,7 @@ import json
 import pytest
 
 import sentry_sdk
-from sentry_sdk._compat import reraise, string_types
+from sentry_sdk._compat import reraise, string_types, iteritems
 from sentry_sdk.transport import Transport
 
 SEMAPHORE = "./semaphore"
@@ -50,7 +50,7 @@ def reraise_internal_exceptions(request, monkeypatch):
 def monkeypatch_test_transport(monkeypatch, assert_semaphore_acceptance):
     def check_event(event):
         def check_string_keys(map):
-            for key, value in map.items():
+            for key, value in iteritems(map):
                 assert isinstance(key, string_types)
                 if isinstance(value, dict):
                     check_string_keys(value)

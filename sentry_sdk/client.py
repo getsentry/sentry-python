@@ -3,7 +3,7 @@ import uuid
 import random
 from datetime import datetime
 
-from sentry_sdk._compat import string_types, text_type
+from sentry_sdk._compat import string_types, text_type, iteritems
 from sentry_sdk.utils import (
     handle_in_app,
     get_type_name,
@@ -41,7 +41,7 @@ def get_options(*args, **kwargs):
     if dsn is not None and options.get("dsn") is None:
         options["dsn"] = dsn  # type: ignore
 
-    for key, value in options.items():
+    for key, value in iteritems(options):
         if key not in rv:
             raise TypeError("Unknown option %r" % (key,))
         rv[key] = value  # type: ignore

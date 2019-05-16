@@ -193,6 +193,9 @@ class LazyMap(object):
     def items(self):
         return self._iterator
 
+    def iteritems(self):
+        return self._iterator
+
 
 class LazySequence(object):
     __slots__ = ("_iterator",)
