@@ -1624,9 +1624,7 @@ argument.</p></div>
         <span class="c1"># Postprocess the event here so that annotated types do</span>
         <span class="c1"># generally not surface in before_send</span>
         <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="n">event</span> <span class="o">=</span> <span class="n">convert_types</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-            <span class="n">strip_event_mut</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-            <span class="n">event</span> <span class="o">=</span> <span class="n">flatten_metadata</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="n">Serializer</span><span class="p">()</span><span class="o">.</span><span class="n">serialize_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
 
         <span class="n">before_send</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;before_send&quot;</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">before_send</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
@@ -3240,7 +3238,7 @@ events that belong to it.</p></div>
             <span class="n">event</span><span class="p">[</span><span class="s2">&quot;fingerprint&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="p">:</span>
-            <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;extra&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">object_to_json</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="p">))</span>
+            <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;extra&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">:</span>
             <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;tags&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">)</span>

@@ -1050,6 +1050,7 @@ table {
           
   <ul>
     <li class="mono"><a href="#sentry_sdk.integrations.excepthook.ExcepthookIntegration.setup_once">setup_once</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.excepthook.ExcepthookIntegration.__init__">__init__</a></li>
   </ul>
 
         </li>
@@ -1085,6 +1086,18 @@ table {
 <span class="k">class</span> <span class="nc">ExcepthookIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
     <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;excepthook&quot;</span>
 
+    <span class="n">always_run</span> <span class="o">=</span> <span class="bp">False</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">always_run</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="c1"># type: (bool) -&gt; None</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">always_run</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Invalid value for always_run: </span><span class="si">%s</span><span class="s2"> (must be type boolean)&quot;</span>
+                <span class="o">%</span> <span class="p">(</span><span class="n">always_run</span><span class="p">,)</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">always_run</span> <span class="o">=</span> <span class="n">always_run</span>
+
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
         <span class="c1"># type: () -&gt; None</span>
@@ -1097,7 +1110,7 @@ table {
         <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
         <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">ExcepthookIntegration</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">_should_send</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">_should_send</span><span class="p">(</span><span class="n">integration</span><span class="o">.</span><span class="n">always_run</span><span class="p">):</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
                 <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
                     <span class="p">(</span><span class="n">exctype</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">),</span>
@@ -1111,7 +1124,10 @@ table {
     <span class="k">return</span> <span class="n">sentry_sdk_excepthook</span>
 
 
-<span class="k">def</span> <span class="nf">_should_send</span><span class="p">():</span>
+<span class="k">def</span> <span class="nf">_should_send</span><span class="p">(</span><span class="n">always_run</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">always_run</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">True</span>
+
     <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">sys</span><span class="p">,</span> <span class="s2">&quot;ps1&quot;</span><span class="p">):</span>
         <span class="c1"># Disable the excepthook for interactive Python shells, otherwise</span>
         <span class="c1"># every typo gets sent to Sentry.</span>
@@ -1139,6 +1155,18 @@ table {
     <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">ExcepthookIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
     <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;excepthook&quot;</span>
 
+    <span class="n">always_run</span> <span class="o">=</span> <span class="bp">False</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">always_run</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="c1"># type: (bool) -&gt; None</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">always_run</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Invalid value for always_run: </span><span class="si">%s</span><span class="s2"> (must be type boolean)&quot;</span>
+                <span class="o">%</span> <span class="p">(</span><span class="n">always_run</span><span class="p">,)</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">always_run</span> <span class="o">=</span> <span class="n">always_run</span>
+
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
         <span class="c1"># type: () -&gt; None</span>
@@ -1157,6 +1185,16 @@ table {
           <li>__builtin__.object</li>
           </ul>
           <h3>Class variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.integrations.excepthook.ExcepthookIntegration.always_run" class="name">var <span class="ident">always_run</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
             <div class="item">
             <p id="sentry_sdk.integrations.excepthook.ExcepthookIntegration.identifier" class="name">var <span class="ident">identifier</span></p>
             
@@ -1194,6 +1232,45 @@ table {
 <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
     <span class="c1"># type: () -&gt; None</span>
     <span class="n">sys</span><span class="o">.</span><span class="n">excepthook</span> <span class="o">=</span> <span class="n">_make_excepthook</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">excepthook</span><span class="p">)</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+          <h3>Instance variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.integrations.excepthook.ExcepthookIntegration.always_run" class="name">var <span class="ident">always_run</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
+          <h3>Methods</h3>
+            
+  <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.excepthook.ExcepthookIntegration.__init__">
+    <p>def <span class="ident">__init__</span>(</p><p>self, always_run=False)</p>
+    </div>
+    
+
+    
+  
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.excepthook.ExcepthookIntegration.__init__', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.excepthook.ExcepthookIntegration.__init__" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">always_run</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+    <span class="c1"># type: (bool) -&gt; None</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">always_run</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Invalid value for always_run: </span><span class="si">%s</span><span class="s2"> (must be type boolean)&quot;</span>
+            <span class="o">%</span> <span class="p">(</span><span class="n">always_run</span><span class="p">,)</span>
+        <span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">always_run</span> <span class="o">=</span> <span class="n">always_run</span>
 </pre></div>
 
   </div>
