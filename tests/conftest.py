@@ -28,7 +28,7 @@ else:
 
 
 @pytest.fixture(autouse=True)
-def reraise_internal_exceptions(request, monkeypatch):
+def internal_exceptions(request, monkeypatch):
     errors = []
     if "tests_internal_exceptions" in request.keywords:
         return
@@ -44,6 +44,8 @@ def reraise_internal_exceptions(request, monkeypatch):
     monkeypatch.setattr(
         sentry_sdk.Hub, "_capture_internal_exception", _capture_internal_exception
     )
+
+    return errors
 
 
 @pytest.fixture

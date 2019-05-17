@@ -52,7 +52,9 @@ def test_basic(sentry_init, crashing_app, capture_events):
     }
 
 
-def test_env_modifing_app(sentry_init, crashing_env_modifing_app, capture_events):
+def test_env_modifing_app(
+    sentry_init, crashing_env_modifing_app, capture_events, internal_exceptions
+):
     sentry_init(send_default_pii=True)
     app = SentryWsgiMiddleware(crashing_env_modifing_app)
     client = Client(app)
@@ -62,3 +64,5 @@ def test_env_modifing_app(sentry_init, crashing_env_modifing_app, capture_events
         client.get("/")
 
     assert len(events) == 1  # only one exception is raised
+    assert len(internal_exceptions) == 1
+    del internal_exceptions[:]
