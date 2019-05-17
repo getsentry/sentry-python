@@ -1,6 +1,9 @@
-## 0.7.15
+## 0.8.0
 
 * Add the always_run option in excepthook integration.
+* Fix performance issues when attaching large data to events. This is not
+  really intended to be a breaking change, but this release does include a
+  rewrite of a larger chunk of code, therefore the minor version bump.
 
 ## 0.7.14
 
