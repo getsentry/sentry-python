@@ -5,7 +5,7 @@ import json
 import pytest
 
 import sentry_sdk
-from sentry_sdk._compat import reraise, string_types
+from sentry_sdk._compat import reraise, string_types, iteritems
 from sentry_sdk.transport import Transport
 
 SEMAPHORE = "./semaphore"
@@ -14,8 +14,21 @@ if not os.path.isfile(SEMAPHORE):
     SEMAPHORE = None
 
 
+try:
+    import pytest_benchmark
+except ImportError:
+
+    @pytest.fixture
+    def benchmark():
+        return lambda x: x()
+
+
+else:
+    del pytest_benchmark
+
+
 @pytest.fixture(autouse=True)
-def reraise_internal_exceptions(request, monkeypatch):
+def internal_exceptions(request, monkeypatch):
     errors = []
     if "tests_internal_exceptions" in request.keywords:
         return
@@ -32,12 +45,14 @@ def reraise_internal_exceptions(request, monkeypatch):
         sentry_sdk.Hub, "_capture_internal_exception", _capture_internal_exception
     )
 
+    return errors
+
 
 @pytest.fixture
 def monkeypatch_test_transport(monkeypatch, assert_semaphore_acceptance):
     def check_event(event):
         def check_string_keys(map):
-            for key, value in map.items():
+            for key, value in iteritems(map):
                 assert isinstance(key, string_types)
                 if isinstance(value, dict):
                     check_string_keys(value)

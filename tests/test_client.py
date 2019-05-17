@@ -475,37 +475,65 @@ def test_cyclic_data(sentry_init, capture_events):
     event, = events
 
     data = event["extra"]["foo"]
-    assert data == {"not_cyclic2": "''", "not_cyclic": "''", "is_cyclic": "<cyclic>"}
+    assert data == {"not_cyclic2": "", "not_cyclic": "", "is_cyclic": "<cyclic>"}
 
 
-def test_databag_stripping(sentry_init, capture_events):
+def test_databag_depth_stripping(sentry_init, capture_events, benchmark):
     sentry_init()
     events = capture_events()
 
-    try:
-        a = "A" * 16000  # noqa
-        1 / 0
-    except Exception:
-        capture_exception()
+    value = ["a"]
+    for _ in range(100000):
+        value = [value]
 
-    event, = events
+    @benchmark
+    def inner():
+        del events[:]
+        try:
+            a = value  # noqa
+            1 / 0
+        except Exception:
+            capture_exception()
 
-    assert len(json.dumps(event)) < 10000
+        event, = events
+
+        assert len(json.dumps(event)) < 10000
 
 
-def test_databag_breadth_stripping(sentry_init, capture_events):
+def test_databag_string_stripping(sentry_init, capture_events, benchmark):
     sentry_init()
     events = capture_events()
 
-    try:
-        a = ["a"] * 16000  # noqa
-        1 / 0
-    except Exception:
-        capture_exception()
+    @benchmark
+    def inner():
+        del events[:]
+        try:
+            a = "A" * 1000000  # noqa
+            1 / 0
+        except Exception:
+            capture_exception()
 
-    event, = events
+        event, = events
 
-    assert len(json.dumps(event)) < 10000
+        assert len(json.dumps(event)) < 10000
+
+
+def test_databag_breadth_stripping(sentry_init, capture_events, benchmark):
+    sentry_init()
+    events = capture_events()
+
+    @benchmark
+    def inner():
+        del events[:]
+        try:
+            a = ["a"] * 1000000  # noqa
+            1 / 0
+        except Exception:
+            capture_exception()
+
+        event, = events
+
+        assert len(json.dumps(event)) < 10000
 
 
 @pytest.mark.skipif(not HAS_CHAINED_EXCEPTIONS, reason="Only works on 3.3+")
@@ -559,7 +587,7 @@ def test_broken_mapping(sentry_init, capture_events):
     event, = events
     assert (
         event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"]
-        == "<broken repr>"
+        == "<failed to serialize, use init(debug=True) to see error logs>"
     )
 
 
@@ -576,3 +604,58 @@ def test_errno_errors(sentry_init, capture_events):
 
     exception, = event["exception"]["values"]
     assert exception["mechanism"]["meta"]["errno"]["number"] == 69
+
+
+def test_non_string_variables(sentry_init, capture_events):
+    """There is some extremely terrible code in the wild that
+    inserts non-strings as variable names into `locals()`."""
+
+    sentry_init()
+    events = capture_events()
+
+    try:
+        locals()[42] = True
+        1 / 0
+    except ZeroDivisionError:
+        capture_exception()
+
+    event, = events
+
+    exception, = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+    frame, = exception["stacktrace"]["frames"]
+    assert frame["vars"]["42"] == "True"
+
+
+def test_dict_changed_during_iteration(sentry_init, capture_events):
+    """
+    Some versions of Bottle modify the WSGI environment inside of this __repr__
+    impl: https://github.com/bottlepy/bottle/blob/0.12.16/bottle.py#L1386
+
+    See https://github.com/getsentry/sentry-python/pull/298 for discussion
+    """
+    sentry_init(send_default_pii=True)
+    events = capture_events()
+
+    class TooSmartClass(object):
+        def __init__(self, environ):
+            self.environ = environ
+
+        def __repr__(self):
+            if "my_representation" in self.environ:
+                return self.environ["my_representation"]
+
+            self.environ["my_representation"] = "<This is me>"
+            return self.environ["my_representation"]
+
+    try:
+        environ = {}
+        environ["a"] = TooSmartClass(environ)
+        1 / 0
+    except ZeroDivisionError:
+        capture_exception()
+
+    event, = events
+    exception, = event["exception"]["values"]
+    frame, = exception["stacktrace"]["frames"]
+    assert frame["vars"]["environ"] == {"a": "<This is me>"}

@@ -3,17 +3,15 @@ import uuid
 import random
 from datetime import datetime
 
-from sentry_sdk._compat import string_types, text_type
+from sentry_sdk._compat import string_types, text_type, iteritems
 from sentry_sdk.utils import (
-    strip_event_mut,
-    flatten_metadata,
-    convert_types,
     handle_in_app,
     get_type_name,
     capture_internal_exceptions,
     current_stacktrace,
     logger,
 )
+from sentry_sdk.serializer import Serializer
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO
 from sentry_sdk.integrations import setup_integrations
@@ -43,7 +41,7 @@ def get_options(*args, **kwargs):
     if dsn is not None and options.get("dsn") is None:
         options["dsn"] = dsn  # type: ignore
 
-    for key, value in options.items():
+    for key, value in iteritems(options):
         if key not in rv:
             raise TypeError("Unknown option %r" % (key,))
         rv[key] = value  # type: ignore
@@ -146,9 +144,7 @@ class Client(object):
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
-            event = convert_types(event)
-            strip_event_mut(event)
-            event = flatten_metadata(event)
+            event = Serializer().serialize_event(event)
 
         before_send = self.options["before_send"]
         if before_send is not None:

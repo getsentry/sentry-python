@@ -9,7 +9,7 @@ from pyramid.request import Request  # type: ignore
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
-from sentry_sdk._compat import reraise
+from sentry_sdk._compat import reraise, iteritems
 
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
@@ -135,7 +135,7 @@ class PyramidRequestExtractor(RequestExtractor):
         # type: () -> Dict[str, str]
         return {
             key: value
-            for key, value in self.request.POST.items()
+            for key, value in iteritems(self.request.POST)
             if not getattr(value, "filename", None)
         }
 
@@ -143,7 +143,7 @@ class PyramidRequestExtractor(RequestExtractor):
         # type: () -> Dict[str, cgi_FieldStorage]
         return {
             key: value
-            for key, value in self.request.POST.items()
+            for key, value in iteritems(self.request.POST)
             if getattr(value, "filename", None)
         }
 
