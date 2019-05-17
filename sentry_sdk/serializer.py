@@ -177,7 +177,10 @@ class Serializer(object):
 
                 return self._serialize_node_impl(obj, **kwargs)
 
-        return u"<failed to serialize, use init(debug=True) to see error logs>"
+        if self.meta_node.is_databag():
+            return u"<failed to serialize, use init(debug=True) to see error logs>"
+
+        return None
 
     def _serialize_node_impl(self, obj, max_depth=None, max_breadth=None):
         # type: (Any, Optional[int], Optional[int]) -> Any
@@ -207,12 +210,18 @@ class Serializer(object):
                         return _flatten_annotated(result, self.meta_node)
 
         if isinstance(obj, Mapping):
-            rv_dict = {}  # type: Dict[Any, Any]
+            # Create temporary list here to avoid calling too much code that
+            # might mutate our dictionary while we're still iterating over it.
+            items = []
             for i, (k, v) in enumerate(iteritems(obj)):
                 if max_breadth is not None and i >= max_breadth:
                     self.meta_node.annotate(len=max_breadth)
                     break
 
+                items.append((k, v))
+
+            rv_dict = {}  # type: Dict[Any, Any]
+            for k, v in items:
                 k = text_type(k)
 
                 with self.enter(k):
@@ -223,9 +232,7 @@ class Serializer(object):
                         rv_dict[k] = v
 
             return rv_dict
-        elif isinstance(obj, Sequence) and not isinstance(
-            obj, string_types
-        ):
+        elif isinstance(obj, Sequence) and not isinstance(obj, string_types):
             rv_list = []  # type: List[Any]
             for i, v in enumerate(obj):
                 if max_breadth is not None and i >= max_breadth:

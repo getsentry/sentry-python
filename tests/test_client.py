@@ -627,10 +627,13 @@ def test_non_string_variables(sentry_init, capture_events):
     assert frame["vars"]["42"] == "True"
 
 
-def test_dict_changed_during_iteration(
-    sentry_init, capture_events, internal_exceptions
-):
-    """Some versions of Bottle modify the WSGI environment inside of a __repr__ impl"""
+def test_dict_changed_during_iteration(sentry_init, capture_events):
+    """
+    Some versions of Bottle modify the WSGI environment inside of this __repr__
+    impl: https://github.com/bottlepy/bottle/blob/0.12.16/bottle.py#L1386
+
+    See https://github.com/getsentry/sentry-python/pull/298 for discussion
+    """
     sentry_init(send_default_pii=True)
     events = capture_events()
 
@@ -647,7 +650,7 @@ def test_dict_changed_during_iteration(
 
     try:
         environ = {}
-        environ["aaaaa"] = TooSmartClass(environ)
+        environ["a"] = TooSmartClass(environ)
         1 / 0
     except ZeroDivisionError:
         capture_exception()
@@ -655,10 +658,4 @@ def test_dict_changed_during_iteration(
     event, = events
     exception, = event["exception"]["values"]
     frame, = exception["stacktrace"]["frames"]
-    assert (
-        frame["vars"]["environ"]
-        == "<failed to serialize, use init(debug=True) to see error logs>"
-    )
-
-    assert len(internal_exceptions) == 1
-    del internal_exceptions[:]
+    assert frame["vars"]["environ"] == {"a": "<This is me>"}

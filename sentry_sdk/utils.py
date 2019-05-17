@@ -6,14 +6,7 @@ import logging
 from contextlib import contextmanager
 from datetime import datetime
 
-from sentry_sdk._compat import (
-    urlparse,
-    text_type,
-    implements_str,
-    int_types,
-    iteritems,
-    PY2,
-)
+from sentry_sdk._compat import urlparse, text_type, implements_str, int_types, PY2
 
 if False:
     from typing import Any
