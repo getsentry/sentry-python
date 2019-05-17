@@ -20,9 +20,6 @@ branches:
     - /^release\/.+$/
 
 matrix:
-  allow_failures:
-    - os: osx
-
   include:
     - python: "3.7"
       dist: xenial
@@ -42,17 +39,6 @@ matrix:
       name: Build documentation
       install: false
       script: make travis-upload-docs
-    - # The OS X VM doesn't have any Python support at all
-      # See https://github.com/travis-ci/travis-ci/issues/2312
-      os: osx
-      name: OS X Python 2.7
-      language: generic
-      before_install:
-        - HOMEBREW_LOGS=/tmp HOMEBREW_NO_AUTO_UPDATE=yes brew install python@2
-        - python2 -m pip install --user virtualenv
-        - /Users/travis/Library/Python/2.7/bin/virtualenv $HOME/osx-py
-        - source $HOME/osx-py/bin/activate
-        - export TRAVIS_PYTHON_VERSION=2.7
 
 before_script:
   - psql -c 'create database travis_ci_test;' -U postgres
