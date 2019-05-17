@@ -184,29 +184,6 @@ class Auth(object):
         return u"Sentry " + u", ".join("%s=%s" % (key, value) for key, value in rv)
 
 
-class LazyMap(object):
-    __slots__ = ("_iterator",)
-
-    def __init__(self, iterator):
-        self._iterator = iterator
-
-    def items(self):
-        return self._iterator
-
-    def iteritems(self):
-        return self._iterator
-
-
-class LazySequence(object):
-    __slots__ = ("_iterator",)
-
-    def __init__(self, iterator):
-        self._iterator = iterator
-
-    def __iter__(self):
-        return iter(self._iterator)
-
-
 class AnnotatedValue(object):
     def __init__(self, value, metadata):
         # type: (Optional[Any], Dict[str, Any]) -> None
@@ -362,11 +339,6 @@ def safe_repr(value):
         return u"<broken repr>"
 
 
-def extract_locals(frame):
-    # type: (Any) -> LazyMap
-    return LazyMap((str(key), value) for key, value in iteritems(frame.f_locals))
-
-
 def filename_for_module(module, abs_path):
     # type: (str, str) -> str
     try:
@@ -415,7 +387,7 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
         "post_context": post_context,
     }
     if with_locals:
-        rv["vars"] = extract_locals(frame)
+        rv["vars"] = frame.f_locals
     return rv
 
 

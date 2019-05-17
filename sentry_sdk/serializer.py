@@ -3,8 +3,6 @@ from datetime import datetime
 
 from sentry_sdk.utils import (
     AnnotatedValue,
-    LazyMap,
-    LazySequence,
     capture_internal_exceptions,
     safe_repr,
     strip_string,
@@ -208,12 +206,14 @@ class Serializer(object):
                     if result is not NotImplemented:
                         return _flatten_annotated(result, self.meta_node)
 
-        if isinstance(obj, (Mapping, LazyMap)):
+        if isinstance(obj, Mapping):
             rv_dict = {}  # type: Dict[Any, Any]
             for i, (k, v) in enumerate(iteritems(obj)):
                 if max_breadth is not None and i >= max_breadth:
                     self.meta_node.annotate(len=max_breadth)
                     break
+
+                k = text_type(k)
 
                 with self.enter(k):
                     v = self._serialize_node(
@@ -223,7 +223,7 @@ class Serializer(object):
                         rv_dict[k] = v
 
             return rv_dict
-        elif isinstance(obj, (LazySequence, Sequence)) and not isinstance(
+        elif isinstance(obj, Sequence) and not isinstance(
             obj, string_types
         ):
             rv_list = []  # type: List[Any]
