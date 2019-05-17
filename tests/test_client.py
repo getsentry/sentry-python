@@ -625,3 +625,40 @@ def test_non_string_variables(sentry_init, capture_events):
     assert exception["type"] == "ZeroDivisionError"
     frame, = exception["stacktrace"]["frames"]
     assert frame["vars"]["42"] == "True"
+
+
+def test_dict_changed_during_iteration(
+    sentry_init, capture_events, internal_exceptions
+):
+    """Some versions of Bottle modify the WSGI environment inside of a __repr__ impl"""
+    sentry_init(send_default_pii=True)
+    events = capture_events()
+
+    class TooSmartClass(object):
+        def __init__(self, environ):
+            self.environ = environ
+
+        def __repr__(self):
+            if "my_representation" in self.environ:
+                return self.environ["my_representation"]
+
+            self.environ["my_representation"] = "<This is me>"
+            return self.environ["my_representation"]
+
+    try:
+        environ = {}
+        environ["aaaaa"] = TooSmartClass(environ)
+        1 / 0
+    except ZeroDivisionError:
+        capture_exception()
+
+    event, = events
+    exception, = event["exception"]["values"]
+    frame, = exception["stacktrace"]["frames"]
+    assert (
+        frame["vars"]["environ"]
+        == "<failed to serialize, use init(debug=True) to see error logs>"
+    )
+
+    assert len(internal_exceptions) == 1
+    del internal_exceptions[:]
