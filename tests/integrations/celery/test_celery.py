@@ -6,7 +6,7 @@ pytest.importorskip("celery")
 
 from sentry_sdk import Hub, configure_scope
 from sentry_sdk.integrations.celery import CeleryIntegration
-from sentry_sdk.tracing import SpanContext
+from sentry_sdk.tracing import Span
 
 from celery import Celery, VERSION
 from celery.bin import worker
@@ -63,7 +63,7 @@ def test_simple(capture_events, celery, invocation, expected_context):
         foo = 42  # noqa
         return x / y
 
-    span_context = SpanContext.start_trace()
+    span_context = Span.start_trace()
     with configure_scope() as scope:
         scope.set_span_context(span_context)
 
@@ -92,7 +92,7 @@ def test_simple_no_propagation(capture_events, init_celery):
     def dummy_task():
         1 / 0
 
-    span_context = SpanContext.start_trace()
+    span_context = Span.start_trace()
     with configure_scope() as scope:
         scope.set_span_context(span_context)
     dummy_task.delay()

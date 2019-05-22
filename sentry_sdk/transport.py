@@ -105,7 +105,7 @@ class HttpTransport(Transport):
         logger.debug(
             "Sending %s event [%s] to %s project:%s"
             % (
-                event.get("level") or "error",
+                event.get("level") or "level-less",
                 event["event_id"],
                 self.parsed_dsn.host,
                 self.parsed_dsn.project_id,

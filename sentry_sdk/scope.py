@@ -83,15 +83,26 @@ class Scope(object):
     def transaction(self, value):
         """When set this forces a specific transaction name to be set."""
         self._transaction = value
+        if self._span:
+            self._span.transaction = value
 
     @_attr_setter
     def user(self, value):
         """When set a specific user is bound to the scope."""
         self._user = value
 
-    def set_span_context(self, span_context):
-        """Sets the span context."""
-        self._span = span_context
+    @property
+    def span(self):
+        """Get/set current tracing span."""
+        return self._span
+
+    @span.setter
+    def span(self, span):
+        self._span = span
+        if span.transaction:
+            self._transaction = span.transaction
+        elif self._transaction:
+            span.transaction = self._transaction
 
     def set_tag(self, key, value):
         """Sets a tag for a key to a specific value."""

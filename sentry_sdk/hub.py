@@ -1,6 +1,8 @@
-import sys
 import copy
+import random
+import sys
 import weakref
+
 from datetime import datetime
 from contextlib import contextmanager
 from warnings import warn
@@ -8,6 +10,7 @@ from warnings import warn
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
+from sentry_sdk.tracing import Span
 from sentry_sdk.utils import (
     exc_info_from_error,
     event_from_exception,
@@ -343,6 +346,57 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         max_breadcrumbs = client.options["max_breadcrumbs"]  # type: int
         while len(scope._breadcrumbs) > max_breadcrumbs:
             scope._breadcrumbs.popleft()
+
+    @contextmanager
+    def span(self, span=None, **kwargs):
+        if span is None:
+            span = self.start_span(**kwargs)
+
+        if span is None:
+            yield span
+            return
+
+        try:
+            yield span
+        except Exception:
+            span.set_tag("success", False)
+        else:
+            span.set_tag("success", True)
+        finally:
+            span.finish()
+            self.capture_trace(span)
+
+    def trace(self, *args, **kwargs):
+        return self.span(self.start_trace(*args, **kwargs))
+
+    def start_span(self, **kwargs):
+        _, scope = self._stack[-1]
+        span = scope.span
+        if span is not None:
+            return span.new_span(**kwargs)
+        return None
+
+    def start_trace(self, transaction, **kwargs):
+        _, scope = self._stack[-1]
+        scope.span = span = Span.start_trace(transaction, **kwargs)
+        return span
+
+    def capture_trace(self, span):
+        if span.transaction is None:
+            return None
+
+        client = self.client
+
+        if client is None:
+            return None
+
+        sample_rate = client.options["traces_sample_rate"]
+        if sample_rate < 1.0 and random.random() >= sample_rate:
+            return None
+
+        return self.capture_event(
+            {"type": "none", "spans": [s.to_json() for s in span._finished_spans]}
+        )
 
     @overload  # noqa
     def push_scope(self):

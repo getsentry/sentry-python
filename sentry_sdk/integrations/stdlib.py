@@ -29,6 +29,7 @@ def install_httplib():
             return rv
 
         self._sentrysdk_data_dict = data = {}
+        self._sentrysdk_span = hub.start_span()
 
         host = self.host
         port = self.port
@@ -61,6 +62,12 @@ def install_httplib():
         if "status_code" not in data:
             data["status_code"] = rv.status
             data["reason"] = rv.reason
+
+        span = self._sentrysdk_span
+        if span is not None:
+            span.set_tag("status_code", rv.status)
+            span.finish()
+
         hub.add_breadcrumb(
             type="http", category="httplib", data=data, hint={"httplib_response": rv}
         )

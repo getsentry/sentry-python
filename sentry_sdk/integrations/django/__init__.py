@@ -112,7 +112,19 @@ class DjangoIntegration(Integration):
             hub = Hub.current
             integration = hub.get_integration(DjangoIntegration)
             if integration is not None:
+
                 with hub.configure_scope() as scope:
+                    # Rely on WSGI middleware to start a trace
+                    try:
+                        if integration.transaction_style == "function_name":
+                            scope.transaction = transaction_from_function(
+                                resolve(request.path).func
+                            )
+                        elif integration.transaction_style == "url":
+                            scope.transaction = LEGACY_RESOLVER.resolve(request.path)
+                    except Exception:
+                        pass
+
                     scope.add_event_processor(
                         _make_event_processor(weakref.ref(request), integration)
                     )
@@ -189,16 +201,6 @@ def _make_event_processor(weak_request, integration):
         request = weak_request()
         if request is None:
             return event
-
-        try:
-            if integration.transaction_style == "function_name":
-                event["transaction"] = transaction_from_function(
-                    resolve(request.path).func
-                )
-            elif integration.transaction_style == "url":
-                event["transaction"] = LEGACY_RESOLVER.resolve(request.path)
-        except Exception:
-            pass
 
         with capture_internal_exceptions():
             DjangoRequestExtractor(request).extract_into_event(event)
