@@ -366,8 +366,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             span.finish()
             self.capture_trace(span)
 
-    def trace(self, *args, **kwargs):
-        return self.span(self.start_trace(*args, **kwargs))
+    def trace(self, **kwargs):
+        return self.span(self.start_trace(**kwargs))
 
     def start_span(self, **kwargs):
         _, scope = self._stack[-1]
@@ -376,26 +376,34 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return span.new_span(**kwargs)
         return None
 
-    def start_trace(self, transaction, **kwargs):
+    def start_trace(self, **kwargs):
+        span = Span.start_trace(**kwargs)
+
         _, scope = self._stack[-1]
-        scope.span = span = Span.start_trace(transaction, **kwargs)
+        scope.span = span
         return span
 
     def capture_trace(self, span):
-        if span.transaction is None:
+        if (
+            span.transaction is None
+            or span.timestamp is None
+            or self.client is None
+            or span.sampled is False
+        ):
             return None
 
-        client = self.client
-
-        if client is None:
-            return None
-
-        sample_rate = client.options["traces_sample_rate"]
+        sample_rate = self.client.options["traces_sample_rate"]
         if sample_rate < 1.0 and random.random() >= sample_rate:
             return None
 
         return self.capture_event(
-            {"type": "none", "spans": [s.to_json() for s in span._finished_spans]}
+            {
+                "type": "transaction",
+                "contexts": {"trace": span.get_trace_context()},
+                "timestamp": span.timestamp,
+                "start_timestamp": span.start_timestamp,
+                "spans": [s.to_json() for s in span._finished_spans if s is not span],
+            }
         )
 
     @overload  # noqa

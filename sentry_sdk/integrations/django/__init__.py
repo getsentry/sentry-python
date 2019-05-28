@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
+import contextlib
 import sys
 import weakref
 
@@ -318,10 +319,12 @@ def format_sql(sql, params):
     return sql, rv
 
 
+@contextlib.contextmanager
 def record_sql(sql, params, cursor=None):
     # type: (Any, Any, Any) -> None
     hub = Hub.current
     if hub.get_integration(DjangoIntegration) is None:
+        yield
         return
 
     real_sql = None
@@ -353,9 +356,33 @@ def record_sql(sql, params, cursor=None):
         except Exception:
             pass
 
+    span = None
+
     if real_sql:
         with capture_internal_exceptions():
             hub.add_breadcrumb(message=real_sql, category="query")
+            span = hub.start_span(op="sql.query", description=real_sql)
+
+    if span is None:
+        yield
+    else:
+        try:
+            yield
+        finally:
+            span.set_tag("status", sys.exc_info()[1] is None)
+            span.finish()
+
+
+@contextlib.contextmanager
+def record_many_sql(sql, param_list, cursor):
+    ctxs = [record_sql(sql, params, cursor).__enter__() for params in param_list]
+
+    try:
+        yield
+    finally:
+        einfo = sys.exc_info()
+        for ctx in ctxs:
+            ctx.__exit__(*einfo)
 
 
 def install_sql_hook():
@@ -373,21 +400,13 @@ def install_sql_hook():
         # This won't work on Django versions < 1.6
         return
 
-    def record_many_sql(sql, param_list, cursor):
-        for params in param_list:
-            record_sql(sql, params, cursor)
-
     def execute(self, sql, params=None):
-        try:
+        with record_sql(sql, params, self.cursor):
             return real_execute(self, sql, params)
-        finally:
-            record_sql(sql, params, self.cursor)
 
     def executemany(self, sql, param_list):
-        try:
+        with record_many_sql(sql, param_list, self.cursor):
             return real_executemany(self, sql, param_list)
-        finally:
-            record_many_sql(sql, param_list, self.cursor)
 
     CursorWrapper.execute = execute
     CursorWrapper.executemany = executemany

@@ -212,10 +212,9 @@ class Scope(object):
             event.setdefault("contexts", {}).update(self._contexts)
 
         if self._span is not None:
-            event.setdefault("contexts", {})["trace"] = {
-                "trace_id": self._span.trace_id,
-                "span_id": self._span.span_id,
-            }
+            contexts = event.setdefault("contexts", {})
+            if not contexts.get("trace"):
+                contexts["trace"] = self._span.get_trace_context()
 
         exc_info = hint.get("exc_info") if hint is not None else None
         if exc_info is not None:

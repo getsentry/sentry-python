@@ -28,9 +28,6 @@ def install_httplib():
         if hub.get_integration(StdlibIntegration) is None:
             return rv
 
-        self._sentrysdk_data_dict = data = {}
-        self._sentrysdk_span = hub.start_span()
-
         host = self.host
         port = self.port
         default_port = self.default_port
@@ -43,6 +40,11 @@ def install_httplib():
                 port != default_port and ":%s" % port or "",
                 url,
             )
+
+        self._sentrysdk_data_dict = data = {}
+        self._sentrysdk_span = hub.start_span(
+            op="http", description="%s %s" % (real_url, method)
+        )
 
         for key, value in hub.iter_trace_propagation_headers():
             self.putheader(key, value)
@@ -66,6 +68,8 @@ def install_httplib():
         span = self._sentrysdk_span
         if span is not None:
             span.set_tag("status_code", rv.status)
+            for k, v in data.items():
+                span.set_data(k, v)
             span.finish()
 
         hub.add_breadcrumb(
