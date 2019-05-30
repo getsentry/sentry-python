@@ -39,6 +39,10 @@ class CeleryIntegration(Integration):
                 task.__call__ = _wrap_task_call(task, task.__call__)
                 task.run = _wrap_task_call(task, task.run)
                 task.apply_async = _wrap_apply_async(task, task.apply_async)
+
+                # `build_tracer` is apparently called for every task
+                # invocation. Can't wrap every celery task for every invocation
+                # or we will get infinitely nested wrapper functions.
                 task._sentry_is_patched = True
 
             return _wrap_tracer(task, old_build_tracer(name, task, *args, **kwargs))
