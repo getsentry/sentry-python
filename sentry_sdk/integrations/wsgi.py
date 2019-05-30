@@ -90,9 +90,9 @@ class SentryWsgiMiddleware(object):
             except Exception:
                 reraise(*_capture_exception(hub))
             except KeyboardInterrupt:
-                reraise(*_capture_exception(self._hub))
+                reraise(*_capture_exception(hub))
             except SystemExit as e:
-                reraise(*_capture_exception(self._hub, skip_capture=e.code == 0))
+                reraise(*_capture_exception(hub, skip_capture=e.code == 0))
 
         return _ScopedResponse(hub, rv)
 
