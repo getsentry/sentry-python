@@ -71,6 +71,7 @@ def test_simple(capture_events, celery, invocation, expected_context):
     invocation(dummy_task, 1, 0)
 
     event, = events
+
     assert event["contexts"]["trace"]["trace_id"] == span_context.trace_id
     assert event["contexts"]["trace"]["span_id"] != span_context.span_id
     assert event["transaction"] == "dummy_task"
@@ -82,6 +83,31 @@ def test_simple(capture_events, celery, invocation, expected_context):
     assert exception["type"] == "ZeroDivisionError"
     assert exception["mechanism"]["type"] == "celery"
     assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
+
+
+def test_no_stackoverflows(celery):
+    """We used to have a bug in the Celery integration where its monkeypatching
+    was repeated for every task invocation, leading to stackoverflows.
+
+    See https://github.com/getsentry/sentry-python/issues/265
+    """
+
+    results = []
+
+    @celery.task(name="dummy_task")
+    def dummy_task():
+        with configure_scope() as scope:
+            scope.set_tag("foo", "bar")
+
+        results.append(42)
+
+    for _ in range(10000):
+        dummy_task.delay()
+
+    assert results == [42] * 10000
+
+    with configure_scope() as scope:
+        assert not scope._tags
 
 
 def test_simple_no_propagation(capture_events, init_celery):

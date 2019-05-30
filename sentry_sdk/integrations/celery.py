@@ -33,11 +33,14 @@ class CeleryIntegration(Integration):
         old_build_tracer = trace.build_tracer
 
         def sentry_build_tracer(name, task, *args, **kwargs):
-            # Need to patch both methods because older celery sometimes
-            # short-circuits to task.run if it thinks it's safe.
-            task.__call__ = _wrap_task_call(task, task.__call__)
-            task.run = _wrap_task_call(task, task.run)
-            task.apply_async = _wrap_apply_async(task, task.apply_async)
+            if not getattr(task, "_sentry_is_patched", False):
+                # Need to patch both methods because older celery sometimes
+                # short-circuits to task.run if it thinks it's safe.
+                task.__call__ = _wrap_task_call(task, task.__call__)
+                task.run = _wrap_task_call(task, task.run)
+                task.apply_async = _wrap_apply_async(task, task.apply_async)
+                task._sentry_is_patched = True
+
             return _wrap_tracer(task, old_build_tracer(name, task, *args, **kwargs))
 
         trace.build_tracer = sentry_build_tracer
