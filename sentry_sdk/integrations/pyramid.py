@@ -59,6 +59,7 @@ class PyramidIntegration(Integration):
     def setup_once():
         # type: () -> None
         from pyramid.router import Router  # type: ignore
+        from pyramid.request import Request  # type: ignore
 
         old_handle_request = Router.handle_request
 
@@ -75,6 +76,24 @@ class PyramidIntegration(Integration):
             return old_handle_request(self, request, *args, **kwargs)
 
         Router.handle_request = sentry_patched_handle_request
+
+        if hasattr(Request, "invoke_exception_view"):
+            old_invoke_exception_view = Request.invoke_exception_view
+
+            def sentry_patched_invoke_exception_view(self, *args, **kwargs):
+                rv = old_invoke_exception_view(self, *args, **kwargs)
+
+                if (
+                    self.exc_info
+                    and all(self.exc_info)
+                    and rv.status_int == 500
+                    and Hub.current.get_integration(PyramidIntegration) is not None
+                ):
+                    _capture_exception(self.exc_info)
+
+                return rv
+
+            Request.invoke_exception_view = sentry_patched_invoke_exception_view
 
         old_wsgi_call = Router.__call__
 

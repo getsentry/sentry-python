@@ -1,20 +1,22 @@
 import json
+import logging
+import pkg_resources
+import pytest
 
 from io import BytesIO
 
-import logging
-
-import pytest
-
-from pyramid.authorization import ACLAuthorizationPolicy
 import pyramid.testing
 
+from pyramid.authorization import ACLAuthorizationPolicy
 from pyramid.response import Response
-
-from werkzeug.test import Client
 
 from sentry_sdk import capture_message, add_breadcrumb
 from sentry_sdk.integrations.pyramid import PyramidIntegration
+
+from werkzeug.test import Client
+
+
+PYRAMID_VERSION = pkg_resources.get_distribution("pyramid").version
 
 
 def hi(request):
@@ -219,7 +221,7 @@ def test_bad_request_not_captured(
     assert not events
 
 
-def test_errorhandler(
+def test_errorhandler_ok(
     sentry_init, pyramid_config, capture_exceptions, route, get_client
 ):
     sentry_init(integrations=[PyramidIntegration()])
@@ -231,6 +233,31 @@ def test_errorhandler(
 
     def errorhandler(exc, request):
         return Response("bad request")
+
+    pyramid_config.add_view(errorhandler, context=Exception)
+
+    client = get_client()
+    client.get("/")
+
+    assert not errors
+
+
+@pytest.mark.skipif(
+    PYRAMID_VERSION < (1, 8),
+    reason="We don't have the right hooks in older Pyramid versions",
+)
+def test_errorhandler_500(
+    sentry_init, pyramid_config, capture_exceptions, route, get_client
+):
+    sentry_init(integrations=[PyramidIntegration()])
+    errors = capture_exceptions()
+
+    @route("/")
+    def index(request):
+        raise Exception()
+
+    def errorhandler(exc, request):
+        return Response("bad request", status=500)
 
     pyramid_config.add_view(errorhandler, context=Exception)
 
