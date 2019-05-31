@@ -63,16 +63,14 @@ def test_simple(capture_events, celery, invocation, expected_context):
         foo = 42  # noqa
         return x / y
 
-    span_context = Span.start_trace()
-    with configure_scope() as scope:
-        scope.set_span_context(span_context)
+    span = Hub.current.start_trace()
 
     invocation(dummy_task, 1, 2)
     invocation(dummy_task, 1, 0)
 
     event, = events
-    assert event["contexts"]["trace"]["trace_id"] == span_context.trace_id
-    assert event["contexts"]["trace"]["span_id"] != span_context.span_id
+    assert event["contexts"]["trace"]["trace_id"] == span.trace_id
+    assert event["contexts"]["trace"]["span_id"] != span.span_id
     assert event["transaction"] == "dummy_task"
     assert event["extra"]["celery-job"] == dict(
         task_name="dummy_task", **expected_context
@@ -92,13 +90,11 @@ def test_simple_no_propagation(capture_events, init_celery):
     def dummy_task():
         1 / 0
 
-    span_context = Span.start_trace()
-    with configure_scope() as scope:
-        scope.set_span_context(span_context)
+    span = Hub.current.start_trace()
     dummy_task.delay()
 
     event, = events
-    assert event["contexts"]["trace"]["trace_id"] != span_context.trace_id
+    assert event["contexts"]["trace"]["trace_id"] != span.trace_id
     assert event["transaction"] == "dummy_task"
     exception, = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"

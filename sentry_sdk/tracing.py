@@ -61,12 +61,12 @@ class Span(object):
         self.timestamp = None
 
     def __repr__(self):
-        return "<%s(transaction=%r, trace_id=%r, span_id=%r, ref=%r)>" % (
+        return "<%s(transaction=%r, trace_id=%r, span_id=%r, parent_span_id=%r)>" % (
             self.__class__.__name__,
             self.transaction,
             self.trace_id,
             self.span_id,
-            self.ref,
+            self.parent_span_id,
         )
 
     @classmethod
@@ -112,9 +112,9 @@ class Span(object):
         trace_id, span_id, sampled = match.groups()
 
         if trace_id is not None:
-            trace_id = int(trace_id, 16)
+            trace_id = "%x" % (int(trace_id, 16),)
         if span_id is not None:
-            span_id = int(span_id, 16)
+            span_id = "%x" % (int(span_id, 16),)
         if sampled is not None:
             sampled = sampled != "0"
 
