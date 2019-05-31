@@ -359,6 +359,23 @@ def test_request_body(sentry_init, client, capture_events):
     assert "" not in event
 
 
+def test_read_request(sentry_init, client, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+    events = capture_events()
+
+    content, status, headers = client.post(
+        reverse("read_body_and_view_exc"),
+        data=b'{"hey": 42}',
+        content_type="application/json",
+    )
+
+    assert status.lower() == "500 internal server error"
+
+    event, = events
+
+    assert event["request"]["data"] == {"hey": 42}
+
+
 def test_template_exception(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()

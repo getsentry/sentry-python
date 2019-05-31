@@ -24,6 +24,11 @@ from . import views
 
 urlpatterns = [
     path("view-exc", views.view_exc, name="view_exc"),
+    path(
+        "read-body-and-view-exc",
+        views.read_body_and_view_exc,
+        name="read_body_and_view_exc",
+    ),
     path("middleware-exc", views.message, name="middleware_exc"),
     path("message", views.message, name="message"),
     path("mylogin", views.mylogin, name="mylogin"),
