@@ -237,8 +237,7 @@ def test_errorhandler(
     client = get_client()
     client.get("/")
 
-    error, = errors
-    assert type(error) is Exception
+    assert not errors
 
 
 def test_error_in_errorhandler(
@@ -262,12 +261,9 @@ def test_error_in_errorhandler(
     with pytest.raises(ZeroDivisionError):
         client.get("/")
 
-    event1, event2 = events
+    event, = events
 
-    exception, = event1["exception"]["values"]
-    assert exception["type"] == "ValueError"
-
-    exception = event2["exception"]["values"][-1]
+    exception = event["exception"]["values"][-1]
     assert exception["type"] == "ZeroDivisionError"
 
 
