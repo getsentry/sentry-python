@@ -1,5 +1,3 @@
-import logging
-
 from werkzeug.test import Client
 import pytest
 

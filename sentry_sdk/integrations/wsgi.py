@@ -150,7 +150,7 @@ def get_client_ip(environ):
 
 
 def _capture_exception(hub, e):
-    # type: (Hub) -> ExcInfo
+    # type: (Hub, BaseException) -> ExcInfo
     exc_info = sys.exc_info()
 
     # Check client here as it might have been unset while streaming response
