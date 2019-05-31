@@ -197,7 +197,7 @@ class _ScopedResponse(object):
                 self._response.close()
             except AttributeError:
                 pass
-            except BaseException:
+            except BaseException as e:
                 reraise(*_capture_exception(self._hub, e))
 
 
