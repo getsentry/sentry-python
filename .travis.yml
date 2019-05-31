@@ -20,6 +20,9 @@ branches:
     - /^release\/.+$/
 
 matrix:
+  allow_failures:
+    - python: "3.8-dev"
+
   include:
     - python: "3.7"
       dist: xenial
@@ -50,14 +53,12 @@ services:
 install:
   - pip install tox
   - pip install codecov
-  - make install-zeus-cli
   - bash scripts/download-semaphore.sh
 
 script:
   - coverage erase
   - ./scripts/runtox.sh '' --cov=sentry_sdk --cov-report= --cov-branch
   - codecov --file .coverage*
-  - zeus upload -t "application/x-cobertura+xml" .coverage*
 
 notifications:
   webhooks:
