@@ -151,9 +151,10 @@ def get_client_ip(environ):
 
 def _capture_exception(hub, e):
     # type: (Hub) -> ExcInfo
+    exc_info = sys.exc_info()
+
     # Check client here as it might have been unset while streaming response
     if hub.client is not None:
-        exc_info = sys.exc_info()
         # SystemExit(0) is the only uncaught exception that is expected behavior
         should_skip_capture = isinstance(e, SystemExit) and e.code in (0, None)
         if not should_skip_capture:
@@ -163,6 +164,7 @@ def _capture_exception(hub, e):
                 mechanism={"type": "wsgi", "handled": False},
             )
             hub.capture_event(event, hint=hint)
+
     return exc_info
 
 
