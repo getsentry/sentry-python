@@ -56,9 +56,11 @@ def test_basic(sentry_init, crashing_app, capture_events):
     }
 
 
-def test_systemexit_0_is_ignored(sentry_init, capture_events):
+@pytest.fixture(params=[0, None])
+def test_systemexit_zero_is_ignored(sentry_init, capture_events, request):
+    zero_code = request.param
     sentry_init(send_default_pii=True)
-    iterable = ExitingIterable(lambda: SystemExit(0))
+    iterable = ExitingIterable(lambda: SystemExit(zero_code))
     app = SentryWsgiMiddleware(IterableApp(iterable))
     client = Client(app)
     events = capture_events()
@@ -69,9 +71,11 @@ def test_systemexit_0_is_ignored(sentry_init, capture_events):
     assert len(events) == 0
 
 
-def test_systemexit_1_is_captured(sentry_init, capture_events):
+@pytest.fixture(params=["", "foo", 1, 2])
+def test_systemexit_nonzero_is_captured(sentry_init, capture_events, request):
+    nonzero_code = request.param
     sentry_init(send_default_pii=True)
-    iterable = ExitingIterable(lambda: SystemExit(1))
+    iterable = ExitingIterable(lambda: SystemExit(nonzero_code))
     app = SentryWsgiMiddleware(IterableApp(iterable))
     client = Client(app)
     events = capture_events()
@@ -84,7 +88,7 @@ def test_systemexit_1_is_captured(sentry_init, capture_events):
     assert "exception" in event
     exc = event["exception"]["values"][-1]
     assert exc["type"] == "SystemExit"
-    assert exc["value"] == "1"
+    assert exc["value"] == nonzero_code
     assert event["level"] == "error"
 
 

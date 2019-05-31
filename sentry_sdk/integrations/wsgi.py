@@ -87,12 +87,8 @@ class SentryWsgiMiddleware(object):
 
             try:
                 rv = self.app(environ, start_response)
-            except Exception:
-                reraise(*_capture_exception(hub))
-            except KeyboardInterrupt:
-                reraise(*_capture_exception(hub))
-            except SystemExit as e:
-                reraise(*_capture_exception(hub, skip_capture=e.code == 0))
+            except BaseException as e:
+                reraise(*_capture_exception(hub, e))
 
         return _ScopedResponse(hub, rv)
 
@@ -153,17 +149,19 @@ def get_client_ip(environ):
     return environ.get("REMOTE_ADDR")
 
 
-def _capture_exception(hub, skip_capture=False):
+def _capture_exception(hub, e):
     # type: (Hub) -> ExcInfo
     # Check client here as it might have been unset while streaming response
     if hub.client is not None:
         exc_info = sys.exc_info()
-        event, hint = event_from_exception(
-            exc_info,
-            client_options=hub.client.options,
-            mechanism={"type": "wsgi", "handled": False},
-        )
-        if not skip_capture:
+        # SystemExit(0) is the only uncaught exception that is expected behavior
+        should_skip_capture = isinstance(e, SystemExit) and e.code in (0, None)
+        if not should_skip_capture:
+            event, hint = event_from_exception(
+                exc_info,
+                client_options=hub.client.options,
+                mechanism={"type": "wsgi", "handled": False},
+            )
             hub.capture_event(event, hint=hint)
     return exc_info
 
@@ -186,12 +184,8 @@ class _ScopedResponse(object):
                     chunk = next(iterator)
                 except StopIteration:
                     break
-                except Exception:
-                    reraise(*_capture_exception(self._hub))
-                except KeyboardInterrupt:
-                    reraise(*_capture_exception(self._hub))
-                except SystemExit as e:
-                    reraise(*_capture_exception(self._hub, skip_capture=e.code == 0))
+                except BaseException as e:
+                    reraise(*_capture_exception(self._hub, e))
 
             yield chunk
 
@@ -201,12 +195,8 @@ class _ScopedResponse(object):
                 self._response.close()
             except AttributeError:
                 pass
-            except Exception:
-                reraise(*_capture_exception(self._hub))
-            except KeyboardInterrupt:
-                reraise(*_capture_exception(self._hub))
-            except SystemExit as e:
-                reraise(*_capture_exception(self._hub, skip_capture=e.code == 0))
+            except BaseException:
+                reraise(*_capture_exception(self._hub, e))
 
 
 def _make_wsgi_event_processor(environ):
