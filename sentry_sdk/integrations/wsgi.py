@@ -87,8 +87,8 @@ class SentryWsgiMiddleware(object):
 
             try:
                 rv = self.app(environ, start_response)
-            except BaseException as e:
-                reraise(*_capture_exception(hub, e))
+            except BaseException:
+                reraise(*_capture_exception(hub))
 
         return _ScopedResponse(hub, rv)
 
@@ -149,12 +149,14 @@ def get_client_ip(environ):
     return environ.get("REMOTE_ADDR")
 
 
-def _capture_exception(hub, e):
-    # type: (Hub, BaseException) -> ExcInfo
+def _capture_exception(hub):
+    # type: (Hub) -> ExcInfo
     exc_info = sys.exc_info()
 
     # Check client here as it might have been unset while streaming response
     if hub.client is not None:
+        e = exc_info[2]
+
         # SystemExit(0) is the only uncaught exception that is expected behavior
         should_skip_capture = isinstance(e, SystemExit) and e.code in (0, None)
         if not should_skip_capture:
@@ -186,8 +188,8 @@ class _ScopedResponse(object):
                     chunk = next(iterator)
                 except StopIteration:
                     break
-                except BaseException as e:
-                    reraise(*_capture_exception(self._hub, e))
+                except BaseException:
+                    reraise(*_capture_exception(self._hub))
 
             yield chunk
 
@@ -197,8 +199,8 @@ class _ScopedResponse(object):
                 self._response.close()
             except AttributeError:
                 pass
-            except BaseException as e:
-                reraise(*_capture_exception(self._hub, e))
+            except BaseException:
+                reraise(*_capture_exception(self._hub))
 
 
 def _make_wsgi_event_processor(environ):
