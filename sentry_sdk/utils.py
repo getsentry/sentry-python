@@ -10,20 +10,31 @@ from sentry_sdk._compat import urlparse, text_type, implements_str, int_types, P
 
 if False:
     from typing import Any
+    from typing import Callable
     from typing import Dict
-    from typing import Union
     from typing import Iterator
-    from typing import Tuple
-    from typing import Optional
     from typing import List
+    from typing import Optional
     from typing import Set
+    from typing import Tuple
     from typing import Type
+    from typing import Union
 
     from sentry_sdk.consts import ClientOptions
 
     ExcInfo = Tuple[
         Optional[Type[BaseException]], Optional[BaseException], Optional[Any]
     ]
+
+    Event = Dict[str, Any]
+    Hint = Dict[str, Any]
+
+    Breadcrumb = Dict[str, Any]
+    BreadcrumbHint = Dict[str, Any]
+
+    EventProcessor = Callable[[Event, Hint], Optional[Event]]
+    ErrorProcessor = Callable[[Event, ExcInfo], Optional[Event]]
+    BreadcrumbProcessor = Callable[[Breadcrumb, BreadcrumbHint], Optional[Breadcrumb]]
 
 epoch = datetime(1970, 1, 1)
 

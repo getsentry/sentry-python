@@ -20,16 +20,19 @@ from sentry_sdk.utils import (
 
 
 if False:
+    from contextlib import ContextManager
+
     from typing import Union
     from typing import Any
     from typing import Optional
-    from typing import Dict
     from typing import Tuple
     from typing import List
     from typing import Callable
+    from typing import Generator
     from typing import overload
-    from contextlib import ContextManager
+
     from sentry_sdk.integrations import Integration
+    from sentry_sdk.utils import Event, Hint, Breadcrumb, BreadcrumbHint
 else:
 
     def overload(x):
@@ -254,7 +257,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self._stack[-1] = (new, top[1])
 
     def capture_event(self, event, hint=None):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Optional[str]
+        # type: (Event, Hint) -> Optional[str]
         """Captures an event.  The return value is the ID of the event.
 
         The event is a dictionary following the Sentry v7/v8 protocol
@@ -271,7 +274,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return None
 
     def capture_message(self, message, level=None):
-        # type: (str, Optional[Any]) -> Optional[str]
+        # type: (str, Optional[str]) -> Optional[str]
         """Captures a message.  The message is just a string.  If no level
         is provided the default level is `info`.
         """
@@ -311,7 +314,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
     def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
-        # type: (Dict[str, Any], Dict[str, Any], **Any) -> None
+        # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], **Any) -> None
         """Adds a breadcrumb.  The breadcrumbs are a dictionary with the
         data as the sentry v7/v8 protocol expects.  `hint` is an optional
         value that can be used by `before_breadcrumb` to customize the
@@ -322,26 +325,27 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             logger.info("Dropped breadcrumb because no client bound")
             return
 
-        crumb = dict(crumb or ())  # type: Dict[str, Any]
+        crumb = dict(crumb or ())  # type: Breadcrumb
         crumb.update(kwargs)
         if not crumb:
             return
 
-        hint = dict(hint or ())
+        hint = dict(hint or ())  # type: Hint
 
         if crumb.get("timestamp") is None:
             crumb["timestamp"] = datetime.utcnow()
         if crumb.get("type") is None:
             crumb["type"] = "default"
 
-        original_crumb = crumb
         if client.options["before_breadcrumb"] is not None:
-            crumb = client.options["before_breadcrumb"](crumb, hint)
-
-        if crumb is not None:
-            scope._breadcrumbs.append(crumb)
+            new_crumb = client.options["before_breadcrumb"](crumb, hint)
         else:
-            logger.info("before breadcrumb dropped breadcrumb (%s)", original_crumb)
+            new_crumb = crumb
+
+        if new_crumb is not None:
+            scope._breadcrumbs.append(new_crumb)
+        else:
+            logger.info("before breadcrumb dropped breadcrumb (%s)", crumb)
 
         max_breadcrumbs = client.options["max_breadcrumbs"]  # type: int
         while len(scope._breadcrumbs) > max_breadcrumbs:
@@ -472,12 +476,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return inner()
 
     def flush(self, timeout=None, callback=None):
+        # type: (Optional[float], Optional[Callable[[int, float], None]]) -> None
         """Alias for self.client.flush"""
         client, scope = self._stack[-1]
         if client is not None:
             return client.flush(timeout=timeout, callback=callback)
 
     def iter_trace_propagation_headers(self):
+        # type: () -> Generator[Tuple[str, str], None, None]
         client, scope = self._stack[-1]
         if scope._span is None:
             return

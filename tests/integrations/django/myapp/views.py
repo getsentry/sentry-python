@@ -23,6 +23,11 @@ def view_exc(request):
     1 / 0
 
 
+def read_body_and_view_exc(request):
+    request.read()
+    1 / 0
+
+
 def message(request):
     sentry_sdk.capture_message("hi")
     return HttpResponse("ok")

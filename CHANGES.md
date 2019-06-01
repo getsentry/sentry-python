@@ -1,3 +1,7 @@
+## 0.8.1
+
+* Fix infinite recursion bug in Celery integration.
+
 ## 0.8.0
 
 * Add the always_run option in excepthook integration.

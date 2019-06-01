@@ -1,20 +1,24 @@
 import json
+import logging
+import pkg_resources
+import pytest
 
 from io import BytesIO
 
-import logging
-
-import pytest
-
-from pyramid.authorization import ACLAuthorizationPolicy
 import pyramid.testing
 
+from pyramid.authorization import ACLAuthorizationPolicy
 from pyramid.response import Response
-
-from werkzeug.test import Client
 
 from sentry_sdk import capture_message, add_breadcrumb
 from sentry_sdk.integrations.pyramid import PyramidIntegration
+
+from werkzeug.test import Client
+
+
+PYRAMID_VERSION = tuple(
+    map(int, pkg_resources.get_distribution("pyramid").version.split("."))
+)
 
 
 def hi(request):
@@ -219,7 +223,7 @@ def test_bad_request_not_captured(
     assert not events
 
 
-def test_errorhandler(
+def test_errorhandler_ok(
     sentry_init, pyramid_config, capture_exceptions, route, get_client
 ):
     sentry_init(integrations=[PyramidIntegration()])
@@ -237,8 +241,36 @@ def test_errorhandler(
     client = get_client()
     client.get("/")
 
+    assert not errors
+
+
+@pytest.mark.skipif(
+    PYRAMID_VERSION < (1, 9),
+    reason="We don't have the right hooks in older Pyramid versions",
+)
+def test_errorhandler_500(
+    sentry_init, pyramid_config, capture_exceptions, route, get_client
+):
+    sentry_init(integrations=[PyramidIntegration()])
+    errors = capture_exceptions()
+
+    @route("/")
+    def index(request):
+        1 / 0
+
+    def errorhandler(exc, request):
+        return Response("bad request", status=500)
+
+    pyramid_config.add_view(errorhandler, context=Exception)
+
+    client = get_client()
+    app_iter, status, headers = client.get("/")
+    assert b"".join(app_iter) == b"bad request"
+    assert status.lower() == "500 internal server error"
+
     error, = errors
-    assert type(error) is Exception
+
+    assert isinstance(error, ZeroDivisionError)
 
 
 def test_error_in_errorhandler(
@@ -262,12 +294,9 @@ def test_error_in_errorhandler(
     with pytest.raises(ZeroDivisionError):
         client.get("/")
 
-    event1, event2 = events
+    event, = events
 
-    exception, = event1["exception"]["values"]
-    assert exception["type"] == "ValueError"
-
-    exception = event2["exception"]["values"][-1]
+    exception = event["exception"]["values"][-1]
     assert exception["type"] == "ZeroDivisionError"
 
 

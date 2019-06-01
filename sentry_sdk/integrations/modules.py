@@ -10,6 +10,8 @@ if False:
     from typing import Tuple
     from typing import Iterator
 
+    from sentry_sdk.utils import Event
+
 _installed_modules = None
 
 
@@ -40,7 +42,7 @@ class ModulesIntegration(Integration):
         # type: () -> None
         @add_global_event_processor
         def processor(event, hint):
-            # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+            # type: (Event, Any) -> Dict[str, Any]
             if Hub.current.get_integration(ModulesIntegration) is not None:
                 event["modules"] = dict(_get_installed_modules())
             return event

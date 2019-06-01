@@ -11,16 +11,20 @@ from django.core import signals  # type: ignore
 
 if False:
     from typing import Any
+    from typing import Callable
     from typing import Dict
+    from typing import List
+    from typing import Optional
     from typing import Tuple
     from typing import Union
-    from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from typing import Callable
+
     from django.core.handlers.wsgi import WSGIRequest  # type: ignore
     from django.http.response import HttpResponse  # type: ignore
     from django.http.request import QueryDict  # type: ignore
     from django.utils.datastructures import MultiValueDict  # type: ignore
-    from typing import List
+
+    from sentry_sdk.integrations.wsgi import _ScopedResponse
+    from sentry_sdk.utils import Event, Hint
 
 
 try:
@@ -137,7 +141,10 @@ class DjangoIntegration(Integration):
 
         @add_global_event_processor
         def process_django_templates(event, hint):
-            # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+            # type: (Event, Optional[Hint]) -> Optional[Event]
+            if hint is None:
+                return event
+
             exc_info = hint.get("exc_info", None)
 
             if exc_info is None:
