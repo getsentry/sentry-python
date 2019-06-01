@@ -359,6 +359,7 @@ def test_request_body(sentry_init, client, capture_events):
     assert "" not in event
 
 
+@pytest.mark.xfail
 def test_read_request(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
