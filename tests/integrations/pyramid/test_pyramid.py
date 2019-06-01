@@ -266,7 +266,7 @@ def test_errorhandler_500(
     client = get_client()
     app_iter, status, headers = client.get("/")
     assert b"".join(app_iter) == b"bad request"
-    assert status.lower() == '500 internal server error'
+    assert status.lower() == "500 internal server error"
 
     error, = errors
 
