@@ -92,7 +92,7 @@ class BackgroundWorker(object):
             self._timed_queue_join(timeout - initial_timeout)
 
     def submit(self, callback):
-        # type: (Callable) -> None
+        # type: (Callable[[], None]) -> None
         self._ensure_thread()
         self._queue.put_nowait(callback)
 

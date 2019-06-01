@@ -19,15 +19,15 @@ from sanic.router import Router  # type: ignore
 from sanic.handlers import ErrorHandler  # type: ignore
 
 if False:
-    from sanic.request import Request  # type: ignore
-
     from typing import Any
     from typing import Callable
-    from typing import Dict
     from typing import Optional
     from typing import Union
     from typing import Tuple
-    from sanic.request import RequestParameters
+
+    from sanic.request import Request, RequestParameters  # type: ignore
+
+    from sentry_sdk.utils import Event, EventProcessor, Hint
 
 
 class SanicIntegration(Integration):
@@ -143,12 +143,12 @@ def _capture_exception(exception):
 
 
 def _make_request_processor(weak_request):
-    # type: (Callable[[], Request]) -> Callable
+    # type: (Callable[[], Request]) -> EventProcessor
     def sanic_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Optional[Dict[str, Any]]
+        # type: (Event, Optional[Hint]) -> Optional[Event]
 
         try:
-            if issubclass(hint["exc_info"][0], SanicException):
+            if hint and issubclass(hint["exc_info"][0], SanicException):
                 return None
         except KeyError:
             pass

@@ -6,9 +6,12 @@ if False:
     from typing import Callable
     from typing import Union
     from typing import List
+    from typing import Type
 
     from sentry_sdk.transport import Transport
     from sentry_sdk.integrations import Integration
+
+    from sentry_sdk.utils import Event, EventProcessor, BreadcrumbProcessor
 
     ClientOptions = TypedDict(
         "ClientOptions",
@@ -25,15 +28,17 @@ if False:
             "in_app_exclude": List[str],
             "default_integrations": bool,
             "dist": Optional[str],
-            "transport": Optional[Union[Transport, type, Callable]],
+            "transport": Optional[
+                Union[Transport, Type[Transport], Callable[[Event], None]]
+            ],
             "sample_rate": int,
             "send_default_pii": bool,
             "http_proxy": Optional[str],
             "https_proxy": Optional[str],
             "ignore_errors": List[type],
             "request_bodies": str,
-            "before_send": Optional[Callable],
-            "before_breadcrumb": Optional[Callable],
+            "before_send": Optional[EventProcessor],
+            "before_breadcrumb": Optional[BreadcrumbProcessor],
             "debug": bool,
             "attach_stacktrace": bool,
             "ca_certs": Optional[str],

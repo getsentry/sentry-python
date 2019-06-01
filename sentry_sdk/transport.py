@@ -23,6 +23,8 @@ if False:
     from urllib3.poolmanager import PoolManager  # type: ignore
     from urllib3.poolmanager import ProxyManager  # type: ignore
 
+    from sentry_sdk.utils import Event
+
 try:
     from urllib.request import getproxies
 except ImportError:
@@ -92,7 +94,7 @@ class HttpTransport(Transport):
         self.hub_cls = Hub
 
     def _send_event(self, event):
-        # type: (Dict[str, Any]) -> None
+        # type: (Event) -> None
         if self._disabled_until is not None:
             if datetime.utcnow() < self._disabled_until:
                 return
@@ -174,7 +176,7 @@ class HttpTransport(Transport):
             return urllib3.PoolManager(**opts)
 
     def capture_event(self, event):
-        # type: (Dict[str, Any]) -> None
+        # type: (Event) -> None
         hub = self.hub_cls.current
 
         def send_event_wrapper():
@@ -199,12 +201,12 @@ class HttpTransport(Transport):
 
 class _FunctionTransport(Transport):
     def __init__(self, func):
-        # type: (Callable[[Dict[str, Any]], None]) -> None
+        # type: (Callable[[Event], None]) -> None
         Transport.__init__(self)
         self._func = func
 
     def capture_event(self, event):
-        # type: (Dict[str, Any]) -> None
+        # type: (Event) -> None
         self._func(event)
         return None
 
@@ -216,17 +218,12 @@ def make_transport(options):
     # If no transport is given, we use the http transport class
     if ref_transport is None:
         transport_cls = HttpTransport  # type: Type[Transport]
-    else:
-        try:
-            issubclass(ref_transport, type)  # type: ignore
-        except TypeError:
-            # if we are not a class but we are a callable, assume a
-            # function that acts as capture_event
-            if callable(ref_transport):
-                return _FunctionTransport(ref_transport)
-            # otherwise assume an object fulfilling the transport contract
-            return ref_transport
-        transport_cls = ref_transport  # type: ignore
+    elif isinstance(ref_transport, Transport):
+        return ref_transport
+    elif isinstance(ref_transport, type) and issubclass(ref_transport, Transport):
+        transport_cls = ref_transport
+    elif callable(ref_transport):
+        return _FunctionTransport(ref_transport)
 
     # if a transport class is given only instanciate it if the dsn is not
     # empty or None

@@ -18,11 +18,14 @@ from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 
 if False:
-    from sentry_sdk.consts import ClientOptions
-    from sentry_sdk.scope import Scope
     from typing import Any
+    from typing import Callable
     from typing import Dict
     from typing import Optional
+
+    from sentry_sdk.consts import ClientOptions
+    from sentry_sdk.scope import Scope
+    from sentry_sdk.utils import Event, Hint
 
 
 _client_init_debug = ContextVar("client_init_debug")
@@ -94,11 +97,11 @@ class Client(object):
 
     def _prepare_event(
         self,
-        event,  # type: Dict[str, Any]
-        hint,  # type: Optional[Dict[str, Any]]
+        event,  # type: Event
+        hint,  # type: Optional[Hint]
         scope,  # type: Optional[Scope]
     ):
-        # type: (...) -> Optional[Dict[str, Any]]
+        # type: (...) -> Optional[Event]
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.utcnow()
 
@@ -158,7 +161,7 @@ class Client(object):
         return event
 
     def _is_ignored_error(self, event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> bool
+        # type: (Event, Hint) -> bool
         exc_info = hint.get("exc_info")
         if exc_info is None:
             return False
@@ -180,8 +183,8 @@ class Client(object):
 
     def _should_capture(
         self,
-        event,  # type: Dict[str, Any]
-        hint,  # type: Dict[str, Any]
+        event,  # type: Event
+        hint,  # type: Hint
         scope=None,  # type: Scope
     ):
         # type: (...) -> bool
@@ -227,6 +230,7 @@ class Client(object):
         return rv
 
     def close(self, timeout=None, callback=None):
+        # type: (Optional[float], Optional[Callable[[int, float], None]]) -> None
         """
         Close the client and shut down the transport. Arguments have the same
         semantics as `self.flush()`.
@@ -237,6 +241,7 @@ class Client(object):
             self.transport = None
 
     def flush(self, timeout=None, callback=None):
+        # type: (Optional[float], Optional[Callable[[int, float], None]]) -> None
         """
         Wait `timeout` seconds for the current events to be sent. If no
         `timeout` is provided, the `shutdown_timeout` option value is used.
