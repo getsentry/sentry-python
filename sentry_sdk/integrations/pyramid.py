@@ -120,7 +120,7 @@ class PyramidIntegration(Integration):
 
 
 def _capture_exception(exc_info):
-    # type: (ExcInfo, **Any) -> None
+    # type: (ExcInfo) -> None
     if exc_info[0] is None or issubclass(exc_info[0], HTTPException):
         return
     hub = Hub.current
