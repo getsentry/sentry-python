@@ -245,7 +245,7 @@ def test_errorhandler_ok(
 
 
 @pytest.mark.skipif(
-    PYRAMID_VERSION < (1, 8),
+    PYRAMID_VERSION < (1, 9),
     reason="We don't have the right hooks in older Pyramid versions",
 )
 def test_errorhandler_500(
@@ -256,7 +256,7 @@ def test_errorhandler_500(
 
     @route("/")
     def index(request):
-        raise Exception()
+        1 / 0
 
     def errorhandler(exc, request):
         return Response("bad request", status=500)
@@ -264,9 +264,13 @@ def test_errorhandler_500(
     pyramid_config.add_view(errorhandler, context=Exception)
 
     client = get_client()
-    client.get("/")
+    app_iter, status, headers = client.get("/")
+    assert b"".join(app_iter) == b"bad request"
+    assert status.lower() == '500 internal server error'
 
-    assert not errors
+    error, = errors
+
+    assert isinstance(error, ZeroDivisionError)
 
 
 def test_error_in_errorhandler(
