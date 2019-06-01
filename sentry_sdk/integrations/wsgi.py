@@ -155,7 +155,7 @@ def _capture_exception(hub):
 
     # Check client here as it might have been unset while streaming response
     if hub.client is not None:
-        e = exc_info[2]
+        e = exc_info[1]
 
         # SystemExit(0) is the only uncaught exception that is expected behavior
         should_skip_capture = isinstance(e, SystemExit) and e.code in (0, None)
