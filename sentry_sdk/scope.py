@@ -170,8 +170,8 @@ class Scope(object):
         self._error_processors.append(func)
 
     @_disable_capture
-    def apply_to_event(self, event, hint=None):
-        # type: (Event, Optional[Hint]) -> Optional[Event]
+    def apply_to_event(self, event, hint):
+        # type: (Event, Hint) -> Optional[Event]
         """Applies the information contained on the scope to the given event."""
 
         def _drop(event, cause, ty):
@@ -207,7 +207,7 @@ class Scope(object):
                 "span_id": self._span.span_id,
             }
 
-        exc_info = hint.get("exc_info") if hint is not None else None
+        exc_info = hint.get("exc_info")
         if exc_info is not None:
             for error_processor in self._error_processors:
                 new_event = error_processor(event, exc_info)

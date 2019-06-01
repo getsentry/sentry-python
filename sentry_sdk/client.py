@@ -105,6 +105,8 @@ class Client(object):
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.utcnow()
 
+        hint = dict(hint or ())  # type: Hint
+
         if scope is not None:
             event = scope.apply_to_event(event, hint)
             if event is None:
@@ -153,7 +155,7 @@ class Client(object):
         if before_send is not None:
             new_event = None
             with capture_internal_exceptions():
-                new_event = before_send(event, hint)
+                new_event = before_send(event, hint or {})
             if new_event is None:
                 logger.info("before send dropped event (%s)", event)
             event = new_event  # type: ignore

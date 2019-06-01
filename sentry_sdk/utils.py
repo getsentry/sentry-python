@@ -32,7 +32,7 @@ if False:
     Breadcrumb = Dict[str, Any]
     BreadcrumbHint = Dict[str, Any]
 
-    EventProcessor = Callable[[Event, Optional[Hint]], Optional[Event]]
+    EventProcessor = Callable[[Event, Hint], Optional[Event]]
     ErrorProcessor = Callable[[Event, ExcInfo], Optional[Event]]
     BreadcrumbProcessor = Callable[[Breadcrumb, BreadcrumbHint], Optional[Breadcrumb]]
 
