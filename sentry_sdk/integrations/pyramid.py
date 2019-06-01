@@ -59,6 +59,7 @@ class PyramidIntegration(Integration):
     def setup_once():
         # type: () -> None
         from pyramid.router import Router  # type: ignore
+        from pyramid.request import Request  # type: ignore
 
         old_handle_request = Router.handle_request
 
@@ -66,22 +67,33 @@ class PyramidIntegration(Integration):
             # type: (Any, Request, *Any, **Any) -> Response
             hub = Hub.current
             integration = hub.get_integration(PyramidIntegration)
-            if integration is None:
-                return old_handle_request(self, request, *args, **kwargs)
+            if integration is not None:
+                with hub.configure_scope() as scope:
+                    scope.add_event_processor(
+                        _make_event_processor(weakref.ref(request), integration)
+                    )
 
-            with hub.configure_scope() as scope:
-                scope.add_event_processor(
-                    _make_event_processor(weakref.ref(request), integration)
-                )
-
-            try:
-                return old_handle_request(self, request, *args, **kwargs)
-            except Exception:
-                exc_info = sys.exc_info()
-                _capture_exception(exc_info)
-                reraise(*exc_info)
+            return old_handle_request(self, request, *args, **kwargs)
 
         Router.handle_request = sentry_patched_handle_request
+
+        if hasattr(Request, "invoke_exception_view"):
+            old_invoke_exception_view = Request.invoke_exception_view
+
+            def sentry_patched_invoke_exception_view(self, *args, **kwargs):
+                rv = old_invoke_exception_view(self, *args, **kwargs)
+
+                if (
+                    self.exc_info
+                    and all(self.exc_info)
+                    and rv.status_int == 500
+                    and Hub.current.get_integration(PyramidIntegration) is not None
+                ):
+                    _capture_exception(self.exc_info)
+
+                return rv
+
+            Request.invoke_exception_view = sentry_patched_invoke_exception_view
 
         old_wsgi_call = Router.__call__
 
@@ -92,15 +104,23 @@ class PyramidIntegration(Integration):
             if integration is None:
                 return old_wsgi_call(self, environ, start_response)
 
-            return SentryWsgiMiddleware(lambda *a, **kw: old_wsgi_call(self, *a, **kw))(
+            def sentry_patched_inner_wsgi_call(environ, start_response):
+                try:
+                    return old_wsgi_call(self, environ, start_response)
+                except Exception:
+                    einfo = sys.exc_info()
+                    _capture_exception(einfo)
+                    reraise(*einfo)
+
+            return SentryWsgiMiddleware(sentry_patched_inner_wsgi_call)(
                 environ, start_response
             )
 
         Router.__call__ = sentry_patched_wsgi_call
 
 
-def _capture_exception(exc_info, **kwargs):
-    # type: (ExcInfo, **Any) -> None
+def _capture_exception(exc_info):
+    # type: (ExcInfo) -> None
     if exc_info[0] is None or issubclass(exc_info[0], HTTPException):
         return
     hub = Hub.current
