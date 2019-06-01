@@ -16,7 +16,9 @@ from sentry_sdk.integrations.pyramid import PyramidIntegration
 from werkzeug.test import Client
 
 
-PYRAMID_VERSION = pkg_resources.get_distribution("pyramid").version
+PYRAMID_VERSION = tuple(
+    map(int, pkg_resources.get_distribution("pyramid").version.split("."))
+)
 
 
 def hi(request):
