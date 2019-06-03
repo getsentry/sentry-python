@@ -1178,7 +1178,7 @@ table {
 
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">app</span><span class="p">(</span><span class="n">environ</span><span class="p">,</span> <span class="n">start_response</span><span class="p">)</span>
-            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">except</span> <span class="ne">BaseException</span><span class="p">:</span>
                 <span class="n">reraise</span><span class="p">(</span><span class="o">*</span><span class="n">_capture_exception</span><span class="p">(</span><span class="n">hub</span><span class="p">))</span>
 
         <span class="k">return</span> <span class="n">_ScopedResponse</span><span class="p">(</span><span class="n">hub</span><span class="p">,</span> <span class="n">rv</span><span class="p">)</span>
@@ -1242,15 +1242,22 @@ table {
 
 <span class="k">def</span> <span class="nf">_capture_exception</span><span class="p">(</span><span class="n">hub</span><span class="p">):</span>
     <span class="c1"># type: (Hub) -&gt; ExcInfo</span>
+    <span class="n">exc_info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
+
     <span class="c1"># Check client here as it might have been unset while streaming response</span>
     <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="n">exc_info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
-        <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
-            <span class="n">exc_info</span><span class="p">,</span>
-            <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
-            <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;wsgi&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">},</span>
-        <span class="p">)</span>
-        <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
+        <span class="n">e</span> <span class="o">=</span> <span class="n">exc_info</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># SystemExit(0) is the only uncaught exception that is expected behavior</span>
+        <span class="n">should_skip_capture</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="ne">SystemExit</span><span class="p">)</span> <span class="ow">and</span> <span class="n">e</span><span class="o">.</span><span class="n">code</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">should_skip_capture</span><span class="p">:</span>
+            <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
+                <span class="n">exc_info</span><span class="p">,</span>
+                <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
+                <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;wsgi&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">},</span>
+            <span class="p">)</span>
+            <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
+
     <span class="k">return</span> <span class="n">exc_info</span>
 
 
@@ -1272,7 +1279,7 @@ table {
                     <span class="n">chunk</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">iterator</span><span class="p">)</span>
                 <span class="k">except</span> <span class="ne">StopIteration</span><span class="p">:</span>
                     <span class="k">break</span>
-                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">except</span> <span class="ne">BaseException</span><span class="p">:</span>
                     <span class="n">reraise</span><span class="p">(</span><span class="o">*</span><span class="n">_capture_exception</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hub</span><span class="p">))</span>
 
             <span class="k">yield</span> <span class="n">chunk</span>
@@ -1283,7 +1290,7 @@ table {
                 <span class="bp">self</span><span class="o">.</span><span class="n">_response</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
             <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
                 <span class="k">pass</span>
-            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">except</span> <span class="ne">BaseException</span><span class="p">:</span>
                 <span class="n">reraise</span><span class="p">(</span><span class="o">*</span><span class="n">_capture_exception</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hub</span><span class="p">))</span>
 
 
@@ -1509,7 +1516,7 @@ environment.</p></div>
 
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">app</span><span class="p">(</span><span class="n">environ</span><span class="p">,</span> <span class="n">start_response</span><span class="p">)</span>
-            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">except</span> <span class="ne">BaseException</span><span class="p">:</span>
                 <span class="n">reraise</span><span class="p">(</span><span class="o">*</span><span class="n">_capture_exception</span><span class="p">(</span><span class="n">hub</span><span class="p">))</span>
 
         <span class="k">return</span> <span class="n">_ScopedResponse</span><span class="p">(</span><span class="n">hub</span><span class="p">,</span> <span class="n">rv</span><span class="p">)</span>

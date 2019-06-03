@@ -1084,6 +1084,8 @@ table {
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Iterator</span>
 
+    <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">Event</span>
+
 <span class="n">_installed_modules</span> <span class="o">=</span> <span class="bp">None</span>
 
 
@@ -1114,7 +1116,7 @@ table {
         <span class="c1"># type: () -&gt; None</span>
         <span class="nd">@add_global_event_processor</span>
         <span class="k">def</span> <span class="nf">processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
-            <span class="c1"># type: (Dict[str, Any], Dict[str, Any]) -&gt; Dict[str, Any]</span>
+            <span class="c1"># type: (Event, Any) -&gt; Dict[str, Any]</span>
             <span class="k">if</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">ModulesIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="n">event</span><span class="p">[</span><span class="s2">&quot;modules&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_get_installed_modules</span><span class="p">())</span>
             <span class="k">return</span> <span class="n">event</span>
@@ -1144,7 +1146,7 @@ table {
         <span class="c1"># type: () -&gt; None</span>
         <span class="nd">@add_global_event_processor</span>
         <span class="k">def</span> <span class="nf">processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
-            <span class="c1"># type: (Dict[str, Any], Dict[str, Any]) -&gt; Dict[str, Any]</span>
+            <span class="c1"># type: (Event, Any) -&gt; Dict[str, Any]</span>
             <span class="k">if</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">ModulesIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="n">event</span><span class="p">[</span><span class="s2">&quot;modules&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_get_installed_modules</span><span class="p">())</span>
             <span class="k">return</span> <span class="n">event</span>
@@ -1200,7 +1202,7 @@ table {
     <span class="c1"># type: () -&gt; None</span>
     <span class="nd">@add_global_event_processor</span>
     <span class="k">def</span> <span class="nf">processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
-        <span class="c1"># type: (Dict[str, Any], Dict[str, Any]) -&gt; Dict[str, Any]</span>
+        <span class="c1"># type: (Event, Any) -&gt; Dict[str, Any]</span>
         <span class="k">if</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">ModulesIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">event</span><span class="p">[</span><span class="s2">&quot;modules&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">_get_installed_modules</span><span class="p">())</span>
         <span class="k">return</span> <span class="n">event</span>

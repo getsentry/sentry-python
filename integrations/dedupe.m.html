@@ -1079,9 +1079,9 @@ table {
 <span class="kn">from</span> <span class="nn">sentry_sdk.scope</span> <span class="kn">import</span> <span class="n">add_global_event_processor</span>
 
 <span class="k">if</span> <span class="bp">False</span><span class="p">:</span>
-    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
-    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+
+    <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">Hint</span>
 
 
 <span class="k">class</span> <span class="nc">DedupeIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
@@ -1096,15 +1096,23 @@ table {
         <span class="c1"># type: () -&gt; None</span>
         <span class="nd">@add_global_event_processor</span>
         <span class="k">def</span> <span class="nf">processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
-            <span class="c1"># type: (Dict[str, Any], Dict[str, Any]) -&gt; Optional[Dict[str, Any]]</span>
+            <span class="c1"># type: (Event, Optional[Hint]) -&gt; Optional[Event]</span>
+            <span class="k">if</span> <span class="n">hint</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">event</span>
+
             <span class="n">integration</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">DedupeIntegration</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="n">exc_info</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exc_info&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                    <span class="n">exc</span> <span class="o">=</span> <span class="n">exc_info</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-                    <span class="k">if</span> <span class="n">integration</span><span class="o">.</span><span class="n">_last_seen</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">None</span><span class="p">)</span> <span class="ow">is</span> <span class="n">exc</span><span class="p">:</span>
-                        <span class="k">return</span> <span class="bp">None</span>
-                    <span class="n">integration</span><span class="o">.</span><span class="n">_last_seen</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">event</span>
+
+            <span class="n">exc_info</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exc_info&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">exc_info</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">event</span>
+
+            <span class="n">exc</span> <span class="o">=</span> <span class="n">exc_info</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">integration</span><span class="o">.</span><span class="n">_last_seen</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">None</span><span class="p">)</span> <span class="ow">is</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">None</span>
+            <span class="n">integration</span><span class="o">.</span><span class="n">_last_seen</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">event</span>
 </pre></div>
 
@@ -1136,15 +1144,23 @@ table {
         <span class="c1"># type: () -&gt; None</span>
         <span class="nd">@add_global_event_processor</span>
         <span class="k">def</span> <span class="nf">processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
-            <span class="c1"># type: (Dict[str, Any], Dict[str, Any]) -&gt; Optional[Dict[str, Any]]</span>
+            <span class="c1"># type: (Event, Optional[Hint]) -&gt; Optional[Event]</span>
+            <span class="k">if</span> <span class="n">hint</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">event</span>
+
             <span class="n">integration</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">DedupeIntegration</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="n">exc_info</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exc_info&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                    <span class="n">exc</span> <span class="o">=</span> <span class="n">exc_info</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-                    <span class="k">if</span> <span class="n">integration</span><span class="o">.</span><span class="n">_last_seen</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">None</span><span class="p">)</span> <span class="ow">is</span> <span class="n">exc</span><span class="p">:</span>
-                        <span class="k">return</span> <span class="bp">None</span>
-                    <span class="n">integration</span><span class="o">.</span><span class="n">_last_seen</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">event</span>
+
+            <span class="n">exc_info</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exc_info&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">exc_info</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">event</span>
+
+            <span class="n">exc</span> <span class="o">=</span> <span class="n">exc_info</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">integration</span><span class="o">.</span><span class="n">_last_seen</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">None</span><span class="p">)</span> <span class="ow">is</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">None</span>
+            <span class="n">integration</span><span class="o">.</span><span class="n">_last_seen</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">event</span>
 </pre></div>
 
@@ -1198,15 +1214,19 @@ table {
     <span class="c1"># type: () -&gt; None</span>
     <span class="nd">@add_global_event_processor</span>
     <span class="k">def</span> <span class="nf">processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
-        <span class="c1"># type: (Dict[str, Any], Dict[str, Any]) -&gt; Optional[Dict[str, Any]]</span>
+        <span class="c1"># type: (Event, Optional[Hint]) -&gt; Optional[Event]</span>
+        <span class="k">if</span> <span class="n">hint</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">event</span>
         <span class="n">integration</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">DedupeIntegration</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="n">exc_info</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exc_info&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="n">exc</span> <span class="o">=</span> <span class="n">exc_info</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-                <span class="k">if</span> <span class="n">integration</span><span class="o">.</span><span class="n">_last_seen</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">None</span><span class="p">)</span> <span class="ow">is</span> <span class="n">exc</span><span class="p">:</span>
-                    <span class="k">return</span> <span class="bp">None</span>
-                <span class="n">integration</span><span class="o">.</span><span class="n">_last_seen</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">event</span>
+        <span class="n">exc_info</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exc_info&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">exc_info</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">event</span>
+        <span class="n">exc</span> <span class="o">=</span> <span class="n">exc_info</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">integration</span><span class="o">.</span><span class="n">_last_seen</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">None</span><span class="p">)</span> <span class="ow">is</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">None</span>
+        <span class="n">integration</span><span class="o">.</span><span class="n">_last_seen</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">event</span>
 </pre></div>
 
