@@ -208,7 +208,7 @@ class Client(object):
         # type: (Dict[str, Any], Any, Scope) -> Optional[str]
         """Captures an event.
 
-        This takes the ready made event and an optoinal hint and scope.  The
+        This takes the ready made event and an optional hint and scope.  The
         hint is internally used to further customize the representation of the
         error.  When provided it's a dictionary of optional information such
         as exception info.
