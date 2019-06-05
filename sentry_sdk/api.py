@@ -18,12 +18,16 @@ else:
         return x
 
 
-__all__ = []
-
-
-def public(f):
-    __all__.append(f.__name__)
-    return f
+__all__ = [
+    "capture_event",
+    "capture_message",
+    "capture_exception",
+    "add_breadcrumb",
+    "configure_scope",
+    "push_scope",
+    "flush",
+    "last_event_id",
+]
 
 
 def hubmethod(f):
@@ -31,7 +35,7 @@ def hubmethod(f):
         "Alias for `Hub.%s`" % f.__name__,
         inspect.getdoc(getattr(Hub, f.__name__)),
     )
-    return public(f)
+    return f
 
 
 @hubmethod
