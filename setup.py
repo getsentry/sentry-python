@@ -20,7 +20,7 @@ setup(
     long_description=__doc__,
     packages=find_packages(exclude=("tests", "tests.*")),
     # PEP 561
-    package_data={"typedpkg": ["py.typed"]},
+    package_data={"sentry_sdk": ["py.typed"]},
     zip_safe=False,
     license="BSD",
     install_requires=["urllib3", "certifi"],
