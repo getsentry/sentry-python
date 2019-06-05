@@ -55,6 +55,7 @@ class AwsLambdaIntegration(Integration):
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         import __main__ as lambda_bootstrap  # type: ignore
 
         pre_37 = True  # Python 3.6 or 2.7

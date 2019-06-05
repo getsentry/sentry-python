@@ -37,6 +37,7 @@ class GnuBacktraceIntegration(Integration):
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         @add_global_event_processor
         def process_gnu_backtrace(event, hint):
             with capture_internal_exceptions():

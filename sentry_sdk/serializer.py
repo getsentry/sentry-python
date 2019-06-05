@@ -49,20 +49,23 @@ class MetaNode(object):
     )
 
     def __init__(self):
+        # type: () -> None
         self._parent = None
         self._segment = None
-        self._depth = 0
-        self._data = None
-        self._is_databag = None
-        self._should_repr_strings = None
+        self._depth = 0  # type: int
+        self._data = None  # type: Optional[Dict[str, Any]]
+        self._is_databag = None  # type: Optional[bool]
+        self._should_repr_strings = None  # type: Optional[bool]
 
     def startswith_path(self, path):
+        # type: (List[Optional[str]]) -> bool
         if len(path) > self._depth:
             return False
 
         return self.is_path(path + [None] * (self._depth - len(path)))
 
     def is_path(self, path):
+        # type: (List[Optional[str]]) -> bool
         if len(path) != self._depth:
             return False
 
@@ -70,6 +73,7 @@ class MetaNode(object):
         for segment in reversed(path):
             if segment is not None and segment != cur._segment:
                 return False
+            assert cur._parent is not None
             cur = cur._parent
 
         return cur._segment is None
@@ -82,6 +86,7 @@ class MetaNode(object):
         return rv
 
     def _create_annotations(self):
+        # type: () -> None
         if self._data is not None:
             return
 
@@ -91,10 +96,13 @@ class MetaNode(object):
             self._parent._data[str(self._segment)] = self._data
 
     def annotate(self, **meta):
+        # type: (Any) -> None
         self._create_annotations()
+        assert self._data is not None
         self._data.setdefault("", {}).update(meta)
 
     def should_repr_strings(self):
+        # type: () -> bool
         if self._should_repr_strings is None:
             self._should_repr_strings = (
                 self.startswith_path(
@@ -109,6 +117,7 @@ class MetaNode(object):
         return self._should_repr_strings
 
     def is_databag(self):
+        # type: () -> bool
         if self._is_databag is None:
             self._is_databag = (
                 self.startswith_path(["request", "data"])
@@ -127,6 +136,7 @@ class MetaNode(object):
 
 
 def _flatten_annotated(obj, meta_node):
+    # type: (Any, MetaNode) -> Any
     if isinstance(obj, AnnotatedValue):
         meta_node.annotate(**obj.metadata)
         obj = obj.value
@@ -135,7 +145,8 @@ def _flatten_annotated(obj, meta_node):
 
 class Memo(object):
     def __init__(self):
-        self._inner = {}
+        # type: () -> None
+        self._inner = {}  # type: Dict[int, Any]
 
     @contextlib.contextmanager
     def memoize(self, obj):
@@ -150,6 +161,7 @@ class Memo(object):
 
 class Serializer(object):
     def __init__(self):
+        # type: () -> None
         self.memo = Memo()
         self.meta_node = MetaNode()
 

@@ -20,6 +20,7 @@ def default_callback(pending, timeout):
     """
 
     def echo(msg):
+        # type: (str) -> None
         sys.stderr.write(msg + "\n")
 
     echo("Sentry is attempting to send %i pending error messages" % pending)

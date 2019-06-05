@@ -50,6 +50,7 @@ def _make_excepthook(old_excepthook):
 
 
 def _should_send(always_run=False):
+    # type: (bool) -> bool
     if always_run:
         return True
 

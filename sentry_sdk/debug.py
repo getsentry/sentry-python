@@ -20,12 +20,14 @@ class _HubBasedClientFilter(logging.Filter):
 
 
 def init_debug_support():
+    # type: () -> None
     if not logger.handlers:
         configure_logger()
     configure_debug_hub()
 
 
 def configure_logger():
+    # type: () -> None
     _handler = logging.StreamHandler(sys.stderr)
     _handler.setFormatter(logging.Formatter(" [sentry] %(levelname)s: %(message)s"))
     logger.addHandler(_handler)
@@ -34,6 +36,7 @@ def configure_logger():
 
 
 def configure_debug_hub():
+    # type: () -> None
     def _get_debug_hub():
         return Hub.current
 
