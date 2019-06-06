@@ -225,7 +225,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if (
             initial_client is not None
             and initial_client is not client
-            and initial_client.integrations.get(name_or_class) is not None
+            and initial_client.integrations.get(integration_name) is not None
         ):
             warning = (
                 "Integration %r attempted to run but it was only "
