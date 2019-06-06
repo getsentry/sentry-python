@@ -212,7 +212,8 @@ def should_hide_frame(frame):
     # type: (Any) -> bool
     try:
         mod = frame.f_globals["__name__"]
-        return mod.startswith("sentry_sdk.")
+        if mod.startswith("sentry_sdk."):
+            return True
     except (AttributeError, KeyError):
         pass
 
