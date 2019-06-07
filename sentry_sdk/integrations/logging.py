@@ -157,7 +157,6 @@ class EventHandler(logging.Handler, object):
         if hub.client is None:
             return
 
-        hint = None  # type: Optional[Dict[str, Any]]
         client_options = hub.client.options
 
         # exc_info might be None or (None, None, None)
@@ -169,7 +168,7 @@ class EventHandler(logging.Handler, object):
             )
         elif record.exc_info and record.exc_info[0] is None:
             event = {}
-            hint = None
+            hint = {}
             with capture_internal_exceptions():
                 event["threads"] = {
                     "values": [
@@ -184,6 +183,9 @@ class EventHandler(logging.Handler, object):
                 }
         else:
             event = {}
+            hint = {}
+
+        hint["log_record"] = record
 
         event["level"] = _logging_to_event_level(record.levelname)
         event["logger"] = record.name
