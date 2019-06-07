@@ -164,8 +164,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     # Mypy doesn't pick up on the metaclass.
     if False:
-        current = ...  # type: Hub
-        main = ...  # type: Hub
+        current = None  # type: Hub
+        main = None  # type: Hub
 
     def __init__(self, client_or_hub=None, scope=None):
         # type: (Optional[Union[Hub, Client]], Optional[Any]) -> None
