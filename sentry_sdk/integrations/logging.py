@@ -17,7 +17,6 @@ if False:
     from logging import LogRecord
     from typing import Any
     from typing import Dict
-    from typing import Optional
 
 DEFAULT_LEVEL = logging.INFO
 DEFAULT_EVENT_LEVEL = logging.ERROR
