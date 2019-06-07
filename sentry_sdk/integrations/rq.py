@@ -17,6 +17,7 @@ if False:
     from rq.job import Job  # type: ignore
     from rq.queue import Queue  # type: ignore
 
+    from sentry_sdk.client import Client
     from sentry_sdk.utils import ExcInfo
 
 
@@ -37,6 +38,9 @@ class RqIntegration(Integration):
             if integration is None:
                 return old_perform_job(self, job, *args, **kwargs)
 
+            client = hub.client
+            assert client is not None
+
             with hub.push_scope() as scope:
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
@@ -46,7 +50,7 @@ class RqIntegration(Integration):
                 # We're inside of a forked process and RQ is
                 # about to call `os._exit`. Make sure that our
                 # events get sent out.
-                hub.client.flush()
+                client.flush()
 
             return rv
 
@@ -95,9 +99,13 @@ def _capture_exception(exc_info, **kwargs):
     hub = Hub.current
     if hub.get_integration(RqIntegration) is None:
         return
+
+    # If an integration is there, a client has to be there.
+    client = hub.client  # type: Client
+
     event, hint = event_from_exception(
         exc_info,
-        client_options=hub.client.options,
+        client_options=client.options,
         mechanism={"type": "rq", "handled": False},
     )
 

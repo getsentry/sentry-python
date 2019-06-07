@@ -9,6 +9,7 @@ from sentry_sdk.utils import logger
 from sentry_sdk.integrations import Integration
 
 if False:
+    from sentry_sdk.client import Client
     from typing import Any
     from typing import Optional
 
@@ -48,4 +49,7 @@ class AtexitIntegration(Integration):
             integration = hub.get_integration(AtexitIntegration)
             if integration is not None:
                 logger.debug("atexit: shutting down client")
-                hub.client.close(callback=integration.callback)
+
+                # If an integration is there, a client has to be there.
+                client = hub.client  # type: Client
+                client.close(callback=integration.callback)

@@ -13,6 +13,8 @@ if False:
     from typing import Callable
     from typing import Dict
 
+    from sentry_sdk.client import Client
+
 
 class FalconRequestExtractor(RequestExtractor):
     def env(self):
@@ -122,9 +124,12 @@ def _patch_handle_exception():
         integration = hub.get_integration(FalconIntegration)
 
         if integration is not None and not _is_falcon_http_error(ex):
+            # If an integration is there, a client has to be there.
+            client = hub.client  # type: Client
+
             event, hint = event_from_exception(
                 ex,
-                client_options=hub.client.options,
+                client_options=client.options,
                 mechanism={"type": "falcon", "handled": False},
             )
             hub.capture_event(event, hint=hint)
