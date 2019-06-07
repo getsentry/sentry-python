@@ -10,7 +10,7 @@ from sentry_sdk.utils import event_from_exception
 from sentry_sdk.integrations import Integration
 
 if False:
-    from sentry_sdk.client import Client
+    from typing import Any
 
 
 class ThreadingIntegration(Integration):
@@ -59,7 +59,7 @@ def _capture_exception():
 
     if hub.get_integration(ThreadingIntegration) is not None:
         # If an integration is there, a client has to be there.
-        client = hub.client  # type: Client
+        client = hub.client  # type: Any
 
         event, hint = event_from_exception(
             exc_info,

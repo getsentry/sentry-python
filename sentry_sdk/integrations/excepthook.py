@@ -6,8 +6,7 @@ from sentry_sdk.integrations import Integration
 
 if False:
     from typing import Callable
-
-    from sentry_sdk.client import Client
+    from typing import Any
 
 
 class ExcepthookIntegration(Integration):
@@ -39,7 +38,7 @@ def _make_excepthook(old_excepthook):
 
         if integration is not None and _should_send(integration.always_run):
             # If an integration is there, a client has to be there.
-            client = hub.client  # type: Client
+            client = hub.client  # type: Any
 
             with capture_internal_exceptions():
                 event, hint = event_from_exception(

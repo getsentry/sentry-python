@@ -9,7 +9,7 @@ from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 
 if False:
-    from sentry_sdk.client import Client
+
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from typing import Any
     from typing import Dict
@@ -179,7 +179,7 @@ def _capture_exception(sender, exception, **kwargs):
         return
 
     # If an integration is there, a client has to be there.
-    client = hub.client  # type: Client
+    client = hub.client  # type: Any
 
     event, hint = event_from_exception(
         exception,

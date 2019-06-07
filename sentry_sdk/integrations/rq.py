@@ -17,7 +17,6 @@ if False:
     from rq.job import Job  # type: ignore
     from rq.queue import Queue  # type: ignore
 
-    from sentry_sdk.client import Client
     from sentry_sdk.utils import ExcInfo
 
 
@@ -101,7 +100,7 @@ def _capture_exception(exc_info, **kwargs):
         return
 
     # If an integration is there, a client has to be there.
-    client = hub.client  # type: Client
+    client = hub.client  # type: Any
 
     event, hint = event_from_exception(
         exc_info,

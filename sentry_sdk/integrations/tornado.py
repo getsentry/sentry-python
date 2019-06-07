@@ -27,8 +27,6 @@ if False:
     from typing import Dict
     from typing import Callable
 
-    from sentry_sdk.client import Client
-
 
 class TornadoIntegration(Integration):
     identifier = "tornado"
@@ -112,7 +110,7 @@ def _capture_exception(ty, value, tb):
         return
 
     # If an integration is there, a client has to be there.
-    client = hub.client  # type: Client
+    client = hub.client  # type: Any
 
     event, hint = event_from_exception(
         (ty, value, tb),

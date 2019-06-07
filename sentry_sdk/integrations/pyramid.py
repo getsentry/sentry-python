@@ -25,7 +25,6 @@ if False:
     from webob.cookies import RequestCookies  # type: ignore
     from webob.compat import cgi_FieldStorage  # type: ignore
 
-    from sentry_sdk.client import Client
     from sentry_sdk.utils import ExcInfo
 
 
@@ -129,7 +128,7 @@ def _capture_exception(exc_info):
         return
 
     # If an integration is there, a client has to be there.
-    client = hub.client  # type: Client
+    client = hub.client  # type: Any
 
     event, hint = event_from_exception(
         exc_info,

@@ -27,7 +27,6 @@ if False:
 
     from sanic.request import Request, RequestParameters  # type: ignore
 
-    from sentry_sdk.client import Client
     from sentry_sdk.utils import Event, EventProcessor, Hint
 
 
@@ -135,7 +134,7 @@ def _capture_exception(exception):
         return
 
     # If an integration is there, a client has to be there.
-    client = hub.client  # type: Client
+    client = hub.client  # type: Any
 
     with capture_internal_exceptions():
         event, hint = event_from_exception(

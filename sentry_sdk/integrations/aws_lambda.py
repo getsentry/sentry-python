@@ -12,7 +12,7 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
 if False:
-    from sentry_sdk.client import Client
+    from typing import Any
 
 
 def _wrap_handler(handler):
@@ -23,7 +23,7 @@ def _wrap_handler(handler):
             return handler(event, context, *args, **kwargs)
 
         # If an integration is there, a client has to be there.
-        client = hub.client  # type: Client
+        client = hub.client  # type: Any
 
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
