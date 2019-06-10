@@ -109,9 +109,12 @@ def _capture_exception(ty, value, tb):
     if isinstance(value, HTTPError):
         return
 
+    # If an integration is there, a client has to be there.
+    client = hub.client  # type: Any
+
     event, hint = event_from_exception(
         (ty, value, tb),
-        client_options=hub.client.options,
+        client_options=client.options,
         mechanism={"type": "tornado", "handled": False},
     )
 

@@ -133,10 +133,13 @@ def _capture_exception(exception):
     if integration is None:
         return
 
+    # If an integration is there, a client has to be there.
+    client = hub.client  # type: Any
+
     with capture_internal_exceptions():
         event, hint = event_from_exception(
             exception,
-            client_options=hub.client.options,
+            client_options=client.options,
             mechanism={"type": "sanic", "handled": False},
         )
         hub.capture_event(event, hint=hint)

@@ -37,6 +37,9 @@ class RqIntegration(Integration):
             if integration is None:
                 return old_perform_job(self, job, *args, **kwargs)
 
+            client = hub.client
+            assert client is not None
+
             with hub.push_scope() as scope:
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
@@ -46,7 +49,7 @@ class RqIntegration(Integration):
                 # We're inside of a forked process and RQ is
                 # about to call `os._exit`. Make sure that our
                 # events get sent out.
-                hub.client.flush()
+                client.flush()
 
             return rv
 
@@ -55,7 +58,7 @@ class RqIntegration(Integration):
         old_handle_exception = Worker.handle_exception
 
         def sentry_patched_handle_exception(self, job, *exc_info, **kwargs):
-            _capture_exception(exc_info)
+            _capture_exception(exc_info)  # type: ignore
             return old_handle_exception(self, job, *exc_info, **kwargs)
 
         Worker.handle_exception = sentry_patched_handle_exception
@@ -95,9 +98,13 @@ def _capture_exception(exc_info, **kwargs):
     hub = Hub.current
     if hub.get_integration(RqIntegration) is None:
         return
+
+    # If an integration is there, a client has to be there.
+    client = hub.client  # type: Any
+
     event, hint = event_from_exception(
         exc_info,
-        client_options=hub.client.options,
+        client_options=client.options,
         mechanism={"type": "rq", "handled": False},
     )
 

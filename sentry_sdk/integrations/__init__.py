@@ -33,9 +33,7 @@ def _generate_default_integrations_iterator(*import_strings):
 
     if isinstance(iter_default_integrations.__doc__, str):
         for import_string in import_strings:
-            iter_default_integrations.__doc__ += "\n- `{}`".format(  # type: ignore
-                import_string
-            )
+            iter_default_integrations.__doc__ += "\n- `{}`".format(import_string)
 
     return iter_default_integrations
 
@@ -72,7 +70,7 @@ def setup_integrations(integrations, with_defaults=True):
                 instance = integration_cls()
                 integrations[instance.identifier] = instance
 
-    for identifier, integration in iteritems(integrations):
+    for identifier, integration in iteritems(integrations):  # type: ignore
         with _installer_lock:
             if identifier not in _installed_integrations:
                 logger.debug(
@@ -113,6 +111,7 @@ class Integration(object):
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         """
         Initialize the integration.
 

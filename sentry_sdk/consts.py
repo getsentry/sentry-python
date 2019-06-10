@@ -35,7 +35,7 @@ if False:
             "send_default_pii": bool,
             "http_proxy": Optional[str],
             "https_proxy": Optional[str],
-            "ignore_errors": List[type],
+            "ignore_errors": List[Union[type, str]],
             "request_bodies": str,
             "before_send": Optional[EventProcessor],
             "before_breadcrumb": Optional[BreadcrumbProcessor],

@@ -10,33 +10,42 @@ if False:
     from typing import Optional
     from typing import overload
     from typing import Callable
-    from typing import Dict
+    from typing import TypeVar
     from contextlib import ContextManager
+
+    from sentry_sdk.utils import Event, Hint, Breadcrumb, BreadcrumbHint
+
+    F = TypeVar("F", bound=Callable[..., Any])
 else:
 
     def overload(x):
         return x
 
 
-__all__ = []
-
-
-def public(f):
-    __all__.append(f.__name__)
-    return f
+__all__ = [
+    "capture_event",
+    "capture_message",
+    "capture_exception",
+    "add_breadcrumb",
+    "configure_scope",
+    "push_scope",
+    "flush",
+    "last_event_id",
+]
 
 
 def hubmethod(f):
+    # type: (F) -> F
     f.__doc__ = "%s\n\n%s" % (
         "Alias for `Hub.%s`" % f.__name__,
         inspect.getdoc(getattr(Hub, f.__name__)),
     )
-    return public(f)
+    return f
 
 
 @hubmethod
 def capture_event(event, hint=None):
-    # type: (Dict[str, Any], Dict[str, Any]) -> Optional[str]
+    # type: (Event, Optional[Hint]) -> Optional[str]
     hub = Hub.current
     if hub is not None:
         return hub.capture_event(event, hint)
@@ -45,7 +54,7 @@ def capture_event(event, hint=None):
 
 @hubmethod
 def capture_message(message, level=None):
-    # type: (str, Optional[Any]) -> Optional[str]
+    # type: (str, Optional[str]) -> Optional[str]
     hub = Hub.current
     if hub is not None:
         return hub.capture_message(message, level)
@@ -63,7 +72,7 @@ def capture_exception(error=None):
 
 @hubmethod
 def add_breadcrumb(crumb=None, hint=None, **kwargs):
-    # type: (Dict[str, Any], Dict[str, Any], **Any) -> None
+    # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], **Any) -> None
     hub = Hub.current
     if hub is not None:
         return hub.add_breadcrumb(crumb, hint, **kwargs)

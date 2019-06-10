@@ -28,6 +28,7 @@ class CeleryIntegration(Integration):
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         import celery.app.trace as trace  # type: ignore
 
         old_build_tracer = trace.build_tracer
