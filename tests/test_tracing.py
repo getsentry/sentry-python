@@ -1,6 +1,7 @@
 import pytest
 
-from sentry_sdk import Hub
+from sentry_sdk import Hub, capture_message
+from sentry_sdk.tracing import Span
 
 
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
@@ -26,3 +27,35 @@ def test_basic(sentry_init, capture_events, sample_rate):
         assert parent_span["transaction"] == "hi"
     else:
         assert not events
+
+
+def test_continue_from_headers(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with Hub.current.trace(transaction="hi"):
+        with Hub.current.span() as old_span:
+            headers = dict(Hub.current.iter_trace_propagation_headers())
+
+    span = Span.continue_from_headers(headers)
+    assert span is not None
+    assert span.trace_id == old_span.trace_id
+
+    with Hub.current.trace(span):
+        with Hub.current.configure_scope() as scope:
+            scope.transaction = "ho"
+
+        capture_message("hello")
+
+    trace1, message, trace2 = events
+
+    assert trace1["transaction"] == "hi"
+    assert trace2["transaction"] == "ho"
+
+    assert (
+        trace1["contexts"]["trace"]["trace_id"]
+        == trace2["contexts"]["trace"]["trace_id"]
+        == span.trace_id
+        == message["contexts"]["trace"]["trace_id"]
+    )
+    assert message["message"] == "hello"

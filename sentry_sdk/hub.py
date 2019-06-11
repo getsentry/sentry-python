@@ -383,8 +383,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             span.finish()
             self.finish_trace(span)
 
-    def trace(self, **kwargs):
-        return self.span(self.start_trace(**kwargs))
+    def trace(self, *args, **kwargs):
+        return self.span(self.start_trace(*args, **kwargs))
 
     def start_span(self, **kwargs):
         _, scope = self._stack[-1]
@@ -393,8 +393,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return span.new_span(**kwargs)
         return None
 
-    def start_trace(self, **kwargs):
-        span = Span.start_trace(**kwargs)
+    def start_trace(self, span=None, **kwargs):
+        if span is None:
+            span = Span.start_trace(**kwargs)
+
         _, scope = self._stack[-1]
 
         if scope.span is not None:

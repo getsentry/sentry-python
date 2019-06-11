@@ -125,9 +125,9 @@ class Span(object):
         trace_id, span_id, sampled_str = match.groups()
 
         if trace_id is not None:
-            trace_id = "%x" % (int(trace_id, 16),)
+            trace_id = "{:032x}".format(int(trace_id, 16))
         if span_id is not None:
-            span_id = "%x" % (int(span_id, 16),)
+            span_id = "{:016x}".format(int(span_id, 16))
 
         if sampled_str is not None:
             sampled = sampled_str != "0"
