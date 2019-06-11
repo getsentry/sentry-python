@@ -381,7 +381,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             span.set_tag("success", True)
         finally:
             span.finish()
-            self.capture_trace(span)
+            self.finish_trace(span)
 
     def trace(self, **kwargs):
         return self.span(self.start_trace(**kwargs))
@@ -407,7 +407,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return span
 
-    def capture_trace(self, span):
+    def finish_trace(self, span):
         if span.transaction is None:
             # If this has no transaction set we assume there's a parent
             # transaction for this span that would be flushed out eventually.

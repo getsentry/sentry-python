@@ -101,7 +101,7 @@ def _wrap_tracer(task, f):
                 return f(*args, **kwargs)
             finally:
                 span.finish()
-                hub.capture_trace(span)
+                hub.finish_trace(span)
 
     return _inner
 

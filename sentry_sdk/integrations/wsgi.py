@@ -93,7 +93,7 @@ class SentryWsgiMiddleware(object):
             finally:
                 if span is not None:
                     span.finish()
-                    hub.capture_trace(span)
+                    hub.finish_trace(span)
 
         return _ScopedResponse(hub, rv)
 
