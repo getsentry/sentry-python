@@ -376,6 +376,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             yield span
         except Exception:
             span.set_tag("success", False)
+            raise
         else:
             span.set_tag("success", True)
         finally:
