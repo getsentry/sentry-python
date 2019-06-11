@@ -408,12 +408,22 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return span
 
     def capture_trace(self, span):
-        if (
-            span.transaction is None
-            or span.timestamp is None
-            or self.client is None
-            or span.sampled is False
-        ):
+        if span.transaction is None:
+            # If this has no transaction set we assume there's a parent
+            # transaction for this span that would be flushed out eventually.
+            return None
+
+        if span.timestamp is None:
+            # This transaction is not yet finished so we just discard it.
+            return None
+
+        if self.client is None:
+            # We have no client and therefore nowhere to send this transaction
+            # event.
+            return None
+
+        if span.sampled is False:
+            # Span is forcibly un-sampled
             return None
 
         sample_rate = self.client.options["traces_sample_rate"]
