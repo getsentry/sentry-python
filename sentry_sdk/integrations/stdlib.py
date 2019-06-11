@@ -43,8 +43,8 @@ def install_httplib():
                 url,
             )
 
-        self._sentrysdk_recorder = record_http_request(hub, real_url, method)
-        self._sentrysdk_data_dict = self._sentrysdk_recorder.__enter__()
+        recorder = record_http_request(hub, real_url, method)
+        data_dict = recorder.__enter__()
 
         try:
             rv = real_putrequest(self, method, url, *args, **kwargs)
@@ -52,9 +52,11 @@ def install_httplib():
             for key, value in hub.iter_trace_propagation_headers():
                 self.putheader(key, value)
         except Exception:
-            self._sentrysdk_recorder.__exit__(*sys.exc_info())
-            self._sentrysdk_recorder = self._sentrysdk_data_dict = None
+            recorder.__exit__(*sys.exc_info())
             raise
+
+        self._sentrysdk_recorder = recorder
+        self._sentrysdk_data_dict = data_dict
 
         return rv
 
@@ -72,7 +74,6 @@ def install_httplib():
         finally:
             if recorder is not None:
                 recorder.__exit__(*sys.exc_info())
-            self._sentrysdk_recorder = self._sentrysdk_data_dict = None
 
         return rv
 
