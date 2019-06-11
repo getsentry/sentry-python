@@ -373,7 +373,7 @@ def record_sql(sql, params, cursor=None):
     if real_sql:
         with capture_internal_exceptions():
             hub.add_breadcrumb(message=real_sql, category="query")
-            span = hub.start_span(op="sql.query", description=real_sql)
+            span = hub.start_span(op="db.statement", description=real_sql)
 
     if span is None:
         yield
