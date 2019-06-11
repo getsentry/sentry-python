@@ -375,10 +375,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         try:
             yield span
         except Exception:
-            span.set_tag("success", False)
+            span.set_tag("error", True)
             raise
         else:
-            span.set_tag("success", True)
+            span.set_tag("error", False)
         finally:
             span.finish()
             self.finish_trace(span)

@@ -368,8 +368,6 @@ def record_sql(sql, params, cursor=None):
         except Exception:
             pass
 
-    span = None
-
     if real_sql:
         hub.add_breadcrumb(message=real_sql, category="query")
         with hub.span(op="db.statement", description=real_sql):
