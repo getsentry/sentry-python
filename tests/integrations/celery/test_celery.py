@@ -6,7 +6,6 @@ pytest.importorskip("celery")
 
 from sentry_sdk import Hub, configure_scope
 from sentry_sdk.integrations.celery import CeleryIntegration
-from sentry_sdk.tracing import Span
 
 from celery import Celery, VERSION
 from celery.bin import worker

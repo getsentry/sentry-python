@@ -22,7 +22,7 @@ if False:
             "release": Optional[str],
             "environment": Optional[str],
             "server_name": Optional[str],
-            "shutdown_timeout": int,
+            "shutdown_timeout": float,
             "integrations": List[Integration],
             "in_app_include": List[str],
             "in_app_exclude": List[str],
@@ -31,7 +31,7 @@ if False:
             "transport": Optional[
                 Union[Transport, Type[Transport], Callable[[Event], None]]
             ],
-            "sample_rate": int,
+            "sample_rate": float,
             "send_default_pii": bool,
             "http_proxy": Optional[str],
             "https_proxy": Optional[str],
@@ -43,7 +43,7 @@ if False:
             "attach_stacktrace": bool,
             "ca_certs": Optional[str],
             "propagate_traces": bool,
-            "send_traces": bool,
+            "traces_sample_rate": float,
         },
         total=False,
     )
@@ -78,7 +78,7 @@ DEFAULT_OPTIONS = {
     "ca_certs": None,
     "propagate_traces": True,
     "traces_sample_rate": 0.0,
-}
+}  # type: ClientOptions
 
 
 SDK_INFO = {

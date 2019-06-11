@@ -17,6 +17,7 @@ if False:
     from typing import Optional
     from typing import Tuple
     from typing import Union
+    from typing import Generator
 
     from django.core.handlers.wsgi import WSGIRequest  # type: ignore
     from django.http.response import HttpResponse  # type: ignore
@@ -328,7 +329,7 @@ def format_sql(sql, params):
 
 @contextlib.contextmanager
 def record_sql(sql, params, cursor=None):
-    # type: (Any, Any, Any) -> None
+    # type: (Any, Any, Any) -> Generator
     hub = Hub.current
     if hub.get_integration(DjangoIntegration) is None:
         yield
