@@ -37,6 +37,7 @@ from sentry_sdk import Hub
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
+from sentry_sdk.tracing import record_sql_query
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -331,61 +332,49 @@ def format_sql(sql, params):
     return sql, rv
 
 
-@contextlib.contextmanager
-def record_sql(sql, params, cursor=None):
+def record_sql(sql, param_list, cursor=None):
     # type: (Any, Any, Any) -> Generator
     hub = Hub.current
     if hub.get_integration(DjangoIntegration) is None:
         yield
         return
 
-    real_sql = None
-    real_params = None
+    formatted_queries = []
 
-    try:
-        # Prefer our own SQL formatting logic because it's the only one that
-        # has proper value trimming.
-        real_sql, real_params = format_sql(sql, params)
-        if real_sql:
-            real_sql = format_and_strip(real_sql, real_params)
-    except Exception:
-        pass
+    for params in param_list:
+        real_sql = None
+        real_params = None
 
-    if not real_sql and cursor and hasattr(cursor, "mogrify"):
-        # If formatting failed and we're using psycopg2, it could be that we're
-        # looking at a query that uses Composed objects. Use psycopg2's mogrify
-        # function to format the query. We lose per-parameter trimming but gain
-        # accuracy in formatting.
-        #
-        # This is intentionally the second choice because we assume Composed
-        # queries are not widely used, while per-parameter trimming is
-        # generally highly desirable.
         try:
-            if cursor and hasattr(cursor, "mogrify"):
-                real_sql = cursor.mogrify(sql, params)
-                if isinstance(real_sql, bytes):
-                    real_sql = real_sql.decode(cursor.connection.encoding)
+            # Prefer our own SQL formatting logic because it's the only one that
+            # has proper value trimming.
+            real_sql, real_params = format_sql(sql, params)
+            if real_sql:
+                real_sql = format_and_strip(real_sql, real_params)
         except Exception:
             pass
 
-    if real_sql:
-        hub.add_breadcrumb(message=real_sql, category="query")
-        with hub.span(op="db.statement", description=real_sql):
-            yield
-    else:
-        yield
+        if not real_sql and cursor and hasattr(cursor, "mogrify"):
+            # If formatting failed and we're using psycopg2, it could be that we're
+            # looking at a query that uses Composed objects. Use psycopg2's mogrify
+            # function to format the query. We lose per-parameter trimming but gain
+            # accuracy in formatting.
+            #
+            # This is intentionally the second choice because we assume Composed
+            # queries are not widely used, while per-parameter trimming is
+            # generally highly desirable.
+            try:
+                if cursor and hasattr(cursor, "mogrify"):
+                    real_sql = cursor.mogrify(sql, params)
+                    if isinstance(real_sql, bytes):
+                        real_sql = real_sql.decode(cursor.connection.encoding)
+            except Exception:
+                pass
 
+        if real_sql:
+            formatted_queries.append(real_sql)
 
-@contextlib.contextmanager
-def record_many_sql(sql, param_list, cursor):
-    ctxs = [record_sql(sql, params, cursor).__enter__() for params in param_list]
-
-    try:
-        yield
-    finally:
-        einfo = sys.exc_info()
-        for ctx in ctxs:
-            ctx.__exit__(*einfo)
+    return record_sql_queries(hub, formatted_queries)
 
 
 def install_sql_hook():
@@ -404,7 +393,7 @@ def install_sql_hook():
         return
 
     def execute(self, sql, params=None):
-        with record_sql(sql, params, self.cursor):
+        with record_sql(sql, [params], self.cursor):
             return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):

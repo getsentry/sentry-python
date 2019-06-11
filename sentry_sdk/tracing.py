@@ -1,5 +1,6 @@
 import re
 import uuid
+import contextlib
 
 from datetime import datetime
 
@@ -155,3 +156,31 @@ class Span(object):
 
     def get_trace_context(self):
         return {"trace_id": self.trace_id, "span_id": self.span_id}
+
+
+@contextlib.contextmanager
+def record_sql_query(hub, queries):
+    if not queries:
+        yield None
+    else:
+        for query in queries:
+            hub.add_breadcrumb(message=query, category="query")
+
+        description = ";".join(queries)
+        with hub.span(op="db.statement", description=description) as span:
+            yield span
+
+
+@contextlib.contextmanager
+def record_http_request(hub, url, method):
+    data_dict = {"url": url, "method": method}
+
+    with hub.span(op="http", description="%s %s" % (url, method)) as span:
+        try:
+            yield data_dict
+        finally:
+            httplib_response = data_dict.pop("httplib_response", None)
+            if "status_code" in data_dict:
+                span.set_tag("http.status_code", data_dict["status_code"])
+            for k, v in data_dict.items():
+                span.set_data(k, v)

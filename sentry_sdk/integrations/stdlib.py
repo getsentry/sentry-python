@@ -1,5 +1,6 @@
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
+from sentry_sdk.tracing import record_http_request
 
 
 try:
@@ -23,10 +24,9 @@ def install_httplib():
     real_getresponse = HTTPConnection.getresponse
 
     def putrequest(self, method, url, *args, **kwargs):
-        rv = real_putrequest(self, method, url, *args, **kwargs)
         hub = Hub.current
         if hub.get_integration(StdlibIntegration) is None:
-            return rv
+            return real_putrequest(self, method, url, *args, **kwargs)
 
         host = self.host
         port = self.port
@@ -41,40 +41,37 @@ def install_httplib():
                 url,
             )
 
-        self._sentrysdk_data_dict = data = {}
-        self._sentrysdk_span = hub.start_span(
-            op="http", description="%s %s" % (real_url, method)
-        )
+        self._sentrysdk_recorder = record_http_request(hub, real_url, method)
+        self._sentrysdk_data_dict = self._sentrysdk_recorder.__enter__()
 
-        for key, value in hub.iter_trace_propagation_headers():
-            self.putheader(key, value)
+        try:
+            rv = real_putrequest(self, method, url, *args, **kwargs)
 
-        data["url"] = real_url
-        data["method"] = method
+            for key, value in hub.iter_trace_propagation_headers():
+                self.putheader(key, value)
+        except Exception:
+            self._sentrysdk_recorder.__exit__(*sys.exc_info())
+            self._sentrysdk_recorder = self._sentrysdk_data_dict = None
+            raise
+
         return rv
 
     def getresponse(self, *args, **kwargs):
-        rv = real_getresponse(self, *args, **kwargs)
-        hub = Hub.current
-        if hub.get_integration(StdlibIntegration) is None:
-            return rv
+        recorder = getattr(self, "_sentrysdk_recorder", None)
+        data_dict = getattr(self, "_sentrysdk_data_dict", None)
 
-        data = getattr(self, "_sentrysdk_data_dict", None) or {}
+        try:
+            rv = real_getresponse(self, *args, **kwargs)
 
-        if "status_code" not in data:
-            data["status_code"] = rv.status
-            data["reason"] = rv.reason
+            if recorder is not None and data_dict is not None:
+                data_dict["httplib_response"] = rv
+                data_dict["status_code"] = rv.status
+                data_dict["reason"] = rv.reason
+        finally:
+            if recorder is not None:
+                recorder.__exit__(*sys.exc_info())
+            self._sentrysdk_recorder = self._sentrysdk_data_dict = None
 
-        span = self._sentrysdk_span
-        if span is not None:
-            span.set_tag("status_code", rv.status)
-            for k, v in data.items():
-                span.set_data(k, v)
-            span.finish()
-
-        hub.add_breadcrumb(
-            type="http", category="httplib", data=data, hint={"httplib_response": rv}
-        )
         return rv
 
     HTTPConnection.putrequest = putrequest
