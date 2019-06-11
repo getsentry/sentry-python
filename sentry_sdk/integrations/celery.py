@@ -90,30 +90,17 @@ def _wrap_tracer(task, f):
         with hub.push_scope() as scope:
             scope._name = "celery"
             scope.clear_breadcrumbs()
-            span = _continue_trace(args[3].get("headers") or {}, scope)
-
-            with capture_internal_exceptions():
-                scope.transaction = task.name
-
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
-            try:
+            with capture_internal_exceptions():
+                # Celery task objects are not a thing to be trusted. Even
+                # something such as attribute access can fail.
+                scope.transaction = task.name
+
+            with hub.trace(Span.continue_from_headers(args[3].get("headers") or {})):
                 return f(*args, **kwargs)
-            finally:
-                span.finish()
-                hub.finish_trace(span)
 
     return _inner
-
-
-def _continue_trace(headers, scope):
-    if headers:
-        span = Span.continue_from_headers(headers)
-    else:
-        span = Span.start_trace()
-
-    scope.span = span
-    return span
 
 
 def _wrap_task_call(task, f):
