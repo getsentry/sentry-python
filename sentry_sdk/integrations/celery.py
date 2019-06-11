@@ -97,7 +97,9 @@ def _wrap_tracer(task, f):
                 # something such as attribute access can fail.
                 scope.transaction = task.name
 
-            with hub.trace(Span.continue_from_headers(args[3].get("headers") or {})):
+            with hub.trace(
+                span=Span.continue_from_headers(args[3].get("headers") or {})
+            ):
                 return f(*args, **kwargs)
 
     return _inner
