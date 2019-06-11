@@ -64,6 +64,8 @@ class Span(object):
         self._data = {}  # type: Dict[str, Any]
         self._finished_spans = []  # type: List[Span]
         self.start_timestamp = datetime.now()
+
+        #: End timestamp of span
         self.timestamp = None
 
     def __repr__(self):
