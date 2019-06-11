@@ -371,18 +371,11 @@ def record_sql(sql, params, cursor=None):
     span = None
 
     if real_sql:
-        with capture_internal_exceptions():
-            hub.add_breadcrumb(message=real_sql, category="query")
-            span = hub.start_span(op="db.statement", description=real_sql)
-
-    if span is None:
-        yield
-    else:
-        try:
+        hub.add_breadcrumb(message=real_sql, category="query")
+        with hub.span(op="db.statement", description=real_sql):
             yield
-        finally:
-            span.set_tag("status", sys.exc_info()[1] is None)
-            span.finish()
+    else:
+        yield
 
 
 @contextlib.contextmanager
