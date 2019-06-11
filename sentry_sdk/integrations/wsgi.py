@@ -78,22 +78,17 @@ class SentryWsgiMiddleware(object):
         hub = Hub(Hub.current)
 
         with hub:
-            span = None
             with capture_internal_exceptions():
                 with hub.configure_scope() as scope:
                     scope.clear_breadcrumbs()
                     scope._name = "wsgi"
                     scope.add_event_processor(_make_wsgi_event_processor(environ))
-                    scope.span = span = Span.continue_from_environ(environ)
 
-            try:
-                rv = self.app(environ, start_response)
-            except BaseException:
-                reraise(*_capture_exception(hub))
-            finally:
-                if span is not None:
-                    span.finish()
-                    hub.finish_trace(span)
+            with hub.trace(Span.continue_from_environ(environ)):
+                try:
+                    rv = self.app(environ, start_response)
+                except BaseException:
+                    reraise(*_capture_exception(hub))
 
         return _ScopedResponse(hub, rv)
 
