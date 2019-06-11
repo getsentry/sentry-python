@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
-import contextlib
 import sys
 import weakref
+import contextlib
 
 from django import VERSION as DJANGO_VERSION  # type: ignore
 from django.db.models.query import QuerySet  # type: ignore
@@ -332,11 +332,12 @@ def format_sql(sql, params):
     return sql, rv
 
 
+@contextlib.contextmanager
 def record_sql(sql, param_list, cursor=None):
     # type: (Any, Any, Any) -> Generator
     hub = Hub.current
     if hub.get_integration(DjangoIntegration) is None:
-        yield
+        yield None
         return
 
     formatted_queries = []
@@ -374,7 +375,8 @@ def record_sql(sql, param_list, cursor=None):
         if real_sql:
             formatted_queries.append(real_sql)
 
-    return record_sql_queries(hub, formatted_queries)
+    with record_sql_query(hub, formatted_queries):
+        yield
 
 
 def install_sql_hook():
@@ -397,7 +399,7 @@ def install_sql_hook():
             return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):
-        with record_many_sql(sql, param_list, self.cursor):
+        with record_sql(sql, param_list, self.cursor):
             return real_executemany(self, sql, param_list)
 
     CursorWrapper.execute = execute

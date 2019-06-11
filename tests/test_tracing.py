@@ -19,9 +19,10 @@ def test_basic(sentry_init, capture_events, sample_rate):
     if sample_rate:
         event, = events
 
-        span1, span2, parent_span = event["spans"]
-        assert not span1["tags"]["success"]
-        assert span2["tags"]["success"]
+        span1, span2 = event["spans"]
+        parent_span = event
+        assert span1["tags"]["error"]
+        assert not span2["tags"]["error"]
         assert parent_span["transaction"] == "hi"
     else:
         assert not events
