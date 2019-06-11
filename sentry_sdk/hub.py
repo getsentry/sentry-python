@@ -426,9 +426,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             # Span is forcibly un-sampled
             return None
 
-        sample_rate = self.client.options["traces_sample_rate"]
-        if sample_rate < 1.0 and random.random() >= sample_rate:
-            return None
+        if span.sampled is None:
+            # span.sampled = True -> Span forcibly sampled
+            sample_rate = self.client.options["traces_sample_rate"]
+            if sample_rate < 1.0 and random.random() >= sample_rate:
+                return None
 
         return self.capture_event(
             {
