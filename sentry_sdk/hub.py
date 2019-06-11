@@ -408,13 +408,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return span
 
     def finish_trace(self, span):
+        if span.timestamp is None:
+            # This transaction is not yet finished so we just finish it.
+            span.finish()
+
         if span.transaction is None:
             # If this has no transaction set we assume there's a parent
             # transaction for this span that would be flushed out eventually.
-            return None
-
-        if span.timestamp is None:
-            # This transaction is not yet finished so we just discard it.
             return None
 
         if self.client is None:
