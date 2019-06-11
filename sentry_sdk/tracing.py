@@ -67,12 +67,16 @@ class Span(object):
         self.timestamp = None
 
     def __repr__(self):
-        return "<%s(transaction=%r, trace_id=%r, span_id=%r, parent_span_id=%r)>" % (
-            self.__class__.__name__,
-            self.transaction,
-            self.trace_id,
-            self.span_id,
-            self.parent_span_id,
+        return (
+            "<%s(transaction=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>"
+            % (
+                self.__class__.__name__,
+                self.transaction,
+                self.trace_id,
+                self.span_id,
+                self.parent_span_id,
+                self.sampled,
+            )
         )
 
     @classmethod
