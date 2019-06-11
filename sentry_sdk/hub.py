@@ -395,9 +395,16 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def start_trace(self, **kwargs):
         span = Span.start_trace(**kwargs)
-
         _, scope = self._stack[-1]
+
+        if scope.span is not None:
+            logger.warning(
+                "Creating new trace %s within existing trace %s",
+                span.trace_id,
+                scope.span.trace_id,
+            )
         scope.span = span
+
         return span
 
     def capture_trace(self, span):
