@@ -105,12 +105,13 @@ class HttpTransport(Transport):
             f.write(json.dumps(event, allow_nan=False).encode("utf-8"))
 
         logger.debug(
-            "Sending %s event [%s] to %s project:%s"
+            "Sending event, type:%s level:%s event_id:%s project:%s host:%s"
             % (
-                event.get("level") or "level-less",
-                event["event_id"],
-                self.parsed_dsn.host,
+                event.get("type") or "null",
+                event.get("level") or "null",
+                event.get("event_id") or "null",
                 self.parsed_dsn.project_id,
+                self.parsed_dsn.host,
             )
         )
         response = self._pool.request(
