@@ -47,7 +47,7 @@ def get_options(*args, **kwargs):
     for key, value in iteritems(options):
         if key not in rv:
             raise TypeError("Unknown option %r" % (key,))
-        rv[key] = value  # type: ignore
+        rv[key] = value
 
     if rv["dsn"] is None:
         rv["dsn"] = os.environ.get("SENTRY_DSN")
@@ -108,9 +108,10 @@ class Client(object):
         hint = dict(hint or ())  # type: Hint
 
         if scope is not None:
-            event = scope.apply_to_event(event, hint)
-            if event is None:
-                return
+            event_ = scope.apply_to_event(event, hint)
+            if event_ is None:
+                return None
+            event = event_
 
         if (
             self.options["attach_stacktrace"]
@@ -178,7 +179,7 @@ class Client(object):
                 if errcls == full_name or errcls == type_name:
                     return True
             else:
-                if issubclass(exc_info[0], errcls):
+                if issubclass(exc_info[0], errcls):  # type: ignore
                     return True
 
         return False
@@ -187,7 +188,7 @@ class Client(object):
         self,
         event,  # type: Event
         hint,  # type: Hint
-        scope=None,  # type: Scope
+        scope=None,  # type: Optional[Scope]
     ):
         # type: (...) -> bool
         if scope is not None and not scope._should_capture:
@@ -205,10 +206,10 @@ class Client(object):
         return True
 
     def capture_event(self, event, hint=None, scope=None):
-        # type: (Dict[str, Any], Any, Scope) -> Optional[str]
+        # type: (Dict[str, Any], Optional[Any], Optional[Scope]) -> Optional[str]
         """Captures an event.
 
-        This takes the ready made event and an optoinal hint and scope.  The
+        This takes the ready made event and an optional hint and scope.  The
         hint is internally used to further customize the representation of the
         error.  When provided it's a dictionary of optional information such
         as exception info.
@@ -225,7 +226,7 @@ class Client(object):
             event["event_id"] = rv = uuid.uuid4().hex
         if not self._should_capture(event, hint, scope):
             return None
-        event = self._prepare_event(event, hint, scope)  # type: ignore
+        event = self._prepare_event(event, hint, scope)
         if event is None:
             return None
         self.transport.capture_event(event)

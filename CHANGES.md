@@ -1,3 +1,10 @@
+## 0.9.0
+
+* The SDK now captures `SystemExit` and other `BaseException`s when coming from
+  within a WSGI app (Flask, Django, ...)
+* Pyramid: No longer report an exception if there exists an exception view for
+  it.
+
 ## 0.8.1
 
 * Fix infinite recursion bug in Celery integration.

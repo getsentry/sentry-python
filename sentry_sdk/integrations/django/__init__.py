@@ -228,9 +228,13 @@ def _got_request_exception(request=None, **kwargs):
     hub = Hub.current
     integration = hub.get_integration(DjangoIntegration)
     if integration is not None:
+
+        # If an integration is there, a client has to be there.
+        client = hub.client  # type: Any
+
         event, hint = event_from_exception(
             sys.exc_info(),
-            client_options=hub.client.options,
+            client_options=client.options,
             mechanism={"type": "django", "handled": False},
         )
         hub.capture_event(event, hint=hint)

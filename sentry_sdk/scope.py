@@ -11,8 +11,12 @@ if False:
     from typing import Optional
     from typing import Deque
     from typing import List
+    from typing import Callable
+    from typing import TypeVar
 
     from sentry_sdk.utils import Breadcrumb, Event, EventProcessor, ErrorProcessor, Hint
+
+    F = TypeVar("F", bound=Callable[..., Any])
 
 
 global_event_processors = []  # type: List[EventProcessor]
@@ -28,6 +32,7 @@ def _attr_setter(fn):
 
 
 def _disable_capture(fn):
+    # type: (F) -> F
     @wraps(fn)
     def wrapper(self, *args, **kwargs):
         # type: (Any, *Dict[str, Any], **Any) -> Any
@@ -39,7 +44,7 @@ def _disable_capture(fn):
         finally:
             self._should_capture = True
 
-    return wrapper
+    return wrapper  # type: ignore
 
 
 class Scope(object):
@@ -64,10 +69,11 @@ class Scope(object):
     )
 
     def __init__(self):
+        # type: () -> None
         self._event_processors = []  # type: List[EventProcessor]
         self._error_processors = []  # type: List[ErrorProcessor]
 
-        self._name = None
+        self._name = None  # type: Optional[str]
         self.clear()
 
     @_attr_setter
@@ -106,26 +112,32 @@ class Scope(object):
             span.transaction = self._transaction
 
     def set_tag(self, key, value):
+        # type: (str, Any) -> None
         """Sets a tag for a key to a specific value."""
         self._tags[key] = value
 
     def remove_tag(self, key):
+        # type: (str) -> None
         """Removes a specific tag."""
         self._tags.pop(key, None)
 
     def set_context(self, key, value):
+        # type: (str, Any) -> None
         """Binds a context at a certain key to a specific value."""
         self._contexts[key] = value
 
     def remove_context(self, key):
+        # type: (str) -> None
         """Removes a context."""
         self._contexts.pop(key, None)
 
     def set_extra(self, key, value):
+        # type: (str, Any) -> None
         """Sets an extra key to a specific value."""
         self._extras[key] = value
 
     def remove_extra(self, key):
+        # type: (str) -> None
         """Removes a specific extra key."""
         self._extras.pop(key, None)
 
@@ -167,11 +179,12 @@ class Scope(object):
         invoked with the original exception info triple as second argument.
         """
         if cls is not None:
+            cls_ = cls  # For mypy.
             real_func = func
 
             def func(event, exc_info):
                 try:
-                    is_inst = isinstance(exc_info[1], cls)
+                    is_inst = isinstance(exc_info[1], cls_)
                 except Exception:
                     is_inst = False
                 if is_inst:
@@ -237,7 +250,7 @@ class Scope(object):
 
     def __copy__(self):
         # type: () -> Scope
-        rv = object.__new__(self.__class__)
+        rv = object.__new__(self.__class__)  # type: Scope
 
         rv._level = self._level
         rv._name = self._name
@@ -259,6 +272,7 @@ class Scope(object):
         return rv
 
     def __repr__(self):
+        # type: () -> str
         return "<%s id=%s name=%s>" % (
             self.__class__.__name__,
             hex(id(self)),

@@ -35,7 +35,7 @@ if False:
             "send_default_pii": bool,
             "http_proxy": Optional[str],
             "https_proxy": Optional[str],
-            "ignore_errors": List[type],
+            "ignore_errors": List[Union[type, str]],
             "request_bodies": str,
             "before_send": Optional[EventProcessor],
             "before_breadcrumb": Optional[BreadcrumbProcessor],
@@ -49,7 +49,7 @@ if False:
     )
 
 
-VERSION = "0.8.1"
+VERSION = "0.9.0"
 DEFAULT_SERVER_NAME = socket.gethostname() if hasattr(socket, "gethostname") else None
 DEFAULT_OPTIONS = {
     "dsn": None,

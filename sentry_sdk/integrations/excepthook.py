@@ -6,6 +6,7 @@ from sentry_sdk.integrations import Integration
 
 if False:
     from typing import Callable
+    from typing import Any
 
 
 class ExcepthookIntegration(Integration):
@@ -36,10 +37,13 @@ def _make_excepthook(old_excepthook):
         integration = hub.get_integration(ExcepthookIntegration)
 
         if integration is not None and _should_send(integration.always_run):
+            # If an integration is there, a client has to be there.
+            client = hub.client  # type: Any
+
             with capture_internal_exceptions():
                 event, hint = event_from_exception(
                     (exctype, value, traceback),
-                    client_options=hub.client.options,
+                    client_options=client.options,
                     mechanism={"type": "excepthook", "handled": False},
                 )
                 hub.capture_event(event, hint=hint)
@@ -50,6 +54,7 @@ def _make_excepthook(old_excepthook):
 
 
 def _should_send(always_run=False):
+    # type: (bool) -> bool
     if always_run:
         return True
 

@@ -21,6 +21,7 @@ if False:
     from typing import Union
 
     from sentry_sdk.consts import ClientOptions
+    from sentry_sdk.hub import Hub
 
     ExcInfo = Tuple[
         Optional[Type[BaseException]], Optional[BaseException], Optional[Any]
@@ -47,6 +48,7 @@ MAX_FORMAT_PARAM_LENGTH = 128
 
 
 def _get_debug_hub():
+    # type: () -> Optional[Hub]
     # This function is replaced by debug.py
     pass
 
@@ -63,11 +65,12 @@ def capture_internal_exceptions():
 
 
 def to_timestamp(value):
+    # type: (datetime) -> float
     return (value - epoch).total_seconds()
 
 
 def event_hint_with_exc_info(exc_info=None):
-    # type: (ExcInfo) -> Dict[str, Optional[ExcInfo]]
+    # type: (Optional[ExcInfo]) -> Dict[str, Optional[ExcInfo]]
     """Creates a hint with the exc info filled in."""
     if exc_info is None:
         exc_info = sys.exc_info()
@@ -87,6 +90,7 @@ class Dsn(object):
     """Represents a DSN."""
 
     def __init__(self, value):
+        # type: (Union[Dsn, str]) -> None
         if isinstance(value, Dsn):
             self.__dict__ = dict(value.__dict__)
             return
@@ -114,6 +118,7 @@ class Dsn(object):
 
     @property
     def netloc(self):
+        # type: () -> str
         """The netloc part of a DSN."""
         rv = self.host
         if (self.scheme, self.port) not in (("http", 80), ("https", 443)):
@@ -121,6 +126,7 @@ class Dsn(object):
         return rv
 
     def to_auth(self, client=None):
+        # type: (Optional[Any]) -> Auth
         """Returns the auth info object for this dsn."""
         return Auth(
             scheme=self.scheme,
@@ -133,6 +139,7 @@ class Dsn(object):
         )
 
     def __str__(self):
+        # type: () -> str
         return "%s://%s%s@%s%s%s" % (
             self.scheme,
             self.public_key,
@@ -157,6 +164,7 @@ class Auth(object):
         client=None,
         path="/",
     ):
+        # type: (str, str, str, str, Optional[str], int, Optional[Any], str) -> None
         self.scheme = scheme
         self.host = host
         self.path = path
@@ -168,6 +176,7 @@ class Auth(object):
 
     @property
     def store_api_url(self):
+        # type: () -> str
         """Returns the API url for storing events."""
         return "%s://%s%sapi/%s/store/" % (
             self.scheme,
@@ -177,6 +186,7 @@ class Auth(object):
         )
 
     def to_header(self, timestamp=None):
+        # type: (Optional[datetime]) -> str
         """Returns the auth header a string."""
         rv = [("sentry_key", self.public_key), ("sentry_version", self.version)]
         if timestamp is not None:
@@ -212,7 +222,8 @@ def should_hide_frame(frame):
     # type: (Any) -> bool
     try:
         mod = frame.f_globals["__name__"]
-        return mod.startswith("sentry_sdk.")
+        if mod.startswith("sentry_sdk."):
+            return True
     except (AttributeError, KeyError):
         pass
 
@@ -246,8 +257,8 @@ def slim_string(value, length=MAX_STRING_LENGTH):
 def get_lines_from_file(
     filename,  # type: str
     lineno,  # type: int
-    loader=None,  # type: Any
-    module=None,  # type: str
+    loader=None,  # type: Optional[Any]
+    module=None,  # type: Optional[str]
 ):
     # type: (...) -> Tuple[List[str], Optional[str], List[str]]
     context_lines = 5
@@ -362,7 +373,7 @@ def filename_for_module(module, abs_path):
 
 
 def serialize_frame(frame, tb_lineno=None, with_locals=True):
-    # type: (Any, int, bool) -> Dict[str, Any]
+    # type: (Any, Optional[int], bool) -> Dict[str, Any]
     f_code = getattr(frame, "f_code", None)
     if f_code:
         abs_path = frame.f_code.co_filename
@@ -408,6 +419,7 @@ def stacktrace_from_traceback(tb=None, with_locals=True):
 
 
 def current_stacktrace(with_locals=True):
+    # type: (bool) -> Any
     __tracebackhide__ = True
     frames = []
 
@@ -432,7 +444,7 @@ def single_exception_from_error_tuple(
     exc_value,  # type: Optional[BaseException]
     tb,  # type: Optional[Any]
     client_options=None,  # type: Optional[ClientOptions]
-    mechanism=None,  # type: Dict[str, Any]
+    mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> Dict[str, Any]
     if exc_value is not None:
@@ -484,7 +496,7 @@ if HAS_CHAINED_EXCEPTIONS:
             seen_exceptions.append(exc_value)
             seen_exception_ids.add(id(exc_value))
 
-            if exc_value.__suppress_context__:  # type: ignore
+            if exc_value.__suppress_context__:
                 cause = exc_value.__cause__
             else:
                 cause = exc_value.__context__
@@ -505,7 +517,7 @@ else:
 def exceptions_from_error_tuple(
     exc_info,  # type: ExcInfo
     client_options=None,  # type: Optional[ClientOptions]
-    mechanism=None,  # type: Dict[str, Any]
+    mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> List[Dict[str, Any]]
     exc_type, exc_value, tb = exc_info
@@ -552,7 +564,7 @@ def iter_event_frames(event):
 
 
 def handle_in_app(event, in_app_exclude=None, in_app_include=None):
-    # type: (Dict[str, Any], List, List) -> Dict[str, Any]
+    # type: (Dict[str, Any], Optional[List], Optional[List]) -> Dict[str, Any]
     for stacktrace in iter_event_stacktraces(event):
         handle_in_app_impl(
             stacktrace.get("frames"),
@@ -564,8 +576,9 @@ def handle_in_app(event, in_app_exclude=None, in_app_include=None):
 
 
 def handle_in_app_impl(frames, in_app_exclude, in_app_include):
+    # type: (Any, Optional[List], Optional[List]) -> Optional[Any]
     if not frames:
-        return
+        return None
 
     any_in_app = False
     for frame in frames:
@@ -617,7 +630,7 @@ def exc_info_from_error(error):
 def event_from_exception(
     exc_info,  # type: Union[BaseException, ExcInfo]
     client_options=None,  # type: Optional[ClientOptions]
-    mechanism=None,  # type: Dict[str, Any]
+    mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> Tuple[Dict[str, Any], Dict[str, Any]]
     exc_info = exc_info_from_error(exc_info)
@@ -676,10 +689,10 @@ def format_and_strip(
         raise ValueError("No formatting placeholders found")
 
     params = list(reversed(params))
-    rv_remarks = []
+    rv_remarks = []  # type: List[Any]
     rv_original_length = 0
     rv_length = 0
-    rv = []
+    rv = []  # type: List[str]
 
     def realign_remark(remark):
         return [
@@ -710,14 +723,14 @@ def format_and_strip(
     rv_length += len(chunks[-1])
     rv_original_length += len(chunks[-1])
 
-    rv = u"".join(rv)
-    assert len(rv) == rv_length
+    rv_joined = u"".join(rv)
+    assert len(rv_joined) == rv_length
 
     if not rv_remarks:
-        return rv
+        return rv_joined
 
     return AnnotatedValue(
-        value=rv, metadata={"len": rv_original_length, "rem": rv_remarks}
+        value=rv_joined, metadata={"len": rv_original_length, "rem": rv_remarks}
     )
 
 
@@ -727,7 +740,7 @@ try:
     from contextvars import ContextVar  # type: ignore
 
     if not PY2 and sys.version_info < (3, 7):
-        import aiocontextvars  # type: ignore # noqa
+        import aiocontextvars  # type: ignore  # noqa
 except ImportError:
     HAS_REAL_CONTEXTVARS = False
 
@@ -748,11 +761,12 @@ except ImportError:
 
 
 def transaction_from_function(func):
+    # type: (Callable[..., Any]) -> Optional[str]
     # Methods in Python 2
     try:
         return "%s.%s.%s" % (
-            func.im_class.__module__,
-            func.im_class.__name__,
+            func.im_class.__module__,  # type: ignore
+            func.im_class.__name__,  # type: ignore
             func.__name__,
         )
     except Exception:
@@ -760,7 +774,7 @@ def transaction_from_function(func):
 
     func_qualname = (
         getattr(func, "__qualname__", None) or getattr(func, "__name__", None) or None
-    )
+    )  # type: Optional[str]
 
     if not func_qualname:
         # No idea what it is

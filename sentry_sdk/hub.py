@@ -21,6 +21,7 @@ from sentry_sdk.utils import (
 
 if False:
     from contextlib import ContextManager
+    from sys import _OptExcInfo
 
     from typing import Union
     from typing import Any
@@ -29,6 +30,7 @@ if False:
     from typing import List
     from typing import Callable
     from typing import Generator
+    from typing import Type
     from typing import overload
 
     from sentry_sdk.integrations import Integration
@@ -39,8 +41,8 @@ else:
         return x
 
 
-_local = ContextVar("sentry_current_hub")
-_initial_client = None
+_local = ContextVar("sentry_current_hub")  # type: ignore
+_initial_client = None  # type: Optional[weakref.ReferenceType[Client]]
 
 
 def _should_send_default_pii():
@@ -53,9 +55,11 @@ def _should_send_default_pii():
 
 class _InitGuard(object):
     def __init__(self, client):
+        # type: (Client) -> None
         self._client = client
 
     def __enter__(self):
+        # type: () -> _InitGuard
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
@@ -106,6 +110,7 @@ class _HubManager(object):
 
 class _ScopeManager(object):
     def __init__(self, hub):
+        # type: (Hub) -> None
         self._hub = hub
         self._original_len = len(hub._stack)
         self._layer = hub._stack[-1]
@@ -160,8 +165,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     _stack = None  # type: List[Tuple[Optional[Client], Scope]]
 
+    # Mypy doesn't pick up on the metaclass.
+    if False:
+        current = None  # type: Hub
+        main = None  # type: Hub
+
     def __init__(self, client_or_hub=None, scope=None):
-        # type: (Union[Hub, Client], Optional[Any]) -> None
+        # type: (Optional[Union[Hub, Client]], Optional[Any]) -> None
         if isinstance(client_or_hub, Hub):
             hub = client_or_hub
             client, other_scope = hub._stack[-1]
@@ -200,7 +210,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return callback()
 
     def get_integration(self, name_or_class):
-        # type: (Union[str, Integration]) -> Any
+        # type: (Union[str, Type[Integration]]) -> Any
         """Returns the integration for this hub by name or class.  If there
         is no client bound or the client does not have that integration
         then `None` is returned.
@@ -221,14 +231,15 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             if rv is not None:
                 return rv
 
-        initial_client = _initial_client
-        if initial_client is not None:
-            initial_client = initial_client()
+        if _initial_client is not None:
+            initial_client = _initial_client()
+        else:
+            initial_client = None
 
         if (
             initial_client is not None
             and initial_client is not client
-            and initial_client.integrations.get(name_or_class) is not None
+            and initial_client.integrations.get(integration_name) is not None
         ):
             warning = (
                 "Integration %r attempted to run but it was only "
@@ -257,7 +268,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self._stack[-1] = (new, top[1])
 
     def capture_event(self, event, hint=None):
-        # type: (Event, Hint) -> Optional[str]
+        # type: (Event, Optional[Hint]) -> Optional[str]
         """Captures an event.  The return value is the ID of the event.
 
         The event is a dictionary following the Sentry v7/v8 protocol
@@ -309,9 +320,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return None
 
     def _capture_internal_exception(self, exc_info):
+        # type: (_OptExcInfo) -> Any
         """Capture an exception that is likely caused by a bug in the SDK
         itself."""
-        logger.error("Internal error in sentry_sdk", exc_info=exc_info)
+        logger.error("Internal error in sentry_sdk", exc_info=exc_info)  # type: ignore
 
     def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
         # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], **Any) -> None

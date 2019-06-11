@@ -6,10 +6,13 @@ import logging
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 other_logger = logging.getLogger("testfoo")
-other_logger.setLevel(logging.DEBUG)
-
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+
+
+@pytest.fixture(autouse=True)
+def reset_level():
+    other_logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.DEBUG)
 
 
 @pytest.mark.parametrize("logger", [logger, other_logger])
@@ -73,3 +76,42 @@ def test_logging_stack(sentry_init, capture_events):
 
     assert event_without["level"] == "error"
     assert "threads" not in event_without
+
+
+def test_logging_level(sentry_init, capture_events):
+    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    events = capture_events()
+
+    logger.setLevel(logging.WARNING)
+    logger.error("hi")
+    event, = events
+    assert event["level"] == "error"
+    assert event["logentry"]["message"] == "hi"
+
+    del events[:]
+
+    logger.setLevel(logging.ERROR)
+    logger.warn("hi")
+    assert not events
+
+
+def test_logging_filters(sentry_init, capture_events):
+    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    events = capture_events()
+
+    should_log = False
+
+    class MyFilter(logging.Filter):
+        def filter(self, record):
+            return should_log
+
+    logger.addFilter(MyFilter())
+    logger.error("hi")
+
+    assert not events
+
+    should_log = True
+    logger.error("hi")
+
+    event, = events
+    assert event["logentry"]["message"] == "hi"

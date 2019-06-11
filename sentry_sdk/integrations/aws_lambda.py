@@ -11,6 +11,9 @@ from sentry_sdk.utils import (
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
+if False:
+    from typing import Any
+
 
 def _wrap_handler(handler):
     def sentry_handler(event, context, *args, **kwargs):
@@ -18,6 +21,9 @@ def _wrap_handler(handler):
         integration = hub.get_integration(AwsLambdaIntegration)
         if integration is None:
             return handler(event, context, *args, **kwargs)
+
+        # If an integration is there, a client has to be there.
+        client = hub.client  # type: Any
 
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
@@ -31,7 +37,7 @@ def _wrap_handler(handler):
                 exc_info = sys.exc_info()
                 event, hint = event_from_exception(
                     exc_info,
-                    client_options=hub.client.options,
+                    client_options=client.options,
                     mechanism={"type": "aws_lambda", "handled": False},
                 )
                 hub.capture_event(event, hint=hint)
@@ -47,7 +53,7 @@ def _drain_queue():
         if integration is not None:
             # Flush out the event queue before AWS kills the
             # process.
-            hub.client.flush()
+            hub.flush()
 
 
 class AwsLambdaIntegration(Integration):
@@ -55,6 +61,7 @@ class AwsLambdaIntegration(Integration):
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         import __main__ as lambda_bootstrap  # type: ignore
 
         pre_37 = True  # Python 3.6 or 2.7

@@ -21,7 +21,7 @@ if False:
     from typing import Union
     from typing import Callable
     from urllib3.poolmanager import PoolManager  # type: ignore
-    from urllib3.poolmanager import ProxyManager  # type: ignore
+    from urllib3.poolmanager import ProxyManager
 
     from sentry_sdk.utils import Event
 
@@ -37,23 +37,25 @@ class Transport(object):
     A transport is used to send an event to sentry.
     """
 
-    parsed_dsn = None  # type: Dsn
+    parsed_dsn = None  # type: Optional[Dsn]
 
     def __init__(self, options=None):
         # type: (Optional[ClientOptions]) -> None
         self.options = options
-        if options and options["dsn"]:
+        if options and options["dsn"] is not None and options["dsn"]:
             self.parsed_dsn = Dsn(options["dsn"])
         else:
-            self.parsed_dsn = None  # type: ignore
+            self.parsed_dsn = None
 
     def capture_event(self, event):
+        # type: (Event) -> None
         """This gets invoked with the event dictionary when an event should
         be sent to sentry.
         """
         raise NotImplementedError()
 
     def flush(self, timeout, callback=None):
+        # type: (float, Optional[Any]) -> None
         """Wait `timeout` seconds for the current events to be sent out."""
         pass
 
@@ -76,6 +78,7 @@ class HttpTransport(Transport):
     def __init__(self, options):
         # type: (ClientOptions) -> None
         Transport.__init__(self, options)
+        assert self.parsed_dsn is not None
         self._worker = BackgroundWorker()
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
         self._disabled_until = None  # type: Optional[datetime]
@@ -104,6 +107,7 @@ class HttpTransport(Transport):
         with gzip.GzipFile(fileobj=body, mode="w") as f:
             f.write(json.dumps(event, allow_nan=False).encode("utf-8"))
 
+        assert self.parsed_dsn is not None
         logger.debug(
             "Sending event, type:%s level:%s event_id:%s project:%s host:%s"
             % (

@@ -126,9 +126,13 @@ def _capture_exception(exc_info):
     hub = Hub.current
     if hub.get_integration(PyramidIntegration) is None:
         return
+
+    # If an integration is there, a client has to be there.
+    client = hub.client  # type: Any
+
     event, hint = event_from_exception(
         exc_info,
-        client_options=hub.client.options,
+        client_options=client.options,
         mechanism={"type": "pyramid", "handled": False},
     )
 
