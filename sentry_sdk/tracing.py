@@ -3,6 +3,11 @@ import uuid
 
 from datetime import datetime
 
+if False:
+    from typing import Any
+    from typing import Dict
+    from typing import List
+
 _traceparent_header_format_re = re.compile(
     "^[ \t]*"  # whitespace
     "([0-9a-f]{32})?"  # trace_id
@@ -54,9 +59,9 @@ class Span(object):
         self.same_process_as_parent = same_process_as_parent
         self.sampled = sampled
         self.transaction = transaction
-        self._tags = {}
-        self._data = {}
-        self._finished_spans = []
+        self._tags = {}  # type: Dict[str, str]
+        self._data = {}  # type: Dict[str, Any]
+        self._finished_spans = []  # type: List[Span]
         self.start_timestamp = datetime.now()
         self.timestamp = None
 
@@ -109,14 +114,17 @@ class Span(object):
         if match is None:
             return None
 
-        trace_id, span_id, sampled = match.groups()
+        trace_id, span_id, sampled_str = match.groups()
 
         if trace_id is not None:
             trace_id = "%x" % (int(trace_id, 16),)
         if span_id is not None:
             span_id = "%x" % (int(span_id, 16),)
-        if sampled is not None:
-            sampled = sampled != "0"
+
+        if sampled_str is not None:
+            sampled = sampled_str != "0"
+        else:
+            sampled = None
 
         return cls(trace_id=trace_id, span_id=span_id, sampled=sampled)
 
