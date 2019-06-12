@@ -11,6 +11,21 @@ if False:
     from typing import Union
 
 
+SENSITIVE_ENV_KEYS = (
+    "REMOTE_ADDR",
+    "HTTP_X_FORWARDED_FOR",
+    "HTTP_SET_COOKIE",
+    "HTTP_COOKIE",
+    "HTTP_AUTHORIZATION",
+    "HTTP_X_FORWARDED_FOR",
+    "HTTP_X_REAL_IP",
+)
+
+SENSITIVE_HEADERS = tuple(
+    x[len("HTTP_") :] for x in SENSITIVE_ENV_KEYS if x.startswith("HTTP_")
+)
+
+
 class RequestExtractor(object):
     def __init__(self, request):
         # type: (Any) -> None
@@ -129,7 +144,10 @@ def _filter_headers(headers):
         return headers
 
     return {
-        k: v
+        k: (
+            v
+            if k.upper().replace("-", "_") not in SENSITIVE_HEADERS
+            else AnnotatedValue("", {"rem": [["!config", "x", 0, len(v)]]})
+        )
         for k, v in iteritems(headers)
-        if k.lower().replace("_", "-") not in ("set-cookie", "cookie", "authorization")
     }
