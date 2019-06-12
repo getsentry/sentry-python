@@ -688,7 +688,36 @@ def format_and_strip(
     if not chunks:
         raise ValueError("No formatting placeholders found")
 
-    params = list(reversed(params))
+    params = params[: len(chunks) - 1]
+
+    if len(params) < len(chunks) - 1:
+        raise ValueError("Not enough params.")
+
+    concat_chunks = []
+    iter_chunks = iter(chunks)  # type: Optional[Iterator]
+    iter_params = iter(params)  # type: Optional[Iterator]
+
+    while iter_chunks is not None or iter_params is not None:
+        if iter_chunks is not None:
+            try:
+                concat_chunks.append(next(iter_chunks))
+            except StopIteration:
+                iter_chunks = None
+
+        if iter_params is not None:
+            try:
+                concat_chunks.append(str(next(iter_params)))
+            except StopIteration:
+                iter_params = None
+
+    return concat_strings(
+        concat_chunks, strip_string=strip_string, max_length=max_length
+    )
+
+
+def concat_strings(
+    chunks, strip_string=strip_string, max_length=MAX_FORMAT_PARAM_LENGTH
+):
     rv_remarks = []  # type: List[Any]
     rv_original_length = 0
     rv_length = 0
@@ -700,28 +729,25 @@ def format_and_strip(
             for i, x in enumerate(remark)
         ]
 
-    for chunk in chunks[:-1]:
-        rv.append(chunk)
-        rv_length += len(chunk)
-        rv_original_length += len(chunk)
-        if not params:
-            raise ValueError("Not enough params.")
-        param = params.pop()
+    for chunk in chunks:
+        if isinstance(chunk, AnnotatedValue):
+            # Assume it's already stripped!
+            stripped_chunk = chunk
+            chunk = chunk.value
+        else:
+            stripped_chunk = strip_string(chunk, max_length=max_length)
 
-        stripped_param = strip_string(param, max_length=max_length)
-        if isinstance(stripped_param, AnnotatedValue):
+        if isinstance(stripped_chunk, AnnotatedValue):
             rv_remarks.extend(
-                realign_remark(remark) for remark in stripped_param.metadata["rem"]
+                realign_remark(remark) for remark in stripped_chunk.metadata["rem"]
             )
-            stripped_param = stripped_param.value
+            stripped_chunk_value = stripped_chunk.value
+        else:
+            stripped_chunk_value = stripped_chunk
 
-        rv_original_length += len(param)
-        rv_length += len(stripped_param)
-        rv.append(stripped_param)
-
-    rv.append(chunks[-1])
-    rv_length += len(chunks[-1])
-    rv_original_length += len(chunks[-1])
+        rv_original_length += len(chunk)
+        rv_length += len(stripped_chunk_value)  # type: ignore
+        rv.append(stripped_chunk_value)  # type: ignore
 
     rv_joined = u"".join(rv)
     assert len(rv_joined) == rv_length

@@ -5,7 +5,11 @@ import contextlib
 
 from datetime import datetime
 
+from sentry_sdk.utils import concat_strings
+
+
 if False:
+    from typing import Optional
     from typing import Any
     from typing import Dict
     from typing import List
@@ -131,7 +135,7 @@ class Span(object):
             span_id = "{:016x}".format(int(span_id, 16))
 
         if sampled_str:
-            sampled = sampled_str != "0"
+            sampled = sampled_str != "0"  # type: Optional[bool]
         else:
             sampled = None
 
@@ -179,7 +183,7 @@ def record_sql_query(hub, queries):
         for query in queries:
             hub.add_breadcrumb(message=query, category="query")
 
-        description = ";".join(queries)
+        description = concat_strings(queries)
         with hub.span(op="db.statement", description=description) as span:
             yield span
 
