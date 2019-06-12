@@ -29,16 +29,27 @@ def test_basic(sentry_init, capture_events, sample_rate):
         assert not events
 
 
-def test_continue_from_headers(sentry_init, capture_events):
+@pytest.mark.parametrize("sampled", [True, False, None])
+def test_continue_from_headers(sentry_init, capture_events, sampled):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    with Hub.current.trace(transaction="hi"):
+    with Hub.current.trace(transaction="hi") as old_trace:
+        old_trace.sampled = sampled
         with Hub.current.span() as old_span:
             headers = dict(Hub.current.iter_trace_propagation_headers())
 
+    header = headers["sentry-trace"]
+    if sampled is True:
+        assert header.endswith("-1")
+    if sampled is False:
+        assert header.endswith("-0")
+    if sampled is None:
+        assert header.endswith("-")
+
     span = Span.continue_from_headers(headers)
     assert span is not None
+    assert span.sampled == sampled
     assert span.trace_id == old_span.trace_id
 
     with Hub.current.trace(span):
@@ -47,15 +58,19 @@ def test_continue_from_headers(sentry_init, capture_events):
 
         capture_message("hello")
 
-    trace1, message, trace2 = events
+    if sampled is False:
+        message, = events
+    else:
+        trace1, message, trace2 = events
 
-    assert trace1["transaction"] == "hi"
-    assert trace2["transaction"] == "ho"
+        assert trace1["transaction"] == "hi"
+        assert trace2["transaction"] == "ho"
 
-    assert (
-        trace1["contexts"]["trace"]["trace_id"]
-        == trace2["contexts"]["trace"]["trace_id"]
-        == span.trace_id
-        == message["contexts"]["trace"]["trace_id"]
-    )
+        assert (
+            trace1["contexts"]["trace"]["trace_id"]
+            == trace2["contexts"]["trace"]["trace_id"]
+            == span.trace_id
+            == message["contexts"]["trace"]["trace_id"]
+        )
+
     assert message["message"] == "hello"

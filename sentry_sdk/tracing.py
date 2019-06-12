@@ -94,6 +94,7 @@ class Span(object):
             trace_id=self.trace_id,
             span_id=uuid.uuid4().hex[16:],
             parent_span_id=self.span_id,
+            sampled=self.sampled,
             **kwargs
         )
         rv._finished_spans = self._finished_spans
@@ -129,7 +130,7 @@ class Span(object):
         if span_id is not None:
             span_id = "{:016x}".format(int(span_id, 16))
 
-        if sampled_str is not None:
+        if sampled_str:
             sampled = sampled_str != "0"
         else:
             sampled = None
@@ -137,7 +138,12 @@ class Span(object):
         return cls(trace_id=trace_id, span_id=span_id, sampled=sampled)
 
     def to_traceparent(self):
-        return "%s-%s-%s" % (self.trace_id, self.span_id, "1" if self.sampled else "0")
+        sampled = ""
+        if self.sampled is True:
+            sampled = "1"
+        if self.sampled is False:
+            sampled = "0"
+        return "%s-%s-%s" % (self.trace_id, self.span_id, sampled)
 
     def set_tag(self, key, value):
         self._tags[key] = value
