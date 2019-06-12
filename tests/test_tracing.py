@@ -11,10 +11,10 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
     with Hub.current.trace(transaction="hi"):
         with pytest.raises(ZeroDivisionError):
-            with Hub.current.span():
+            with Hub.current.span(op='foo', description='foodesc'):
                 1 / 0
 
-        with Hub.current.span():
+        with Hub.current.span(op='bar', description='bardesc'):
             pass
 
     if sample_rate:
@@ -23,7 +23,11 @@ def test_basic(sentry_init, capture_events, sample_rate):
         span1, span2 = event["spans"]
         parent_span = event
         assert span1["tags"]["error"]
+        assert span1['op'] == 'foo'
+        assert span1['description'] == 'foodesc'
         assert not span2["tags"]["error"]
+        assert span2['op'] == 'bar'
+        assert span2['description'] == 'bardesc'
         assert parent_span["transaction"] == "hi"
     else:
         assert not events

@@ -65,6 +65,8 @@ class Span(object):
         self.same_process_as_parent = same_process_as_parent
         self.sampled = sampled
         self.transaction = transaction
+        self.op = op
+        self.description = description
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
         self._finished_spans = []  # type: List[Span]
@@ -165,6 +167,8 @@ class Span(object):
             "span_id": self.span_id,
             "parent_span_id": self.parent_span_id,
             "transaction": self.transaction,
+            "op": self.op,
+            "description": self.description,
             "tags": self._tags,
             "data": self._data,
             "start_timestamp": self.start_timestamp,
@@ -172,7 +176,12 @@ class Span(object):
         }
 
     def get_trace_context(self):
-        return {"trace_id": self.trace_id, "span_id": self.span_id}
+        return {
+            "trace_id": self.trace_id,
+            "span_id": self.span_id,
+            "op": self.op,
+            "description": self.description,
+        }
 
 
 @contextlib.contextmanager
