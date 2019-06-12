@@ -84,7 +84,7 @@ class SentryWsgiMiddleware(object):
                     scope._name = "wsgi"
                     scope.add_event_processor(_make_wsgi_event_processor(environ))
 
-            with hub.span(Span.continue_from_environ(environ)):
+            with hub.trace(Span.continue_from_environ(environ)):
                 try:
                     rv = self.app(environ, start_response)
                 except BaseException:
