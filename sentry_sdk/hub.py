@@ -437,6 +437,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return self.capture_event(
             {
                 "type": "transaction",
+                "transaction": span.transaction,
                 "contexts": {"trace": span.get_trace_context()},
                 "timestamp": span.timestamp,
                 "start_timestamp": span.start_timestamp,

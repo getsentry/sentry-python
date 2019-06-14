@@ -125,6 +125,9 @@ class Span(object):
         if not traceparent:
             return None
 
+        if traceparent.startswith("00-") and traceparent.endswith("-00"):
+            traceparent = traceparent[3:-3]
+
         match = _traceparent_header_format_re.match(traceparent)
         if match is None:
             return None
@@ -166,19 +169,21 @@ class Span(object):
             "trace_id": self.trace_id,
             "span_id": self.span_id,
             "parent_span_id": self.parent_span_id,
+            "same_process_as_parent": self.same_process_as_parent,
             "transaction": self.transaction,
             "op": self.op,
             "description": self.description,
-            "tags": self._tags,
-            "data": self._data,
             "start_timestamp": self.start_timestamp,
             "timestamp": self.timestamp,
+            "tags": self._tags,
+            "data": self._data,
         }
 
     def get_trace_context(self):
         return {
             "trace_id": self.trace_id,
             "span_id": self.span_id,
+            "parent_span_id": self.parent_span_id,
             "op": self.op,
             "description": self.description,
         }
