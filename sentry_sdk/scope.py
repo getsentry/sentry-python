@@ -106,10 +106,8 @@ class Scope(object):
     @span.setter
     def span(self, span):
         self._span = span
-        if span.transaction:
+        if span is not None and span.transaction:
             self._transaction = span.transaction
-        elif self._transaction:
-            span.transaction = self._transaction
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None

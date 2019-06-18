@@ -372,6 +372,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             yield span
             return
 
+        _, scope = self._stack[-1]
+        old_span = scope.span
+        scope.span = span
+
         try:
             yield span
         except Exception:
@@ -382,6 +386,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         finally:
             span.finish()
             self.finish_trace(span)
+            scope.span = old_span
 
     def trace(self, *args, **kwargs):
         return self.span(self.start_trace(*args, **kwargs))
@@ -405,7 +410,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
                 span.trace_id,
                 scope.span.trace_id,
             )
-        scope.span = span
 
         return span
 

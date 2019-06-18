@@ -62,10 +62,9 @@ def test_simple(capture_events, celery, invocation, expected_context):
         foo = 42  # noqa
         return x / y
 
-    span = Hub.current.start_trace()
-
-    invocation(dummy_task, 1, 2)
-    invocation(dummy_task, 1, 0)
+    with Hub.current.trace() as span:
+        invocation(dummy_task, 1, 2)
+        invocation(dummy_task, 1, 0)
 
     event, = events
 
@@ -115,8 +114,8 @@ def test_simple_no_propagation(capture_events, init_celery):
     def dummy_task():
         1 / 0
 
-    span = Hub.current.start_trace()
-    dummy_task.delay()
+    with Hub.current.trace() as span:
+        dummy_task.delay()
 
     event, = events
     assert event["contexts"]["trace"]["trace_id"] != span.trace_id
