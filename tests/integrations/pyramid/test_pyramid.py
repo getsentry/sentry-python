@@ -336,12 +336,7 @@ def tween_factory(handler, registry):
         except:
             mroute = request.matched_route
             if mroute and mroute.name in ("index",):
-                status_code = 400
-                return Response(
-                    text=json.dumps(dict()),
-                    status_code=status_code,
-                    content_type="application/json",
-                )
+                return Response("bad request", status_code=400)
         return response
 
     return tween
