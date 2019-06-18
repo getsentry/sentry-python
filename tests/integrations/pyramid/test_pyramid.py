@@ -327,3 +327,40 @@ def test_error_in_authenticated_userid(
     client.get("/message")
 
     assert len(events) == 1
+
+
+def tween_factory(handler, registry):
+    def tween(request):
+        try:
+            response = handler(request)
+        except:
+            mroute = request.matched_route
+            if mroute and mroute.name in ("index",):
+                status_code = 400
+                return Response(
+                    text=json.dumps(dict()),
+                    status_code=status_code,
+                    content_type="application/json",
+                )
+        return response
+
+    return tween
+
+
+def test_tween_ok(sentry_init, pyramid_config, capture_exceptions, route, get_client):
+    sentry_init(integrations=[PyramidIntegration()])
+    errors = capture_exceptions()
+
+    @route("/")
+    def index(request):
+        raise Exception()
+
+    pyramid_config.add_tween(
+        "tests.integrations.pyramid.test_pyramid.tween_factory",
+        under=pyramid.tweens.INGRESS,
+    )
+
+    client = get_client()
+    client.get("/")
+
+    assert not errors
