@@ -333,7 +333,7 @@ def tween_factory(handler, registry):
     def tween(request):
         try:
             response = handler(request)
-        except:
+        except Exception:
             mroute = request.matched_route
             if mroute and mroute.name in ("index",):
                 return Response("bad request", status_code=400)
