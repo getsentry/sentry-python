@@ -312,7 +312,9 @@ def install_sql_hook():
         if hub.get_integration(DjangoIntegration) is None:
             return
 
-        with record_sql_queries(hub, [format_sql(sql, params, self.cursor)]):
+        with record_sql_queries(
+            hub, [format_sql(sql, params, self.cursor)], label="Django: "
+        ):
             return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):
@@ -321,7 +323,9 @@ def install_sql_hook():
             return
 
         with record_sql_queries(
-            hub, [format_sql(sql, params, self.cursor) for params in param_list]
+            hub,
+            [format_sql(sql, params, self.cursor) for params in param_list],
+            label="Django: ",
         ):
             return real_executemany(self, sql, param_list)
 

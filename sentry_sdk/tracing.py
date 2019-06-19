@@ -190,14 +190,16 @@ class Span(object):
 
 
 @contextlib.contextmanager
-def record_sql_queries(hub, queries):
+def record_sql_queries(hub, queries, label=""):
     if not queries:
         yield None
     else:
+        strings = [label]
         for query in queries:
             hub.add_breadcrumb(message=query, category="query")
+            strings.append(query)
 
-        description = concat_strings(queries)
+        description = concat_strings(strings)
         with hub.span(op="db.statement", description=description) as span:
             yield span
 
