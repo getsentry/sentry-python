@@ -42,6 +42,13 @@ try:
     urlpatterns.append(
         path("rest-framework-exc", views.rest_framework_exc, name="rest_framework_exc")
     )
+    urlpatterns.append(
+        path(
+            "rest-framework-read-body-and-exc",
+            views.rest_framework_read_body_and_exc,
+            name="rest_framework_read_body_and_exc",
+        )
+    )
 except AttributeError:
     pass
 

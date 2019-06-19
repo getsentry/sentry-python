@@ -374,7 +374,7 @@ def test_read_request(sentry_init, client, capture_events):
 
     event, = events
 
-    assert event["request"]["data"] == {"hey": 42}
+    assert "data" not in event["request"]
 
 
 def test_template_exception(sentry_init, client, capture_events):
@@ -414,11 +414,14 @@ def test_template_exception(sentry_init, client, capture_events):
 
 
 @pytest.mark.parametrize(
+    "route", ["rest_framework_exc", "rest_framework_read_body_and_exc"]
+)
+@pytest.mark.parametrize(
     "type,event_request",
     [
         [
             "json",
-            {
+            lambda route: {
                 "cookies": {},
                 "data": {"foo": "bar"},
                 "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
@@ -429,12 +432,12 @@ def test_template_exception(sentry_init, client, capture_events):
                 },
                 "method": "POST",
                 "query_string": "",
-                "url": "http://localhost/rest-framework-exc",
+                "url": "http://localhost/{}".format(route.replace("_", "-")),
             },
         ],
         [
             "formdata",
-            {
+            lambda route: {
                 "cookies": {},
                 "data": {"foo": "bar"},
                 "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
@@ -445,13 +448,13 @@ def test_template_exception(sentry_init, client, capture_events):
                 },
                 "method": "POST",
                 "query_string": "",
-                "url": "http://localhost/rest-framework-exc",
+                "url": "http://localhost/{}".format(route.replace("_", "-")),
             },
         ],
     ],
 )
 def test_rest_framework_basic(
-    sentry_init, client, capture_events, capture_exceptions, type, event_request
+    sentry_init, client, capture_events, capture_exceptions, type, event_request, route
 ):
     pytest.importorskip("rest_framework")
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
@@ -460,12 +463,12 @@ def test_rest_framework_basic(
 
     if type == "json":
         client.post(
-            reverse("rest_framework_exc"),
+            reverse(route),
             data=json.dumps({"foo": "bar"}),
             content_type="application/json",
         )
     elif type == "formdata":
-        client.post(reverse("rest_framework_exc"), data={"foo": "bar"})
+        client.post(reverse(route), data={"foo": "bar"})
     else:
         assert False
 
@@ -475,4 +478,4 @@ def test_rest_framework_basic(
     event, = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "django"
 
-    assert event["request"] == event_request
+    assert event["request"] == event_request(route)
