@@ -18,7 +18,7 @@ def test_subprocess_basic(sentry_init, capture_events):
             shell=True,
         )
 
-    assert span.trace_id in output
+    assert span.trace_id in str(output)
 
     events = capture_events()
 
@@ -27,4 +27,9 @@ def test_subprocess_basic(sentry_init, capture_events):
     event, = events
 
     crumb, = event["breadcrumbs"]
-    assert crumb == {}
+    assert crumb == {
+        "category": "subprocess",
+        "data": {},
+        "timestamp": crumb["timestamp"],
+        "type": "subprocess",
+    }

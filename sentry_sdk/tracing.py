@@ -1,6 +1,7 @@
 import re
 import uuid
 import contextlib
+import collections
 
 from datetime import datetime
 
@@ -22,13 +23,27 @@ _traceparent_header_format_re = re.compile(
 )
 
 
-class EnvironHeaders(object):
+class EnvironHeaders(collections.Mapping):
     def __init__(self, environ, prefix="HTTP_"):
         self.environ = environ
         self.prefix = prefix
 
-    def get(self, key):
-        return self.environ.get(self.prefix + key.replace("-", "_").upper())
+    def __getitem__(self, key):
+        return self.environ[self.prefix + key.replace("-", "_").upper()]
+
+    def __len__(self):
+        return sum(1 for _ in iter(self))
+
+    def __iter__(self):
+        for k in self.environ:
+            if not isinstance(k, str):
+                continue
+
+            k = k.replace("-", "_").upper()
+            if not k.startswith(self.prefix):
+                continue
+
+            yield k[len(self.prefix) :]
 
 
 class Span(object):
