@@ -10,7 +10,7 @@ from warnings import warn
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
-from sentry_sdk.tracing import Span
+from sentry_sdk.tracing import Span, maybe_create_breadcrumbs_from_span
 from sentry_sdk.utils import (
     exc_info_from_error,
     event_from_exception,
@@ -385,6 +385,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             span.set_tag("error", False)
         finally:
             span.finish()
+            maybe_create_breadcrumbs_from_span(self, span)
             self.finish_trace(span)
             scope.span = old_span
 
@@ -396,7 +397,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         span = scope.span
         if span is not None:
             return span.new_span(**kwargs)
-        return None
+        return Span.start_trace(**kwargs)
 
     def start_trace(self, span=None, **kwargs):
         if span is None:

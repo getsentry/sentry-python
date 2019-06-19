@@ -199,7 +199,7 @@ def record_sql_queries(hub, queries, label=""):
             strings.append(query)
 
         description = concat_strings(strings)
-        with hub.span(op="db.statement", description=description) as span:
+        with hub.span(op="db", description=description) as span:
             yield span
 
 
@@ -210,21 +210,21 @@ def record_http_request(hub, url, method):
     with hub.span(op="http", description="%s %s" % (url, method)) as span:
         try:
             yield data_dict
-        except Exception:
-            httplib_response = data_dict.pop("httplib_response", None)
-            raise
-        else:
-            httplib_response = data_dict.pop("httplib_response", None)
-
-            hub.add_breadcrumb(
-                type="http",
-                category="httplib",
-                data=data_dict,
-                hint={"httplib_response": httplib_response},
-            )
         finally:
             if span is not None:
                 if "status_code" in data_dict:
                     span.set_tag("http.status_code", data_dict["status_code"])
                 for k, v in data_dict.items():
                     span.set_data(k, v)
+
+
+def maybe_create_breadcrumbs_from_span(hub, span):
+    if span.op == "redis":
+        hub.add_breadcrumb(type="redis", category="redis", data=span._tags)
+    elif span.op == "http" and not span._tags.get("error"):
+        hub.add_breadcrumb(
+            type="http",
+            category="httplib",
+            data=span._data,
+            hint={"httplib_response": span._data.get("httplib_response")},
+        )

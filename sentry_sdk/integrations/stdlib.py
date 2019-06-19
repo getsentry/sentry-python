@@ -82,7 +82,7 @@ def install_httplib():
             raise
         except Exception:
             recorder.__exit__(*sys.exc_info())
-            pass
+            raise
         else:
             recorder.__exit__(None, None, None)
 
