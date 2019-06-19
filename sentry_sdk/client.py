@@ -196,7 +196,7 @@ class Client(object):
 
         if (
             self.options["sample_rate"] < 1.0
-            and random.random() >= self.options["sample_rate"]
+            and random.random() <= self.options["sample_rate"]
         ):
             return False
 
