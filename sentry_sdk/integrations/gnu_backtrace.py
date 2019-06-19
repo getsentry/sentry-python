@@ -20,7 +20,7 @@ FRAME_RE = r"""
 (?P<package>{MODULE_RE})\(
   (?P<retval>{TYPE_RE}\ )?
   ((?P<function>{TYPE_RE})
-    (?P<args>\([^)]*\))?
+    (?P<args>\(.*\))?
   )?
   ((?P<constoffset>\ const)?\+0x(?P<offset>{HEXVAL_RE}))?
 \)\s
@@ -89,13 +89,10 @@ def _process_gnu_backtrace(event, hint):
                         },
                     )
                 )
-            elif additional_frames and line.strip():
-                # If we already started parsing a stacktrace, it must be at the
-                # end of the message and must not contain random garbage lines
-                # between the frames
-                del additional_frames[:]
-                break
-            else:
+            elif additional_frames:
+                # Skip garbage lines, not sure what to do with them.
+                pass
+            elif line.strip():
                 new_msg.append(line)
 
         if additional_frames:
