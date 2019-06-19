@@ -190,7 +190,7 @@ class Span(object):
 
 
 @contextlib.contextmanager
-def record_sql_query(hub, queries):
+def record_sql_queries(hub, queries):
     if not queries:
         yield None
     else:

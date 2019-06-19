@@ -39,12 +39,11 @@ def decode_base64(encoded, redis_key):
 
 @app.route("/")
 def index():
-    with sentry_sdk.configure_scope() as scope:
-        return flask.render_template(
-            "index.html",
-            sentry_dsn=os.environ["SENTRY_DSN"],
-            traceparent=dict(sentry_sdk.Hub.current.iter_trace_propagation_headers()),
-        )
+    return flask.render_template(
+        "index.html",
+        sentry_dsn=os.environ["SENTRY_DSN"],
+        traceparent=dict(sentry_sdk.Hub.current.iter_trace_propagation_headers()),
+    )
 
 
 @app.route("/compute/<input>")

@@ -3,7 +3,6 @@ from __future__ import absolute_import
 
 import sys
 import weakref
-import contextlib
 
 from django import VERSION as DJANGO_VERSION  # type: ignore
 from django.db.models.query import QuerySet  # type: ignore
@@ -13,11 +12,8 @@ if False:
     from typing import Any
     from typing import Callable
     from typing import Dict
-    from typing import List
     from typing import Optional
-    from typing import Tuple
     from typing import Union
-    from typing import Generator
 
     from django.core.handlers.wsgi import WSGIRequest  # type: ignore
     from django.http.response import HttpResponse  # type: ignore
@@ -37,12 +33,10 @@ from sentry_sdk import Hub
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
-from sentry_sdk.tracing import record_sql_query
+from sentry_sdk.tracing import record_sql_queries
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    safe_repr,
-    format_and_strip,
     transaction_from_function,
     walk_exception_chain,
 )
@@ -50,6 +44,7 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
+from sentry_sdk.integrations._sql_common import format_sql
 from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
 from sentry_sdk.integrations.django.templates import get_template_frame_from_exception
 
@@ -297,88 +292,6 @@ def _set_user_info(request, event):
         pass
 
 
-class _FormatConverter(object):
-    def __init__(self, param_mapping):
-        # type: (Dict[str, int]) -> None
-
-        self.param_mapping = param_mapping
-        self.params = []  # type: List[Any]
-
-    def __getitem__(self, val):
-        # type: (str) -> str
-        self.params.append(self.param_mapping.get(val))
-        return "%s"
-
-
-def format_sql(sql, params):
-    # type: (Any, Any) -> Tuple[str, List[str]]
-    rv = []
-
-    if isinstance(params, dict):
-        # convert sql with named parameters to sql with unnamed parameters
-        conv = _FormatConverter(params)
-        if params:
-            sql = sql % conv
-            params = conv.params
-        else:
-            params = ()
-
-    for param in params or ():
-        if param is None:
-            rv.append("NULL")
-        param = safe_repr(param)
-        rv.append(param)
-
-    return sql, rv
-
-
-@contextlib.contextmanager
-def record_sql(sql, param_list, cursor=None):
-    # type: (Any, Any, Any) -> Generator
-    hub = Hub.current
-    if hub.get_integration(DjangoIntegration) is None:
-        yield None
-        return
-
-    formatted_queries = []
-
-    for params in param_list:
-        real_sql = None
-        real_params = None
-
-        try:
-            # Prefer our own SQL formatting logic because it's the only one that
-            # has proper value trimming.
-            real_sql, real_params = format_sql(sql, params)
-            if real_sql:
-                real_sql = format_and_strip(real_sql, real_params)
-        except Exception:
-            pass
-
-        if not real_sql and cursor and hasattr(cursor, "mogrify"):
-            # If formatting failed and we're using psycopg2, it could be that we're
-            # looking at a query that uses Composed objects. Use psycopg2's mogrify
-            # function to format the query. We lose per-parameter trimming but gain
-            # accuracy in formatting.
-            #
-            # This is intentionally the second choice because we assume Composed
-            # queries are not widely used, while per-parameter trimming is
-            # generally highly desirable.
-            try:
-                if cursor and hasattr(cursor, "mogrify"):
-                    real_sql = cursor.mogrify(sql, params)
-                    if isinstance(real_sql, bytes):
-                        real_sql = real_sql.decode(cursor.connection.encoding)
-            except Exception:
-                pass
-
-        if real_sql:
-            formatted_queries.append(real_sql)
-
-    with record_sql_query(hub, formatted_queries):
-        yield
-
-
 def install_sql_hook():
     # type: () -> None
     """If installed this causes Django's queries to be captured."""
@@ -395,11 +308,21 @@ def install_sql_hook():
         return
 
     def execute(self, sql, params=None):
-        with record_sql(sql, [params], self.cursor):
+        hub = Hub.current
+        if hub.get_integration(DjangoIntegration) is None:
+            return
+
+        with record_sql_queries(hub, [format_sql(sql, params, self.cursor)]):
             return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):
-        with record_sql(sql, param_list, self.cursor):
+        hub = Hub.current
+        if hub.get_integration(DjangoIntegration) is None:
+            return
+
+        with record_sql_queries(
+            hub, [format_sql(sql, params, self.cursor) for params in param_list]
+        ):
             return real_executemany(self, sql, param_list)
 
     CursorWrapper.execute = execute
