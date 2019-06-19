@@ -62,18 +62,29 @@ def install_httplib():
 
     def getresponse(self, *args, **kwargs):
         recorder = getattr(self, "_sentrysdk_recorder", None)
+
+        if recorder is None:
+            return real_getresponse(self, *args, **kwargs)
+
         data_dict = getattr(self, "_sentrysdk_data_dict", None)
 
         try:
             rv = real_getresponse(self, *args, **kwargs)
 
-            if recorder is not None and data_dict is not None:
+            if data_dict is not None:
                 data_dict["httplib_response"] = rv
                 data_dict["status_code"] = rv.status
                 data_dict["reason"] = rv.reason
-        finally:
-            if recorder is not None:
-                recorder.__exit__(*sys.exc_info())
+        except TypeError:
+            # python-requests provokes a typeerror to discover py3 vs py2 differences
+            #
+            # > TypeError("getresponse() got an unexpected keyword argument 'buffering'")
+            raise
+        except Exception:
+            recorder.__exit__(*sys.exc_info())
+            pass
+        else:
+            recorder.__exit__(None, None, None)
 
         return rv
 

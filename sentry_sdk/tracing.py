@@ -1,5 +1,4 @@
 import re
-import sys
 import uuid
 import contextlib
 
@@ -211,19 +210,21 @@ def record_http_request(hub, url, method):
     with hub.span(op="http", description="%s %s" % (url, method)) as span:
         try:
             yield data_dict
-        finally:
+        except Exception:
+            httplib_response = data_dict.pop("httplib_response", None)
+            raise
+        else:
             httplib_response = data_dict.pop("httplib_response", None)
 
+            hub.add_breadcrumb(
+                type="http",
+                category="httplib",
+                data=data_dict,
+                hint={"httplib_response": httplib_response},
+            )
+        finally:
             if span is not None:
                 if "status_code" in data_dict:
                     span.set_tag("http.status_code", data_dict["status_code"])
                 for k, v in data_dict.items():
                     span.set_data(k, v)
-
-            if sys.exc_info()[1] is None:
-                hub.add_breadcrumb(
-                    type="http",
-                    category="httplib",
-                    data=data_dict,
-                    hint={"httplib_response": httplib_response},
-                )
