@@ -22,12 +22,13 @@ _traceparent_header_format_re = re.compile(
 )
 
 
-class _EnvironHeaders(object):
-    def __init__(self, environ):
+class EnvironHeaders(object):
+    def __init__(self, environ, prefix="HTTP_"):
         self.environ = environ
+        self.prefix = prefix
 
     def get(self, key):
-        return self.environ.get("HTTP_" + key.replace("-", "_").upper())
+        return self.environ.get(self.prefix + key.replace("-", "_").upper())
 
 
 class Span(object):
@@ -107,7 +108,7 @@ class Span(object):
 
     @classmethod
     def continue_from_environ(cls, environ):
-        return cls.continue_from_headers(_EnvironHeaders(environ))
+        return cls.continue_from_headers(EnvironHeaders(environ))
 
     @classmethod
     def continue_from_headers(cls, headers):
@@ -227,4 +228,11 @@ def maybe_create_breadcrumbs_from_span(hub, span):
             category="httplib",
             data=span._data,
             hint={"httplib_response": span._data.get("httplib_response")},
+        )
+    elif span.op == "subprocess":
+        hub.add_breadcrumb(
+            type="subprocess",
+            category="subprocess",
+            data=span._data,
+            hint={"popen_instance": span._data.get("popen_instance")},
         )

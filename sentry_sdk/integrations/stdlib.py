@@ -1,8 +1,10 @@
+import os
+import subprocess
 import sys
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
-from sentry_sdk.tracing import record_http_request
+from sentry_sdk.tracing import EnvironHeaders, record_http_request
 
 
 try:
@@ -17,10 +19,11 @@ class StdlibIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        install_httplib()
+        _install_httplib()
+        _install_subprocess()
 
 
-def install_httplib():
+def _install_httplib():
     # type: () -> None
     real_putrequest = HTTPConnection.putrequest
     real_getresponse = HTTPConnection.getresponse
@@ -90,3 +93,47 @@ def install_httplib():
 
     HTTPConnection.putrequest = putrequest
     HTTPConnection.getresponse = getresponse
+
+
+def _get_argument(args, kwargs, name, position, setdefault=None):
+    if name in kwargs:
+        rv = kwargs[name]
+        if rv is None and setdefault is not None:
+            rv = kwargs[name] = setdefault
+    elif position < len(args):
+        rv = args[position]
+        if rv is None and setdefault is not None:
+            rv = args[position] = setdefault
+    else:
+        rv = kwargs[name] = setdefault
+
+    return rv
+
+
+def _install_subprocess():
+    old_popen_init = subprocess.Popen.__init__
+
+    def sentry_patched_popen_init(self, *a, **kw):
+        hub = Hub.current
+        if hub.get_integration(StdlibIntegration) is None:
+            return old_popen_init(self, *a, **kw)
+
+        # do not setdefault! args is required by Popen, doing setdefault would
+        # make invalid calls valid
+        args = _get_argument(a, kw, "args", 0) or []
+        cwd = _get_argument(a, kw, "cwd", 10)
+
+        for k, v in hub.iter_trace_propagation_headers():
+            env = _get_argument(a, kw, "env", 11, {})
+            env["SUBPROCESS_" + k.upper().replace("-", "_")] = v
+
+        with hub.span(op="subprocess", description=" ".join(map(str, args))) as span:
+            span.set_tag("subprocess.cwd", cwd)
+
+            return old_popen_init(self, *a, **kw)
+
+    subprocess.Popen.__init__ = sentry_patched_popen_init
+
+
+def get_subprocess_traceparent_headers():
+    return EnvironHeaders(os.environ, prefix="SUBPROCESS_")

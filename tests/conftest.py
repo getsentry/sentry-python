@@ -91,16 +91,19 @@ def assert_semaphore_acceptance(tmpdir):
     def inner(event):
         if not SEMAPHORE:
             return
-        # not dealing with the subprocess API right now
-        file = tmpdir.join("event")
-        file.write(json.dumps(dict(event)))
-        output = json.loads(
-            subprocess.check_output(
-                [SEMAPHORE, "process-event"], stdin=file.open()
-            ).decode("utf-8")
-        )
-        _no_errors_in_semaphore_response(output)
-        output.pop("_meta", None)
+
+        # Disable subprocess integration
+        with sentry_sdk.Hub(None):
+            # not dealing with the subprocess API right now
+            file = tmpdir.join("event")
+            file.write(json.dumps(dict(event)))
+            output = json.loads(
+                subprocess.check_output(
+                    [SEMAPHORE, "process-event"], stdin=file.open()
+                ).decode("utf-8")
+            )
+            _no_errors_in_semaphore_response(output)
+            output.pop("_meta", None)
 
     return inner
 
