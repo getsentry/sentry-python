@@ -89,10 +89,8 @@ def _process_gnu_backtrace(event, hint):
                         },
                     )
                 )
-            elif additional_frames:
-                # Skip garbage lines, not sure what to do with them.
-                pass
-            elif line.strip():
+            else:
+                # Put garbage lines back into message, not sure what to do with them.
                 new_msg.append(line)
 
         if additional_frames:
