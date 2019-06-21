@@ -11,6 +11,11 @@ try:
     def rest_framework_exc(request):
         1 / 0
 
+    @api_view(["POST"])
+    def rest_framework_read_body_and_exc(request):
+        request.data
+        1 / 0
+
 
 except ImportError:
     pass
