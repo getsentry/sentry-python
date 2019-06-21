@@ -134,6 +134,25 @@ class DjangoIntegration(Integration):
 
         BaseHandler.get_response = sentry_patched_get_response
 
+        try:
+            from rest_framework.views import APIView  # type: ignore
+        except ImportError:
+            pass
+        else:
+            # DRF's request type (which wraps the Django request and proxies
+            # all attrs) has some attributes such as `data` which buffer
+            # request data.  We want to use those in the RequestExtractor to
+            # get body data more reliably.
+            old_drf_initial = APIView.initial
+
+            def sentry_patched_drf_initial(self, request, *args, **kwargs):
+                with capture_internal_exceptions():
+                    request._request._sentry_drf_request_backref = weakref.ref(request)
+                    pass
+                return old_drf_initial(self, request, *args, **kwargs)
+
+            APIView.initial = sentry_patched_drf_initial
+
         signals.got_request_exception.connect(_got_request_exception)
 
         @add_global_event_processor
@@ -206,6 +225,13 @@ def _make_event_processor(weak_request, integration):
         request = weak_request()
         if request is None:
             return event
+
+        try:
+            drf_request = request._sentry_drf_request_backref()
+            if drf_request is not None:
+                request = drf_request
+        except AttributeError:
+            pass
 
         with capture_internal_exceptions():
             DjangoRequestExtractor(request).extract_into_event(event)
