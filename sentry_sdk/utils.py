@@ -737,7 +737,7 @@ def format_and_strip(
 def _is_threading_local_monkey_patched():
     # type: () -> bool
     try:
-        from gevent.monkey import is_object_patched
+        from gevent.monkey import is_object_patched  # type: ignore
 
         if is_object_patched("_threading", "local"):
             return True
@@ -745,7 +745,7 @@ def _is_threading_local_monkey_patched():
         pass
 
     try:
-        from eventlet.patcher import is_monkey_patched
+        from eventlet.patcher import is_monkey_patched  # type: ignore
 
         if is_monkey_patched("thread"):
             return True
