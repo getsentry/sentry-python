@@ -1,5 +1,7 @@
 ## 0.9.1
 
+* Fix a bug on Python 3.7 where gunicorn with gevent would cause the SDK to
+  leak event data between requests.
 * Fix a bug where the GNU backtrace integration would not parse certain frames.
 * Fix a bug where the SDK would not pick up request bodies for Django Rest
   Framework based apps.
