@@ -1,3 +1,16 @@
+## 0.9.1
+
+* Fix a bug where the GNU backtrace integration would not parse certain frames.
+* Fix a bug where the SDK would not pick up request bodies for Django Rest
+  Framework based apps.
+* Remove a few more headers containing sensitive data per default.
+* Various improvements to type hints. Thanks Ran Benita!
+* Add a event hint to access the log record from `before_send`.
+* Fix a bug that would ignore `__tracebackhide__`. Thanks Matt Millican!
+* Fix distribution information for mypy support (add `py.typed` file). Thanks
+  Ran Benita!
+
+
 ## 0.9.0
 
 * The SDK now captures `SystemExit` and other `BaseException`s when coming from
