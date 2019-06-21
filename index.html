@@ -1260,7 +1260,7 @@ breadcrumbs that are emitted.</p></div>
   <div id="source-sentry_sdk.add_breadcrumb" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">add_breadcrumb</span><span class="p">(</span><span class="n">crumb</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-    <span class="c1"># type: (Dict[str, Any], Dict[str, Any], **Any) -&gt; None</span>
+    <span class="c1"># type: (Optional[Breadcrumb], Optional[BreadcrumbHint], **Any) -&gt; None</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
     <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">hub</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span><span class="n">crumb</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
@@ -1291,7 +1291,7 @@ Typically the event hint object would contain exception information.</p></div>
   <div id="source-sentry_sdk.capture_event" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-    <span class="c1"># type: (Dict[str, Any], Dict[str, Any]) -&gt; Optional[str]</span>
+    <span class="c1"># type: (Event, Optional[Hint]) -&gt; Optional[str]</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
     <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
@@ -1351,7 +1351,7 @@ is provided the default level is <code>info</code>.</p></div>
   <div id="source-sentry_sdk.capture_message" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">capture_message</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-    <span class="c1"># type: (str, Optional[Any]) -&gt; Optional[str]</span>
+    <span class="c1"># type: (str, Optional[str]) -&gt; Optional[str]</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
     <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">hub</span><span class="o">.</span><span class="n">capture_message</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">level</span><span class="p">)</span>
@@ -1585,9 +1585,10 @@ argument.</p></div>
         <span class="n">hint</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">hint</span> <span class="ow">or</span> <span class="p">())</span>  <span class="c1"># type: Hint</span>
 
         <span class="k">if</span> <span class="n">scope</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="n">event</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">apply_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-                <span class="k">return</span>
+            <span class="n">event_</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">apply_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">event_</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">None</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="n">event_</span>
 
         <span class="k">if</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;attach_stacktrace&quot;</span><span class="p">]</span>
@@ -1655,7 +1656,7 @@ argument.</p></div>
                 <span class="k">if</span> <span class="n">errcls</span> <span class="o">==</span> <span class="n">full_name</span> <span class="ow">or</span> <span class="n">errcls</span> <span class="o">==</span> <span class="n">type_name</span><span class="p">:</span>
                     <span class="k">return</span> <span class="bp">True</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="k">if</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">errcls</span><span class="p">):</span>
+                <span class="k">if</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">errcls</span><span class="p">):</span>  <span class="c1"># type: ignore</span>
                     <span class="k">return</span> <span class="bp">True</span>
 
         <span class="k">return</span> <span class="bp">False</span>
@@ -1664,7 +1665,7 @@ argument.</p></div>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
         <span class="n">hint</span><span class="p">,</span>  <span class="c1"># type: Hint</span>
-        <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>  <span class="c1"># type: Scope</span>
+        <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Scope]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; bool</span>
         <span class="k">if</span> <span class="n">scope</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">scope</span><span class="o">.</span><span class="n">_should_capture</span><span class="p">:</span>
@@ -1682,10 +1683,10 @@ argument.</p></div>
         <span class="k">return</span> <span class="bp">True</span>
 
     <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-        <span class="c1"># type: (Dict[str, Any], Any, Scope) -&gt; Optional[str]</span>
+        <span class="c1"># type: (Dict[str, Any], Optional[Any], Optional[Scope]) -&gt; Optional[str]</span>
         <span class="sd">&quot;&quot;&quot;Captures an event.</span>
 
-<span class="sd">        This takes the ready made event and an optoinal hint and scope.  The</span>
+<span class="sd">        This takes the ready made event and an optional hint and scope.  The</span>
 <span class="sd">        hint is internally used to further customize the representation of the</span>
 <span class="sd">        error.  When provided it&#39;s a dictionary of optional information such</span>
 <span class="sd">        as exception info.</span>
@@ -1702,7 +1703,7 @@ argument.</p></div>
             <span class="n">event</span><span class="p">[</span><span class="s2">&quot;event_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span> <span class="o">=</span> <span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">()</span><span class="o">.</span><span class="n">hex</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">):</span>
             <span class="k">return</span> <span class="bp">None</span>
-        <span class="n">event</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+        <span class="n">event</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
@@ -1812,7 +1813,7 @@ argument.</p></div>
     
   
     <div class="desc"><p>Captures an event.</p>
-<p>This takes the ready made event and an optoinal hint and scope.  The
+<p>This takes the ready made event and an optional hint and scope.  The
 hint is internally used to further customize the representation of the
 error.  When provided it's a dictionary of optional information such
 as exception info.</p>
@@ -1822,9 +1823,9 @@ value of this function will be the ID of the captured event.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Client.capture_event', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Client.capture_event" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-    <span class="c1"># type: (Dict[str, Any], Any, Scope) -&gt; Optional[str]</span>
+    <span class="c1"># type: (Dict[str, Any], Optional[Any], Optional[Scope]) -&gt; Optional[str]</span>
     <span class="sd">&quot;&quot;&quot;Captures an event.</span>
-<span class="sd">    This takes the ready made event and an optoinal hint and scope.  The</span>
+<span class="sd">    This takes the ready made event and an optional hint and scope.  The</span>
 <span class="sd">    hint is internally used to further customize the representation of the</span>
 <span class="sd">    error.  When provided it&#39;s a dictionary of optional information such</span>
 <span class="sd">    as exception info.</span>
@@ -1840,7 +1841,7 @@ value of this function will be the ID of the captured event.</p></div>
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;event_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span> <span class="o">=</span> <span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">()</span><span class="o">.</span><span class="n">hex</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">None</span>
-    <span class="n">event</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+    <span class="n">event</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
@@ -1937,6 +1938,7 @@ integration will use this to render out a message on stderr.</p></div>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
         <span class="c1"># type: (ClientOptions) -&gt; None</span>
         <span class="n">Transport</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span> <span class="o">=</span> <span class="n">BackgroundWorker</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_auth</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">to_auth</span><span class="p">(</span><span class="s2">&quot;sentry.python/</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">VERSION</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Optional[datetime]</span>
@@ -1965,6 +1967,7 @@ integration will use this to render out a message on stderr.</p></div>
         <span class="k">with</span> <span class="n">gzip</span><span class="o">.</span><span class="n">GzipFile</span><span class="p">(</span><span class="n">fileobj</span><span class="o">=</span><span class="n">body</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
             <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">allow_nan</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span>
 
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
             <span class="s2">&quot;Sending </span><span class="si">%s</span><span class="s2"> event [</span><span class="si">%s</span><span class="s2">] to </span><span class="si">%s</span><span class="s2"> project:</span><span class="si">%s</span><span class="s2">&quot;</span>
             <span class="o">%</span> <span class="p">(</span>
@@ -2131,6 +2134,7 @@ integration will use this to render out a message on stderr.</p></div>
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
     <span class="c1"># type: (ClientOptions) -&gt; None</span>
     <span class="n">Transport</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span> <span class="o">=</span> <span class="n">BackgroundWorker</span><span class="p">()</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_auth</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">to_auth</span><span class="p">(</span><span class="s2">&quot;sentry.python/</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">VERSION</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Optional[datetime]</span>
@@ -2266,8 +2270,13 @@ context vars are available.</p>
 
     <span class="n">_stack</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: List[Tuple[Optional[Client], Scope]]</span>
 
+    <span class="c1"># Mypy doesn&#39;t pick up on the metaclass.</span>
+    <span class="k">if</span> <span class="bp">False</span><span class="p">:</span>
+        <span class="n">current</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Hub</span>
+        <span class="n">main</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Hub</span>
+
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">client_or_hub</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-        <span class="c1"># type: (Union[Hub, Client], Optional[Any]) -&gt; None</span>
+        <span class="c1"># type: (Optional[Union[Hub, Client]], Optional[Any]) -&gt; None</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">client_or_hub</span><span class="p">,</span> <span class="n">Hub</span><span class="p">):</span>
             <span class="n">hub</span> <span class="o">=</span> <span class="n">client_or_hub</span>
             <span class="n">client</span><span class="p">,</span> <span class="n">other_scope</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
@@ -2306,7 +2315,7 @@ context vars are available.</p>
             <span class="k">return</span> <span class="n">callback</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
-        <span class="c1"># type: (Union[str, Integration]) -&gt; Any</span>
+        <span class="c1"># type: (Union[str, Type[Integration]]) -&gt; Any</span>
         <span class="sd">&quot;&quot;&quot;Returns the integration for this hub by name or class.  If there</span>
 <span class="sd">        is no client bound or the client does not have that integration</span>
 <span class="sd">        then `None` is returned.</span>
@@ -2327,14 +2336,15 @@ context vars are available.</p>
             <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">rv</span>
 
-        <span class="n">initial_client</span> <span class="o">=</span> <span class="n">_initial_client</span>
-        <span class="k">if</span> <span class="n">initial_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="n">initial_client</span> <span class="o">=</span> <span class="n">initial_client</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">_initial_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">initial_client</span> <span class="o">=</span> <span class="n">_initial_client</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">initial_client</span> <span class="o">=</span> <span class="bp">None</span>
 
         <span class="k">if</span> <span class="p">(</span>
             <span class="n">initial_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
             <span class="ow">and</span> <span class="n">initial_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">client</span>
-            <span class="ow">and</span> <span class="n">initial_client</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
+            <span class="ow">and</span> <span class="n">initial_client</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">integration_name</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
         <span class="p">):</span>
             <span class="n">warning</span> <span class="o">=</span> <span class="p">(</span>
                 <span class="s2">&quot;Integration </span><span class="si">%r</span><span class="s2"> attempted to run but it was only &quot;</span>
@@ -2363,7 +2373,7 @@ context vars are available.</p>
         <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">new</span><span class="p">,</span> <span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
 
     <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-        <span class="c1"># type: (Event, Hint) -&gt; Optional[str]</span>
+        <span class="c1"># type: (Event, Optional[Hint]) -&gt; Optional[str]</span>
         <span class="sd">&quot;&quot;&quot;Captures an event.  The return value is the ID of the event.</span>
 
 <span class="sd">        The event is a dictionary following the Sentry v7/v8 protocol</span>
@@ -2415,9 +2425,10 @@ context vars are available.</p>
         <span class="k">return</span> <span class="bp">None</span>
 
     <span class="k">def</span> <span class="nf">_capture_internal_exception</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">):</span>
+        <span class="c1"># type: (_OptExcInfo) -&gt; Any</span>
         <span class="sd">&quot;&quot;&quot;Capture an exception that is likely caused by a bug in the SDK</span>
 <span class="sd">        itself.&quot;&quot;&quot;</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Internal error in sentry_sdk&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="n">exc_info</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Internal error in sentry_sdk&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="n">exc_info</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
 
     <span class="k">def</span> <span class="nf">add_breadcrumb</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">crumb</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="c1"># type: (Optional[Breadcrumb], Optional[BreadcrumbHint], **Any) -&gt; None</span>
@@ -2579,7 +2590,7 @@ context vars are available.</p>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.__init__" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">client_or_hub</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-    <span class="c1"># type: (Union[Hub, Client], Optional[Any]) -&gt; None</span>
+    <span class="c1"># type: (Optional[Union[Hub, Client]], Optional[Any]) -&gt; None</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">client_or_hub</span><span class="p">,</span> <span class="n">Hub</span><span class="p">):</span>
         <span class="n">hub</span> <span class="o">=</span> <span class="n">client_or_hub</span>
         <span class="n">client</span><span class="p">,</span> <span class="n">other_scope</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
@@ -2695,7 +2706,7 @@ Typically the event hint object would contain exception information.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.capture_event', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.capture_event" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-    <span class="c1"># type: (Event, Hint) -&gt; Optional[str]</span>
+    <span class="c1"># type: (Event, Optional[Hint]) -&gt; Optional[str]</span>
     <span class="sd">&quot;&quot;&quot;Captures an event.  The return value is the ID of the event.</span>
 <span class="sd">    The event is a dictionary following the Sentry v7/v8 protocol</span>
 <span class="sd">    specification.  Optionally an event hint dict can be passed that</span>
@@ -2868,7 +2879,7 @@ client attached.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.get_integration', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.get_integration" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">get_integration</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span><span class="p">):</span>
-    <span class="c1"># type: (Union[str, Integration]) -&gt; Any</span>
+    <span class="c1"># type: (Union[str, Type[Integration]]) -&gt; Any</span>
     <span class="sd">&quot;&quot;&quot;Returns the integration for this hub by name or class.  If there</span>
 <span class="sd">    is no client bound or the client does not have that integration</span>
 <span class="sd">    then `None` is returned.</span>
@@ -2886,13 +2897,14 @@ client attached.</p></div>
         <span class="n">rv</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">integration_name</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">rv</span>
-    <span class="n">initial_client</span> <span class="o">=</span> <span class="n">_initial_client</span>
-    <span class="k">if</span> <span class="n">initial_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="n">initial_client</span> <span class="o">=</span> <span class="n">initial_client</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">_initial_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">initial_client</span> <span class="o">=</span> <span class="n">_initial_client</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">initial_client</span> <span class="o">=</span> <span class="bp">None</span>
     <span class="k">if</span> <span class="p">(</span>
         <span class="n">initial_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
         <span class="ow">and</span> <span class="n">initial_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">client</span>
-        <span class="ow">and</span> <span class="n">initial_client</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
+        <span class="ow">and</span> <span class="n">initial_client</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">integration_name</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
     <span class="p">):</span>
         <span class="n">warning</span> <span class="o">=</span> <span class="p">(</span>
             <span class="s2">&quot;Integration </span><span class="si">%r</span><span class="s2"> attempted to run but it was only &quot;</span>
@@ -3121,10 +3133,11 @@ events that belong to it.</p></div>
     <span class="p">)</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># type: List[EventProcessor]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># type: List[ErrorProcessor]</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Optional[str]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
 
     <span class="nd">@_attr_setter</span>
@@ -3152,26 +3165,32 @@ events that belong to it.</p></div>
         <span class="bp">self</span><span class="o">.</span><span class="n">_span</span> <span class="o">=</span> <span class="n">span_context</span>
 
     <span class="k">def</span> <span class="nf">set_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="c1"># type: (str, Any) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Sets a tag for a key to a specific value.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
 
     <span class="k">def</span> <span class="nf">remove_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="c1"># type: (str) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Removes a specific tag.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">set_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="c1"># type: (str, Any) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Binds a context at a certain key to a specific value.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
 
     <span class="k">def</span> <span class="nf">remove_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="c1"># type: (str) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Removes a context.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">set_extra</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="c1"># type: (str, Any) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Sets an extra key to a specific value.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
 
     <span class="k">def</span> <span class="nf">remove_extra</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="c1"># type: (str) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Removes a specific extra key.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
 
@@ -3213,11 +3232,12 @@ events that belong to it.</p></div>
 <span class="sd">        invoked with the original exception info triple as second argument.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">cls</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">cls_</span> <span class="o">=</span> <span class="bp">cls</span>  <span class="c1"># For mypy.</span>
             <span class="n">real_func</span> <span class="o">=</span> <span class="n">func</span>
 
             <span class="k">def</span> <span class="nf">func</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">):</span>
                 <span class="k">try</span><span class="p">:</span>
-                    <span class="n">is_inst</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">cls</span><span class="p">)</span>
+                    <span class="n">is_inst</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">cls_</span><span class="p">)</span>
                 <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                     <span class="n">is_inst</span> <span class="o">=</span> <span class="bp">False</span>
                 <span class="k">if</span> <span class="n">is_inst</span><span class="p">:</span>
@@ -3284,7 +3304,7 @@ events that belong to it.</p></div>
 
     <span class="k">def</span> <span class="nf">__copy__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; Scope</span>
-        <span class="n">rv</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">)</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">)</span>  <span class="c1"># type: Scope</span>
 
         <span class="n">rv</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span>
         <span class="n">rv</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span>
@@ -3306,6 +3326,7 @@ events that belong to it.</p></div>
         <span class="k">return</span> <span class="n">rv</span>
 
     <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; str</span>
         <span class="k">return</span> <span class="s2">&quot;&lt;</span><span class="si">%s</span><span class="s2"> id=</span><span class="si">%s</span><span class="s2"> name=</span><span class="si">%s</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
             <span class="nb">hex</span><span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="p">)),</span>
@@ -3382,9 +3403,10 @@ events that belong to it.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Scope.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Scope.__init__" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="c1"># type: () -&gt; None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># type: List[EventProcessor]</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># type: List[ErrorProcessor]</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Optional[str]</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
 </pre></div>
 
@@ -3415,10 +3437,11 @@ invoked with the original exception info triple as second argument.</p></div>
 <span class="sd">    invoked with the original exception info triple as second argument.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="bp">cls</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">cls_</span> <span class="o">=</span> <span class="bp">cls</span>  <span class="c1"># For mypy.</span>
         <span class="n">real_func</span> <span class="o">=</span> <span class="n">func</span>
         <span class="k">def</span> <span class="nf">func</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">):</span>
             <span class="k">try</span><span class="p">:</span>
-                <span class="n">is_inst</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">cls</span><span class="p">)</span>
+                <span class="n">is_inst</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">cls_</span><span class="p">)</span>
             <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                 <span class="n">is_inst</span> <span class="o">=</span> <span class="bp">False</span>
             <span class="k">if</span> <span class="n">is_inst</span><span class="p">:</span>
@@ -3560,6 +3583,7 @@ invoked with the original exception info triple as second argument.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Scope.remove_context', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Scope.remove_context" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">remove_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+    <span class="c1"># type: (str) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;Removes a context.&quot;&quot;&quot;</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
 </pre></div>
@@ -3583,6 +3607,7 @@ invoked with the original exception info triple as second argument.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Scope.remove_extra', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Scope.remove_extra" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">remove_extra</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+    <span class="c1"># type: (str) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;Removes a specific extra key.&quot;&quot;&quot;</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
 </pre></div>
@@ -3606,6 +3631,7 @@ invoked with the original exception info triple as second argument.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Scope.remove_tag', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Scope.remove_tag" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">remove_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+    <span class="c1"># type: (str) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;Removes a specific tag.&quot;&quot;&quot;</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
 </pre></div>
@@ -3629,6 +3655,7 @@ invoked with the original exception info triple as second argument.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Scope.set_context', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Scope.set_context" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">set_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+    <span class="c1"># type: (str, Any) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;Binds a context at a certain key to a specific value.&quot;&quot;&quot;</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
 </pre></div>
@@ -3652,6 +3679,7 @@ invoked with the original exception info triple as second argument.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Scope.set_extra', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Scope.set_extra" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">set_extra</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+    <span class="c1"># type: (str, Any) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;Sets an extra key to a specific value.&quot;&quot;&quot;</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
 </pre></div>
@@ -3698,6 +3726,7 @@ invoked with the original exception info triple as second argument.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Scope.set_tag', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Scope.set_tag" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">set_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+    <span class="c1"># type: (str, Any) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;Sets a tag for a key to a specific value.&quot;&quot;&quot;</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
 </pre></div>
@@ -3725,23 +3754,25 @@ invoked with the original exception info triple as second argument.</p></div>
 <span class="sd">    A transport is used to send an event to sentry.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="n">parsed_dsn</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Dsn</span>
+    <span class="n">parsed_dsn</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Optional[Dsn]</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
         <span class="c1"># type: (Optional[ClientOptions]) -&gt; None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
-        <span class="k">if</span> <span class="n">options</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">options</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="n">Dsn</span><span class="p">(</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">])</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: ignore</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="bp">None</span>
 
     <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="c1"># type: (Event) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;This gets invoked with the event dictionary when an event should</span>
 <span class="sd">        be sent to sentry.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="c1"># type: (float, Optional[Any]) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Wait `timeout` seconds for the current events to be sent out.&quot;&quot;&quot;</span>
         <span class="k">pass</span>
 
@@ -3806,10 +3837,10 @@ invoked with the original exception info triple as second argument.</p></div>
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
     <span class="c1"># type: (Optional[ClientOptions]) -&gt; None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
-    <span class="k">if</span> <span class="n">options</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]:</span>
+    <span class="k">if</span> <span class="n">options</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="n">Dsn</span><span class="p">(</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">])</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: ignore</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="bp">None</span>
 </pre></div>
 
   </div>
@@ -3832,6 +3863,7 @@ be sent to sentry.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Transport.capture_event', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Transport.capture_event" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+    <span class="c1"># type: (Event) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;This gets invoked with the event dictionary when an event should</span>
 <span class="sd">    be sent to sentry.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -3857,6 +3889,7 @@ be sent to sentry.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Transport.flush', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Transport.flush" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="c1"># type: (float, Optional[Any]) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;Wait `timeout` seconds for the current events to be sent out.&quot;&quot;&quot;</span>
     <span class="k">pass</span>
 </pre></div>

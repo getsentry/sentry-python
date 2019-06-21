@@ -1191,8 +1191,9 @@ table {
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">keys</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;SERVER_NAME&quot;</span><span class="p">,</span> <span class="s2">&quot;SERVER_PORT&quot;</span><span class="p">]</span>
     <span class="k">if</span> <span class="n">_should_send_default_pii</span><span class="p">():</span>
-        <span class="c1"># Add all three headers here to make debugging of proxy setup easier.</span>
-        <span class="n">keys</span> <span class="o">+=</span> <span class="p">[</span><span class="s2">&quot;REMOTE_ADDR&quot;</span><span class="p">,</span> <span class="s2">&quot;HTTP_X_FORWARDED_FOR&quot;</span><span class="p">,</span> <span class="s2">&quot;HTTP_X_REAL_IP&quot;</span><span class="p">]</span>
+        <span class="c1"># make debugging of proxy setup easier. Proxy headers are</span>
+        <span class="c1"># in headers.</span>
+        <span class="n">keys</span> <span class="o">+=</span> <span class="p">[</span><span class="s2">&quot;REMOTE_ADDR&quot;</span><span class="p">]</span>
 
     <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">environ</span><span class="p">:</span>

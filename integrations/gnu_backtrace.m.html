@@ -1104,7 +1104,7 @@ table {
 <span class="s2">(?P&lt;package&gt;{MODULE_RE})\(</span>
 <span class="s2">  (?P&lt;retval&gt;{TYPE_RE}\ )?</span>
 <span class="s2">  ((?P&lt;function&gt;{TYPE_RE})</span>
-<span class="s2">    (?P&lt;args&gt;\([^)]*\))?</span>
+<span class="s2">    (?P&lt;args&gt;\(.*\))?</span>
 <span class="s2">  )?</span>
 <span class="s2">  ((?P&lt;constoffset&gt;\ const)?\+0x(?P&lt;offset&gt;{HEXVAL_RE}))?</span>
 <span class="s2">\)\s</span>
@@ -1121,6 +1121,7 @@ table {
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="c1"># type: () -&gt; None</span>
         <span class="nd">@add_global_event_processor</span>
         <span class="k">def</span> <span class="nf">process_gnu_backtrace</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
@@ -1172,13 +1173,8 @@ table {
                         <span class="p">},</span>
                     <span class="p">)</span>
                 <span class="p">)</span>
-            <span class="k">elif</span> <span class="n">additional_frames</span> <span class="ow">and</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
-                <span class="c1"># If we already started parsing a stacktrace, it must be at the</span>
-                <span class="c1"># end of the message and must not contain random garbage lines</span>
-                <span class="c1"># between the frames</span>
-                <span class="k">del</span> <span class="n">additional_frames</span><span class="p">[:]</span>
-                <span class="k">break</span>
             <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Put garbage lines back into message, not sure what to do with them.</span>
                 <span class="n">new_msg</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">additional_frames</span><span class="p">:</span>
@@ -1246,6 +1242,7 @@ table {
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="c1"># type: () -&gt; None</span>
         <span class="nd">@add_global_event_processor</span>
         <span class="k">def</span> <span class="nf">process_gnu_backtrace</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
@@ -1299,6 +1296,7 @@ table {
   <div id="source-sentry_sdk.integrations.gnu_backtrace.GnuBacktraceIntegration.setup_once" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@staticmethod</span>
 <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+    <span class="c1"># type: () -&gt; None</span>
     <span class="nd">@add_global_event_processor</span>
     <span class="k">def</span> <span class="nf">process_gnu_backtrace</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
         <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>

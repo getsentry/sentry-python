@@ -1085,6 +1085,9 @@ table {
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations._wsgi_common</span> <span class="kn">import</span> <span class="n">_filter_headers</span>
 
+<span class="k">if</span> <span class="bp">False</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+
 
 <span class="k">def</span> <span class="nf">_wrap_handler</span><span class="p">(</span><span class="n">handler</span><span class="p">):</span>
     <span class="k">def</span> <span class="nf">sentry_handler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
@@ -1092,6 +1095,9 @@ table {
         <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AwsLambdaIntegration</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">handler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="c1"># If an integration is there, a client has to be there.</span>
+        <span class="n">client</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span>  <span class="c1"># type: Any</span>
 
         <span class="k">with</span> <span class="n">hub</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
@@ -1105,7 +1111,7 @@ table {
                 <span class="n">exc_info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
                 <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
                     <span class="n">exc_info</span><span class="p">,</span>
-                    <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
+                    <span class="n">client_options</span><span class="o">=</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
                     <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;aws_lambda&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">},</span>
                 <span class="p">)</span>
                 <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
@@ -1121,7 +1127,7 @@ table {
         <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="c1"># Flush out the event queue before AWS kills the</span>
             <span class="c1"># process.</span>
-            <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+            <span class="n">hub</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
 
 
 <span class="k">class</span> <span class="nc">AwsLambdaIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
@@ -1129,6 +1135,7 @@ table {
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="c1"># type: () -&gt; None</span>
         <span class="kn">import</span> <span class="nn">__main__</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>  <span class="c1"># type: ignore</span>
 
         <span class="n">pre_37</span> <span class="o">=</span> <span class="bp">True</span>  <span class="c1"># Python 3.6 or 2.7</span>
@@ -1282,6 +1289,7 @@ table {
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="c1"># type: () -&gt; None</span>
         <span class="kn">import</span> <span class="nn">__main__</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>  <span class="c1"># type: ignore</span>
 
         <span class="n">pre_37</span> <span class="o">=</span> <span class="bp">True</span>  <span class="c1"># Python 3.6 or 2.7</span>
@@ -1406,6 +1414,7 @@ table {
   <div id="source-sentry_sdk.integrations.aws_lambda.AwsLambdaIntegration.setup_once" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@staticmethod</span>
 <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+    <span class="c1"># type: () -&gt; None</span>
     <span class="kn">import</span> <span class="nn">__main__</span> <span class="kn">as</span> <span class="nn">lambda_bootstrap</span>  <span class="c1"># type: ignore</span>
     <span class="n">pre_37</span> <span class="o">=</span> <span class="bp">True</span>  <span class="c1"># Python 3.6 or 2.7</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">lambda_bootstrap</span><span class="p">,</span> <span class="s2">&quot;handle_http_request&quot;</span><span class="p">):</span>

@@ -1091,6 +1091,7 @@ table {
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
 
 <span class="k">if</span> <span class="bp">False</span><span class="p">:</span>
+
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
 
@@ -1102,6 +1103,7 @@ table {
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="nf">echo</span><span class="p">(</span><span class="n">msg</span><span class="p">):</span>
+        <span class="c1"># type: (str) -&gt; None</span>
         <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">msg</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="n">echo</span><span class="p">(</span><span class="s2">&quot;Sentry is attempting to send </span><span class="si">%i</span><span class="s2"> pending error messages&quot;</span> <span class="o">%</span> <span class="n">pending</span><span class="p">)</span>
@@ -1129,7 +1131,10 @@ table {
             <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AtexitIntegration</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: shutting down client&quot;</span><span class="p">)</span>
-                <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">callback</span><span class="o">=</span><span class="n">integration</span><span class="o">.</span><span class="n">callback</span><span class="p">)</span>
+
+                <span class="c1"># If an integration is there, a client has to be there.</span>
+                <span class="n">client</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span>  <span class="c1"># type: Any</span>
+                <span class="n">client</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">callback</span><span class="o">=</span><span class="n">integration</span><span class="o">.</span><span class="n">callback</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1161,6 +1166,7 @@ are still pending and the process is waiting for them to flush out.</p></div>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="nf">echo</span><span class="p">(</span><span class="n">msg</span><span class="p">):</span>
+        <span class="c1"># type: (str) -&gt; None</span>
         <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">msg</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="n">echo</span><span class="p">(</span><span class="s2">&quot;Sentry is attempting to send </span><span class="si">%i</span><span class="s2"> pending error messages&quot;</span> <span class="o">%</span> <span class="n">pending</span><span class="p">)</span>
@@ -1203,7 +1209,10 @@ are still pending and the process is waiting for them to flush out.</p></div>
             <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AtexitIntegration</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: shutting down client&quot;</span><span class="p">)</span>
-                <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">callback</span><span class="o">=</span><span class="n">integration</span><span class="o">.</span><span class="n">callback</span><span class="p">)</span>
+
+                <span class="c1"># If an integration is there, a client has to be there.</span>
+                <span class="n">client</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span>  <span class="c1"># type: Any</span>
+                <span class="n">client</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">callback</span><span class="o">=</span><span class="n">integration</span><span class="o">.</span><span class="n">callback</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1261,7 +1270,9 @@ are still pending and the process is waiting for them to flush out.</p></div>
         <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">AtexitIntegration</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;atexit: shutting down client&quot;</span><span class="p">)</span>
-            <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">callback</span><span class="o">=</span><span class="n">integration</span><span class="o">.</span><span class="n">callback</span><span class="p">)</span>
+            <span class="c1"># If an integration is there, a client has to be there.</span>
+            <span class="n">client</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span>  <span class="c1"># type: Any</span>
+            <span class="n">client</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">callback</span><span class="o">=</span><span class="n">integration</span><span class="o">.</span><span class="n">callback</span><span class="p">)</span>
 </pre></div>
 
   </div>

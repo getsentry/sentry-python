@@ -1081,6 +1081,7 @@ table {
 
 <span class="k">if</span> <span class="bp">False</span><span class="p">:</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
 
 
 <span class="k">class</span> <span class="nc">ExcepthookIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
@@ -1111,10 +1112,13 @@ table {
         <span class="n">integration</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">ExcepthookIntegration</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">_should_send</span><span class="p">(</span><span class="n">integration</span><span class="o">.</span><span class="n">always_run</span><span class="p">):</span>
+            <span class="c1"># If an integration is there, a client has to be there.</span>
+            <span class="n">client</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span>  <span class="c1"># type: Any</span>
+
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
                 <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
                     <span class="p">(</span><span class="n">exctype</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">traceback</span><span class="p">),</span>
-                    <span class="n">client_options</span><span class="o">=</span><span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
+                    <span class="n">client_options</span><span class="o">=</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
                     <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;excepthook&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="bp">False</span><span class="p">},</span>
                 <span class="p">)</span>
                 <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
@@ -1125,6 +1129,7 @@ table {
 
 
 <span class="k">def</span> <span class="nf">_should_send</span><span class="p">(</span><span class="n">always_run</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+    <span class="c1"># type: (bool) -&gt; bool</span>
     <span class="k">if</span> <span class="n">always_run</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">True</span>
 

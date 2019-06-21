@@ -1131,9 +1131,7 @@ table {
 
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">iter_default_integrations</span><span class="o">.</span><span class="vm">__doc__</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
         <span class="k">for</span> <span class="n">import_string</span> <span class="ow">in</span> <span class="n">import_strings</span><span class="p">:</span>
-            <span class="n">iter_default_integrations</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">- `{}`&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>  <span class="c1"># type: ignore</span>
-                <span class="n">import_string</span>
-            <span class="p">)</span>
+            <span class="n">iter_default_integrations</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">- `{}`&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">import_string</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">iter_default_integrations</span>
 
@@ -1170,7 +1168,7 @@ table {
                 <span class="n">instance</span> <span class="o">=</span> <span class="n">integration_cls</span><span class="p">()</span>
                 <span class="n">integrations</span><span class="p">[</span><span class="n">instance</span><span class="o">.</span><span class="n">identifier</span><span class="p">]</span> <span class="o">=</span> <span class="n">instance</span>
 
-    <span class="k">for</span> <span class="n">identifier</span><span class="p">,</span> <span class="n">integration</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">integrations</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">identifier</span><span class="p">,</span> <span class="n">integration</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">integrations</span><span class="p">):</span>  <span class="c1"># type: ignore</span>
         <span class="k">with</span> <span class="n">_installer_lock</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">identifier</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_installed_integrations</span><span class="p">:</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
@@ -1211,6 +1209,7 @@ table {
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="c1"># type: () -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Initialize the integration.</span>
 
@@ -1302,7 +1301,7 @@ unless they were already provided before.</p></div>
                 <span class="n">instance</span> <span class="o">=</span> <span class="n">integration_cls</span><span class="p">()</span>
                 <span class="n">integrations</span><span class="p">[</span><span class="n">instance</span><span class="o">.</span><span class="n">identifier</span><span class="p">]</span> <span class="o">=</span> <span class="n">instance</span>
 
-    <span class="k">for</span> <span class="n">identifier</span><span class="p">,</span> <span class="n">integration</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">integrations</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">identifier</span><span class="p">,</span> <span class="n">integration</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">integrations</span><span class="p">):</span>  <span class="c1"># type: ignore</span>
         <span class="k">with</span> <span class="n">_installer_lock</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">identifier</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_installed_integrations</span><span class="p">:</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
@@ -1361,6 +1360,7 @@ saves those options on <code>self</code>.</p></div>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="c1"># type: () -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Initialize the integration.</span>
 
@@ -1428,6 +1428,7 @@ instance again.</p></div>
   <div id="source-sentry_sdk.integrations.Integration.setup_once" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@staticmethod</span>
 <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+    <span class="c1"># type: () -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Initialize the integration.</span>
 <span class="sd">    This function is only called once, ever. Configuration is not available</span>

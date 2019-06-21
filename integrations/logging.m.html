@@ -1183,7 +1183,6 @@ table {
     <span class="kn">from</span> <span class="nn">logging</span> <span class="kn">import</span> <span class="n">LogRecord</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
-    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
 
 <span class="n">DEFAULT_LEVEL</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span>
 <span class="n">DEFAULT_EVENT_LEVEL</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">ERROR</span>
@@ -1323,7 +1322,6 @@ table {
         <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span>
 
-        <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
         <span class="n">client_options</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span>
 
         <span class="c1"># exc_info might be None or (None, None, None)</span>
@@ -1335,7 +1333,7 @@ table {
             <span class="p">)</span>
         <span class="k">elif</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
-            <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
+            <span class="n">hint</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
                 <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
                     <span class="s2">&quot;values&quot;</span><span class="p">:</span> <span class="p">[</span>
@@ -1350,6 +1348,9 @@ table {
                 <span class="p">}</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">hint</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="n">hint</span><span class="p">[</span><span class="s2">&quot;log_record&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span>
 
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">)</span>
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
@@ -2033,7 +2034,6 @@ The record which was being processed is passed in to this method.</p></div>
         <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span>
 
-        <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
         <span class="n">client_options</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span>
 
         <span class="c1"># exc_info might be None or (None, None, None)</span>
@@ -2045,7 +2045,7 @@ The record which was being processed is passed in to this method.</p></div>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
-            <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
+            <span class="n">hint</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
                 <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
                     <span class="s2">&quot;values&quot;</span><span class="p">:</span> <span class="p">[</span>
@@ -2060,6 +2060,9 @@ The record which was being processed is passed in to this method.</p></div>
                 <span class="p">}</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">hint</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="n">hint</span><span class="p">[</span><span class="s2">&quot;log_record&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span>
 
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">)</span>
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
@@ -2789,7 +2792,6 @@ The record which was being processed is passed in to this method.</p></div>
         <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span>
 
-        <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
         <span class="n">client_options</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span>
 
         <span class="c1"># exc_info might be None or (None, None, None)</span>
@@ -2801,7 +2803,7 @@ The record which was being processed is passed in to this method.</p></div>
             <span class="p">)</span>
         <span class="k">elif</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
-            <span class="n">hint</span> <span class="o">=</span> <span class="bp">None</span>
+            <span class="n">hint</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
                 <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
                     <span class="s2">&quot;values&quot;</span><span class="p">:</span> <span class="p">[</span>
@@ -2816,6 +2818,9 @@ The record which was being processed is passed in to this method.</p></div>
                 <span class="p">}</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">hint</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="n">hint</span><span class="p">[</span><span class="s2">&quot;log_record&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span>
 
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">)</span>
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
