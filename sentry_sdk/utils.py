@@ -734,15 +734,50 @@ def format_and_strip(
     )
 
 
-HAS_REAL_CONTEXTVARS = True
+def _is_threading_local_monkey_patched():
+    # type: () -> bool
+    try:
+        from gevent.monkey import is_object_patched
 
-try:
-    from contextvars import ContextVar  # type: ignore
+        if is_object_patched("_threading", "local"):
+            return True
+    except ImportError:
+        pass
 
-    if not PY2 and sys.version_info < (3, 7):
-        import aiocontextvars  # type: ignore  # noqa
-except ImportError:
-    HAS_REAL_CONTEXTVARS = False
+    try:
+        from eventlet.patcher import is_monkey_patched
+
+        if is_monkey_patched("thread"):
+            return True
+    except ImportError:
+        pass
+
+    return False
+
+
+IS_THREADING_LOCAL_MONKEY_PATCHED = _is_threading_local_monkey_patched()
+del _is_threading_local_monkey_patched
+
+
+def _get_contextvars():
+    # () -> (bool, Type)
+    """
+    Try to import contextvars and use it if it's deemed safe. We should not use
+    contextvars if gevent or eventlet have patched thread locals, as
+    contextvars are unaffected by that patch.
+
+    https://github.com/gevent/gevent/issues/1407
+    """
+    if not IS_THREADING_LOCAL_MONKEY_PATCHED:
+        try:
+            from contextvars import ContextVar  # type: ignore
+
+            if not PY2 and sys.version_info < (3, 7):
+                import aiocontextvars  # type: ignore  # noqa
+
+            return True, ContextVar
+        except ImportError:
+            pass
 
     from threading import local
 
@@ -758,6 +793,12 @@ except ImportError:
 
         def set(self, value):
             setattr(self._local, "value", value)
+
+    return False, ContextVar
+
+
+HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()
+del _get_contextvars
 
 
 def transaction_from_function(func):
