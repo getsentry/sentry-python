@@ -198,10 +198,12 @@ def _patch_drf():
     Patch Django Rest Framework for more/better request data. DRF's request
     type is a wrapper around Django's request type. The attribute we're
     interested in is `request.data`, which is a cached property containing a
-    parsed request body.
+    parsed request body. Reading a request body from that property is more
+    reliable than reading from any of Django's own properties, as those don't
+    hold payloads in memory and therefore can only be accessed once.
 
     We patch the Django request object to include a weak backreference to the
-    DRF request object, such that we can later use both as needed in
+    DRF request object, such that we can later use either in
     `DjangoRequestExtractor`.
 
     This function is not called directly on SDK setup, because importing almost
@@ -231,10 +233,6 @@ def _patch_drf():
             except ImportError:
                 pass
             else:
-                # DRF's request type (which wraps the Django request and proxies
-                # all attrs) has some attributes such as `data` which buffer
-                # request data.  We want to use those in the RequestExtractor to
-                # get body data more reliably.
                 old_drf_initial = APIView.initial
 
                 def sentry_patched_drf_initial(self, request, *args, **kwargs):
