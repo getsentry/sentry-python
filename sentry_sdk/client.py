@@ -92,6 +92,7 @@ class Client(object):
 
     @property
     def dsn(self):
+        # type: () -> Optional[str]
         """Returns the configured DSN as string."""
         return self.options["dsn"]
 
@@ -259,7 +260,9 @@ class Client(object):
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):
+        # type: () -> Client
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
+        # type: (Any, Any, Any) -> None
         self.close()

@@ -15,6 +15,12 @@ if False:
     from typing import Dict
     from typing import List
     from typing import Optional
+    from typing import Callable
+    from typing import Union
+    from typing import Generator
+
+    ReprProcessor = Callable[[Any, Dict[str, Any]], Union[NotImplemented, str]]
+    Segment = Union[str, int]
 
 
 if PY2:
@@ -31,10 +37,11 @@ MAX_DATABAG_BREADTH = 10
 CYCLE_MARKER = u"<cyclic>"
 
 
-global_repr_processors = []
+global_repr_processors = []  # type: List[ReprProcessor]
 
 
 def add_global_repr_processor(processor):
+    # type: (ReprProcessor) -> None
     global_repr_processors.append(processor)
 
 
@@ -50,8 +57,8 @@ class MetaNode(object):
 
     def __init__(self):
         # type: () -> None
-        self._parent = None
-        self._segment = None
+        self._parent = None  # type: Optional[MetaNode]
+        self._segment = None  # type: Optional[Segment]
         self._depth = 0  # type: int
         self._data = None  # type: Optional[Dict[str, Any]]
         self._is_databag = None  # type: Optional[bool]
@@ -79,6 +86,7 @@ class MetaNode(object):
         return cur._segment is None
 
     def enter(self, segment):
+        # type: (Segment) -> MetaNode
         rv = MetaNode()
         rv._parent = self
         rv._depth = self._depth + 1
@@ -93,7 +101,7 @@ class MetaNode(object):
         self._data = {}
         if self._parent is not None:
             self._parent._create_annotations()
-            self._parent._data[str(self._segment)] = self._data
+            self._parent._data[str(self._segment)] = self._data  # type: ignore
 
     def annotate(self, **meta):
         # type: (Any) -> None
@@ -150,6 +158,7 @@ class Memo(object):
 
     @contextlib.contextmanager
     def memoize(self, obj):
+        # type: (Any) -> Generator[bool, None, None]
         if id(obj) in self._inner:
             yield True
         else:
@@ -167,6 +176,7 @@ class Serializer(object):
 
     @contextlib.contextmanager
     def enter(self, segment):
+        # type: (Segment) -> Generator[None, None, None]
         old_node = self.meta_node
         self.meta_node = self.meta_node.enter(segment)
 
@@ -176,25 +186,29 @@ class Serializer(object):
             self.meta_node = old_node
 
     def serialize_event(self, obj):
+        # type: (Any) -> Dict[str, Any]
         rv = self._serialize_node(obj)
         if self.meta_node._data is not None:
             rv["_meta"] = self.meta_node._data
         return rv
 
-    def _serialize_node(self, obj, **kwargs):
+    def _serialize_node(self, obj, max_depth=None, max_breadth=None):
+        # type: (Any, Optional[int], Optional[int]) -> Any
         with capture_internal_exceptions():
             with self.memo.memoize(obj) as result:
                 if result:
                     return CYCLE_MARKER
 
-                return self._serialize_node_impl(obj, **kwargs)
+                return self._serialize_node_impl(
+                    obj, max_depth=max_depth, max_breadth=max_breadth
+                )
 
         if self.meta_node.is_databag():
             return u"<failed to serialize, use init(debug=True) to see error logs>"
 
         return None
 
-    def _serialize_node_impl(self, obj, max_depth=None, max_breadth=None):
+    def _serialize_node_impl(self, obj, max_depth, max_breadth):
         # type: (Any, Optional[int], Optional[int]) -> Any
         if max_depth is None and max_breadth is None and self.meta_node.is_databag():
             max_depth = self.meta_node._depth + MAX_DATABAG_DEPTH
