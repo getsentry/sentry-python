@@ -2,6 +2,7 @@
 from __future__ import absolute_import
 
 import sys
+import threading
 import weakref
 
 from django import VERSION as DJANGO_VERSION  # type: ignore
@@ -116,6 +117,8 @@ class DjangoIntegration(Integration):
             hub = Hub.current
             integration = hub.get_integration(DjangoIntegration)
             if integration is not None:
+                _patch_drf()
+
                 with hub.configure_scope() as scope:
                     scope.add_event_processor(
                         _make_event_processor(weakref.ref(request), integration)
@@ -123,25 +126,6 @@ class DjangoIntegration(Integration):
             return old_get_response(self, request)
 
         BaseHandler.get_response = sentry_patched_get_response
-
-        try:
-            from rest_framework.views import APIView  # type: ignore
-        except ImportError:
-            pass
-        else:
-            # DRF's request type (which wraps the Django request and proxies
-            # all attrs) has some attributes such as `data` which buffer
-            # request data.  We want to use those in the RequestExtractor to
-            # get body data more reliably.
-            old_drf_initial = APIView.initial
-
-            def sentry_patched_drf_initial(self, request, *args, **kwargs):
-                with capture_internal_exceptions():
-                    request._request._sentry_drf_request_backref = weakref.ref(request)
-                    pass
-                return old_drf_initial(self, request, *args, **kwargs)
-
-            APIView.initial = sentry_patched_drf_initial
 
         signals.got_request_exception.connect(_got_request_exception)
 
@@ -203,6 +187,65 @@ class DjangoIntegration(Integration):
                 value.__module__,
                 id(value),
             )
+
+
+_DRF_PATCHED = False
+_DRF_PATCH_LOCK = threading.Lock()
+
+
+def _patch_drf():
+    """
+    Patch Django Rest Framework for more/better request data. DRF's request
+    type is a wrapper around Django's request type. The attribute we're
+    interested in is `request.data`, which is a cached property containing a
+    parsed request body.
+
+    We patch the Django request object to include a weak backreference to the
+    DRF request object, such that we can later use both as needed in
+    `DjangoRequestExtractor`.
+
+    This function is not called directly on SDK setup, because importing almost
+    any part of Django Rest Framework will try to access Django settings (where
+    `sentry_sdk.init()` might be called from in the first place). Instead we
+    run this function on every request and do the patching on the first
+    request.
+    """
+
+    global _DRF_PATCHED
+
+    if _DRF_PATCHED:
+        # Double-checked locking
+        return
+
+    with _DRF_PATCH_LOCK:
+        if _DRF_PATCHED:
+            return
+
+        # We set this regardless of whether the code below succeeds or fails.
+        # There is no point in trying to patch again on the next request.
+        _DRF_PATCHED = True
+
+        with capture_internal_exceptions():
+            try:
+                from rest_framework.views import APIView  # type: ignore
+            except ImportError:
+                pass
+            else:
+                # DRF's request type (which wraps the Django request and proxies
+                # all attrs) has some attributes such as `data` which buffer
+                # request data.  We want to use those in the RequestExtractor to
+                # get body data more reliably.
+                old_drf_initial = APIView.initial
+
+                def sentry_patched_drf_initial(self, request, *args, **kwargs):
+                    with capture_internal_exceptions():
+                        request._request._sentry_drf_request_backref = weakref.ref(
+                            request
+                        )
+                        pass
+                    return old_drf_initial(self, request, *args, **kwargs)
+
+                APIView.initial = sentry_patched_drf_initial
 
 
 def _make_event_processor(weak_request, integration):
