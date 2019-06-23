@@ -6,7 +6,6 @@ import threading
 import weakref
 
 from django import VERSION as DJANGO_VERSION  # type: ignore
-from django.db.models.query import QuerySet  # type: ignore
 from django.core import signals  # type: ignore
 
 if False:
@@ -174,6 +173,17 @@ class DjangoIntegration(Integration):
 
         @add_global_repr_processor
         def _django_queryset_repr(value, hint):
+            try:
+                # Django 1.6 can fail to import `QuerySet` when Django settings
+                # have not yet been initialized.
+                #
+                # If we fail to import, return `NotImplemented`. It's at least
+                # unlikely that we have a query set in `value` when importing
+                # `QuerySet` fails.
+                from django.db.models.query import QuerySet  # type: ignore
+            except Exception:
+                return NotImplemented
+
             if not isinstance(value, QuerySet) or value._result_cache:
                 return NotImplemented
 
