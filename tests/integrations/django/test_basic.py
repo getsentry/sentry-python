@@ -179,7 +179,7 @@ def test_sql_queries(sentry_init, capture_events):
 
     event, = events
 
-    crumb, = event["breadcrumbs"]
+    crumb = event["breadcrumbs"][-1]
 
     assert crumb["message"] == """SELECT count(*) FROM people_person WHERE foo = 123"""
 
@@ -297,7 +297,7 @@ def test_sql_queries_large_params(sentry_init, capture_events):
 
     event, = events
 
-    crumb, = event["breadcrumbs"]
+    crumb = event["breadcrumbs"][-1]
     assert crumb["message"] == (
         "SELECT count(*) FROM people_person WHERE foo = '%s... and bar IS NULL"
         % ("x" * 124,)

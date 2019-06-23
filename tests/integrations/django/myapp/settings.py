@@ -10,6 +10,15 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.0/ref/settings/
 """
 
+
+# We shouldn't access settings while setting up integrations. Initialize SDK
+# here to provoke any errors that might occur.
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
+
+sentry_sdk.init(integrations=[DjangoIntegration()])
+
+
 import os
 
 try:
