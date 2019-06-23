@@ -5,7 +5,8 @@ from itertools import chain
 
 from sentry_sdk.utils import logger, capture_internal_exceptions
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
     from typing import Dict
     from typing import Optional

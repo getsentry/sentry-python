@@ -11,7 +11,8 @@ from sentry_sdk.utils import (
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
 
 

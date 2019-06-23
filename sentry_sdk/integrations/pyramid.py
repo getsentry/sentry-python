@@ -15,7 +15,8 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 
-if False:
+MYPY = False
+if MYPY:
     from pyramid.response import Response  # type: ignore
     from typing import Any
     from sentry_sdk.integrations.wsgi import _ScopedResponse

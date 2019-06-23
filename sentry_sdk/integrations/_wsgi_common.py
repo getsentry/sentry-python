@@ -4,7 +4,8 @@ from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue
 from sentry_sdk._compat import text_type, iteritems
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
     from typing import Dict
     from typing import Optional

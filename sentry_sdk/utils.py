@@ -8,7 +8,8 @@ from datetime import datetime
 
 from sentry_sdk._compat import urlparse, text_type, implements_str, int_types, PY2
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
     from typing import Callable
     from typing import Dict

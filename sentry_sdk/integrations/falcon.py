@@ -8,7 +8,8 @@ from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
     from typing import Callable
     from typing import Dict

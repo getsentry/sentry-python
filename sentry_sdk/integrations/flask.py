@@ -8,7 +8,8 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 
-if False:
+MYPY = False
+if MYPY:
 
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from typing import Any

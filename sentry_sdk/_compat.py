@@ -1,6 +1,7 @@
 import sys
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Optional
     from typing import Tuple
     from typing import Any

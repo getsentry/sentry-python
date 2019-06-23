@@ -6,7 +6,8 @@ from threading import Lock
 from sentry_sdk._compat import iteritems
 from sentry_sdk.utils import logger
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Iterator
     from typing import Dict
     from typing import List

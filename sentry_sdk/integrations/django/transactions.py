@@ -7,7 +7,8 @@ from __future__ import absolute_import
 
 import re
 
-if False:
+MYPY = False
+if MYPY:
     from django.urls.resolvers import URLResolver  # type: ignore
     from typing import Dict
     from typing import List

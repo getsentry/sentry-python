@@ -5,7 +5,8 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
 
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
     from typing import Optional
     from typing import overload

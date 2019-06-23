@@ -8,7 +8,8 @@ import weakref
 from django import VERSION as DJANGO_VERSION  # type: ignore
 from django.core import signals  # type: ignore
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
     from typing import Callable
     from typing import Dict

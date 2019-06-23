@@ -1,6 +1,7 @@
 import socket
 
-if False:
+MYPY = False
+if MYPY:
     from mypy_extensions import TypedDict
     from typing import Optional
     from typing import Callable

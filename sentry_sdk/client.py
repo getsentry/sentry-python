@@ -17,7 +17,8 @@ from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO
 from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
     from typing import Callable
     from typing import Dict

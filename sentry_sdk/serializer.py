@@ -10,7 +10,8 @@ from sentry_sdk.utils import (
 
 from sentry_sdk._compat import text_type, PY2, string_types, number_types, iteritems
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
     from typing import Dict
     from typing import List

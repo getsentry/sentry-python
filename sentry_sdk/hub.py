@@ -16,7 +16,8 @@ from sentry_sdk.utils import (
 )
 
 
-if False:
+MYPY = False
+if MYPY:
     from contextlib import ContextManager
     from sys import _OptExcInfo
 
@@ -174,7 +175,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     _stack = None  # type: List[Tuple[Optional[Client], Scope]]
 
     # Mypy doesn't pick up on the metaclass.
-    if False:
+    MYPY = False
+    if MYPY:
         current = None  # type: Hub
         main = None  # type: Hub
 
