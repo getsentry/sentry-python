@@ -122,6 +122,7 @@ class HttpTransport(Transport):
             str(self._auth.store_api_url),
             body=body.getvalue(),
             headers={
+                "User-Agent": str(self._auth.client),
                 "X-Sentry-Auth": str(self._auth.to_header()),
                 "Content-Type": "application/json",
                 "Content-Encoding": "gzip",
