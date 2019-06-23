@@ -1378,7 +1378,10 @@ is provided the default level is <code>info</code>.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.configure_scope', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.configure_scope" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>  <span class="c1"># noqa</span>
-<span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span><span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>
+    <span class="n">callback</span><span class="o">=</span><span class="bp">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
+<span class="p">):</span>
+    <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
     <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">hub</span><span class="o">.</span><span class="n">configure_scope</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
@@ -1415,6 +1418,7 @@ is provided the default level is <code>info</code>.</p></div>
   <div id="source-sentry_sdk.flush" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="c1"># type: (Optional[float], Optional[Callable[[int, float], None]]) -&gt; None</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
     <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">hub</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
@@ -1440,6 +1444,8 @@ is provided the default level is <code>info</code>.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.init', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.init" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">init</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="c1"># type: (*str, **Any) -&gt; ContextManager[Any]</span>
+    <span class="c1"># TODO: https://github.com/getsentry/sentry-python/issues/272</span>
     <span class="sd">&quot;&quot;&quot;Initializes the SDK and optionally integrations.</span>
 
 <span class="sd">    This takes the same arguments as the client constructor.</span>
@@ -1503,7 +1509,10 @@ can be provided that is executed in the context of the scope.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.push_scope', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.push_scope" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@hubmethod</span>  <span class="c1"># noqa</span>
-<span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>
+    <span class="n">callback</span><span class="o">=</span><span class="bp">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
+<span class="p">):</span>
+    <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
     <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">hub</span><span class="o">.</span><span class="n">push_scope</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
@@ -1569,6 +1578,7 @@ argument.</p></div>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">dsn</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Optional[str]</span>
         <span class="sd">&quot;&quot;&quot;Returns the configured DSN as string.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]</span>
 
@@ -1736,9 +1746,11 @@ argument.</p></div>
             <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Client</span>
         <span class="k">return</span> <span class="bp">self</span>
 
     <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
+        <span class="c1"># type: (Any, Any, Any) -&gt; None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 </pre></div>
 
@@ -2308,6 +2320,7 @@ context vars are available.</p>
         <span class="n">_local</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">old</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">):</span>
+        <span class="c1"># type: (Callable[[], T]) -&gt; T</span>
         <span class="sd">&quot;&quot;&quot;Runs a callback in the context of the hub.  Alternatively the</span>
 <span class="sd">        with statement can be used on the hub directly.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -2368,6 +2381,7 @@ context vars are available.</p>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span>
 
     <span class="k">def</span> <span class="nf">bind_client</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new</span><span class="p">):</span>
+        <span class="c1"># type: (Optional[Client]) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Binds a new client to the hub.&quot;&quot;&quot;</span>
         <span class="n">top</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">new</span><span class="p">,</span> <span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
@@ -2469,8 +2483,8 @@ context vars are available.</p>
             <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
 
     <span class="nd">@overload</span>  <span class="c1"># noqa</span>
-    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="c1"># type: () -&gt; ContextManager[Scope]</span>
+    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="c1"># type: (Optional[None]) -&gt; ContextManager[Scope]</span>
         <span class="k">pass</span>
 
     <span class="nd">@overload</span>  <span class="c1"># noqa</span>
@@ -2478,7 +2492,10 @@ context vars are available.</p>
         <span class="c1"># type: (Callable[[Scope], None]) -&gt; None</span>
         <span class="k">pass</span>
 
-    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>  <span class="c1"># noqa</span>
+    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>  <span class="c1"># noqa</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
         <span class="sd">&quot;&quot;&quot;Pushes a new layer on the scope stack. Returns a context manager</span>
 <span class="sd">        that should be used to pop the scope again.  Alternatively a callback</span>
 <span class="sd">        can be provided that is executed in the context of the scope.</span>
@@ -2498,6 +2515,7 @@ context vars are available.</p>
     <span class="n">scope</span> <span class="o">=</span> <span class="n">push_scope</span>
 
     <span class="k">def</span> <span class="nf">pop_scope_unsafe</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Tuple[Optional[Client], Scope]</span>
         <span class="sd">&quot;&quot;&quot;Pops a scope layer from the stack. Try to use the context manager</span>
 <span class="sd">        `push_scope()` instead.&quot;&quot;&quot;</span>
         <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
@@ -2505,8 +2523,8 @@ context vars are available.</p>
         <span class="k">return</span> <span class="n">rv</span>
 
     <span class="nd">@overload</span>  <span class="c1"># noqa</span>
-    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="c1"># type: () -&gt; ContextManager[Scope]</span>
+    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="c1"># type: (Optional[None]) -&gt; ContextManager[Scope]</span>
         <span class="k">pass</span>
 
     <span class="nd">@overload</span>  <span class="c1"># noqa</span>
@@ -2514,7 +2532,11 @@ context vars are available.</p>
         <span class="c1"># type: (Callable[[Scope], None]) -&gt; None</span>
         <span class="k">pass</span>
 
-    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>  <span class="c1"># noqa</span>
+    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>  <span class="c1"># noqa</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
+    <span class="p">):</span>  <span class="c1"># noqa</span>
+        <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
+
         <span class="sd">&quot;&quot;&quot;Reconfigures the scope.&quot;&quot;&quot;</span>
 
         <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
@@ -2526,6 +2548,7 @@ context vars are available.</p>
 
         <span class="nd">@contextmanager</span>
         <span class="k">def</span> <span class="nf">inner</span><span class="p">():</span>
+            <span class="c1"># type: () -&gt; Generator[Scope, None, None]</span>
             <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
                 <span class="k">yield</span> <span class="n">scope</span>
             <span class="k">else</span><span class="p">:</span>
@@ -2678,6 +2701,7 @@ breadcrumbs that are emitted.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.bind_client', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.bind_client" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">bind_client</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new</span><span class="p">):</span>
+    <span class="c1"># type: (Optional[Client]) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;Binds a new client to the hub.&quot;&quot;&quot;</span>
     <span class="n">top</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">new</span><span class="p">,</span> <span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
@@ -2814,7 +2838,10 @@ is provided the default level is <code>info</code>.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.configure_scope', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.configure_scope" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>  <span class="c1"># noqa</span>
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>  <span class="c1"># noqa</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
+<span class="p">):</span>  <span class="c1"># noqa</span>
+    <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
     <span class="sd">&quot;&quot;&quot;Reconfigures the scope.&quot;&quot;&quot;</span>
     <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
@@ -2823,6 +2850,7 @@ is provided the default level is <code>info</code>.</p></div>
         <span class="k">return</span> <span class="bp">None</span>
     <span class="nd">@contextmanager</span>
     <span class="k">def</span> <span class="nf">inner</span><span class="p">():</span>
+        <span class="c1"># type: () -&gt; Generator[Scope, None, None]</span>
         <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">yield</span> <span class="n">scope</span>
         <span class="k">else</span><span class="p">:</span>
@@ -2990,6 +3018,7 @@ client attached.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.pop_scope_unsafe', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.pop_scope_unsafe" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">pop_scope_unsafe</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="c1"># type: () -&gt; Tuple[Optional[Client], Scope]</span>
     <span class="sd">&quot;&quot;&quot;Pops a scope layer from the stack. Try to use the context manager</span>
 <span class="sd">    `push_scope()` instead.&quot;&quot;&quot;</span>
     <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
@@ -3017,7 +3046,10 @@ can be provided that is executed in the context of the scope.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.push_scope', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.push_scope" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>  <span class="c1"># noqa</span>
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>  <span class="c1"># noqa</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
+<span class="p">):</span>
+    <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
     <span class="sd">&quot;&quot;&quot;Pushes a new layer on the scope stack. Returns a context manager</span>
 <span class="sd">    that should be used to pop the scope again.  Alternatively a callback</span>
 <span class="sd">    can be provided that is executed in the context of the scope.</span>
@@ -3052,6 +3084,7 @@ with statement can be used on the hub directly.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.run', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.run" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">):</span>
+    <span class="c1"># type: (Callable[[], T]) -&gt; T</span>
     <span class="sd">&quot;&quot;&quot;Runs a callback in the context of the hub.  Alternatively the</span>
 <span class="sd">    with statement can be used on the hub directly.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -3079,7 +3112,10 @@ can be provided that is executed in the context of the scope.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.scope', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.scope" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>  <span class="c1"># noqa</span>
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>  <span class="c1"># noqa</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
+<span class="p">):</span>
+    <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
     <span class="sd">&quot;&quot;&quot;Pushes a new layer on the scope stack. Returns a context manager</span>
 <span class="sd">    that should be used to pop the scope again.  Alternatively a callback</span>
 <span class="sd">    can be provided that is executed in the context of the scope.</span>
