@@ -1,3 +1,11 @@
+## 0.9.2
+
+* Fix a bug in the Django integration that would prevent the user
+  from initializing the SDK at the top of `settings.py`.
+
+  This bug was introduced in 0.9.1 for all Django versions, but has been there
+  for much longer for Django 1.6 in particular.
+
 ## 0.9.1
 
 * Fix a bug on Python 3.7 where gunicorn with gevent would cause the SDK to
