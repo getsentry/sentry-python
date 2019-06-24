@@ -27,9 +27,10 @@ _IGNORED_LOGGERS = set(["sentry_sdk.errors"])
 
 def ignore_logger(name):
     # type: (str) -> None
-    """This disables the breadcrumb integration for a logger of a specific
-    name.  This primary use is for some integrations to disable breadcrumbs
-    of this integration.
+    """This disables recording (both in breadcrumbs and as events) calls to
+    a logger of a specific name.  Among other uses, many of our integrations
+    use this to prevent their actions being recorded as breadcrumbs. Exposed
+    to users as a way to quiet spammy loggers.
     """
     _IGNORED_LOGGERS.add(name)
 
