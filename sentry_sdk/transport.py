@@ -14,7 +14,6 @@ from sentry_sdk.worker import BackgroundWorker
 
 MYPY = False
 if MYPY:
-    from sentry_sdk.consts import ClientOptions
     from typing import Type
     from typing import Any
     from typing import Optional
@@ -41,7 +40,7 @@ class Transport(object):
     parsed_dsn = None  # type: Optional[Dsn]
 
     def __init__(self, options=None):
-        # type: (Optional[ClientOptions]) -> None
+        # type: (Optional[Dict[str, Any]]) -> None
         self.options = options
         if options and options["dsn"] is not None and options["dsn"]:
             self.parsed_dsn = Dsn(options["dsn"])
@@ -77,7 +76,7 @@ class HttpTransport(Transport):
     """The default HTTP transport."""
 
     def __init__(self, options):
-        # type: (ClientOptions) -> None
+        # type: (Dict[str, Any]) -> None
         Transport.__init__(self, options)
         assert self.parsed_dsn is not None
         self._worker = BackgroundWorker()
@@ -218,7 +217,7 @@ class _FunctionTransport(Transport):
 
 
 def make_transport(options):
-    # type: (ClientOptions) -> Optional[Transport]
+    # type: (Dict[str, Any]) -> Optional[Transport]
     ref_transport = options["transport"]
 
     # If no transport is given, we use the http transport class
@@ -229,7 +228,7 @@ def make_transport(options):
     elif isinstance(ref_transport, type) and issubclass(ref_transport, Transport):
         transport_cls = ref_transport
     elif callable(ref_transport):
-        return _FunctionTransport(ref_transport)
+        return _FunctionTransport(ref_transport)  # type: ignore
 
     # if a transport class is given only instanciate it if the dsn is not
     # empty or None

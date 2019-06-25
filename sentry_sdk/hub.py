@@ -34,8 +34,10 @@ if MYPY:
 
     from sentry_sdk.integrations import Integration
     from sentry_sdk.utils import Event, Hint, Breadcrumb, BreadcrumbHint
+    from sentry_sdk.consts import ClientConstructor
 
     T = TypeVar("T")
+
 else:
 
     def overload(x):
@@ -71,20 +73,25 @@ class _InitGuard(object):
             c.close()
 
 
-def init(*args, **kwargs):
-    # type: (*str, **Any) -> ContextManager[Any]
-    # TODO: https://github.com/getsentry/sentry-python/issues/272
+def _init(*args, **kwargs):
+    # type: (*Optional[str], **Any) -> ContextManager[Any]
     """Initializes the SDK and optionally integrations.
 
     This takes the same arguments as the client constructor.
     """
     global _initial_client
-    client = Client(*args, **kwargs)
+    client = Client(*args, **kwargs)  # type: ignore
     Hub.current.bind_client(client)
     rv = _InitGuard(client)
     if client is not None:
         _initial_client = weakref.ref(client)
     return rv
+
+
+if MYPY:
+    init = ClientConstructor()  # type: ClientConstructor[ContextManager[Any]]
+else:
+    init = _init
 
 
 class HubMeta(type):

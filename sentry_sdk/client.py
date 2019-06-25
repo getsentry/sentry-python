@@ -24,17 +24,17 @@ if MYPY:
     from typing import Dict
     from typing import Optional
 
-    from sentry_sdk.consts import ClientOptions
     from sentry_sdk.scope import Scope
     from sentry_sdk.utils import Event, Hint
+    from sentry_sdk.consts import ClientConstructor
 
 
 _client_init_debug = ContextVar("client_init_debug")
 
 
-def get_options(*args, **kwargs):
-    # type: (*str, **ClientOptions) -> ClientOptions
-    if args and (isinstance(args[0], string_types) or args[0] is None):
+def _get_options(*args, **kwargs):
+    # type: (*Optional[str], **Any) -> Dict[str, Any]
+    if args and (isinstance(args[0], str) or args[0] is None):
         dsn = args[0]  # type: Optional[str]
         args = args[1:]
     else:
@@ -62,6 +62,12 @@ def get_options(*args, **kwargs):
     return rv  # type: ignore
 
 
+if MYPY:
+    get_options = ClientConstructor()  # type: ClientConstructor[Dict[str, Any]]
+else:
+    get_options = _get_options
+
+
 class Client(object):
     """The client is internally responsible for capturing the events and
     forwarding them to sentry through the configured transport.  It takes
@@ -70,10 +76,10 @@ class Client(object):
     """
 
     def __init__(self, *args, **kwargs):
-        # type: (*str, **ClientOptions) -> None
+        # type: (*Optional[str], **Any) -> None
         old_debug = _client_init_debug.get(False)
         try:
-            self.options = options = get_options(*args, **kwargs)
+            self.options = options = get_options(*args, **kwargs)  # type: ignore
             _client_init_debug.set(options["debug"])
             self.transport = make_transport(options)
 

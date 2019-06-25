@@ -21,7 +21,6 @@ if MYPY:
     from typing import Type
     from typing import Union
 
-    from sentry_sdk.consts import ClientOptions
     from sentry_sdk.hub import Hub
 
     ExcInfo = Tuple[
@@ -444,7 +443,7 @@ def single_exception_from_error_tuple(
     exc_type,  # type: Optional[type]
     exc_value,  # type: Optional[BaseException]
     tb,  # type: Optional[Any]
-    client_options=None,  # type: Optional[ClientOptions]
+    client_options=None,  # type: Optional[dict]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> Dict[str, Any]
@@ -517,7 +516,7 @@ else:
 
 def exceptions_from_error_tuple(
     exc_info,  # type: ExcInfo
-    client_options=None,  # type: Optional[ClientOptions]
+    client_options=None,  # type: Optional[dict]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> List[Dict[str, Any]]
@@ -630,7 +629,7 @@ def exc_info_from_error(error):
 
 def event_from_exception(
     exc_info,  # type: Union[BaseException, ExcInfo]
-    client_options=None,  # type: Optional[ClientOptions]
+    client_options=None,  # type: Optional[dict]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> Tuple[Dict[str, Any], Dict[str, Any]]
