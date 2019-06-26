@@ -7,8 +7,6 @@ if MYPY:
     from typing import Union
     from typing import List
     from typing import Type
-    from typing import Generic
-    from typing import TypeVar
     from typing import Dict
     from typing import Any
 
@@ -16,11 +14,6 @@ if MYPY:
     from sentry_sdk.integrations import Integration
 
     from sentry_sdk.utils import Event, EventProcessor, BreadcrumbProcessor
-
-    _T = TypeVar("_T")
-else:
-    _T = None
-    Generic = {None: object}
 
 
 DEFAULT_SERVER_NAME = socket.gethostname() if hasattr(socket, "gethostname") else None
