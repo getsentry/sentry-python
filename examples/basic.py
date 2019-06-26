@@ -5,7 +5,7 @@ from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 
 
-sentry_sdk.Client(
+sentry_sdk.init(
     dsn="https://<key>@sentry.io/<project>",
     default_integrations=False,
     integrations=[
