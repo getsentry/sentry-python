@@ -273,7 +273,7 @@ if MYPY:
     # type to have nicer autocompletion for params.
     #
     # Use `ClientConstructor` to define the argument types of `init` and
-    # `ContextManager[Any]` to tell static analyzers about the return type.
+    # `Dict[str, Any]` to tell static analyzers about the return type.
 
     class get_options(ClientConstructor, Dict[str, Any]):
         pass
