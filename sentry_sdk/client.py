@@ -69,7 +69,7 @@ if MYPY:
 
 
 else:
-    get_options = _get_options
+    get_options = (lambda: _get_options)()
 
 
 class _Client(object):
@@ -286,4 +286,4 @@ if MYPY:
 
 
 else:
-    Client = _Client
+    Client = (lambda: _Client)()

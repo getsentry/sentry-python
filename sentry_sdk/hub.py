@@ -89,13 +89,22 @@ def _init(*args, **kwargs):
 
 
 if MYPY:
+    # Make mypy, PyCharm and other static analyzers think `init` is a type to
+    # have nicer autocompletion for params.
+    #
+    # Use `ClientConstructor` to define the argument types of `init` and
+    # `ContextManager[Any]` to tell static analyzers about the return type.
 
     class init(ClientConstructor, ContextManager[Any]):
         pass
 
 
 else:
-    init = _init
+    # Alias `init` for actual usage. Go through the lambda indirection to throw
+    # PyCharm off of the weakly typed signature (it would otherwise discover
+    # both the weakly typed signature of `_init` and our faked `init` type).
+
+    init = (lambda: _init)()
 
 
 class HubMeta(type):
