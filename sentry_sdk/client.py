@@ -13,7 +13,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.serializer import Serializer
 from sentry_sdk.transport import make_transport
-from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO
+from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO, ClientConstructor
 from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 
@@ -26,7 +26,6 @@ if MYPY:
 
     from sentry_sdk.scope import Scope
     from sentry_sdk.utils import Event, Hint
-    from sentry_sdk.consts import ClientConstructor
 
 
 _client_init_debug = ContextVar("client_init_debug")
@@ -60,16 +59,6 @@ def _get_options(*args, **kwargs):
         rv["environment"] = os.environ.get("SENTRY_ENVIRONMENT")
 
     return rv  # type: ignore
-
-
-if MYPY:
-
-    class get_options(ClientConstructor, Dict[str, Any]):
-        pass
-
-
-else:
-    get_options = (lambda: _get_options)()
 
 
 class _Client(object):
@@ -280,10 +269,24 @@ class _Client(object):
 
 
 if MYPY:
+    # Make mypy, PyCharm and other static analyzers think `get_options` is a
+    # type to have nicer autocompletion for params.
+    #
+    # Use `ClientConstructor` to define the argument types of `init` and
+    # `ContextManager[Any]` to tell static analyzers about the return type.
+
+    class get_options(ClientConstructor, Dict[str, Any]):
+        pass
 
     class Client(ClientConstructor, _Client):
         pass
 
 
 else:
+    # Alias `get_options` for actual usage. Go through the lambda indirection
+    # to throw PyCharm off of the weakly typed signature (it would otherwise
+    # discover both the weakly typed signature of `_init` and our faked `init`
+    # type).
+
+    get_options = (lambda: _get_options)()
     Client = (lambda: _Client)()
