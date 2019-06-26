@@ -26,10 +26,10 @@ else:
 DEFAULT_SERVER_NAME = socket.gethostname() if hasattr(socket, "gethostname") else None
 
 
-class ClientConstructor(Generic[_T]):
-    __bogus = None  # type: _T
-
-    def __call__(
+# This type exists to trick mypy and PyCharm into thinking `init` and `Client`
+# take these arguments (even though they take opaque **kwargs)
+class ClientConstructor(object):
+    def __init__(
         self,
         dsn=None,  # type: Optional[str]
         with_locals=True,  # type: bool
@@ -57,15 +57,15 @@ class ClientConstructor(Generic[_T]):
         ca_certs=None,  # type: Optional[str]
         propagate_traces=True,  # type: bool
     ):
-        # type: (...) -> _T
-        return self.__bogus
+        # type: (...) -> None
+        pass
 
 
 def _get_default_options():
     # type: () -> Dict[str, Any]
     import inspect
 
-    a = inspect.getargspec(ClientConstructor().__call__)
+    a = inspect.getargspec(ClientConstructor.__init__)
     return dict(zip(a.args[-len(a.defaults) :], a.defaults))
 
 

@@ -63,12 +63,16 @@ def _get_options(*args, **kwargs):
 
 
 if MYPY:
-    get_options = ClientConstructor()  # type: ClientConstructor[Dict[str, Any]]
+
+    class get_options(ClientConstructor, Dict[str, Any]):
+        pass
+
+
 else:
     get_options = _get_options
 
 
-class Client(object):
+class _Client(object):
     """The client is internally responsible for capturing the events and
     forwarding them to sentry through the configured transport.  It takes
     the client options as keyword arguments and optionally the DSN as first
@@ -267,9 +271,19 @@ class Client(object):
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):
-        # type: () -> Client
+        # type: () -> _Client
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
         # type: (Any, Any, Any) -> None
         self.close()
+
+
+if MYPY:
+
+    class Client(ClientConstructor, _Client):
+        pass
+
+
+else:
+    Client = _Client

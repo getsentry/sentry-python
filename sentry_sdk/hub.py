@@ -89,7 +89,11 @@ def _init(*args, **kwargs):
 
 
 if MYPY:
-    init = ClientConstructor()  # type: ClientConstructor[ContextManager[Any]]
+
+    class init(ClientConstructor, ContextManager[Any]):
+        pass
+
+
 else:
     init = _init
 
