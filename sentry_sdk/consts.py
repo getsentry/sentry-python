@@ -2,84 +2,71 @@ import socket
 
 MYPY = False
 if MYPY:
-    from mypy_extensions import TypedDict
     from typing import Optional
     from typing import Callable
     from typing import Union
     from typing import List
     from typing import Type
+    from typing import Dict
+    from typing import Any
 
     from sentry_sdk.transport import Transport
     from sentry_sdk.integrations import Integration
 
     from sentry_sdk.utils import Event, EventProcessor, BreadcrumbProcessor
 
-    ClientOptions = TypedDict(
-        "ClientOptions",
-        {
-            "dsn": Optional[str],
-            "with_locals": bool,
-            "max_breadcrumbs": int,
-            "release": Optional[str],
-            "environment": Optional[str],
-            "server_name": Optional[str],
-            "shutdown_timeout": int,
-            "integrations": List[Integration],
-            "in_app_include": List[str],
-            "in_app_exclude": List[str],
-            "default_integrations": bool,
-            "dist": Optional[str],
-            "transport": Optional[
-                Union[Transport, Type[Transport], Callable[[Event], None]]
-            ],
-            "sample_rate": int,
-            "send_default_pii": bool,
-            "http_proxy": Optional[str],
-            "https_proxy": Optional[str],
-            "ignore_errors": List[Union[type, str]],
-            "request_bodies": str,
-            "before_send": Optional[EventProcessor],
-            "before_breadcrumb": Optional[BreadcrumbProcessor],
-            "debug": bool,
-            "attach_stacktrace": bool,
-            "ca_certs": Optional[str],
-            "propagate_traces": bool,
-        },
-        total=False,
-    )
+
+DEFAULT_SERVER_NAME = socket.gethostname() if hasattr(socket, "gethostname") else None
+
+
+# This type exists to trick mypy and PyCharm into thinking `init` and `Client`
+# take these arguments (even though they take opaque **kwargs)
+class ClientConstructor(object):
+    def __init__(
+        self,
+        dsn=None,  # type: Optional[str]
+        with_locals=True,  # type: bool
+        max_breadcrumbs=100,  # type: int
+        release=None,  # type: Optional[str]
+        environment=None,  # type: Optional[str]
+        server_name=DEFAULT_SERVER_NAME,  # type: Optional[str]
+        shutdown_timeout=2,  # type: int
+        integrations=[],  # type: List[Integration]
+        in_app_include=[],  # type: List[str]
+        in_app_exclude=[],  # type: List[str]
+        default_integrations=True,  # type: bool
+        dist=None,  # type: Optional[str]
+        transport=None,  # type: Optional[Union[Transport, Type[Transport], Callable[[Event], None]]]
+        sample_rate=1.0,  # type: float
+        send_default_pii=False,  # type: bool
+        http_proxy=None,  # type: Optional[str]
+        https_proxy=None,  # type: Optional[str]
+        ignore_errors=[],  # type: List[Union[type, str]]
+        request_bodies="medium",  # type: str
+        before_send=None,  # type: Optional[EventProcessor]
+        before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
+        debug=False,  # type: bool
+        attach_stacktrace=False,  # type: bool
+        ca_certs=None,  # type: Optional[str]
+        propagate_traces=True,  # type: bool
+    ):
+        # type: (...) -> None
+        pass
+
+
+def _get_default_options():
+    # type: () -> Dict[str, Any]
+    import inspect
+
+    a = inspect.getargspec(ClientConstructor.__init__)
+    return dict(zip(a.args[-len(a.defaults) :], a.defaults))
+
+
+DEFAULT_OPTIONS = _get_default_options()
+del _get_default_options
 
 
 VERSION = "0.9.2"
-DEFAULT_SERVER_NAME = socket.gethostname() if hasattr(socket, "gethostname") else None
-DEFAULT_OPTIONS = {
-    "dsn": None,
-    "with_locals": True,
-    "max_breadcrumbs": 100,
-    "release": None,
-    "environment": None,
-    "server_name": DEFAULT_SERVER_NAME,
-    "shutdown_timeout": 2.0,
-    "integrations": [],
-    "in_app_include": [],
-    "in_app_exclude": [],
-    "default_integrations": True,
-    "dist": None,
-    "transport": None,
-    "sample_rate": 1.0,
-    "send_default_pii": False,
-    "http_proxy": None,
-    "https_proxy": None,
-    "ignore_errors": [],
-    "request_bodies": "medium",
-    "before_send": None,
-    "before_breadcrumb": None,
-    "debug": False,
-    "attach_stacktrace": False,
-    "ca_certs": None,
-    "propagate_traces": True,
-}
-
-
 SDK_INFO = {
     "name": "sentry.python",
     "version": VERSION,
