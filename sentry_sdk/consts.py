@@ -58,7 +58,12 @@ def _get_default_options():
     # type: () -> Dict[str, Any]
     import inspect
 
-    a = inspect.getargspec(ClientConstructor.__init__)
+    if hasattr(inspect, "getfullargspec"):
+        getargspec = inspect.getfullargspec  # type: ignore
+    else:
+        getargspec = inspect.getargspec  # type: ignore
+
+    a = getargspec(ClientConstructor.__init__)
     return dict(zip(a.args[-len(a.defaults) :], a.defaults))
 
 
