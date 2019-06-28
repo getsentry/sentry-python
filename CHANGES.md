@@ -1,3 +1,7 @@
+## 0.9.4
+
+* Revert a change in 0.9.3 that prevented passing a ``unicode``
+  string as DSN to ``init()``.
 ## 0.9.3
 
 * Add type hints for ``init()``.
