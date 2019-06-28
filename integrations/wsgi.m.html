@@ -1043,6 +1043,7 @@ table {
     <li class="set"><h3><a href="#header-variables">Module variables</a></h3>
       
   <ul>
+    <li class="mono"><a href="#sentry_sdk.integrations.wsgi.MYPY">MYPY</a></li>
     <li class="mono"><a href="#sentry_sdk.integrations.wsgi.PY2">PY2</a></li>
   </ul>
 
@@ -1097,7 +1098,8 @@ table {
 <span class="kn">from</span> <span class="nn">sentry_sdk.tracing</span> <span class="kn">import</span> <span class="n">SpanContext</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations._wsgi_common</span> <span class="kn">import</span> <span class="n">_filter_headers</span>
 
-<span class="k">if</span> <span class="bp">False</span><span class="p">:</span>
+<span class="n">MYPY</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="k">if</span> <span class="n">MYPY</span><span class="p">:</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
@@ -1343,6 +1345,14 @@ table {
 
   <section id="section-items">
     <h2 class="section-title" id="header-variables">Module variables</h2>
+      <div class="item">
+      <p id="sentry_sdk.integrations.wsgi.MYPY" class="name">var <span class="ident">MYPY</span></p>
+      
+  
+  <div class="source_cont">
+</div>
+
+      </div>
       <div class="item">
       <p id="sentry_sdk.integrations.wsgi.PY2" class="name">var <span class="ident">PY2</span></p>
       

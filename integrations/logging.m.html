@@ -1046,6 +1046,7 @@ table {
     <li class="mono"><a href="#sentry_sdk.integrations.logging.COMMON_RECORD_ATTRS">COMMON_RECORD_ATTRS</a></li>
     <li class="mono"><a href="#sentry_sdk.integrations.logging.DEFAULT_EVENT_LEVEL">DEFAULT_EVENT_LEVEL</a></li>
     <li class="mono"><a href="#sentry_sdk.integrations.logging.DEFAULT_LEVEL">DEFAULT_LEVEL</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.logging.MYPY">MYPY</a></li>
   </ul>
 
     </li>
@@ -1179,7 +1180,8 @@ table {
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk._compat</span> <span class="kn">import</span> <span class="n">iteritems</span>
 
-<span class="k">if</span> <span class="bp">False</span><span class="p">:</span>
+<span class="n">MYPY</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="k">if</span> <span class="n">MYPY</span><span class="p">:</span>
     <span class="kn">from</span> <span class="nn">logging</span> <span class="kn">import</span> <span class="n">LogRecord</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
@@ -1192,9 +1194,10 @@ table {
 
 <span class="k">def</span> <span class="nf">ignore_logger</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
     <span class="c1"># type: (str) -&gt; None</span>
-    <span class="sd">&quot;&quot;&quot;This disables the breadcrumb integration for a logger of a specific</span>
-<span class="sd">    name.  This primary use is for some integrations to disable breadcrumbs</span>
-<span class="sd">    of this integration.</span>
+    <span class="sd">&quot;&quot;&quot;This disables recording (both in breadcrumbs and as events) calls to</span>
+<span class="sd">    a logger of a specific name.  Among other uses, many of our integrations</span>
+<span class="sd">    use this to prevent their actions being recorded as breadcrumbs. Exposed</span>
+<span class="sd">    to users as a way to quiet spammy loggers.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">_IGNORED_LOGGERS</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
 
@@ -1411,6 +1414,14 @@ table {
 </div>
 
       </div>
+      <div class="item">
+      <p id="sentry_sdk.integrations.logging.MYPY" class="name">var <span class="ident">MYPY</span></p>
+      
+  
+  <div class="source_cont">
+</div>
+
+      </div>
 
     <h2 class="section-title" id="header-functions">Functions</h2>
       
@@ -1422,17 +1433,19 @@ table {
 
     
   
-    <div class="desc"><p>This disables the breadcrumb integration for a logger of a specific
-name.  This primary use is for some integrations to disable breadcrumbs
-of this integration.</p></div>
+    <div class="desc"><p>This disables recording (both in breadcrumbs and as events) calls to
+a logger of a specific name.  Among other uses, many of our integrations
+use this to prevent their actions being recorded as breadcrumbs. Exposed
+to users as a way to quiet spammy loggers.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.logging.ignore_logger', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.logging.ignore_logger" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">ignore_logger</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
     <span class="c1"># type: (str) -&gt; None</span>
-    <span class="sd">&quot;&quot;&quot;This disables the breadcrumb integration for a logger of a specific</span>
-<span class="sd">    name.  This primary use is for some integrations to disable breadcrumbs</span>
-<span class="sd">    of this integration.</span>
+    <span class="sd">&quot;&quot;&quot;This disables recording (both in breadcrumbs and as events) calls to</span>
+<span class="sd">    a logger of a specific name.  Among other uses, many of our integrations</span>
+<span class="sd">    use this to prevent their actions being recorded as breadcrumbs. Exposed</span>
+<span class="sd">    to users as a way to quiet spammy loggers.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">_IGNORED_LOGGERS</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
 </pre></div>

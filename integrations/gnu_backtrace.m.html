@@ -1046,6 +1046,7 @@ table {
     <li class="mono"><a href="#sentry_sdk.integrations.gnu_backtrace.FRAME_RE">FRAME_RE</a></li>
     <li class="mono"><a href="#sentry_sdk.integrations.gnu_backtrace.HEXVAL_RE">HEXVAL_RE</a></li>
     <li class="mono"><a href="#sentry_sdk.integrations.gnu_backtrace.MODULE_RE">MODULE_RE</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.gnu_backtrace.MYPY">MYPY</a></li>
     <li class="mono"><a href="#sentry_sdk.integrations.gnu_backtrace.TYPE_RE">TYPE_RE</a></li>
   </ul>
 
@@ -1089,7 +1090,8 @@ table {
 <span class="kn">from</span> <span class="nn">sentry_sdk.scope</span> <span class="kn">import</span> <span class="n">add_global_event_processor</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">capture_internal_exceptions</span>
 
-<span class="k">if</span> <span class="bp">False</span><span class="p">:</span>
+<span class="n">MYPY</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="k">if</span> <span class="n">MYPY</span><span class="p">:</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
 
@@ -1212,6 +1214,14 @@ table {
       </div>
       <div class="item">
       <p id="sentry_sdk.integrations.gnu_backtrace.MODULE_RE" class="name">var <span class="ident">MODULE_RE</span></p>
+      
+  
+  <div class="source_cont">
+</div>
+
+      </div>
+      <div class="item">
+      <p id="sentry_sdk.integrations.gnu_backtrace.MYPY" class="name">var <span class="ident">MYPY</span></p>
       
   
   <div class="source_cont">

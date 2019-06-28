@@ -1061,14 +1061,14 @@ table {
     <li class="set"><h3><a href="#header-classes">Classes</a></h3>
       <ul>
         <li class="mono">
-        <span class="class_name"><a href="#sentry_sdk.Client">Client</a></span>
+        <span class="class_name"><a href="#sentry_sdk._Client">Client</a></span>
         
           
   <ul>
-    <li class="mono"><a href="#sentry_sdk.Client.__init__">__init__</a></li>
-    <li class="mono"><a href="#sentry_sdk.Client.capture_event">capture_event</a></li>
-    <li class="mono"><a href="#sentry_sdk.Client.close">close</a></li>
-    <li class="mono"><a href="#sentry_sdk.Client.flush">flush</a></li>
+    <li class="mono"><a href="#sentry_sdk._Client.__init__">__init__</a></li>
+    <li class="mono"><a href="#sentry_sdk._Client.capture_event">capture_event</a></li>
+    <li class="mono"><a href="#sentry_sdk._Client.close">close</a></li>
+    <li class="mono"><a href="#sentry_sdk._Client.flush">flush</a></li>
   </ul>
 
         </li>
@@ -1443,15 +1443,14 @@ is provided the default level is <code>info</code>.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.init', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.init" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">init</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-    <span class="c1"># type: (*str, **Any) -&gt; ContextManager[Any]</span>
-    <span class="c1"># TODO: https://github.com/getsentry/sentry-python/issues/272</span>
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">_init</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="c1"># type: (*Optional[str], **Any) -&gt; ContextManager[Any]</span>
     <span class="sd">&quot;&quot;&quot;Initializes the SDK and optionally integrations.</span>
 
 <span class="sd">    This takes the same arguments as the client constructor.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">global</span> <span class="n">_initial_client</span>
-    <span class="n">client</span> <span class="o">=</span> <span class="n">Client</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="n">client</span> <span class="o">=</span> <span class="n">Client</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
     <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">bind_client</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
     <span class="n">rv</span> <span class="o">=</span> <span class="n">_InitGuard</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
@@ -1537,7 +1536,7 @@ can be provided that is executed in the context of the scope.</p></div>
     <h2 class="section-title" id="header-classes">Classes</h2>
       
       <div class="item">
-      <p id="sentry_sdk.Client" class="name">class <span class="ident">Client</span></p>
+      <p id="sentry_sdk._Client" class="name">class <span class="ident">Client</span></p>
       
   
     <div class="desc"><p>The client is internally responsible for capturing the events and
@@ -1545,9 +1544,9 @@ forwarding them to sentry through the configured transport.  It takes
 the client options as keyword arguments and optionally the DSN as first
 argument.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Client', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.Client" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">Client</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk._Client', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk._Client" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">class</span> <span class="nc">_Client</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;The client is internally responsible for capturing the events and</span>
 <span class="sd">    forwarding them to sentry through the configured transport.  It takes</span>
 <span class="sd">    the client options as keyword arguments and optionally the DSN as first</span>
@@ -1555,10 +1554,10 @@ argument.</p></div>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="c1"># type: (*str, **ClientOptions) -&gt; None</span>
+        <span class="c1"># type: (*Optional[str], **Any) -&gt; None</span>
         <span class="n">old_debug</span> <span class="o">=</span> <span class="n">_client_init_debug</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span> <span class="o">=</span> <span class="n">get_options</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span> <span class="o">=</span> <span class="n">get_options</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
             <span class="n">_client_init_debug</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;debug&quot;</span><span class="p">])</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="n">make_transport</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
 
@@ -1746,7 +1745,7 @@ argument.</p></div>
             <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="c1"># type: () -&gt; Client</span>
+        <span class="c1"># type: () -&gt; _Client</span>
         <span class="k">return</span> <span class="bp">self</span>
 
     <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
@@ -1761,12 +1760,12 @@ argument.</p></div>
       <div class="class">
           <h3>Ancestors (in MRO)</h3>
           <ul class="class_list">
-          <li><a href="#sentry_sdk.Client">Client</a></li>
+          <li><a href="#sentry_sdk._Client">Client</a></li>
           <li>__builtin__.object</li>
           </ul>
           <h3>Instance variables</h3>
             <div class="item">
-            <p id="sentry_sdk.Client.dsn" class="name">var <span class="ident">dsn</span></p>
+            <p id="sentry_sdk._Client.dsn" class="name">var <span class="ident">dsn</span></p>
             
 
             
@@ -1779,7 +1778,7 @@ argument.</p></div>
           <h3>Methods</h3>
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.Client.__init__">
+    <div class="name def" id="sentry_sdk._Client.__init__">
     <p>def <span class="ident">__init__</span>(</p><p>self, *args, **kwargs)</p>
     </div>
     
@@ -1787,13 +1786,13 @@ argument.</p></div>
     
   
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Client.__init__', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.Client.__init__" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk._Client.__init__', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk._Client.__init__" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-    <span class="c1"># type: (*str, **ClientOptions) -&gt; None</span>
+    <span class="c1"># type: (*Optional[str], **Any) -&gt; None</span>
     <span class="n">old_debug</span> <span class="o">=</span> <span class="n">_client_init_debug</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">False</span><span class="p">)</span>
     <span class="k">try</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span> <span class="o">=</span> <span class="n">get_options</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span> <span class="o">=</span> <span class="n">get_options</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
         <span class="n">_client_init_debug</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;debug&quot;</span><span class="p">])</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="n">make_transport</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
         <span class="n">request_bodies</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;always&quot;</span><span class="p">,</span> <span class="s2">&quot;never&quot;</span><span class="p">,</span> <span class="s2">&quot;small&quot;</span><span class="p">,</span> <span class="s2">&quot;medium&quot;</span><span class="p">)</span>
@@ -1817,7 +1816,7 @@ argument.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.Client.capture_event">
+    <div class="name def" id="sentry_sdk._Client.capture_event">
     <p>def <span class="ident">capture_event</span>(</p><p>self, event, hint=None, scope=None)</p>
     </div>
     
@@ -1832,8 +1831,8 @@ as exception info.</p>
 <p>If the transport is not set nothing happens, otherwise the return
 value of this function will be the ID of the captured event.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Client.capture_event', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.Client.capture_event" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk._Client.capture_event', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk._Client.capture_event" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
     <span class="c1"># type: (Dict[str, Any], Optional[Any], Optional[Scope]) -&gt; Optional[str]</span>
     <span class="sd">&quot;&quot;&quot;Captures an event.</span>
@@ -1867,7 +1866,7 @@ value of this function will be the ID of the captured event.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.Client.close">
+    <div class="name def" id="sentry_sdk._Client.close">
     <p>def <span class="ident">close</span>(</p><p>self, timeout=None, callback=None)</p>
     </div>
     
@@ -1877,8 +1876,8 @@ value of this function will be the ID of the captured event.</p></div>
     <div class="desc"><p>Close the client and shut down the transport. Arguments have the same
 semantics as <code>self.flush()</code>.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Client.close', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.Client.close" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk._Client.close', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk._Client.close" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
     <span class="c1"># type: (Optional[float], Optional[Callable[[int, float], None]]) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;</span>
@@ -1898,7 +1897,7 @@ semantics as <code>self.flush()</code>.</p></div>
   
             
   <div class="item">
-    <div class="name def" id="sentry_sdk.Client.flush">
+    <div class="name def" id="sentry_sdk._Client.flush">
     <p>def <span class="ident">flush</span>(</p><p>self, timeout=None, callback=None)</p>
     </div>
     
@@ -1911,8 +1910,8 @@ semantics as <code>self.flush()</code>.</p></div>
 events and the configured timeout.  For instance the default atexit
 integration will use this to render out a message on stderr.</p></div>
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Client.flush', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.Client.flush" class="source">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk._Client.flush', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk._Client.flush" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
     <span class="c1"># type: (Optional[float], Optional[Callable[[int, float], None]]) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;</span>
@@ -1948,7 +1947,7 @@ integration will use this to render out a message on stderr.</p></div>
     <span class="sd">&quot;&quot;&quot;The default HTTP transport.&quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
-        <span class="c1"># type: (ClientOptions) -&gt; None</span>
+        <span class="c1"># type: (Dict[str, Any]) -&gt; None</span>
         <span class="n">Transport</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span> <span class="o">=</span> <span class="n">BackgroundWorker</span><span class="p">()</span>
@@ -1994,6 +1993,7 @@ integration will use this to render out a message on stderr.</p></div>
             <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="o">.</span><span class="n">store_api_url</span><span class="p">),</span>
             <span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="o">.</span><span class="n">getvalue</span><span class="p">(),</span>
             <span class="n">headers</span><span class="o">=</span><span class="p">{</span>
+                <span class="s2">&quot;User-Agent&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="o">.</span><span class="n">client</span><span class="p">),</span>
                 <span class="s2">&quot;X-Sentry-Auth&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="o">.</span><span class="n">to_header</span><span class="p">()),</span>
                 <span class="s2">&quot;Content-Type&quot;</span><span class="p">:</span> <span class="s2">&quot;application/json&quot;</span><span class="p">,</span>
                 <span class="s2">&quot;Content-Encoding&quot;</span><span class="p">:</span> <span class="s2">&quot;gzip&quot;</span><span class="p">,</span>
@@ -2144,7 +2144,7 @@ integration will use this to render out a message on stderr.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.HttpTransport.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.HttpTransport.__init__" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">):</span>
-    <span class="c1"># type: (ClientOptions) -&gt; None</span>
+    <span class="c1"># type: (Dict[str, Any]) -&gt; None</span>
     <span class="n">Transport</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
     <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span> <span class="o">=</span> <span class="n">BackgroundWorker</span><span class="p">()</span>
@@ -2283,7 +2283,8 @@ context vars are available.</p>
     <span class="n">_stack</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: List[Tuple[Optional[Client], Scope]]</span>
 
     <span class="c1"># Mypy doesn&#39;t pick up on the metaclass.</span>
-    <span class="k">if</span> <span class="bp">False</span><span class="p">:</span>
+    <span class="n">MYPY</span> <span class="o">=</span> <span class="bp">False</span>
+    <span class="k">if</span> <span class="n">MYPY</span><span class="p">:</span>
         <span class="n">current</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Hub</span>
         <span class="n">main</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Hub</span>
 
@@ -2587,6 +2588,17 @@ context vars are available.</p>
           <li><a href="#sentry_sdk.Hub">Hub</a></li>
           <li>__builtin__.object</li>
           </ul>
+          <h3>Class variables</h3>
+            <div class="item">
+            <p id="sentry_sdk.Hub.MYPY" class="name">var <span class="ident">MYPY</span></p>
+            
+
+            
+  
+  <div class="source_cont">
+</div>
+
+            </div>
           <h3>Instance variables</h3>
             <div class="item">
             <p id="sentry_sdk.Hub.client" class="name">var <span class="ident">client</span></p>
@@ -3793,7 +3805,7 @@ invoked with the original exception info triple as second argument.</p></div>
     <span class="n">parsed_dsn</span> <span class="o">=</span> <span class="bp">None</span>  <span class="c1"># type: Optional[Dsn]</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-        <span class="c1"># type: (Optional[ClientOptions]) -&gt; None</span>
+        <span class="c1"># type: (Optional[Dict[str, Any]]) -&gt; None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
         <span class="k">if</span> <span class="n">options</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="n">Dsn</span><span class="p">(</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">])</span>
@@ -3871,7 +3883,7 @@ invoked with the original exception info triple as second argument.</p></div>
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Transport.__init__', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Transport.__init__" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-    <span class="c1"># type: (Optional[ClientOptions]) -&gt; None</span>
+    <span class="c1"># type: (Optional[Dict[str, Any]]) -&gt; None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
     <span class="k">if</span> <span class="n">options</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="n">Dsn</span><span class="p">(</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">])</span>
