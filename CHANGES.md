@@ -1,3 +1,8 @@
+## 0.9.5
+
+* Do not use ``getargspec`` on Python 3 to evade deprecation
+  warning.
+
 ## 0.9.4
 
 * Revert a change in 0.9.3 that prevented passing a ``unicode``
