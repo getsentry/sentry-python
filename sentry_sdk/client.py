@@ -33,7 +33,7 @@ _client_init_debug = ContextVar("client_init_debug")
 
 def _get_options(*args, **kwargs):
     # type: (*Optional[str], **Any) -> Dict[str, Any]
-    if args and (isinstance(args[0], str) or args[0] is None):
+    if args and (isinstance(args[0], (text_type, bytes, str)) or args[0] is None):
         dsn = args[0]  # type: Optional[str]
         args = args[1:]
     else:

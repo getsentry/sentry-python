@@ -659,3 +659,23 @@ def test_dict_changed_during_iteration(sentry_init, capture_events):
     exception, = event["exception"]["values"]
     frame, = exception["stacktrace"]["frames"]
     assert frame["vars"]["environ"] == {"a": "<This is me>"}
+
+
+@pytest.mark.parametrize(
+    "dsn",
+    [
+        "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2",
+        u"http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2",
+    ],
+)
+def test_init_string_types(dsn, sentry_init):
+    # Allow unicode strings on Python 3 and both on Python 2 (due to
+    # unicode_literals)
+    #
+    # Supporting bytes on Python 3 is not really wrong but probably would be
+    # extra code
+    sentry_init(dsn)
+    assert (
+        Hub.current.client.dsn
+        == "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2"
+    )
