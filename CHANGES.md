@@ -1,3 +1,8 @@
+## 0.9.3
+
+* Add type hints for ``init()``.
+* Include user agent header when sending events.
+
 ## 0.9.2
 
 * Fix a bug in the Django integration that would prevent the user
