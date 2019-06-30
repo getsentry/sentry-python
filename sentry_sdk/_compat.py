@@ -19,7 +19,7 @@ if PY2:
     string_types = (str, text_type)
     number_types = (int, long, float)  # noqa
     int_types = (int, long)  # noqa
-    iteritems = lambda x: x.iteritems()
+    iteritems = lambda x: x.iteritems()  # noqa: B301
 
     def implements_str(cls):
         cls.__unicode__ = cls.__str__
