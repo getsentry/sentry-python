@@ -24,6 +24,7 @@ class CeleryIntegration(Integration):
     identifier = "celery"
 
     def __init__(self, propagate_traces=True):
+        # type: (bool) -> None
         self.propagate_traces = propagate_traces
 
     @staticmethod
