@@ -20,7 +20,8 @@ from sentry_sdk._compat import iteritems
 from tornado.web import RequestHandler, HTTPError  # type: ignore
 from tornado.gen import coroutine  # type: ignore
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
     from typing import List
     from typing import Optional

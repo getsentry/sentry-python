@@ -18,7 +18,8 @@ from sanic.exceptions import SanicException  # type: ignore
 from sanic.router import Router  # type: ignore
 from sanic.handlers import ErrorHandler  # type: ignore
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
     from typing import Callable
     from typing import Optional

@@ -1,6 +1,7 @@
 from django.template import TemplateSyntaxError  # type: ignore
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
     from typing import Dict
     from typing import Optional

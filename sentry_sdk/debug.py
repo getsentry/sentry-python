@@ -38,6 +38,7 @@ def configure_logger():
 def configure_debug_hub():
     # type: () -> None
     def _get_debug_hub():
+        # type: () -> Hub
         return Hub.current
 
     utils._get_debug_hub = _get_debug_hub

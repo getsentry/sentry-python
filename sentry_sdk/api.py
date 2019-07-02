@@ -5,7 +5,8 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
 
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
     from typing import Optional
     from typing import overload
@@ -15,10 +16,12 @@ if False:
 
     from sentry_sdk.utils import Event, Hint, Breadcrumb, BreadcrumbHint
 
+    T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
 else:
 
     def overload(x):
+        # type: (T) -> T
         return x
 
 
@@ -91,7 +94,10 @@ def configure_scope(callback):
 
 
 @hubmethod  # noqa
-def configure_scope(callback=None):
+def configure_scope(
+    callback=None  # type: Optional[Callable[[Scope], None]]
+):
+    # type: (...) -> Optional[ContextManager[Scope]]
     hub = Hub.current
     if hub is not None:
         return hub.configure_scope(callback)
@@ -120,7 +126,10 @@ def push_scope(callback):
 
 
 @hubmethod  # noqa
-def push_scope(callback=None):
+def push_scope(
+    callback=None  # type: Optional[Callable[[Scope], None]]
+):
+    # type: (...) -> Optional[ContextManager[Scope]]
     hub = Hub.current
     if hub is not None:
         return hub.push_scope(callback)
@@ -138,6 +147,7 @@ def push_scope(callback=None):
 
 @hubmethod
 def flush(timeout=None, callback=None):
+    # type: (Optional[float], Optional[Callable[[int, float], None]]) -> None
     hub = Hub.current
     if hub is not None:
         return hub.flush(timeout=timeout, callback=callback)

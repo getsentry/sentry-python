@@ -8,7 +8,8 @@ from datetime import datetime
 
 from sentry_sdk._compat import urlparse, text_type, implements_str, int_types, PY2
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
     from typing import Callable
     from typing import Dict
@@ -20,7 +21,6 @@ if False:
     from typing import Type
     from typing import Union
 
-    from sentry_sdk.consts import ClientOptions
     from sentry_sdk.hub import Hub
 
     ExcInfo = Tuple[
@@ -443,7 +443,7 @@ def single_exception_from_error_tuple(
     exc_type,  # type: Optional[type]
     exc_value,  # type: Optional[BaseException]
     tb,  # type: Optional[Any]
-    client_options=None,  # type: Optional[ClientOptions]
+    client_options=None,  # type: Optional[dict]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> Dict[str, Any]
@@ -516,7 +516,7 @@ else:
 
 def exceptions_from_error_tuple(
     exc_info,  # type: ExcInfo
-    client_options=None,  # type: Optional[ClientOptions]
+    client_options=None,  # type: Optional[dict]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> List[Dict[str, Any]]
@@ -629,7 +629,7 @@ def exc_info_from_error(error):
 
 def event_from_exception(
     exc_info,  # type: Union[BaseException, ExcInfo]
-    client_options=None,  # type: Optional[ClientOptions]
+    client_options=None,  # type: Optional[dict]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> Tuple[Dict[str, Any], Dict[str, Any]]
@@ -760,15 +760,50 @@ def concat_strings(
     )
 
 
-HAS_REAL_CONTEXTVARS = True
+def _is_threading_local_monkey_patched():
+    # type: () -> bool
+    try:
+        from gevent.monkey import is_object_patched  # type: ignore
 
-try:
-    from contextvars import ContextVar  # type: ignore
+        if is_object_patched("_threading", "local"):
+            return True
+    except ImportError:
+        pass
 
-    if not PY2 and sys.version_info < (3, 7):
-        import aiocontextvars  # type: ignore  # noqa
-except ImportError:
-    HAS_REAL_CONTEXTVARS = False
+    try:
+        from eventlet.patcher import is_monkey_patched  # type: ignore
+
+        if is_monkey_patched("thread"):
+            return True
+    except ImportError:
+        pass
+
+    return False
+
+
+IS_THREADING_LOCAL_MONKEY_PATCHED = _is_threading_local_monkey_patched()
+del _is_threading_local_monkey_patched
+
+
+def _get_contextvars():
+    # () -> (bool, Type)
+    """
+    Try to import contextvars and use it if it's deemed safe. We should not use
+    contextvars if gevent or eventlet have patched thread locals, as
+    contextvars are unaffected by that patch.
+
+    https://github.com/gevent/gevent/issues/1407
+    """
+    if not IS_THREADING_LOCAL_MONKEY_PATCHED:
+        try:
+            from contextvars import ContextVar  # type: ignore
+
+            if not PY2 and sys.version_info < (3, 7):
+                import aiocontextvars  # type: ignore  # noqa
+
+            return True, ContextVar
+        except ImportError:
+            pass
 
     from threading import local
 
@@ -784,6 +819,12 @@ except ImportError:
 
         def set(self, value):
             setattr(self._local, "value", value)
+
+    return False, ContextVar
+
+
+HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()
+del _get_contextvars
 
 
 def transaction_from_function(func):

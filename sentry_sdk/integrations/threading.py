@@ -9,7 +9,8 @@ from sentry_sdk._compat import reraise
 from sentry_sdk.utils import event_from_exception
 from sentry_sdk.integrations import Integration
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
 
 

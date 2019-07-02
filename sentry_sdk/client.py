@@ -13,17 +13,17 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.serializer import Serializer
 from sentry_sdk.transport import make_transport
-from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO
+from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO, ClientConstructor
 from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
     from typing import Callable
     from typing import Dict
     from typing import Optional
 
-    from sentry_sdk.consts import ClientOptions
     from sentry_sdk.scope import Scope
     from sentry_sdk.utils import Event, Hint
 
@@ -31,9 +31,9 @@ if False:
 _client_init_debug = ContextVar("client_init_debug")
 
 
-def get_options(*args, **kwargs):
-    # type: (*str, **ClientOptions) -> ClientOptions
-    if args and (isinstance(args[0], string_types) or args[0] is None):
+def _get_options(*args, **kwargs):
+    # type: (*Optional[str], **Any) -> Dict[str, Any]
+    if args and (isinstance(args[0], (text_type, bytes, str)) or args[0] is None):
         dsn = args[0]  # type: Optional[str]
         args = args[1:]
     else:
@@ -61,7 +61,7 @@ def get_options(*args, **kwargs):
     return rv  # type: ignore
 
 
-class Client(object):
+class _Client(object):
     """The client is internally responsible for capturing the events and
     forwarding them to sentry through the configured transport.  It takes
     the client options as keyword arguments and optionally the DSN as first
@@ -69,10 +69,10 @@ class Client(object):
     """
 
     def __init__(self, *args, **kwargs):
-        # type: (*str, **ClientOptions) -> None
+        # type: (*Optional[str], **Any) -> None
         old_debug = _client_init_debug.get(False)
         try:
-            self.options = options = get_options(*args, **kwargs)
+            self.options = options = get_options(*args, **kwargs)  # type: ignore
             _client_init_debug.set(options["debug"])
             self.transport = make_transport(options)
 
@@ -92,6 +92,7 @@ class Client(object):
 
     @property
     def dsn(self):
+        # type: () -> Optional[str]
         """Returns the configured DSN as string."""
         return self.options["dsn"]
 
@@ -259,7 +260,33 @@ class Client(object):
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):
+        # type: () -> _Client
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
+        # type: (Any, Any, Any) -> None
         self.close()
+
+
+if MYPY:
+    # Make mypy, PyCharm and other static analyzers think `get_options` is a
+    # type to have nicer autocompletion for params.
+    #
+    # Use `ClientConstructor` to define the argument types of `init` and
+    # `Dict[str, Any]` to tell static analyzers about the return type.
+
+    class get_options(ClientConstructor, Dict[str, Any]):
+        pass
+
+    class Client(ClientConstructor, _Client):
+        pass
+
+
+else:
+    # Alias `get_options` for actual usage. Go through the lambda indirection
+    # to throw PyCharm off of the weakly typed signature (it would otherwise
+    # discover both the weakly typed signature of `_init` and our faked `init`
+    # type).
+
+    get_options = (lambda: _get_options)()
+    Client = (lambda: _Client)()

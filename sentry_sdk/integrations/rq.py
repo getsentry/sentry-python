@@ -11,7 +11,8 @@ from rq.timeouts import JobTimeoutException  # type: ignore
 from rq.worker import Worker  # type: ignore
 from rq.queue import Queue  # type: ignore
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
     from typing import Dict
     from typing import Callable

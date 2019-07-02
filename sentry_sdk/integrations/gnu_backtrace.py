@@ -5,7 +5,8 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import capture_internal_exceptions
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Any
     from typing import Dict
 

@@ -19,7 +19,8 @@ from sentry_sdk.utils import (
 )
 
 
-if False:
+MYPY = False
+if MYPY:
     from contextlib import ContextManager
     from sys import _OptExcInfo
 
@@ -31,13 +32,19 @@ if False:
     from typing import Callable
     from typing import Generator
     from typing import Type
+    from typing import TypeVar
     from typing import overload
 
     from sentry_sdk.integrations import Integration
     from sentry_sdk.utils import Event, Hint, Breadcrumb, BreadcrumbHint
+    from sentry_sdk.consts import ClientConstructor
+
+    T = TypeVar("T")
+
 else:
 
     def overload(x):
+        # type: (T) -> T
         return x
 
 
@@ -63,23 +70,44 @@ class _InitGuard(object):
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
+        # type: (Any, Any, Any) -> None
         c = self._client
         if c is not None:
             c.close()
 
 
-def init(*args, **kwargs):
+def _init(*args, **kwargs):
+    # type: (*Optional[str], **Any) -> ContextManager[Any]
     """Initializes the SDK and optionally integrations.
 
     This takes the same arguments as the client constructor.
     """
     global _initial_client
-    client = Client(*args, **kwargs)
+    client = Client(*args, **kwargs)  # type: ignore
     Hub.current.bind_client(client)
     rv = _InitGuard(client)
     if client is not None:
         _initial_client = weakref.ref(client)
     return rv
+
+
+if MYPY:
+    # Make mypy, PyCharm and other static analyzers think `init` is a type to
+    # have nicer autocompletion for params.
+    #
+    # Use `ClientConstructor` to define the argument types of `init` and
+    # `ContextManager[Any]` to tell static analyzers about the return type.
+
+    class init(ClientConstructor, ContextManager[Any]):
+        pass
+
+
+else:
+    # Alias `init` for actual usage. Go through the lambda indirection to throw
+    # PyCharm off of the weakly typed signature (it would otherwise discover
+    # both the weakly typed signature of `_init` and our faked `init` type).
+
+    init = (lambda: _init)()
 
 
 class HubMeta(type):
@@ -95,16 +123,19 @@ class HubMeta(type):
 
     @property
     def main(self):
+        # type: () -> Hub
         """Returns the main instance of the hub."""
         return GLOBAL_HUB
 
 
 class _HubManager(object):
     def __init__(self, hub):
+        # type: (Hub) -> None
         self._old = Hub.current
         _local.set(hub)
 
     def __exit__(self, exc_type, exc_value, tb):
+        # type: (Any, Any, Any) -> None
         _local.set(self._old)
 
 
@@ -122,6 +153,7 @@ class _ScopeManager(object):
         return scope
 
     def __exit__(self, exc_type, exc_value, tb):
+        # type: (Any, Any, Any) -> None
         current_len = len(self._hub._stack)
         if current_len < self._original_len:
             logger.error(
@@ -166,7 +198,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     _stack = None  # type: List[Tuple[Optional[Client], Scope]]
 
     # Mypy doesn't pick up on the metaclass.
-    if False:
+    MYPY = False
+    if MYPY:
         current = None  # type: Hub
         main = None  # type: Hub
 
@@ -203,6 +236,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         _local.set(old)
 
     def run(self, callback):
+        # type: (Callable[[], T]) -> T
         """Runs a callback in the context of the hub.  Alternatively the
         with statement can be used on the hub directly.
         """
@@ -263,6 +297,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return self._last_event_id
 
     def bind_client(self, new):
+        # type: (Optional[Client]) -> None
         """Binds a new client to the hub."""
         top = self._stack[-1]
         self._stack[-1] = (new, top[1])
@@ -451,8 +486,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         )
 
     @overload  # noqa
-    def push_scope(self):
-        # type: () -> ContextManager[Scope]
+    def push_scope(self, callback=None):
+        # type: (Optional[None]) -> ContextManager[Scope]
         pass
 
     @overload  # noqa
@@ -460,7 +495,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         # type: (Callable[[Scope], None]) -> None
         pass
 
-    def push_scope(self, callback=None):  # noqa
+    def push_scope(  # noqa
+        self, callback=None  # type: Optional[Callable[[Scope], None]]
+    ):
+        # type: (...) -> Optional[ContextManager[Scope]]
         """Pushes a new layer on the scope stack. Returns a context manager
         that should be used to pop the scope again.  Alternatively a callback
         can be provided that is executed in the context of the scope.
@@ -480,6 +518,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     scope = push_scope
 
     def pop_scope_unsafe(self):
+        # type: () -> Tuple[Optional[Client], Scope]
         """Pops a scope layer from the stack. Try to use the context manager
         `push_scope()` instead."""
         rv = self._stack.pop()
@@ -487,8 +526,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return rv
 
     @overload  # noqa
-    def configure_scope(self):
-        # type: () -> ContextManager[Scope]
+    def configure_scope(self, callback=None):
+        # type: (Optional[None]) -> ContextManager[Scope]
         pass
 
     @overload  # noqa
@@ -496,7 +535,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         # type: (Callable[[Scope], None]) -> None
         pass
 
-    def configure_scope(self, callback=None):  # noqa
+    def configure_scope(  # noqa
+        self, callback=None  # type: Optional[Callable[[Scope], None]]
+    ):  # noqa
+        # type: (...) -> Optional[ContextManager[Scope]]
+
         """Reconfigures the scope."""
 
         client, scope = self._stack[-1]
@@ -508,6 +551,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         @contextmanager
         def inner():
+            # type: () -> Generator[Scope, None, None]
             if client is not None:
                 yield scope
             else:

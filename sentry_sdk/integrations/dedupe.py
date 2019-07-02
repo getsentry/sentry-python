@@ -3,7 +3,8 @@ from sentry_sdk.utils import ContextVar
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 
-if False:
+MYPY = False
+if MYPY:
     from typing import Optional
 
     from sentry_sdk.utils import Event, Hint
