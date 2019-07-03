@@ -101,33 +101,51 @@ class Scope(object):
         """Sets the span context."""
         self._span = span_context
 
-    def set_tag(self, key, value):
-        # type: (str, Any) -> None
+    def set_tag(
+        self,
+        key,  # type: str
+        value,  # type: Any
+    ):
+        # type: (...) -> None
         """Sets a tag for a key to a specific value."""
         self._tags[key] = value
 
-    def remove_tag(self, key):
-        # type: (str) -> None
+    def remove_tag(
+        self, key  # type: str
+    ):
+        # type: (...) -> None
         """Removes a specific tag."""
         self._tags.pop(key, None)
 
-    def set_context(self, key, value):
-        # type: (str, Any) -> None
+    def set_context(
+        self,
+        key,  # type: str
+        value,  # type: Any
+    ):
+        # type: (...) -> None
         """Binds a context at a certain key to a specific value."""
         self._contexts[key] = value
 
-    def remove_context(self, key):
-        # type: (str) -> None
+    def remove_context(
+        self, key  # type: str
+    ):
+        # type: (...) -> None
         """Removes a context."""
         self._contexts.pop(key, None)
 
-    def set_extra(self, key, value):
-        # type: (str, Any) -> None
+    def set_extra(
+        self,
+        key,  # type: str
+        value,  # type: Any
+    ):
+        # type: (...) -> None
         """Sets an extra key to a specific value."""
         self._extras[key] = value
 
-    def remove_extra(self, key):
-        # type: (str) -> None
+    def remove_extra(
+        self, key  # type: str
+    ):
+        # type: (...) -> None
         """Removes a specific extra key."""
         self._extras.pop(key, None)
 
@@ -153,20 +171,27 @@ class Scope(object):
         """Clears breadcrumb buffer."""
         self._breadcrumbs = deque()  # type: Deque[Breadcrumb]
 
-    def add_event_processor(self, func):
-        # type: (EventProcessor) -> None
-        """"Register a scope local event processor on the scope.
+    def add_event_processor(
+        self, func  # type: EventProcessor
+    ):
+        # type: (...) -> None
+        """Register a scope local event processor on the scope.
 
-        This function behaves like `before_send.`
+        :param func: This function behaves like `before_send.`
         """
         self._event_processors.append(func)
 
-    def add_error_processor(self, func, cls=None):
-        # type: (ErrorProcessor, Optional[type]) -> None
-        """"Register a scope local error processor on the scope.
+    def add_error_processor(
+        self,
+        func,  # type: ErrorProcessor
+        cls=None,  # type: Optional[type]
+    ):
+        # type: (...) -> None
+        """Register a scope local error processor on the scope.
 
-        The error processor works similar to an event processor but is
-        invoked with the original exception info triple as second argument.
+        :param func: A callback that works similar to an event processor but is invoked with the original exception info triple as second argument.
+
+        :param cls: Optionally, only process exceptions of this type.
         """
         if cls is not None:
             cls_ = cls  # For mypy.
@@ -184,8 +209,12 @@ class Scope(object):
         self._error_processors.append(func)
 
     @_disable_capture
-    def apply_to_event(self, event, hint):
-        # type: (Event, Hint) -> Optional[Event]
+    def apply_to_event(
+        self,
+        event,  # type: Event
+        hint,  # type: Hint
+    ):
+        # type: (...) -> Optional[Event]
         """Applies the information contained on the scope to the given event."""
 
         def _drop(event, cause, ty):

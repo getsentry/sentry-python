@@ -268,6 +268,7 @@ class _Client(object):
         self.close()
 
 
+MYPY = False
 if MYPY:
     # Make mypy, PyCharm and other static analyzers think `get_options` is a
     # type to have nicer autocompletion for params.

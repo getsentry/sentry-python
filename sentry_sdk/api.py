@@ -4,7 +4,6 @@ from contextlib import contextmanager
 from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
 
-
 MYPY = False
 if MYPY:
     from typing import Any
@@ -40,15 +39,18 @@ __all__ = [
 def hubmethod(f):
     # type: (F) -> F
     f.__doc__ = "%s\n\n%s" % (
-        "Alias for `Hub.%s`" % f.__name__,
+        "Alias for :py:meth:`sentry_sdk.Hub.%s`" % f.__name__,
         inspect.getdoc(getattr(Hub, f.__name__)),
     )
     return f
 
 
 @hubmethod
-def capture_event(event, hint=None):
-    # type: (Event, Optional[Hint]) -> Optional[str]
+def capture_event(
+    event,  # type: Event
+    hint=None,  # type: Optional[Hint]
+):
+    # type: (...) -> Optional[str]
     hub = Hub.current
     if hub is not None:
         return hub.capture_event(event, hint)
@@ -56,8 +58,11 @@ def capture_event(event, hint=None):
 
 
 @hubmethod
-def capture_message(message, level=None):
-    # type: (str, Optional[str]) -> Optional[str]
+def capture_message(
+    message,  # type: str
+    level=None,  # type: Optional[str]
+):
+    # type: (...) -> Optional[str]
     hub = Hub.current
     if hub is not None:
         return hub.capture_message(message, level)
@@ -65,8 +70,10 @@ def capture_message(message, level=None):
 
 
 @hubmethod
-def capture_exception(error=None):
-    # type: (Optional[BaseException]) -> Optional[str]
+def capture_exception(
+    error=None  # type: Optional[BaseException]
+):
+    # type: (...) -> Optional[str]
     hub = Hub.current
     if hub is not None:
         return hub.capture_exception(error)
@@ -74,8 +81,12 @@ def capture_exception(error=None):
 
 
 @hubmethod
-def add_breadcrumb(crumb=None, hint=None, **kwargs):
-    # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], **Any) -> None
+def add_breadcrumb(
+    crumb=None,  # type: Optional[Breadcrumb]
+    hint=None,  # type: Optional[BreadcrumbHint]
+    **kwargs  # type: **Any
+):
+    # type: (...) -> None
     hub = Hub.current
     if hub is not None:
         return hub.add_breadcrumb(crumb, hint, **kwargs)
@@ -88,8 +99,10 @@ def configure_scope():
 
 
 @overload  # noqa
-def configure_scope(callback):
-    # type: (Callable[[Scope], None]) -> None
+def configure_scope(
+    callback  # type: Callable[[Scope], None]
+):
+    # type: (...) -> None
     pass
 
 
@@ -120,8 +133,10 @@ def push_scope():
 
 
 @overload  # noqa
-def push_scope(callback):
-    # type: (Callable[[Scope], None]) -> None
+def push_scope(
+    callback  # type: Callable[[Scope], None]
+):
+    # type: (...) -> None
     pass
 
 
@@ -146,8 +161,11 @@ def push_scope(
 
 
 @hubmethod
-def flush(timeout=None, callback=None):
-    # type: (Optional[float], Optional[Callable[[int, float], None]]) -> None
+def flush(
+    timeout=None,  # type: Optional[float]
+    callback=None,  # type: Optional[Callable[[int, float], None]]
+):
+    # type: (...) -> None
     hub = Hub.current
     if hub is not None:
         return hub.flush(timeout=timeout, callback=callback)
