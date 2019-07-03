@@ -59,9 +59,9 @@ class Transport(object):
         raise NotImplementedError()
 
     def flush(
-        self,  # type; float
-        timeout,  # type: Optional[Any]
-        callback=None,
+        self,
+        timeout,  # type: float
+        callback=None,  # type: Optional[Any]
     ):
         # type: (...) -> None
         """Wait `timeout` seconds for the current events to be sent out."""
