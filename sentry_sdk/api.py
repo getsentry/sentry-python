@@ -84,7 +84,7 @@ def capture_exception(
 def add_breadcrumb(
     crumb=None,  # type: Optional[Breadcrumb]
     hint=None,  # type: Optional[BreadcrumbHint]
-    **kwargs  # type: **Any
+    **kwargs  # type: Any
 ):
     # type: (...) -> None
     hub = Hub.current

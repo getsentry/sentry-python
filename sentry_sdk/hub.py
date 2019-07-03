@@ -307,7 +307,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def bind_client(
         self, new  # type: Optional[Client]
     ):
-        # type: () -> None
+        # type: (...) -> None
         """Binds a new client to the hub."""
         top = self._stack[-1]
         self._stack[-1] = (new, top[1])
@@ -386,7 +386,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self,
         crumb=None,  # type: Optional[Breadcrumb]
         hint=None,  # type: Optional[BreadcrumbHint]
-        **kwargs  # type: **Any
+        **kwargs  # type: Any
     ):
         # type: (...) -> None
         """Adds a breadcrumb.  The breadcrumbs are a dictionary with the
