@@ -14,7 +14,7 @@ help:
 	@false
 
 .venv:
-	virtualenv $(VENV_PATH)
+	virtualenv -ppython3 $(VENV_PATH)
 	$(VENV_PATH)/bin/pip install tox
 
 dist: .venv
@@ -48,12 +48,17 @@ lint: .venv
 
 .PHONY: lint
 
+apidocs-sphinx: .venv
+	@$(VENV_PATH)/bin/pip install --editable .
+	@$(VENV_PATH)/bin/pip install sphinx sphinx-rtd-theme 'git+https://github.com/untitaker/sphinx-autodoc-typehints@feat/type-hint-comments' typed_ast
+	@$(VENV_PATH)/bin/sphinx-build -b html docs/ docs/_build
+.PHONY: apidocs-sphinx
+
 apidocs: .venv
 	@$(VENV_PATH)/bin/pip install --editable .
 	@$(VENV_PATH)/bin/pip install pdoc==0.3.2 pygments
 	@$(VENV_PATH)/bin/pdoc --overwrite --html --html-dir build/apidocs sentry_sdk
 .PHONY: apidocs
-
 install-zeus-cli:
 	npm install -g @zeus-ci/cli
 .PHONY: install-zeus-cli

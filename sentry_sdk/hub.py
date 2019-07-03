@@ -18,7 +18,6 @@ from sentry_sdk.utils import (
     ContextVar,
 )
 
-
 MYPY = False
 if MYPY:
     from contextlib import ContextManager
@@ -91,6 +90,7 @@ def _init(*args, **kwargs):
     return rv
 
 
+MYPY = False
 if MYPY:
     # Make mypy, PyCharm and other static analyzers think `init` is a type to
     # have nicer autocompletion for params.
@@ -198,13 +198,17 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     _stack = None  # type: List[Tuple[Optional[Client], Scope]]
 
     # Mypy doesn't pick up on the metaclass.
-    MYPY = False
+
     if MYPY:
         current = None  # type: Hub
         main = None  # type: Hub
 
-    def __init__(self, client_or_hub=None, scope=None):
-        # type: (Optional[Union[Hub, Client]], Optional[Any]) -> None
+    def __init__(
+        self,
+        client_or_hub=None,  # type: Optional[Union[Hub, Client]]
+        scope=None,  # type: Optional[Any]
+    ):
+        # type: (...) -> None
         if isinstance(client_or_hub, Hub):
             hub = client_or_hub
             client, other_scope = hub._stack[-1]
@@ -235,16 +239,20 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         old = self._old_hubs.pop()
         _local.set(old)
 
-    def run(self, callback):
-        # type: (Callable[[], T]) -> T
+    def run(
+        self, callback  # type: Callable[[], T]
+    ):
+        # type: (...) -> T
         """Runs a callback in the context of the hub.  Alternatively the
         with statement can be used on the hub directly.
         """
         with self:
             return callback()
 
-    def get_integration(self, name_or_class):
-        # type: (Union[str, Type[Integration]]) -> Any
+    def get_integration(
+        self, name_or_class  # type: Union[str, Type[Integration]]
+    ):
+        # type: (...) -> Any
         """Returns the integration for this hub by name or class.  If there
         is no client bound or the client does not have that integration
         then `None` is returned.
@@ -296,14 +304,20 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """Returns the last event ID."""
         return self._last_event_id
 
-    def bind_client(self, new):
-        # type: (Optional[Client]) -> None
+    def bind_client(
+        self, new  # type: Optional[Client]
+    ):
+        # type: () -> None
         """Binds a new client to the hub."""
         top = self._stack[-1]
         self._stack[-1] = (new, top[1])
 
-    def capture_event(self, event, hint=None):
-        # type: (Event, Optional[Hint]) -> Optional[str]
+    def capture_event(
+        self,
+        event,  # type: Event
+        hint=None,  # type: Optional[Hint]
+    ):
+        # type: (...) -> Optional[str]
         """Captures an event.  The return value is the ID of the event.
 
         The event is a dictionary following the Sentry v7/v8 protocol
@@ -319,8 +333,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return rv
         return None
 
-    def capture_message(self, message, level=None):
-        # type: (str, Optional[str]) -> Optional[str]
+    def capture_message(
+        self,
+        message,  # type: str
+        level=None,  # type: Optional[str]
+    ):
+        # type: (...) -> Optional[str]
         """Captures a message.  The message is just a string.  If no level
         is provided the default level is `info`.
         """
@@ -330,8 +348,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             level = "info"
         return self.capture_event({"message": message, "level": level})
 
-    def capture_exception(self, error=None):
-        # type: (Optional[BaseException]) -> Optional[str]
+    def capture_exception(
+        self, error=None  # type: Optional[BaseException]
+    ):
+        # type: (...) -> Optional[str]
         """Captures an exception.
 
         The argument passed can be `None` in which case the last exception
@@ -354,14 +374,21 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return None
 
-    def _capture_internal_exception(self, exc_info):
-        # type: (_OptExcInfo) -> Any
+    def _capture_internal_exception(
+        self, exc_info  # type: _OptExcInfo
+    ):
+        # type: (...) -> Any
         """Capture an exception that is likely caused by a bug in the SDK
         itself."""
         logger.error("Internal error in sentry_sdk", exc_info=exc_info)  # type: ignore
 
-    def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
-        # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], **Any) -> None
+    def add_breadcrumb(
+        self,
+        crumb=None,  # type: Optional[Breadcrumb]
+        hint=None,  # type: Optional[BreadcrumbHint]
+        **kwargs  # type: **Any
+    ):
+        # type: (...) -> None
         """Adds a breadcrumb.  The breadcrumbs are a dictionary with the
         data as the sentry v7/v8 protocol expects.  `hint` is an optional
         value that can be used by `before_breadcrumb` to customize the
@@ -486,13 +513,17 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         )
 
     @overload  # noqa
-    def push_scope(self, callback=None):
-        # type: (Optional[None]) -> ContextManager[Scope]
+    def push_scope(
+        self, callback=None  # type: Optional[None]
+    ):
+        # type: (...) -> ContextManager[Scope]
         pass
 
     @overload  # noqa
-    def push_scope(self, callback):
-        # type: (Callable[[Scope], None]) -> None
+    def push_scope(
+        self, callback  # type: Callable[[Scope], None]
+    ):
+        # type: (...) -> None
         pass
 
     def push_scope(  # noqa
@@ -526,13 +557,17 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return rv
 
     @overload  # noqa
-    def configure_scope(self, callback=None):
-        # type: (Optional[None]) -> ContextManager[Scope]
+    def configure_scope(
+        self, callback=None  # type: Optional[None]
+    ):
+        # type: (...) -> ContextManager[Scope]
         pass
 
     @overload  # noqa
-    def configure_scope(self, callback):
-        # type: (Callable[[Scope], None]) -> None
+    def configure_scope(
+        self, callback  # type: Callable[[Scope], None]
+    ):
+        # type: (...) -> None
         pass
 
     def configure_scope(  # noqa
@@ -559,9 +594,15 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return inner()
 
-    def flush(self, timeout=None, callback=None):
-        # type: (Optional[float], Optional[Callable[[int, float], None]]) -> None
-        """Alias for self.client.flush"""
+    def flush(
+        self,
+        timeout=None,  # type: Optional[float]
+        callback=None,  # type: Optional[Callable[[int, float], None]]
+    ):
+        # type: (...) -> None
+        """
+        Alias for :py:meth:`sentry_sdk.Client.flush`
+        """
         client, scope = self._stack[-1]
         if client is not None:
             return client.flush(timeout=timeout, callback=callback)
