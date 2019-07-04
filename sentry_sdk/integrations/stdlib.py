@@ -132,7 +132,7 @@ def _install_subprocess():
 
             return old_popen_init(self, *a, **kw)
 
-    subprocess.Popen.__init__ = sentry_patched_popen_init
+    subprocess.Popen.__init__ = sentry_patched_popen_init  # type: ignore
 
 
 def get_subprocess_traceparent_headers():

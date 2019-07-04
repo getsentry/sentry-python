@@ -38,4 +38,6 @@ class RedisIntegration(Integration):
 
                 return old_execute_command(self, name, *args, **kwargs)
 
-        redis.StrictRedis.execute_command = sentry_patched_execute_command
+        redis.StrictRedis.execute_command = (  # type: ignore
+            sentry_patched_execute_command
+        )

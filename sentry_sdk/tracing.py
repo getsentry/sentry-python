@@ -12,6 +12,7 @@ if False:
     from typing import Optional
     from typing import Any
     from typing import Dict
+    from typing import Mapping
     from typing import List
 
 _traceparent_header_format_re = re.compile(
@@ -23,8 +24,13 @@ _traceparent_header_format_re = re.compile(
 )
 
 
-class EnvironHeaders(collections.Mapping):
-    def __init__(self, environ, prefix="HTTP_"):
+class EnvironHeaders(collections.Mapping):  # type: ignore
+    def __init__(
+        self,
+        environ,  # type: Mapping[str, str]
+        prefix="HTTP_",  # type: str
+    ):
+        # type: (...) -> None
         self.environ = environ
         self.prefix = prefix
 

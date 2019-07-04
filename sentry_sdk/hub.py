@@ -426,13 +426,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             scope._breadcrumbs.popleft()
 
     @contextmanager
-    def span(self, span=None, **kwargs):
+    def span(
+        self,
+        span=None,  # type: Optional[Span]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Generator[Span, None, None]
         if span is None:
             span = self.start_span(**kwargs)
-
-        if span is None:
-            yield span
-            return
 
         _, scope = self._stack[-1]
         old_span = scope.span
@@ -451,17 +452,30 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             self.finish_trace(span)
             scope.span = old_span
 
-    def trace(self, *args, **kwargs):
-        return self.span(self.start_trace(*args, **kwargs))
+    def trace(
+        self,
+        span=None,  # type: Optional[Span]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> ContextManager[Span]
+        return self.span(self.start_trace(span=span, **kwargs))
 
-    def start_span(self, **kwargs):
+    def start_span(
+        self, **kwargs  # type: Any
+    ):
+        # type: (...) -> Span
         _, scope = self._stack[-1]
         span = scope.span
         if span is not None:
             return span.new_span(**kwargs)
         return Span.start_trace(**kwargs)
 
-    def start_trace(self, span=None, **kwargs):
+    def start_trace(
+        self,
+        span=None,  # type: Optional[Span]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Span
         if span is None:
             span = Span.start_trace(**kwargs)
 
@@ -476,7 +490,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return span
 
-    def finish_trace(self, span):
+    def finish_trace(
+        self, span  # type: Span
+    ):
+        # type: (...) -> Optional[str]
         if span.timestamp is None:
             # This transaction is not yet finished so we just finish it.
             span.finish()
