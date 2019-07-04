@@ -13,6 +13,7 @@ if MYPY:
 
     from sentry_sdk.utils import Event
 
+
 _installed_modules = None
 
 
