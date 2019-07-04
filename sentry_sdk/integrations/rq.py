@@ -46,14 +46,14 @@ class RqIntegration(Integration):
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
 
-                with capture_internal_exceptions():
-                    scope.transaction = job.func_name
+                span = Span.continue_from_headers(
+                    job.meta.get("_sentry_trace_headers") or {}
+                )
 
-                with hub.trace(
-                    span=Span.continue_from_headers(
-                        job.meta.get("_sentry_trace_headers") or {}
-                    )
-                ):
+                with capture_internal_exceptions():
+                    span.transaction = job.func_name
+
+                with hub.span(span):
                     rv = old_perform_job(self, job, *args, **kwargs)
 
             if self.is_horse:

@@ -9,7 +9,7 @@ def test_basic(sentry_init, capture_events, sample_rate):
     sentry_init(traces_sample_rate=sample_rate)
     events = capture_events()
 
-    with Hub.current.trace(transaction="hi"):
+    with Hub.current.span(transaction="hi"):
         with pytest.raises(ZeroDivisionError):
             with Hub.current.span(op="foo", description="foodesc"):
                 1 / 0
@@ -38,9 +38,9 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    with Hub.current.trace(transaction="hi") as old_trace:
-        old_trace.sampled = sampled
+    with Hub.current.span(transaction="hi") as old_trace:
         with Hub.current.span() as old_span:
+            old_span.sampled = sampled
             headers = dict(Hub.current.iter_trace_propagation_headers())
 
     header = headers["sentry-trace"]
@@ -52,18 +52,20 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
         assert header.endswith("-")
 
     span = Span.continue_from_headers(headers)
+    span.transaction = "WRONG"
     assert span is not None
     assert span.sampled == sampled
     assert span.trace_id == old_span.trace_id
 
-    with Hub.current.trace(span):
+    with Hub.current.span(span):
         with Hub.current.configure_scope() as scope:
             scope.transaction = "ho"
-
         capture_message("hello")
 
     if sampled is False:
-        message, = events
+        trace1, message = events
+
+        assert trace1["transaction"] == "hi"
     else:
         trace1, message, trace2 = events
 
@@ -78,3 +80,16 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
         )
 
     assert message["message"] == "hello"
+
+
+def test_sampling_decided_only_for_transactions(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=0.5)
+
+    with Hub.current.span(transaction="hi") as trace:
+        assert trace.sampled is not None
+
+        with Hub.current.span() as span:
+            assert span.sampled == trace.sampled
+
+    with Hub.current.span() as span:
+        assert span.sampled is None

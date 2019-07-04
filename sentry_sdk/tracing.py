@@ -71,8 +71,8 @@ class Span(object):
 
     def __init__(
         self,
-        trace_id,
-        span_id,
+        trace_id=None,
+        span_id=None,
         parent_span_id=None,
         same_process_as_parent=True,
         sampled=None,
@@ -80,8 +80,8 @@ class Span(object):
         op=None,
         description=None,
     ):
-        self.trace_id = trace_id
-        self.span_id = span_id
+        self.trace_id = trace_id or uuid.uuid4().hex
+        self.span_id = span_id or uuid.uuid4().hex[16:]
         self.parent_span_id = parent_span_id
         self.same_process_as_parent = same_process_as_parent
         self.sampled = sampled
@@ -109,17 +109,10 @@ class Span(object):
             )
         )
 
-    @classmethod
-    def start_trace(cls, **kwargs):
-        return cls(trace_id=uuid.uuid4().hex, span_id=uuid.uuid4().hex[16:], **kwargs)
-
     def new_span(self, **kwargs):
-        if self.trace_id is None:
-            return Span.start_trace()
-
-        rv = Span(
+        rv = type(self)(
             trace_id=self.trace_id,
-            span_id=uuid.uuid4().hex[16:],
+            span_id=None,
             parent_span_id=self.span_id,
             sampled=self.sampled,
             **kwargs
@@ -135,7 +128,7 @@ class Span(object):
     def continue_from_headers(cls, headers):
         parent = cls.from_traceparent(headers.get("sentry-trace"))
         if parent is None:
-            return cls.start_trace()
+            return cls()
         return parent.new_span(same_process_as_parent=False)
 
     def iter_headers(self):

@@ -432,8 +432,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         **kwargs  # type: Any
     ):
         # type: (...) -> Generator[Span, None, None]
-        if span is None:
-            span = self.start_span(**kwargs)
+        span = self.start_span(span=span, **kwargs)
 
         _, scope = self._stack[-1]
         old_span = scope.span
@@ -449,48 +448,31 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         finally:
             span.finish()
             maybe_create_breadcrumbs_from_span(self, span)
-            self.finish_trace(span)
+            self.finish_span(span)
             scope.span = old_span
 
-    def trace(
-        self,
-        span=None,  # type: Optional[Span]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> ContextManager[Span]
-        return self.span(self.start_trace(span=span, **kwargs))
-
     def start_span(
-        self, **kwargs  # type: Any
-    ):
-        # type: (...) -> Span
-        _, scope = self._stack[-1]
-        span = scope.span
-        if span is not None:
-            return span.new_span(**kwargs)
-        return Span.start_trace(**kwargs)
-
-    def start_trace(
         self,
         span=None,  # type: Optional[Span]
         **kwargs  # type: Any
     ):
         # type: (...) -> Span
+
         if span is None:
-            span = Span.start_trace(**kwargs)
+            _, scope = self._stack[-1]
 
-        _, scope = self._stack[-1]
+            if scope.span is not None:
+                span = scope.span.new_span(**kwargs)
+            else:
+                span = Span(**kwargs)
 
-        if scope.span is not None:
-            logger.warning(
-                "Creating new trace %s within existing trace %s",
-                span.trace_id,
-                scope.span.trace_id,
-            )
+        if span.sampled is None and span.transaction is not None:
+            sample_rate = self.client.options["traces_sample_rate"]
+            span.sampled = random.random() < sample_rate
 
         return span
 
-    def finish_trace(
+    def finish_span(
         self, span  # type: Span
     ):
         # type: (...) -> Optional[str]
@@ -508,15 +490,15 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             # event.
             return None
 
-        if span.sampled is False:
-            # Span is forcibly un-sampled
+        if not span.sampled:
+            # At this point a `sampled = None` should have already been
+            # resolved to a concrete decision. If `sampled` is `None`, it's
+            # likely that somebody used `with Hub.span(..)` on a
+            # non-transaction span and later decided to make it a transaction.
+            assert (
+                span.sampled is not None
+            ), "Need to set transaction when entering span!"
             return None
-
-        if span.sampled is None:
-            # span.sampled = True -> Span forcibly sampled
-            sample_rate = self.client.options["traces_sample_rate"]
-            if sample_rate < 1.0 and random.random() >= sample_rate:
-                return None
 
         return self.capture_event(
             {

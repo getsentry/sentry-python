@@ -8,7 +8,7 @@ from sentry_sdk.integrations.stdlib import StdlibIntegration
 def test_subprocess_basic(sentry_init, capture_events):
     sentry_init(integrations=[StdlibIntegration()], traces_sample_rate=1.0)
 
-    with Hub.current.trace(transaction="foo", op="foo") as span:
+    with Hub.current.span(transaction="foo", op="foo") as span:
         output = subprocess.check_output(
             [
                 sys.executable,
