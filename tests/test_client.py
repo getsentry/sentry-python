@@ -378,7 +378,7 @@ def test_transport_works(httpserver, request, capsys, caplog, debug):
     assert not err and not out
     assert httpserver.requests
 
-    assert any("Sending info event" in record.msg for record in caplog.records) == debug
+    assert any("Sending event" in record.msg for record in caplog.records) == debug
 
 
 @pytest.mark.tests_internal_exceptions

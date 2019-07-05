@@ -91,15 +91,24 @@ class Scope(object):
     def transaction(self, value):
         """When set this forces a specific transaction name to be set."""
         self._transaction = value
+        if self._span:
+            self._span.transaction = value
 
     @_attr_setter
     def user(self, value):
         """When set a specific user is bound to the scope."""
         self._user = value
 
-    def set_span_context(self, span_context):
-        """Sets the span context."""
-        self._span = span_context
+    @property
+    def span(self):
+        """Get/set current tracing span."""
+        return self._span
+
+    @span.setter
+    def span(self, span):
+        self._span = span
+        if span is not None and span.transaction:
+            self._transaction = span.transaction
 
     def set_tag(
         self,
@@ -245,10 +254,9 @@ class Scope(object):
             event.setdefault("contexts", {}).update(self._contexts)
 
         if self._span is not None:
-            event.setdefault("contexts", {})["trace"] = {
-                "trace_id": self._span.trace_id,
-                "span_id": self._span.span_id,
-            }
+            contexts = event.setdefault("contexts", {})
+            if not contexts.get("trace"):
+                contexts["trace"] = self._span.get_trace_context()
 
         exc_info = hint.get("exc_info")
         if exc_info is not None:

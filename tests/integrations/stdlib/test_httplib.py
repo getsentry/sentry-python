@@ -32,6 +32,7 @@ def test_crumb_capture(sentry_init, capture_events):
         "method": "GET",
         "status_code": 200,
         "reason": "OK",
+        "httplib_response": crumb["data"]["httplib_response"],
     }
 
 
@@ -61,6 +62,7 @@ def test_crumb_capture_hint(sentry_init, capture_events):
         "status_code": 200,
         "reason": "OK",
         "extra": "foo",
+        "httplib_response": crumb["data"]["httplib_response"],
     }
 
 
@@ -102,4 +104,5 @@ def test_httplib_misuse(sentry_init, capture_events):
         "method": "GET",
         "status_code": 200,
         "reason": "OK",
+        "httplib_response": crumb["data"]["httplib_response"],
     }

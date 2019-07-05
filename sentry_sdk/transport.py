@@ -121,12 +121,13 @@ class HttpTransport(Transport):
 
         assert self.parsed_dsn is not None
         logger.debug(
-            "Sending %s event [%s] to %s project:%s"
+            "Sending event, type:%s level:%s event_id:%s project:%s host:%s"
             % (
-                event.get("level") or "error",
-                event["event_id"],
-                self.parsed_dsn.host,
+                event.get("type") or "null",
+                event.get("level") or "null",
+                event.get("event_id") or "null",
                 self.parsed_dsn.project_id,
+                self.parsed_dsn.host,
             )
         )
         response = self._pool.request(

@@ -101,6 +101,16 @@ def _request_started(sender, **kwargs):
     app = _app_ctx_stack.top.app
     with hub.configure_scope() as scope:
         request = _request_ctx_stack.top.request
+
+        # Rely on WSGI middleware to start a trace
+        try:
+            if integration.transaction_style == "endpoint":
+                scope.transaction = request.url_rule.endpoint  # type: ignore
+            elif integration.transaction_style == "url":
+                scope.transaction = request.url_rule.rule  # type: ignore
+        except Exception:
+            pass
+
         weak_request = weakref.ref(request)
         scope.add_event_processor(
             _make_request_event_processor(  # type: ignore
@@ -152,14 +162,6 @@ def _make_request_event_processor(app, weak_request, integration):
         # another thread.
         if request is None:
             return event
-
-        try:
-            if integration.transaction_style == "endpoint":
-                event["transaction"] = request.url_rule.endpoint  # type: ignore
-            elif integration.transaction_style == "url":
-                event["transaction"] = request.url_rule.rule  # type: ignore
-        except Exception:
-            pass
 
         with capture_internal_exceptions():
             FlaskRequestExtractor(request).extract_into_event(event)

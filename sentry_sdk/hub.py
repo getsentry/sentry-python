@@ -1,6 +1,8 @@
-import sys
 import copy
+import random
+import sys
 import weakref
+
 from datetime import datetime
 from contextlib import contextmanager
 from warnings import warn
@@ -8,6 +10,7 @@ from warnings import warn
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
+from sentry_sdk.tracing import Span, maybe_create_breadcrumbs_from_span
 from sentry_sdk.utils import (
     exc_info_from_error,
     event_from_exception,
@@ -422,6 +425,92 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         while len(scope._breadcrumbs) > max_breadcrumbs:
             scope._breadcrumbs.popleft()
 
+    @contextmanager
+    def span(
+        self,
+        span=None,  # type: Optional[Span]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Generator[Span, None, None]
+        span = self.start_span(span=span, **kwargs)
+
+        _, scope = self._stack[-1]
+        old_span = scope.span
+        scope.span = span
+
+        try:
+            yield span
+        except Exception:
+            span.set_tag("error", True)
+            raise
+        else:
+            span.set_tag("error", False)
+        finally:
+            span.finish()
+            maybe_create_breadcrumbs_from_span(self, span)
+            self.finish_span(span)
+            scope.span = old_span
+
+    def start_span(
+        self,
+        span=None,  # type: Optional[Span]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Span
+
+        client, scope = self._stack[-1]
+
+        if span is None:
+            if scope.span is not None:
+                span = scope.span.new_span(**kwargs)
+            else:
+                span = Span(**kwargs)
+
+        if span.sampled is None and span.transaction is not None:
+            sample_rate = client and client.options["traces_sample_rate"] or 0
+            span.sampled = random.random() < sample_rate
+
+        return span
+
+    def finish_span(
+        self, span  # type: Span
+    ):
+        # type: (...) -> Optional[str]
+        if span.timestamp is None:
+            # This transaction is not yet finished so we just finish it.
+            span.finish()
+
+        if span.transaction is None:
+            # If this has no transaction set we assume there's a parent
+            # transaction for this span that would be flushed out eventually.
+            return None
+
+        if self.client is None:
+            # We have no client and therefore nowhere to send this transaction
+            # event.
+            return None
+
+        if not span.sampled:
+            # At this point a `sampled = None` should have already been
+            # resolved to a concrete decision. If `sampled` is `None`, it's
+            # likely that somebody used `with Hub.span(..)` on a
+            # non-transaction span and later decided to make it a transaction.
+            assert (
+                span.sampled is not None
+            ), "Need to set transaction when entering span!"
+            return None
+
+        return self.capture_event(
+            {
+                "type": "transaction",
+                "transaction": span.transaction,
+                "contexts": {"trace": span.get_trace_context()},
+                "timestamp": span.timestamp,
+                "start_timestamp": span.start_timestamp,
+                "spans": [s.to_json() for s in span._finished_spans if s is not span],
+            }
+        )
+
     @overload  # noqa
     def push_scope(
         self, callback=None  # type: Optional[None]
@@ -527,8 +616,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if not propagate_traces:
             return
 
-        for item in scope._span.iter_headers():
-            yield item
+        if client and client.options["traceparent_v2"]:
+            traceparent = scope._span.to_traceparent()
+        else:
+            traceparent = scope._span.to_legacy_traceparent()
+
+        yield "sentry-trace", traceparent
 
 
 GLOBAL_HUB = Hub()

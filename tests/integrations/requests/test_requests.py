@@ -23,4 +23,5 @@ def test_crumb_capture(sentry_init, capture_events):
         "method": "GET",
         "status_code": 418,
         "reason": "I'M A TEAPOT",
+        "httplib_response": crumb["data"]["httplib_response"],
     }

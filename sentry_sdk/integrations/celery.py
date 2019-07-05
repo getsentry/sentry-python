@@ -11,7 +11,7 @@ from celery.exceptions import (  # type: ignore
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
-from sentry_sdk.tracing import SpanContext
+from sentry_sdk.tracing import Span
 from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
@@ -91,20 +91,20 @@ def _wrap_tracer(task, f):
         with hub.push_scope() as scope:
             scope._name = "celery"
             scope.clear_breadcrumbs()
-            _continue_trace(args[3].get("headers") or {}, scope)
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
-            return f(*args, **kwargs)
+            span = Span.continue_from_headers(args[3].get("headers") or {})
+            span.transaction = "unknown celery task"
+
+            with capture_internal_exceptions():
+                # Celery task objects are not a thing to be trusted. Even
+                # something such as attribute access can fail.
+                span.transaction = task.name
+
+            with hub.span(span):
+                return f(*args, **kwargs)
 
     return _inner
-
-
-def _continue_trace(headers, scope):
-    if headers:
-        span_context = SpanContext.continue_from_headers(headers)
-    else:
-        span_context = SpanContext.start_trace()
-    scope.set_span_context(span_context)
 
 
 def _wrap_task_call(task, f):
@@ -124,9 +124,6 @@ def _wrap_task_call(task, f):
 
 def _make_event_processor(task, uuid, args, kwargs, request=None):
     def event_processor(event, hint):
-        with capture_internal_exceptions():
-            event["transaction"] = task.name
-
         with capture_internal_exceptions():
             extra = event.setdefault("extra", {})
             extra["celery-job"] = {
