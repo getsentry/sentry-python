@@ -27,6 +27,11 @@ if PY2:
         return cls
 
     exec("def reraise(tp, value, tb=None):\n raise tp, value, tb")
+    if MYPY:
+
+        def reraise(tp, value, tb=None):
+            # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[Any]) -> None
+            pass
 
 
 else:

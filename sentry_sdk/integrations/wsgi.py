@@ -17,12 +17,13 @@ if MYPY:
     from typing import Optional
 
     from sentry_sdk.utils import ExcInfo
+    from sentry_sdk._compat import text_type
 
 
 if PY2:
 
     def wsgi_decoding_dance(s, charset="utf-8", errors="replace"):
-        # type: (str, str, str) -> str
+        # type: (str, str, str) -> text_type
         return s.decode(charset, errors)
 
 

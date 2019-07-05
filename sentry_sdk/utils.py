@@ -164,7 +164,7 @@ class Auth(object):
         client=None,
         path="/",
     ):
-        # type: (str, str, str, str, Optional[str], int, Optional[Any], str) -> None
+        # type: (str, str, text_type, str, Optional[str], int, Optional[Any], str) -> None
         self.scheme = scheme
         self.host = host
         self.path = path
@@ -186,7 +186,7 @@ class Auth(object):
         )
 
     def to_header(self, timestamp=None):
-        # type: (Optional[datetime]) -> str
+        # type: (Optional[datetime]) -> text_type
         """Returns the auth header a string."""
         rv = [("sentry_key", self.public_key), ("sentry_version", self.version)]
         if timestamp is not None:
@@ -319,7 +319,7 @@ def get_source_context(frame, tb_lineno):
 
 
 def safe_str(value):
-    # type: (Any) -> str
+    # type: (Any) -> text_type
     try:
         return text_type(value)
     except Exception:
@@ -327,11 +327,13 @@ def safe_str(value):
 
 
 def safe_repr(value):
-    # type: (Any) -> str
+    # type: (Any) -> text_type
     try:
-        rv = repr(value)
-        if isinstance(rv, bytes):
-            rv = rv.decode("utf-8", "replace")
+        rv_ = repr(value)
+        if isinstance(rv_, bytes):
+            rv = rv_.decode("utf-8", "replace")
+        else:
+            rv = rv_
 
         # At this point `rv` contains a bunch of literal escape codes, like
         # this (exaggerated example):
@@ -496,10 +498,10 @@ if HAS_CHAINED_EXCEPTIONS:
             seen_exceptions.append(exc_value)
             seen_exception_ids.add(id(exc_value))
 
-            if exc_value.__suppress_context__:
-                cause = exc_value.__cause__
+            if exc_value.__suppress_context__:  # type: ignore # for --py2
+                cause = exc_value.__cause__  # type: ignore # for --py2
             else:
-                cause = exc_value.__context__
+                cause = exc_value.__context__  # type: ignore # for --py2
             if cause is None:
                 break
             exc_type = type(cause)
@@ -535,7 +537,7 @@ def exceptions_from_error_tuple(
 
 
 def to_string(value):
-    # type: (str) -> str
+    # type: (str) -> text_type
     try:
         return text_type(value)
     except UnicodeDecodeError:
@@ -659,7 +661,7 @@ def _module_in_set(name, set):
 
 
 def strip_string(value, max_length=512):
-    # type: (str, int) -> Union[AnnotatedValue, str]
+    # type: (text_type, int) -> Union[AnnotatedValue, text_type]
     # TODO: read max_length from config
     if not value:
         return value

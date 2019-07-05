@@ -28,7 +28,7 @@ class ExcepthookIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        sys.excepthook = _make_excepthook(sys.excepthook)
+        sys.excepthook = _make_excepthook(sys.excepthook)  # type: ignore # for --py2
 
 
 def _make_excepthook(old_excepthook):

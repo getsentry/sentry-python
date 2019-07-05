@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from sentry_sdk.consts import VERSION
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
+from sentry_sdk._compat import PY2
 
 MYPY = False
 if MYPY:
@@ -25,10 +26,10 @@ if MYPY:
 
     from sentry_sdk.utils import Event
 
-try:
+if PY2:
+    from urllib import getproxies
+else:
     from urllib.request import getproxies
-except ImportError:
-    from urllib import getproxies  # type: ignore
 
 
 class Transport(object):

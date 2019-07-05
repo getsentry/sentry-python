@@ -1,13 +1,14 @@
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
+from sentry_sdk._compat import PY2
 
 import sys
 import platform
 
-try:
-    from httplib import HTTPConnection  # type: ignore
-except ImportError:
+if PY2:
+    from httplib import HTTPConnection
+else:
     from http.client import HTTPConnection
 
 _RUNTIME_CONTEXT = {
@@ -69,7 +70,7 @@ def install_httplib():
         return rv
 
     def getresponse(self, *args, **kwargs):
-        rv = real_getresponse(self, *args, **kwargs)
+        rv = real_getresponse(self, *args, **kwargs)  # type: ignore
         hub = Hub.current
         if hub.get_integration(StdlibIntegration) is None:
             return rv
@@ -84,5 +85,5 @@ def install_httplib():
         )
         return rv
 
-    HTTPConnection.putrequest = putrequest
-    HTTPConnection.getresponse = getresponse
+    HTTPConnection.putrequest = putrequest  # type: ignore
+    HTTPConnection.getresponse = getresponse  # type: ignore

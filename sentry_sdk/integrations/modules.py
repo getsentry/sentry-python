@@ -20,7 +20,7 @@ _installed_modules = None
 def _generate_installed_modules():
     # type: () -> Iterator[Tuple[str, str]]
     try:
-        import pkg_resources
+        import pkg_resources  # type: ignore # for --py2
     except ImportError:
         return
 

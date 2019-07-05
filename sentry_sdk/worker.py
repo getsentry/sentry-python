@@ -8,7 +8,7 @@ from sentry_sdk.utils import logger
 
 MYPY = False
 if MYPY:
-    from queue import Queue
+    from queue import Queue  # type: ignore # for --py2
     from typing import Any
     from typing import Optional
     from typing import Callable

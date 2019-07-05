@@ -436,7 +436,9 @@ def record_sql(sql, params, cursor=None):
             if cursor and hasattr(cursor, "mogrify"):
                 real_sql = cursor.mogrify(sql, params)
                 if isinstance(real_sql, bytes):
-                    real_sql = real_sql.decode(cursor.connection.encoding)
+                    real_sql = real_sql.decode(  # type: ignore # for --py2
+                        cursor.connection.encoding
+                    )
         except Exception:
             pass
 
