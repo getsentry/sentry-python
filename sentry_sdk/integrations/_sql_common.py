@@ -61,7 +61,7 @@ def format_sql(sql, params, cursor):
     except Exception:
         pass
 
-    if not real_sql and cursor and hasattr(cursor, "mogrify"):
+    if not real_sql and hasattr(cursor, "mogrify"):
         # If formatting failed and we're using psycopg2, it could be that we're
         # looking at a query that uses Composed objects. Use psycopg2's mogrify
         # function to format the query. We lose per-parameter trimming but gain
@@ -71,7 +71,7 @@ def format_sql(sql, params, cursor):
         # queries are not widely used, while per-parameter trimming is
         # generally highly desirable.
         try:
-            if cursor and hasattr(cursor, "mogrify"):
+            if hasattr(cursor, "mogrify"):
                 real_sql = cursor.mogrify(sql, params)
                 if isinstance(real_sql, bytes):
                     real_sql = real_sql.decode(cursor.connection.encoding)

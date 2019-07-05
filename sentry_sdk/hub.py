@@ -446,9 +446,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         else:
             span.set_tag("error", False)
         finally:
-            span.finish()
-            maybe_create_breadcrumbs_from_span(self, span)
-            self.finish_span(span)
+            try:
+                span.finish()
+                maybe_create_breadcrumbs_from_span(self, span)
+                self.finish_span(span)
+            except Exception:
+                self._capture_internal_exception(sys.exc_info())
             scope.span = old_span
 
     def start_span(

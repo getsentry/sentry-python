@@ -5,7 +5,7 @@ import collections
 
 from datetime import datetime
 
-from sentry_sdk.utils import concat_strings
+from sentry_sdk.utils import capture_internal_exceptions, concat_strings
 
 
 if False:
@@ -211,14 +211,20 @@ def record_sql_queries(hub, queries, label=""):
     if not queries:
         yield None
     else:
-        strings = [label]
-        for query in queries:
-            hub.add_breadcrumb(message=query, category="query")
-            strings.append(query)
+        description = None
+        with capture_internal_exceptions():
+            strings = [label]
+            for query in queries:
+                hub.add_breadcrumb(message=query, category="query")
+                strings.append(query)
 
-        description = concat_strings(strings)
-        with hub.span(op="db", description=description) as span:
-            yield span
+            description = concat_strings(strings)
+
+        if description is None:
+            yield None
+        else:
+            with hub.span(op="db", description=description) as span:
+                yield span
 
 
 @contextlib.contextmanager
