@@ -1,3 +1,11 @@
+## 0.10.0
+
+* Massive refactor in preparation to tracing. There are no intentional breaking
+  changes, but there is a risk of breakage (hence the minor version bump). Two
+  new client options `traces_sample_rate` and `traceparent_v2` have been added.
+  Do not change the defaults in production, they will bring your application
+  down or at least fill your Sentry project up with nonsense events.
+
 ## 0.9.5
 
 * Do not use ``getargspec`` on Python 3 to evade deprecation
