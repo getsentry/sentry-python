@@ -358,7 +358,7 @@ def safe_repr(value):
 
 
 def filename_for_module(module, abs_path):
-    # type: (str, str) -> str
+    # type: (str, str) -> Optional[str]
     try:
         if abs_path.endswith(".pyc"):
             abs_path = abs_path[:-1]
@@ -395,7 +395,10 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
     pre_context, context_line, post_context = get_source_context(frame, tb_lineno)
 
     rv = {
-        "filename": filename_for_module(module, abs_path) or None,
+        "filename": module
+        and abs_path
+        and filename_for_module(module, abs_path)
+        or None,
         "abs_path": os.path.abspath(abs_path) if abs_path else None,
         "function": function or "<unknown>",
         "module": module,
