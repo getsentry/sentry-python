@@ -4,13 +4,22 @@ import sys
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
+from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing import EnvironHeaders, record_http_request
 
+import sys
+import platform
 
 try:
     from httplib import HTTPConnection  # type: ignore
 except ImportError:
     from http.client import HTTPConnection
+
+_RUNTIME_CONTEXT = {
+    "name": platform.python_implementation(),
+    "version": "%s.%s.%s" % (sys.version_info[:3]),
+    "build": sys.version,
+}
 
 
 class StdlibIntegration(Integration):
@@ -21,6 +30,15 @@ class StdlibIntegration(Integration):
         # type: () -> None
         _install_httplib()
         _install_subprocess()
+
+        @add_global_event_processor
+        def add_python_runtime_context(event, hint):
+            if Hub.current.get_integration(StdlibIntegration) is not None:
+                contexts = event.setdefault("contexts", {})
+                if isinstance(contexts, dict) and "runtime" not in contexts:
+                    contexts["runtime"] = _RUNTIME_CONTEXT
+
+            return event
 
 
 def _install_httplib():

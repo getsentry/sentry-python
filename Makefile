@@ -50,7 +50,7 @@ lint: .venv
 
 apidocs-sphinx: .venv
 	@$(VENV_PATH)/bin/pip install --editable .
-	@$(VENV_PATH)/bin/pip install sphinx sphinx-rtd-theme 'git+https://github.com/untitaker/sphinx-autodoc-typehints@feat/type-hint-comments' typed_ast
+	@$(VENV_PATH)/bin/pip install -U -r ./docs-requirements.txt
 	@$(VENV_PATH)/bin/sphinx-build -b html docs/ docs/_build
 .PHONY: apidocs-sphinx
 

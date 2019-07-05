@@ -1,0 +1,4 @@
+sphinx
+sphinx-rtd-theme
+git+https://github.com/untitaker/sphinx-autodoc-typehints@feat/type-hint-comments
+typed_ast
