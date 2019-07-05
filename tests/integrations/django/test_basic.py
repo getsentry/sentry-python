@@ -164,8 +164,12 @@ def test_management_command_raises():
 
 
 @pytest.mark.django_db
-def test_sql_queries(sentry_init, capture_events):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+@pytest.mark.parametrize("with_integration", [True, False])
+def test_sql_queries(sentry_init, capture_events, with_integration):
+    sentry_init(
+        integrations=[DjangoIntegration()] if with_integration else [],
+        send_default_pii=True,
+    )
     from django.db import connection
 
     sql = connection.cursor()
@@ -179,9 +183,12 @@ def test_sql_queries(sentry_init, capture_events):
 
     event, = events
 
-    crumb = event["breadcrumbs"][-1]
+    if with_integration:
+        crumb = event["breadcrumbs"][-1]
 
-    assert crumb["message"] == """SELECT count(*) FROM people_person WHERE foo = 123"""
+        assert (
+            crumb["message"] == """SELECT count(*) FROM people_person WHERE foo = 123"""
+        )
 
 
 @pytest.mark.django_db
