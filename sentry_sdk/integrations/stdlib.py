@@ -1,14 +1,12 @@
 import os
 import subprocess
 import sys
+import platform
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing import EnvironHeaders, record_http_request
-
-import sys
-import platform
 
 try:
     from httplib import HTTPConnection  # type: ignore

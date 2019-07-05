@@ -50,6 +50,7 @@ class ClientConstructor(object):
         ca_certs=None,  # type: Optional[str]
         propagate_traces=True,  # type: bool
         traces_sample_rate=0.0,  # type: float
+        traceparent_v2=False,  # type: bool
     ):
         # type: (...) -> None
         pass

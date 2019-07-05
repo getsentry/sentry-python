@@ -35,10 +35,10 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
 @pytest.mark.parametrize("sampled", [True, False, None])
 def test_continue_from_headers(sentry_init, capture_events, sampled):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, traceparent_v2=True)
     events = capture_events()
 
-    with Hub.current.span(transaction="hi") as old_trace:
+    with Hub.current.span(transaction="hi"):
         with Hub.current.span() as old_span:
             old_span.sampled = sampled
             headers = dict(Hub.current.iter_trace_propagation_headers())

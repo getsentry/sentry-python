@@ -458,16 +458,16 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     ):
         # type: (...) -> Span
 
-        if span is None:
-            _, scope = self._stack[-1]
+        client, scope = self._stack[-1]
 
+        if span is None:
             if scope.span is not None:
                 span = scope.span.new_span(**kwargs)
             else:
                 span = Span(**kwargs)
 
         if span.sampled is None and span.transaction is not None:
-            sample_rate = self.client.options["traces_sample_rate"]
+            sample_rate = client and client.options["traces_sample_rate"] or 0
             span.sampled = random.random() < sample_rate
 
         return span
@@ -616,8 +616,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if not propagate_traces:
             return
 
-        for item in scope._span.iter_headers():
-            yield item
+        if client and client.options["traceparent_v2"]:
+            traceparent = scope._span.to_traceparent()
+        else:
+            traceparent = scope._span.to_legacy_traceparent()
+
+        yield "sentry-trace", traceparent
 
 
 GLOBAL_HUB = Hub()
