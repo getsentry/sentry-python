@@ -1044,7 +1044,7 @@ table {
     <li class="set"><h3><a href="#header-functions">Functions</a></h3>
       
   <ul>
-    <li class="mono"><a href="#sentry_sdk.integrations.stdlib.install_httplib">install_httplib</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.stdlib.get_subprocess_traceparent_headers">get_subprocess_traceparent_headers</a></li>
   </ul>
 
     </li>
@@ -1079,14 +1079,26 @@ table {
   
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.stdlib', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.stdlib" class="source">
-    <div class="codehilite"><pre><span></span><span class="kn">from</span> <span class="nn">sentry_sdk.hub</span> <span class="kn">import</span> <span class="n">Hub</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
+    <div class="codehilite"><pre><span></span><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">platform</span>
 
+<span class="kn">from</span> <span class="nn">sentry_sdk.hub</span> <span class="kn">import</span> <span class="n">Hub</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.scope</span> <span class="kn">import</span> <span class="n">add_global_event_processor</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.tracing</span> <span class="kn">import</span> <span class="n">EnvironHeaders</span><span class="p">,</span> <span class="n">record_http_request</span>
 
 <span class="k">try</span><span class="p">:</span>
     <span class="kn">from</span> <span class="nn">httplib</span> <span class="kn">import</span> <span class="n">HTTPConnection</span>  <span class="c1"># type: ignore</span>
 <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
     <span class="kn">from</span> <span class="nn">http.client</span> <span class="kn">import</span> <span class="n">HTTPConnection</span>
+
+<span class="n">_RUNTIME_CONTEXT</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">python_implementation</span><span class="p">(),</span>
+    <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">.</span><span class="si">%s</span><span class="s2">.</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">[:</span><span class="mi">3</span><span class="p">]),</span>
+    <span class="s2">&quot;build&quot;</span><span class="p">:</span> <span class="n">sys</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+<span class="p">}</span>
 
 
 <span class="k">class</span> <span class="nc">StdlibIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
@@ -1095,21 +1107,28 @@ table {
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
         <span class="c1"># type: () -&gt; None</span>
-        <span class="n">install_httplib</span><span class="p">()</span>
+        <span class="n">_install_httplib</span><span class="p">()</span>
+        <span class="n">_install_subprocess</span><span class="p">()</span>
+
+        <span class="nd">@add_global_event_processor</span>
+        <span class="k">def</span> <span class="nf">add_python_runtime_context</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">StdlibIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="n">contexts</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;contexts&quot;</span><span class="p">,</span> <span class="p">{})</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">contexts</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">&quot;runtime&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">contexts</span><span class="p">:</span>
+                    <span class="n">contexts</span><span class="p">[</span><span class="s2">&quot;runtime&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_RUNTIME_CONTEXT</span>
+
+            <span class="k">return</span> <span class="n">event</span>
 
 
-<span class="k">def</span> <span class="nf">install_httplib</span><span class="p">():</span>
+<span class="k">def</span> <span class="nf">_install_httplib</span><span class="p">():</span>
     <span class="c1"># type: () -&gt; None</span>
     <span class="n">real_putrequest</span> <span class="o">=</span> <span class="n">HTTPConnection</span><span class="o">.</span><span class="n">putrequest</span>
     <span class="n">real_getresponse</span> <span class="o">=</span> <span class="n">HTTPConnection</span><span class="o">.</span><span class="n">getresponse</span>
 
     <span class="k">def</span> <span class="nf">putrequest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="n">rv</span> <span class="o">=</span> <span class="n">real_putrequest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
         <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">StdlibIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">rv</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">_sentrysdk_data_dict</span> <span class="o">=</span> <span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">return</span> <span class="n">real_putrequest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
         <span class="n">host</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">host</span>
         <span class="n">port</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">port</span>
@@ -1124,31 +1143,97 @@ table {
                 <span class="n">url</span><span class="p">,</span>
             <span class="p">)</span>
 
-        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">hub</span><span class="o">.</span><span class="n">iter_trace_propagation_headers</span><span class="p">():</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">putheader</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+        <span class="n">recorder</span> <span class="o">=</span> <span class="n">record_http_request</span><span class="p">(</span><span class="n">hub</span><span class="p">,</span> <span class="n">real_url</span><span class="p">,</span> <span class="n">method</span><span class="p">)</span>
+        <span class="n">data_dict</span> <span class="o">=</span> <span class="n">recorder</span><span class="o">.</span><span class="fm">__enter__</span><span class="p">()</span>
 
-        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">real_url</span>
-        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">method</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">rv</span> <span class="o">=</span> <span class="n">real_putrequest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">hub</span><span class="o">.</span><span class="n">iter_trace_propagation_headers</span><span class="p">():</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">putheader</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">recorder</span><span class="o">.</span><span class="fm">__exit__</span><span class="p">(</span><span class="o">*</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
+            <span class="k">raise</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sentrysdk_recorder</span> <span class="o">=</span> <span class="n">recorder</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sentrysdk_data_dict</span> <span class="o">=</span> <span class="n">data_dict</span>
+
         <span class="k">return</span> <span class="n">rv</span>
 
     <span class="k">def</span> <span class="nf">getresponse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="n">rv</span> <span class="o">=</span> <span class="n">real_getresponse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-        <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">StdlibIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">rv</span>
+        <span class="n">recorder</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_sentrysdk_recorder&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
 
-        <span class="n">data</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_sentrysdk_data_dict&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">recorder</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">real_getresponse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="s2">&quot;status_code&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
-            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;status_code&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">status</span>
-            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;reason&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">reason</span>
-        <span class="n">hub</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span>
-            <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;http&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;httplib&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;httplib_response&quot;</span><span class="p">:</span> <span class="n">rv</span><span class="p">}</span>
-        <span class="p">)</span>
+        <span class="n">data_dict</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_sentrysdk_data_dict&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">rv</span> <span class="o">=</span> <span class="n">real_getresponse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">data_dict</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;httplib_response&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span>
+                <span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;status_code&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">status</span>
+                <span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;reason&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">reason</span>
+        <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+            <span class="c1"># python-requests provokes a typeerror to discover py3 vs py2 differences</span>
+            <span class="c1">#</span>
+            <span class="c1"># &gt; TypeError(&quot;getresponse() got an unexpected keyword argument &#39;buffering&#39;&quot;)</span>
+            <span class="k">raise</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">recorder</span><span class="o">.</span><span class="fm">__exit__</span><span class="p">(</span><span class="o">*</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
+            <span class="k">raise</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">recorder</span><span class="o">.</span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">None</span><span class="p">,</span> <span class="bp">None</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+
         <span class="k">return</span> <span class="n">rv</span>
 
     <span class="n">HTTPConnection</span><span class="o">.</span><span class="n">putrequest</span> <span class="o">=</span> <span class="n">putrequest</span>
     <span class="n">HTTPConnection</span><span class="o">.</span><span class="n">getresponse</span> <span class="o">=</span> <span class="n">getresponse</span>
+
+
+<span class="k">def</span> <span class="nf">_get_argument</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">position</span><span class="p">,</span> <span class="n">setdefault</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">setdefault</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">rv</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">setdefault</span>
+    <span class="k">elif</span> <span class="n">position</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="n">position</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">setdefault</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">rv</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="n">position</span><span class="p">]</span> <span class="o">=</span> <span class="n">setdefault</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">setdefault</span>
+
+    <span class="k">return</span> <span class="n">rv</span>
+
+
+<span class="k">def</span> <span class="nf">_install_subprocess</span><span class="p">():</span>
+    <span class="n">old_popen_init</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="o">.</span><span class="fm">__init__</span>
+
+    <span class="k">def</span> <span class="nf">sentry_patched_popen_init</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">a</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+        <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">StdlibIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">old_popen_init</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">a</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+
+        <span class="c1"># do not setdefault! args is required by Popen, doing setdefault would</span>
+        <span class="c1"># make invalid calls valid</span>
+        <span class="n">args</span> <span class="o">=</span> <span class="n">_get_argument</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">kw</span><span class="p">,</span> <span class="s2">&quot;args&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
+        <span class="n">cwd</span> <span class="o">=</span> <span class="n">_get_argument</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">kw</span><span class="p">,</span> <span class="s2">&quot;cwd&quot;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">hub</span><span class="o">.</span><span class="n">iter_trace_propagation_headers</span><span class="p">():</span>
+            <span class="n">env</span> <span class="o">=</span> <span class="n">_get_argument</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">kw</span><span class="p">,</span> <span class="s2">&quot;env&quot;</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="n">env</span><span class="p">[</span><span class="s2">&quot;SUBPROCESS_&quot;</span> <span class="o">+</span> <span class="n">k</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)]</span> <span class="o">=</span> <span class="n">v</span>
+
+        <span class="k">with</span> <span class="n">hub</span><span class="o">.</span><span class="n">span</span><span class="p">(</span><span class="n">op</span><span class="o">=</span><span class="s2">&quot;subprocess&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">args</span><span class="p">)))</span> <span class="k">as</span> <span class="n">span</span><span class="p">:</span>
+            <span class="n">span</span><span class="o">.</span><span class="n">set_tag</span><span class="p">(</span><span class="s2">&quot;subprocess.cwd&quot;</span><span class="p">,</span> <span class="n">cwd</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">old_popen_init</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">a</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+
+    <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="o">.</span><span class="fm">__init__</span> <span class="o">=</span> <span class="n">sentry_patched_popen_init</span>  <span class="c1"># type: ignore</span>
+
+
+<span class="k">def</span> <span class="nf">get_subprocess_traceparent_headers</span><span class="p">():</span>
+    <span class="k">return</span> <span class="n">EnvironHeaders</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;SUBPROCESS_&quot;</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1160,67 +1245,18 @@ table {
     <h2 class="section-title" id="header-functions">Functions</h2>
       
   <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.stdlib.install_httplib">
-    <p>def <span class="ident">install_httplib</span>(</p><p>)</p>
+    <div class="name def" id="sentry_sdk.integrations.stdlib.get_subprocess_traceparent_headers">
+    <p>def <span class="ident">get_subprocess_traceparent_headers</span>(</p><p>)</p>
     </div>
     
 
     
   
   <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.stdlib.install_httplib', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.stdlib.install_httplib" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">install_httplib</span><span class="p">():</span>
-    <span class="c1"># type: () -&gt; None</span>
-    <span class="n">real_putrequest</span> <span class="o">=</span> <span class="n">HTTPConnection</span><span class="o">.</span><span class="n">putrequest</span>
-    <span class="n">real_getresponse</span> <span class="o">=</span> <span class="n">HTTPConnection</span><span class="o">.</span><span class="n">getresponse</span>
-
-    <span class="k">def</span> <span class="nf">putrequest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="n">rv</span> <span class="o">=</span> <span class="n">real_putrequest</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">url</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-        <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">StdlibIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">rv</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">_sentrysdk_data_dict</span> <span class="o">=</span> <span class="n">data</span> <span class="o">=</span> <span class="p">{}</span>
-
-        <span class="n">host</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">host</span>
-        <span class="n">port</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">port</span>
-        <span class="n">default_port</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_port</span>
-
-        <span class="n">real_url</span> <span class="o">=</span> <span class="n">url</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">real_url</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s2">&quot;http://&quot;</span><span class="p">,</span> <span class="s2">&quot;https://&quot;</span><span class="p">)):</span>
-            <span class="n">real_url</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">://</span><span class="si">%s%s%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
-                <span class="n">default_port</span> <span class="o">==</span> <span class="mi">443</span> <span class="ow">and</span> <span class="s2">&quot;https&quot;</span> <span class="ow">or</span> <span class="s2">&quot;http&quot;</span><span class="p">,</span>
-                <span class="n">host</span><span class="p">,</span>
-                <span class="n">port</span> <span class="o">!=</span> <span class="n">default_port</span> <span class="ow">and</span> <span class="s2">&quot;:</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">port</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
-                <span class="n">url</span><span class="p">,</span>
-            <span class="p">)</span>
-
-        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">hub</span><span class="o">.</span><span class="n">iter_trace_propagation_headers</span><span class="p">():</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">putheader</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
-
-        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">real_url</span>
-        <span class="n">data</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">method</span>
-        <span class="k">return</span> <span class="n">rv</span>
-
-    <span class="k">def</span> <span class="nf">getresponse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="n">rv</span> <span class="o">=</span> <span class="n">real_getresponse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-        <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">StdlibIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">rv</span>
-
-        <span class="n">data</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_sentrysdk_data_dict&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
-
-        <span class="k">if</span> <span class="s2">&quot;status_code&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
-            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;status_code&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">status</span>
-            <span class="n">data</span><span class="p">[</span><span class="s2">&quot;reason&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span><span class="o">.</span><span class="n">reason</span>
-        <span class="n">hub</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span>
-            <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;http&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">&quot;httplib&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;httplib_response&quot;</span><span class="p">:</span> <span class="n">rv</span><span class="p">}</span>
-        <span class="p">)</span>
-        <span class="k">return</span> <span class="n">rv</span>
-
-    <span class="n">HTTPConnection</span><span class="o">.</span><span class="n">putrequest</span> <span class="o">=</span> <span class="n">putrequest</span>
-    <span class="n">HTTPConnection</span><span class="o">.</span><span class="n">getresponse</span> <span class="o">=</span> <span class="n">getresponse</span>
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.stdlib.get_subprocess_traceparent_headers', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.stdlib.get_subprocess_traceparent_headers" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">get_subprocess_traceparent_headers</span><span class="p">():</span>
+    <span class="k">return</span> <span class="n">EnvironHeaders</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;SUBPROCESS_&quot;</span><span class="p">)</span>
 </pre></div>
 
   </div>
@@ -1235,6 +1271,9 @@ table {
       <p id="sentry_sdk.integrations.stdlib.StdlibIntegration" class="name">class <span class="ident">StdlibIntegration</span></p>
       
   
+    <div class="desc"><p>Baseclass for all integrations.</p>
+<p>To accept options for an integration, implement your own constructor that
+saves those options on <code>self</code>.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.stdlib.StdlibIntegration', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.stdlib.StdlibIntegration" class="source">
@@ -1244,7 +1283,17 @@ table {
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
         <span class="c1"># type: () -&gt; None</span>
-        <span class="n">install_httplib</span><span class="p">()</span>
+        <span class="n">_install_httplib</span><span class="p">()</span>
+        <span class="n">_install_subprocess</span><span class="p">()</span>
+
+        <span class="nd">@add_global_event_processor</span>
+        <span class="k">def</span> <span class="nf">add_python_runtime_context</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">StdlibIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="n">contexts</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;contexts&quot;</span><span class="p">,</span> <span class="p">{})</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">contexts</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">&quot;runtime&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">contexts</span><span class="p">:</span>
+                    <span class="n">contexts</span><span class="p">[</span><span class="s2">&quot;runtime&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_RUNTIME_CONTEXT</span>
+
+            <span class="k">return</span> <span class="n">event</span>
 </pre></div>
 
   </div>
@@ -1256,7 +1305,7 @@ table {
           <ul class="class_list">
           <li><a href="#sentry_sdk.integrations.stdlib.StdlibIntegration">StdlibIntegration</a></li>
           <li>sentry_sdk.integrations.Integration</li>
-          <li>__builtin__.object</li>
+          <li>builtins.object</li>
           </ul>
           <h3>Class variables</h3>
             <div class="item">
@@ -1289,13 +1338,27 @@ table {
 
     
   
+    <div class="desc"><p>Initialize the integration.</p>
+<p>This function is only called once, ever. Configuration is not available
+at this point, so the only thing to do here is to hook into exception
+handlers, and perhaps do monkeypatches.</p>
+<p>Inside those hooks <code>Integration.current</code> can be used to access the
+instance again.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.stdlib.StdlibIntegration.setup_once', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.stdlib.StdlibIntegration.setup_once" class="source">
     <div class="codehilite"><pre><span></span><span class="nd">@staticmethod</span>
 <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
     <span class="c1"># type: () -&gt; None</span>
-    <span class="n">install_httplib</span><span class="p">()</span>
+    <span class="n">_install_httplib</span><span class="p">()</span>
+    <span class="n">_install_subprocess</span><span class="p">()</span>
+    <span class="nd">@add_global_event_processor</span>
+    <span class="k">def</span> <span class="nf">add_python_runtime_context</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">StdlibIntegration</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">contexts</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;contexts&quot;</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">contexts</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">&quot;runtime&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">contexts</span><span class="p">:</span>
+                <span class="n">contexts</span><span class="p">[</span><span class="s2">&quot;runtime&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_RUNTIME_CONTEXT</span>
+        <span class="k">return</span> <span class="n">event</span>
 </pre></div>
 
   </div>

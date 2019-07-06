@@ -1056,8 +1056,8 @@ table {
         
           
   <ul>
-    <li class="mono"><a href="#sentry_sdk.integrations.excepthook.ExcepthookIntegration.setup_once">setup_once</a></li>
     <li class="mono"><a href="#sentry_sdk.integrations.excepthook.ExcepthookIntegration.__init__">__init__</a></li>
+    <li class="mono"><a href="#sentry_sdk.integrations.excepthook.ExcepthookIntegration.setup_once">setup_once</a></li>
   </ul>
 
         </li>
@@ -1171,6 +1171,9 @@ table {
       <p id="sentry_sdk.integrations.excepthook.ExcepthookIntegration" class="name">class <span class="ident">ExcepthookIntegration</span></p>
       
   
+    <div class="desc"><p>Baseclass for all integrations.</p>
+<p>To accept options for an integration, implement your own constructor that
+saves those options on <code>self</code>.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.excepthook.ExcepthookIntegration', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.excepthook.ExcepthookIntegration" class="source">
@@ -1204,7 +1207,7 @@ table {
           <ul class="class_list">
           <li><a href="#sentry_sdk.integrations.excepthook.ExcepthookIntegration">ExcepthookIntegration</a></li>
           <li>sentry_sdk.integrations.Integration</li>
-          <li>__builtin__.object</li>
+          <li>builtins.object</li>
           </ul>
           <h3>Class variables</h3>
             <div class="item">
@@ -1240,6 +1243,34 @@ table {
           <h3>Static methods</h3>
             
   <div class="item">
+    <div class="name def" id="sentry_sdk.integrations.excepthook.ExcepthookIntegration.__init__">
+    <p>def <span class="ident">__init__</span>(</p><p>self, always_run=False)</p>
+    </div>
+    
+
+    
+  
+    <div class="desc"><p>Initialize self.  See help(type(self)) for accurate signature.</p></div>
+  <div class="source_cont">
+  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.excepthook.ExcepthookIntegration.__init__', this);">Show source &equiv;</a></p>
+  <div id="source-sentry_sdk.integrations.excepthook.ExcepthookIntegration.__init__" class="source">
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">always_run</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+    <span class="c1"># type: (bool) -&gt; None</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">always_run</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Invalid value for always_run: </span><span class="si">%s</span><span class="s2"> (must be type boolean)&quot;</span>
+            <span class="o">%</span> <span class="p">(</span><span class="n">always_run</span><span class="p">,)</span>
+        <span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">always_run</span> <span class="o">=</span> <span class="n">always_run</span>
+</pre></div>
+
+  </div>
+</div>
+
+  </div>
+  
+            
+  <div class="item">
     <div class="name def" id="sentry_sdk.integrations.excepthook.ExcepthookIntegration.setup_once">
     <p>def <span class="ident">setup_once</span>(</p><p>)</p>
     </div>
@@ -1247,6 +1278,12 @@ table {
 
     
   
+    <div class="desc"><p>Initialize the integration.</p>
+<p>This function is only called once, ever. Configuration is not available
+at this point, so the only thing to do here is to hook into exception
+handlers, and perhaps do monkeypatches.</p>
+<p>Inside those hooks <code>Integration.current</code> can be used to access the
+instance again.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.excepthook.ExcepthookIntegration.setup_once', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.integrations.excepthook.ExcepthookIntegration.setup_once" class="source">
@@ -1272,34 +1309,6 @@ table {
 </div>
 
             </div>
-          <h3>Methods</h3>
-            
-  <div class="item">
-    <div class="name def" id="sentry_sdk.integrations.excepthook.ExcepthookIntegration.__init__">
-    <p>def <span class="ident">__init__</span>(</p><p>self, always_run=False)</p>
-    </div>
-    
-
-    
-  
-  <div class="source_cont">
-  <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.integrations.excepthook.ExcepthookIntegration.__init__', this);">Show source &equiv;</a></p>
-  <div id="source-sentry_sdk.integrations.excepthook.ExcepthookIntegration.__init__" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">always_run</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
-    <span class="c1"># type: (bool) -&gt; None</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">always_run</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="s2">&quot;Invalid value for always_run: </span><span class="si">%s</span><span class="s2"> (must be type boolean)&quot;</span>
-            <span class="o">%</span> <span class="p">(</span><span class="n">always_run</span><span class="p">,)</span>
-        <span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">always_run</span> <span class="o">=</span> <span class="n">always_run</span>
-</pre></div>
-
-  </div>
-</div>
-
-  </div>
-  
       </div>
       </div>
 
