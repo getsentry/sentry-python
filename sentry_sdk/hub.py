@@ -34,7 +34,7 @@ if MYPY:
     from typing import ContextManager
 
     from sentry_sdk.integrations import Integration
-    from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint
+    from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint, ExcInfo
     from sentry_sdk.consts import ClientConstructor
 
     T = TypeVar("T")
@@ -318,12 +318,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         hint=None,  # type: Optional[Hint]
     ):
         # type: (...) -> Optional[str]
-        """Captures an event.  The return value is the ID of the event.
-
-        The event is a dictionary following the Sentry v7/v8 protocol
-        specification.  Optionally an event hint dict can be passed that
-        is used by processors to extract additional information from it.
-        Typically the event hint object would contain exception information.
+        """Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`.
         """
         client, scope = self._stack[-1]
         if client is not None:
@@ -341,6 +336,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         # type: (...) -> Optional[str]
         """Captures a message.  The message is just a string.  If no level
         is provided the default level is `info`.
+
+        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
         if self.client is None:
             return None
@@ -349,14 +346,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return self.capture_event({"message": message, "level": level})
 
     def capture_exception(
-        self, error=None  # type: Optional[BaseException]
+        self, error=None  # type: Optional[Union[BaseException, ExcInfo]]
     ):
         # type: (...) -> Optional[str]
         """Captures an exception.
 
-        The argument passed can be `None` in which case the last exception
-        will be reported, otherwise an exception object or an `exc_info`
-        tuple.
+        :param error: An exception to catch. If `None`, `sys.exc_info()` will be used.
+
+        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
         client = self.client
         if client is None:
@@ -378,8 +375,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self, exc_info  # type: Any
     ):
         # type: (...) -> Any
-        """Capture an exception that is likely caused by a bug in the SDK
-        itself."""
+        """
+        Capture an exception that is likely caused by a bug in the SDK
+        itself.
+
+        These exceptions do not end up in Sentry and are just logged instead.
+        """
         logger.error("Internal error in sentry_sdk", exc_info=exc_info)  # type: ignore
 
     def add_breadcrumb(
@@ -389,10 +390,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         **kwargs  # type: Any
     ):
         # type: (...) -> None
-        """Adds a breadcrumb.  The breadcrumbs are a dictionary with the
-        data as the sentry v7/v8 protocol expects.  `hint` is an optional
-        value that can be used by `before_breadcrumb` to customize the
-        breadcrumbs that are emitted.
+        """
+        Adds a breadcrumb.
+
+        :param crumb: Dictionary with the data as the sentry v7/v8 protocol expects.
+
+        :param hint: An optional value that can be used by `before_breadcrumb`
+            to customize the breadcrumbs that are emitted.
         """
         client, scope = self._stack[-1]
         if client is None:
@@ -432,6 +436,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         **kwargs  # type: Any
     ):
         # type: (...) -> Generator[Span, None, None]
+        # TODO: Document
         span = self.start_span(span=span, **kwargs)
 
         _, scope = self._stack[-1]
@@ -460,6 +465,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         **kwargs  # type: Any
     ):
         # type: (...) -> Span
+        # TODO: Document
 
         client, scope = self._stack[-1]
 
@@ -479,6 +485,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self, span  # type: Span
     ):
         # type: (...) -> Optional[str]
+        # TODO: Document
         if span.timestamp is None:
             # This transaction is not yet finished so we just finish it.
             span.finish()
@@ -532,9 +539,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self, callback=None  # type: Optional[Callable[[Scope], None]]
     ):
         # type: (...) -> Optional[ContextManager[Scope]]
-        """Pushes a new layer on the scope stack. Returns a context manager
-        that should be used to pop the scope again.  Alternatively a callback
-        can be provided that is executed in the context of the scope.
+        """
+        Pushes a new layer on the scope stack.
+
+        :param callback: If provided, this method pushes a scope, calls
+            `callback`, and pops the scope again.
+
+        :returns: If no `callback` is provided, a context manager that should
+            be used to pop the scope again.
         """
 
         if callback is not None:
@@ -552,8 +564,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def pop_scope_unsafe(self):
         # type: () -> Tuple[Optional[Client], Scope]
-        """Pops a scope layer from the stack. Try to use the context manager
-        `push_scope()` instead."""
+        """
+        Pops a scope layer from the stack.
+
+        Try to use the context manager :py:meth:`push_scope` instead.
+        """
         rv = self._stack.pop()
         assert self._stack, "stack must have at least one layer"
         return rv
@@ -577,7 +592,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     ):  # noqa
         # type: (...) -> Optional[ContextManager[Scope]]
 
-        """Reconfigures the scope."""
+        """
+        Reconfigures the scope.
+
+        :param callback: If provided, call the callback with the current scope.
+
+        :returns: If no callback is provided, returns a context manager that returns the scope.
+        """
 
         client, scope = self._stack[-1]
         if callback is not None:
@@ -611,6 +632,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def iter_trace_propagation_headers(self):
         # type: () -> Generator[Tuple[str, str], None, None]
+        # TODO: Document
         client, scope = self._stack[-1]
         if scope._span is None:
             return

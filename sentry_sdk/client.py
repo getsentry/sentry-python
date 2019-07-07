@@ -2,6 +2,7 @@ import os
 import uuid
 import random
 from datetime import datetime
+import socket
 
 from sentry_sdk._compat import string_types, text_type, iteritems
 from sentry_sdk.utils import (
@@ -58,6 +59,9 @@ def _get_options(*args, **kwargs):
 
     if rv["environment"] is None:
         rv["environment"] = os.environ.get("SENTRY_ENVIRONMENT")
+
+    if rv["server_name"] is None and hasattr(socket, "gethostname"):
+        rv["server_name"] = socket.gethostname()
 
     return rv  # type: ignore
 
@@ -208,16 +212,14 @@ class _Client(object):
         return True
 
     def capture_event(self, event, hint=None, scope=None):
-        # type: (Dict[str, Any], Optional[Any], Optional[Scope]) -> Optional[str]
+        # type: (Event, Optional[Hint], Optional[Scope]) -> Optional[str]
         """Captures an event.
 
-        This takes the ready made event and an optional hint and scope.  The
-        hint is internally used to further customize the representation of the
-        error.  When provided it's a dictionary of optional information such
-        as exception info.
+        :param event: A ready-made event that can be directly sent to Sentry.
 
-        If the transport is not set nothing happens, otherwise the return
-        value of this function will be the ID of the captured event.
+        :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
+
+        :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
         if self.transport is None:
             return None
@@ -234,26 +236,33 @@ class _Client(object):
         self.transport.capture_event(event)
         return rv
 
-    def close(self, timeout=None, callback=None):
-        # type: (Optional[float], Optional[Callable[[int, float], None]]) -> None
+    def close(
+        self,
+        timeout=None,  # type: Optional[float]
+        callback=None,  # type: Optional[Callable[[int, float], None]]
+    ):
+        # type: (...) -> None
         """
         Close the client and shut down the transport. Arguments have the same
-        semantics as `self.flush()`.
+        semantics as :py:meth:`Client.flush`.
         """
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
             self.transport.kill()
             self.transport = None
 
-    def flush(self, timeout=None, callback=None):
-        # type: (Optional[float], Optional[Callable[[int, float], None]]) -> None
+    def flush(
+        self,
+        timeout=None,  # type: Optional[float]
+        callback=None,  # type: Optional[Callable[[int, float], None]]
+    ):
+        # type: (...) -> None
         """
-        Wait `timeout` seconds for the current events to be sent. If no
-        `timeout` is provided, the `shutdown_timeout` option value is used.
+        Wait for the current events to be sent.
 
-        The `callback` is invoked with two arguments: the number of pending
-        events and the configured timeout.  For instance the default atexit
-        integration will use this to render out a message on stderr.
+        :param timeout: Wait for at most `timeout` seconds. If no `timeout` is provided, the `shutdown_timeout` option value is used.
+
+        :param callback: Is invoked with the number of pending events and the configured timeout.
         """
         if self.transport is not None:
             if timeout is None:

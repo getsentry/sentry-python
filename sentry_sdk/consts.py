@@ -1,5 +1,3 @@
-import socket
-
 from sentry_sdk._types import MYPY
 
 if MYPY:
@@ -17,9 +15,6 @@ if MYPY:
     from sentry_sdk._types import Event, EventProcessor, BreadcrumbProcessor
 
 
-DEFAULT_SERVER_NAME = socket.gethostname() if hasattr(socket, "gethostname") else None
-
-
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
 # take these arguments (even though they take opaque **kwargs)
 class ClientConstructor(object):
@@ -30,7 +25,7 @@ class ClientConstructor(object):
         max_breadcrumbs=100,  # type: int
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
-        server_name=DEFAULT_SERVER_NAME,  # type: Optional[str]
+        server_name=None,  # type: Optional[str]
         shutdown_timeout=2,  # type: int
         integrations=[],  # type: List[Integration]
         in_app_include=[],  # type: List[str]
