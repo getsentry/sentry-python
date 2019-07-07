@@ -4,7 +4,8 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Callable
     from typing import Any

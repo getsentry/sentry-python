@@ -18,7 +18,8 @@ from sanic.exceptions import SanicException  # type: ignore
 from sanic.router import Router  # type: ignore
 from sanic.handlers import ErrorHandler  # type: ignore
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Any
     from typing import Callable
@@ -28,7 +29,7 @@ if MYPY:
 
     from sanic.request import Request, RequestParameters  # type: ignore
 
-    from sentry_sdk.utils import Event, EventProcessor, Hint
+    from sentry_sdk._types import Event, EventProcessor, Hint
 
 
 class SanicIntegration(Integration):

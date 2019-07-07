@@ -4,14 +4,15 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Any
     from typing import Dict
     from typing import Tuple
     from typing import Iterator
 
-    from sentry_sdk.utils import Event
+    from sentry_sdk._types import Event
 
 
 _installed_modules = None

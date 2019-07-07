@@ -5,7 +5,8 @@ from itertools import chain
 
 from sentry_sdk.utils import logger, capture_internal_exceptions
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Any
     from typing import Dict
@@ -15,7 +16,13 @@ if MYPY:
     from typing import Callable
     from typing import TypeVar
 
-    from sentry_sdk.utils import Breadcrumb, Event, EventProcessor, ErrorProcessor, Hint
+    from sentry_sdk._types import (
+        Breadcrumb,
+        Event,
+        EventProcessor,
+        ErrorProcessor,
+        Hint,
+    )
 
     F = TypeVar("F", bound=Callable[..., Any])
 

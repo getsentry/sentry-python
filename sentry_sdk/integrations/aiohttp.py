@@ -15,7 +15,8 @@ from sentry_sdk.utils import (
 import asyncio
 from aiohttp.web import Application, HTTPException  # type: ignore
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from aiohttp.web_request import Request  # type: ignore
     from typing import Any

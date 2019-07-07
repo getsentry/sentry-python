@@ -1,6 +1,7 @@
 import sys
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Optional
     from typing import Tuple

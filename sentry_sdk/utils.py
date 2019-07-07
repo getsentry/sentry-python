@@ -8,7 +8,8 @@ from datetime import datetime
 
 from sentry_sdk._compat import urlparse, text_type, implements_str, int_types, PY2
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Any
     from typing import Callable
@@ -18,26 +19,13 @@ if MYPY:
     from typing import Optional
     from typing import Set
     from typing import Tuple
-    from typing import Type
     from typing import Union
     from types import FrameType
     from types import TracebackType
 
-    from sentry_sdk.hub import Hub
+    import sentry_sdk
 
-    ExcInfo = Tuple[
-        Optional[Type[BaseException]], Optional[BaseException], Optional[TracebackType]
-    ]
-
-    Event = Dict[str, Any]
-    Hint = Dict[str, Any]
-
-    Breadcrumb = Dict[str, Any]
-    BreadcrumbHint = Dict[str, Any]
-
-    EventProcessor = Callable[[Event, Hint], Optional[Event]]
-    ErrorProcessor = Callable[[Event, ExcInfo], Optional[Event]]
-    BreadcrumbProcessor = Callable[[Breadcrumb, BreadcrumbHint], Optional[Breadcrumb]]
+    from sentry_sdk._types import ExcInfo
 
 epoch = datetime(1970, 1, 1)
 
@@ -50,7 +38,7 @@ MAX_FORMAT_PARAM_LENGTH = 128
 
 
 def _get_debug_hub():
-    # type: () -> Optional[Hub]
+    # type: () -> Optional[sentry_sdk.Hub]
     # This function is replaced by debug.py
     pass
 

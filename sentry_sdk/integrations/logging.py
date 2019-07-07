@@ -13,7 +13,8 @@ from sentry_sdk.utils import (
 from sentry_sdk.integrations import Integration
 from sentry_sdk._compat import iteritems
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from logging import LogRecord
     from typing import Any

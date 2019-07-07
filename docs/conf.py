@@ -3,6 +3,10 @@
 import os
 import sys
 
+import typing
+
+typing.TYPE_CHECKING = True
+
 #
 # Configuration file for the Sphinx documentation builder.
 #
@@ -36,6 +40,7 @@ extensions = [
     "sphinx_autodoc_typehints",
     "sphinx.ext.viewcode",
     "sphinx.ext.githubpages",
+    "sphinx.ext.intersphinx",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -74,19 +79,7 @@ pygments_style = None
 
 on_rtd = os.environ.get("READTHEDOCS", None) == "True"
 
-try:
-    import sphinx_rtd_theme
-
-    html_theme = "sphinx_rtd_theme"
-    html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
-except ImportError:
-    html_theme = "default"
-    if not on_rtd:
-        print("-" * 74)
-        print(
-            "Warning: sphinx-rtd-theme not installed, building with default " "theme."
-        )
-        print("-" * 74)
+html_theme = "alabaster"
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -188,3 +181,5 @@ epub_title = project
 
 # A list of files that should not be packed into the epub file.
 epub_exclude_files = ["search.html"]
+
+intersphinx_mapping = {"python": ("https://docs.python.org/3", None)}

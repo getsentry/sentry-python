@@ -1,4 +1,4 @@
 sphinx
 sphinx-rtd-theme
-git+https://github.com/untitaker/sphinx-autodoc-typehints@feat/type-hint-comments
+git+https://github.com/agronholm/sphinx-autodoc-typehints
 typed_ast

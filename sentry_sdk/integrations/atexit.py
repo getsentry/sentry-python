@@ -8,7 +8,8 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.utils import logger
 from sentry_sdk.integrations import Integration
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
 
     from typing import Any

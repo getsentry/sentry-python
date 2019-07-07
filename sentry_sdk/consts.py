@@ -1,6 +1,5 @@
-import socket
+from sentry_sdk._types import MYPY
 
-MYPY = False
 if MYPY:
     from typing import Optional
     from typing import Callable
@@ -13,10 +12,7 @@ if MYPY:
     from sentry_sdk.transport import Transport
     from sentry_sdk.integrations import Integration
 
-    from sentry_sdk.utils import Event, EventProcessor, BreadcrumbProcessor
-
-
-DEFAULT_SERVER_NAME = socket.gethostname() if hasattr(socket, "gethostname") else None
+    from sentry_sdk._types import Event, EventProcessor, BreadcrumbProcessor
 
 
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
@@ -29,7 +25,7 @@ class ClientConstructor(object):
         max_breadcrumbs=100,  # type: int
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
-        server_name=DEFAULT_SERVER_NAME,  # type: Optional[str]
+        server_name=None,  # type: Optional[str]
         shutdown_timeout=2,  # type: int
         integrations=[],  # type: List[Integration]
         in_app_include=[],  # type: List[str]
