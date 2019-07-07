@@ -211,8 +211,13 @@ class _Client(object):
 
         return True
 
-    def capture_event(self, event, hint=None, scope=None):
-        # type: (Event, Optional[Hint], Optional[Scope]) -> Optional[str]
+    def capture_event(
+        self,
+        event,  # type: Event
+        hint=None,  # type: Optional[Hint]
+        scope=None,  # type: Optional[Scope]
+    ):
+        # type: (...) -> Optional[str]
         """Captures an event.
 
         :param event: A ready-made event that can be directly sent to Sentry.
