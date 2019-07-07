@@ -1,6 +1,7 @@
 import socket
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Optional
     from typing import Callable
@@ -13,7 +14,7 @@ if MYPY:
     from sentry_sdk.transport import Transport
     from sentry_sdk.integrations import Integration
 
-    from sentry_sdk.utils import Event, EventProcessor, BreadcrumbProcessor
+    from sentry_sdk._types import Event, EventProcessor, BreadcrumbProcessor
 
 
 DEFAULT_SERVER_NAME = socket.gethostname() if hasattr(socket, "gethostname") else None

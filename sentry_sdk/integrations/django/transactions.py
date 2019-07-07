@@ -7,7 +7,8 @@ from __future__ import absolute_import
 
 import re
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from django.urls.resolvers import URLResolver  # type: ignore
     from typing import Dict

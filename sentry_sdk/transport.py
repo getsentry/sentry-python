@@ -8,11 +8,11 @@ import gzip
 
 from datetime import datetime, timedelta
 
-from sentry_sdk.consts import VERSION
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Type
     from typing import Any
@@ -23,7 +23,7 @@ if MYPY:
     from urllib3.poolmanager import PoolManager  # type: ignore
     from urllib3.poolmanager import ProxyManager
 
-    from sentry_sdk.utils import Event
+    from sentry_sdk._types import Event
 
 try:
     from urllib.request import getproxies
@@ -87,6 +87,8 @@ class HttpTransport(Transport):
         self, options  # type: Dict[str, Any]
     ):
         # type: (...) -> None
+        from sentry_sdk.consts import VERSION
+
         Transport.__init__(self, options)
         assert self.parsed_dsn is not None
         self._worker = BackgroundWorker()

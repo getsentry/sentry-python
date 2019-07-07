@@ -6,7 +6,8 @@ from sentry_sdk._compat import PY2, reraise, iteritems
 from sentry_sdk.tracing import Span
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Callable
     from typing import Dict

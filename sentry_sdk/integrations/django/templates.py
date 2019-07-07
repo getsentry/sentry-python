@@ -1,6 +1,7 @@
 from django.template import TemplateSyntaxError  # type: ignore
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Any
     from typing import Dict

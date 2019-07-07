@@ -18,11 +18,9 @@ from sentry_sdk.utils import (
     ContextVar,
 )
 
-MYPY = False
-if MYPY:
-    from contextlib import ContextManager
-    from sys import _OptExcInfo
+from sentry_sdk._types import MYPY
 
+if MYPY:
     from typing import Union
     from typing import Any
     from typing import Optional
@@ -33,9 +31,10 @@ if MYPY:
     from typing import Type
     from typing import TypeVar
     from typing import overload
+    from typing import ContextManager
 
     from sentry_sdk.integrations import Integration
-    from sentry_sdk.utils import Event, Hint, Breadcrumb, BreadcrumbHint
+    from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint
     from sentry_sdk.consts import ClientConstructor
 
     T = TypeVar("T")
@@ -90,7 +89,8 @@ def _init(*args, **kwargs):
     return rv
 
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     # Make mypy, PyCharm and other static analyzers think `init` is a type to
     # have nicer autocompletion for params.
@@ -375,7 +375,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return None
 
     def _capture_internal_exception(
-        self, exc_info  # type: _OptExcInfo
+        self, exc_info  # type: Any
     ):
         # type: (...) -> Any
         """Capture an exception that is likely caused by a bug in the SDK

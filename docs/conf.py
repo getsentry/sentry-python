@@ -3,6 +3,10 @@
 import os
 import sys
 
+import typing
+
+typing.TYPE_CHECKING = True
+
 #
 # Configuration file for the Sphinx documentation builder.
 #

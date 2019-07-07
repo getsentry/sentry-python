@@ -17,7 +17,8 @@ from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO, ClientConstructor
 from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Any
     from typing import Callable
@@ -25,7 +26,7 @@ if MYPY:
     from typing import Optional
 
     from sentry_sdk.scope import Scope
-    from sentry_sdk.utils import Event, Hint
+    from sentry_sdk._types import Event, Hint
 
 
 _client_init_debug = ContextVar("client_init_debug")
@@ -268,7 +269,8 @@ class _Client(object):
         self.close()
 
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     # Make mypy, PyCharm and other static analyzers think `get_options` is a
     # type to have nicer autocompletion for params.

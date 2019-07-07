@@ -11,7 +11,8 @@ from rq.timeouts import JobTimeoutException  # type: ignore
 from rq.worker import Worker  # type: ignore
 from rq.queue import Queue  # type: ignore
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Any
     from typing import Dict

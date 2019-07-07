@@ -4,16 +4,17 @@ from contextlib import contextmanager
 from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Any
     from typing import Optional
     from typing import overload
     from typing import Callable
     from typing import TypeVar
-    from contextlib import ContextManager
+    from typing import ContextManager
 
-    from sentry_sdk.utils import Event, Hint, Breadcrumb, BreadcrumbHint
+    from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])

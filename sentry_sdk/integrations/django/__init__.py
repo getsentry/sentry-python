@@ -8,7 +8,8 @@ import weakref
 from django import VERSION as DJANGO_VERSION  # type: ignore
 from django.core import signals  # type: ignore
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Any
     from typing import Callable
@@ -22,7 +23,7 @@ if MYPY:
     from django.utils.datastructures import MultiValueDict  # type: ignore
 
     from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from sentry_sdk.utils import Event, Hint
+    from sentry_sdk._types import Event, Hint
 
 
 try:

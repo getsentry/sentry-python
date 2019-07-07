@@ -3,11 +3,12 @@ from sentry_sdk.utils import ContextVar
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 
-MYPY = False
+from sentry_sdk._types import MYPY
+
 if MYPY:
     from typing import Optional
 
-    from sentry_sdk.utils import Event, Hint
+    from sentry_sdk._types import Event, Hint
 
 
 class DedupeIntegration(Integration):
