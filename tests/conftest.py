@@ -48,6 +48,24 @@ def internal_exceptions(request, monkeypatch):
     return errors
 
 
+@pytest.fixture(autouse=True)
+def internal_warnings():
+    with pytest.warns(None) as recorder:
+        yield
+
+    for warning in recorder:
+        try:
+            if isinstance(warning.message, ResourceWarning):
+                continue
+        except NameError:
+            pass
+
+        if "getfuncargvalue" in str(warning.message):
+            continue
+
+        raise AssertionError(warning)
+
+
 @pytest.fixture
 def monkeypatch_test_transport(monkeypatch, assert_semaphore_acceptance):
     def check_event(event):
