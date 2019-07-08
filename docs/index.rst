@@ -10,5 +10,4 @@ visit the `GitHub repository <https://github.com/getsentry/sentry-python>`_.
 
 .. automodule:: sentry_sdk
     :members:
-
     :inherited-members:
