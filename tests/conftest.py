@@ -60,7 +60,16 @@ def internal_warnings():
         except NameError:
             pass
 
+        # pytest-django
         if "getfuncargvalue" in str(warning.message):
+            continue
+
+        # Happens when re-initializing the SDK
+        if "but it was only enabled on init()" in str(warning.message):
+            continue
+
+        # sanic's usage of aiohttp for test client
+        if "verify_ssl is deprecated, use ssl=False instead" in str(warning.message):
             continue
 
         raise AssertionError(warning)
