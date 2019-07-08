@@ -5,16 +5,11 @@ import sys
 
 import pytest
 
-
-# This is used in _capture_internal_warnings. We need to run this at import
-# time because that's where many deprecation warnings might get thrown
-assert "sentry_sdk" not in sys.modules
-_warning_recorder_mgr = pytest.warns(None)
-_warning_recorder = _warning_recorder_mgr.__enter__()
-
 import sentry_sdk
 from sentry_sdk._compat import reraise, string_types, iteritems
 from sentry_sdk.transport import Transport
+
+from tests import _warning_recorder, _warning_recorder_mgr
 
 SEMAPHORE = "./semaphore"
 
