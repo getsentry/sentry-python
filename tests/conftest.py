@@ -72,6 +72,16 @@ def internal_warnings():
         if "verify_ssl is deprecated, use ssl=False instead" in str(warning.message):
             continue
 
+        if "getargspec" in str(warning.message) and warning.filename.endswith(
+            ("pyramid/config/util.py", "pyramid/config/views.py")
+        ):
+            continue
+
+        if "isAlive() is deprecated" in str(
+            warning.message
+        ) and warning.filename.endswith("celery/utils/timer2.py"):
+            continue
+
         raise AssertionError(warning)
 
 
