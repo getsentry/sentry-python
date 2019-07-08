@@ -1,8 +1,16 @@
 import os
 import subprocess
 import json
+import sys
 
 import pytest
+
+
+# This is used in _capture_internal_warnings. We need to run this at import
+# time because that's where many deprecation warnings might get thrown
+assert "sentry_sdk" not in sys.modules
+_warning_recorder_mgr = pytest.warns(None)
+_warning_recorder = _warning_recorder_mgr.__enter__()
 
 import sentry_sdk
 from sentry_sdk._compat import reraise, string_types, iteritems
@@ -48,10 +56,12 @@ def internal_exceptions(request, monkeypatch):
     return errors
 
 
-@pytest.fixture(autouse=True)
-def internal_warnings():
-    with pytest.warns(None) as recorder:
-        yield
+@pytest.fixture(autouse=True, scope="session")
+def _capture_internal_warnings():
+    yield
+
+    _warning_recorder_mgr.__exit__(None, None, None)
+    recorder = _warning_recorder
 
     for warning in recorder:
         try:
@@ -83,7 +93,7 @@ def internal_warnings():
             continue
 
         if "collections.abc" in str(warning.message) and warning.filename.endswith(
-            "celery/canvas.py"
+            ("celery/canvas.py", "werkzeug/datastructures.py")
         ):
             continue
 
