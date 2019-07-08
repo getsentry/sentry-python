@@ -92,6 +92,12 @@ def _capture_internal_warnings():
         ):
             continue
 
+        # Django 1.7 emits a (seemingly) false-positive warning for our test
+        # app and suggests to use a middleware that does not exist in later
+        # Django versions.
+        if "SessionAuthenticationMiddleware" in str(warning.message):
+            continue
+
         raise AssertionError(warning)
 
 
