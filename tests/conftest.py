@@ -82,6 +82,11 @@ def internal_warnings():
         ) and warning.filename.endswith("celery/utils/timer2.py"):
             continue
 
+        if "collections.abc" in str(warning.message) and warning.filename.endswith(
+            "celery/canvas.py"
+        ):
+            continue
+
         raise AssertionError(warning)
 
 
