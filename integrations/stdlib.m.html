@@ -1192,17 +1192,28 @@ table {
     <span class="n">HTTPConnection</span><span class="o">.</span><span class="n">getresponse</span> <span class="o">=</span> <span class="n">getresponse</span>
 
 
-<span class="k">def</span> <span class="nf">_get_argument</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">position</span><span class="p">,</span> <span class="n">setdefault</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">_init_argument</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">position</span><span class="p">,</span> <span class="n">setdefault_callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    given (*args, **kwargs) of a function call, retrieve (and optionally set a</span>
+<span class="sd">    default for) an argument by either name or position.</span>
+
+<span class="sd">    This is useful for wrapping functions with complex type signatures and</span>
+<span class="sd">    extracting a few arguments without needing to redefine that function&#39;s</span>
+<span class="sd">    entire type signature.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
         <span class="n">rv</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
-        <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">setdefault</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="n">rv</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">setdefault</span>
+        <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">setdefault_callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">rv</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">setdefault_callback</span><span class="p">()</span>
     <span class="k">elif</span> <span class="n">position</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
         <span class="n">rv</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="n">position</span><span class="p">]</span>
-        <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">setdefault</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-            <span class="n">rv</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="n">position</span><span class="p">]</span> <span class="o">=</span> <span class="n">setdefault</span>
+        <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="bp">None</span> <span class="ow">and</span> <span class="n">setdefault_callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">rv</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="n">position</span><span class="p">]</span> <span class="o">=</span> <span class="n">setdefault_callback</span><span class="p">()</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="n">rv</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">setdefault</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">setdefault_callback</span> <span class="ow">and</span> <span class="n">setdefault_callback</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">rv</span>
 
     <span class="k">return</span> <span class="n">rv</span>
 
@@ -1217,11 +1228,14 @@ table {
 
         <span class="c1"># do not setdefault! args is required by Popen, doing setdefault would</span>
         <span class="c1"># make invalid calls valid</span>
-        <span class="n">args</span> <span class="o">=</span> <span class="n">_get_argument</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">kw</span><span class="p">,</span> <span class="s2">&quot;args&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
-        <span class="n">cwd</span> <span class="o">=</span> <span class="n">_get_argument</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">kw</span><span class="p">,</span> <span class="s2">&quot;cwd&quot;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+        <span class="n">args</span> <span class="o">=</span> <span class="n">_init_argument</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">kw</span><span class="p">,</span> <span class="s2">&quot;args&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
+        <span class="n">cwd</span> <span class="o">=</span> <span class="n">_init_argument</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">kw</span><span class="p">,</span> <span class="s2">&quot;cwd&quot;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
+        <span class="n">env</span> <span class="o">=</span> <span class="bp">None</span>
 
         <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">hub</span><span class="o">.</span><span class="n">iter_trace_propagation_headers</span><span class="p">():</span>
-            <span class="n">env</span> <span class="o">=</span> <span class="n">_get_argument</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">kw</span><span class="p">,</span> <span class="s2">&quot;env&quot;</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="k">if</span> <span class="n">env</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+                <span class="n">env</span> <span class="o">=</span> <span class="n">_init_argument</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">kw</span><span class="p">,</span> <span class="s2">&quot;env&quot;</span><span class="p">,</span> <span class="mi">11</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">))</span>
             <span class="n">env</span><span class="p">[</span><span class="s2">&quot;SUBPROCESS_&quot;</span> <span class="o">+</span> <span class="n">k</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)]</span> <span class="o">=</span> <span class="n">v</span>
 
         <span class="k">with</span> <span class="n">hub</span><span class="o">.</span><span class="n">span</span><span class="p">(</span><span class="n">op</span><span class="o">=</span><span class="s2">&quot;subprocess&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">args</span><span class="p">)))</span> <span class="k">as</span> <span class="n">span</span><span class="p">:</span>

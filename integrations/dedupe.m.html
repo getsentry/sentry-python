@@ -1085,11 +1085,12 @@ table {
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">Integration</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.scope</span> <span class="kn">import</span> <span class="n">add_global_event_processor</span>
 
-<span class="n">MYPY</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">MYPY</span>
+
 <span class="k">if</span> <span class="n">MYPY</span><span class="p">:</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
 
-    <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">Hint</span>
+    <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">Hint</span>
 
 
 <span class="k">class</span> <span class="nc">DedupeIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>

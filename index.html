@@ -1209,10 +1209,10 @@ table {
     
   
     <div class="desc"><p>Alias for :py:meth:<a href="#sentry_sdk.Hub.add_breadcrumb"><code>add_breadcrumb</code></a></p>
-<p>Adds a breadcrumb.  The breadcrumbs are a dictionary with the
-data as the sentry v7/v8 protocol expects.  <code>hint</code> is an optional
-value that can be used by <code>before_breadcrumb</code> to customize the
-breadcrumbs that are emitted.</p></div>
+<p>Adds a breadcrumb.</p>
+<p>:param crumb: Dictionary with the data as the sentry v7/v8 protocol expects.</p>
+<p>:param hint: An optional value that can be used by <code>before_breadcrumb</code>
+    to customize the breadcrumbs that are emitted.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.add_breadcrumb', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.add_breadcrumb" class="source">
@@ -1243,11 +1243,7 @@ breadcrumbs that are emitted.</p></div>
     
   
     <div class="desc"><p>Alias for :py:meth:<a href="#sentry_sdk.Hub.capture_event"><code>capture_event</code></a></p>
-<p>Captures an event.  The return value is the ID of the event.</p>
-<p>The event is a dictionary following the Sentry v7/v8 protocol
-specification.  Optionally an event hint dict can be passed that
-is used by processors to extract additional information from it.
-Typically the event hint object would contain exception information.</p></div>
+<p>Captures an event. Alias of :py:meth:<code>sentry_sdk.Client.capture_event</code>.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.capture_event', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.capture_event" class="source">
@@ -1279,9 +1275,8 @@ Typically the event hint object would contain exception information.</p></div>
   
     <div class="desc"><p>Alias for :py:meth:<a href="#sentry_sdk.Hub.capture_exception"><code>capture_exception</code></a></p>
 <p>Captures an exception.</p>
-<p>The argument passed can be <code>None</code> in which case the last exception
-will be reported, otherwise an exception object or an <code>exc_info</code>
-tuple.</p></div>
+<p>:param error: An exception to catch. If <code>None</code>, <code>sys.exc_info()</code> will be used.</p>
+<p>:returns: An <code>event_id</code> if the SDK decided to send the event (see :py:meth:<code>sentry_sdk.Client.capture_event</code>).</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.capture_exception', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.capture_exception" class="source">
@@ -1312,7 +1307,8 @@ tuple.</p></div>
   
     <div class="desc"><p>Alias for :py:meth:<a href="#sentry_sdk.Hub.capture_message"><code>capture_message</code></a></p>
 <p>Captures a message.  The message is just a string.  If no level
-is provided the default level is <code>info</code>.</p></div>
+is provided the default level is <code>info</code>.</p>
+<p>:returns: An <code>event_id</code> if the SDK decided to send the event (see :py:meth:<code>sentry_sdk.Client.capture_event</code>).</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.capture_message', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.capture_message" class="source">
@@ -1343,7 +1339,9 @@ is provided the default level is <code>info</code>.</p></div>
     
   
     <div class="desc"><p>Alias for :py:meth:<a href="#sentry_sdk.Hub.configure_scope"><code>configure_scope</code></a></p>
-<p>Reconfigures the scope.</p></div>
+<p>Reconfigures the scope.</p>
+<p>:param callback: If provided, call the callback with the current scope.</p>
+<p>:returns: If no callback is provided, returns a context manager that returns the scope.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.configure_scope', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.configure_scope" class="source">
@@ -1474,9 +1472,11 @@ is provided the default level is <code>info</code>.</p></div>
     
   
     <div class="desc"><p>Alias for :py:meth:<a href="#sentry_sdk.Hub.push_scope"><code>push_scope</code></a></p>
-<p>Pushes a new layer on the scope stack. Returns a context manager
-that should be used to pop the scope again.  Alternatively a callback
-can be provided that is executed in the context of the scope.</p></div>
+<p>Pushes a new layer on the scope stack.</p>
+<p>:param callback: If provided, this method pushes a scope, calls
+    <code>callback</code>, and pops the scope again.</p>
+<p>:returns: If no <code>callback</code> is provided, a context manager that should
+    be used to pop the scope again.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.push_scope', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.push_scope" class="source">
@@ -1664,17 +1664,20 @@ argument.</p></div>
 
         <span class="k">return</span> <span class="bp">True</span>
 
-    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-        <span class="c1"># type: (Dict[str, Any], Optional[Any], Optional[Scope]) -&gt; Optional[str]</span>
+    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
+        <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Hint]</span>
+        <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Scope]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; Optional[str]</span>
         <span class="sd">&quot;&quot;&quot;Captures an event.</span>
 
-<span class="sd">        This takes the ready made event and an optional hint and scope.  The</span>
-<span class="sd">        hint is internally used to further customize the representation of the</span>
-<span class="sd">        error.  When provided it&#39;s a dictionary of optional information such</span>
-<span class="sd">        as exception info.</span>
+<span class="sd">        :param event: A ready-made event that can be directly sent to Sentry.</span>
 
-<span class="sd">        If the transport is not set nothing happens, otherwise the return</span>
-<span class="sd">        value of this function will be the ID of the captured event.</span>
+<span class="sd">        :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.</span>
+
+<span class="sd">        :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">None</span>
@@ -1691,26 +1694,33 @@ argument.</p></div>
         <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">rv</span>
 
-    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-        <span class="c1"># type: (Optional[float], Optional[Callable[[int, float], None]]) -&gt; None</span>
+    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
+        <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Close the client and shut down the transport. Arguments have the same</span>
-<span class="sd">        semantics as `self.flush()`.</span>
+<span class="sd">        semantics as :py:meth:`Client.flush`.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="bp">None</span>
 
-    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-        <span class="c1"># type: (Optional[float], Optional[Callable[[int, float], None]]) -&gt; None</span>
+    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
+        <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Wait `timeout` seconds for the current events to be sent. If no</span>
-<span class="sd">        `timeout` is provided, the `shutdown_timeout` option value is used.</span>
+<span class="sd">        Wait for the current events to be sent.</span>
 
-<span class="sd">        The `callback` is invoked with two arguments: the number of pending</span>
-<span class="sd">        events and the configured timeout.  For instance the default atexit</span>
-<span class="sd">        integration will use this to render out a message on stderr.</span>
+<span class="sd">        :param timeout: Wait for at most `timeout` seconds. If no `timeout` is provided, the `shutdown_timeout` option value is used.</span>
+
+<span class="sd">        :param callback: Is invoked with the number of pending events and the configured timeout.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">timeout</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
@@ -1786,24 +1796,23 @@ argument.</p></div>
     
   
     <div class="desc"><p>Captures an event.</p>
-<p>This takes the ready made event and an optional hint and scope.  The
-hint is internally used to further customize the representation of the
-error.  When provided it's a dictionary of optional information such
-as exception info.</p>
-<p>If the transport is not set nothing happens, otherwise the return
-value of this function will be the ID of the captured event.</p></div>
+<p>:param event: A ready-made event that can be directly sent to Sentry.</p>
+<p>:param hint: Contains metadata about the event that can be read from <code>before_send</code>, such as the original exception object or a HTTP request object.</p>
+<p>:returns: An event ID. May be <code>None</code> if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting <code>debug=True</code> on <code>init()</code> may help.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk._Client.capture_event', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk._Client.capture_event" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-    <span class="c1"># type: (Dict[str, Any], Optional[Any], Optional[Scope]) -&gt; Optional[str]</span>
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
+    <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Hint]</span>
+    <span class="n">scope</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Scope]</span>
+<span class="p">):</span>
+    <span class="c1"># type: (...) -&gt; Optional[str]</span>
     <span class="sd">&quot;&quot;&quot;Captures an event.</span>
-<span class="sd">    This takes the ready made event and an optional hint and scope.  The</span>
-<span class="sd">    hint is internally used to further customize the representation of the</span>
-<span class="sd">    error.  When provided it&#39;s a dictionary of optional information such</span>
-<span class="sd">    as exception info.</span>
-<span class="sd">    If the transport is not set nothing happens, otherwise the return</span>
-<span class="sd">    value of this function will be the ID of the captured event.</span>
+<span class="sd">    :param event: A ready-made event that can be directly sent to Sentry.</span>
+<span class="sd">    :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.</span>
+<span class="sd">    :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">None</span>
@@ -1836,15 +1845,19 @@ value of this function will be the ID of the captured event.</p></div>
     
   
     <div class="desc"><p>Close the client and shut down the transport. Arguments have the same
-semantics as <code>self.flush()</code>.</p></div>
+semantics as :py:meth:<code>Client.flush</code>.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk._Client.close', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk._Client.close" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-    <span class="c1"># type: (Optional[float], Optional[Callable[[int, float], None]]) -&gt; None</span>
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">close</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
+    <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
+<span class="p">):</span>
+    <span class="c1"># type: (...) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Close the client and shut down the transport. Arguments have the same</span>
-<span class="sd">    semantics as `self.flush()`.</span>
+<span class="sd">    semantics as :py:meth:`Client.flush`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
@@ -1866,22 +1879,22 @@ semantics as <code>self.flush()</code>.</p></div>
 
     
   
-    <div class="desc"><p>Wait <code>timeout</code> seconds for the current events to be sent. If no
-<code>timeout</code> is provided, the <code>shutdown_timeout</code> option value is used.</p>
-<p>The <code>callback</code> is invoked with two arguments: the number of pending
-events and the configured timeout.  For instance the default atexit
-integration will use this to render out a message on stderr.</p></div>
+    <div class="desc"><p>Wait for the current events to be sent.</p>
+<p>:param timeout: Wait for at most <code>timeout</code> seconds. If no <code>timeout</code> is provided, the <code>shutdown_timeout</code> option value is used.</p>
+<p>:param callback: Is invoked with the number of pending events and the configured timeout.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk._Client.flush', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk._Client.flush" class="source">
-    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
-    <span class="c1"># type: (Optional[float], Optional[Callable[[int, float], None]]) -&gt; None</span>
+    <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">timeout</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
+    <span class="n">callback</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
+<span class="p">):</span>
+    <span class="c1"># type: (...) -&gt; None</span>
     <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Wait `timeout` seconds for the current events to be sent. If no</span>
-<span class="sd">    `timeout` is provided, the `shutdown_timeout` option value is used.</span>
-<span class="sd">    The `callback` is invoked with two arguments: the number of pending</span>
-<span class="sd">    events and the configured timeout.  For instance the default atexit</span>
-<span class="sd">    integration will use this to render out a message on stderr.</span>
+<span class="sd">    Wait for the current events to be sent.</span>
+<span class="sd">    :param timeout: Wait for at most `timeout` seconds. If no `timeout` is provided, the `shutdown_timeout` option value is used.</span>
+<span class="sd">    :param callback: Is invoked with the number of pending events and the configured timeout.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">timeout</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
@@ -1924,6 +1937,8 @@ integration will use this to render out a message on stderr.</p></div>
         <span class="bp">self</span><span class="p">,</span> <span class="n">options</span>  <span class="c1"># type: Dict[str, Any]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
+        <span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="kn">import</span> <span class="n">VERSION</span>
+
         <span class="n">Transport</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span> <span class="o">=</span> <span class="n">BackgroundWorker</span><span class="p">()</span>
@@ -2100,6 +2115,7 @@ integration will use this to render out a message on stderr.</p></div>
     <span class="bp">self</span><span class="p">,</span> <span class="n">options</span>  <span class="c1"># type: Dict[str, Any]</span>
 <span class="p">):</span>
     <span class="c1"># type: (...) -&gt; None</span>
+    <span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="kn">import</span> <span class="n">VERSION</span>
     <span class="n">Transport</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
     <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span> <span class="o">=</span> <span class="n">BackgroundWorker</span><span class="p">()</span>
@@ -2377,12 +2393,7 @@ context vars are available.</p>
         <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Hint]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Optional[str]</span>
-        <span class="sd">&quot;&quot;&quot;Captures an event.  The return value is the ID of the event.</span>
-
-<span class="sd">        The event is a dictionary following the Sentry v7/v8 protocol</span>
-<span class="sd">        specification.  Optionally an event hint dict can be passed that</span>
-<span class="sd">        is used by processors to extract additional information from it.</span>
-<span class="sd">        Typically the event hint object would contain exception information.</span>
+        <span class="sd">&quot;&quot;&quot;Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
@@ -2400,6 +2411,8 @@ context vars are available.</p>
         <span class="c1"># type: (...) -&gt; Optional[str]</span>
         <span class="sd">&quot;&quot;&quot;Captures a message.  The message is just a string.  If no level</span>
 <span class="sd">        is provided the default level is `info`.</span>
+
+<span class="sd">        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">None</span>
@@ -2408,14 +2421,14 @@ context vars are available.</p>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">capture_event</span><span class="p">({</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">message</span><span class="p">,</span> <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="n">level</span><span class="p">})</span>
 
     <span class="k">def</span> <span class="nf">capture_exception</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="bp">None</span>  <span class="c1"># type: Optional[BaseException]</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="bp">None</span>  <span class="c1"># type: Optional[Union[BaseException, ExcInfo]]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Optional[str]</span>
         <span class="sd">&quot;&quot;&quot;Captures an exception.</span>
 
-<span class="sd">        The argument passed can be `None` in which case the last exception</span>
-<span class="sd">        will be reported, otherwise an exception object or an `exc_info`</span>
-<span class="sd">        tuple.</span>
+<span class="sd">        :param error: An exception to catch. If `None`, `sys.exc_info()` will be used.</span>
+
+<span class="sd">        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span>
         <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
@@ -2434,11 +2447,15 @@ context vars are available.</p>
         <span class="k">return</span> <span class="bp">None</span>
 
     <span class="k">def</span> <span class="nf">_capture_internal_exception</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">exc_info</span>  <span class="c1"># type: _OptExcInfo</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">exc_info</span>  <span class="c1"># type: Any</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Any</span>
-        <span class="sd">&quot;&quot;&quot;Capture an exception that is likely caused by a bug in the SDK</span>
-<span class="sd">        itself.&quot;&quot;&quot;</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Capture an exception that is likely caused by a bug in the SDK</span>
+<span class="sd">        itself.</span>
+
+<span class="sd">        These exceptions do not end up in Sentry and are just logged instead.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Internal error in sentry_sdk&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="n">exc_info</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
 
     <span class="k">def</span> <span class="nf">add_breadcrumb</span><span class="p">(</span>
@@ -2448,10 +2465,13 @@ context vars are available.</p>
         <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
-        <span class="sd">&quot;&quot;&quot;Adds a breadcrumb.  The breadcrumbs are a dictionary with the</span>
-<span class="sd">        data as the sentry v7/v8 protocol expects.  `hint` is an optional</span>
-<span class="sd">        value that can be used by `before_breadcrumb` to customize the</span>
-<span class="sd">        breadcrumbs that are emitted.</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Adds a breadcrumb.</span>
+
+<span class="sd">        :param crumb: Dictionary with the data as the sentry v7/v8 protocol expects.</span>
+
+<span class="sd">        :param hint: An optional value that can be used by `before_breadcrumb`</span>
+<span class="sd">            to customize the breadcrumbs that are emitted.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
@@ -2491,6 +2511,7 @@ context vars are available.</p>
         <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Generator[Span, None, None]</span>
+        <span class="c1"># TODO: Document</span>
         <span class="n">span</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_span</span><span class="p">(</span><span class="n">span</span><span class="o">=</span><span class="n">span</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
         <span class="n">_</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
@@ -2519,6 +2540,7 @@ context vars are available.</p>
         <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Span</span>
+        <span class="c1"># TODO: Document</span>
 
         <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
 
@@ -2538,6 +2560,7 @@ context vars are available.</p>
         <span class="bp">self</span><span class="p">,</span> <span class="n">span</span>  <span class="c1"># type: Span</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Optional[str]</span>
+        <span class="c1"># TODO: Document</span>
         <span class="k">if</span> <span class="n">span</span><span class="o">.</span><span class="n">timestamp</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="c1"># This transaction is not yet finished so we just finish it.</span>
             <span class="n">span</span><span class="o">.</span><span class="n">finish</span><span class="p">()</span>
@@ -2591,9 +2614,14 @@ context vars are available.</p>
         <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
-        <span class="sd">&quot;&quot;&quot;Pushes a new layer on the scope stack. Returns a context manager</span>
-<span class="sd">        that should be used to pop the scope again.  Alternatively a callback</span>
-<span class="sd">        can be provided that is executed in the context of the scope.</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Pushes a new layer on the scope stack.</span>
+
+<span class="sd">        :param callback: If provided, this method pushes a scope, calls</span>
+<span class="sd">            `callback`, and pops the scope again.</span>
+
+<span class="sd">        :returns: If no `callback` is provided, a context manager that should</span>
+<span class="sd">            be used to pop the scope again.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
@@ -2611,8 +2639,11 @@ context vars are available.</p>
 
     <span class="k">def</span> <span class="nf">pop_scope_unsafe</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; Tuple[Optional[Client], Scope]</span>
-        <span class="sd">&quot;&quot;&quot;Pops a scope layer from the stack. Try to use the context manager</span>
-<span class="sd">        `push_scope()` instead.&quot;&quot;&quot;</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Pops a scope layer from the stack.</span>
+
+<span class="sd">        Try to use the context manager :py:meth:`push_scope` instead.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">,</span> <span class="s2">&quot;stack must have at least one layer&quot;</span>
         <span class="k">return</span> <span class="n">rv</span>
@@ -2636,7 +2667,13 @@ context vars are available.</p>
     <span class="p">):</span>  <span class="c1"># noqa</span>
         <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
 
-        <span class="sd">&quot;&quot;&quot;Reconfigures the scope.&quot;&quot;&quot;</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Reconfigures the scope.</span>
+
+<span class="sd">        :param callback: If provided, call the callback with the current scope.</span>
+
+<span class="sd">        :returns: If no callback is provided, returns a context manager that returns the scope.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
@@ -2670,6 +2707,7 @@ context vars are available.</p>
 
     <span class="k">def</span> <span class="nf">iter_trace_propagation_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; Generator[Tuple[str, str], None, None]</span>
+        <span class="c1"># TODO: Document</span>
         <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
             <span class="k">return</span>
@@ -2744,10 +2782,10 @@ context vars are available.</p>
 
     
   
-    <div class="desc"><p>Adds a breadcrumb.  The breadcrumbs are a dictionary with the
-data as the sentry v7/v8 protocol expects.  <code>hint</code> is an optional
-value that can be used by <code>before_breadcrumb</code> to customize the
-breadcrumbs that are emitted.</p></div>
+    <div class="desc"><p>Adds a breadcrumb.</p>
+<p>:param crumb: Dictionary with the data as the sentry v7/v8 protocol expects.</p>
+<p>:param hint: An optional value that can be used by <code>before_breadcrumb</code>
+    to customize the breadcrumbs that are emitted.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.add_breadcrumb', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.add_breadcrumb" class="source">
@@ -2758,10 +2796,11 @@ breadcrumbs that are emitted.</p></div>
     <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
 <span class="p">):</span>
     <span class="c1"># type: (...) -&gt; None</span>
-    <span class="sd">&quot;&quot;&quot;Adds a breadcrumb.  The breadcrumbs are a dictionary with the</span>
-<span class="sd">    data as the sentry v7/v8 protocol expects.  `hint` is an optional</span>
-<span class="sd">    value that can be used by `before_breadcrumb` to customize the</span>
-<span class="sd">    breadcrumbs that are emitted.</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Adds a breadcrumb.</span>
+<span class="sd">    :param crumb: Dictionary with the data as the sentry v7/v8 protocol expects.</span>
+<span class="sd">    :param hint: An optional value that can be used by `before_breadcrumb`</span>
+<span class="sd">        to customize the breadcrumbs that are emitted.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
@@ -2830,11 +2869,7 @@ breadcrumbs that are emitted.</p></div>
 
     
   
-    <div class="desc"><p>Captures an event.  The return value is the ID of the event.</p>
-<p>The event is a dictionary following the Sentry v7/v8 protocol
-specification.  Optionally an event hint dict can be passed that
-is used by processors to extract additional information from it.
-Typically the event hint object would contain exception information.</p></div>
+    <div class="desc"><p>Captures an event. Alias of :py:meth:<code>sentry_sdk.Client.capture_event</code>.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.capture_event', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.capture_event" class="source">
@@ -2844,11 +2879,7 @@ Typically the event hint object would contain exception information.</p></div>
     <span class="n">hint</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Hint]</span>
 <span class="p">):</span>
     <span class="c1"># type: (...) -&gt; Optional[str]</span>
-    <span class="sd">&quot;&quot;&quot;Captures an event.  The return value is the ID of the event.</span>
-<span class="sd">    The event is a dictionary following the Sentry v7/v8 protocol</span>
-<span class="sd">    specification.  Optionally an event hint dict can be passed that</span>
-<span class="sd">    is used by processors to extract additional information from it.</span>
-<span class="sd">    Typically the event hint object would contain exception information.</span>
+    <span class="sd">&quot;&quot;&quot;Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
@@ -2874,20 +2905,18 @@ Typically the event hint object would contain exception information.</p></div>
     
   
     <div class="desc"><p>Captures an exception.</p>
-<p>The argument passed can be <code>None</code> in which case the last exception
-will be reported, otherwise an exception object or an <code>exc_info</code>
-tuple.</p></div>
+<p>:param error: An exception to catch. If <code>None</code>, <code>sys.exc_info()</code> will be used.</p>
+<p>:returns: An <code>event_id</code> if the SDK decided to send the event (see :py:meth:<code>sentry_sdk.Client.capture_event</code>).</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.capture_exception', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.capture_exception" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">capture_exception</span><span class="p">(</span>
-    <span class="bp">self</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="bp">None</span>  <span class="c1"># type: Optional[BaseException]</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="bp">None</span>  <span class="c1"># type: Optional[Union[BaseException, ExcInfo]]</span>
 <span class="p">):</span>
     <span class="c1"># type: (...) -&gt; Optional[str]</span>
     <span class="sd">&quot;&quot;&quot;Captures an exception.</span>
-<span class="sd">    The argument passed can be `None` in which case the last exception</span>
-<span class="sd">    will be reported, otherwise an exception object or an `exc_info`</span>
-<span class="sd">    tuple.</span>
+<span class="sd">    :param error: An exception to catch. If `None`, `sys.exc_info()` will be used.</span>
+<span class="sd">    :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span>
     <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
@@ -2919,7 +2948,8 @@ tuple.</p></div>
     
   
     <div class="desc"><p>Captures a message.  The message is just a string.  If no level
-is provided the default level is <code>info</code>.</p></div>
+is provided the default level is <code>info</code>.</p>
+<p>:returns: An <code>event_id</code> if the SDK decided to send the event (see :py:meth:<code>sentry_sdk.Client.capture_event</code>).</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.capture_message', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.capture_message" class="source">
@@ -2931,6 +2961,7 @@ is provided the default level is <code>info</code>.</p></div>
     <span class="c1"># type: (...) -&gt; Optional[str]</span>
     <span class="sd">&quot;&quot;&quot;Captures a message.  The message is just a string.  If no level</span>
 <span class="sd">    is provided the default level is `info`.</span>
+<span class="sd">    :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">None</span>
@@ -2953,7 +2984,9 @@ is provided the default level is <code>info</code>.</p></div>
 
     
   
-    <div class="desc"><p>Reconfigures the scope.</p></div>
+    <div class="desc"><p>Reconfigures the scope.</p>
+<p>:param callback: If provided, call the callback with the current scope.</p>
+<p>:returns: If no callback is provided, returns a context manager that returns the scope.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.configure_scope', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.configure_scope" class="source">
@@ -2961,7 +2994,11 @@ is provided the default level is <code>info</code>.</p></div>
     <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
 <span class="p">):</span>  <span class="c1"># noqa</span>
     <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
-    <span class="sd">&quot;&quot;&quot;Reconfigures the scope.&quot;&quot;&quot;</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Reconfigures the scope.</span>
+<span class="sd">    :param callback: If provided, call the callback with the current scope.</span>
+<span class="sd">    :returns: If no callback is provided, returns a context manager that returns the scope.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
@@ -2998,6 +3035,7 @@ is provided the default level is <code>info</code>.</p></div>
     <span class="bp">self</span><span class="p">,</span> <span class="n">span</span>  <span class="c1"># type: Span</span>
 <span class="p">):</span>
     <span class="c1"># type: (...) -&gt; Optional[str]</span>
+    <span class="c1"># TODO: Document</span>
     <span class="k">if</span> <span class="n">span</span><span class="o">.</span><span class="n">timestamp</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
         <span class="c1"># This transaction is not yet finished so we just finish it.</span>
         <span class="n">span</span><span class="o">.</span><span class="n">finish</span><span class="p">()</span>
@@ -3144,6 +3182,7 @@ client attached.</p></div>
   <div id="source-sentry_sdk.Hub.iter_trace_propagation_headers" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">iter_trace_propagation_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="c1"># type: () -&gt; Generator[Tuple[str, str], None, None]</span>
+    <span class="c1"># TODO: Document</span>
     <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">return</span>
@@ -3195,15 +3234,17 @@ client attached.</p></div>
 
     
   
-    <div class="desc"><p>Pops a scope layer from the stack. Try to use the context manager
-<code>push_scope()</code> instead.</p></div>
+    <div class="desc"><p>Pops a scope layer from the stack.</p>
+<p>Try to use the context manager :py:meth:<code>push_scope</code> instead.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.pop_scope_unsafe', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.pop_scope_unsafe" class="source">
     <div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">pop_scope_unsafe</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="c1"># type: () -&gt; Tuple[Optional[Client], Scope]</span>
-    <span class="sd">&quot;&quot;&quot;Pops a scope layer from the stack. Try to use the context manager</span>
-<span class="sd">    `push_scope()` instead.&quot;&quot;&quot;</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Pops a scope layer from the stack.</span>
+<span class="sd">    Try to use the context manager :py:meth:`push_scope` instead.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
     <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">,</span> <span class="s2">&quot;stack must have at least one layer&quot;</span>
     <span class="k">return</span> <span class="n">rv</span>
@@ -3223,9 +3264,11 @@ client attached.</p></div>
 
     
   
-    <div class="desc"><p>Pushes a new layer on the scope stack. Returns a context manager
-that should be used to pop the scope again.  Alternatively a callback
-can be provided that is executed in the context of the scope.</p></div>
+    <div class="desc"><p>Pushes a new layer on the scope stack.</p>
+<p>:param callback: If provided, this method pushes a scope, calls
+    <code>callback</code>, and pops the scope again.</p>
+<p>:returns: If no <code>callback</code> is provided, a context manager that should
+    be used to pop the scope again.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.push_scope', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.push_scope" class="source">
@@ -3233,9 +3276,12 @@ can be provided that is executed in the context of the scope.</p></div>
     <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
 <span class="p">):</span>
     <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
-    <span class="sd">&quot;&quot;&quot;Pushes a new layer on the scope stack. Returns a context manager</span>
-<span class="sd">    that should be used to pop the scope again.  Alternatively a callback</span>
-<span class="sd">    can be provided that is executed in the context of the scope.</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Pushes a new layer on the scope stack.</span>
+<span class="sd">    :param callback: If provided, this method pushes a scope, calls</span>
+<span class="sd">        `callback`, and pops the scope again.</span>
+<span class="sd">    :returns: If no `callback` is provided, a context manager that should</span>
+<span class="sd">        be used to pop the scope again.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
@@ -3291,9 +3337,11 @@ with statement can be used on the hub directly.</p></div>
 
     
   
-    <div class="desc"><p>Pushes a new layer on the scope stack. Returns a context manager
-that should be used to pop the scope again.  Alternatively a callback
-can be provided that is executed in the context of the scope.</p></div>
+    <div class="desc"><p>Pushes a new layer on the scope stack.</p>
+<p>:param callback: If provided, this method pushes a scope, calls
+    <code>callback</code>, and pops the scope again.</p>
+<p>:returns: If no <code>callback</code> is provided, a context manager that should
+    be used to pop the scope again.</p></div>
   <div class="source_cont">
   <p class="source_link"><a href="javascript:void(0);" onclick="toggle('source-sentry_sdk.Hub.scope', this);">Show source &equiv;</a></p>
   <div id="source-sentry_sdk.Hub.scope" class="source">
@@ -3301,9 +3349,12 @@ can be provided that is executed in the context of the scope.</p></div>
     <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="bp">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
 <span class="p">):</span>
     <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
-    <span class="sd">&quot;&quot;&quot;Pushes a new layer on the scope stack. Returns a context manager</span>
-<span class="sd">    that should be used to pop the scope again.  Alternatively a callback</span>
-<span class="sd">    can be provided that is executed in the context of the scope.</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Pushes a new layer on the scope stack.</span>
+<span class="sd">    :param callback: If provided, this method pushes a scope, calls</span>
+<span class="sd">        `callback`, and pops the scope again.</span>
+<span class="sd">    :returns: If no `callback` is provided, a context manager that should</span>
+<span class="sd">        be used to pop the scope again.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
@@ -3339,6 +3390,7 @@ can be provided that is executed in the context of the scope.</p></div>
     <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
 <span class="p">):</span>
     <span class="c1"># type: (...) -&gt; Generator[Span, None, None]</span>
+    <span class="c1"># TODO: Document</span>
     <span class="n">span</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_span</span><span class="p">(</span><span class="n">span</span><span class="o">=</span><span class="n">span</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="n">_</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="n">old_span</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">span</span>
@@ -3383,6 +3435,7 @@ can be provided that is executed in the context of the scope.</p></div>
     <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
 <span class="p">):</span>
     <span class="c1"># type: (...) -&gt; Span</span>
+    <span class="c1"># TODO: Document</span>
     <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>

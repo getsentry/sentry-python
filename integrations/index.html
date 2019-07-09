@@ -1112,7 +1112,8 @@ table {
 <span class="kn">from</span> <span class="nn">sentry_sdk._compat</span> <span class="kn">import</span> <span class="n">iteritems</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">logger</span>
 
-<span class="n">MYPY</span> <span class="o">=</span> <span class="bp">False</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">MYPY</span>
+
 <span class="k">if</span> <span class="n">MYPY</span><span class="p">:</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Iterator</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
@@ -1187,7 +1188,7 @@ table {
                     <span class="nb">type</span><span class="p">(</span><span class="n">integration</span><span class="p">)</span><span class="o">.</span><span class="n">setup_once</span><span class="p">()</span>
                 <span class="k">except</span> <span class="ne">NotImplementedError</span><span class="p">:</span>
                     <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">integration</span><span class="p">,</span> <span class="s2">&quot;install&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                        <span class="n">logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                             <span class="s2">&quot;Integration </span><span class="si">%s</span><span class="s2">: The install method is &quot;</span>
                             <span class="s2">&quot;deprecated. Use `setup_once`.&quot;</span><span class="p">,</span>
                             <span class="n">identifier</span><span class="p">,</span>
@@ -1329,7 +1330,7 @@ unless they were already provided before.</p></div>
                     <span class="nb">type</span><span class="p">(</span><span class="n">integration</span><span class="p">)</span><span class="o">.</span><span class="n">setup_once</span><span class="p">()</span>
                 <span class="k">except</span> <span class="ne">NotImplementedError</span><span class="p">:</span>
                     <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">integration</span><span class="p">,</span> <span class="s2">&quot;install&quot;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
-                        <span class="n">logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                             <span class="s2">&quot;Integration </span><span class="si">%s</span><span class="s2">: The install method is &quot;</span>
                             <span class="s2">&quot;deprecated. Use `setup_once`.&quot;</span><span class="p">,</span>
                             <span class="n">identifier</span><span class="p">,</span>
