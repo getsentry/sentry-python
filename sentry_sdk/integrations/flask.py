@@ -131,7 +131,7 @@ class FlaskRequestExtractor(RequestExtractor):
 
     def raw_data(self):
         # type: () -> bytes
-        return self.request.data
+        return self.request.get_data()
 
     def form(self):
         # type: () -> ImmutableMultiDict

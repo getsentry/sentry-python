@@ -8,6 +8,8 @@ import sentry_sdk
 from sentry_sdk._compat import reraise, string_types, iteritems
 from sentry_sdk.transport import Transport
 
+from tests import _warning_recorder, _warning_recorder_mgr
+
 SEMAPHORE = "./semaphore"
 
 if not os.path.isfile(SEMAPHORE):
@@ -46,6 +48,56 @@ def internal_exceptions(request, monkeypatch):
     )
 
     return errors
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _capture_internal_warnings():
+    yield
+
+    _warning_recorder_mgr.__exit__(None, None, None)
+    recorder = _warning_recorder
+
+    for warning in recorder:
+        try:
+            if isinstance(warning.message, ResourceWarning):
+                continue
+        except NameError:
+            pass
+
+        # pytest-django
+        if "getfuncargvalue" in str(warning.message):
+            continue
+
+        # Happens when re-initializing the SDK
+        if "but it was only enabled on init()" in str(warning.message):
+            continue
+
+        # sanic's usage of aiohttp for test client
+        if "verify_ssl is deprecated, use ssl=False instead" in str(warning.message):
+            continue
+
+        if "getargspec" in str(warning.message) and warning.filename.endswith(
+            ("pyramid/config/util.py", "pyramid/config/views.py")
+        ):
+            continue
+
+        if "isAlive() is deprecated" in str(
+            warning.message
+        ) and warning.filename.endswith("celery/utils/timer2.py"):
+            continue
+
+        if "collections.abc" in str(warning.message) and warning.filename.endswith(
+            ("celery/canvas.py", "werkzeug/datastructures.py", "tornado/httputil.py")
+        ):
+            continue
+
+        # Django 1.7 emits a (seemingly) false-positive warning for our test
+        # app and suggests to use a middleware that does not exist in later
+        # Django versions.
+        if "SessionAuthenticationMiddleware" in str(warning.message):
+            continue
+
+        raise AssertionError(warning)
 
 
 @pytest.fixture

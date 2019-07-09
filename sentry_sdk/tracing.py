@@ -1,18 +1,23 @@
 import re
 import uuid
 import contextlib
-import collections
 
 from datetime import datetime
 
 from sentry_sdk.utils import capture_internal_exceptions, concat_strings
+from sentry_sdk._compat import PY2
 
+if PY2:
+    from collections import Mapping
+else:
+    from collections.abc import Mapping
 
 if False:
+    import typing
+
     from typing import Optional
     from typing import Any
     from typing import Dict
-    from typing import Mapping
     from typing import List
 
 _traceparent_header_format_re = re.compile(
@@ -24,10 +29,10 @@ _traceparent_header_format_re = re.compile(
 )
 
 
-class EnvironHeaders(collections.Mapping):  # type: ignore
+class EnvironHeaders(Mapping):  # type: ignore
     def __init__(
         self,
-        environ,  # type: Mapping[str, str]
+        environ,  # type: typing.Mapping[str, str]
         prefix="HTTP_",  # type: str
     ):
         # type: (...) -> None

@@ -91,7 +91,7 @@ def test_logging_level(sentry_init, capture_events):
     del events[:]
 
     logger.setLevel(logging.ERROR)
-    logger.warn("hi")
+    logger.warning("hi")
     assert not events
 
 
