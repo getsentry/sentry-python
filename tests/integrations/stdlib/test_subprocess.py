@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 
@@ -10,6 +11,8 @@ from sentry_sdk.integrations.stdlib import StdlibIntegration
 
 def test_subprocess_basic(sentry_init, capture_events, monkeypatch):
     monkeypatch.setenv("FOO", "bar")
+
+    old_environ = dict(os.environ)
 
     sentry_init(integrations=[StdlibIntegration()], traces_sample_rate=1.0)
 
@@ -26,6 +29,8 @@ def test_subprocess_basic(sentry_init, capture_events, monkeypatch):
                 "print(dict(get_subprocess_traceparent_headers()))",
             ]
         )
+
+    assert os.environ == old_environ
 
     assert span.trace_id in str(output)
 

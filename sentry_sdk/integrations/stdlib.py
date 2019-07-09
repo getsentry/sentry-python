@@ -154,7 +154,7 @@ def _install_subprocess():
 
         for k, v in hub.iter_trace_propagation_headers():
             if env is None:
-                env = _init_argument(a, kw, "env", 11, os.environ)
+                env = _init_argument(a, kw, "env", 11, dict(os.environ))
             env["SUBPROCESS_" + k.upper().replace("-", "_")] = v
 
         with hub.span(op="subprocess", description=" ".join(map(str, args))) as span:
