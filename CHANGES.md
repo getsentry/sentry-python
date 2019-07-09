@@ -1,3 +1,10 @@
+## 0.10.1
+
+* Fix bug where the SDK would yield a deprecation warning about
+  `collections.abc` vs `collections`.
+* Fix bug in stdlib integration that would cause spawned subprocesses to not
+  inherit the environment variables from the parent process.
+
 ## 0.10.0
 
 * Massive refactor in preparation to tracing. There are no intentional breaking
