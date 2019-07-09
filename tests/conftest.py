@@ -88,7 +88,7 @@ def _capture_internal_warnings():
             continue
 
         if "collections.abc" in str(warning.message) and warning.filename.endswith(
-            ("celery/canvas.py", "werkzeug/datastructures.py")
+            ("celery/canvas.py", "werkzeug/datastructures.py", "tornado/httputil.py")
         ):
             continue
 
