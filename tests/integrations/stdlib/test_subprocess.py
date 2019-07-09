@@ -4,6 +4,7 @@ import sys
 import pytest
 
 from sentry_sdk import Hub, capture_message
+from sentry_sdk._compat import PY2
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 
 
@@ -49,4 +50,7 @@ def test_subprocess_invalid_args(sentry_init):
     with pytest.raises(TypeError) as excinfo:
         subprocess.Popen()
 
-    assert "missing 1 required positional argument: 'args" in str(excinfo.value)
+    if PY2:
+        assert "__init__() takes at least 2 arguments (1 given)" in str(excinfo.value)
+    else:
+        assert "missing 1 required positional argument: 'args" in str(excinfo.value)
