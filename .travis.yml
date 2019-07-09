@@ -18,6 +18,7 @@ branches:
   only:
     - master
     - /^release\/.+$/
+    - beam-integration
 
 matrix:
   allow_failures:
