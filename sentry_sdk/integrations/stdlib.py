@@ -111,7 +111,7 @@ def _install_httplib():
     HTTPConnection.getresponse = getresponse
 
 
-def _init_argument(args, kwargs, name, position, setdefault=None):
+def _init_argument(args, kwargs, name, position, setdefault_callback=None):
     """
     given (*args, **kwargs) of a function call, retrieve (and optionally set a
     default for) an argument by either name or position.
@@ -123,16 +123,16 @@ def _init_argument(args, kwargs, name, position, setdefault=None):
 
     if name in kwargs:
         rv = kwargs[name]
-        if rv is None and setdefault is not None:
-            rv = kwargs[name] = setdefault
+        if rv is None and setdefault_callback is not None:
+            rv = kwargs[name] = setdefault_callback()
     elif position < len(args):
         rv = args[position]
-        if rv is None and setdefault is not None:
-            rv = args[position] = setdefault
+        if rv is None and setdefault_callback is not None:
+            rv = args[position] = setdefault_callback()
     else:
-        rv = setdefault
-        if setdefault is not None:
-            kwargs[name] = setdefault
+        rv = setdefault_callback and setdefault_callback()
+        if rv is not None:
+            kwargs[name] = rv
 
     return rv
 
@@ -154,7 +154,7 @@ def _install_subprocess():
 
         for k, v in hub.iter_trace_propagation_headers():
             if env is None:
-                env = _init_argument(a, kw, "env", 11, dict(os.environ))
+                env = _init_argument(a, kw, "env", 11, lambda: dict(os.environ))
             env["SUBPROCESS_" + k.upper().replace("-", "_")] = v
 
         with hub.span(op="subprocess", description=" ".join(map(str, args))) as span:
