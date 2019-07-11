@@ -139,7 +139,8 @@ def _extra_from_record(record):
     return {
         k: v
         for k, v in iteritems(vars(record))
-        if k not in COMMON_RECORD_ATTRS and not k.startswith("_")
+        if k not in COMMON_RECORD_ATTRS
+        and (not isinstance(k, str) or not k.startswith("_"))
     }
 
 
