@@ -1,19 +1,25 @@
 from datetime import datetime
 
-from hypothesis import given, assume, example
+from hypothesis import given, example
 import hypothesis.strategies as st
+
+import pytest
 
 from sentry_sdk.serializer import Serializer
 
 
-@given(dt=st.datetimes(timezones=st.just(None)))
+@given(
+    dt=st.datetimes(min_value=datetime(2000, 1, 1, 0, 0, 0), timezones=st.just(None))
+)
 @example(dt=datetime(2001, 1, 1, 0, 0, 0, 999500))
-def test_datetime_precision(dt, assert_semaphore_acceptance):
-    assume(dt.year > 2000)
+def test_datetime_precision(dt, semaphore_normalize):
     serializer = Serializer()
 
     event = serializer.serialize_event({"timestamp": dt})
-    normalized = assert_semaphore_acceptance(event)
+    normalized = semaphore_normalize(event)
+
+    if normalized is None:
+        pytest.skip("no semaphore available")
 
     dt2 = datetime.utcfromtimestamp(normalized["timestamp"])
 
