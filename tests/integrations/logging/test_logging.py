@@ -61,6 +61,17 @@ def test_logging_extra_data(sentry_init, capture_events):
     )
 
 
+def test_logging_extra_data_integer_keys(sentry_init, capture_events):
+    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    events = capture_events()
+
+    logger.critical("integer in extra keys", extra={1: 1})
+
+    event, = events
+
+    assert event["extra"] == {"1": 1}
+
+
 @pytest.mark.xfail(sys.version_info[:2] == (3, 4), reason="buggy logging module")
 def test_logging_stack(sentry_init, capture_events):
     sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
