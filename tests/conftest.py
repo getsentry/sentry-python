@@ -156,6 +156,7 @@ def assert_semaphore_acceptance(tmpdir):
             )
             _no_errors_in_semaphore_response(output)
             output.pop("_meta", None)
+            return output
 
     return inner
 

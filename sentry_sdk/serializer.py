@@ -1,4 +1,5 @@
 import contextlib
+
 from datetime import datetime
 
 from sentry_sdk.utils import (
@@ -285,7 +286,7 @@ class Serializer(object):
                 return obj
 
             if isinstance(obj, datetime):
-                return text_type(obj.strftime("%Y-%m-%dT%H:%M:%SZ"))
+                return text_type(obj.strftime("%Y-%m-%dT%H:%M:%S.%fZ"))
 
             if isinstance(obj, bytes):
                 obj = obj.decode("utf-8", "replace")
