@@ -101,7 +101,7 @@ def _capture_internal_warnings():
 
 
 @pytest.fixture
-def monkeypatch_test_transport(monkeypatch, assert_semaphore_acceptance):
+def monkeypatch_test_transport(monkeypatch, semaphore_normalize):
     def check_event(event):
         def check_string_keys(map):
             for key, value in iteritems(map):
@@ -110,7 +110,7 @@ def monkeypatch_test_transport(monkeypatch, assert_semaphore_acceptance):
                     check_string_keys(value)
 
         check_string_keys(event)
-        assert_semaphore_acceptance(event)
+        semaphore_normalize(event)
 
     def inner(client):
         monkeypatch.setattr(client, "transport", TestTransport(check_event))
@@ -139,7 +139,7 @@ def _no_errors_in_semaphore_response(obj):
 
 
 @pytest.fixture
-def assert_semaphore_acceptance(tmpdir):
+def semaphore_normalize(tmpdir):
     def inner(event):
         if not SEMAPHORE:
             return

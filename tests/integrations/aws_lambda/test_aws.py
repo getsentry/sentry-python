@@ -59,7 +59,7 @@ def lambda_client():
 
 
 @pytest.fixture(params=["python3.6", "python3.7", "python2.7"])
-def run_lambda_function(tmpdir, lambda_client, request, assert_semaphore_acceptance):
+def run_lambda_function(tmpdir, lambda_client, request, semaphore_normalize):
     def inner(code, payload):
         runtime = request.param
         tmpdir.ensure_dir("lambda_tmp").remove()
@@ -111,7 +111,7 @@ def run_lambda_function(tmpdir, lambda_client, request, assert_semaphore_accepta
                 continue
             line = line[len(b"EVENT: ") :]
             events.append(json.loads(line.decode("utf-8")))
-            assert_semaphore_acceptance(events[-1])
+            semaphore_normalize(events[-1])
 
         return events, response
 
