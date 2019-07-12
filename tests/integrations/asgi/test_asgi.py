@@ -70,7 +70,7 @@ def test_async_request_data(sentry_init, app, capture_events):
     assert response.status_code == 200
 
     event, = events
-    assert event["transaction"] == "tests.integrations.asgi.test_asgi.app.<locals>.hi"
+    assert event["transaction"] == "tests.integrations.asgi.test_asgi.app.<locals>.hi2"
     assert event["request"]["env"] == {"REMOTE_ADDR": "testclient"}
     assert set(event["request"]["headers"]) == {
         "accept",
