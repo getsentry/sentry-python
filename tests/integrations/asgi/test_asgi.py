@@ -1,5 +1,3 @@
-import asyncio
-import random
 import sys
 
 import pytest
@@ -20,7 +18,7 @@ def app():
         return PlainTextResponse("ok")
 
     @app.route("/async-message")
-    async def hi(request):
+    async def hi2(request):
         capture_message("hi", level="error")
         return PlainTextResponse("ok")
 
