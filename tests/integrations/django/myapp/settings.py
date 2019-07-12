@@ -152,4 +152,4 @@ TEMPLATE_DEBUG = True
 STATIC_URL = "/static/"
 
 # django-channels specific
-ASGI_APPLICATION = 'tests.integrations.django.myapp.routing.application'
+ASGI_APPLICATION = "tests.integrations.django.myapp.routing.application"

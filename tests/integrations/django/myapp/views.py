@@ -20,6 +20,7 @@ try:
     def rest_hello(request):
         return HttpResponse("ok")
 
+
 except ImportError:
     pass
 

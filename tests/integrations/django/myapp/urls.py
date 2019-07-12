@@ -49,13 +49,7 @@ try:
             name="rest_framework_read_body_and_exc",
         )
     )
-    urlpatterns.append(
-        path(
-            "rest-hello",
-            views.rest_hello,
-             name="rest_hello"
-        )
-    )
+    urlpatterns.append(path("rest-hello", views.rest_hello, name="rest_hello"))
 except AttributeError:
     pass
 
