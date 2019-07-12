@@ -1,3 +1,9 @@
+"""
+An ASGI middleware.
+
+Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`_.
+"""
+
 import functools
 import urllib
 
