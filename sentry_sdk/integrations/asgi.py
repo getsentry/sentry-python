@@ -39,8 +39,7 @@ class SentryAsgiMiddleware:
         with Hub(hub) as hub:
             with hub.configure_scope() as sentry_scope:
                 sentry_scope._name = "asgi"
-                if scope.get("endpoint"):
-                    sentry_scope.transaction = self.get_transaction(scope)
+                sentry_scope.transaction = scope.get("path") or "unknown asgi request"
 
                 processor = functools.partial(self.event_processor, asgi_scope=scope)
                 sentry_scope.add_event_processor(processor)
@@ -62,6 +61,12 @@ class SentryAsgiMiddleware:
 
         if asgi_scope.get("client") and _should_send_default_pii():
             request_info["env"] = {"REMOTE_ADDR": asgi_scope["client"][0]}
+
+        if asgi_scope.get("endpoint"):
+            # Webframeworks like Starlette mutate the ASGI env once routing is
+            # done, which is sometime after the request has started. If we have
+            # an endpoint, overwrite our path-based transaction name.
+            event["transaction"] = self.get_transaction(asgi_scope)
         return event
 
     def get_url(self, scope):
