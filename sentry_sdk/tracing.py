@@ -2,23 +2,25 @@ import re
 import uuid
 import contextlib
 
+from collections import deque
 from datetime import datetime
 
 from sentry_sdk.utils import capture_internal_exceptions, concat_strings
 from sentry_sdk._compat import PY2
+from sentry_sdk._types import MYPY
 
 if PY2:
     from collections import Mapping
 else:
     from collections.abc import Mapping
 
-if False:
+if MYPY:
     import typing
 
     from typing import Optional
     from typing import Any
     from typing import Dict
-    from typing import List
+    from typing import Deque
 
 _traceparent_header_format_re = re.compile(
     "^[ \t]*"  # whitespace
@@ -76,15 +78,16 @@ class Span(object):
 
     def __init__(
         self,
-        trace_id=None,
-        span_id=None,
-        parent_span_id=None,
-        same_process_as_parent=True,
-        sampled=None,
-        transaction=None,
-        op=None,
-        description=None,
+        trace_id=None,  # type: Optional[str]
+        span_id=None,  # type: Optional[str]
+        parent_span_id=None,  # type: Optional[str]
+        same_process_as_parent=True,  # type: bool
+        sampled=None,  # type: Optional[bool]
+        transaction=None,  # type: Optional[str]
+        op=None,  # type: Optional[str]
+        description=None,  # type: Optional[str]
     ):
+        # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
         self.span_id = span_id or uuid.uuid4().hex[16:]
         self.parent_span_id = parent_span_id
@@ -95,11 +98,15 @@ class Span(object):
         self.description = description
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
-        self._finished_spans = []  # type: List[Span]
+        self._finished_spans = None  # type: Optional[Deque[Span]]
         self.start_timestamp = datetime.now()
 
         #: End timestamp of span
         self.timestamp = None
+
+    def init_finished_spans(self, maxlen):
+        if self._finished_spans is None:
+            self._finished_spans = deque(maxlen=maxlen)
 
     def __repr__(self):
         return (
@@ -184,7 +191,8 @@ class Span(object):
 
     def finish(self):
         self.timestamp = datetime.now()
-        self._finished_spans.append(self)
+        if self._finished_spans is not None:
+            self._finished_spans.append(self)
 
     def to_json(self):
         return {
