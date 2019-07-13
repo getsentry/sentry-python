@@ -95,7 +95,7 @@ TEMPLATES = [
     }
 ]
 
-WSGI_APPLICATION = "tests.django.myapp.wsgi.application"
+WSGI_APPLICATION = "tests.integrations.django.myapp.wsgi.application"
 
 
 # Database
@@ -150,3 +150,6 @@ TEMPLATE_DEBUG = True
 # https://docs.djangoproject.com/en/2.0/howto/static-files/
 
 STATIC_URL = "/static/"
+
+# django-channels specific
+ASGI_APPLICATION = "tests.integrations.django.myapp.routing.application"

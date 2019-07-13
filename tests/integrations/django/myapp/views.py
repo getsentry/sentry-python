@@ -16,6 +16,10 @@ try:
         request.data
         1 / 0
 
+    @api_view(["GET"])
+    def rest_hello(request):
+        return HttpResponse("ok")
+
 
 except ImportError:
     pass
