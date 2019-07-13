@@ -22,32 +22,46 @@ class SentryAsgiMiddleware:
     def __init__(self, app):
         self.app = app
 
-    async def __call__(self, scope, receive, send):
+    def __call__(self, scope, receive=None, send=None):
+        if receive is None or send is None:
+
+            async def run_asgi2(receive, send):
+                return await self._run_app(
+                    scope, lambda: self.app(scope)(receive, send)
+                )
+
+            return run_asgi2
+        else:
+            return self._run_app(scope, lambda: self.app(scope, receive, send))
+
+    async def _run_app(self, scope, callback):
         hub = Hub.current
         with Hub(hub) as hub:
             with hub.configure_scope() as sentry_scope:
                 sentry_scope._name = "asgi"
+                if scope.get("endpoint"):
+                    sentry_scope.transaction = self.get_transaction(scope)
+
                 processor = functools.partial(self.event_processor, asgi_scope=scope)
                 sentry_scope.add_event_processor(processor)
 
             try:
-                await self.app(scope, receive, send)
+                await callback()
             except Exception as exc:
                 hub.capture_exception(exc)
                 raise exc from None
 
     def event_processor(self, event, hint, asgi_scope):
+        request_info = event.setdefault("request", {})
+
         if asgi_scope["type"] in ("http", "websocket"):
-            event["request"] = {
-                "url": self.get_url(asgi_scope),
-                "method": asgi_scope["method"],
-                "headers": _filter_headers(self.get_headers(asgi_scope)),
-                "query_string": self.get_query(asgi_scope),
-            }
+            request_info["url"] = self.get_url(asgi_scope)
+            request_info["method"] = asgi_scope["method"]
+            request_info["headers"] = _filter_headers(self.get_headers(asgi_scope))
+            request_info["query_string"] = self.get_query(asgi_scope)
+
         if asgi_scope.get("client") and _should_send_default_pii():
-            event["request"]["env"] = {"REMOTE_ADDR": asgi_scope["client"][0]}
-        if asgi_scope.get("endpoint"):
-            event["transaction"] = self.get_transaction(asgi_scope)
+            request_info["env"] = {"REMOTE_ADDR": asgi_scope["client"][0]}
         return event
 
     def get_url(self, scope):
