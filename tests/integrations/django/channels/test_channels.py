@@ -1,6 +1,5 @@
 import pytest
 
-pytest.importorskip("channels")
 
 from channels.testing import HttpCommunicator
 
