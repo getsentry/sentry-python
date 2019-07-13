@@ -15,6 +15,10 @@ from sentry_sdk.tracing import Span
 from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from typing import Any
 
 
 CELERY_CONTROL_FLOW_EXCEPTIONS = (Retry, Ignore, Reject)
@@ -156,9 +160,12 @@ def _capture_exception(task, exc_info):
     if hasattr(task, "throws") and isinstance(exc_info[1], task.throws):
         return
 
+    # If an integration is there, a client has to be there.
+    client = hub.client  # type: Any
+
     event, hint = event_from_exception(
         exc_info,
-        client_options=hub.client.options,
+        client_options=client.options,
         mechanism={"type": "celery", "handled": False},
     )
 
