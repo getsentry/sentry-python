@@ -1,4 +1,5 @@
 import weakref
+import gc
 
 import pytest
 
@@ -128,4 +129,5 @@ def test_memory_usage(sentry_init, capture_events, args, expected_refcount):
 
         del foo
         del span
+        gc.collect()
         assert len(references) == expected_refcount
