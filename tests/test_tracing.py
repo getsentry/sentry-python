@@ -129,5 +129,8 @@ def test_memory_usage(sentry_init, capture_events, args, expected_refcount):
 
         del foo
         del span
+
+        # required only for pypy (cpython frees immediately)
         gc.collect()
+
         assert len(references) == expected_refcount
