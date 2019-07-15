@@ -97,6 +97,9 @@ def _capture_internal_warnings():
         if "SessionAuthenticationMiddleware" in str(warning.message):
             continue
 
+        if "Something has already installed a non-asyncio" in str(warning.message):
+            continue
+
         raise AssertionError(warning)
 
 
