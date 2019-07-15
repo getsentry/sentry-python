@@ -479,6 +479,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             sample_rate = client and client.options["traces_sample_rate"] or 0
             span.sampled = random.random() < sample_rate
 
+        if span.sampled:
+            span.init_finished_spans()
+
         return span
 
     def finish_span(
@@ -517,7 +520,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
                 "contexts": {"trace": span.get_trace_context()},
                 "timestamp": span.timestamp,
                 "start_timestamp": span.start_timestamp,
-                "spans": [s.to_json() for s in span._finished_spans if s is not span],
+                "spans": [
+                    s.to_json() for s in (span._finished_spans or ()) if s is not span
+                ],
             }
         )
 

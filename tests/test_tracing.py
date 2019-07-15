@@ -1,3 +1,6 @@
+import weakref
+import gc
+
 import pytest
 
 from sentry_sdk import Hub, capture_message
@@ -93,3 +96,34 @@ def test_sampling_decided_only_for_transactions(sentry_init, capture_events):
 
     with Hub.current.span() as span:
         assert span.sampled is None
+
+
+@pytest.mark.parametrize(
+    "args,expected_refcount",
+    [({"traces_sample_rate": 1.0}, 100), ({"traces_sample_rate": 0.0}, 0)],
+)
+def test_memory_usage(sentry_init, capture_events, args, expected_refcount):
+    sentry_init(**args)
+
+    references = weakref.WeakSet()
+
+    with Hub.current.span(transaction="hi"):
+        for i in range(100):
+            with Hub.current.span(
+                op="helloworld", description="hi {}".format(i)
+            ) as span:
+
+                def foo():
+                    pass
+
+                references.add(foo)
+                span.set_tag("foo", foo)
+                pass
+
+        del foo
+        del span
+
+        # required only for pypy (cpython frees immediately)
+        gc.collect()
+
+        assert len(references) == expected_refcount
