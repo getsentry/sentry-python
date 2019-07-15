@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import functools
 import sys
 
 from celery.exceptions import (  # type: ignore
@@ -64,6 +65,7 @@ class CeleryIntegration(Integration):
 
 
 def _wrap_apply_async(task, f):
+    @functools.wraps(f)
     def apply_async(*args, **kwargs):
         hub = Hub.current
         integration = hub.get_integration(CeleryIntegration)
@@ -87,6 +89,7 @@ def _wrap_tracer(task, f):
     # This is the reason we don't use signals for hooking in the first place.
     # Also because in Celery 3, signal dispatch returns early if one handler
     # crashes.
+    @functools.wraps(f)
     def _inner(*args, **kwargs):
         hub = Hub.current
         if hub.get_integration(CeleryIntegration) is None:
@@ -114,6 +117,11 @@ def _wrap_tracer(task, f):
 def _wrap_task_call(task, f):
     # Need to wrap task call because the exception is caught before we get to
     # see it. Also celery's reported stacktrace is untrustworthy.
+
+    # functools.wraps is important here because celery-once looks at this
+    # method's name.
+    # https://github.com/getsentry/sentry-python/issues/421
+    @functools.wraps(f)
     def _inner(*args, **kwargs):
         try:
             return f(*args, **kwargs)
