@@ -479,8 +479,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             sample_rate = client and client.options["traces_sample_rate"] or 0
             span.sampled = random.random() < sample_rate
 
-        if span.sampled and client:
-            span.init_finished_spans(client.options["max_breadcrumbs"])
+        if span.sampled:
+            span.init_finished_spans()
 
         return span
 

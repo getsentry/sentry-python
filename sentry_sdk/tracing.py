@@ -2,7 +2,6 @@ import re
 import uuid
 import contextlib
 
-from collections import deque
 from datetime import datetime
 
 from sentry_sdk.utils import capture_internal_exceptions, concat_strings
@@ -20,7 +19,7 @@ if MYPY:
     from typing import Optional
     from typing import Any
     from typing import Dict
-    from typing import Deque
+    from typing import List
 
 _traceparent_header_format_re = re.compile(
     "^[ \t]*"  # whitespace
@@ -98,15 +97,15 @@ class Span(object):
         self.description = description
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
-        self._finished_spans = None  # type: Optional[Deque[Span]]
+        self._finished_spans = None  # type: Optional[List[Span]]
         self.start_timestamp = datetime.now()
 
         #: End timestamp of span
         self.timestamp = None
 
-    def init_finished_spans(self, maxlen):
+    def init_finished_spans(self):
         if self._finished_spans is None:
-            self._finished_spans = deque(maxlen=maxlen)
+            self._finished_spans = []
 
     def __repr__(self):
         return (
