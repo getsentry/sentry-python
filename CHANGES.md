@@ -25,6 +25,13 @@ sentry-sdk>=0.10.0,<0.11.0
 sentry-sdk==0.10.1
 ```
 
+## 0.10.2
+
+* Fix a bug where a log record with non-strings as `extra` keys would make the SDK crash.
+* Added ASGI integration for better hub propagation, request data for your events and capturing uncaught exceptions. Using this middleware explicitly in your code will also fix a few issues with Django Channels.
+* Fix a bug where `celery-once` was deadlocking when used in combination with the celery integration.
+* Fix a memory leak in the new tracing feature when it is not enabled.
+
 ## 0.10.1
 
 * Fix bug where the SDK would yield a deprecation warning about
