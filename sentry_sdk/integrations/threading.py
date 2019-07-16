@@ -45,6 +45,7 @@ class ThreadingIntegration(Integration):
 def _wrap_run(parent_hub, old_run):
     def run(*a, **kw):
         hub = parent_hub or Hub.current
+        del old_run.__self__.run
 
         with hub:
             try:
