@@ -74,15 +74,28 @@ class _Client(object):
     """
 
     def __init__(self, *args, **kwargs):
-        # type: (*Optional[str], **Any) -> None
+        # type: (*Any, **Any) -> None
+        self.options = get_options(*args, **kwargs)  # type: Dict[str, Any]
+        self._init_impl()
+
+    def __getstate__(self):
+        # type: () -> Any
+        return self.options
+
+    def __setstate__(self, state):
+        # type: (Any) -> None
+        self.options = state
+        self._init_impl()
+
+    def _init_impl(self):
+        # type: () -> None
         old_debug = _client_init_debug.get(False)
         try:
-            self.options = options = get_options(*args, **kwargs)  # type: ignore
-            _client_init_debug.set(options["debug"])
-            self.transport = make_transport(options)
+            _client_init_debug.set(self.options["debug"])
+            self.transport = make_transport(self.options)
 
             request_bodies = ("always", "never", "small", "medium")
-            if options["request_bodies"] not in request_bodies:
+            if self.options["request_bodies"] not in request_bodies:
                 raise ValueError(
                     "Invalid value for request_bodies. Must be one of {}".format(
                         request_bodies
@@ -90,7 +103,8 @@ class _Client(object):
                 )
 
             self.integrations = setup_integrations(
-                options["integrations"], with_defaults=options["default_integrations"]
+                self.options["integrations"],
+                with_defaults=self.options["default_integrations"],
             )
         finally:
             _client_init_debug.set(old_debug)
