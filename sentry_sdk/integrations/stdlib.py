@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 import platform
+from itertools import tee
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
@@ -147,7 +148,7 @@ def _install_subprocess():
 
         # do not setdefault! args is required by Popen, doing setdefault would
         # make invalid calls valid
-        args = _init_argument(a, kw, "args", 0) or []
+        args = tee(_init_argument(a, kw, "args", 0) or [])
         cwd = _init_argument(a, kw, "cwd", 10)
 
         env = None
