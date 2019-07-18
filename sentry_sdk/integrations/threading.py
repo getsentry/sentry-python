@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import sys
 
 from threading import Thread
+from types import MethodType
 
 from sentry_sdk import Hub
 from sentry_sdk._compat import reraise
@@ -15,6 +16,36 @@ if MYPY:
     from typing import Any
 
 
+class RunDescriptor:
+    def __init__(self, func, parent_hub):
+        self.class_func = func
+        self.parent_hub = parent_hub
+
+    def __get__(self, instance, owner):
+        """The descriptor which is used to patch instance method is sort of tricky and
+        difficult to understand. But according to the `Python Data Model`,
+        it is a proper way to prevent reference cycle using this way::
+
+            # reference cycle between self.__dict__ and self.run.__self__
+            self.run = new_run(self.run)
+
+        Using descriptor will patch instance method with holding this instance
+        inside closure rather than storing reference of itself into the attribute of instance.
+        """
+        if instance is None:
+            return self
+
+        def run(*a, **kw):
+            hub = self.parent_hub or Hub.current
+            with hub:
+                try:
+                    return MethodType(self.class_func, instance)(*a, **kw)
+                except Exception:
+                    reraise(*_capture_exception())
+
+        return run
+
+
 class ThreadingIntegration(Integration):
     identifier = "threading"
 
@@ -25,6 +56,7 @@ class ThreadingIntegration(Integration):
     def setup_once():
         # type: () -> None
         old_start = Thread.start
+        old_run = Thread.run
 
         def sentry_start(self, *a, **kw):
             hub = Hub.current
@@ -35,25 +67,11 @@ class ThreadingIntegration(Integration):
                 else:
                     hub_ = Hub(hub)
 
-                self.run = _wrap_run(hub_, self.run)
+                self.__class__.run = RunDescriptor(old_run, hub_)
 
             return old_start(self, *a, **kw)  # type: ignore
 
         Thread.start = sentry_start  # type: ignore
-
-
-def _wrap_run(parent_hub, old_run):
-    def run(*a, **kw):
-        hub = parent_hub or Hub.current
-        del old_run.__self__.run
-
-        with hub:
-            try:
-                return old_run(*a, **kw)
-            except Exception:
-                reraise(*_capture_exception())
-
-    return run
 
 
 def _capture_exception():
