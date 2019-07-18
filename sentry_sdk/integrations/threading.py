@@ -33,7 +33,7 @@ class RunDescriptor:
         inside closure rather than storing reference of itself into the attribute of instance.
         """
         if instance is None:
-            return self
+            return self.class_func
 
         def run(*a, **kw):
             hub = self.parent_hub or Hub.current
@@ -56,7 +56,6 @@ class ThreadingIntegration(Integration):
     def setup_once():
         # type: () -> None
         old_start = Thread.start
-        old_run = Thread.run
 
         def sentry_start(self, *a, **kw):
             hub = Hub.current
@@ -67,7 +66,7 @@ class ThreadingIntegration(Integration):
                 else:
                     hub_ = Hub(hub)
 
-                self.__class__.run = RunDescriptor(old_run, hub_)
+                self.__class__.run = RunDescriptor(self.__class__.run, hub_)
 
             return old_start(self, *a, **kw)  # type: ignore
 
