@@ -16,10 +16,13 @@ if MYPY:
     from typing import Any
 
 
-class RunDescriptor:
-    def __init__(self, func, parent_hub):
-        self.class_func = func
+class PatchedInstanceMethodDescriptor(object):
+    def __init__(self, class_method, parent_hub):
+        self.origin_class_method = class_method
         self.parent_hub = parent_hub
+
+    def __set__(self, instance, value):
+        pass
 
     def __get__(self, instance, owner):
         """The descriptor which is used to patch instance method is sort of tricky and
@@ -33,13 +36,13 @@ class RunDescriptor:
         inside closure rather than storing reference of itself into the attribute of instance.
         """
         if instance is None:
-            return self.class_func
+            return self.origin_class_method
 
         def run(*a, **kw):
             hub = self.parent_hub or Hub.current
             with hub:
                 try:
-                    return MethodType(self.class_func, instance)(*a, **kw)
+                    return MethodType(self.origin_class_method, instance)(*a, **kw)
                 except Exception:
                     reraise(*_capture_exception())
 
@@ -66,7 +69,7 @@ class ThreadingIntegration(Integration):
                 else:
                     hub_ = Hub(hub)
 
-                self.__class__.run = RunDescriptor(self.__class__.run, hub_)
+                self.__class__.run = PatchedInstanceMethodDescriptor(self.__class__.run, hub_)
 
             return old_start(self, *a, **kw)  # type: ignore
 
