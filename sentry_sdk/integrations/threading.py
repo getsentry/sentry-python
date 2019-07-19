@@ -74,7 +74,9 @@ class ThreadingIntegration(Integration):
                 else:
                     hub_ = Hub(hub)
 
-                self.__class__.run = PatchedInstanceMethodDescriptor(self.__class__.run, hub_)
+                self.__class__.run = PatchedInstanceMethodDescriptor(
+                    self.__class__.run, hub_
+                )
 
             return old_start(self, *a, **kw)  # type: ignore
 

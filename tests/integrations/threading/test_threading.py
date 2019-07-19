@@ -104,5 +104,5 @@ def test_double_patching(sentry_init, capture_events):
 
     assert len(events) == 10
     for event in events:
-        exception, = event['exception']['values']
-        assert exception['type'] == 'ZeroDivisionError'
+        exception, = event["exception"]["values"]
+        assert exception["type"] == "ZeroDivisionError"
