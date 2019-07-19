@@ -25,7 +25,12 @@ class PatchedInstanceMethodDescriptor(object):
         pass
 
     def __get__(self, instance, owner):
-        """The descriptor which is used to patch instance method is sort of tricky and
+        """
+        Patching instance methods in `start()` creates a reference cycle if
+        done in a naive way. See
+        https://github.com/getsentry/sentry-python/pull/434
+
+        The descriptor which is used to patch instance method is sort of tricky and
         difficult to understand. But according to the `Python Data Model`,
         it is a proper way to prevent reference cycle using this way::
 
