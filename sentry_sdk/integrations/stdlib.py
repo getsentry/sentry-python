@@ -111,7 +111,9 @@ def _install_httplib():
     HTTPConnection.getresponse = getresponse
 
 
-def _init_argument(args, kwargs, name, position, setdefault_callback=None, force_setdefault=False):
+def _init_argument(
+    args, kwargs, name, position, setdefault_callback=None, force_setdefault=False
+):
     """
     given (*args, **kwargs) of a function call, retrieve (and optionally set a
     default for) an argument by either name or position.
@@ -157,7 +159,7 @@ def _install_subprocess():
             args = []
         elif args is str:
             args = [args]
-        else: # args could be iterator, reinsert as list via forced setdefault
+        else:  # args could be iterator, reinsert as list via forced setdefault
             args = _init_argument(a, kw, "args", 0, lambda: list(args), True)
 
         env = None
