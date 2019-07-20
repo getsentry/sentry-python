@@ -111,7 +111,7 @@ def _install_httplib():
     HTTPConnection.getresponse = getresponse
 
 
-def _init_argument(args, kwargs, name, position, setdefault_callback=None):
+def _init_argument(args, kwargs, name, position, setdefault_callback=None, force_setdefault=False):
     """
     given (*args, **kwargs) of a function call, retrieve (and optionally set a
     default for) an argument by either name or position.
@@ -123,11 +123,11 @@ def _init_argument(args, kwargs, name, position, setdefault_callback=None):
 
     if name in kwargs:
         rv = kwargs[name]
-        if rv is None and setdefault_callback is not None:
+        if (force_setdefault or rv is None) and setdefault_callback is not None:
             rv = kwargs[name] = setdefault_callback()
     elif position < len(args):
         rv = args[position]
-        if rv is None and setdefault_callback is not None:
+        if (force_setdefault or rv is None) and setdefault_callback is not None:
             rv = args[position] = setdefault_callback()
     else:
         rv = setdefault_callback and setdefault_callback()
@@ -145,10 +145,20 @@ def _install_subprocess():
         if hub.get_integration(StdlibIntegration) is None:
             return old_popen_init(self, *a, **kw)
 
+        # a needs conversion from tuple to list in order to setdefault
+        a = list(a)
+
         # do not setdefault! args is required by Popen, doing setdefault would
         # make invalid calls valid
-        args = _init_argument(a, kw, "args", 0) or []
+        args = _init_argument(a, kw, "args", 0)
         cwd = _init_argument(a, kw, "cwd", 10)
+
+        if args is None:
+            args = []
+        elif args is str:
+            args = [args]
+        else: # args could be iterator, reinsert as list via forced setdefault
+            args = _init_argument(a, kw, "args", 0, lambda: list(args), True)
 
         env = None
 
