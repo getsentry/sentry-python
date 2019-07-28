@@ -27,7 +27,7 @@ class ClientConstructor(object):
         environment=None,  # type: Optional[str]
         server_name=None,  # type: Optional[str]
         shutdown_timeout=2,  # type: int
-        integrations=[],  # type: List[Integration]
+        integrations=[],  # type: Sequence[Integration]
         in_app_include=[],  # type: List[str]
         in_app_exclude=[],  # type: List[str]
         default_integrations=True,  # type: bool
