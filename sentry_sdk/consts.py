@@ -8,6 +8,7 @@ if MYPY:
     from typing import Type
     from typing import Dict
     from typing import Any
+    from typing import Sequence
 
     from sentry_sdk.transport import Transport
     from sentry_sdk.integrations import Integration
