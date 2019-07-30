@@ -29,11 +29,12 @@ class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
 
         @app.append_err_handler
         def error_handler(e):
-            if type(e) not in {
-                TrytondUserError,
-                TrytondUserWarning,
-                ConcurrencyException,
-                LoginException,
-            }:
+            if (
+                    isinstance(e, TrytondUserError)
+                    or isinstance(e, TrytondUserWarning)
+                    or isinstance(e, ConcurrencyException)
+                    or isinstance(e, LoginException)
+            ):
+                return
+            else:
                 sentry_sdk.capture_exception(e)
-            return
