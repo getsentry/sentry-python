@@ -38,6 +38,9 @@ class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
 
 
 def rpc_error_page(self, e):
+    if isinstance(e, TrytondBaseException):
+        return
+    else:
     _environ = dict()
     request_stub = type('JSONRequestStub', (JSONRequest,), dict(
         accept_mimetypes=[('json', None)],
