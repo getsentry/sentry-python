@@ -1,57 +1,16 @@
 from __future__ import absolute_import
 
 import sys
-
-from threading import Thread
-from types import MethodType
+from threading import Thread, current_thread
 
 from sentry_sdk import Hub
 from sentry_sdk._compat import reraise
-from sentry_sdk.utils import event_from_exception
-from sentry_sdk.integrations import Integration
-
 from sentry_sdk._types import MYPY
+from sentry_sdk.integrations import Integration
+from sentry_sdk.utils import event_from_exception
 
 if MYPY:
     from typing import Any
-
-
-class PatchedInstanceMethodDescriptor(object):
-    def __init__(self, class_method, parent_hub):
-        self.origin_class_method = class_method
-        self.parent_hub = parent_hub
-
-    def __set__(self, instance, value):
-        pass
-
-    def __get__(self, instance, owner):
-        """
-        Patching instance methods in `start()` creates a reference cycle if
-        done in a naive way. See
-        https://github.com/getsentry/sentry-python/pull/434
-
-        The descriptor which is used to patch instance method is sort of tricky and
-        difficult to understand. But according to the `Python Data Model`,
-        it is a proper way to prevent reference cycle using this way::
-
-            # reference cycle between self.__dict__ and self.run.__self__
-            self.run = new_run(self.run)
-
-        Using descriptor will patch instance method with holding this instance
-        inside closure rather than storing reference of itself into the attribute of instance.
-        """
-        if instance is None:
-            return self.origin_class_method
-
-        def run(*a, **kw):
-            hub = self.parent_hub or Hub.current
-            with hub:
-                try:
-                    return MethodType(self.origin_class_method, instance)(*a, **kw)
-                except Exception:
-                    reraise(*_capture_exception())
-
-        return run
 
 
 class ThreadingIntegration(Integration):
@@ -73,14 +32,30 @@ class ThreadingIntegration(Integration):
                     hub_ = None
                 else:
                     hub_ = Hub(hub)
-
-                self.__class__.run = PatchedInstanceMethodDescriptor(
-                    self.__class__.run, hub_
-                )
+                # Patching instance methods in `start()` creates a reference cycle if
+                # done in a naive way. See
+                # https://github.com/getsentry/sentry-python/pull/434
+                #
+                # In threading module, using current_thread API will access current thread instance
+                # without holding it to avoid a reference cycle in an easier way.
+                self.run = _wrap_run(hub_, self.run.__func__)
 
             return old_start(self, *a, **kw)  # type: ignore
 
         Thread.start = sentry_start  # type: ignore
+
+
+def _wrap_run(parent_hub, old_run_func):
+    def run(*a, **kw):
+        hub = parent_hub or Hub.current
+        with hub:
+            try:
+                self = current_thread()
+                return old_run_func(self, *a, **kw)
+            except Exception:
+                reraise(*_capture_exception())
+
+    return run
 
 
 def _capture_exception():
