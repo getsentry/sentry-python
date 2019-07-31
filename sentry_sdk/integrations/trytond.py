@@ -4,10 +4,8 @@ import sentry_sdk.integrations
 
 from werkzeug.wrappers import Response
 from trytond.wsgi import app
+from trytond.exceptions import TrytonException as TrytondBaseException
 from trytond.exceptions import UserError as TrytondUserError
-from trytond.exceptions import UserWarning as TrytondUserWarning
-from trytond.exceptions import ConcurrencyException
-from trytond.exceptions import LoginException
 
 
 def append_err_handler(self, handler):
@@ -53,12 +51,8 @@ class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
         bound_error_responder = asdf.__get__(app)
         @app.append_err_handler
         def error_handler(e):
-            import pudb; pudb.set_trace()
-            if isinstance(e, (
-                    TrytondUserError,
-                    TrytondUserWarning,
-                    ConcurrencyException,
-                    LoginException)):
+            # import pudb; pudb.set_trace()
+            if isinstance(e, TrytondBaseException):
                 return
             else:
                 event_id = sentry_sdk.capture_exception(e)
