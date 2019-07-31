@@ -22,7 +22,7 @@ from trytond.protocols.wrappers import with_pool, with_transaction
 
 
 app.append_err_handler(
-    sentry_sdk.integrations.trytond.rpc_error
+    sentry_sdk.integrations.trytond.rpc_error_page
 )
 
 

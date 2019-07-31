@@ -93,13 +93,21 @@ def test_rpc_error_page(sentry_init, app, capture_events, get_client):
 
     client = get_client()
     # This would look like a Tryton RPC natural call
+    _ids = [1234]
+    _values = ["values"]
+    _context = dict(
+        client='12345678-9abc-def0-1234-56789abc',
+        groups=[1],
+        language='ca',
+        language_direction='ltr',
+    )
     response = client.post(
         "/rpcerror",
         content_type="application/json",
         data=json.dumps(dict(
             id=42,
             method='class.method',
-            params=dict(),
+            params=[_ids, _values, _context],
         ))
     )
 
