@@ -26,15 +26,6 @@ app.append_err_handler(
 )
 
 
-class MyModel(Model):
-    __name__ = 'mymodel'
-
-    @classmethod
-    def cronfail(cls):
-        raise Exception('unhandled')
-        raise TrytondUserError('err message', 'error details')
-
-
 class Cron(metaclass=PoolMeta):
     __name__ = 'ir.cron'
 
@@ -42,8 +33,13 @@ class Cron(metaclass=PoolMeta):
     def __setup__(cls):
         super(Cron, cls).__setup__()
         cls.method.selection += [
-            ('mymodel|cronfail', 'Fail'),
+            ('ir.cron|cronfail', 'Fail'),
         ]
+
+    @classmethod
+    def cronfail(cls):
+        raise Exception('unhandled')
+        raise TrytondUserError('err message', 'error details')
 
 
 class UserApplication(metaclass=PoolMeta):
@@ -56,7 +52,6 @@ class UserApplication(metaclass=PoolMeta):
 
 
 Pool.register(
-    MyModel,
     Cron,
     UserApplication,
     module='res',
