@@ -21,6 +21,11 @@ from trytond.protocols.wrappers import user_application
 from trytond.protocols.wrappers import with_pool, with_transaction
 
 
+app.append_err_handler(
+    sentry_sdk.integrations.trytond.rpc_error
+)
+
+
 class MyModel(Model):
     __name__ = 'mymodel'
 
@@ -68,7 +73,6 @@ def _route_fail(request):
 @with_pool
 @with_transaction()
 def _pool_fail(request, pool):
-    import pudb; pudb.set_trace()
     raise Exception('pool')
 
 

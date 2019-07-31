@@ -12,6 +12,7 @@ from trytond.wsgi import app as trytond_app
 from werkzeug.test import Client
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.trytond import TrytondWSGIIntegration
+from sentry_sdk.integrations.trytond import rpc_error_page
 
 
 @pytest.fixture(scope="function")
@@ -78,3 +79,35 @@ def test_trytonderrors_not_captured(sentry_init, app, capture_exceptions, get_cl
     response = client.get("/usererror")
 
     assert not exceptions
+
+
+def test_rpc_error_page(sentry_init, app, capture_events, get_client):
+    sentry_init(integrations=[TrytondWSGIIntegration()])
+    events = capture_events()
+
+    @app.route('/rpcerror', methods=['POST'])
+    def _(request):
+        raise Exception('foo')
+
+    app.append_err_handler(rpc_error_page)
+
+    client = get_client()
+    response = client.post(
+        "/rpcerror",
+        content_type="application/json",
+        data=json.dumps(dict(
+            id=42,
+            method='class.method',
+            params=dict(),
+        ))
+    )
+
+    (event,) = events
+    (content, status, headers) = response
+    assert status == '200 OK'
+    assert headers.get('Content-Type') == 'application/json'
+    data = json.loads(next(content))
+    assert data == dict(
+        error=['UserError', [event['event_id'], 'foo']],
+        id=None  # FIXME: 42
+    )
