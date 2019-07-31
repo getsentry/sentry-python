@@ -92,6 +92,7 @@ def test_rpc_error_page(sentry_init, app, capture_events, get_client):
     app.append_err_handler(rpc_error_page)
 
     client = get_client()
+    # This would look like a Tryton RPC natural call
     response = client.post(
         "/rpcerror",
         content_type="application/json",
