@@ -13,6 +13,7 @@ sentry_sdk.init(
 
 
 from trytond.application import app
+from trytond.exceptions import UserError as TrytondUserError
 
 from trytond.pool import PoolMeta, Pool
 from trytond.model import Model
@@ -25,7 +26,8 @@ class MyModel(Model):
 
     @classmethod
     def cronfail(cls):
-        raise Exception('cron')
+        raise Exception('unhandled')
+        raise TrytondUserError('err message', 'error details')
 
 
 class Cron(metaclass=PoolMeta):
