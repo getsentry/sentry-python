@@ -47,10 +47,11 @@ def rpc_error_page(self, e):
         request_stub = type('JSONRequestStub', (JSONRequest,), dict(
             accept_mimetypes=[('json', None)],
             parsed_data=dict(
-                id=None,  # FIXME: The client won't trust this response because
-                        # the parameter id won't match the one it crafted
-                        # for the request. We must gain access to the
-                        # original request for error handlers
+                id=None,
+                # FIXME: A Trtyon RPC client won't trust this response
+                # because the `id` parameter won't match the one it
+                # crafted for the request. We must gain access to the
+                # original request for error handlers
                 method=None,
                 params=None
             ),
@@ -70,18 +71,24 @@ class TrytondSentryHandler(logging.NullHandler):
 
     def __init__(self, dsn, ignore=tuple()):
         super(TrytondSentryHandler, self).__init__()
+
         # There is no clean way to run a static configuration code block
         # when running the trytond-cron binary without crafting a whole
-        # new binary that wraps it. This is a workaround in the line of
-        # the old raven package
+        # new binary that wraps it.
+        # (See https://github.com/trytonus/trytond-sentry/blob/master/bin/trytond_sentry)
+        # This is a workaround to provide a behaviour
+        # similar to the old raven package
+
         sentry_sdk.init(dsn)
+
         # Also, there is no need to inherit
         # sentry_sdk.integrations.logging.EventHandler because
-        # sentry_sdk.init will already install the default 
-        # sentry_sdk.integrations.logging.LoggingIntegration
-        # that will already patch any logger.error call
-        # except fo rthe following
+        # sentry_sdk.init will already install the default
+        # LoggingIntegration that will already spy on any
+        # logger.error call except for the following
+
         for logger in ignore:
             sentry_sdk.integrations.logging.ignore_logger(logger)
+
         # That is: there is no actual TrytondCronIntegration to be written
-        # but we need this so as to inject a sentry_sdk.init call
+        # but this is needed so as to inject a sentry_sdk.init call

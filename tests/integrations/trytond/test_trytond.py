@@ -27,22 +27,6 @@ def get_client(app):
     return inner
 
 
-# def test_errors(sentry_init, app, capture_events, get_client):
-#     sentry_init(integrations=[TrytondWSGIIntegration(app)])
-#     # events = capture_events()
-#     client = get_client()
-#     response = client.post(
-#         "/", content_type="application/json",
-#         data=json.dumps(dict(method='common.server.version', params=dict())))
-#     assert response[1] == "200 OK"
-# #
-# #     event, = events
-# #     assert event["message"] == "hi"
-# #     assert "data" not in event["request"]
-# #     assert event["request"]["url"] == "http://localhost/message"
-#     assert True
-
-
 @pytest.mark.parametrize("exception", [
     Exception('foo'),
     type('FooException', (Exception,), {})('bar'),
@@ -92,7 +76,7 @@ def test_rpc_error_page(sentry_init, app, capture_events, get_client):
     app.append_err_handler(rpc_error_page)
 
     client = get_client()
-    # This would look like a Tryton RPC natural call
+    # This would look like a natural Tryton RPC call
     _ids = [1234]
     _values = ["values"]
     _context = dict(
