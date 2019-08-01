@@ -30,7 +30,7 @@ class BeamIntegration(Integration):
             setattr(
                 DoFn,
                 INSPECT_FUNC.format(func_name),
-                patched_inspect_process(DoFn, func_name),
+                _wrap_inspect_call(DoFn, func_name),
             )
 
         old_init = ParDo.__init__
@@ -61,7 +61,7 @@ class BeamIntegration(Integration):
         ParDo.__init__ = sentry_init_pardo
 
 
-def patched_inspect_process(cls, func_name):
+def _wrap_inspect_call(cls, func_name):
     from apache_beam.typehints.decorators import getfullargspec  # type: ignore
 
     if not hasattr(cls, func_name):
@@ -108,7 +108,7 @@ def _wrap_task_call(func):
 
 def _capture_exception(exc_info, hub):
     """
-    Send Beam exception to Sentry
+    Send Beam exception to Sentry.
     """
     integration = hub.get_integration(BeamIntegration)
     if integration:
@@ -142,6 +142,6 @@ def _wrap_generator_call(gen, client):
         try:
             yield next(gen)
         except StopIteration:
-            raise
+            break
         except Exception:
             raise_exception(client)

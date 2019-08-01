@@ -1,13 +1,14 @@
 import pytest
-import dill
 import inspect
 
 pytest.importorskip("apache_beam")
 
+import dill
+
 from sentry_sdk.integrations.beam import (
     BeamIntegration,
     _wrap_task_call,
-    patched_inspect_process,
+    _wrap_inspect_call,
 )
 
 from apache_beam.typehints.trivial_inference import instance_to_type
@@ -35,7 +36,7 @@ class A:
     def __init__(self, fn):
         self.r = "We are in A"
         self.fn = fn
-        setattr(self, "_inspect_fn", patched_inspect_process(self, "fn"))
+        setattr(self, "_inspect_fn", _wrap_inspect_call(self, "fn"))
 
     def process(self):
         return self.fn()
@@ -153,8 +154,12 @@ def test_monkey_patch_signature(f, args, kwargs):
 class _OutputProcessor(OutputProcessor):
     def process_outputs(self, windowed_input_element, results):
         print(windowed_input_element)
-        for result in results:
-            assert result
+        try:
+            for result in results:
+                assert result
+        except StopIteration:
+            print("In here")
+
 
 
 @pytest.fixture
