@@ -759,7 +759,7 @@ def _is_threading_local_monkey_patched():
     try:
         from gevent.monkey import is_object_patched  # type: ignore
 
-        if is_object_patched("_threading", "local"):
+        if is_object_patched("threading", "local"):
             return True
     except ImportError:
         pass
