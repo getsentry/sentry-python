@@ -62,6 +62,7 @@ class CeleryIntegration(Integration):
         # Meaning that every task's breadcrumbs are full of stuff like "Task
         # <foo> raised unexpected <bar>".
         ignore_logger("celery.worker.job")
+        ignore_logger("celery.app.trace")
 
 
 def _wrap_apply_async(task, f):
