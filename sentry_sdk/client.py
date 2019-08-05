@@ -80,11 +80,11 @@ class _Client(object):
 
     def __getstate__(self):
         # type: () -> Any
-        return self.options
+        return {"options": self.options}
 
     def __setstate__(self, state):
         # type: (Any) -> None
-        self.options = state
+        self.options = state["options"]
         self._init_impl()
 
     def _init_impl(self):
