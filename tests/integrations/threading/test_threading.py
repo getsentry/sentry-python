@@ -1,3 +1,5 @@
+import gc
+
 from threading import Thread
 
 import pytest
@@ -62,3 +64,45 @@ def test_propagates_hub(sentry_init, capture_events, propagate_hub):
         assert event["tags"]["stage1"] is True
     else:
         assert "stage1" not in event.get("tags", {})
+
+
+def test_circular_references(sentry_init, request):
+    sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
+
+    gc.collect()
+    gc.disable()
+    request.addfinalizer(gc.enable)
+
+    class MyThread(Thread):
+        def run(self):
+            pass
+
+    t = MyThread()
+    t.start()
+    t.join()
+    del t
+
+    assert not gc.collect()
+
+
+def test_double_patching(sentry_init, capture_events):
+    sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
+    events = capture_events()
+
+    class MyThread(Thread):
+        def run(self):
+            1 / 0
+
+    ts = []
+    for _ in range(10):
+        t = MyThread()
+        t.start()
+        ts.append(t)
+
+    for t in ts:
+        t.join()
+
+    assert len(events) == 10
+    for event in events:
+        exception, = event["exception"]["values"]
+        assert exception["type"] == "ZeroDivisionError"
