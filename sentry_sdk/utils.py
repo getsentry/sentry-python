@@ -775,10 +775,6 @@ def _is_threading_local_monkey_patched():
     return False
 
 
-IS_THREADING_LOCAL_MONKEY_PATCHED = _is_threading_local_monkey_patched()
-del _is_threading_local_monkey_patched
-
-
 def _get_contextvars():
     # () -> (bool, Type)
     """
@@ -788,7 +784,7 @@ def _get_contextvars():
 
     https://github.com/gevent/gevent/issues/1407
     """
-    if not IS_THREADING_LOCAL_MONKEY_PATCHED:
+    if not _is_threading_local_monkey_patched():
         try:
             from contextvars import ContextVar  # type: ignore
 
@@ -818,7 +814,6 @@ def _get_contextvars():
 
 
 HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()
-del _get_contextvars
 
 
 def transaction_from_function(func):
