@@ -19,6 +19,7 @@ if MYPY:
     from logging import LogRecord
     from typing import Any
     from typing import Dict
+    from typing import Optional
 
 DEFAULT_LEVEL = logging.INFO
 DEFAULT_EVENT_LEVEL = logging.ERROR
@@ -40,7 +41,7 @@ class LoggingIntegration(Integration):
     identifier = "logging"
 
     def __init__(self, level=DEFAULT_LEVEL, event_level=DEFAULT_EVENT_LEVEL):
-        # type: (int, int) -> None
+        # type: (Optional[int], Optional[int]) -> None
         self._handler = None
         self._breadcrumb_handler = None
 
