@@ -1,4 +1,5 @@
 import os
+import platform
 import subprocess
 import sys
 
@@ -30,7 +31,19 @@ class ImmutableDict(Mapping):
 
 
 @pytest.mark.parametrize("positional_args", [True, False])
-@pytest.mark.parametrize("iterator", [True, False])
+@pytest.mark.parametrize(
+    "iterator",
+    [
+        pytest.param(
+            True,
+            marks=pytest.mark.skipif(
+                platform.python_implementation() == "PyPy",
+                reason="https://github.com/getsentry/sentry-python/pull/449",
+            ),
+        ),
+        False,
+    ],
+)
 @pytest.mark.parametrize("env_mapping", [None, os.environ, ImmutableDict(os.environ)])
 @pytest.mark.parametrize("with_cwd", [True, False])
 def test_subprocess_basic(
