@@ -8,6 +8,7 @@ if MYPY:
     from typing import Type
     from typing import Dict
     from typing import Any
+    from typing import Sequence
 
     from sentry_sdk.transport import Transport
     from sentry_sdk.integrations import Integration
@@ -27,7 +28,7 @@ class ClientConstructor(object):
         environment=None,  # type: Optional[str]
         server_name=None,  # type: Optional[str]
         shutdown_timeout=2,  # type: int
-        integrations=[],  # type: List[Integration]
+        integrations=[],  # type: Sequence[Integration]
         in_app_include=[],  # type: List[str]
         in_app_exclude=[],  # type: List[str]
         default_integrations=True,  # type: bool
