@@ -162,6 +162,9 @@ def _install_subprocess():
         # let's not use it at all. There are too many things that can go wrong
         # when trying to collect an iterator into a list and setting that list
         # into `a` again.
+        #
+        # Also invocations where `args` is not a sequence are not actually
+        # legal. They just happen to work under CPython.
         description = None
 
         if isinstance(args, (list, tuple)) and len(args) < 100:
