@@ -1,21 +1,12 @@
 # coding: utf-8
 import json
-import logging
 import pytest
 import subprocess
 import sys
 import time
 
-from datetime import datetime
 from textwrap import dedent
-from sentry_sdk import (
-    Hub,
-    Client,
-    configure_scope,
-    capture_message,
-    add_breadcrumb,
-    capture_exception,
-)
+from sentry_sdk import Hub, Client, configure_scope, capture_message, capture_exception
 from sentry_sdk.hub import HubMeta
 from sentry_sdk.transport import Transport
 from sentry_sdk._compat import reraise, text_type, PY2
@@ -357,28 +348,6 @@ def test_configure_scope_unavailable(no_sdk, monkeypatch):
 
     assert configure_scope(callback) is None
     assert not calls
-
-
-@pytest.mark.parametrize("debug", (True, False))
-def test_transport_works(httpserver, request, capsys, caplog, debug):
-    httpserver.serve_content("ok", 200)
-    caplog.set_level(logging.DEBUG)
-
-    client = Client(
-        "http://foobar@{}/123".format(httpserver.url[len("http://") :]), debug=debug
-    )
-    Hub.current.bind_client(client)
-    request.addfinalizer(lambda: Hub.current.bind_client(None))
-
-    add_breadcrumb(level="info", message="i like bread", timestamp=datetime.now())
-    capture_message("löl")
-    client.close()
-
-    out, err = capsys.readouterr()
-    assert not err and not out
-    assert httpserver.requests
-
-    assert any("Sending event" in record.msg for record in caplog.records) == debug
 
 
 @pytest.mark.tests_internal_exceptions
