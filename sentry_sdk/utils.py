@@ -236,15 +236,6 @@ def iter_stacks(tb):
         tb_ = tb_.tb_next
 
 
-def slim_string(value, length=MAX_STRING_LENGTH):
-    # type: (str, int) -> str
-    if not value:
-        return value
-    if len(value) > length:
-        return value[: length - 3] + "..."
-    return value[:length]
-
-
 def get_lines_from_file(
     filename,  # type: str
     lineno,  # type: int
@@ -276,11 +267,11 @@ def get_lines_from_file(
 
     try:
         pre_context = [
-            slim_string(line.strip("\r\n")) for line in source[lower_bound:lineno]
+            strip_string(line.strip("\r\n")) for line in source[lower_bound:lineno]
         ]
-        context_line = slim_string(source[lineno].strip("\r\n"))
+        context_line = strip_string(source[lineno].strip("\r\n"))
         post_context = [
-            slim_string(line.strip("\r\n"))
+            strip_string(line.strip("\r\n"))
             for line in source[(lineno + 1) : upper_bound]
         ]
         return pre_context, context_line, post_context
@@ -652,12 +643,18 @@ def _module_in_set(name, set):
     return False
 
 
-def strip_string(value, max_length=512):
-    # type: (str, int) -> Union[AnnotatedValue, str]
+def strip_string(value, max_length=None):
+    # type: (str, Optional[int]) -> Union[AnnotatedValue, str]
     # TODO: read max_length from config
     if not value:
         return value
+
+    if max_length is None:
+        # This is intentionally not just the default such that one can patch `MAX_STRING_LENGTH` and affect `strip_string`.
+        max_length = MAX_STRING_LENGTH
+
     length = len(value)
+
     if length > max_length:
         return AnnotatedValue(
             value=value[: max_length - 3] + u"...",
