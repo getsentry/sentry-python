@@ -77,7 +77,11 @@ def _wrap_apply_async(task, f):
                 headers[key] = value
             if headers is not None:
                 kwargs["headers"] = headers
-        return f(*args, **kwargs)
+
+            with hub.span(op="celery", description=task.name):
+                return f(*args, **kwargs)
+        else:
+            return f(*args, **kwargs)
 
     return apply_async
 
