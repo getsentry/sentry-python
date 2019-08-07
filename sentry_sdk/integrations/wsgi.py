@@ -87,7 +87,7 @@ class SentryWsgiMiddleware(object):
                     scope.add_event_processor(_make_wsgi_event_processor(environ))
 
             span = Span.continue_from_environ(environ)
-            span.transaction = environ.get("PATH_INFO") or "unknown http request"
+            span.transaction = "generic WSGI request"
 
             with hub.span(span):
                 try:
