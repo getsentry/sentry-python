@@ -145,6 +145,14 @@ def _extra_from_record(record):
     }
 
 
+def _user_from_record(record):
+    # type: (LogRecord) -> Optional[Dict[str, None]]
+    user = vars(record).get("user")
+    if not isinstance(user, dict):
+        return None
+    return user
+
+
 class EventHandler(logging.Handler, object):
     def emit(self, record):
         # type: (LogRecord) -> Any
@@ -194,6 +202,7 @@ class EventHandler(logging.Handler, object):
         event["level"] = _logging_to_event_level(record.levelname)
         event["logger"] = record.name
         event["logentry"] = {"message": to_string(record.msg), "params": record.args}
+        event["user"] = _user_from_record(record)
         event["extra"] = _extra_from_record(record)
 
         hub.capture_event(event, hint=hint)

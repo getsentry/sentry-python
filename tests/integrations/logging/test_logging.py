@@ -72,6 +72,32 @@ def test_logging_extra_data_integer_keys(sentry_init, capture_events):
     assert event["extra"] == {"1": 1}
 
 
+def test_logging_user_data(sentry_init, capture_events):
+    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    events = capture_events()
+
+    logger.critical(
+        "User error", extra=dict(user=dict(id=123, email="user@example.org"))
+    )
+
+    event, = events
+
+    assert event["user"]["id"] == 123
+    assert event["user"]["email"] == "user@example.org"
+
+
+def test_logging_invalid_user_data(sentry_init, capture_events):
+    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    events = capture_events()
+
+    logger.critical("User error", extra=dict(user=123))
+
+    event, = events
+
+    assert "user" not in event
+    assert event["extra"]["user"] == 123
+
+
 @pytest.mark.xfail(sys.version_info[:2] == (3, 4), reason="buggy logging module")
 def test_logging_stack(sentry_init, capture_events):
     sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
