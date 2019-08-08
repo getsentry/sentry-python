@@ -195,6 +195,13 @@ class AnnotatedValue(object):
         self.metadata = metadata
 
 
+if MYPY:
+    from typing import TypeVar
+
+    T = TypeVar("T")
+    Annotated = Union[AnnotatedValue, T]
+
+
 def get_type_name(cls):
     # type: (Optional[type]) -> Optional[str]
     return getattr(cls, "__qualname__", None) or getattr(cls, "__name__", None)
@@ -242,7 +249,7 @@ def get_lines_from_file(
     loader=None,  # type: Optional[Any]
     module=None,  # type: Optional[str]
 ):
-    # type: (...) -> Tuple[List[str], Optional[str], List[str]]
+    # type: (...) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]
     context_lines = 5
     source = None
     if loader is not None and hasattr(loader, "get_source"):
@@ -280,8 +287,11 @@ def get_lines_from_file(
         return [], None, []
 
 
-def get_source_context(frame, tb_lineno):
-    # type: (FrameType, int) -> Tuple[List[str], Optional[str], List[str]]
+def get_source_context(
+    frame,  # type: FrameType
+    tb_lineno,  # type: int
+):
+    # type: (...) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]
     try:
         abs_path = frame.f_code.co_filename  # type: Optional[str]
     except Exception:
