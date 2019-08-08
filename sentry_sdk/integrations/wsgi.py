@@ -88,7 +88,7 @@ class SentryWsgiMiddleware(object):
 
             span = Span.continue_from_environ(environ)
             span.op = "http.server"
-            span.transaction = environ.get("PATH_INFO") or "unknown http request"
+            span.transaction = "generic WSGI request"
 
             with hub.span(span):
                 try:

@@ -45,6 +45,8 @@ def test_basic(sentry_init, crashing_app, capture_events):
 
     event, = events
 
+    assert event["transaction"] == "generic WSGI request"
+
     assert event["request"] == {
         "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
         "headers": {"Content-Length": "0", "Content-Type": "", "Host": "localhost"},
