@@ -101,6 +101,7 @@ def _wrap_tracer(task, f):
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
             span = Span.continue_from_headers(args[3].get("headers") or {})
+            span.op = 'celery.task'
             span.transaction = "unknown celery task"
 
             with capture_internal_exceptions():
