@@ -50,6 +50,7 @@ class RqIntegration(Integration):
                 span = Span.continue_from_headers(
                     job.meta.get("_sentry_trace_headers") or {}
                 )
+                span.op = "rq.task"
 
                 with capture_internal_exceptions():
                     span.transaction = job.func_name
