@@ -161,7 +161,6 @@ class _OutputProcessor(OutputProcessor):
             print("In here")
 
 
-
 @pytest.fixture
 def init_beam(sentry_init):
     def inner(fn):

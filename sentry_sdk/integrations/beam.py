@@ -11,7 +11,7 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
 
 WRAPPED_FUNC = "_wrapped_{}_"
-INSPECT_FUNC = "_inspect_{}" # Required format per apache_beam/transforms/core.py
+INSPECT_FUNC = "_inspect_{}"  # Required format per apache_beam/transforms/core.py
 USED_FUNC = "_sentry_used_"
 
 
