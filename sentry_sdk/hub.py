@@ -446,10 +446,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         try:
             yield span
         except Exception:
-            span.set_tag("error", True)
+            span.set_failure()
             raise
         else:
-            span.set_tag("error", False)
+            span.set_success()
         finally:
             try:
                 span.finish()

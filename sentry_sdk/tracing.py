@@ -4,7 +4,7 @@ import contextlib
 
 from datetime import datetime
 
-from sentry_sdk.utils import capture_internal_exceptions, concat_strings
+from sentry_sdk.utils import capture_internal_exceptions
 from sentry_sdk._compat import PY2
 from sentry_sdk._types import MYPY
 
@@ -16,10 +16,13 @@ else:
 if MYPY:
     import typing
 
+    from typing import Generator
     from typing import Optional
     from typing import Any
     from typing import Dict
     from typing import List
+
+    from sentry_sdk import Hub
 
 _traceparent_header_format_re = re.compile(
     "^[ \t]*"  # whitespace
@@ -188,6 +191,12 @@ class Span(object):
     def set_data(self, key, value):
         self._data[key] = value
 
+    def set_failure(self):
+        self.set_tag("error", True)
+
+    def set_success(self):
+        self.set_tag("error", False)
+
     def finish(self):
         self.timestamp = datetime.now()
         if self._finished_spans is not None:
@@ -218,25 +227,55 @@ class Span(object):
         }
 
 
+def _format_sql(cursor, sql):
+    # type: (Any, str) -> Optional[str]
+
+    real_sql = None
+
+    # If we're using psycopg2, it could be that we're
+    # looking at a query that uses Composed objects. Use psycopg2's mogrify
+    # function to format the query. We lose per-parameter trimming but gain
+    # accuracy in formatting.
+    try:
+        if hasattr(cursor, "mogrify"):
+            real_sql = cursor.mogrify(sql)
+            if isinstance(real_sql, bytes):
+                real_sql = real_sql.decode(cursor.connection.encoding)
+    except Exception:
+        real_sql = None
+
+    return real_sql or str(sql)
+
+
 @contextlib.contextmanager
-def record_sql_queries(hub, queries, label=""):
-    if not queries:
-        yield None
-    else:
-        description = None
-        with capture_internal_exceptions():
-            strings = [label]
-            for query in queries:
-                hub.add_breadcrumb(message=query, category="query")
-                strings.append(query)
+def record_sql_queries(
+    hub,  # type: Hub
+    cursor,  # type: Any
+    query,  # type: Any
+    params_list,  # type:  Any
+    paramstyle,  # type: Optional[str]
+    executemany,  # type: bool
+):
+    # type: (...) -> Generator[Optional[Span], None, None]
+    if not params_list or params_list == [None]:
+        params_list = None
 
-            description = concat_strings(strings)
+    if paramstyle == "pyformat":
+        paramstyle = "format"
 
-        if description is None:
-            yield None
-        else:
-            with hub.span(op="db", description=description) as span:
-                yield span
+    query = _format_sql(cursor, query)
+
+    data = {"db.params": params_list, "db.paramstyle": paramstyle}
+    if executemany:
+        data["db.executemany"] = True
+
+    with capture_internal_exceptions():
+        hub.add_breadcrumb(message=query, category="query", data=data)
+
+    with hub.span(op="db", description=query) as span:
+        for k, v in data.items():
+            span.set_data(k, v)
+        yield span
 
 
 @contextlib.contextmanager

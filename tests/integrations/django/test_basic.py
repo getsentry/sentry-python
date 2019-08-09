@@ -186,9 +186,8 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
     if with_integration:
         crumb = event["breadcrumbs"][-1]
 
-        assert (
-            crumb["message"] == """SELECT count(*) FROM people_person WHERE foo = 123"""
-        )
+        assert crumb["message"] == "SELECT count(*) FROM people_person WHERE foo = %s"
+        assert crumb["data"]["db.params"] == [123]
 
 
 @pytest.mark.django_db
@@ -212,8 +211,11 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     capture_message("HI")
     event, = events
 
-    crumb, = event["breadcrumbs"]
-    assert crumb["message"] == ("SELECT count(*) FROM people_person WHERE foo = 10")
+    crumb = event["breadcrumbs"][-1]
+    assert crumb["message"] == (
+        "SELECT count(*) FROM people_person WHERE foo = %(my_foo)s"
+    )
+    assert crumb["data"]["db.params"] == {"my_foo": 10}
 
 
 @pytest.mark.parametrize(
@@ -244,8 +246,9 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     capture_message("HI")
 
     event, = events
-    crumb, = event["breadcrumbs"]
-    assert crumb["message"] == ('SELECT 10 FROM "foobar"')
+    crumb = event["breadcrumbs"][-1]
+    assert crumb["message"] == ('SELECT %(my_param)s FROM "foobar"')
+    assert crumb["data"]["db.params"] == {"my_param": 10}
 
 
 @pytest.mark.django_db
@@ -278,37 +281,27 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     capture_message("HI")
 
     event, = events
-    crumb1, crumb2 = event["breadcrumbs"]
-    assert crumb1["message"] == ("create table my_test_table (foo text, bar date)")
-    assert crumb2["message"] == (
-        """insert into my_test_table ("foo", "bar") values ('fizz', 'not a date')"""
-    )
+    for crumb in event["breadcrumbs"]:
+        del crumb["timestamp"]
 
-
-@pytest.mark.django_db
-def test_sql_queries_large_params(sentry_init, capture_events):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
-    from django.db import connection
-
-    sql = connection.cursor()
-
-    events = capture_events()
-    with pytest.raises(OperationalError):
-        # table doesn't even exist
-        sql.execute(
-            """SELECT count(*) FROM people_person WHERE foo = %s and bar IS NULL""",
-            ["x" * 1000],
-        )
-
-    capture_message("HI")
-
-    event, = events
-
-    crumb = event["breadcrumbs"][-1]
-    assert crumb["message"] == (
-        "SELECT count(*) FROM people_person WHERE foo = '%s... and bar IS NULL"
-        % ("x" * 124,)
-    )
+    assert event["breadcrumbs"][-2:] == [
+        {
+            "category": "query",
+            "data": {"db.paramstyle": "format"},
+            "message": "create table my_test_table (foo text, bar date)",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {
+                "db.params": {"first_var": "fizz", "second_var": "not a date"},
+                "db.paramstyle": "format",
+            },
+            "message": 'insert into my_test_table ("foo", "bar") values (%(first_var)s, '
+            "%(second_var)s)",
+            "type": "default",
+        },
+    ]
 
 
 @pytest.mark.parametrize(

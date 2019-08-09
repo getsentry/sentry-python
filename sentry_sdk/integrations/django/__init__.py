@@ -46,7 +46,6 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
-from sentry_sdk.integrations._sql_common import format_sql
 from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
 from sentry_sdk.integrations.django.templates import get_template_frame_from_exception
 
@@ -391,7 +390,7 @@ def install_sql_hook():
             return real_execute(self, sql, params)
 
         with record_sql_queries(
-            hub, [format_sql(sql, params, self.cursor)], label="Django: "
+            hub, self.cursor, sql, params, paramstyle="format", executemany=False
         ):
             return real_execute(self, sql, params)
 
@@ -401,9 +400,7 @@ def install_sql_hook():
             return real_executemany(self, sql, param_list)
 
         with record_sql_queries(
-            hub,
-            [format_sql(sql, params, self.cursor) for params in param_list],
-            label="Django: ",
+            hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
         ):
             return real_executemany(self, sql, param_list)
 
