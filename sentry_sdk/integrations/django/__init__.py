@@ -389,7 +389,9 @@ def install_sql_hook():
         if hub.get_integration(DjangoIntegration) is None:
             return real_execute(self, sql, params)
 
-        with record_sql_queries(hub, self.cursor, sql, [params], label="Django: "):
+        with record_sql_queries(
+            hub, self.cursor, sql, [params], label="Django: ", paramstyle="format"
+        ):
             return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):
@@ -397,7 +399,9 @@ def install_sql_hook():
         if hub.get_integration(DjangoIntegration) is None:
             return real_executemany(self, sql, param_list)
 
-        with record_sql_queries(hub, self.cursor, sql, param_list, label="Django: "):
+        with record_sql_queries(
+            hub, self.cursor, sql, param_list, label="Django: ", paramstyle="format"
+        ):
             return real_executemany(self, sql, param_list)
 
     CursorWrapper.execute = execute

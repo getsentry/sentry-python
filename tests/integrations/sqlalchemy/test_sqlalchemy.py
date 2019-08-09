@@ -48,13 +48,13 @@ def test_orm_queries(sentry_init, capture_events):
     assert event["breadcrumbs"][-2:] == [
         {
             "category": "query",
-            "data": {"db.params": [["Bob"]]},
+            "data": {"db.params": [["Bob"]], "db.paramstyle": "qmark"},
             "message": "INSERT INTO person (name) VALUES (?)",
             "type": "default",
         },
         {
             "category": "query",
-            "data": {"db.params": [[1, 0]]},
+            "data": {"db.params": [[1, 0]], "db.paramstyle": "qmark"},
             "message": "SELECT person.id AS person_id, person.name AS person_name \n"
             "FROM person\n"
             " LIMIT ? OFFSET ?",

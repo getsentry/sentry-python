@@ -281,13 +281,26 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     capture_message("HI")
 
     event, = events
-    crumb1, crumb2 = event["breadcrumbs"][-2:]
-    assert crumb1["message"] == ("create table my_test_table (foo text, bar date)")
-    assert crumb2["message"] == (
-        """insert into my_test_table ("foo", "bar") values (%(first_var)s, %(second_var)s)"""
-    )
-    assert crumb2["data"]["db.params"] == [
-        {"first_var": "fizz", "second_var": "not a date"}
+    for crumb in event["breadcrumbs"]:
+        del crumb["timestamp"]
+
+    assert event["breadcrumbs"][-2:] == [
+        {
+            "category": "query",
+            "data": {"db.paramstyle": "format"},
+            "message": "create table my_test_table (foo text, bar date)",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {
+                "db.params": [{"first_var": "fizz", "second_var": "not a date"}],
+                "db.paramstyle": "format",
+            },
+            "message": 'insert into my_test_table ("foo", "bar") values (%(first_var)s, '
+            "%(second_var)s)",
+            "type": "default",
+        },
     ]
 
 

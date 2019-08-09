@@ -40,7 +40,12 @@ def _before_cursor_execute(
         parameters = [parameters]
 
     ctx_mgr = record_sql_queries(
-        hub, cursor, statement, parameters, label="SQLAlchemy: "
+        hub,
+        cursor,
+        statement,
+        parameters,
+        label="SQLAlchemy: ",
+        paramstyle=context and context.dialect and context.dialect.paramstyle or None,
     )
     conn._sentry_sql_span_manager = ctx_mgr
 

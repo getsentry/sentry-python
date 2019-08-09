@@ -248,17 +248,21 @@ def _format_sql(cursor, sql):
 
 
 @contextlib.contextmanager
-def record_sql_queries(hub, cursor, query, params_list, label=""):
-    # type: (Hub, Any, str, List[Any], str) -> Generator[Optional[Span], None, None]
-    if not params_list:
-        yield None
-        return
+def record_sql_queries(hub, cursor, query, params_list, label, paramstyle):
+    # type: (Hub, Any, str, Optional[List[Any]], str, Optional[str]) -> Generator[Optional[Span], None, None]
+    if not params_list or params_list == [None]:
+        params_list = None
+
+    if paramstyle == "pyformat":
+        paramstyle = "format"
 
     query = _format_sql(cursor, query)
 
     with capture_internal_exceptions():
         hub.add_breadcrumb(
-            message=query, category="query", data={"db.params": params_list}
+            message=query,
+            category="query",
+            data={"db.params": params_list, "db.paramstyle": paramstyle},
         )
 
     description = None
