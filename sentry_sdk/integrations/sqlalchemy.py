@@ -36,16 +36,13 @@ def _before_cursor_execute(
     if hub.get_integration(SqlalchemyIntegration) is None:
         return
 
-    if not executemany:
-        parameters = [parameters]
-
     ctx_mgr = record_sql_queries(
         hub,
         cursor,
         statement,
         parameters,
-        label="SQLAlchemy: ",
         paramstyle=context and context.dialect and context.dialect.paramstyle or None,
+        executemany=executemany,
     )
     conn._sentry_sql_span_manager = ctx_mgr
 

@@ -4,7 +4,7 @@ import contextlib
 
 from datetime import datetime
 
-from sentry_sdk.utils import capture_internal_exceptions, concat_strings
+from sentry_sdk.utils import capture_internal_exceptions
 from sentry_sdk._compat import PY2
 from sentry_sdk._types import MYPY
 
@@ -248,8 +248,15 @@ def _format_sql(cursor, sql):
 
 
 @contextlib.contextmanager
-def record_sql_queries(hub, cursor, query, params_list, label, paramstyle):
-    # type: (Hub, Any, str, Optional[List[Any]], str, Optional[str]) -> Generator[Optional[Span], None, None]
+def record_sql_queries(
+    hub,  # type: Hub
+    cursor,  # type: Any
+    query,  # type: Any
+    params_list,  # type:  Any
+    paramstyle,  # type: Optional[str]
+    executemany,  # type: bool
+):
+    # type: (...) -> Generator[Optional[Span], None, None]
     if not params_list or params_list == [None]:
         params_list = None
 
@@ -258,23 +265,16 @@ def record_sql_queries(hub, cursor, query, params_list, label, paramstyle):
 
     query = _format_sql(cursor, query)
 
+    data = {"db.params": params_list, "db.paramstyle": paramstyle}
+    if executemany:
+        data["db.executemany"] = True
+
     with capture_internal_exceptions():
-        hub.add_breadcrumb(
-            message=query,
-            category="query",
-            data={"db.params": params_list, "db.paramstyle": paramstyle},
-        )
+        hub.add_breadcrumb(message=query, category="query", data=data)
 
-    description = None
-    with capture_internal_exceptions():
-        description = concat_strings([label, query])
-
-    if description is None:
-        yield None
-        return
-
-    with hub.span(op="db", description=description) as span:
-        span.set_data("db.params", params_list)
+    with hub.span(op="db", description=query) as span:
+        for k, v in data.items():
+            span.set_data(k, v)
         yield span
 
 

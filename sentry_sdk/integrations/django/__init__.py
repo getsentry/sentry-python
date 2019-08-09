@@ -390,7 +390,7 @@ def install_sql_hook():
             return real_execute(self, sql, params)
 
         with record_sql_queries(
-            hub, self.cursor, sql, [params], label="Django: ", paramstyle="format"
+            hub, self.cursor, sql, params, paramstyle="format", executemany=False
         ):
             return real_execute(self, sql, params)
 
@@ -400,7 +400,7 @@ def install_sql_hook():
             return real_executemany(self, sql, param_list)
 
         with record_sql_queries(
-            hub, self.cursor, sql, param_list, label="Django: ", paramstyle="format"
+            hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
         ):
             return real_executemany(self, sql, param_list)
 
