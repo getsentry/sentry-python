@@ -11,7 +11,8 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
 
 WRAPPED_FUNC = "_wrapped_{}_"
-INSPECT_FUNC = "_inspect_{}"
+INSPECT_FUNC = "_inspect_{}" # Required format per apache_beam/transforms/core.py
+USED_FUNC = "_sentry_used_"
 
 
 class BeamIntegration(Integration):
@@ -49,8 +50,8 @@ class BeamIntegration(Integration):
                     # backwards compatibility.
                     process_func = getattr(fn, func_name)
                     inspect_func = getattr(fn, INSPECT_FUNC.format(func_name))
-                    if not getattr(inspect_func, "__used__", False) and not getattr(
-                        process_func, "__used__", False
+                    if not getattr(inspect_func, USED_FUNC, False) and not getattr(
+                        process_func, USED_FUNC, False
                     ):
                         setattr(fn, wrapped_func, process_func)
                         setattr(fn, func_name, _wrap_task_call(process_func))
@@ -80,7 +81,7 @@ def _wrap_inspect_call(cls, func_name):
             setattr(self, wrapped_func, process_func)
         return getfullargspec(process_func)
 
-    setattr(_inspect, "__used__", True)
+    setattr(_inspect, USED_FUNC, True)
     return _inspect
 
 
@@ -102,7 +103,7 @@ def _wrap_task_call(func):
             return gen
         return _wrap_generator_call(gen, client)
 
-    setattr(_inner, "__used__", True)
+    setattr(_inner, USED_FUNC, True)
     return _inner
 
 
