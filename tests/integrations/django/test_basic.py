@@ -366,8 +366,14 @@ def test_request_body(sentry_init, client, capture_events):
     assert "" not in event
 
 
-@pytest.mark.xfail
 def test_read_request(sentry_init, client, capture_events):
+    """
+    If this test fails, no actual functionality is broken. We just want to make
+    sure request bodies behave the same in all Django versions we care about.
+
+    If this test fails for a Django version we might be able to simplify our
+    integration.
+    """
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
 
