@@ -96,7 +96,7 @@ def _breadcrumb_from_record(record):
         "level": _logging_to_event_level(record.levelname),
         "category": record.name,
         "message": record.message,
-        "timestamp": datetime.datetime.fromtimestamp(record.created),
+        "timestamp": datetime.datetime.utcfromtimestamp(record.created),
         "data": _extra_from_record(record),
     }
 
