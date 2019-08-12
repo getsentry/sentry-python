@@ -55,7 +55,7 @@ class RqIntegration(Integration):
                 with capture_internal_exceptions():
                     span.transaction = job.func_name
 
-                with hub.span(span):
+                with hub.start_span(span):
                     rv = old_perform_job(self, job, *args, **kwargs)
 
             if self.is_horse:

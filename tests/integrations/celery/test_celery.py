@@ -74,7 +74,7 @@ def test_simple(capture_events, celery, celery_invocation):
         foo = 42  # noqa
         return x / y
 
-    with Hub.current.span() as span:
+    with Hub.current.start_span() as span:
         celery_invocation(dummy_task, 1, 2)
         _, expected_context = celery_invocation(dummy_task, 1, 0)
 
@@ -106,7 +106,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
 
     events = capture_events()
 
-    with Hub.current.span(transaction="submission") as span:
+    with Hub.current.start_span(transaction="submission") as span:
         celery_invocation(dummy_task, 1, 0 if task_fails else 1)
 
     if task_fails:
@@ -173,7 +173,7 @@ def test_simple_no_propagation(capture_events, init_celery):
     def dummy_task():
         1 / 0
 
-    with Hub.current.span() as span:
+    with Hub.current.start_span() as span:
         dummy_task.delay()
 
     event, = events

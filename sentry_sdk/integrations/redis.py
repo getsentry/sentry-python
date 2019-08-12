@@ -32,7 +32,7 @@ class RedisIntegration(Integration):
 
                 description = " ".join(description_parts)
 
-            with hub.span(op="redis", description=description) as span:
+            with hub.start_span(op="redis", description=description) as span:
                 if name and args and name.lower() in ("get", "set", "setex", "setnx"):
                     span.set_tag("redis.key", args[0])
 

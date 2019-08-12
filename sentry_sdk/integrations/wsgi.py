@@ -90,7 +90,7 @@ class SentryWsgiMiddleware(object):
             span.op = "http.server"
             span.transaction = "generic WSGI request"
 
-            with hub.span(span):
+            with hub.start_span(span):
                 try:
                     rv = self.app(environ, start_response)
                 except BaseException:

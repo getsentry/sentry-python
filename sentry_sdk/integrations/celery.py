@@ -78,7 +78,7 @@ def _wrap_apply_async(task, f):
             if headers is not None:
                 kwargs["headers"] = headers
 
-            with hub.span(op="celery.submit", description=task.name):
+            with hub.start_span(op="celery.submit", description=task.name):
                 return f(*args, **kwargs)
         else:
             return f(*args, **kwargs)
@@ -113,7 +113,7 @@ def _wrap_tracer(task, f):
                 # something such as attribute access can fail.
                 span.transaction = task.name
 
-            with hub.span(span):
+            with hub.start_span(span):
                 return f(*args, **kwargs)
 
     return _inner
