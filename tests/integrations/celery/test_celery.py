@@ -123,7 +123,11 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     assert execution_event["contexts"]["trace"]["trace_id"] == span.trace_id
     assert submission_event["contexts"]["trace"]["trace_id"] == span.trace_id
 
-    assert execution_event["contexts"]["trace"].get("status", False) == task_fails
+    if task_fails:
+        assert execution_event["contexts"]["trace"]["status"] == "failure"
+    else:
+        assert "status" not in execution_event["contexts"]["trace"]
+
     assert execution_event["spans"] == []
     assert submission_event["spans"] == [
         {
