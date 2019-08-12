@@ -49,7 +49,6 @@ def _before_cursor_execute(
     span = ctx_mgr.__enter__()
 
     if span is not None:
-        span.set_success()  # might be overwritten later
         conn._sentry_sql_span = span
 
 

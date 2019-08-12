@@ -1,3 +1,4 @@
+import functools
 import sys
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
@@ -16,8 +17,12 @@ if MYPY:
     from typing import Any
     from typing import Tuple
     from typing import Optional
+    from typing import TypeVar
 
     from sentry_sdk.utils import ExcInfo
+
+    T = TypeVar("T")
+    U = TypeVar("U")
 
 
 if PY2:
@@ -90,13 +95,31 @@ class SentryWsgiMiddleware(object):
             span.op = "http.server"
             span.transaction = "generic WSGI request"
 
-            with hub.span(span):
+            with hub.span(span) as span:
                 try:
-                    rv = self.app(environ, start_response)
+                    rv = self.app(
+                        environ,
+                        functools.partial(
+                            _sentry_start_response,
+                            old_start_response=start_response,
+                            span=span,
+                        ),
+                    )
                 except BaseException:
                     reraise(*_capture_exception(hub))
 
         return _ScopedResponse(hub, rv)
+
+
+def _sentry_start_response(status, headers, old_start_response, span):
+    # type: (str, U, Callable[[str, U], T], Span) -> T
+    with capture_internal_exceptions():
+        status_int = int(status.split(" ", 1)[0])
+        span.set_tag("http.status_code", status_int)
+        if 500 <= status_int < 600:
+            span.set_failure()
+
+    return old_start_response(status, headers)
 
 
 def _get_environ(environ):

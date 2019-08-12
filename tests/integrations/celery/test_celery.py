@@ -123,6 +123,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     assert execution_event["contexts"]["trace"]["trace_id"] == span.trace_id
     assert submission_event["contexts"]["trace"]["trace_id"] == span.trace_id
 
+    assert execution_event["contexts"]["trace"].get("status", False) == task_fails
     assert execution_event["spans"] == []
     assert submission_event["spans"] == [
         {
@@ -133,7 +134,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
             u"same_process_as_parent": True,
             u"span_id": submission_event["spans"][0]["span_id"],
             u"start_timestamp": submission_event["spans"][0]["start_timestamp"],
-            u"tags": {u"error": False},
+            u"tags": {},
             u"timestamp": submission_event["spans"][0]["timestamp"],
             u"trace_id": text_type(span.trace_id),
         }
