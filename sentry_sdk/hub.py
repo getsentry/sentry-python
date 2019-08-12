@@ -516,7 +516,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
                 "type": "transaction",
                 "transaction": span.transaction,
                 "contexts": {"trace": span.get_trace_context()},
-                "tags": span._tags,
                 "timestamp": span.timestamp,
                 "start_timestamp": span.start_timestamp,
                 "spans": [
