@@ -576,4 +576,4 @@ def test_class_based_views(sentry_init, app, capture_events):
     event, = events
 
     assert event["message"] == "hi"
-    assert event['transaction'] == 'hello_class'
+    assert event["transaction"] == "hello_class"
