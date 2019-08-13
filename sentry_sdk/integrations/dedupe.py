@@ -1,3 +1,5 @@
+import os
+
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.integrations import Integration
@@ -24,6 +26,7 @@ class DedupeIntegration(Integration):
         @add_global_event_processor
         def processor(event, hint):
             # type: (Event, Optional[Hint]) -> Optional[Event]
+            own_pid = os.getpid()
             if hint is None:
                 return event
 
@@ -32,12 +35,12 @@ class DedupeIntegration(Integration):
             if integration is None:
                 return event
 
-            exc_info = hint.get("exc_info", None)
+            pid, exc_info = hint.get("exc_info", None)
             if exc_info is None:
                 return event
 
             exc = exc_info[1]
-            if integration._last_seen.get(None) is exc:
+            if integration._last_seen.get(None) is exc and pid == own_pid:
                 return None
-            integration._last_seen.set(exc)
+            integration._last_seen.set((own_pid, exc))
             return event
