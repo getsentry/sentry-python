@@ -23,6 +23,7 @@ if MYPY:
 
     T = TypeVar("T")
     U = TypeVar("U")
+    E = TypeVar("E")
 
 
 if PY2:
@@ -99,11 +100,7 @@ class SentryWsgiMiddleware(object):
                 try:
                     rv = self.app(
                         environ,
-                        functools.partial(
-                            _sentry_start_response,
-                            old_start_response=start_response,
-                            span=span,
-                        ),
+                        functools.partial(_sentry_start_response, start_response, span),
                     )
                 except BaseException:
                     reraise(*_capture_exception(hub))
@@ -111,15 +108,17 @@ class SentryWsgiMiddleware(object):
         return _ScopedResponse(hub, rv)
 
 
-def _sentry_start_response(status, headers, old_start_response, span):
-    # type: (str, U, Callable[[str, U], T], Span) -> T
+def _sentry_start_response(
+    old_start_response, span, status, response_headers, exc_info=None
+):
+    # type: (Callable[[str, U, Optional[E]], T], Span, str, U, Optional[E]) -> T
     with capture_internal_exceptions():
         status_int = int(status.split(" ", 1)[0])
         span.set_tag("http.status_code", status_int)
         if 500 <= status_int < 600:
             span.set_failure()
 
-    return old_start_response(status, headers)
+    return old_start_response(status, response_headers, exc_info)
 
 
 def _get_environ(environ):
