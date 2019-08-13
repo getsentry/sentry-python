@@ -6,6 +6,7 @@ from io import BytesIO
 flask = pytest.importorskip("flask")
 
 from flask import Flask, Response, request, abort, stream_with_context
+from flask.views import View
 
 from flask_login import LoginManager, login_user
 
@@ -554,3 +555,25 @@ def test_errorhandler_for_exception_swallows_exception(
         assert response.status_code == 200
 
     assert not events
+
+
+def test_class_based_views(sentry_init, app, capture_events):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    events = capture_events()
+
+    @app.route("/")
+    class HelloClass(View):
+        def dispatch_request(self):
+            capture_message("hi")
+            return "ok"
+
+    app.add_url_rule("/hello-class/", view_func=HelloClass.as_view("hello_class"))
+
+    with app.test_client() as client:
+        response = client.get("/hello-class/")
+        assert response.status_code == 200
+
+    event, = events
+
+    assert event["message"] == "hi"
+    assert event['transaction'] == 'hello_class'
