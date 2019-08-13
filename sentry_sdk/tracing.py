@@ -22,7 +22,7 @@ if MYPY:
     from typing import Dict
     from typing import List
 
-    from sentry_sdk import Hub
+    import sentry_sdk
 
 _traceparent_header_format_re = re.compile(
     "^[ \t]*"  # whitespace
@@ -259,7 +259,7 @@ def _format_sql(cursor, sql):
 
 @contextlib.contextmanager
 def record_sql_queries(
-    hub,  # type: Hub
+    hub,  # type: sentry_sdk.Hub
     cursor,  # type: Any
     query,  # type: Any
     params_list,  # type:  Any
