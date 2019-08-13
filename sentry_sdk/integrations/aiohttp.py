@@ -9,22 +9,25 @@ from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    transaction_from_function,
     HAS_REAL_CONTEXTVARS,
 )
 
 import asyncio
-from aiohttp.web import Application, HTTPException  # type: ignore
+from aiohttp.web import Application, HTTPException, UrlDispatcher  # type: ignore
 
 from sentry_sdk._types import MYPY
 
 if MYPY:
     from aiohttp.web_request import Request  # type: ignore
+    from aiohttp.abc import AbstractMatchInfo  # type: ignore
     from typing import Any
     from typing import Dict
     from typing import Tuple
     from typing import Callable
 
     from sentry_sdk.utils import ExcInfo
+    from sentry_sdk._types import EventProcessor
 
 
 class AioHttpIntegration(Integration):
@@ -60,14 +63,17 @@ class AioHttpIntegration(Integration):
                         scope.clear_breadcrumbs()
                         scope.add_event_processor(_make_request_processor(weak_request))
 
-                    try:
-                        response = await old_handle(self, request)
-                    except HTTPException:
-                        raise
-                    except Exception:
-                        reraise(*_capture_exception(hub))
+                    # If this transaction name makes it to the UI, AIOHTTP's
+                    # URL resolver did not find a route or died trying.
+                    with hub.span(transaction="generic AIOHTTP request"):
+                        try:
+                            response = await old_handle(self, request)
+                        except HTTPException:
+                            raise
+                        except Exception:
+                            reraise(*_capture_exception(hub))
 
-                    return response
+                        return response
 
             # Explicitly wrap in task such that current contextvar context is
             # copied. Just doing `return await inner()` will leak scope data
@@ -76,9 +82,30 @@ class AioHttpIntegration(Integration):
 
         Application._handle = sentry_app_handle
 
+        old_urldispatcher_resolve = UrlDispatcher.resolve
+
+        async def sentry_urldispatcher_resolve(self, request):
+            # type: (UrlDispatcher, Request) -> AbstractMatchInfo
+            rv = await old_urldispatcher_resolve(self, request)
+
+            name = None
+
+            try:
+                name = transaction_from_function(rv.handler)
+            except Exception:
+                pass
+
+            if name is not None:
+                with Hub.current.configure_scope() as scope:
+                    scope.transaction = name
+
+            return rv
+
+        UrlDispatcher.resolve = sentry_urldispatcher_resolve
+
 
 def _make_request_processor(weak_request):
-    # type: (Callable[[], Request]) -> Callable
+    # type: (Callable[[], Request]) -> EventProcessor
     def aiohttp_processor(
         event,  # type: Dict[str, Any]
         hint,  # type: Dict[str, Tuple[type, BaseException, Any]]
