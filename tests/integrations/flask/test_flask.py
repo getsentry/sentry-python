@@ -557,6 +557,50 @@ def test_errorhandler_for_exception_swallows_exception(
     assert not events
 
 
+def test_tracing_success(sentry_init, capture_events, app):
+    sentry_init(traces_sample_rate=1.0, integrations=[flask_sentry.FlaskIntegration()])
+
+    events = capture_events()
+
+    with app.test_client() as client:
+        response = client.get("/message")
+        assert response.status_code == 200
+
+    message_event, transaction_event = events
+
+    assert transaction_event["type"] == "transaction"
+    assert transaction_event["transaction"] == "hi"
+    assert "status" not in transaction_event["contexts"]["trace"]
+
+    assert message_event["message"] == "hi"
+    assert message_event["transaction"] == "hi"
+
+
+def test_tracing_error(sentry_init, capture_events, app):
+    sentry_init(traces_sample_rate=1.0, integrations=[flask_sentry.FlaskIntegration()])
+
+    events = capture_events()
+
+    @app.route("/error")
+    def error():
+        1 / 0
+
+    with pytest.raises(ZeroDivisionError):
+        with app.test_client() as client:
+            response = client.get("/error")
+            assert response.status_code == 500
+
+    error_event, transaction_event = events
+
+    assert transaction_event["type"] == "transaction"
+    assert transaction_event["transaction"] == "error"
+    assert transaction_event["contexts"]["trace"]["status"] == "failure"
+
+    assert error_event["transaction"] == "error"
+    exception, = error_event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+
+
 def test_class_based_views(sentry_init, app, capture_events):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()

@@ -192,10 +192,13 @@ class Span(object):
         self._data[key] = value
 
     def set_failure(self):
-        self.set_tag("error", True)
+        self.set_tag("status", "failure")
 
     def set_success(self):
-        self.set_tag("error", False)
+        self.set_tag("status", "success")
+
+    def is_success(self):
+        return self._tags.get("status") in (None, "success")
 
     def finish(self):
         self.timestamp = datetime.now()
@@ -203,7 +206,7 @@ class Span(object):
             self._finished_spans.append(self)
 
     def to_json(self):
-        return {
+        rv = {
             "trace_id": self.trace_id,
             "span_id": self.span_id,
             "parent_span_id": self.parent_span_id,
@@ -217,14 +220,21 @@ class Span(object):
             "data": self._data,
         }
 
+        return rv
+
     def get_trace_context(self):
-        return {
+        rv = {
             "trace_id": self.trace_id,
             "span_id": self.span_id,
             "parent_span_id": self.parent_span_id,
             "op": self.op,
             "description": self.description,
         }
+
+        if "status" in self._tags:
+            rv["status"] = self._tags["status"]
+
+        return rv
 
 
 def _format_sql(cursor, sql):
@@ -296,7 +306,7 @@ def record_http_request(hub, url, method):
 def maybe_create_breadcrumbs_from_span(hub, span):
     if span.op == "redis":
         hub.add_breadcrumb(type="redis", category="redis", data=span._tags)
-    elif span.op == "http" and not span._tags.get("error"):
+    elif span.op == "http" and span.is_success():
         hub.add_breadcrumb(
             type="http",
             category="httplib",

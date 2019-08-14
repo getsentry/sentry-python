@@ -448,8 +448,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         except Exception:
             span.set_failure()
             raise
-        else:
-            span.set_success()
         finally:
             try:
                 span.finish()

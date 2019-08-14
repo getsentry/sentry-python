@@ -185,6 +185,10 @@ def _capture_exception(task, exc_info):
 
     hub.capture_event(event, hint=hint)
 
+    with capture_internal_exceptions():
+        with hub.configure_scope() as scope:
+            scope.span.set_failure()
+
 
 def _patch_worker_exit():
     # Need to flush queue before worker shutdown because a crashing worker will
