@@ -560,6 +560,31 @@ def test_broken_mapping(sentry_init, capture_events):
     )
 
 
+def test_mapping_sends_exception(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    class C(object):
+        def __repr__(self):
+            try:
+                1 / 0
+            except ZeroDivisionError:
+                capture_exception()
+
+    try:
+        a = C()  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    event, = events
+
+    assert (
+        event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"]
+        == "<broken repr>"
+    )
+
+
 def test_errno_errors(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
