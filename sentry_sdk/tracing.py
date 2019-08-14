@@ -146,8 +146,6 @@ class Span(object):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         if value is not None:
             self.set_failure()
-        else:
-            self.set_success()
 
         hub, scope, old_span = self._context_manager_state
         del self._context_manager_state
