@@ -564,6 +564,42 @@ def test_mapping_sends_exception(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
+    class C(Mapping):
+        def __iter__(self):
+            try:
+                1 / 0
+            except ZeroDivisionError:
+                capture_exception()
+            yield "hi"
+
+        def __len__(self):
+            """List length"""
+            return 1
+
+        def __getitem__(self, ii):
+            """Get a list item"""
+            if ii == "hi":
+                return "hi"
+
+            raise KeyError()
+
+    try:
+        a = C()  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    event, = events
+
+    assert event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"] == {
+        "hi": "'hi'"
+    }
+
+
+def test_object_sends_exception(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
     class C(object):
         def __repr__(self):
             try:
