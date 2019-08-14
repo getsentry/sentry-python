@@ -24,7 +24,7 @@ def test_leaks(with_gevent):
             gevent.monkey.patch_all()
         except Exception as e:
             if "_RLock__owner" in str(e):
-                pytest.skip(reason="https://github.com/gevent/gevent/issues/1380")
+                pytest.skip("https://github.com/gevent/gevent/issues/1380")
             else:
                 raise
 
