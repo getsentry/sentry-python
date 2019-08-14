@@ -248,12 +248,14 @@ class Span(object):
         # type: (Optional[sentry_sdk.Hub]) -> Optional[str]
         hub = hub or self.hub or sentry_sdk.Hub.current
 
-        if self.timestamp is None:
-            # This transaction is not yet finished so we just finish it.
-            self.timestamp = datetime.now()
+        if self.timestamp is not None:
+            # This transaction is already finished, so we should not flush it again.
+            return None
 
-            if self._finished_spans is not None:
-                self._finished_spans.append(self)
+        self.timestamp = datetime.now()
+
+        if self._finished_spans is not None:
+            self._finished_spans.append(self)
 
         _maybe_create_breadcrumbs_from_span(hub, self)
 
