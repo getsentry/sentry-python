@@ -8,8 +8,18 @@ import gevent
 from sentry_sdk.utils import _is_threading_local_monkey_patched
 
 
+def try_gevent_patch_all():
+    try:
+        gevent.monkey.patch_all()
+    except Exception as e:
+        if "_RLock__owner" in str(e):
+            pytest.skip("https://github.com/gevent/gevent/issues/1380")
+        else:
+            raise
+
+
 def test_gevent_is_patched():
-    gevent.monkey.patch_all()
+    try_gevent_patch_all()
     assert _is_threading_local_monkey_patched()
 
 
@@ -20,13 +30,7 @@ def test_gevent_is_not_patched():
 @pytest.mark.parametrize("with_gevent", [True, False])
 def test_leaks(with_gevent):
     if with_gevent:
-        try:
-            gevent.monkey.patch_all()
-        except Exception as e:
-            if "_RLock__owner" in str(e):
-                pytest.skip(reason="https://github.com/gevent/gevent/issues/1380")
-            else:
-                raise
+        try_gevent_patch_all()
 
     import threading
 
