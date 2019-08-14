@@ -24,8 +24,6 @@ if MYPY:
     from typing import List
     from typing import Tuple
 
-    from sentry_sdk import Hub
-
 _traceparent_header_format_re = re.compile(
     "^[ \t]*"  # whitespace
     "([0-9a-f]{32})?"  # trace_id
@@ -95,7 +93,7 @@ class Span(object):
         transaction=None,  # type: Optional[str]
         op=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
-        hub=None,  # type: Optional[Hub]
+        hub=None,  # type: Optional[sentry_sdk.Hub]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -236,15 +234,19 @@ class Span(object):
 
     def set_failure(self):
         # type: () -> None
-        self.set_tag("error", True)
+        self.set_tag("status", "failure")
 
     def set_success(self):
         # type: () -> None
-        self.set_tag("error", False)
+        self.set_tag("status", "success")
+
+    def is_success(self):
+        # type: () -> bool
+        return self._tags.get("status") in (None, "success")
 
     def finish(self, hub=None):
-        # type: (Optional[Hub]) -> Optional[str]
-        hub = hub or self.hub or Hub.current
+        # type: (Optional[sentry_sdk.Hub]) -> Optional[str]
+        hub = hub or self.hub or sentry_sdk.Hub.current
 
         if self.timestamp is None:
             # This transaction is not yet finished so we just finish it.
@@ -268,7 +270,7 @@ class Span(object):
         if not self.sampled:
             # At this point a `sampled = None` should have already been
             # resolved to a concrete decision. If `sampled` is `None`, it's
-            # likely that somebody used `with Hub.start_span(..)` on a
+            # likely that somebody used `with sentry_sdk.Hub.start_span(..)` on a
             # non-transaction span and later decided to make it a transaction.
             assert (
                 self.sampled is not None
@@ -290,7 +292,7 @@ class Span(object):
 
     def to_json(self):
         # type: () -> Any
-        return {
+        rv = {
             "trace_id": self.trace_id,
             "span_id": self.span_id,
             "parent_span_id": self.parent_span_id,
@@ -304,15 +306,22 @@ class Span(object):
             "data": self._data,
         }
 
+        return rv
+
     def get_trace_context(self):
         # type: () -> Any
-        return {
+        rv = {
             "trace_id": self.trace_id,
             "span_id": self.span_id,
             "parent_span_id": self.parent_span_id,
             "op": self.op,
             "description": self.description,
         }
+
+        if "status" in self._tags:
+            rv["status"] = self._tags["status"]
+
+        return rv
 
 
 def _format_sql(cursor, sql):
@@ -337,7 +346,7 @@ def _format_sql(cursor, sql):
 
 @contextlib.contextmanager
 def record_sql_queries(
-    hub,  # type: Hub
+    hub,  # type: sentry_sdk.Hub
     cursor,  # type: Any
     query,  # type: Any
     params_list,  # type:  Any
@@ -368,7 +377,7 @@ def record_sql_queries(
 
 @contextlib.contextmanager
 def record_http_request(hub, url, method):
-    # type: (Hub, str, str) -> Generator[Dict[str, str], None, None]
+    # type: (sentry_sdk.Hub, str, str) -> Generator[Dict[str, str], None, None]
     data_dict = {"url": url, "method": method}
 
     with hub.start_span(op="http", description="%s %s" % (url, method)) as span:
@@ -383,10 +392,10 @@ def record_http_request(hub, url, method):
 
 
 def _maybe_create_breadcrumbs_from_span(hub, span):
-    # type: (Hub, Span) -> None
+    # type: (sentry_sdk.Hub, Span) -> None
     if span.op == "redis":
         hub.add_breadcrumb(type="redis", category="redis", data=span._tags)
-    elif span.op == "http" and not span._tags.get("error"):
+    elif span.op == "http" and span.is_success():
         hub.add_breadcrumb(
             type="http",
             category="httplib",

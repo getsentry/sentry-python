@@ -25,10 +25,10 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
         span1, span2 = event["spans"]
         parent_span = event
-        assert span1["tags"]["error"]
+        assert span1["tags"]["status"] == "failure"
         assert span1["op"] == "foo"
         assert span1["description"] == "foodesc"
-        assert not span2["tags"]["error"]
+        assert "status" not in span2["tags"]
         assert span2["op"] == "bar"
         assert span2["description"] == "bardesc"
         assert parent_span["transaction"] == "hi"
