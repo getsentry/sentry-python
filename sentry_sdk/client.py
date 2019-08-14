@@ -31,6 +31,7 @@ if MYPY:
 
 
 _client_init_debug = ContextVar("client_init_debug")
+_client_in_capture_event = ContextVar("client_in_capture_event")
 
 
 def _get_options(*args, **kwargs):
@@ -240,20 +241,29 @@ class _Client(object):
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
-        if self.transport is None:
+        is_recursive = _client_in_capture_event.get(False)
+        if is_recursive:
             return None
-        if hint is None:
-            hint = {}
-        rv = event.get("event_id")
-        if rv is None:
-            event["event_id"] = rv = uuid.uuid4().hex
-        if not self._should_capture(event, hint, scope):
-            return None
-        event = self._prepare_event(event, hint, scope)
-        if event is None:
-            return None
-        self.transport.capture_event(event)
-        return rv
+
+        _client_in_capture_event.set(True)
+
+        try:
+            if self.transport is None:
+                return None
+            if hint is None:
+                hint = {}
+            event_id = event.get("event_id")
+            if event_id is None:
+                event["event_id"] = event_id = uuid.uuid4().hex
+            if not self._should_capture(event, hint, scope):
+                return None
+            event_opt = self._prepare_event(event, hint, scope)
+            if event_opt is None:
+                return None
+            self.transport.capture_event(event_opt)
+            return event_id
+        finally:
+            _client_in_capture_event.set(False)
 
     def close(
         self,
