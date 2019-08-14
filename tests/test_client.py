@@ -570,6 +570,7 @@ def test_mapping_sends_exception(sentry_init, capture_events):
                 1 / 0
             except ZeroDivisionError:
                 capture_exception()
+            return "hi, i am a repr"
 
     try:
         a = C()  # noqa
@@ -581,7 +582,7 @@ def test_mapping_sends_exception(sentry_init, capture_events):
 
     assert (
         event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"]
-        == "<broken repr>"
+        == "hi, i am a repr"
     )
 
 
