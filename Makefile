@@ -59,7 +59,7 @@ install-zeus-cli:
 .PHONY: install-zeus-cli
 
 travis-upload-docs: apidocs install-zeus-cli
-	cd docs/_build && zip -r gh-pages ./sentry_sdk
+	cd docs/_build && zip -r gh-pages ./
 	zeus upload -t "application/zip+docs" docs/_build/gh-pages.zip \
 		|| [[ ! "$(TRAVIS_BRANCH)" =~ ^release/ ]]
 .PHONY: travis-upload-docs
