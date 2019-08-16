@@ -424,7 +424,16 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         **kwargs  # type: Any
     ):
         # type: (...) -> Span
-        # TODO: Document
+        """
+        Create a new span whose parent span is the currently active
+        span, if any. The return value is the span object that can
+        be used as a context manager to start and stop timing.
+
+        Note that you will not see any span that is not contained
+        within a transaction. Create a transaction with
+        ``start_span(transaction="my transaction")`` if an
+        integration doesn't already do this for you.
+        """
 
         client, scope = self._stack[-1]
 
