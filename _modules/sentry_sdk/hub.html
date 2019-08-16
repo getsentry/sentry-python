@@ -1,0 +1,683 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>sentry_sdk.hub &#8212; sentry-python 0.11.0 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for sentry_sdk.hub</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">copy</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">weakref</span>
+
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="k">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">contextlib</span> <span class="k">import</span> <span class="n">contextmanager</span>
+<span class="kn">from</span> <span class="nn">warnings</span> <span class="k">import</span> <span class="n">warn</span>
+
+<span class="kn">from</span> <span class="nn">sentry_sdk._compat</span> <span class="k">import</span> <span class="n">with_metaclass</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.scope</span> <span class="k">import</span> <span class="n">Scope</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.client</span> <span class="k">import</span> <span class="n">Client</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.tracing</span> <span class="k">import</span> <span class="n">Span</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="k">import</span> <span class="p">(</span>
+    <span class="n">exc_info_from_error</span><span class="p">,</span>
+    <span class="n">event_from_exception</span><span class="p">,</span>
+    <span class="n">logger</span><span class="p">,</span>
+    <span class="n">ContextVar</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="k">import</span> <span class="n">MYPY</span>
+
+<span class="k">if</span> <span class="n">MYPY</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Union</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Any</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Optional</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Tuple</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">List</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Callable</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Generator</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Type</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">TypeVar</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">overload</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">ContextManager</span>
+
+    <span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="k">import</span> <span class="n">Integration</span>
+    <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="k">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">Hint</span><span class="p">,</span> <span class="n">Breadcrumb</span><span class="p">,</span> <span class="n">BreadcrumbHint</span><span class="p">,</span> <span class="n">ExcInfo</span>
+    <span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="k">import</span> <span class="n">ClientConstructor</span>
+
+    <span class="n">T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;T&quot;</span><span class="p">)</span>
+
+<span class="k">else</span><span class="p">:</span>
+
+    <span class="k">def</span> <span class="nf">overload</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+        <span class="c1"># type: (T) -&gt; T</span>
+        <span class="k">return</span> <span class="n">x</span>
+
+
+<span class="n">_local</span> <span class="o">=</span> <span class="n">ContextVar</span><span class="p">(</span><span class="s2">&quot;sentry_current_hub&quot;</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+<span class="n">_initial_client</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[weakref.ReferenceType[Client]]</span>
+
+
+<span class="k">def</span> <span class="nf">_should_send_default_pii</span><span class="p">():</span>
+    <span class="c1"># type: () -&gt; bool</span>
+    <span class="n">client</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">client</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">client</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;send_default_pii&quot;</span><span class="p">]</span>
+
+
+<span class="k">class</span> <span class="nc">_InitGuard</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">client</span><span class="p">):</span>
+        <span class="c1"># type: (Client) -&gt; None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_client</span> <span class="o">=</span> <span class="n">client</span>
+
+    <span class="k">def</span> <span class="nf">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; _InitGuard</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="nf">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
+        <span class="c1"># type: (Any, Any, Any) -&gt; None</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_client</span>
+        <span class="k">if</span> <span class="n">c</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">c</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+
+<span class="k">def</span> <span class="nf">_init</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="c1"># type: (*Optional[str], **Any) -&gt; ContextManager[Any]</span>
+    <span class="sd">&quot;&quot;&quot;Initializes the SDK and optionally integrations.</span>
+
+<span class="sd">    This takes the same arguments as the client constructor.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">_initial_client</span>
+    <span class="n">client</span> <span class="o">=</span> <span class="n">Client</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+    <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">bind_client</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
+    <span class="n">rv</span> <span class="o">=</span> <span class="n">_InitGuard</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">_initial_client</span> <span class="o">=</span> <span class="n">weakref</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">rv</span>
+
+
+<span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="k">import</span> <span class="n">MYPY</span>
+
+<span class="k">if</span> <span class="n">MYPY</span><span class="p">:</span>
+    <span class="c1"># Make mypy, PyCharm and other static analyzers think `init` is a type to</span>
+    <span class="c1"># have nicer autocompletion for params.</span>
+    <span class="c1">#</span>
+    <span class="c1"># Use `ClientConstructor` to define the argument types of `init` and</span>
+    <span class="c1"># `ContextManager[Any]` to tell static analyzers about the return type.</span>
+
+<div class="viewcode-block" id="init"><a class="viewcode-back" href="../../index.html#sentry_sdk.init">[docs]</a>    <span class="k">class</span> <span class="nc">init</span><span class="p">(</span><span class="n">ClientConstructor</span><span class="p">,</span> <span class="n">ContextManager</span><span class="p">[</span><span class="n">Any</span><span class="p">]):</span>
+        <span class="k">pass</span></div>
+
+
+<span class="k">else</span><span class="p">:</span>
+    <span class="c1"># Alias `init` for actual usage. Go through the lambda indirection to throw</span>
+    <span class="c1"># PyCharm off of the weakly typed signature (it would otherwise discover</span>
+    <span class="c1"># both the weakly typed signature of `_init` and our faked `init` type).</span>
+
+    <span class="n">init</span> <span class="o">=</span> <span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">_init</span><span class="p">)()</span>
+
+
+<span class="k">class</span> <span class="nc">HubMeta</span><span class="p">(</span><span class="nb">type</span><span class="p">):</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">current</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Hub</span>
+        <span class="sd">&quot;&quot;&quot;Returns the current instance of the hub.&quot;&quot;&quot;</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="n">_local</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">rv</span> <span class="o">=</span> <span class="n">Hub</span><span class="p">(</span><span class="n">GLOBAL_HUB</span><span class="p">)</span>
+            <span class="n">_local</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">rv</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">rv</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Hub</span>
+        <span class="sd">&quot;&quot;&quot;Returns the main instance of the hub.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">GLOBAL_HUB</span>
+
+
+<span class="k">class</span> <span class="nc">_ScopeManager</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hub</span><span class="p">):</span>
+        <span class="c1"># type: (Hub) -&gt; None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_hub</span> <span class="o">=</span> <span class="n">hub</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_original_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">hub</span><span class="o">.</span><span class="n">_stack</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_layer</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Scope</span>
+        <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layer</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">assert</span> <span class="n">scope</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">scope</span>
+
+    <span class="k">def</span> <span class="nf">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
+        <span class="c1"># type: (Any, Any, Any) -&gt; None</span>
+        <span class="n">current_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_hub</span><span class="o">.</span><span class="n">_stack</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">current_len</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_original_len</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;Scope popped too soon. Popped </span><span class="si">%s</span><span class="s2"> scopes too many.&quot;</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_original_len</span> <span class="o">-</span> <span class="n">current_len</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">elif</span> <span class="n">current_len</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_original_len</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;Leaked </span><span class="si">%s</span><span class="s2"> scopes: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">current_len</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_original_len</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_hub</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_original_len</span> <span class="p">:],</span>
+            <span class="p">)</span>
+
+        <span class="n">layer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hub</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_original_len</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hub</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_original_len</span> <span class="o">-</span> <span class="mi">1</span> <span class="p">:]</span>
+
+        <span class="k">if</span> <span class="n">layer</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layer</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;Wrong scope found. Meant to pop </span><span class="si">%s</span><span class="s2">, but popped </span><span class="si">%s</span><span class="s2">.&quot;</span><span class="p">,</span>
+                <span class="n">layer</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_layer</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">layer</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layer</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="n">warning</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">&quot;init() called inside of pushed scope. This might be entirely &quot;</span>
+                <span class="s2">&quot;legitimate but usually occurs when initializing the SDK inside &quot;</span>
+                <span class="s2">&quot;a request handler or task/job function. Try to initialize the &quot;</span>
+                <span class="s2">&quot;SDK as early as possible instead.&quot;</span>
+            <span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">warning</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="Hub"><a class="viewcode-back" href="../../index.html#sentry_sdk.Hub">[docs]</a><span class="k">class</span> <span class="nc">Hub</span><span class="p">(</span><span class="n">with_metaclass</span><span class="p">(</span><span class="n">HubMeta</span><span class="p">)):</span>  <span class="c1"># type: ignore</span>
+    <span class="sd">&quot;&quot;&quot;The hub wraps the concurrency management of the SDK.  Each thread has</span>
+<span class="sd">    its own hub but the hub might transfer with the flow of execution if</span>
+<span class="sd">    context vars are available.</span>
+
+<span class="sd">    If the hub is used with a with statement it&#39;s temporarily activated.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">_stack</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: List[Tuple[Optional[Client], Scope]]</span>
+
+    <span class="c1"># Mypy doesn&#39;t pick up on the metaclass.</span>
+
+    <span class="k">if</span> <span class="n">MYPY</span><span class="p">:</span>
+        <span class="n">current</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Hub</span>
+        <span class="n">main</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Hub</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">client_or_hub</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Union[Hub, Client]]</span>
+        <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; None</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">client_or_hub</span><span class="p">,</span> <span class="n">Hub</span><span class="p">):</span>
+            <span class="n">hub</span> <span class="o">=</span> <span class="n">client_or_hub</span>
+            <span class="n">client</span><span class="p">,</span> <span class="n">other_scope</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">scope</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">scope</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">other_scope</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">client</span> <span class="o">=</span> <span class="n">client_or_hub</span>
+        <span class="k">if</span> <span class="n">scope</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">scope</span> <span class="o">=</span> <span class="n">Scope</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span> <span class="o">=</span> <span class="p">[(</span><span class="n">client</span><span class="p">,</span> <span class="n">scope</span><span class="p">)]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[str]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_old_hubs</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># type: List[Hub]</span>
+
+    <span class="k">def</span> <span class="nf">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Hub</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_old_hubs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="p">)</span>
+        <span class="n">_local</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="nf">__exit__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">exc_type</span><span class="p">,</span>  <span class="c1"># type: Optional[type]</span>
+        <span class="n">exc_value</span><span class="p">,</span>  <span class="c1"># type: Optional[BaseException]</span>
+        <span class="n">tb</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; None</span>
+        <span class="n">old</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_old_hubs</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+        <span class="n">_local</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">old</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Hub.run"><a class="viewcode-back" href="../../index.html#sentry_sdk.Hub.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span>  <span class="c1"># type: Callable[[], T]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; T</span>
+        <span class="sd">&quot;&quot;&quot;Runs a callback in the context of the hub.  Alternatively the</span>
+<span class="sd">        with statement can be used on the hub directly.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">callback</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="Hub.get_integration"><a class="viewcode-back" href="../../index.html#sentry_sdk.Hub.get_integration">[docs]</a>    <span class="k">def</span> <span class="nf">get_integration</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span>  <span class="c1"># type: Union[str, Type[Integration]]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; Any</span>
+        <span class="sd">&quot;&quot;&quot;Returns the integration for this hub by name or class.  If there</span>
+<span class="sd">        is no client bound or the client does not have that integration</span>
+<span class="sd">        then `None` is returned.</span>
+
+<span class="sd">        If the return value is not `None` the hub is guaranteed to have a</span>
+<span class="sd">        client attached.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">name_or_class</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">integration_name</span> <span class="o">=</span> <span class="n">name_or_class</span>
+        <span class="k">elif</span> <span class="n">name_or_class</span><span class="o">.</span><span class="n">identifier</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">integration_name</span> <span class="o">=</span> <span class="n">name_or_class</span><span class="o">.</span><span class="n">identifier</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Integration has no name&quot;</span><span class="p">)</span>
+
+        <span class="n">client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">rv</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">integration_name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">rv</span>
+
+        <span class="k">if</span> <span class="n">_initial_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">initial_client</span> <span class="o">=</span> <span class="n">_initial_client</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">initial_client</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">initial_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">initial_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">client</span>
+            <span class="ow">and</span> <span class="n">initial_client</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">integration_name</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="p">):</span>
+            <span class="n">warning</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">&quot;Integration </span><span class="si">%r</span><span class="s2"> attempted to run but it was only &quot;</span>
+                <span class="s2">&quot;enabled on init() but not the client that &quot;</span>
+                <span class="s2">&quot;was bound to the current flow.  Earlier versions of &quot;</span>
+                <span class="s2">&quot;the SDK would consider these integrations enabled but &quot;</span>
+                <span class="s2">&quot;this is no longer the case.&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">name_or_class</span><span class="p">,)</span>
+            <span class="p">)</span>
+            <span class="n">warn</span><span class="p">(</span><span class="ne">Warning</span><span class="p">(</span><span class="n">warning</span><span class="p">),</span> <span class="n">stacklevel</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">warning</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">client</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Optional[Client]</span>
+        <span class="sd">&quot;&quot;&quot;Returns the current client on the hub.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+
+<div class="viewcode-block" id="Hub.last_event_id"><a class="viewcode-back" href="../../index.html#sentry_sdk.Hub.last_event_id">[docs]</a>    <span class="k">def</span> <span class="nf">last_event_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Optional[str]</span>
+        <span class="sd">&quot;&quot;&quot;Returns the last event ID.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span></div>
+
+<div class="viewcode-block" id="Hub.bind_client"><a class="viewcode-back" href="../../index.html#sentry_sdk.Hub.bind_client">[docs]</a>    <span class="k">def</span> <span class="nf">bind_client</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">new</span>  <span class="c1"># type: Optional[Client]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; None</span>
+        <span class="sd">&quot;&quot;&quot;Binds a new client to the hub.&quot;&quot;&quot;</span>
+        <span class="n">top</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">new</span><span class="p">,</span> <span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span></div>
+
+<div class="viewcode-block" id="Hub.capture_event"><a class="viewcode-back" href="../../index.html#sentry_sdk.Hub.capture_event">[docs]</a>    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
+        <span class="n">hint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Hint]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; Optional[str]</span>
+        <span class="sd">&quot;&quot;&quot;Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">rv</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span> <span class="o">=</span> <span class="n">rv</span>
+            <span class="k">return</span> <span class="n">rv</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="Hub.capture_message"><a class="viewcode-back" href="../../index.html#sentry_sdk.Hub.capture_message">[docs]</a>    <span class="k">def</span> <span class="nf">capture_message</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">message</span><span class="p">,</span>  <span class="c1"># type: str</span>
+        <span class="n">level</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; Optional[str]</span>
+        <span class="sd">&quot;&quot;&quot;Captures a message.  The message is just a string.  If no level</span>
+<span class="sd">        is provided the default level is `info`.</span>
+
+<span class="sd">        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">level</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">level</span> <span class="o">=</span> <span class="s2">&quot;info&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">capture_event</span><span class="p">({</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">message</span><span class="p">,</span> <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="n">level</span><span class="p">})</span></div>
+
+<div class="viewcode-block" id="Hub.capture_exception"><a class="viewcode-back" href="../../index.html#sentry_sdk.Hub.capture_exception">[docs]</a>    <span class="k">def</span> <span class="nf">capture_exception</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[Union[BaseException, ExcInfo]]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; Optional[str]</span>
+        <span class="sd">&quot;&quot;&quot;Captures an exception.</span>
+
+<span class="sd">        :param error: An exception to catch. If `None`, `sys.exc_info()` will be used.</span>
+
+<span class="sd">        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span>
+        <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">error</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">exc_info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">exc_info</span> <span class="o">=</span> <span class="n">exc_info_from_error</span><span class="p">(</span><span class="n">error</span><span class="p">)</span>
+
+        <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span><span class="n">exc_info</span><span class="p">,</span> <span class="n">client_options</span><span class="o">=</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
+
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+    <span class="k">def</span> <span class="nf">_capture_internal_exception</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">exc_info</span>  <span class="c1"># type: Any</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; Any</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Capture an exception that is likely caused by a bug in the SDK</span>
+<span class="sd">        itself.</span>
+
+<span class="sd">        These exceptions do not end up in Sentry and are just logged instead.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Internal error in sentry_sdk&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="n">exc_info</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+
+<div class="viewcode-block" id="Hub.add_breadcrumb"><a class="viewcode-back" href="../../index.html#sentry_sdk.Hub.add_breadcrumb">[docs]</a>    <span class="k">def</span> <span class="nf">add_breadcrumb</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">crumb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Breadcrumb]</span>
+        <span class="n">hint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[BreadcrumbHint]</span>
+        <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; None</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Adds a breadcrumb.</span>
+
+<span class="sd">        :param crumb: Dictionary with the data as the sentry v7/v8 protocol expects.</span>
+
+<span class="sd">        :param hint: An optional value that can be used by `before_breadcrumb`</span>
+<span class="sd">            to customize the breadcrumbs that are emitted.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Dropped breadcrumb because no client bound&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="n">crumb</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">crumb</span> <span class="ow">or</span> <span class="p">())</span>  <span class="c1"># type: Breadcrumb</span>
+        <span class="n">crumb</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">crumb</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="n">hint</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">hint</span> <span class="ow">or</span> <span class="p">())</span>  <span class="c1"># type: Hint</span>
+
+        <span class="k">if</span> <span class="n">crumb</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;timestamp&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">crumb</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">crumb</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">crumb</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span>
+
+        <span class="k">if</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;before_breadcrumb&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">new_crumb</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;before_breadcrumb&quot;</span><span class="p">](</span><span class="n">crumb</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">new_crumb</span> <span class="o">=</span> <span class="n">crumb</span>
+
+        <span class="k">if</span> <span class="n">new_crumb</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_crumb</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;before breadcrumb dropped breadcrumb (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">crumb</span><span class="p">)</span>
+
+        <span class="n">max_breadcrumbs</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;max_breadcrumbs&quot;</span><span class="p">]</span>  <span class="c1"># type: int</span>
+        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">max_breadcrumbs</span><span class="p">:</span>
+            <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="Hub.start_span"><a class="viewcode-back" href="../../index.html#sentry_sdk.Hub.start_span">[docs]</a>    <span class="k">def</span> <span class="nf">start_span</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Span]</span>
+        <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; Span</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a new span whose parent span is the currently active</span>
+<span class="sd">        span, if any. The return value is the span object that can</span>
+<span class="sd">        be used as a context manager to start and stop timing.</span>
+
+<span class="sd">        Note that you will not see any span that is not contained</span>
+<span class="sd">        within a transaction. Create a transaction with</span>
+<span class="sd">        ``start_span(transaction=&quot;my transaction&quot;)`` if an</span>
+<span class="sd">        integration doesn&#39;t already do this for you.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;hub&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">span</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">span</span><span class="o">.</span><span class="n">new_span</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">span</span> <span class="o">=</span> <span class="n">Span</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">span</span><span class="o">.</span><span class="n">sampled</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">span</span><span class="o">.</span><span class="n">transaction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">sample_rate</span> <span class="o">=</span> <span class="n">client</span> <span class="ow">and</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;traces_sample_rate&quot;</span><span class="p">]</span> <span class="ow">or</span> <span class="mi">0</span>
+            <span class="n">span</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">sample_rate</span>
+
+        <span class="k">if</span> <span class="n">span</span><span class="o">.</span><span class="n">sampled</span><span class="p">:</span>
+            <span class="n">span</span><span class="o">.</span><span class="n">init_finished_spans</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">span</span></div>
+
+    <span class="nd">@overload</span>  <span class="c1"># noqa</span>
+    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[None]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; ContextManager[Scope]</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@overload</span>  <span class="c1"># noqa</span>
+    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span>  <span class="c1"># type: Callable[[Scope], None]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; None</span>
+        <span class="k">pass</span>
+
+<div class="viewcode-block" id="Hub.push_scope"><a class="viewcode-back" href="../../index.html#sentry_sdk.Hub.push_scope">[docs]</a>    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>  <span class="c1"># noqa</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Pushes a new layer on the scope stack.</span>
+
+<span class="sd">        :param callback: If provided, this method pushes a scope, calls</span>
+<span class="sd">            `callback`, and pops the scope again.</span>
+
+<span class="sd">        :returns: If no `callback` is provided, a context manager that should</span>
+<span class="sd">            be used to pop the scope again.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
+                <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">new_layer</span> <span class="o">=</span> <span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">scope</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_layer</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
+
+    <span class="n">scope</span> <span class="o">=</span> <span class="n">push_scope</span>
+
+<div class="viewcode-block" id="Hub.pop_scope_unsafe"><a class="viewcode-back" href="../../index.html#sentry_sdk.Hub.pop_scope_unsafe">[docs]</a>    <span class="k">def</span> <span class="nf">pop_scope_unsafe</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Tuple[Optional[Client], Scope]</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Pops a scope layer from the stack.</span>
+
+<span class="sd">        Try to use the context manager :py:meth:`push_scope` instead.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">,</span> <span class="s2">&quot;stack must have at least one layer&quot;</span>
+        <span class="k">return</span> <span class="n">rv</span></div>
+
+    <span class="nd">@overload</span>  <span class="c1"># noqa</span>
+    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[None]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; ContextManager[Scope]</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@overload</span>  <span class="c1"># noqa</span>
+    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span>  <span class="c1"># type: Callable[[Scope], None]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; None</span>
+        <span class="k">pass</span>
+
+<div class="viewcode-block" id="Hub.configure_scope"><a class="viewcode-back" href="../../index.html#sentry_sdk.Hub.configure_scope">[docs]</a>    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>  <span class="c1"># noqa</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
+    <span class="p">):</span>  <span class="c1"># noqa</span>
+        <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
+
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Reconfigures the scope.</span>
+
+<span class="sd">        :param callback: If provided, call the callback with the current scope.</span>
+
+<span class="sd">        :returns: If no callback is provided, returns a context manager that returns the scope.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="nd">@contextmanager</span>
+        <span class="k">def</span> <span class="nf">inner</span><span class="p">():</span>
+            <span class="c1"># type: () -&gt; Generator[Scope, None, None]</span>
+            <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="n">scope</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="n">Scope</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">inner</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="Hub.flush"><a class="viewcode-back" href="../../index.html#sentry_sdk.Hub.flush">[docs]</a>    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
+        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; None</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Alias for :py:meth:`sentry_sdk.Client.flush`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">client</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">iter_trace_propagation_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Generator[Tuple[str, str], None, None]</span>
+        <span class="c1"># TODO: Document</span>
+        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="n">propagate_traces</span> <span class="o">=</span> <span class="n">client</span> <span class="ow">and</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;propagate_traces&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">propagate_traces</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="n">client</span> <span class="ow">and</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;traceparent_v2&quot;</span><span class="p">]:</span>
+            <span class="n">traceparent</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span><span class="o">.</span><span class="n">to_traceparent</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">traceparent</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span><span class="o">.</span><span class="n">to_legacy_traceparent</span><span class="p">()</span>
+
+        <span class="k">yield</span> <span class="s2">&quot;sentry-trace&quot;</span><span class="p">,</span> <span class="n">traceparent</span></div>
+
+
+<span class="n">GLOBAL_HUB</span> <span class="o">=</span> <span class="n">Hub</span><span class="p">()</span>
+<span class="n">_local</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">GLOBAL_HUB</span><span class="p">)</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">sentry-python</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Sentry Team and Contributors.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
