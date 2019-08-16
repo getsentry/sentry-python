@@ -27,6 +27,19 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.11.0
+
+* Fix type hints for the logging integration. Thansk Steven Dignam!
+* Fix an issue where scope/context data would leak in applications that use `gevent` with its threading monkeypatch. The fix is to avoid usage of contextvars in such environments. Thanks Ran Benita!
+* Fix a reference cycle in the `ThreadingIntegration` that led to exceptions on interpreter shutdown. Thanks Guang Tian Li!
+* Fix a series of bugs in the stdlib integration that broke usage of `subprocess`.
+* More instrumentation for APM.
+* New integration for SQLAlchemy (creates breadcrumbs from queries).
+* New (experimental) integration for Apache Beam.
+* Fix a bug in the `LoggingIntegration` that would send breadcrumbs timestamps in the wrong timezone.
+* The `AiohttpIntegration` now sets the event's transaction name.
+* Fix a bug that caused infinite recursion when serializing local variables that logged errors or otherwise created Sentry events.
+
 ## 0.10.2
 
 * Fix a bug where a log record with non-strings as `extra` keys would make the SDK crash.
