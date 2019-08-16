@@ -25,6 +25,8 @@ sentry-sdk>=0.10.0,<0.11.0
 sentry-sdk==0.10.1
 ```
 
+A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
+
 ## 0.10.2
 
 * Fix a bug where a log record with non-strings as `extra` keys would make the SDK crash.
