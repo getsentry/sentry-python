@@ -181,7 +181,7 @@ def _install_subprocess():
                 env = _init_argument(a, kw, "env", 10, lambda x: dict(x or os.environ))
             env["SUBPROCESS_" + k.upper().replace("-", "_")] = v
 
-        with hub.span(op="subprocess", description=description) as span:
+        with hub.start_span(op="subprocess", description=description) as span:
             span.set_data("subprocess.cwd", cwd)
 
             return old_popen_init(self, *a, **kw)

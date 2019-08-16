@@ -96,7 +96,7 @@ class SentryWsgiMiddleware(object):
             span.op = "http.server"
             span.transaction = "generic WSGI request"
 
-            with hub.span(span) as span:
+            with hub.start_span(span) as span:
                 try:
                     rv = self.app(
                         environ,

@@ -12,12 +12,12 @@ def test_basic(sentry_init, capture_events, sample_rate):
     sentry_init(traces_sample_rate=sample_rate)
     events = capture_events()
 
-    with Hub.current.span(transaction="hi"):
+    with Hub.current.start_span(transaction="hi"):
         with pytest.raises(ZeroDivisionError):
-            with Hub.current.span(op="foo", description="foodesc"):
+            with Hub.current.start_span(op="foo", description="foodesc"):
                 1 / 0
 
-        with Hub.current.span(op="bar", description="bardesc"):
+        with Hub.current.start_span(op="bar", description="bardesc"):
             pass
 
     if sample_rate:
@@ -41,8 +41,8 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
     sentry_init(traces_sample_rate=1.0, traceparent_v2=True)
     events = capture_events()
 
-    with Hub.current.span(transaction="hi"):
-        with Hub.current.span() as old_span:
+    with Hub.current.start_span(transaction="hi"):
+        with Hub.current.start_span() as old_span:
             old_span.sampled = sampled
             headers = dict(Hub.current.iter_trace_propagation_headers())
 
@@ -60,7 +60,7 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
     assert span.sampled == sampled
     assert span.trace_id == old_span.trace_id
 
-    with Hub.current.span(span):
+    with Hub.current.start_span(span):
         with Hub.current.configure_scope() as scope:
             scope.transaction = "ho"
         capture_message("hello")
@@ -88,13 +88,13 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
 def test_sampling_decided_only_for_transactions(sentry_init, capture_events):
     sentry_init(traces_sample_rate=0.5)
 
-    with Hub.current.span(transaction="hi") as trace:
+    with Hub.current.start_span(transaction="hi") as trace:
         assert trace.sampled is not None
 
-        with Hub.current.span() as span:
+        with Hub.current.start_span() as span:
             assert span.sampled == trace.sampled
 
-    with Hub.current.span() as span:
+    with Hub.current.start_span() as span:
         assert span.sampled is None
 
 
@@ -107,9 +107,9 @@ def test_memory_usage(sentry_init, capture_events, args, expected_refcount):
 
     references = weakref.WeakSet()
 
-    with Hub.current.span(transaction="hi"):
+    with Hub.current.start_span(transaction="hi"):
         for i in range(100):
-            with Hub.current.span(
+            with Hub.current.start_span(
                 op="helloworld", description="hi {}".format(i)
             ) as span:
 

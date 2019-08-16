@@ -15,6 +15,7 @@ if MYPY:
     from typing import ContextManager
 
     from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint
+    from sentry_sdk.tracing import Span
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
@@ -34,6 +35,7 @@ __all__ = [
     "push_scope",
     "flush",
     "last_event_id",
+    "start_span",
 ]
 
 
@@ -179,3 +181,15 @@ def last_event_id():
     if hub is not None:
         return hub.last_event_id()
     return None
+
+
+@hubmethod
+def start_span(
+    span=None,  # type: Optional[Span]
+    **kwargs  # type: Any
+):
+    # type: (...) -> Span
+
+    # TODO: All other functions in this module check for
+    # `Hub.current is None`. That actually should never happen?
+    return Hub.current.start_span(span=span, **kwargs)

@@ -62,7 +62,7 @@ def test_subprocess_basic(
     sentry_init(integrations=[StdlibIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
-    with Hub.current.span(transaction="foo", op="foo") as span:
+    with Hub.current.start_span(transaction="foo", op="foo") as span:
         args = [
             sys.executable,
             "-c",

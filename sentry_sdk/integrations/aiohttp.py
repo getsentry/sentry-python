@@ -65,7 +65,7 @@ class AioHttpIntegration(Integration):
 
                     # If this transaction name makes it to the UI, AIOHTTP's
                     # URL resolver did not find a route or died trying.
-                    with hub.span(transaction="generic AIOHTTP request"):
+                    with hub.start_span(transaction="generic AIOHTTP request"):
                         try:
                             response = await old_handle(self, request)
                         except HTTPException:
