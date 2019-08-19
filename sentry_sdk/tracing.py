@@ -5,7 +5,7 @@ import contextlib
 from datetime import datetime
 
 import sentry_sdk
-from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.utils import capture_internal_exceptions, logger
 from sentry_sdk._compat import PY2
 from sentry_sdk._types import MYPY
 
