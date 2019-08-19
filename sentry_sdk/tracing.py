@@ -272,9 +272,9 @@ class Span(object):
             # resolved to a concrete decision. If `sampled` is `None`, it's
             # likely that somebody used `with sentry_sdk.Hub.start_span(..)` on a
             # non-transaction span and later decided to make it a transaction.
-            assert (
-                self.sampled is not None
-            ), "Need to set transaction when entering span!"
+            if self.sampled is None:
+                logger.warning("Discarding transaction Span without sampling decision")
+
             return None
 
         return hub.capture_event(
