@@ -2,6 +2,7 @@ import os
 import sys
 import linecache
 import logging
+import functools
 
 from contextlib import contextmanager
 from datetime import datetime
@@ -768,3 +769,13 @@ def transaction_from_function(func):
 
     # Possibly a lambda
     return func_qualname
+
+
+def wraps(f):
+    w = functools.wraps(f)
+    if PY2:
+        # Back port __wrapped_ attribute to Python 2. Present from Python > 3.2
+        # https://docs.python.org/3/library/functools.html#functools.update_wrapper
+        # https://github.com/getsentry/sentry-python/pull/475
+        w.__wrapped__ = f
+    return w

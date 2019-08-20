@@ -5,10 +5,9 @@ import pytest
 pytest.importorskip("celery")
 
 from sentry_sdk import Hub, configure_scope
-from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk._compat import text_type
 
-from celery import Celery, VERSION
+from celery import VERSION
 from celery.bin import worker
 
 
@@ -19,28 +18,6 @@ def connect_signal(request):
         request.addfinalizer(lambda: signal.disconnect(f))
 
     return inner
-
-
-@pytest.fixture
-def init_celery(sentry_init):
-    def inner(propagate_traces=True, **kwargs):
-        sentry_init(
-            integrations=[CeleryIntegration(propagate_traces=propagate_traces)],
-            **kwargs
-        )
-        celery = Celery(__name__)
-        if VERSION < (4,):
-            celery.conf.CELERY_ALWAYS_EAGER = True
-        else:
-            celery.conf.task_always_eager = True
-        return celery
-
-    return inner
-
-
-@pytest.fixture
-def celery(init_celery):
-    return init_celery()
 
 
 @pytest.fixture(
