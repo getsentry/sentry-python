@@ -48,6 +48,8 @@ The usual release process goes like this:
 
     * One code example with basic setup.
 
+    * Make sure to add integration page to `python/index.md` (people forget to do that all the time).
+
   Tip: Put most relevant parts wrapped in `<!--WIZARD-->..<!--ENDWIZARD-->` tags for usage from within the Sentry UI.
 
 3. Merge docs after new version has been released (auto-deploys on merge).
