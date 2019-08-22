@@ -16,6 +16,7 @@ if MYPY:
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from typing import Any
     from typing import Dict
+    from typing import Optional
     from werkzeug.datastructures import ImmutableTypeConversionDict
     from werkzeug.datastructures import ImmutableMultiDict
     from werkzeug.datastructures import FileStorage
@@ -57,7 +58,7 @@ class FlaskIntegration(Integration):
         user_object="current_user",
         user_attr_mapping=None,
     ):
-        # type: (str) -> None
+        # type: (Any, str, str, str, Optional[Dict[str, str]]) -> None
         TRANSACTION_STYLE_VALUES = ("endpoint", "url")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
