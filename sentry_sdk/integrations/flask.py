@@ -29,7 +29,7 @@ except ImportError:
 
 if flask_login is None:
     try:
-        import flask_jwt_extended as flask_login # type: ignore
+        import flask_jwt_extended as flask_login  # type: ignore
     except ImportError:
         pass
 
@@ -50,8 +50,13 @@ class FlaskIntegration(Integration):
     user_object = None
     user_attr_mapping = None
 
-    def __init__(self, transaction_style="endpoint", user_module="flask_login",
-            user_object="current_user", user_attr_mapping=None):
+    def __init__(
+        self,
+        transaction_style="endpoint",
+        user_module="flask_login",
+        user_object="current_user",
+        user_attr_mapping=None,
+    ):
         # type: (str) -> None
         TRANSACTION_STYLE_VALUES = ("endpoint", "url")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
@@ -61,16 +66,13 @@ class FlaskIntegration(Integration):
             )
         self.transaction_style = transaction_style
         try:
-            self.usermodule = importlib.import_module( user_module )
-        except  ImportError:
+            self.usermodule = importlib.import_module(user_module)
+        except ImportError:
             self.usermodule = None
 
         self.user_object = user_object
         if user_attr_mapping is None:
-            self.user_attr_mapping = {
-                'username': 'username',
-                'email': 'email'
-            }
+            self.user_attr_mapping = {"username": "username", "email": "email"}
         else:
             self.user_attr_mapping = user_attr_mapping
 
@@ -247,12 +249,12 @@ def _add_user_to_event(event):
             pass
 
         for attr in integration.user_attr_mapping:
-        # The following attribute accesses are ineffective for the general
-        # Flask-Login case, because the User interface of Flask-Login does not
-        # care about anything but the ID. However, Flask-User (based on
-        # Flask-Login) documents a few optional extra attributes.
-        #
-        # https://github.com/lingthio/Flask-User/blob/a379fa0a281789618c484b459cb41236779b95b1/docs/source/data_models.rst#fixed-data-model-property-names
+            # The following attribute accesses are ineffective for the general
+            # Flask-Login case, because the User interface of Flask-Login does not
+            # care about anything but the ID. However, Flask-User (based on
+            # Flask-Login) documents a few optional extra attributes.
+            #
+            # https://github.com/lingthio/Flask-User/blob/a379fa0a281789618c484b459cb41236779b95b1/docs/source/data_models.rst#fixed-data-model-property-names
 
             try:
                 user_info[attr] = getattr(user, integration.user_attr_mapping.get(attr))
