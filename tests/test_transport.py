@@ -7,6 +7,8 @@ from datetime import datetime
 import eventlet
 import pytest
 
+from sentry_sdk import Hub, Client, add_breadcrumb, capture_message
+
 
 @pytest.fixture(scope="session", params=[True, False])
 def eventlet_maybe_patched(request):
@@ -17,8 +19,6 @@ def eventlet_maybe_patched(request):
 @pytest.fixture(params=[True, False])
 def make_client(request):
     def inner(*args, **kwargs):
-        from sentry_sdk import Client
-
         client = Client(*args, **kwargs)
         if request.param:
             client = pickle.loads(pickle.dumps(client))
@@ -41,8 +41,6 @@ def test_transport_works(
     eventlet_maybe_patched,
 ):
     httpserver.serve_content("ok", 200)
-
-    from sentry_sdk import Hub, Client, add_breadcrumb, capture_message
 
     caplog.set_level(logging.DEBUG)
 

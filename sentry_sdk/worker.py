@@ -1,7 +1,7 @@
 import os
 
-import threading
-import time
+from threading import Thread, Lock
+from time import sleep, time
 from sentry_sdk._compat import queue, check_thread_support
 from sentry_sdk.utils import logger
 
@@ -23,8 +23,8 @@ class BackgroundWorker(object):
         # type: () -> None
         check_thread_support()
         self._queue = queue.Queue(-1)  # type: Queue[Any]
-        self._lock = threading.Lock()
-        self._thread = None  # type: Optional[threading.Thread]
+        self._lock = Lock()
+        self._thread = None  # type: Optional[Thread]
         self._thread_for_pid = None  # type: Optional[int]
 
     @property
@@ -43,7 +43,7 @@ class BackgroundWorker(object):
 
     def _timed_queue_join(self, timeout):
         # type: (float) -> bool
-        deadline = time.time() + timeout
+        deadline = time() + timeout
         queue = self._queue
 
         real_all_tasks_done = getattr(
@@ -58,7 +58,7 @@ class BackgroundWorker(object):
 
         try:
             while queue.unfinished_tasks:  # type: ignore
-                delay = deadline - time.time()
+                delay = deadline - time()
                 if delay <= 0:
                     return False
                 if all_tasks_done is not None:
@@ -76,7 +76,7 @@ class BackgroundWorker(object):
         # type: () -> None
         with self._lock:
             if not self.is_alive:
-                self._thread = threading.Thread(
+                self._thread = Thread(
                     target=self._target, name="raven-sentry.BackgroundWorker"
                 )
                 self._thread.setDaemon(True)
@@ -128,4 +128,4 @@ class BackgroundWorker(object):
                     logger.error("Failed processing job", exc_info=True)
             finally:
                 self._queue.task_done()
-            # time.sleep(0)
+            sleep(0)
