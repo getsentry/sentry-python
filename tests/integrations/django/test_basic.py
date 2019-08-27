@@ -485,6 +485,9 @@ def test_rest_framework_basic(
     "endpoint", ["rest_permission_denied_exc", "permission_denied_exc"]
 )
 def test_does_not_capture_403(sentry_init, client, capture_events, endpoint):
+    if endpoint == "rest_permission_denied_exc":
+        pytest.importorskip("rest_framework")
+
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
 
