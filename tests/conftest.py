@@ -4,6 +4,9 @@ import json
 
 import pytest
 
+import gevent
+import eventlet
+
 import sentry_sdk
 from sentry_sdk._compat import reraise, string_types, iteritems
 from sentry_sdk.transport import Transport
@@ -238,3 +241,29 @@ class EventStreamReader(object):
 
     def read_flush(self):
         assert self.file.readline() == b"flush\n"
+
+
+# scope=session ensures that fixture is run earlier
+@pytest.fixture(scope="session", params=[None, "eventlet", "gevent"])
+def maybe_monkeypatched_threading(request):
+    if request.param == "eventlet":
+        try:
+            eventlet.monkey_patch()
+        except AttributeError as e:
+            if "'thread.RLock' object has no attribute" in str(e):
+                # https://bitbucket.org/pypy/pypy/issues/2962/gevent-cannot-patch-rlock-under-pypy-27-7
+                pytest.skip("https://github.com/eventlet/eventlet/issues/546")
+            else:
+                raise
+    elif request.param == "gevent":
+        try:
+            gevent.monkey.patch_all()
+        except Exception as e:
+            if "_RLock__owner" in str(e):
+                pytest.skip("https://github.com/gevent/gevent/issues/1380")
+            else:
+                raise
+    else:
+        assert request.param is None
+
+    return request.param

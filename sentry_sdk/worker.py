@@ -52,9 +52,10 @@ class BackgroundWorker(object):
         if real_all_tasks_done is not None:
             real_all_tasks_done.acquire()
             all_tasks_done = real_all_tasks_done  # type: Optional[Any]
-        else:
-            # eventlet
+        elif queue.__module__.startswith("eventlet."):
             all_tasks_done = getattr(queue, "_cond", None)
+        else:
+            all_tasks_done = None
 
         try:
             while queue.unfinished_tasks:  # type: ignore

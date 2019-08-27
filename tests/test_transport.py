@@ -4,22 +4,9 @@ import pickle
 
 from datetime import datetime
 
-import eventlet
 import pytest
 
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message
-
-
-# scope=session ensures that fixture is run earlier
-@pytest.fixture(scope="session", params=[True, False])
-def eventlet_maybe_patched(request):
-    if request.param:
-        try:
-            eventlet.monkey_patch()
-        except AttributeError as e:
-            if "'thread.RLock' object has no attribute" in str(e):
-                # https://bitbucket.org/pypy/pypy/issues/2962/gevent-cannot-patch-rlock-under-pypy-27-7
-                pytest.skip("https://github.com/eventlet/eventlet/issues/546")
 
 
 @pytest.fixture(params=[True, False])
@@ -44,7 +31,7 @@ def test_transport_works(
     debug,
     make_client,
     client_flush_method,
-    eventlet_maybe_patched,
+    maybe_monkeypatched_threading,
 ):
     httpserver.serve_content("ok", 200)
 
