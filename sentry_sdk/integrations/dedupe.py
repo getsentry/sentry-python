@@ -26,7 +26,7 @@ class DedupeIntegration(Integration):
         @add_global_event_processor
         def processor(event, hint):
             # type: (Event, Optional[Hint]) -> Optional[Event]
-            own_pid = os.getpid()
+            pid = os.getpid()
             if hint is None:
                 return event
 
@@ -35,12 +35,14 @@ class DedupeIntegration(Integration):
             if integration is None:
                 return event
 
-            pid, exc_info = hint.get("exc_info", None)
+            exc_info = hint.get("exc_info", None)
             if exc_info is None:
                 return event
 
             exc = exc_info[1]
-            if integration._last_seen.get(None) is exc and pid == own_pid:
+
+            last_seen_pid, last_seen_exc = integration._last_seen.get((None, None))
+            if last_seen_exc is exc and last_seen_pid == pid:
                 return None
-            integration._last_seen.set((own_pid, exc))
+            integration._last_seen.set((pid, exc))
             return event
