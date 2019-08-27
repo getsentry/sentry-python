@@ -479,3 +479,19 @@ def test_rest_framework_basic(
     assert event["exception"]["values"][0]["mechanism"]["type"] == "django"
 
     assert event["request"] == event_request(route)
+
+
+@pytest.mark.parametrize(
+    "endpoint", ["rest_permission_denied_exc", "permission_denied_exc"]
+)
+def test_does_not_capture_403(sentry_init, client, capture_events, endpoint):
+    if endpoint == "rest_permission_denied_exc":
+        pytest.importorskip("rest_framework")
+
+    sentry_init(integrations=[DjangoIntegration()])
+    events = capture_events()
+
+    _content, status, _headers = client.get(reverse(endpoint))
+    assert status.lower() == "403 forbidden"
+
+    assert not events
