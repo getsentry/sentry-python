@@ -101,7 +101,7 @@ def test_has_context(route, get_client, sentry_init, capture_events):
     assert event["message"] == "yoo"
     assert event["request"] == {
         "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
-        "headers": {"Content-Length": "0", "Content-Type": "", "Host": "localhost"},
+        "headers": {"Host": "localhost"},
         "method": "GET",
         "query_string": "",
         "url": "http://localhost/message/yoo",

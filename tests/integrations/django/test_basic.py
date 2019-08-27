@@ -56,7 +56,7 @@ def test_request_captured(sentry_init, client, capture_events):
     assert event["request"] == {
         "cookies": {},
         "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
-        "headers": {"Content-Length": "0", "Content-Type": "", "Host": "localhost"},
+        "headers": {"Host": "localhost"},
         "method": "GET",
         "query_string": "",
         "url": "http://localhost/message",
@@ -135,7 +135,7 @@ def test_custom_error_handler_request_context(sentry_init, client, capture_event
     assert event["level"] == "error"
     assert event["request"] == {
         "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
-        "headers": {"Content-Length": "0", "Content-Type": "", "Host": "localhost"},
+        "headers": {"Host": "localhost"},
         "method": "POST",
         "query_string": "",
         "url": "http://localhost/404",
