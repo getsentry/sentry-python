@@ -10,6 +10,7 @@ import pytest
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message
 
 
+# scope=session ensures that fixture is run earlier
 @pytest.fixture(scope="session", params=[True, False])
 def eventlet_maybe_patched(request):
     if request.param:
