@@ -100,6 +100,9 @@ def _capture_internal_warnings():
         if "Something has already installed a non-asyncio" in str(warning.message):
             continue
 
+        if "dns.hash" in str(warning.message) or "dns/namedict" in warning.filename:
+            continue
+
         raise AssertionError(warning)
 
 

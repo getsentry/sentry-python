@@ -1,7 +1,7 @@
 import os
 
-from threading import Thread, Lock
-from time import sleep, time
+import threading
+import time
 from sentry_sdk._compat import queue, check_thread_support
 from sentry_sdk.utils import logger
 
@@ -23,8 +23,8 @@ class BackgroundWorker(object):
         # type: () -> None
         check_thread_support()
         self._queue = queue.Queue(-1)  # type: Queue[Any]
-        self._lock = Lock()
-        self._thread = None  # type: Optional[Thread]
+        self._lock = threading.Lock()
+        self._thread = None  # type: Optional[threading.Thread]
         self._thread_for_pid = None  # type: Optional[int]
 
     @property
@@ -43,24 +43,40 @@ class BackgroundWorker(object):
 
     def _timed_queue_join(self, timeout):
         # type: (float) -> bool
-        deadline = time() + timeout
+        deadline = time.time() + timeout
         queue = self._queue
-        queue.all_tasks_done.acquire()  # type: ignore
+
+        real_all_tasks_done = getattr(
+            queue, "all_tasks_done", None
+        )  # type: Optional[Any]
+        if real_all_tasks_done is not None:
+            real_all_tasks_done.acquire()
+            all_tasks_done = real_all_tasks_done  # type: Optional[Any]
+        else:
+            # eventlet
+            all_tasks_done = getattr(queue, "_cond", None)
+
         try:
             while queue.unfinished_tasks:  # type: ignore
-                delay = deadline - time()
+                delay = deadline - time.time()
                 if delay <= 0:
                     return False
-                queue.all_tasks_done.wait(timeout=delay)  # type: ignore
+                if all_tasks_done is not None:
+                    all_tasks_done.wait(timeout=delay)
+                else:
+                    # worst case, we just poll the number of remaining tasks
+                    sleep(0.1)
+
             return True
         finally:
-            queue.all_tasks_done.release()  # type: ignore
+            if real_all_tasks_done is not None:
+                real_all_tasks_done.release()  # type: ignore
 
     def start(self):
         # type: () -> None
         with self._lock:
             if not self.is_alive:
-                self._thread = Thread(
+                self._thread = threading.Thread(
                     target=self._target, name="raven-sentry.BackgroundWorker"
                 )
                 self._thread.setDaemon(True)
@@ -112,4 +128,4 @@ class BackgroundWorker(object):
                     logger.error("Failed processing job", exc_info=True)
             finally:
                 self._queue.task_done()
-            sleep(0)
+            # time.sleep(0)

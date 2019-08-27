@@ -4,14 +4,21 @@ import pickle
 
 from datetime import datetime
 
+import eventlet
 import pytest
 
-from sentry_sdk import Hub, Client, add_breadcrumb, capture_message
+
+@pytest.fixture(scope="session", params=[True, False])
+def eventlet_maybe_patched(request):
+    if request.param:
+        eventlet.monkey_patch()
 
 
 @pytest.fixture(params=[True, False])
 def make_client(request):
     def inner(*args, **kwargs):
+        from sentry_sdk import Client
+
         client = Client(*args, **kwargs)
         if request.param:
             client = pickle.loads(pickle.dumps(client))
@@ -22,8 +29,21 @@ def make_client(request):
 
 
 @pytest.mark.parametrize("debug", (True, False))
-def test_transport_works(httpserver, request, capsys, caplog, debug, make_client):
+@pytest.mark.parametrize("client_flush_method", ["close", "flush"])
+def test_transport_works(
+    httpserver,
+    request,
+    capsys,
+    caplog,
+    debug,
+    make_client,
+    client_flush_method,
+    eventlet_maybe_patched,
+):
     httpserver.serve_content("ok", 200)
+
+    from sentry_sdk import Hub, Client, add_breadcrumb, capture_message
+
     caplog.set_level(logging.DEBUG)
 
     client = make_client(
@@ -34,7 +54,8 @@ def test_transport_works(httpserver, request, capsys, caplog, debug, make_client
 
     add_breadcrumb(level="info", message="i like bread", timestamp=datetime.now())
     capture_message("löl")
-    client.close()
+
+    getattr(client, client_flush_method)()
 
     out, err = capsys.readouterr()
     assert not err and not out
