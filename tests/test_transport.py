@@ -22,8 +22,19 @@ def make_client(request):
 
 
 @pytest.mark.parametrize("debug", (True, False))
-def test_transport_works(httpserver, request, capsys, caplog, debug, make_client):
+@pytest.mark.parametrize("client_flush_method", ["close", "flush"])
+def test_transport_works(
+    httpserver,
+    request,
+    capsys,
+    caplog,
+    debug,
+    make_client,
+    client_flush_method,
+    maybe_monkeypatched_threading,
+):
     httpserver.serve_content("ok", 200)
+
     caplog.set_level(logging.DEBUG)
 
     client = make_client(
@@ -34,7 +45,8 @@ def test_transport_works(httpserver, request, capsys, caplog, debug, make_client
 
     add_breadcrumb(level="info", message="i like bread", timestamp=datetime.now())
     capture_message("löl")
-    client.close()
+
+    getattr(client, client_flush_method)()
 
     out, err = capsys.readouterr()
     assert not err and not out

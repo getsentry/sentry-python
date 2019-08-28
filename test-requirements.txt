@@ -6,3 +6,4 @@ Werkzeug==0.15.3
 pytest-localserver==0.4.1
 pytest-cov==2.6.0
 gevent
+eventlet
