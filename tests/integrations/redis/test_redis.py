@@ -18,7 +18,8 @@ def test_basic(sentry_init, capture_events):
 
     assert crumb == {
         "category": "redis",
-        "data": {"redis.key": "foobar"},
+        "message": "GET 'foobar'",
+        "data": {"redis.key": "foobar", "redis.command": "GET"},
         "timestamp": crumb["timestamp"],
         "type": "redis",
     }

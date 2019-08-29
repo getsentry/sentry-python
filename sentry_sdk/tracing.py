@@ -401,7 +401,6 @@ def _maybe_create_breadcrumbs_from_span(hub, span):
         hub.add_breadcrumb(
             type="http",
             category="httplib",
-            message=span.description,
             data=span._data,
             hint={"httplib_response": span._data.get("httplib_response")},
         )
