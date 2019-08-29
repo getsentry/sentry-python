@@ -46,7 +46,7 @@ class ModulesIntegration(Integration):
         @add_global_event_processor
         def processor(event, hint):
             # type: (Event, Any) -> Dict[str, Any]
-            if event.get("type") != "transaction":
+            if event.get("type") == "transaction":
                 return event
 
             if Hub.current.get_integration(ModulesIntegration) is None:
