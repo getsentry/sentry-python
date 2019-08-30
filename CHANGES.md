@@ -27,6 +27,10 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.11.2
+
+* Fix a bug where the SDK would throw an exception on shutdown when running under eventlet.
+
 ## 0.11.1
 
 * Remove a faulty assertion (observed in environment with Django Channels and ASGI).
