@@ -30,6 +30,7 @@ A major release `N` implies the previous release `N-1` will no longer receive up
 ## 0.11.2
 
 * Fix a bug where the SDK would throw an exception on shutdown when running under eventlet.
+* Add missing data to Redis breadcrumbs.
 
 ## 0.11.1
 
