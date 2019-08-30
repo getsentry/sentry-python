@@ -394,7 +394,9 @@ def record_http_request(hub, url, method):
 def _maybe_create_breadcrumbs_from_span(hub, span):
     # type: (sentry_sdk.Hub, Span) -> None
     if span.op == "redis":
-        hub.add_breadcrumb(type="redis", category="redis", data=span._tags)
+        hub.add_breadcrumb(
+            message=span.description, type="redis", category="redis", data=span._tags
+        )
     elif span.op == "http" and span.is_success():
         hub.add_breadcrumb(
             type="http",
@@ -406,6 +408,7 @@ def _maybe_create_breadcrumbs_from_span(hub, span):
         hub.add_breadcrumb(
             type="subprocess",
             category="subprocess",
+            message=span.description,
             data=span._data,
             hint={"popen_instance": span._data.get("popen_instance")},
         )

@@ -38,11 +38,12 @@ class ImmutableDict(Mapping):
             True,
             marks=pytest.mark.skipif(
                 platform.python_implementation() == "PyPy",
-                reason="https://github.com/getsentry/sentry-python/pull/449",
+                reason="https://bitbucket.org/pypy/pypy/issues/3050/subprocesspopen-only-accepts-sequences",
             ),
         ),
         False,
     ],
+    ids=("as_iterator", "as_list"),
 )
 @pytest.mark.parametrize("env_mapping", [None, os.environ, ImmutableDict(os.environ)])
 @pytest.mark.parametrize("with_cwd", [True, False])
@@ -126,9 +127,13 @@ def test_subprocess_basic(
     assert crumb == {
         "category": "subprocess",
         "data": data,
+        "message": crumb["message"],
         "timestamp": crumb["timestamp"],
         "type": "subprocess",
     }
+
+    if not iterator:
+        assert crumb["message"].startswith(sys.executable + " ")
 
     assert transaction_event["type"] == "transaction"
 
