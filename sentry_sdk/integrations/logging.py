@@ -27,12 +27,16 @@ DEFAULT_EVENT_LEVEL = logging.ERROR
 _IGNORED_LOGGERS = set(["sentry_sdk.errors"])
 
 
-def ignore_logger(name):
-    # type: (str) -> None
+def ignore_logger(
+    name  # type: str
+):
+    # type: (...) -> None
     """This disables recording (both in breadcrumbs and as events) calls to
     a logger of a specific name.  Among other uses, many of our integrations
     use this to prevent their actions being recorded as breadcrumbs. Exposed
     to users as a way to quiet spammy loggers.
+
+    :param name: The name of the logger to ignore (same string you would pass to ``logging.getLogger``).
     """
     _IGNORED_LOGGERS.add(name)
 
@@ -146,6 +150,12 @@ def _extra_from_record(record):
 
 
 class EventHandler(logging.Handler, object):
+    """
+    A logging handler that emits Sentry events for each log record
+
+    Note that you do not have to use this class if the logging integration is enabled, which it is by default.
+    """
+
     def emit(self, record):
         # type: (LogRecord) -> Any
         with capture_internal_exceptions():
@@ -204,6 +214,12 @@ SentryHandler = EventHandler
 
 
 class BreadcrumbHandler(logging.Handler, object):
+    """
+    A logging handler that records breadcrumbs for each log record.
+
+    Note that you do not have to use this class if the logging integration is enabled, which it is by default.
+    """
+
     def emit(self, record):
         # type: (LogRecord) -> Any
         with capture_internal_exceptions():
