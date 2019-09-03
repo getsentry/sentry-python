@@ -88,7 +88,7 @@
     <span class="k">return</span> <span class="n">wrapper</span>  <span class="c1"># type: ignore</span>
 
 
-<div class="viewcode-block" id="Scope"><a class="viewcode-back" href="../../index.html#sentry_sdk.Scope">[docs]</a><span class="k">class</span> <span class="nc">Scope</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<div class="viewcode-block" id="Scope"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope">[docs]</a><span class="k">class</span> <span class="nc">Scope</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;The scope holds extra information that should be sent with all</span>
 <span class="sd">    events that belong to it.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -150,7 +150,7 @@
         <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">span</span><span class="o">.</span><span class="n">transaction</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="n">span</span><span class="o">.</span><span class="n">transaction</span>
 
-<div class="viewcode-block" id="Scope.set_tag"><a class="viewcode-back" href="../../index.html#sentry_sdk.Scope.set_tag">[docs]</a>    <span class="k">def</span> <span class="nf">set_tag</span><span class="p">(</span>
+<div class="viewcode-block" id="Scope.set_tag"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_tag">[docs]</a>    <span class="k">def</span> <span class="nf">set_tag</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">key</span><span class="p">,</span>  <span class="c1"># type: str</span>
         <span class="n">value</span><span class="p">,</span>  <span class="c1"># type: Any</span>
@@ -159,14 +159,14 @@
         <span class="sd">&quot;&quot;&quot;Sets a tag for a key to a specific value.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span></div>
 
-<div class="viewcode-block" id="Scope.remove_tag"><a class="viewcode-back" href="../../index.html#sentry_sdk.Scope.remove_tag">[docs]</a>    <span class="k">def</span> <span class="nf">remove_tag</span><span class="p">(</span>
+<div class="viewcode-block" id="Scope.remove_tag"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_tag">[docs]</a>    <span class="k">def</span> <span class="nf">remove_tag</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">key</span>  <span class="c1"># type: str</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Removes a specific tag.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Scope.set_context"><a class="viewcode-back" href="../../index.html#sentry_sdk.Scope.set_context">[docs]</a>    <span class="k">def</span> <span class="nf">set_context</span><span class="p">(</span>
+<div class="viewcode-block" id="Scope.set_context"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_context">[docs]</a>    <span class="k">def</span> <span class="nf">set_context</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">key</span><span class="p">,</span>  <span class="c1"># type: str</span>
         <span class="n">value</span><span class="p">,</span>  <span class="c1"># type: Any</span>
@@ -175,14 +175,14 @@
         <span class="sd">&quot;&quot;&quot;Binds a context at a certain key to a specific value.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span></div>
 
-<div class="viewcode-block" id="Scope.remove_context"><a class="viewcode-back" href="../../index.html#sentry_sdk.Scope.remove_context">[docs]</a>    <span class="k">def</span> <span class="nf">remove_context</span><span class="p">(</span>
+<div class="viewcode-block" id="Scope.remove_context"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_context">[docs]</a>    <span class="k">def</span> <span class="nf">remove_context</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">key</span>  <span class="c1"># type: str</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Removes a context.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Scope.set_extra"><a class="viewcode-back" href="../../index.html#sentry_sdk.Scope.set_extra">[docs]</a>    <span class="k">def</span> <span class="nf">set_extra</span><span class="p">(</span>
+<div class="viewcode-block" id="Scope.set_extra"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_extra">[docs]</a>    <span class="k">def</span> <span class="nf">set_extra</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">key</span><span class="p">,</span>  <span class="c1"># type: str</span>
         <span class="n">value</span><span class="p">,</span>  <span class="c1"># type: Any</span>
@@ -191,14 +191,14 @@
         <span class="sd">&quot;&quot;&quot;Sets an extra key to a specific value.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span></div>
 
-<div class="viewcode-block" id="Scope.remove_extra"><a class="viewcode-back" href="../../index.html#sentry_sdk.Scope.remove_extra">[docs]</a>    <span class="k">def</span> <span class="nf">remove_extra</span><span class="p">(</span>
+<div class="viewcode-block" id="Scope.remove_extra"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_extra">[docs]</a>    <span class="k">def</span> <span class="nf">remove_extra</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">key</span>  <span class="c1"># type: str</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Removes a specific extra key.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Scope.clear"><a class="viewcode-back" href="../../index.html#sentry_sdk.Scope.clear">[docs]</a>    <span class="k">def</span> <span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Scope.clear"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.clear">[docs]</a>    <span class="k">def</span> <span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Clears the entire scope.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="kc">None</span>
@@ -215,12 +215,12 @@
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_span</span> <span class="o">=</span> <span class="kc">None</span></div>
 
-<div class="viewcode-block" id="Scope.clear_breadcrumbs"><a class="viewcode-back" href="../../index.html#sentry_sdk.Scope.clear_breadcrumbs">[docs]</a>    <span class="k">def</span> <span class="nf">clear_breadcrumbs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Scope.clear_breadcrumbs"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.clear_breadcrumbs">[docs]</a>    <span class="k">def</span> <span class="nf">clear_breadcrumbs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Clears breadcrumb buffer.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>  <span class="c1"># type: Deque[Breadcrumb]</span></div>
 
-<div class="viewcode-block" id="Scope.add_event_processor"><a class="viewcode-back" href="../../index.html#sentry_sdk.Scope.add_event_processor">[docs]</a>    <span class="k">def</span> <span class="nf">add_event_processor</span><span class="p">(</span>
+<div class="viewcode-block" id="Scope.add_event_processor"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.add_event_processor">[docs]</a>    <span class="k">def</span> <span class="nf">add_event_processor</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">func</span>  <span class="c1"># type: EventProcessor</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
@@ -230,7 +230,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">func</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Scope.add_error_processor"><a class="viewcode-back" href="../../index.html#sentry_sdk.Scope.add_error_processor">[docs]</a>    <span class="k">def</span> <span class="nf">add_error_processor</span><span class="p">(</span>
+<div class="viewcode-block" id="Scope.add_error_processor"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.add_error_processor">[docs]</a>    <span class="k">def</span> <span class="nf">add_error_processor</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">func</span><span class="p">,</span>  <span class="c1"># type: ErrorProcessor</span>
         <span class="bp">cls</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[type]</span>
@@ -257,7 +257,7 @@
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">func</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Scope.apply_to_event"><a class="viewcode-back" href="../../index.html#sentry_sdk.Scope.apply_to_event">[docs]</a>    <span class="nd">@_disable_capture</span>
+<div class="viewcode-block" id="Scope.apply_to_event"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.apply_to_event">[docs]</a>    <span class="nd">@_disable_capture</span>
     <span class="k">def</span> <span class="nf">apply_to_event</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
@@ -366,6 +366,10 @@
 
 
 <h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">Main API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../integrations.html">Integrations</a></li>
+</ul>
 
 <div class="relations">
 <h3>Related Topics</h3>
@@ -402,7 +406,7 @@
       &copy;2019, Sentry Team and Contributors.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.0+/296b1bf</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
     </div>

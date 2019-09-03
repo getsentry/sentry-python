@@ -1,0 +1,143 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Integrations &#8212; sentry-python 0.11.2 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Main API" href="api.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="integrations">
+<h1>Integrations<a class="headerlink" href="#integrations" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="module-sentry_sdk.integrations.logging">
+<span id="logging"></span><h2>Logging<a class="headerlink" href="#module-sentry_sdk.integrations.logging" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="sentry_sdk.integrations.logging.ignore_logger">
+<code class="sig-prename descclassname">sentry_sdk.integrations.logging.</code><code class="sig-name descname">ignore_logger</code><span class="sig-paren">(</span><em class="sig-param">name</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/integrations/logging.html#ignore_logger"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.integrations.logging.ignore_logger" title="Permalink to this definition">¶</a></dt>
+<dd><p>This disables recording (both in breadcrumbs and as events) calls to
+a logger of a specific name.  Among other uses, many of our integrations
+use this to prevent their actions being recorded as breadcrumbs. Exposed
+to users as a way to quiet spammy loggers.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.7)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>) – The name of the logger to ignore (same string you would pass to <code class="docutils literal notranslate"><span class="pre">logging.getLogger</span></code>).</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="class">
+<dt id="sentry_sdk.integrations.logging.EventHandler">
+<em class="property">class </em><code class="sig-prename descclassname">sentry_sdk.integrations.logging.</code><code class="sig-name descname">EventHandler</code><span class="sig-paren">(</span><em class="sig-param">level=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/integrations/logging.html#EventHandler"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.integrations.logging.EventHandler" title="Permalink to this definition">¶</a></dt>
+<dd><p>A logging handler that emits Sentry events for each log record</p>
+<p>Note that you do not have to use this class if the logging integration is enabled, which it is by default.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="sentry_sdk.integrations.logging.BreadcrumbHandler">
+<em class="property">class </em><code class="sig-prename descclassname">sentry_sdk.integrations.logging.</code><code class="sig-name descname">BreadcrumbHandler</code><span class="sig-paren">(</span><em class="sig-param">level=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/integrations/logging.html#BreadcrumbHandler"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.integrations.logging.BreadcrumbHandler" title="Permalink to this definition">¶</a></dt>
+<dd><p>A logging handler that records breadcrumbs for each log record.</p>
+<p>Note that you do not have to use this class if the logging integration is enabled, which it is by default.</p>
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">sentry-python</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="api.html">Main API</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Integrations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-sentry_sdk.integrations.logging">Logging</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="api.html" title="previous chapter">Main API</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Sentry Team and Contributors.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.0+/296b1bf</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/integrations.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

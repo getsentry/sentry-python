@@ -81,7 +81,7 @@
     <span class="k">return</span> <span class="n">f</span>
 
 
-<div class="viewcode-block" id="capture_event"><a class="viewcode-back" href="../../index.html#sentry_sdk.capture_event">[docs]</a><span class="nd">@hubmethod</span>
+<div class="viewcode-block" id="capture_event"><a class="viewcode-back" href="../../api.html#sentry_sdk.capture_event">[docs]</a><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
     <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
     <span class="n">hint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Hint]</span>
@@ -93,7 +93,7 @@
     <span class="k">return</span> <span class="kc">None</span></div>
 
 
-<div class="viewcode-block" id="capture_message"><a class="viewcode-back" href="../../index.html#sentry_sdk.capture_message">[docs]</a><span class="nd">@hubmethod</span>
+<div class="viewcode-block" id="capture_message"><a class="viewcode-back" href="../../api.html#sentry_sdk.capture_message">[docs]</a><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">capture_message</span><span class="p">(</span>
     <span class="n">message</span><span class="p">,</span>  <span class="c1"># type: str</span>
     <span class="n">level</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
@@ -105,7 +105,7 @@
     <span class="k">return</span> <span class="kc">None</span></div>
 
 
-<div class="viewcode-block" id="capture_exception"><a class="viewcode-back" href="../../index.html#sentry_sdk.capture_exception">[docs]</a><span class="nd">@hubmethod</span>
+<div class="viewcode-block" id="capture_exception"><a class="viewcode-back" href="../../api.html#sentry_sdk.capture_exception">[docs]</a><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">capture_exception</span><span class="p">(</span>
     <span class="n">error</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[BaseException]</span>
 <span class="p">):</span>
@@ -116,7 +116,7 @@
     <span class="k">return</span> <span class="kc">None</span></div>
 
 
-<div class="viewcode-block" id="add_breadcrumb"><a class="viewcode-back" href="../../index.html#sentry_sdk.add_breadcrumb">[docs]</a><span class="nd">@hubmethod</span>
+<div class="viewcode-block" id="add_breadcrumb"><a class="viewcode-back" href="../../api.html#sentry_sdk.add_breadcrumb">[docs]</a><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">add_breadcrumb</span><span class="p">(</span>
     <span class="n">crumb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Breadcrumb]</span>
     <span class="n">hint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[BreadcrumbHint]</span>
@@ -142,7 +142,7 @@
     <span class="k">pass</span>
 
 
-<div class="viewcode-block" id="configure_scope"><a class="viewcode-back" href="../../index.html#sentry_sdk.configure_scope">[docs]</a><span class="nd">@hubmethod</span>  <span class="c1"># noqa</span>
+<div class="viewcode-block" id="configure_scope"><a class="viewcode-back" href="../../api.html#sentry_sdk.configure_scope">[docs]</a><span class="nd">@hubmethod</span>  <span class="c1"># noqa</span>
 <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>
     <span class="n">callback</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
 <span class="p">):</span>
@@ -176,7 +176,7 @@
     <span class="k">pass</span>
 
 
-<div class="viewcode-block" id="push_scope"><a class="viewcode-back" href="../../index.html#sentry_sdk.push_scope">[docs]</a><span class="nd">@hubmethod</span>  <span class="c1"># noqa</span>
+<div class="viewcode-block" id="push_scope"><a class="viewcode-back" href="../../api.html#sentry_sdk.push_scope">[docs]</a><span class="nd">@hubmethod</span>  <span class="c1"># noqa</span>
 <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>
     <span class="n">callback</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
 <span class="p">):</span>
@@ -196,7 +196,7 @@
         <span class="k">return</span> <span class="kc">None</span></div>
 
 
-<div class="viewcode-block" id="flush"><a class="viewcode-back" href="../../index.html#sentry_sdk.flush">[docs]</a><span class="nd">@hubmethod</span>
+<div class="viewcode-block" id="flush"><a class="viewcode-back" href="../../api.html#sentry_sdk.flush">[docs]</a><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
     <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
     <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
@@ -207,7 +207,7 @@
         <span class="k">return</span> <span class="n">hub</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="last_event_id"><a class="viewcode-back" href="../../index.html#sentry_sdk.last_event_id">[docs]</a><span class="nd">@hubmethod</span>
+<div class="viewcode-block" id="last_event_id"><a class="viewcode-back" href="../../api.html#sentry_sdk.last_event_id">[docs]</a><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">last_event_id</span><span class="p">():</span>
     <span class="c1"># type: () -&gt; Optional[str]</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
@@ -216,7 +216,7 @@
     <span class="k">return</span> <span class="kc">None</span></div>
 
 
-<div class="viewcode-block" id="start_span"><a class="viewcode-back" href="../../index.html#sentry_sdk.start_span">[docs]</a><span class="nd">@hubmethod</span>
+<div class="viewcode-block" id="start_span"><a class="viewcode-back" href="../../api.html#sentry_sdk.start_span">[docs]</a><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">start_span</span><span class="p">(</span>
     <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Span]</span>
     <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
@@ -244,6 +244,10 @@
 
 
 <h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">Main API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../integrations.html">Integrations</a></li>
+</ul>
 
 <div class="relations">
 <h3>Related Topics</h3>
@@ -280,7 +284,7 @@
       &copy;2019, Sentry Team and Contributors.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.0+/296b1bf</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
     </div>

@@ -64,7 +64,7 @@
     <span class="kn">from</span> <span class="nn">urllib</span> <span class="k">import</span> <span class="n">getproxies</span>  <span class="c1"># type: ignore</span>
 
 
-<div class="viewcode-block" id="Transport"><a class="viewcode-back" href="../../index.html#sentry_sdk.Transport">[docs]</a><span class="k">class</span> <span class="nc">Transport</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<div class="viewcode-block" id="Transport"><a class="viewcode-back" href="../../api.html#sentry_sdk.Transport">[docs]</a><span class="k">class</span> <span class="nc">Transport</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Baseclass for all transports.</span>
 
 <span class="sd">    A transport is used to send an event to sentry.</span>
@@ -82,7 +82,7 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="kc">None</span>
 
-<div class="viewcode-block" id="Transport.capture_event"><a class="viewcode-back" href="../../index.html#sentry_sdk.Transport.capture_event">[docs]</a>    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
+<div class="viewcode-block" id="Transport.capture_event"><a class="viewcode-back" href="../../api.html#sentry_sdk.Transport.capture_event">[docs]</a>    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">event</span>  <span class="c1"># type: Event</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
@@ -91,7 +91,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
 
-<div class="viewcode-block" id="Transport.flush"><a class="viewcode-back" href="../../index.html#sentry_sdk.Transport.flush">[docs]</a>    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
+<div class="viewcode-block" id="Transport.flush"><a class="viewcode-back" href="../../api.html#sentry_sdk.Transport.flush">[docs]</a>    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">timeout</span><span class="p">,</span>  <span class="c1"># type: float</span>
         <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
@@ -100,7 +100,7 @@
         <span class="sd">&quot;&quot;&quot;Wait `timeout` seconds for the current events to be sent out.&quot;&quot;&quot;</span>
         <span class="k">pass</span></div>
 
-<div class="viewcode-block" id="Transport.kill"><a class="viewcode-back" href="../../index.html#sentry_sdk.Transport.kill">[docs]</a>    <span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Transport.kill"><a class="viewcode-back" href="../../api.html#sentry_sdk.Transport.kill">[docs]</a>    <span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Forcefully kills the transport.&quot;&quot;&quot;</span>
         <span class="k">pass</span></div>
@@ -113,7 +113,7 @@
             <span class="k">pass</span></div>
 
 
-<div class="viewcode-block" id="HttpTransport"><a class="viewcode-back" href="../../index.html#sentry_sdk.HttpTransport">[docs]</a><span class="k">class</span> <span class="nc">HttpTransport</span><span class="p">(</span><span class="n">Transport</span><span class="p">):</span>
+<div class="viewcode-block" id="HttpTransport"><a class="viewcode-back" href="../../api.html#sentry_sdk.HttpTransport">[docs]</a><span class="k">class</span> <span class="nc">HttpTransport</span><span class="p">(</span><span class="n">Transport</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;The default HTTP transport.&quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
@@ -228,7 +228,7 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">PoolManager</span><span class="p">(</span><span class="o">**</span><span class="n">opts</span><span class="p">)</span>
 
-<div class="viewcode-block" id="HttpTransport.capture_event"><a class="viewcode-back" href="../../index.html#sentry_sdk.HttpTransport.capture_event">[docs]</a>    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
+<div class="viewcode-block" id="HttpTransport.capture_event"><a class="viewcode-back" href="../../api.html#sentry_sdk.HttpTransport.capture_event">[docs]</a>    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">event</span>  <span class="c1"># type: Event</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
@@ -242,7 +242,7 @@
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">send_event_wrapper</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="HttpTransport.flush"><a class="viewcode-back" href="../../index.html#sentry_sdk.HttpTransport.flush">[docs]</a>    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
+<div class="viewcode-block" id="HttpTransport.flush"><a class="viewcode-back" href="../../api.html#sentry_sdk.HttpTransport.flush">[docs]</a>    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">timeout</span><span class="p">,</span>  <span class="c1"># type: float</span>
         <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
@@ -252,7 +252,7 @@
         <span class="k">if</span> <span class="n">timeout</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="HttpTransport.kill"><a class="viewcode-back" href="../../index.html#sentry_sdk.HttpTransport.kill">[docs]</a>    <span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="HttpTransport.kill"><a class="viewcode-back" href="../../api.html#sentry_sdk.HttpTransport.kill">[docs]</a>    <span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; None</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Killing HTTP transport&quot;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span></div></div>
@@ -312,6 +312,10 @@
 
 
 <h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">Main API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../integrations.html">Integrations</a></li>
+</ul>
 
 <div class="relations">
 <h3>Related Topics</h3>
@@ -348,7 +352,7 @@
       &copy;2019, Sentry Team and Contributors.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.0+/296b1bf</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
     </div>

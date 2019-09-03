@@ -1,0 +1,337 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>sentry_sdk.integrations.logging &#8212; sentry-python 0.11.2 documentation</title>
+    <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for sentry_sdk.integrations.logging</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">absolute_import</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">datetime</span>
+
+<span class="kn">from</span> <span class="nn">sentry_sdk.hub</span> <span class="k">import</span> <span class="n">Hub</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="k">import</span> <span class="p">(</span>
+    <span class="n">to_string</span><span class="p">,</span>
+    <span class="n">event_from_exception</span><span class="p">,</span>
+    <span class="n">current_stacktrace</span><span class="p">,</span>
+    <span class="n">capture_internal_exceptions</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="k">import</span> <span class="n">Integration</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk._compat</span> <span class="k">import</span> <span class="n">iteritems</span>
+
+<span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="k">import</span> <span class="n">MYPY</span>
+
+<span class="k">if</span> <span class="n">MYPY</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">logging</span> <span class="k">import</span> <span class="n">LogRecord</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Any</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Dict</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Optional</span>
+
+<span class="n">DEFAULT_LEVEL</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span>
+<span class="n">DEFAULT_EVENT_LEVEL</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">ERROR</span>
+
+<span class="n">_IGNORED_LOGGERS</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span><span class="s2">&quot;sentry_sdk.errors&quot;</span><span class="p">])</span>
+
+
+<div class="viewcode-block" id="ignore_logger"><a class="viewcode-back" href="../../../integrations.html#sentry_sdk.integrations.logging.ignore_logger">[docs]</a><span class="k">def</span> <span class="nf">ignore_logger</span><span class="p">(</span>
+    <span class="n">name</span>  <span class="c1"># type: str</span>
+<span class="p">):</span>
+    <span class="c1"># type: (...) -&gt; None</span>
+    <span class="sd">&quot;&quot;&quot;This disables recording (both in breadcrumbs and as events) calls to</span>
+<span class="sd">    a logger of a specific name.  Among other uses, many of our integrations</span>
+<span class="sd">    use this to prevent their actions being recorded as breadcrumbs. Exposed</span>
+<span class="sd">    to users as a way to quiet spammy loggers.</span>
+
+<span class="sd">    :param name: The name of the logger to ignore (same string you would pass to ``logging.getLogger``).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_IGNORED_LOGGERS</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">name</span><span class="p">)</span></div>
+
+
+<span class="k">class</span> <span class="nc">LoggingIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
+    <span class="n">identifier</span> <span class="o">=</span> <span class="s2">&quot;logging&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">DEFAULT_LEVEL</span><span class="p">,</span> <span class="n">event_level</span><span class="o">=</span><span class="n">DEFAULT_EVENT_LEVEL</span><span class="p">):</span>
+        <span class="c1"># type: (Optional[int], Optional[int]) -&gt; None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="n">level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span> <span class="o">=</span> <span class="n">BreadcrumbHandler</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">event_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="o">=</span> <span class="n">EventHandler</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">event_level</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_handle_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (LogRecord) -&gt; None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">levelno</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span><span class="o">.</span><span class="n">level</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_handler</span><span class="o">.</span><span class="n">handle</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">levelno</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span><span class="o">.</span><span class="n">level</span>
+        <span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_handler</span><span class="o">.</span><span class="n">handle</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">setup_once</span><span class="p">():</span>
+        <span class="c1"># type: () -&gt; None</span>
+        <span class="n">old_callhandlers</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span>  <span class="c1"># type: ignore</span>
+
+        <span class="k">def</span> <span class="nf">sentry_patched_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+            <span class="c1"># type: (Any, LogRecord) -&gt; Any</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">old_callhandlers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
+            <span class="k">finally</span><span class="p">:</span>
+                <span class="c1"># This check is done twice, once also here before we even get</span>
+                <span class="c1"># the integration.  Otherwise we have a high chance of getting</span>
+                <span class="c1"># into a recursion error when the integration is resolved</span>
+                <span class="c1"># (this also is slower).</span>
+                <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span><span class="p">:</span>
+                    <span class="n">integration</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_integration</span><span class="p">(</span><span class="n">LoggingIntegration</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">integration</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">integration</span><span class="o">.</span><span class="n">_handle_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+        <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">callHandlers</span> <span class="o">=</span> <span class="n">sentry_patched_callhandlers</span>  <span class="c1"># type: ignore</span>
+
+
+<span class="k">def</span> <span class="nf">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+    <span class="c1"># type: (LogRecord) -&gt; bool</span>
+    <span class="k">return</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span>
+
+
+<span class="k">def</span> <span class="nf">_breadcrumb_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+    <span class="c1"># type: (LogRecord) -&gt; Dict[str, Any]</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;ty&quot;</span><span class="p">:</span> <span class="s2">&quot;log&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">),</span>
+        <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+        <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">message</span><span class="p">,</span>
+        <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcfromtimestamp</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">created</span><span class="p">),</span>
+        <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="n">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span> <span class="nf">_logging_to_event_level</span><span class="p">(</span><span class="n">levelname</span><span class="p">):</span>
+    <span class="c1"># type: (str) -&gt; str</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;critical&quot;</span><span class="p">:</span> <span class="s2">&quot;fatal&quot;</span><span class="p">}</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">levelname</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="n">levelname</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
+
+
+<span class="n">COMMON_RECORD_ATTRS</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
+    <span class="p">(</span>
+        <span class="s2">&quot;args&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;created&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;exc_info&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;exc_text&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;filename&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;funcName&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;levelname&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;levelno&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;linenno&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;lineno&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;message&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;module&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;msecs&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;msg&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;name&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;pathname&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;process&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;processName&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;relativeCreated&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;stack&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;tags&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;thread&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;threadName&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+    <span class="c1"># type: (LogRecord) -&gt; Dict[str, None]</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="n">k</span><span class="p">:</span> <span class="n">v</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="nb">vars</span><span class="p">(</span><span class="n">record</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">COMMON_RECORD_ATTRS</span>
+        <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">))</span>
+    <span class="p">}</span>
+
+
+<div class="viewcode-block" id="EventHandler"><a class="viewcode-back" href="../../../integrations.html#sentry_sdk.integrations.logging.EventHandler">[docs]</a><span class="k">class</span> <span class="nc">EventHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">,</span> <span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A logging handler that emits Sentry events for each log record</span>
+
+<span class="sd">    Note that you do not have to use this class if the logging integration is enabled, which it is by default.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (LogRecord) -&gt; Any</span>
+        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (LogRecord) -&gt; None</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+            <span class="k">return</span>
+
+        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+        <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="n">client_options</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span>
+
+        <span class="c1"># exc_info might be None or (None, None, None)</span>
+        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
+                <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">,</span>
+                <span class="n">client_options</span><span class="o">=</span><span class="n">client_options</span><span class="p">,</span>
+                <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;logging&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">hint</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;values&quot;</span><span class="p">:</span> <span class="p">[</span>
+                        <span class="p">{</span>
+                            <span class="s2">&quot;stacktrace&quot;</span><span class="p">:</span> <span class="n">current_stacktrace</span><span class="p">(</span>
+                                <span class="n">client_options</span><span class="p">[</span><span class="s2">&quot;with_locals&quot;</span><span class="p">]</span>
+                            <span class="p">),</span>
+                            <span class="s2">&quot;crashed&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+                            <span class="s2">&quot;current&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                        <span class="p">}</span>
+                    <span class="p">]</span>
+                <span class="p">}</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">hint</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="n">hint</span><span class="p">[</span><span class="s2">&quot;log_record&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span>
+
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">)</span>
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logentry&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">to_string</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="p">),</span> <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">}</span>
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;extra&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+        <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span></div>
+
+
+<span class="c1"># Legacy name</span>
+<span class="n">SentryHandler</span> <span class="o">=</span> <span class="n">EventHandler</span>
+
+
+<div class="viewcode-block" id="BreadcrumbHandler"><a class="viewcode-back" href="../../../integrations.html#sentry_sdk.integrations.logging.BreadcrumbHandler">[docs]</a><span class="k">class</span> <span class="nc">BreadcrumbHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">,</span> <span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A logging handler that records breadcrumbs for each log record.</span>
+
+<span class="sd">    Note that you do not have to use this class if the logging integration is enabled, which it is by default.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (LogRecord) -&gt; Any</span>
+        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+        <span class="c1"># type: (LogRecord) -&gt; None</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+            <span class="k">return</span>
+
+        <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span>
+            <span class="n">_breadcrumb_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;log_record&quot;</span><span class="p">:</span> <span class="n">record</span><span class="p">}</span>
+        <span class="p">)</span></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">sentry-python</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">Main API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../integrations.html">Integrations</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Sentry Team and Contributors.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.0+/296b1bf</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
