@@ -54,6 +54,11 @@ apidocs: .venv
 	@$(VENV_PATH)/bin/sphinx-build -W -b html docs/ docs/_build
 .PHONY: apidocs
 
+apidocs-hotfix: apidocs
+	@$(VENV_PATH)/bin/pip install ghp-import
+	@$(VENV_PATH)/bin/ghp-import -pf docs/_build
+.PHONY: apidocs-hotfix
+
 install-zeus-cli:
 	npm install -g @zeus-ci/cli
 .PHONY: install-zeus-cli
