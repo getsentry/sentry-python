@@ -402,7 +402,7 @@ def _maybe_create_breadcrumbs_from_span(hub, span):
             type="http",
             category="httplib",
             data=span._data,
-            hint={"httplib_response": span._data.get("httplib_response")},
+            hint={"httplib_response": span._data.pop("httplib_response", None)},
         )
     elif span.op == "subprocess":
         hub.add_breadcrumb(
@@ -410,5 +410,5 @@ def _maybe_create_breadcrumbs_from_span(hub, span):
             category="subprocess",
             message=span.description,
             data=span._data,
-            hint={"popen_instance": span._data.get("popen_instance")},
+            hint={"popen_instance": span._data.pop("popen_instance", None)},
         )
