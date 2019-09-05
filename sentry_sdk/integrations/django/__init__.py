@@ -9,6 +9,7 @@ from django import VERSION as DJANGO_VERSION  # type: ignore
 from django.core import signals  # type: ignore
 
 from sentry_sdk._types import MYPY
+from sentry_sdk.utils import HAS_REAL_CONTEXTVARS
 
 if MYPY:
     from typing import Any
@@ -98,9 +99,9 @@ class DjangoIntegration(Integration):
             if Hub.current.get_integration(DjangoIntegration) is None:
                 return old_app(self, environ, start_response)
 
-            return SentryWsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))(
-                environ, start_response
-            )
+            bound_old_app = old_app.__get__(self, WSGIHandler)
+
+            return SentryWsgiMiddleware(bound_old_app)(environ, start_response)
 
         WSGIHandler.__call__ = sentry_patched_wsgi_handler
 
@@ -208,6 +209,8 @@ class DjangoIntegration(Integration):
                 id(value),
             )
 
+        _patch_channels()
+
 
 _DRF_PATCHED = False
 _DRF_PATCH_LOCK = threading.Lock()
@@ -264,6 +267,38 @@ def _patch_drf():
                     return old_drf_initial(self, request, *args, **kwargs)
 
                 APIView.initial = sentry_patched_drf_initial
+
+
+def _patch_channels():
+    try:
+        from channels.http import AsgiHandler  # type: ignore
+    except ImportError:
+        return
+
+    if not HAS_REAL_CONTEXTVARS:
+        # We better have contextvars or we're going to leak state between
+        # requests.
+        raise RuntimeError(
+            "We detected that you are using Django channels 2.0. To get proper "
+            "instrumentation for ASGI requests, the Sentry SDK requires "
+            "Python 3.7+ or the aiocontextvars package from PyPI."
+        )
+
+    from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+
+    old_app = AsgiHandler.__call__
+
+    def sentry_patched_asgi_handler(self, receive, send):
+        if Hub.current.get_integration(DjangoIntegration) is None:
+            return old_app(receive, send)
+
+        middleware = SentryAsgiMiddleware(
+            lambda _scope: old_app.__get__(self, AsgiHandler)
+        )
+
+        return middleware(self.scope)(receive, send)
+
+    AsgiHandler.__call__ = sentry_patched_asgi_handler
 
 
 def _make_event_processor(weak_request, integration):

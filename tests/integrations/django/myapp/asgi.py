@@ -12,8 +12,4 @@ os.environ.setdefault(
 )
 
 django.setup()
-
-from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-
 application = get_default_application()
-application = SentryAsgiMiddleware(application)

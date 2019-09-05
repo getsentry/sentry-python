@@ -3,6 +3,7 @@ import pytest
 
 from channels.testing import HttpCommunicator
 
+from sentry_sdk import capture_message
 from sentry_sdk.integrations.django import DjangoIntegration
 
 from tests.integrations.django.myapp.asgi import application
@@ -32,3 +33,7 @@ async def test_basic(sentry_init, capture_events):
         "query_string": "test=query",
         "url": "/view-exc",
     }
+
+    capture_message("hi")
+    event = events[-1]
+    assert "request" not in event
