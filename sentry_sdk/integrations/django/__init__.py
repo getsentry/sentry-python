@@ -48,6 +48,7 @@ from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
 from sentry_sdk.integrations.django.templates import get_template_frame_from_exception
+from sentry_sdk.integrations.django.middleware import patch_django_middlewares
 
 
 if DJANGO_VERSION < (1, 10):
@@ -68,9 +69,10 @@ class DjangoIntegration(Integration):
     identifier = "django"
 
     transaction_style = None
+    middleware_spans = None
 
-    def __init__(self, transaction_style="url"):
-        # type: (str) -> None
+    def __init__(self, transaction_style="url", middleware_spans=True):
+        # type: (str, bool) -> None
         TRANSACTION_STYLE_VALUES = ("function_name", "url")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
@@ -78,6 +80,7 @@ class DjangoIntegration(Integration):
                 % (transaction_style, TRANSACTION_STYLE_VALUES)
             )
         self.transaction_style = transaction_style
+        self.middleware_spans = middleware_spans
 
     @staticmethod
     def setup_once():
@@ -207,6 +210,8 @@ class DjangoIntegration(Integration):
                 value.__module__,
                 id(value),
             )
+
+        patch_django_middlewares()
 
 
 _DRF_PATCHED = False
