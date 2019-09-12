@@ -4,6 +4,10 @@
 install -e .` into some virtualenv, edit the sourcecode and test out your
 changes manually.
 
+## Community
+
+The public-facing channels for support and development of Sentry SDKs can be found on [Discord](https://discord.gg/Ww9hbqr).
+
 ## Running tests and linters
 
 Make sure you have `virtualenv` installed, and the Python versions you care

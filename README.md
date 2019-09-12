@@ -8,6 +8,7 @@
 
 [![Build Status](https://travis-ci.com/getsentry/sentry-python.svg?branch=master)](https://travis-ci.com/getsentry/sentry-python)
 [![PyPi page link -- version](https://img.shields.io/pypi/v/sentry-sdk.svg)](https://pypi.python.org/pypi/sentry-sdk)
+[![Discord](https://img.shields.io/discord/621778831602221064)](https://discord.gg/Ww9hbqr)
 
 This is the next line of the Python SDK for [Sentry](http://sentry.io/), intended to replace the `raven` package on PyPI.
 
