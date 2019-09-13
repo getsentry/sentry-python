@@ -1,5 +1,7 @@
 from functools import wraps
 
+from django import VERSION as DJANGO_VERSION  # type: ignore
+
 from sentry_sdk import Hub
 from sentry_sdk.utils import ContextVar, transaction_from_function
 
@@ -7,11 +9,16 @@ _import_string_should_wrap_middleware = ContextVar(
     "import_string_should_wrap_middleware"
 )
 
+if DJANGO_VERSION < (1, 7):
+    import_string_name = "import_by_path"
+else:
+    import_string_name = "import_string"
+
 
 def patch_django_middlewares():
     from django.core.handlers import base
 
-    old_import_string = base.import_string
+    old_import_string = getattr(base, import_string_name)
 
     def sentry_patched_import_string(dotted_path):
         rv = old_import_string(dotted_path)
@@ -21,7 +28,7 @@ def patch_django_middlewares():
 
         return rv
 
-    base.import_string = sentry_patched_import_string
+    setattr(base, import_string_name, sentry_patched_import_string)
 
     old_load_middleware = base.BaseHandler.load_middleware
 
