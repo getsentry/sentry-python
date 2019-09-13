@@ -197,7 +197,7 @@ def _install_subprocess():
         hub = Hub.current
 
         if hub.get_integration(StdlibIntegration) is None:
-            return old_popen_communicate(self, *a, **kw)
+            return old_popen_wait(self, *a, **kw)
 
         with hub.start_span(op="subprocess.wait") as span:
             span.set_tag("subprocess.pid", self.pid)
