@@ -137,14 +137,38 @@ def test_subprocess_basic(
 
     assert transaction_event["type"] == "transaction"
 
-    subprocess_span, = transaction_event["spans"]
+    subprocess_init_span, subprocess_wait_span, subprocess_communicate_span = transaction_event[
+        "spans"
+    ]
 
-    assert subprocess_span["data"] == data
+    assert subprocess_init_span["op"] == "subprocess"
+    assert subprocess_communicate_span["op"] == "subprocess.communicate"
+    assert subprocess_wait_span["op"] == "subprocess.wait"
+
+    # span hierarchy
+    assert (
+        subprocess_wait_span["parent_span_id"] == subprocess_communicate_span["span_id"]
+    )
+    assert (
+        subprocess_communicate_span["parent_span_id"]
+        == subprocess_init_span["parent_span_id"]
+        == transaction_event["contexts"]["trace"]["span_id"]
+    )
+
+    # common data
+    assert (
+        subprocess_init_span["tags"]["subprocess.pid"]
+        == subprocess_wait_span["tags"]["subprocess.pid"]
+        == subprocess_communicate_span["tags"]["subprocess.pid"]
+    )
+
+    # data of init span
+    assert subprocess_init_span["data"] == data
     if iterator:
-        assert "iterator" in subprocess_span["description"]
-        assert subprocess_span["description"].startswith("<")
+        assert "iterator" in subprocess_init_span["description"]
+        assert subprocess_init_span["description"].startswith("<")
     else:
-        assert sys.executable + " -c" in subprocess_span["description"]
+        assert sys.executable + " -c" in subprocess_init_span["description"]
 
 
 def test_subprocess_invalid_args(sentry_init):

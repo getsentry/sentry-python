@@ -184,9 +184,40 @@ def _install_subprocess():
         with hub.start_span(op="subprocess", description=description) as span:
             span.set_data("subprocess.cwd", cwd)
 
-            return old_popen_init(self, *a, **kw)
+            rv = old_popen_init(self, *a, **kw)
+
+            span.set_tag("subprocess.pid", self.pid)
+            return rv
 
     subprocess.Popen.__init__ = sentry_patched_popen_init  # type: ignore
+
+    old_popen_wait = subprocess.Popen.wait
+
+    def sentry_patched_popen_wait(self, *a, **kw):
+        hub = Hub.current
+
+        if hub.get_integration(StdlibIntegration) is None:
+            return old_popen_wait(self, *a, **kw)
+
+        with hub.start_span(op="subprocess.wait") as span:
+            span.set_tag("subprocess.pid", self.pid)
+            return old_popen_wait(self, *a, **kw)
+
+    subprocess.Popen.wait = sentry_patched_popen_wait  # type: ignore
+
+    old_popen_communicate = subprocess.Popen.communicate
+
+    def sentry_patched_popen_communicate(self, *a, **kw):
+        hub = Hub.current
+
+        if hub.get_integration(StdlibIntegration) is None:
+            return old_popen_communicate(self, *a, **kw)
+
+        with hub.start_span(op="subprocess.communicate") as span:
+            span.set_tag("subprocess.pid", self.pid)
+            return old_popen_communicate(self, *a, **kw)
+
+    subprocess.Popen.communicate = sentry_patched_popen_communicate  # type: ignore
 
 
 def get_subprocess_traceparent_headers():
