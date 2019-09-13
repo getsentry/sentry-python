@@ -203,7 +203,7 @@ def _install_subprocess():
             span.set_tag("subprocess.pid", self.pid)
             return old_popen_wait(self, *a, **kw)
 
-    subprocess.Popen.wait = sentry_patched_popen_wait
+    subprocess.Popen.wait = sentry_patched_popen_wait  # type: ignore
 
     old_popen_communicate = subprocess.Popen.communicate
 
