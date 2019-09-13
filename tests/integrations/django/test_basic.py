@@ -2,6 +2,7 @@ import pytest
 import json
 
 from werkzeug.test import Client
+from django import VERSION as DJANGO_VERSION
 from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError, ProgrammingError, DataError
@@ -495,3 +496,49 @@ def test_does_not_capture_403(sentry_init, client, capture_events, endpoint):
     assert status.lower() == "403 forbidden"
 
     assert not events
+
+
+def test_middleware_spans(sentry_init, client, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    _content, status, _headers = client.get(reverse("message"))
+
+    message, transaction = events
+
+    assert message["message"] == "hi"
+
+    for middleware in transaction["spans"]:
+        assert middleware["op"] == "django.middleware"
+
+    if DJANGO_VERSION >= (1, 10):
+        reference_value = [
+            "tests.integrations.django.myapp.settings.TestMiddleware.__call__",
+            "django.contrib.auth.middleware.AuthenticationMiddleware.__call__",
+            "django.contrib.sessions.middleware.SessionMiddleware.__call__",
+        ]
+    else:
+        reference_value = [
+            "django.contrib.sessions.middleware.SessionMiddleware.process_request",
+            "django.contrib.auth.middleware.AuthenticationMiddleware.process_request",
+            "tests.integrations.django.myapp.settings.TestMiddleware.process_request",
+            "tests.integrations.django.myapp.settings.TestMiddleware.process_response",
+            "django.contrib.sessions.middleware.SessionMiddleware.process_response",
+        ]
+
+    assert [t["description"] for t in transaction["spans"]] == reference_value
+
+
+def test_middleware_spans_disabled(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration(middleware_spans=False)], traces_sample_rate=1.0
+    )
+    events = capture_events()
+
+    _content, status, _headers = client.get(reverse("message"))
+
+    message, transaction = events
+
+    assert message["message"] == "hi"
+
+    assert not transaction["spans"]
