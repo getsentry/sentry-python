@@ -198,7 +198,7 @@ class Scope(object):
         if len(self._event_processors) > 20:
             logger.warning(
                 "Too many event processors on scope! Clearing list to free up some memory: %r",
-                self._event_processors
+                self._event_processors,
             )
             del self._event_processors[:]
 

@@ -79,7 +79,15 @@ def _wrap_inspect_call(cls, func_name):
             process_func = getattr(self, func_name)
             setattr(self, func_name, _wrap_task_call(process_func))
             setattr(self, wrapped_func, process_func)
-        return getfullargspec(process_func)
+
+        # getfullargspec is deprecated in more recent beam versions and get_function_args_defaults
+        # (which uses Signatures internally) should be used instead.
+        try:
+            from apache_beam.transforms.core import get_function_args_defaults
+
+            return get_function_args_defaults(process_func)
+        except ImportError:
+            return getfullargspec(process_func)
 
     setattr(_inspect, USED_FUNC, True)
     return _inspect
