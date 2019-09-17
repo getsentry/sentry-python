@@ -10,10 +10,27 @@ import urllib
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk.utils import transaction_from_function
+from sentry_sdk.utils import ContextVar, event_from_exception, transaction_from_function
 
 if MYPY:
     from typing import Dict
+    from typing import Any
+
+
+_asgi_middleware_applied = ContextVar("sentry_asgi_middleware_applied")
+
+
+def _capture_exception(hub, exc):
+    # type: (Hub, Any) -> None
+
+    # Check client here as it might have been unset while streaming response
+    if hub.client is not None:
+        event, hint = event_from_exception(
+            exc,
+            client_options=hub.client.options,
+            mechanism={"type": "asgi", "handled": False},
+        )
+        hub.capture_event(event, hint=hint)
 
 
 class SentryAsgiMiddleware:
@@ -35,20 +52,31 @@ class SentryAsgiMiddleware:
             return self._run_app(scope, lambda: self.app(scope, receive, send))
 
     async def _run_app(self, scope, callback):
-        hub = Hub.current
-        with Hub(hub) as hub:
-            with hub.configure_scope() as sentry_scope:
-                sentry_scope._name = "asgi"
-                sentry_scope.transaction = scope.get("path") or "unknown asgi request"
+        if _asgi_middleware_applied.get(False):
+            return await callback()
 
-                processor = functools.partial(self.event_processor, asgi_scope=scope)
-                sentry_scope.add_event_processor(processor)
+        _asgi_middleware_applied.set(True)
+        try:
+            hub = Hub(Hub.current)
+            with hub:
+                with hub.configure_scope() as sentry_scope:
+                    sentry_scope._name = "asgi"
+                    sentry_scope.transaction = (
+                        scope.get("path") or "unknown asgi request"
+                    )
 
-            try:
-                await callback()
-            except Exception as exc:
-                hub.capture_exception(exc)
-                raise exc from None
+                    processor = functools.partial(
+                        self.event_processor, asgi_scope=scope
+                    )
+                    sentry_scope.add_event_processor(processor)
+
+                try:
+                    await callback()
+                except Exception as exc:
+                    _capture_exception(hub, exc)
+                    raise exc from None
+        finally:
+            _asgi_middleware_applied.set(False)
 
     def event_processor(self, event, hint, asgi_scope):
         request_info = event.setdefault("request", {})

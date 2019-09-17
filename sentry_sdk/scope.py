@@ -195,6 +195,13 @@ class Scope(object):
 
         :param func: This function behaves like `before_send.`
         """
+        if len(self._event_processors) > 20:
+            logger.warning(
+                "Too many event processors on scope! Clearing list to free up some memory: %r",
+                self._event_processors,
+            )
+            del self._event_processors[:]
+
         self._event_processors.append(func)
 
     def add_error_processor(

@@ -2,7 +2,11 @@ import functools
 import sys
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
+from sentry_sdk.utils import (
+    ContextVar,
+    capture_internal_exceptions,
+    event_from_exception,
+)
 from sentry_sdk._compat import PY2, reraise, iteritems
 from sentry_sdk.tracing import Span
 from sentry_sdk.integrations._wsgi_common import _filter_headers
@@ -24,6 +28,9 @@ if MYPY:
     T = TypeVar("T")
     U = TypeVar("U")
     E = TypeVar("E")
+
+
+_wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
 
 
 if PY2:
@@ -83,27 +90,36 @@ class SentryWsgiMiddleware(object):
 
     def __call__(self, environ, start_response):
         # type: (Dict[str, str], Callable) -> _ScopedResponse
-        hub = Hub(Hub.current)
+        if _wsgi_middleware_applied.get(False):
+            return self.app(environ, start_response)
 
-        with hub:
-            with capture_internal_exceptions():
-                with hub.configure_scope() as scope:
-                    scope.clear_breadcrumbs()
-                    scope._name = "wsgi"
-                    scope.add_event_processor(_make_wsgi_event_processor(environ))
+        _wsgi_middleware_applied.set(True)
+        try:
+            hub = Hub(Hub.current)
 
-            span = Span.continue_from_environ(environ)
-            span.op = "http.server"
-            span.transaction = "generic WSGI request"
+            with hub:
+                with capture_internal_exceptions():
+                    with hub.configure_scope() as scope:
+                        scope.clear_breadcrumbs()
+                        scope._name = "wsgi"
+                        scope.add_event_processor(_make_wsgi_event_processor(environ))
 
-            with hub.start_span(span) as span:
-                try:
-                    rv = self.app(
-                        environ,
-                        functools.partial(_sentry_start_response, start_response, span),
-                    )
-                except BaseException:
-                    reraise(*_capture_exception(hub))
+                span = Span.continue_from_environ(environ)
+                span.op = "http.server"
+                span.transaction = "generic WSGI request"
+
+                with hub.start_span(span) as span:
+                    try:
+                        rv = self.app(
+                            environ,
+                            functools.partial(
+                                _sentry_start_response, start_response, span
+                            ),
+                        )
+                    except BaseException:
+                        reraise(*_capture_exception(hub))
+        finally:
+            _wsgi_middleware_applied.set(False)
 
         return _ScopedResponse(hub, rv)
 
