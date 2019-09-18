@@ -27,6 +27,15 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.12.0
+
+* Sentry now has a [Discord server](https://discord.gg/cWnMQeA)! Join the server to get involved into SDK development and ask questions.
+* Fix a bug where the response object for httplib (or requests) was held onto for an unnecessarily long amount of time.
+* APM: Add spans for more methods on `subprocess.Popen` objects.
+* APM: Add spans for Django middlewares.
+* APM: Add spans for ASGI requests.
+* Automatically inject the ASGI middleware for Django Channels 2.0. This will **break your Channels 2.0 application if it is running on Python 3.5 or 3.6** (while previously it would "only" leak a lot of memory for each ASGI request). **Install `aiocontextvars` from PyPI to make it work again.**
+
 ## 0.11.2
 
 * Fix a bug where the SDK would throw an exception on shutdown when running under eventlet.
