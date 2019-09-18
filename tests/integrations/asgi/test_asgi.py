@@ -46,7 +46,7 @@ def test_sync_request_data(sentry_init, app, capture_events):
         "connection",
         "host",
         "user-agent",
-        "foo"
+        "foo",
     }
     assert event["request"]["query_string"] == "foo=bar"
     assert event["request"]["url"].endswith("/sync-message")

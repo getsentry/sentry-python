@@ -68,7 +68,7 @@ class SentryAsgiMiddleware:
                     )
                     sentry_scope.add_event_processor(processor)
 
-                span = Span.continue_from_headers(dict(scope['headers']))
+                span = Span.continue_from_headers(dict(scope["headers"]))
                 span.op = "http.server"
                 span.transaction = "generic ASGI request"
 
