@@ -4,6 +4,7 @@ from functools import wraps
 
 from sentry_sdk import configure_scope
 from sentry_sdk.integrations import Integration
+from sentry_sdk.utils import logger
 
 SCOPE_TAGS = frozenset(("startTime"))
 
@@ -13,6 +14,7 @@ class SparkIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+        patch_pyspark_java_gateway()
         patch_spark_context()
 
 def patch_spark_context():
@@ -33,3 +35,17 @@ def patch_spark_context():
                 scope.set_extra("web_url", self.uiWebUrl)
 
     SparkContext._do_init = _sentry_patched_spark_context_init
+
+
+def patch_pyspark_java_gateway():
+    from pyspark.java_gateway import launch_gateway
+
+    old_launch_gateway = launch_gateway
+
+    def _sentry_patched_launch_gateway(self, *args, **kwargs):
+
+        gateway = old_launch_gateway(self, *args, **kwargs)
+        logger.error(dir(gateway))
+        return gateway
+
+    launch_gateway = _sentry_patched_launch_gateway
