@@ -191,7 +191,7 @@ class Span(object):
         if traceparent.startswith("00-") and traceparent.endswith("-00"):
             traceparent = traceparent[3:-3]
 
-        match = _traceparent_header_format_re.match(traceparent)
+        match = _traceparent_header_format_re.match(str(traceparent))
         if match is None:
             return None
 

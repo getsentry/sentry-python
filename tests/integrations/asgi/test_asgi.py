@@ -33,7 +33,7 @@ def test_sync_request_data(sentry_init, app, capture_events):
     events = capture_events()
 
     client = TestClient(app)
-    response = client.get("/sync-message?foo=bar")
+    response = client.get("/sync-message?foo=bar", headers={"Foo": u"ä"})
 
     assert response.status_code == 200
 
@@ -46,6 +46,7 @@ def test_sync_request_data(sentry_init, app, capture_events):
         "connection",
         "host",
         "user-agent",
+        "foo",
     }
     assert event["request"]["query_string"] == "foo=bar"
     assert event["request"]["url"].endswith("/sync-message")

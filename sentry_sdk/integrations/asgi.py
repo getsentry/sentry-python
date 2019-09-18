@@ -11,6 +11,7 @@ from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.utils import ContextVar, event_from_exception, transaction_from_function
+from sentry_sdk.tracing import Span
 
 if MYPY:
     from typing import Dict
@@ -60,21 +61,23 @@ class SentryAsgiMiddleware:
             hub = Hub(Hub.current)
             with hub:
                 with hub.configure_scope() as sentry_scope:
+                    sentry_scope.clear_breadcrumbs()
                     sentry_scope._name = "asgi"
-                    sentry_scope.transaction = (
-                        scope.get("path") or "unknown asgi request"
-                    )
-
                     processor = functools.partial(
                         self.event_processor, asgi_scope=scope
                     )
                     sentry_scope.add_event_processor(processor)
 
-                try:
-                    await callback()
-                except Exception as exc:
-                    _capture_exception(hub, exc)
-                    raise exc from None
+                span = Span.continue_from_headers(dict(scope["headers"]))
+                span.op = "http.server"
+                span.transaction = "generic ASGI request"
+
+                with hub.start_span(span) as span:
+                    try:
+                        return await callback()
+                    except Exception as exc:
+                        _capture_exception(hub, exc)
+                        raise exc from None
         finally:
             _asgi_middleware_applied.set(False)
 
