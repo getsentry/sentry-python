@@ -2,6 +2,7 @@ import re
 import uuid
 import contextlib
 
+from collections import deque
 from datetime import datetime
 
 import sentry_sdk
@@ -23,6 +24,7 @@ if MYPY:
     from typing import Dict
     from typing import List
     from typing import Tuple
+    from typing import Deque
 
 _traceparent_header_format_re = re.compile(
     "^[ \t]*"  # whitespace
@@ -107,16 +109,16 @@ class Span(object):
         self.hub = hub
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
-        self._finished_spans = None  # type: Optional[List[Span]]
+        self._finished_spans = None  # type: Optional[Deque[Span]]
         self.start_timestamp = datetime.now()
 
         #: End timestamp of span
         self.timestamp = None  # type: Optional[datetime]
 
-    def init_finished_spans(self):
+    def init_finished_spans(self, maxlen):
         # type: () -> None
         if self._finished_spans is None:
-            self._finished_spans = []
+            self._finished_spans = deque(maxlen=maxlen)
 
     def __repr__(self):
         # type: () -> str
@@ -354,15 +356,10 @@ def record_sql_queries(
     executemany,  # type: bool
 ):
     # type: (...) -> Generator[Span, None, None]
-    if not params_list or params_list == [None]:
-        params_list = None
-
-    if paramstyle == "pyformat":
-        paramstyle = "format"
-
+    # TODO: Bring back capturing of params
     query = _format_sql(cursor, query)
 
-    data = {"db.params": params_list, "db.paramstyle": paramstyle}
+    data = {}
     if executemany:
         data["db.executemany"] = True
 
