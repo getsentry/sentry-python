@@ -19,8 +19,21 @@ class SparkIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        # patch_pyspark_java_gateway()
+        patch_spark_worker()
         patch_spark_context()
+
+
+def patch_spark_worker():
+    from pyspark.worker import main
+
+    old_main = main
+
+    def _sentry_patched_worker_main(*args, **kwargs):
+        try:
+            old_main(*args, **kwargs)
+        except Exception as e:
+            capture_exception(e)
+    main = _sentry_patched_worker_main
 
 def patch_spark_context():
     from pyspark import SparkContext # type: ignore
@@ -48,7 +61,7 @@ def patch_spark_context():
             scope.set_extra("web_url", self.uiWebUrl)
 
     
-    def _sentry_patched_spark_context_
+    #def _sentry_patched_spark_context_
 
     # try:
     SparkContext._do_init = _sentry_patched_spark_context_init
