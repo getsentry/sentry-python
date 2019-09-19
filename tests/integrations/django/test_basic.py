@@ -170,7 +170,9 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
     sentry_init(
         integrations=[DjangoIntegration()] if with_integration else [],
         send_default_pii=True,
+        _experiments={"record_sql_params": True},
     )
+
     from django.db import connection
 
     sql = connection.cursor()
@@ -188,11 +190,16 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
         crumb = event["breadcrumbs"][-1]
 
         assert crumb["message"] == "SELECT count(*) FROM people_person WHERE foo = %s"
+        assert crumb["data"]["db.params"] == [123]
 
 
 @pytest.mark.django_db
 def test_sql_dict_query_params(sentry_init, capture_events):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        _experiments={"record_sql_params": True},
+    )
 
     from django.db import connections
 
@@ -215,6 +222,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     assert crumb["message"] == (
         "SELECT count(*) FROM people_person WHERE foo = %(my_foo)s"
     )
+    assert crumb["data"]["db.params"] == {"my_foo": 10}
 
 
 @pytest.mark.parametrize(
@@ -228,7 +236,11 @@ def test_sql_dict_query_params(sentry_init, capture_events):
 )
 @pytest.mark.django_db
 def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        _experiments={"record_sql_params": True},
+    )
     from django.db import connections
 
     if "postgres" not in connections:
@@ -247,11 +259,16 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     event, = events
     crumb = event["breadcrumbs"][-1]
     assert crumb["message"] == ('SELECT %(my_param)s FROM "foobar"')
+    assert crumb["data"]["db.params"] == {"my_param": 10}
 
 
 @pytest.mark.django_db
 def test_sql_psycopg2_placeholders(sentry_init, capture_events):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        _experiments={"record_sql_params": True},
+    )
     from django.db import connections
 
     if "postgres" not in connections:
@@ -285,13 +302,16 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     assert event["breadcrumbs"][-2:] == [
         {
             "category": "query",
-            "data": {},
+            "data": {"db.paramstyle": "format"},
             "message": "create table my_test_table (foo text, bar date)",
             "type": "default",
         },
         {
             "category": "query",
-            "data": {},
+            "data": {
+                "db.params": {"first_var": "fizz", "second_var": "not a date"},
+                "db.paramstyle": "format",
+            },
             "message": 'insert into my_test_table ("foo", "bar") values (%(first_var)s, '
             "%(second_var)s)",
             "type": "default",
@@ -493,7 +513,11 @@ def test_does_not_capture_403(sentry_init, client, capture_events, endpoint):
 
 
 def test_middleware_spans(sentry_init, client, capture_events):
-    sentry_init(integrations=[DjangoIntegration()], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"record_sql_params": True},
+    )
     events = capture_events()
 
     _content, status, _headers = client.get(reverse("message"))

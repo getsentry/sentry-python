@@ -386,10 +386,23 @@ def record_sql_queries(
     executemany,  # type: bool
 ):
     # type: (...) -> Generator[Span, None, None]
-    # TODO: Bring back capturing of params
+
+    # TODO: Bring back capturing of params by default
+    if hub.client and hub.client.options["_experiments"].get(
+        "record_sql_params", False
+    ):
+        if not params_list or params_list == [None]:
+            params_list = None
+
+        if paramstyle == "pyformat":
+            paramstyle = "format"
+    else:
+        params_list = None
+        paramstyle = None
+
     query = _format_sql(cursor, query)
 
-    data = {}
+    data = {"db.params": params_list, "db.paramstyle": paramstyle}
     if executemany:
         data["db.executemany"] = True
 

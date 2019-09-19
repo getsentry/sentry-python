@@ -8,7 +8,9 @@ from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 
 def test_orm_queries(sentry_init, capture_events):
-    sentry_init(integrations=[SqlalchemyIntegration()])
+    sentry_init(
+        integrations=[SqlalchemyIntegration()], _experiments={"record_sql_params": True}
+    )
     events = capture_events()
 
     Base = declarative_base()
@@ -48,13 +50,13 @@ def test_orm_queries(sentry_init, capture_events):
     assert event["breadcrumbs"][-2:] == [
         {
             "category": "query",
-            "data": {},
+            "data": {"db.params": ["Bob"], "db.paramstyle": "qmark"},
             "message": "INSERT INTO person (name) VALUES (?)",
             "type": "default",
         },
         {
             "category": "query",
-            "data": {},
+            "data": {"db.params": [1, 0], "db.paramstyle": "qmark"},
             "message": "SELECT person.id AS person_id, person.name AS person_name \n"
             "FROM person\n"
             " LIMIT ? OFFSET ?",
