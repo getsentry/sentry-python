@@ -8,7 +8,9 @@ from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 
 def test_orm_queries(sentry_init, capture_events):
-    sentry_init(integrations=[SqlalchemyIntegration()])
+    sentry_init(
+        integrations=[SqlalchemyIntegration()], _experiments={"record_sql_params": True}
+    )
     events = capture_events()
 
     Base = declarative_base()

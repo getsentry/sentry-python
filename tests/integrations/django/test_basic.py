@@ -170,7 +170,9 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
     sentry_init(
         integrations=[DjangoIntegration()] if with_integration else [],
         send_default_pii=True,
+        _experiments={"record_sql_params": True},
     )
+
     from django.db import connection
 
     sql = connection.cursor()
@@ -193,7 +195,11 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
 
 @pytest.mark.django_db
 def test_sql_dict_query_params(sentry_init, capture_events):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        _experiments={"record_sql_params": True},
+    )
 
     from django.db import connections
 
@@ -230,7 +236,11 @@ def test_sql_dict_query_params(sentry_init, capture_events):
 )
 @pytest.mark.django_db
 def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        _experiments={"record_sql_params": True},
+    )
     from django.db import connections
 
     if "postgres" not in connections:
@@ -254,7 +264,11 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
 
 @pytest.mark.django_db
 def test_sql_psycopg2_placeholders(sentry_init, capture_events):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        _experiments={"record_sql_params": True},
+    )
     from django.db import connections
 
     if "postgres" not in connections:
@@ -499,7 +513,11 @@ def test_does_not_capture_403(sentry_init, client, capture_events, endpoint):
 
 
 def test_middleware_spans(sentry_init, client, capture_events):
-    sentry_init(integrations=[DjangoIntegration()], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"record_sql_params": True},
+    )
     events = capture_events()
 
     _content, status, _headers = client.get(reverse("message"))

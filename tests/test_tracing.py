@@ -127,3 +127,18 @@ def test_memory_usage(sentry_init, capture_events, args, expected_refcount):
         gc.collect()
 
         assert len(references) == expected_refcount
+
+
+def test_span_trimming(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0, _experiments={"max_spans": 3})
+    events = capture_events()
+
+    with Hub.current.start_span(transaction="hi"):
+        for i in range(10):
+            with Hub.current.start_span(op="foo{}".format(i)):
+                pass
+
+    event, = events
+    span1, span2 = event["spans"]
+    assert span1["op"] == "foo0"
+    assert span2["op"] == "foo1"

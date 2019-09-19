@@ -64,6 +64,31 @@ class EnvironHeaders(Mapping):  # type: ignore
             yield k[len(self.prefix) :]
 
 
+class _SpanRecorder(object):
+    __slots__ = ("maxlen", "finished_spans", "open_span_count")
+
+    def __init__(self, maxlen):
+        # type: (int) -> None
+        self.maxlen = maxlen
+        self.open_span_count = 0  # type: int
+        self.finished_spans = []  # type: List[Span]
+
+    def start_span(self, span):
+        # type: (Span) -> None
+
+        # This is just so that we don't run out of memory while recording a lot
+        # of spans. At some point we just stop and flush out the start of the
+        # trace tree (i.e. the first n spans with the smallest
+        # start_timestamp).
+        self.open_span_count += 1
+        if self.open_span_count > self.maxlen:
+            span._span_recorder = None
+
+    def finish_span(self, span):
+        # type: (Span) -> None
+        self.finished_spans.append(span)
+
+
 class Span(object):
     __slots__ = (
         "trace_id",
@@ -78,7 +103,7 @@ class Span(object):
         "timestamp",
         "_tags",
         "_data",
-        "_finished_spans",
+        "_span_recorder",
         "hub",
         "_context_manager_state",
     )
@@ -107,16 +132,18 @@ class Span(object):
         self.hub = hub
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
-        self._finished_spans = None  # type: Optional[List[Span]]
         self.start_timestamp = datetime.now()
 
         #: End timestamp of span
         self.timestamp = None  # type: Optional[datetime]
 
-    def init_finished_spans(self):
-        # type: () -> None
-        if self._finished_spans is None:
-            self._finished_spans = []
+        self._span_recorder = None  # type: Optional[_SpanRecorder]
+
+    def init_finished_spans(self, maxlen):
+        # type: (int) -> None
+        if self._span_recorder is None:
+            self._span_recorder = _SpanRecorder(maxlen)
+        self._span_recorder.start_span(self)
 
     def __repr__(self):
         # type: () -> str
@@ -162,7 +189,8 @@ class Span(object):
             sampled=self.sampled,
             **kwargs
         )
-        rv._finished_spans = self._finished_spans
+
+        rv._span_recorder = self._span_recorder
         return rv
 
     @classmethod
@@ -252,10 +280,12 @@ class Span(object):
 
         self.timestamp = datetime.now()
 
-        if self._finished_spans is not None:
-            self._finished_spans.append(self)
-
         _maybe_create_breadcrumbs_from_span(hub, self)
+
+        if self._span_recorder is None:
+            return None
+
+        self._span_recorder.finish_span(self)
 
         if self.transaction is None:
             # If this has no transaction set we assume there's a parent
@@ -285,7 +315,9 @@ class Span(object):
                 "timestamp": self.timestamp,
                 "start_timestamp": self.start_timestamp,
                 "spans": [
-                    s.to_json() for s in (self._finished_spans or ()) if s is not self
+                    s.to_json()
+                    for s in self._span_recorder.finished_spans
+                    if s is not self
                 ],
             }
         )
@@ -354,11 +386,19 @@ def record_sql_queries(
     executemany,  # type: bool
 ):
     # type: (...) -> Generator[Span, None, None]
-    if not params_list or params_list == [None]:
-        params_list = None
 
-    if paramstyle == "pyformat":
-        paramstyle = "format"
+    # TODO: Bring back capturing of params by default
+    if hub.client and hub.client.options["_experiments"].get(
+        "record_sql_params", False
+    ):
+        if not params_list or params_list == [None]:
+            params_list = None
+
+        if paramstyle == "pyformat":
+            paramstyle = "format"
+    else:
+        params_list = None
+        paramstyle = None
 
     query = _format_sql(cursor, query)
 
