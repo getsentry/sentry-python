@@ -23,7 +23,6 @@ if MYPY:
     from typing import Dict
     from typing import List
     from typing import Tuple
-    from typing import Iterator
 
 _traceparent_header_format_re = re.compile(
     "^[ \t]*"  # whitespace
@@ -66,27 +65,28 @@ class EnvironHeaders(Mapping):  # type: ignore
 
 
 class _SpanRecorder(object):
-    __slots__ = ("maxlen", "finished_spans")
+    __slots__ = ("maxlen", "finished_spans", "open_span_count")
 
-    def __init__(self):
-        # type: () -> None
-        self.maxlen = 1000
-        self.finished_spans = None  # type: Optional[List[Span]]
+    def __init__(self, maxlen):
+        # type: (int) -> None
+        self.maxlen = maxlen
+        self.open_span_count = 0  # type: int
+        self.finished_spans = []  # type: List[Span]
 
-    def append(self, span):
+    def start_span(self, span):
         # type: (Span) -> None
-        if self.finished_spans is not None:
-            if len(self.finished_spans) >= self.maxlen:
-                # If the span tree grows too large we decided it's better to
-                # discard all spans instead of trying to apply some expensive
-                # trimming.
-                self.finished_spans = None
-            else:
-                self.finished_spans.append(span)
 
-    def __iter__(self):
-        # type: () -> Iterator[Span]
-        return iter(self.finished_spans or ())
+        # This is just so that we don't run out of memory while recording a lot
+        # of spans. At some point we just stop and flush out the start of the
+        # trace tree (i.e. the first n spans with the smallest
+        # start_timestamp).
+        self.open_span_count += 1
+        if self.open_span_count > self.maxlen:
+            span._span_recorder = None
+
+    def finish_span(self, span):
+        # type: (Span) -> None
+        self.finished_spans.append(span)
 
 
 class Span(object):
@@ -132,18 +132,18 @@ class Span(object):
         self.hub = hub
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
-        self._span_recorder = _SpanRecorder()  # type: _SpanRecorder
         self.start_timestamp = datetime.now()
 
         #: End timestamp of span
         self.timestamp = None  # type: Optional[datetime]
 
+        self._span_recorder = None  # type: Optional[_SpanRecorder]
+
     def init_finished_spans(self, maxlen):
         # type: (int) -> None
-        if self._span_recorder.finished_spans is None:
-            self._span_recorder.finished_spans = []
-
-        self._span_recorder.maxlen = maxlen
+        if self._span_recorder is None:
+            self._span_recorder = _SpanRecorder(maxlen)
+        self._span_recorder.start_span(self)
 
     def __repr__(self):
         # type: () -> str
@@ -189,6 +189,7 @@ class Span(object):
             sampled=self.sampled,
             **kwargs
         )
+
         rv._span_recorder = self._span_recorder
         return rv
 
@@ -279,9 +280,12 @@ class Span(object):
 
         self.timestamp = datetime.now()
 
-        self._span_recorder.append(self)
-
         _maybe_create_breadcrumbs_from_span(hub, self)
+
+        if self._span_recorder is None:
+            return None
+
+        self._span_recorder.finish_span(self)
 
         if self.transaction is None:
             # If this has no transaction set we assume there's a parent
@@ -310,7 +314,11 @@ class Span(object):
                 "contexts": {"trace": self.get_trace_context()},
                 "timestamp": self.timestamp,
                 "start_timestamp": self.start_timestamp,
-                "spans": [s.to_json() for s in self._span_recorder if s is not self],
+                "spans": [
+                    s.to_json()
+                    for s in self._span_recorder.finished_spans
+                    if s is not self
+                ],
             }
         )
 
