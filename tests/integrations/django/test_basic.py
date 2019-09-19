@@ -188,7 +188,6 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
         crumb = event["breadcrumbs"][-1]
 
         assert crumb["message"] == "SELECT count(*) FROM people_person WHERE foo = %s"
-        assert crumb["data"]["db.params"] == [123]
 
 
 @pytest.mark.django_db
@@ -216,7 +215,6 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     assert crumb["message"] == (
         "SELECT count(*) FROM people_person WHERE foo = %(my_foo)s"
     )
-    assert crumb["data"]["db.params"] == {"my_foo": 10}
 
 
 @pytest.mark.parametrize(
@@ -249,7 +247,6 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     event, = events
     crumb = event["breadcrumbs"][-1]
     assert crumb["message"] == ('SELECT %(my_param)s FROM "foobar"')
-    assert crumb["data"]["db.params"] == {"my_param": 10}
 
 
 @pytest.mark.django_db
@@ -288,16 +285,13 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     assert event["breadcrumbs"][-2:] == [
         {
             "category": "query",
-            "data": {"db.paramstyle": "format"},
+            "data": {},
             "message": "create table my_test_table (foo text, bar date)",
             "type": "default",
         },
         {
             "category": "query",
-            "data": {
-                "db.params": {"first_var": "fizz", "second_var": "not a date"},
-                "db.paramstyle": "format",
-            },
+            "data": {},
             "message": 'insert into my_test_table ("foo", "bar") values (%(first_var)s, '
             "%(second_var)s)",
             "type": "default",
