@@ -19,8 +19,37 @@ class SparkIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+        patch_spark_context_getOrCreate()
+        patch_spark_utils()
         patch_spark_worker()
         patch_spark_context()
+
+
+def raise_exception(client):
+    """
+    Raise an exception. If the client is not in the hub, rebind it.
+    """
+    hub = Hub.current
+    if hub.client is None:
+        hub.bind_client(client)
+    exc_info = sys.exc_info()
+    with capture_internal_exceptions():
+        _capture_exception(exc_info, hub)
+    reraise(*exc_info)
+
+
+def patch_spark_utils():
+    from pyspark.util import fail_on_stopiteration
+    client = Hub.current.client
+
+    old_fail_on_stopiteration = fail_on_stopiteration
+
+    def _sentry_patched_fail_on_stopiteration(*args, **kwargs):
+        try:
+            return fail_on_stopiteration(*args, **kwargs)
+        except Exception:
+            raise_exception(client)
+    fail_on_stopiteration = _sentry_patched_fail_on_stopiteration
 
 
 def patch_spark_worker():
@@ -35,16 +64,39 @@ def patch_spark_worker():
             capture_exception(e)
     main = _sentry_patched_worker_main
 
+
+def patch_spark_context_getOrCreate():
+    from pyspark import SparkContext
+    from pyspark.java_gateway import ensure_callback_server_started
+    from py4j.java_gateway import java_import, CallbackServerParameters
+
+    spark_context_getOrCreate = SparkContext.getOrCreate
+
+    def _sentry_patched_spark_context_getOrCreate(self, *args, **kwargs):
+        sc = spark_context_getOrCreate(self, *args, **kwargs)
+        
+        # java_import(sc._gateway.jvm, "org.apache.spark.scheduler.*")
+        ensure_callback_server_started(sc._gateway)
+        # gw = sc._gateway
+        # ensure_callback_server_started(gw)
+        listener = SentryListener()
+        sc._jsc.sc().addSparkListener(listener)
+        sc.parallelize(range(100), 3).saveAsTextFile("/tmp/listener_test_simple")
+        # log4jLogger = sc._jvm.org.apache.log4j
+        # LOGGER = log4jLogger.LogManager.getLogger(__name__)
+        # LOGGER.info("hello from py world")
+        sc._gateway.shutdown_callback_server()
+        return sc
+
+    SparkContext.getOrCreate = _sentry_patched_spark_context_getOrCreate
+
+
 def patch_spark_context():
     from pyspark import SparkContext # type: ignore
-    from pyspark.java_gateway import ensure_callback_server_started
-    from py4j.java_gateway import java_import
 
     spark_context_init = SparkContext._do_init
 
     def _sentry_patched_spark_context_init(self, *args, **kwargs):
-        SparkContext._ensure_initialized()
-        java_import(self._gateway.jvm, "org.apache.spark.scheduler.*")
         spark_context_init(self, *args, **kwargs)
 
         # gw = SparkContext._gateway
@@ -96,10 +148,6 @@ def patch_spark_context():
 #         return gateway
 
 #     launch_gateway = _sentry_patched_launch_gateway
-
-# log4jLogger = self._jvm.org.apache.log4j
-# LOGGER = log4jLogger.LogManager.getLogger(__name__)
-# LOGGER.info("hello from py world")
 
 class PythonListener(object):
     package = "net.zero323.spark.examples.listener"
