@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.hub &#8212; sentry-python 0.12.0 documentation</title>
+    <title>sentry_sdk.hub &#8212; sentry-python 0.12.1 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -483,7 +483,10 @@
             <span class="n">span</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">sample_rate</span>
 
         <span class="k">if</span> <span class="n">span</span><span class="o">.</span><span class="n">sampled</span><span class="p">:</span>
-            <span class="n">span</span><span class="o">.</span><span class="n">init_finished_spans</span><span class="p">()</span>
+            <span class="n">max_spans</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">client</span> <span class="ow">and</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;_experiments&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_spans&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">1000</span>
+            <span class="p">)</span>
+            <span class="n">span</span><span class="o">.</span><span class="n">init_finished_spans</span><span class="p">(</span><span class="n">maxlen</span><span class="o">=</span><span class="n">max_spans</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">span</span></div>
 
