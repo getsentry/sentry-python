@@ -2,7 +2,6 @@ import re
 import uuid
 import contextlib
 
-from collections import deque
 from datetime import datetime
 
 import sentry_sdk
@@ -24,7 +23,7 @@ if MYPY:
     from typing import Dict
     from typing import List
     from typing import Tuple
-    from typing import Deque
+    from typing import Iterator
 
 _traceparent_header_format_re = re.compile(
     "^[ \t]*"  # whitespace
@@ -66,6 +65,30 @@ class EnvironHeaders(Mapping):  # type: ignore
             yield k[len(self.prefix) :]
 
 
+class _SpanRecorder(object):
+    __slots__ = ("maxlen", "finished_spans")
+
+    def __init__(self):
+        # type: () -> None
+        self.maxlen = 1000
+        self.finished_spans = None  # type: Optional[List[Span]]
+
+    def append(self, span):
+        # type: (Span) -> None
+        if self.finished_spans is not None:
+            if len(self.finished_spans) >= self.maxlen:
+                # If the span tree grows too large we decided it's better to
+                # discard all spans instead of trying to apply some expensive
+                # trimming.
+                self.finished_spans = None
+            else:
+                self.finished_spans.append(span)
+
+    def __iter__(self):
+        # type: () -> Iterator[Span]
+        return iter(self.finished_spans or ())
+
+
 class Span(object):
     __slots__ = (
         "trace_id",
@@ -80,7 +103,7 @@ class Span(object):
         "timestamp",
         "_tags",
         "_data",
-        "_finished_spans",
+        "_span_recorder",
         "hub",
         "_context_manager_state",
     )
@@ -109,16 +132,18 @@ class Span(object):
         self.hub = hub
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
-        self._finished_spans = None  # type: Optional[Deque[Span]]
+        self._span_recorder = _SpanRecorder()  # type: _SpanRecorder
         self.start_timestamp = datetime.now()
 
         #: End timestamp of span
         self.timestamp = None  # type: Optional[datetime]
 
     def init_finished_spans(self, maxlen):
-        # type: () -> None
-        if self._finished_spans is None:
-            self._finished_spans = deque(maxlen=maxlen)
+        # type: (int) -> None
+        if self._span_recorder.finished_spans is None:
+            self._span_recorder.finished_spans = []
+
+        self._span_recorder.maxlen = maxlen
 
     def __repr__(self):
         # type: () -> str
@@ -164,7 +189,7 @@ class Span(object):
             sampled=self.sampled,
             **kwargs
         )
-        rv._finished_spans = self._finished_spans
+        rv._span_recorder = self._span_recorder
         return rv
 
     @classmethod
@@ -254,8 +279,7 @@ class Span(object):
 
         self.timestamp = datetime.now()
 
-        if self._finished_spans is not None:
-            self._finished_spans.append(self)
+        self._span_recorder.append(self)
 
         _maybe_create_breadcrumbs_from_span(hub, self)
 
@@ -286,9 +310,7 @@ class Span(object):
                 "contexts": {"trace": self.get_trace_context()},
                 "timestamp": self.timestamp,
                 "start_timestamp": self.start_timestamp,
-                "spans": [
-                    s.to_json() for s in (self._finished_spans or ()) if s is not self
-                ],
+                "spans": [s.to_json() for s in self._span_recorder if s is not self],
             }
         )
 

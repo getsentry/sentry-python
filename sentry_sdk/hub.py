@@ -450,7 +450,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             span.sampled = random.random() < sample_rate
 
         if span.sampled:
-            span.init_finished_spans()
+            max_spans = (
+                client and client.options["_experiments"].get("max_spans") or 1000
+            )
+            span.init_finished_spans(maxlen=max_spans)
 
         return span
 
