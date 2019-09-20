@@ -68,8 +68,14 @@ class SentryAsgiMiddleware:
                     )
                     sentry_scope.add_event_processor(processor)
 
-                span = Span.continue_from_headers(dict(scope["headers"]))
-                span.op = "http.server"
+                if scope["type"] in ("http", "websocket"):
+                    span = Span.continue_from_headers(dict(scope["headers"]))
+                    span.op = "{}.server".format(scope["type"])
+                else:
+                    span = Span()
+                    span.op = "asgi.server"
+
+                span.set_tag("asgi.type", scope["type"])
                 span.transaction = "generic ASGI request"
 
                 with hub.start_span(span) as span:
