@@ -72,7 +72,7 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "0.12.1"
+VERSION = "0.12.2"
 SDK_INFO = {
     "name": "sentry.python",
     "version": VERSION,
