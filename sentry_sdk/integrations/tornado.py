@@ -17,8 +17,8 @@ from sentry_sdk.integrations._wsgi_common import (
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk._compat import iteritems
 
-from tornado.web import RequestHandler, HTTPError  # type: ignore
-from tornado.gen import coroutine  # type: ignore
+from tornado.web import RequestHandler, HTTPError
+from tornado.gen import coroutine
 
 from sentry_sdk._types import MYPY
 
@@ -36,7 +36,7 @@ class TornadoIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        import tornado  # type: ignore
+        import tornado
 
         tornado_version = getattr(tornado, "version_info", None)
         if tornado_version is None or tornado_version < (5, 0):
@@ -76,7 +76,7 @@ class TornadoIntegration(Integration):
 
         else:
 
-            @coroutine  # type: ignore
+            @coroutine
             def sentry_execute_request_handler(self, *args, **kwargs):
                 hub = Hub.current
                 integration = hub.get_integration(TornadoIntegration)

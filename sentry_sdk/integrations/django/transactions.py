@@ -10,19 +10,19 @@ import re
 from sentry_sdk._types import MYPY
 
 if MYPY:
-    from django.urls.resolvers import URLResolver  # type: ignore
+    from django.urls.resolvers import URLResolver
     from typing import Dict
     from typing import List
     from typing import Optional
-    from django.urls.resolvers import URLPattern  # type: ignore
+    from django.urls.resolvers import URLPattern
     from typing import Tuple
     from typing import Union
     from re import Pattern  # type: ignore
 
 try:
-    from django.urls import get_resolver  # type: ignore
+    from django.urls import get_resolver
 except ImportError:
-    from django.core.urlresolvers import get_resolver  # type: ignore
+    from django.core.urlresolvers import get_resolver
 
 
 def get_regex(resolver_or_pattern):

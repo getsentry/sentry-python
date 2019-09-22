@@ -1,4 +1,4 @@
-from django.template import TemplateSyntaxError  # type: ignore
+from django.template import TemplateSyntaxError
 
 from sentry_sdk._types import MYPY
 
@@ -9,10 +9,10 @@ if MYPY:
 
 try:
     # support Django 1.9
-    from django.template.base import Origin  # type: ignore
+    from django.template.base import Origin
 except ImportError:
     # backward compatibility
-    from django.template.loader import LoaderOrigin as Origin  # type: ignore
+    from django.template.loader import LoaderOrigin as Origin
 
 
 def get_template_frame_from_exception(exc_value):

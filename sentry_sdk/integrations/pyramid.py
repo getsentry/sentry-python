@@ -4,8 +4,8 @@ import os
 import sys
 import weakref
 
-from pyramid.httpexceptions import HTTPException  # type: ignore
-from pyramid.request import Request  # type: ignore
+from pyramid.httpexceptions import HTTPException
+from pyramid.request import Request
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
@@ -18,7 +18,7 @@ from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk._types import MYPY
 
 if MYPY:
-    from pyramid.response import Response  # type: ignore
+    from pyramid.response import Response
     from typing import Any
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from typing import Callable
@@ -60,8 +60,8 @@ class PyramidIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        from pyramid.router import Router  # type: ignore
-        from pyramid.request import Request  # type: ignore
+        from pyramid.router import Router
+        from pyramid.request import Request
 
         old_handle_request = Router.handle_request
 

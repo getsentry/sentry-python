@@ -21,12 +21,7 @@ if MYPY:
     from typing import Optional
     from bottle import FileUpload, FormsDict, LocalRequest  # type: ignore
 
-from bottle import (
-    Bottle,
-    Route,
-    request as bottle_request,
-    HTTPResponse,
-)  # type: ignore
+from bottle import Bottle, Route, request as bottle_request, HTTPResponse
 
 
 class BottleIntegration(Integration):
@@ -63,7 +58,7 @@ class BottleIntegration(Integration):
                 environ, start_response
             )
 
-        Bottle.__call__ = sentry_patched_wsgi_app  # type: ignore
+        Bottle.__call__ = sentry_patched_wsgi_app
 
         # monkey patch method Bottle._handle
         old_handle = Bottle._handle
@@ -170,7 +165,7 @@ def _make_request_event_processor(app, request, integration):
                     request.route.callback
                 )
             elif integration.transaction_style == "url":
-                event["transaction"] = request.route.rule  # type: ignore
+                event["transaction"] = request.route.rule
         except Exception:
             pass
 

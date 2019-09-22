@@ -4,7 +4,7 @@ Create spans from Django middleware invocations
 
 from functools import wraps
 
-from django import VERSION as DJANGO_VERSION  # type: ignore
+from django import VERSION as DJANGO_VERSION
 
 from sentry_sdk import Hub
 from sentry_sdk.utils import ContextVar, transaction_from_function

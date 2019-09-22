@@ -14,13 +14,13 @@ from sentry_sdk.utils import (
 )
 
 import asyncio
-from aiohttp.web import Application, HTTPException, UrlDispatcher  # type: ignore
+from aiohttp.web import Application, HTTPException, UrlDispatcher
 
 from sentry_sdk._types import MYPY
 
 if MYPY:
-    from aiohttp.web_request import Request  # type: ignore
-    from aiohttp.abc import AbstractMatchInfo  # type: ignore
+    from aiohttp.web_request import Request
+    from aiohttp.abc import AbstractMatchInfo
     from typing import Any
     from typing import Dict
     from typing import Tuple

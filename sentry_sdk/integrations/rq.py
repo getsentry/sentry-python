@@ -7,9 +7,9 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
-from rq.timeouts import JobTimeoutException  # type: ignore
-from rq.worker import Worker  # type: ignore
-from rq.queue import Queue  # type: ignore
+from rq.timeouts import JobTimeoutException
+from rq.worker import Worker
+from rq.queue import Queue
 
 from sentry_sdk._types import MYPY
 
@@ -18,7 +18,7 @@ if MYPY:
     from typing import Dict
     from typing import Callable
 
-    from rq.job import Job  # type: ignore
+    from rq.job import Job
 
     from sentry_sdk.utils import ExcInfo
 

@@ -15,6 +15,7 @@ if MYPY:
     from typing import Callable
     from typing import Dict
     from typing import Iterator
+    from typing import Generator
     from typing import List
     from typing import Optional
     from typing import Set
@@ -45,7 +46,7 @@ def _get_debug_hub():
 
 @contextmanager
 def capture_internal_exceptions():
-    # type: () -> Iterator
+    # type: () -> Generator[None, None, None]
     try:
         yield
     except Exception:
@@ -708,10 +709,10 @@ def _get_contextvars():
     """
     if not _is_threading_local_monkey_patched():
         try:
-            from contextvars import ContextVar  # type: ignore
+            from contextvars import ContextVar
 
             if not PY2 and sys.version_info < (3, 7):
-                import aiocontextvars  # type: ignore  # noqa
+                import aiocontextvars  # noqa
 
             return True, ContextVar
         except ImportError:
@@ -719,7 +720,7 @@ def _get_contextvars():
 
     from threading import local
 
-    class ContextVar(object):  # type: ignore
+    class ContextVar(object):
         # Super-limited impl of ContextVar
 
         def __init__(self, name):

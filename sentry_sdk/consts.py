@@ -60,7 +60,7 @@ def _get_default_options():
     import inspect
 
     if hasattr(inspect, "getfullargspec"):
-        getargspec = inspect.getfullargspec  # type: ignore
+        getargspec = inspect.getfullargspec
     else:
         getargspec = inspect.getargspec  # type: ignore
 

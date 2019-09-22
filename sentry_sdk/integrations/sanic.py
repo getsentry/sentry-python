@@ -13,10 +13,10 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
 
-from sanic import Sanic, __version__ as VERSION  # type: ignore
-from sanic.exceptions import SanicException  # type: ignore
-from sanic.router import Router  # type: ignore
-from sanic.handlers import ErrorHandler  # type: ignore
+from sanic import Sanic, __version__ as VERSION
+from sanic.exceptions import SanicException
+from sanic.router import Router
+from sanic.handlers import ErrorHandler
 
 from sentry_sdk._types import MYPY
 
@@ -27,7 +27,7 @@ if MYPY:
     from typing import Union
     from typing import Tuple
 
-    from sanic.request import Request, RequestParameters  # type: ignore
+    from sanic.request import Request, RequestParameters
 
     from sentry_sdk._types import Event, EventProcessor, Hint
 

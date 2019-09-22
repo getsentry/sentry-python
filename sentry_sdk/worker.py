@@ -71,7 +71,7 @@ class BackgroundWorker(object):
             return True
         finally:
             if real_all_tasks_done is not None:
-                real_all_tasks_done.release()  # type: ignore
+                real_all_tasks_done.release()
 
     def start(self):
         # type: () -> None

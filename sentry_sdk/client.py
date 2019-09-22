@@ -45,7 +45,7 @@ def _get_options(*args, **kwargs):
     rv = dict(DEFAULT_OPTIONS)
     options = dict(*args, **kwargs)  # type: ignore
     if dsn is not None and options.get("dsn") is None:
-        options["dsn"] = dsn  # type: ignore
+        options["dsn"] = dsn
 
     for key, value in iteritems(options):
         if key not in rv:
@@ -64,7 +64,7 @@ def _get_options(*args, **kwargs):
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
 
-    return rv  # type: ignore
+    return rv
 
 
 class _Client(object):
@@ -154,8 +154,8 @@ class _Client(object):
                 }
 
         for key in "release", "environment", "server_name", "dist":
-            if event.get(key) is None and self.options[key] is not None:  # type: ignore
-                event[key] = text_type(self.options[key]).strip()  # type: ignore
+            if event.get(key) is None and self.options[key] is not None:
+                event[key] = text_type(self.options[key]).strip()
         if event.get("sdk") is None:
             sdk_info = dict(SDK_INFO)
             sdk_info["integrations"] = sorted(self.integrations.keys())
@@ -200,7 +200,7 @@ class _Client(object):
                 if errcls == full_name or errcls == type_name:
                     return True
             else:
-                if issubclass(exc_info[0], errcls):  # type: ignore
+                if issubclass(exc_info[0], errcls):
                     return True
 
         return False

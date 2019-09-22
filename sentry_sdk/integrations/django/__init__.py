@@ -5,8 +5,8 @@ import sys
 import threading
 import weakref
 
-from django import VERSION as DJANGO_VERSION  # type: ignore
-from django.core import signals  # type: ignore
+from django import VERSION as DJANGO_VERSION
+from django.core import signals
 
 from sentry_sdk._types import MYPY
 from sentry_sdk.utils import HAS_REAL_CONTEXTVARS
@@ -18,19 +18,19 @@ if MYPY:
     from typing import Optional
     from typing import Union
 
-    from django.core.handlers.wsgi import WSGIRequest  # type: ignore
-    from django.http.response import HttpResponse  # type: ignore
-    from django.http.request import QueryDict  # type: ignore
-    from django.utils.datastructures import MultiValueDict  # type: ignore
+    from django.core.handlers.wsgi import WSGIRequest
+    from django.http.response import HttpResponse
+    from django.http.request import QueryDict
+    from django.utils.datastructures import MultiValueDict
 
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from sentry_sdk._types import Event, Hint
 
 
 try:
-    from django.urls import resolve  # type: ignore
+    from django.urls import resolve
 except ImportError:
-    from django.core.urlresolvers import resolve  # type: ignore
+    from django.core.urlresolvers import resolve
 
 from sentry_sdk import Hub
 from sentry_sdk.hub import _should_send_default_pii
@@ -110,7 +110,7 @@ class DjangoIntegration(Integration):
 
         # patch get_response, because at that point we have the Django request
         # object
-        from django.core.handlers.base import BaseHandler  # type: ignore
+        from django.core.handlers.base import BaseHandler
 
         old_get_response = BaseHandler.get_response
 
@@ -194,7 +194,7 @@ class DjangoIntegration(Integration):
                 # If we fail to import, return `NotImplemented`. It's at least
                 # unlikely that we have a query set in `value` when importing
                 # `QuerySet` fails.
-                from django.db.models.query import QuerySet  # type: ignore
+                from django.db.models.query import QuerySet
             except Exception:
                 return NotImplemented
 
@@ -412,9 +412,9 @@ def install_sql_hook():
     # type: () -> None
     """If installed this causes Django's queries to be captured."""
     try:
-        from django.db.backends.utils import CursorWrapper  # type: ignore
+        from django.db.backends.utils import CursorWrapper
     except ImportError:
-        from django.db.backends.util import CursorWrapper  # type: ignore
+        from django.db.backends.util import CursorWrapper
 
     try:
         real_execute = CursorWrapper.execute

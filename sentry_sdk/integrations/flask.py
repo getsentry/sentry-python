@@ -106,9 +106,9 @@ def _request_started(sender, **kwargs):
         # Rely on WSGI middleware to start a trace
         try:
             if integration.transaction_style == "endpoint":
-                scope.transaction = request.url_rule.endpoint  # type: ignore
+                scope.transaction = request.url_rule.endpoint
             elif integration.transaction_style == "url":
-                scope.transaction = request.url_rule.rule  # type: ignore
+                scope.transaction = request.url_rule.rule
         except Exception:
             pass
 

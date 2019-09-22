@@ -46,7 +46,7 @@ else:
         return x
 
 
-_local = ContextVar("sentry_current_hub")  # type: ignore
+_local = ContextVar("sentry_current_hub")
 _initial_client = None  # type: Optional[weakref.ReferenceType[Client]]
 
 
@@ -370,7 +370,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         These exceptions do not end up in Sentry and are just logged instead.
         """
-        logger.error("Internal error in sentry_sdk", exc_info=exc_info)  # type: ignore
+        logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
     def add_breadcrumb(
         self,

@@ -10,6 +10,7 @@ class RedisIntegration(Integration):
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         import redis
 
         old_execute_command = redis.StrictRedis.execute_command

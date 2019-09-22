@@ -25,6 +25,7 @@ if MYPY:
     )
 
     F = TypeVar("F", bound=Callable[..., Any])
+    T = TypeVar("T")
 
 
 global_event_processors = []  # type: List[EventProcessor]
