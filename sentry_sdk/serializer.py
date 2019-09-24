@@ -100,7 +100,7 @@ class Serializer(object):
         while len(self._meta_stack) <= len(self._path):
             try:
                 segment = self._path[len(self._meta_stack) - 1]
-                node = self._meta_stack[-1].setdefault(segment, {})
+                node = self._meta_stack[-1].setdefault(text_type(segment), {})
             except IndexError:
                 node = {}
 
@@ -166,7 +166,7 @@ class Serializer(object):
         finally:
             if segment is not None:
                 self._path.pop()
-                del self._meta_stack[: len(self._path)]
+                del self._meta_stack[len(self._path) + 1 :]
                 self._is_databag = self._is_databag and None
                 self._should_repr_strings = self._should_repr_strings and None
 
@@ -212,7 +212,7 @@ class Serializer(object):
                 rv_dict = dict(itertools.islice(iteritems(obj), None, max_breadth))
                 self.annotate(len=len(obj))
             else:
-                rv_dict = dict(obj)
+                rv_dict = dict(iteritems(obj))
 
             for k in list(rv_dict):
                 str_k = text_type(k)
