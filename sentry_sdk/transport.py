@@ -108,6 +108,11 @@ class HttpTransport(Transport):
 
         self.hub_cls = Hub
 
+    @staticmethod
+    def _convert_datetime(event):
+        if isinstance(event, datetime):
+            return str(event)
+        
     def _send_event(
         self, event  # type: Event
     ):
@@ -119,7 +124,7 @@ class HttpTransport(Transport):
 
         body = io.BytesIO()
         with gzip.GzipFile(fileobj=body, mode="w") as f:
-            f.write(json.dumps(event, allow_nan=False).encode("utf-8"))
+            f.write(json.dumps(event, allow_nan=False, default=self._convert_datetime).encode("utf-8"))
 
         assert self.parsed_dsn is not None
         logger.debug(
