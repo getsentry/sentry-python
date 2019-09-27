@@ -108,8 +108,7 @@ class RequestExtractor(object):
 
     def is_json(self):
         # type: () -> bool
-        ct = self.env().get("CONTENT_TYPE")
-        return isinstance(ct, str) and _is_json_content_type(ct)
+        return _is_json_content_type(self.env().get("CONTENT_TYPE"))
 
     def json(self):
         # type: () -> Optional[Any]
@@ -144,8 +143,8 @@ class RequestExtractor(object):
 
 
 def _is_json_content_type(ct):
-    # type: (str) -> bool
-    mt = ct.split(";", 1)[0]
+    # type: (Optional[str]) -> bool
+    mt = (ct or "").split(";", 1)[0]
     return (
         mt == "application/json"
         or (mt.startswith("application/"))
