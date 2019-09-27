@@ -113,11 +113,10 @@ def _request_started(sender, **kwargs):
             pass
 
         weak_request = weakref.ref(request)
-        scope.add_event_processor(
-            _make_request_event_processor(  # type: ignore
-                app, weak_request, integration
-            )
+        evt_processor = _make_request_event_processor(
+            app, weak_request, integration  # type: ignore
         )
+        scope.add_event_processor(evt_processor)
 
 
 class FlaskRequestExtractor(RequestExtractor):

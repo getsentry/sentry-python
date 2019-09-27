@@ -347,10 +347,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         client = self.client
         if client is None:
             return None
-        if error is None:
-            exc_info = sys.exc_info()
-        else:
+        if error is not None:
             exc_info = exc_info_from_error(error)
+        else:
+            exc_info = sys.exc_info()
 
         event, hint = event_from_exception(exc_info, client_options=client.options)
         try:

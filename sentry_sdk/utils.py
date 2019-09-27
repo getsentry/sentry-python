@@ -482,6 +482,7 @@ if HAS_CHAINED_EXCEPTIONS:
         while (
             exc_type is not None
             and exc_value is not None
+            and tb is not None
             and id(exc_value) not in seen_exception_ids
         ):
             yield exc_type, exc_value, tb

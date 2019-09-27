@@ -43,7 +43,7 @@ def _get_options(*args, **kwargs):
         dsn = None
 
     rv = dict(DEFAULT_OPTIONS)
-    options = dict(*args, **kwargs)  # type: ignore
+    options = dict(*args, **kwargs)
     if dsn is not None and options.get("dsn") is None:
         options["dsn"] = dsn
 

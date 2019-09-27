@@ -58,7 +58,7 @@ class BackgroundWorker(object):
             all_tasks_done = None
 
         try:
-            while queue.unfinished_tasks:  # type: ignore
+            while queue.unfinished_tasks:
                 delay = deadline - time()
                 if delay <= 0:
                     return False

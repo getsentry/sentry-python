@@ -150,7 +150,7 @@ def _install_subprocess():
     def sentry_patched_popen_init(self, *a, **kw):
         hub = Hub.current
         if hub.get_integration(StdlibIntegration) is None:
-            return old_popen_init(self, *a, **kw)
+            return old_popen_init(self, *a, **kw)  # type: ignore
 
         # Convert from tuple to list to be able to set values.
         a = list(a)
@@ -184,7 +184,7 @@ def _install_subprocess():
         with hub.start_span(op="subprocess", description=description) as span:
             span.set_data("subprocess.cwd", cwd)
 
-            rv = old_popen_init(self, *a, **kw)
+            rv = old_popen_init(self, *a, **kw)  # type: ignore
 
             span.set_tag("subprocess.pid", self.pid)
             return rv
