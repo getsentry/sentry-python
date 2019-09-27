@@ -79,12 +79,15 @@ class RequestExtractor(object):
             return 0
 
     def cookies(self):
+        # type: () -> Dict[str, Any]
         raise NotImplementedError()
 
     def raw_data(self):
+        # type: () -> Optional[Union[str, bytes]]
         raise NotImplementedError()
 
     def form(self):
+        # type: () -> Optional[Dict[str, Any]]
         raise NotImplementedError()
 
     def parsed_body(self):
@@ -105,34 +108,44 @@ class RequestExtractor(object):
 
     def is_json(self):
         # type: () -> bool
-        return _is_json_content_type(self.env().get("CONTENT_TYPE"))
+        ct = self.env().get("CONTENT_TYPE")
+        return isinstance(ct, str) and _is_json_content_type(ct)
 
     def json(self):
         # type: () -> Optional[Any]
         try:
-            if self.is_json():
-                raw_data = self.raw_data()
-                if not isinstance(raw_data, text_type):
-                    raw_data = raw_data.decode("utf-8")
+            if not self.is_json():
+                return None
+
+            raw_data = self.raw_data()
+            if raw_data is None:
+                return None
+
+            if isinstance(raw_data, text_type):
                 return json.loads(raw_data)
+            else:
+                return json.loads(raw_data.decode("utf-8"))
         except ValueError:
             pass
 
         return None
 
     def files(self):
+        # type: () -> Optional[Dict[str, Any]]
         raise NotImplementedError()
 
     def size_of_file(self, file):
+        # type: (Any) -> int
         raise NotImplementedError()
 
     def env(self):
+        # type: () -> Dict[str, Any]
         raise NotImplementedError()
 
 
 def _is_json_content_type(ct):
     # type: (str) -> bool
-    mt = (ct or "").split(";", 1)[0]
+    mt = ct.split(";", 1)[0]
     return (
         mt == "application/json"
         or (mt.startswith("application/"))

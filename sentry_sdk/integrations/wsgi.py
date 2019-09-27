@@ -16,7 +16,6 @@ from sentry_sdk._types import MYPY
 if MYPY:
     from typing import Callable
     from typing import Dict
-    from typing import List
     from typing import Iterator
     from typing import Any
     from typing import Tuple
@@ -24,6 +23,7 @@ if MYPY:
     from typing import TypeVar
 
     from sentry_sdk.utils import ExcInfo
+    from sentry_sdk._types import EventProcessor
 
     T = TypeVar("T")
     U = TypeVar("U")
@@ -85,11 +85,11 @@ class SentryWsgiMiddleware(object):
     __slots__ = ("app",)
 
     def __init__(self, app):
-        # type: (Callable) -> None
+        # type: (Callable[[Dict[str, str], Callable[..., Any]], Any]) -> None
         self.app = app
 
     def __call__(self, environ, start_response):
-        # type: (Dict[str, str], Callable) -> _ScopedResponse
+        # type: (Dict[str, str], Callable[..., Any]) -> _ScopedResponse
         if _wsgi_middleware_applied.get(False):
             return self.app(environ, start_response)
 
@@ -219,7 +219,7 @@ class _ScopedResponse(object):
     __slots__ = ("_response", "_hub")
 
     def __init__(self, hub, response):
-        # type: (Hub, List[bytes]) -> None
+        # type: (Hub, Iterator[bytes]) -> None
         self._hub = hub
         self._response = response
 
@@ -239,9 +239,10 @@ class _ScopedResponse(object):
             yield chunk
 
     def close(self):
+        # type: () -> None
         with self._hub:
             try:
-                self._response.close()
+                self._response.close()  # type: ignore
             except AttributeError:
                 pass
             except BaseException:
@@ -249,7 +250,7 @@ class _ScopedResponse(object):
 
 
 def _make_wsgi_event_processor(environ):
-    # type: (Dict[str, str]) -> Callable
+    # type: (Dict[str, str]) -> EventProcessor
     # It's a bit unfortunate that we have to extract and parse the request data
     # from the environ so eagerly, but there are a few good reasons for this.
     #

@@ -16,6 +16,9 @@ from sentry_sdk.tracing import Span
 if MYPY:
     from typing import Dict
     from typing import Any
+    from typing import Optional
+
+    from sentry_sdk._types import Event, Hint
 
 
 _asgi_middleware_applied = ContextVar("sentry_asgi_middleware_applied")
@@ -38,12 +41,15 @@ class SentryAsgiMiddleware:
     __slots__ = ("app",)
 
     def __init__(self, app):
+        # type: (Any) -> None
         self.app = app
 
     def __call__(self, scope, receive=None, send=None):
+        # type: (Any, Any, Any) -> Any
         if receive is None or send is None:
 
             async def run_asgi2(receive, send):
+                # type: (Any, Any) -> Any
                 return await self._run_app(
                     scope, lambda: self.app(scope)(receive, send)
                 )
@@ -53,6 +59,7 @@ class SentryAsgiMiddleware:
             return self._run_app(scope, lambda: self.app(scope, receive, send))
 
     async def _run_app(self, scope, callback):
+        # type: (Any, Any) -> Any
         if _asgi_middleware_applied.get(False):
             return await callback()
 
@@ -88,6 +95,7 @@ class SentryAsgiMiddleware:
             _asgi_middleware_applied.set(False)
 
     def event_processor(self, event, hint, asgi_scope):
+        # type: (Event, Hint, Any) -> Optional[Event]
         request_info = event.setdefault("request", {})
 
         if asgi_scope["type"] in ("http", "websocket"):
@@ -107,6 +115,7 @@ class SentryAsgiMiddleware:
         return event
 
     def get_url(self, scope):
+        # type: (Any) -> str
         """
         Extract URL from the ASGI scope, without also including the querystring.
         """
@@ -128,12 +137,14 @@ class SentryAsgiMiddleware:
         return path
 
     def get_query(self, scope):
+        # type: (Any) -> Any
         """
         Extract querystring from the ASGI scope, in the format that the Sentry protocol expects.
         """
         return urllib.parse.unquote(scope["query_string"].decode("latin-1"))
 
     def get_headers(self, scope):
+        # type: (Any) -> Dict[str, Any]
         """
         Extract headers from the ASGI scope, in the format that the Sentry protocol expects.
         """
@@ -148,6 +159,7 @@ class SentryAsgiMiddleware:
         return headers
 
     def get_transaction(self, scope):
+        # type: (Any) -> Optional[str]
         """
         Return a transaction string to identify the routed endpoint.
         """

@@ -11,7 +11,6 @@ from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk._types import MYPY
 
 if MYPY:
-
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from typing import Any
     from typing import Dict
@@ -20,6 +19,8 @@ if MYPY:
     from werkzeug.datastructures import FileStorage
     from typing import Union
     from typing import Callable
+
+    from sentry_sdk._types import EventProcessor
 
 try:
     import flask_login  # type: ignore
@@ -61,7 +62,7 @@ class FlaskIntegration(Integration):
         old_app = Flask.__call__
 
         def sentry_patched_wsgi_app(self, environ, start_response):
-            # type: (Any, Dict[str, str], Callable) -> _ScopedResponse
+            # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
             if Hub.current.get_integration(FlaskIntegration) is None:
                 return old_app(self, environ, start_response)
 
@@ -125,7 +126,7 @@ class FlaskRequestExtractor(RequestExtractor):
         return self.request.environ
 
     def cookies(self):
-        # type: () -> ImmutableTypeConversionDict
+        # type: () -> ImmutableTypeConversionDict[Any, Any]
         return self.request.cookies
 
     def raw_data(self):
@@ -141,9 +142,11 @@ class FlaskRequestExtractor(RequestExtractor):
         return self.request.files
 
     def is_json(self):
+        # type: () -> bool
         return self.request.is_json
 
     def json(self):
+        # type: () -> Any
         return self.request.get_json()
 
     def size_of_file(self, file):
@@ -152,7 +155,7 @@ class FlaskRequestExtractor(RequestExtractor):
 
 
 def _make_request_event_processor(app, weak_request, integration):
-    # type: (Flask, Callable[[], Request], FlaskIntegration) -> Callable
+    # type: (Flask, Callable[[], Request], FlaskIntegration) -> EventProcessor
     def inner(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         request = weak_request()

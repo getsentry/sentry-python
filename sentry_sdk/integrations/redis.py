@@ -4,6 +4,11 @@ from sentry_sdk import Hub
 from sentry_sdk.utils import capture_internal_exceptions
 from sentry_sdk.integrations import Integration
 
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from typing import Any
+
 
 class RedisIntegration(Integration):
     identifier = "redis"
@@ -16,6 +21,7 @@ class RedisIntegration(Integration):
         old_execute_command = redis.StrictRedis.execute_command
 
         def sentry_patched_execute_command(self, name, *args, **kwargs):
+            # type: (redis.StrictRedis, str, *Any, **Any) -> Any
             hub = Hub.current
 
             if hub.get_integration(RedisIntegration) is None:

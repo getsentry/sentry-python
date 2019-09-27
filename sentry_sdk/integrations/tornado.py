@@ -24,10 +24,11 @@ from sentry_sdk._types import MYPY
 
 if MYPY:
     from typing import Any
-    from typing import List
     from typing import Optional
     from typing import Dict
     from typing import Callable
+
+    from sentry_sdk._types import EventProcessor
 
 
 class TornadoIntegration(Integration):
@@ -60,7 +61,7 @@ class TornadoIntegration(Integration):
             # Starting Tornado 6 RequestHandler._execute method is a standard Python coroutine (async/await)
             # In that case our method should be a coroutine function too
             async def sentry_execute_request_handler(self, *args, **kwargs):
-                # type: (Any, *List, **Any) -> Any
+                # type: (Any, *Any, **Any) -> Any
                 hub = Hub.current
                 integration = hub.get_integration(TornadoIntegration)
                 if integration is None:
@@ -76,8 +77,9 @@ class TornadoIntegration(Integration):
 
         else:
 
-            @coroutine
+            @coroutine  # type: ignore
             def sentry_execute_request_handler(self, *args, **kwargs):
+                # type: (RequestHandler, *Any, **Any) -> Any
                 hub = Hub.current
                 integration = hub.get_integration(TornadoIntegration)
                 if integration is None:
@@ -124,7 +126,7 @@ def _capture_exception(ty, value, tb):
 
 
 def _make_event_processor(weak_handler):
-    # type: (Callable[[], RequestHandler]) -> Callable
+    # type: (Callable[[], RequestHandler]) -> EventProcessor
     def tornado_processor(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         handler = weak_handler()
@@ -171,7 +173,7 @@ class TornadoRequestExtractor(RequestExtractor):
         return len(self.request.body)
 
     def cookies(self):
-        # type: () -> Dict
+        # type: () -> Dict[str, str]
         return {k: v.value for k, v in iteritems(self.request.cookies)}
 
     def raw_data(self):
@@ -179,7 +181,7 @@ class TornadoRequestExtractor(RequestExtractor):
         return self.request.body
 
     def form(self):
-        # type: () -> Optional[Any]
+        # type: () -> Dict[str, Any]
         return {
             k: [v.decode("latin1", "replace") for v in vs]
             for k, vs in iteritems(self.request.body_arguments)
@@ -190,8 +192,9 @@ class TornadoRequestExtractor(RequestExtractor):
         return _is_json_content_type(self.request.headers.get("content-type"))
 
     def files(self):
-        # type: () -> Dict
+        # type: () -> Dict[str, Any]
         return {k: v[0] for k, v in iteritems(self.request.files) if v}
 
     def size_of_file(self, file):
+        # type: (Any) -> int
         return len(file.body or ())
