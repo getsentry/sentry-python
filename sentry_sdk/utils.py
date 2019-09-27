@@ -11,18 +11,18 @@ from sentry_sdk._compat import urlparse, text_type, implements_str, PY2
 from sentry_sdk._types import MYPY
 
 if MYPY:
+    from types import FrameType
+    from types import TracebackType
     from typing import Any
     from typing import Callable
     from typing import Dict
-    from typing import Iterator
     from typing import Generator
+    from typing import Iterator
     from typing import List
     from typing import Optional
     from typing import Set
     from typing import Tuple
     from typing import Union
-    from types import FrameType
-    from types import TracebackType
 
     import sentry_sdk
 
@@ -439,7 +439,7 @@ def single_exception_from_error_tuple(
     exc_type,  # type: Optional[type]
     exc_value,  # type: Optional[BaseException]
     tb,  # type: Optional[TracebackType]
-    client_options=None,  # type: Optional[dict]
+    client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> Dict[str, Any]
@@ -512,7 +512,7 @@ else:
 
 def exceptions_from_error_tuple(
     exc_info,  # type: ExcInfo
-    client_options=None,  # type: Optional[dict]
+    client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> List[Dict[str, Any]]
@@ -560,7 +560,7 @@ def iter_event_frames(event):
 
 
 def handle_in_app(event, in_app_exclude=None, in_app_include=None):
-    # type: (Dict[str, Any], Optional[List], Optional[List]) -> Dict[str, Any]
+    # type: (Dict[str, Any], Optional[List[str]], Optional[List[str]]) -> Dict[str, Any]
     for stacktrace in iter_event_stacktraces(event):
         handle_in_app_impl(
             stacktrace.get("frames"),
@@ -572,7 +572,7 @@ def handle_in_app(event, in_app_exclude=None, in_app_include=None):
 
 
 def handle_in_app_impl(frames, in_app_exclude, in_app_include):
-    # type: (Any, Optional[List], Optional[List]) -> Optional[Any]
+    # type: (Any, Optional[List[str]], Optional[List[str]]) -> Optional[Any]
     if not frames:
         return None
 
@@ -625,7 +625,7 @@ def exc_info_from_error(error):
 
 def event_from_exception(
     exc_info,  # type: Union[BaseException, ExcInfo]
-    client_options=None,  # type: Optional[dict]
+    client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> Tuple[Dict[str, Any], Dict[str, Any]]
@@ -645,7 +645,7 @@ def event_from_exception(
 
 
 def _module_in_set(name, set):
-    # type: (str, Optional[List]) -> bool
+    # type: (str, Optional[List[str]]) -> bool
     if not set:
         return False
     for item in set or ():
@@ -699,7 +699,7 @@ def _is_threading_local_monkey_patched():
 
 
 def _get_contextvars():
-    # () -> (bool, Type)
+    # type: () -> Tuple[bool, type]
     """
     Try to import contextvars and use it if it's deemed safe. We should not use
     contextvars if gevent or eventlet have patched thread locals, as
@@ -724,13 +724,16 @@ def _get_contextvars():
         # Super-limited impl of ContextVar
 
         def __init__(self, name):
+            # type: (str) -> None
             self._name = name
             self._local = local()
 
         def get(self, default):
+            # type: (Any) -> Any
             return getattr(self._local, "value", default)
 
         def set(self, value):
+            # type: (Any) -> None
             setattr(self._local, "value", value)
 
     return False, ContextVar

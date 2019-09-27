@@ -9,6 +9,17 @@ from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing import EnvironHeaders, record_http_request
 from sentry_sdk.utils import capture_internal_exceptions, safe_repr
 
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from typing import Any
+    from typing import Callable
+    from typing import Dict
+    from typing import Optional
+    from typing import List
+
+    from sentry_sdk._types import Event, Hint
+
 
 try:
     from httplib import HTTPConnection  # type: ignore
@@ -34,6 +45,7 @@ class StdlibIntegration(Integration):
 
         @add_global_event_processor
         def add_python_runtime_context(event, hint):
+            # type: (Event, Hint) -> Optional[Event]
             if Hub.current.get_integration(StdlibIntegration) is not None:
                 contexts = event.setdefault("contexts", {})
                 if isinstance(contexts, dict) and "runtime" not in contexts:
@@ -48,6 +60,7 @@ def _install_httplib():
     real_getresponse = HTTPConnection.getresponse
 
     def putrequest(self, method, url, *args, **kwargs):
+        # type: (HTTPConnection, str, str, *Any, **Any) -> Any
         hub = Hub.current
         if hub.get_integration(StdlibIntegration) is None:
             return real_putrequest(self, method, url, *args, **kwargs)
@@ -83,6 +96,7 @@ def _install_httplib():
         return rv
 
     def getresponse(self, *args, **kwargs):
+        # type: (HTTPConnection, *Any, **Any) -> Any
         recorder = getattr(self, "_sentrysdk_recorder", None)
 
         if recorder is None:
@@ -115,6 +129,7 @@ def _install_httplib():
 
 
 def _init_argument(args, kwargs, name, position, setdefault_callback=None):
+    # type: (List[Any], Dict[Any, Any], str, int, Optional[Callable[[Any], Any]]) -> Any
     """
     given (*args, **kwargs) of a function call, retrieve (and optionally set a
     default for) an argument by either name or position.
@@ -145,9 +160,12 @@ def _init_argument(args, kwargs, name, position, setdefault_callback=None):
 
 
 def _install_subprocess():
+    # type: () -> None
     old_popen_init = subprocess.Popen.__init__
 
     def sentry_patched_popen_init(self, *a, **kw):
+        # type: (subprocess.Popen[Any], *Any, **Any) -> None
+
         hub = Hub.current
         if hub.get_integration(StdlibIntegration) is None:
             return old_popen_init(self, *a, **kw)  # type: ignore
@@ -194,6 +212,7 @@ def _install_subprocess():
     old_popen_wait = subprocess.Popen.wait
 
     def sentry_patched_popen_wait(self, *a, **kw):
+        # type: (subprocess.Popen[Any], *Any, **Any) -> Any
         hub = Hub.current
 
         if hub.get_integration(StdlibIntegration) is None:
@@ -208,6 +227,7 @@ def _install_subprocess():
     old_popen_communicate = subprocess.Popen.communicate
 
     def sentry_patched_popen_communicate(self, *a, **kw):
+        # type: (subprocess.Popen[Any], *Any, **Any) -> Any
         hub = Hub.current
 
         if hub.get_integration(StdlibIntegration) is None:
@@ -221,4 +241,5 @@ def _install_subprocess():
 
 
 def get_subprocess_traceparent_headers():
+    # type: () -> EnvironHeaders
     return EnvironHeaders(os.environ, prefix="SUBPROCESS_")

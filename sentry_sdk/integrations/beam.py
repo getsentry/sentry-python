@@ -9,6 +9,21 @@ from sentry_sdk._compat import reraise
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from typing import Any
+    from typing import Iterator
+    from typing import TypeVar
+    from typing import Optional
+    from typing import Callable
+
+    from sentry_sdk.client import Client
+    from sentry_sdk._types import ExcInfo
+
+    T = TypeVar("T")
+    F = TypeVar("F", bound=Callable[..., Any])
+
 
 WRAPPED_FUNC = "_wrapped_{}_"
 INSPECT_FUNC = "_inspect_{}"  # Required format per apache_beam/transforms/core.py
@@ -37,6 +52,7 @@ class BeamIntegration(Integration):
         old_init = ParDo.__init__
 
         def sentry_init_pardo(self, fn, *args, **kwargs):
+            # type: (ParDo, Any, *Any, **Any) -> Any
             # Do not monkey patch init twice
             if not getattr(self, "_sentry_is_patched", False):
                 for func_name in function_patches:
@@ -63,12 +79,14 @@ class BeamIntegration(Integration):
 
 
 def _wrap_inspect_call(cls, func_name):
+    # type: (Any, Any) -> Any
     from apache_beam.typehints.decorators import getfullargspec  # type: ignore
 
     if not hasattr(cls, func_name):
         return None
 
     def _inspect(self):
+        # type: (Any) -> Any
         """
         Inspect function overrides the way Beam gets argspec.
         """
@@ -94,6 +112,7 @@ def _wrap_inspect_call(cls, func_name):
 
 
 def _wrap_task_call(func):
+    # type: (F) -> F
     """
     Wrap task call with a try catch to get exceptions.
     Pass the client on to raise_exception so it can get rebinded.
@@ -102,6 +121,7 @@ def _wrap_task_call(func):
 
     @wraps(func)
     def _inner(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
         try:
             gen = func(*args, **kwargs)
         except Exception:
@@ -112,25 +132,32 @@ def _wrap_task_call(func):
         return _wrap_generator_call(gen, client)
 
     setattr(_inner, USED_FUNC, True)
-    return _inner
+    return _inner  # type: ignore
 
 
 def _capture_exception(exc_info, hub):
+    # type: (ExcInfo, Hub) -> None
     """
     Send Beam exception to Sentry.
     """
     integration = hub.get_integration(BeamIntegration)
-    if integration:
-        client = hub.client
-        event, hint = event_from_exception(
-            exc_info,
-            client_options=client.options,
-            mechanism={"type": "beam", "handled": False},
-        )
-        hub.capture_event(event, hint=hint)
+    if integration is None:
+        return
+
+    client = hub.client
+    if client is None:
+        return
+
+    event, hint = event_from_exception(
+        exc_info,
+        client_options=client.options,
+        mechanism={"type": "beam", "handled": False},
+    )
+    hub.capture_event(event, hint=hint)
 
 
 def raise_exception(client):
+    # type: (Optional[Client]) -> None
     """
     Raise an exception. If the client is not in the hub, rebind it.
     """
@@ -144,6 +171,7 @@ def raise_exception(client):
 
 
 def _wrap_generator_call(gen, client):
+    # type: (Iterator[T], Optional[Client]) -> Iterator[T]
     """
     Wrap the generator to handle any failures.
     """

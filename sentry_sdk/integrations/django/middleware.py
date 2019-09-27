@@ -9,6 +9,15 @@ from django import VERSION as DJANGO_VERSION
 from sentry_sdk import Hub
 from sentry_sdk.utils import ContextVar, transaction_from_function
 
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from typing import Any
+    from typing import Callable
+    from typing import TypeVar
+
+    F = TypeVar("F", bound=Callable[..., Any])
+
 _import_string_should_wrap_middleware = ContextVar(
     "import_string_should_wrap_middleware"
 )
@@ -20,11 +29,13 @@ else:
 
 
 def patch_django_middlewares():
+    # type: () -> None
     from django.core.handlers import base
 
     old_import_string = getattr(base, import_string_name)
 
     def sentry_patched_import_string(dotted_path):
+        # type: (str) -> Any
         rv = old_import_string(dotted_path)
 
         if _import_string_should_wrap_middleware.get(None):
@@ -37,6 +48,7 @@ def patch_django_middlewares():
     old_load_middleware = base.BaseHandler.load_middleware
 
     def sentry_patched_load_middleware(self):
+        # type: (base.BaseHandler) -> Any
         _import_string_should_wrap_middleware.set(True)
         try:
             return old_load_middleware(self)
@@ -47,11 +59,14 @@ def patch_django_middlewares():
 
 
 def _wrap_middleware(middleware, middleware_name):
+    # type: (Any, str) -> Any
     from sentry_sdk.integrations.django import DjangoIntegration
 
     def _get_wrapped_method(old_method):
+        # type: (F) -> F
         @wraps(old_method)
         def sentry_wrapped_method(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
             hub = Hub.current
             integration = hub.get_integration(DjangoIntegration)
             if integration is None or not integration.middleware_spans:
@@ -71,16 +86,18 @@ def _wrap_middleware(middleware, middleware_name):
                 span.set_tag("django.middleware_name", middleware_name)
                 return old_method(*args, **kwargs)
 
-        return sentry_wrapped_method
+        return sentry_wrapped_method  # type: ignore
 
     class SentryWrappingMiddleware(object):
         def __init__(self, *args, **kwargs):
+            # type: (*Any, **Any) -> None
             self._inner = middleware(*args, **kwargs)
             self._call_method = None
 
         # We need correct behavior for `hasattr()`, which we can only determine
         # when we have an instance of the middleware we're wrapping.
         def __getattr__(self, method_name):
+            # type: (str) -> Any
             if method_name not in (
                 "process_request",
                 "process_view",
@@ -96,9 +113,11 @@ def _wrap_middleware(middleware, middleware_name):
             return rv
 
         def __call__(self, *args, **kwargs):
-            if self._call_method is None:
-                self._call_method = _get_wrapped_method(self._inner.__call__)
-            return self._call_method(*args, **kwargs)
+            # type: (*Any, **Any) -> Any
+            f = self._call_method
+            if f is None:
+                self._call_method = f = _get_wrapped_method(self._inner.__call__)
+            return f(*args, **kwargs)
 
     if hasattr(middleware, "__name__"):
         SentryWrappingMiddleware.__name__ = middleware.__name__

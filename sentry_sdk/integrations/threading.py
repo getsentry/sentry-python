@@ -7,16 +7,24 @@ from sentry_sdk import Hub
 from sentry_sdk._compat import reraise
 from sentry_sdk._types import MYPY
 from sentry_sdk.integrations import Integration
-from sentry_sdk.utils import event_from_exception
+from sentry_sdk.utils import event_from_exception, capture_internal_exceptions
 
 if MYPY:
     from typing import Any
+    from typing import TypeVar
+    from typing import Callable
+    from typing import Optional
+
+    from sentry_sdk._types import ExcInfo
+
+    F = TypeVar("F", bound=Callable[..., Any])
 
 
 class ThreadingIntegration(Integration):
     identifier = "threading"
 
     def __init__(self, propagate_hub=False):
+        # type: (bool) -> None
         self.propagate_hub = propagate_hub
 
     @staticmethod
@@ -25,6 +33,7 @@ class ThreadingIntegration(Integration):
         old_start = Thread.start
 
         def sentry_start(self, *a, **kw):
+            # type: (Thread, *Any, **Any) -> Any
             hub = Hub.current
             integration = hub.get_integration(ThreadingIntegration)
             if integration is not None:
@@ -38,7 +47,9 @@ class ThreadingIntegration(Integration):
                 #
                 # In threading module, using current_thread API will access current thread instance
                 # without holding it to avoid a reference cycle in an easier way.
-                self.run = _wrap_run(hub_, self.run.__func__)
+                with capture_internal_exceptions():
+                    new_run = _wrap_run(hub_, getattr(self.run, "__func__", self.run))
+                    self.run = new_run  # type: ignore
 
             return old_start(self, *a, **kw)  # type: ignore
 
@@ -46,7 +57,9 @@ class ThreadingIntegration(Integration):
 
 
 def _wrap_run(parent_hub, old_run_func):
+    # type: (Optional[Hub], F) -> F
     def run(*a, **kw):
+        # type: (*Any, **Any) -> Any
         hub = parent_hub or Hub.current
         with hub:
             try:
@@ -55,10 +68,11 @@ def _wrap_run(parent_hub, old_run_func):
             except Exception:
                 reraise(*_capture_exception())
 
-    return run
+    return run  # type: ignore
 
 
 def _capture_exception():
+    # type: () -> ExcInfo
     hub = Hub.current
     exc_info = sys.exc_info()
 

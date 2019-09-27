@@ -17,6 +17,7 @@ if MYPY:
     from typing import Dict
     from typing import Optional
     from typing import Union
+    from typing import List
 
     from django.core.handlers.wsgi import WSGIRequest
     from django.http.response import HttpResponse
@@ -24,7 +25,7 @@ if MYPY:
     from django.utils.datastructures import MultiValueDict
 
     from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from sentry_sdk._types import Event, Hint
+    from sentry_sdk._types import Event, Hint, EventProcessor, NotImplementedType
 
 
 try:
@@ -98,7 +99,7 @@ class DjangoIntegration(Integration):
         old_app = WSGIHandler.__call__
 
         def sentry_patched_wsgi_handler(self, environ, start_response):
-            # type: (Any, Dict[str, str], Callable) -> _ScopedResponse
+            # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
             if Hub.current.get_integration(DjangoIntegration) is None:
                 return old_app(self, environ, start_response)
 
@@ -187,6 +188,7 @@ class DjangoIntegration(Integration):
 
         @add_global_repr_processor
         def _django_queryset_repr(value, hint):
+            # type: (Any, Dict[str, Any]) -> Union[NotImplementedType, str]
             try:
                 # Django 1.6 can fail to import `QuerySet` when Django settings
                 # have not yet been initialized.
@@ -221,6 +223,7 @@ _DRF_PATCH_LOCK = threading.Lock()
 
 
 def _patch_drf():
+    # type: () -> None
     """
     Patch Django Rest Framework for more/better request data. DRF's request
     type is a wrapper around Django's request type. The attribute we're
@@ -263,6 +266,7 @@ def _patch_drf():
                 old_drf_initial = APIView.initial
 
                 def sentry_patched_drf_initial(self, request, *args, **kwargs):
+                    # type: (APIView, Any, *Any, **Any) -> Any
                     with capture_internal_exceptions():
                         request._request._sentry_drf_request_backref = weakref.ref(
                             request
@@ -274,6 +278,7 @@ def _patch_drf():
 
 
 def _patch_channels():
+    # type: () -> None
     try:
         from channels.http import AsgiHandler  # type: ignore
     except ImportError:
@@ -293,6 +298,7 @@ def _patch_channels():
     old_app = AsgiHandler.__call__
 
     def sentry_patched_asgi_handler(self, receive, send):
+        # type: (AsgiHandler, Any, Any) -> Any
         if Hub.current.get_integration(DjangoIntegration) is None:
             return old_app(receive, send)
 
@@ -306,7 +312,7 @@ def _patch_channels():
 
 
 def _make_event_processor(weak_request, integration):
-    # type: (Callable[[], WSGIRequest], DjangoIntegration) -> Callable
+    # type: (Callable[[], WSGIRequest], DjangoIntegration) -> EventProcessor
     def event_processor(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         # if the request is gone we are fine not logging the data from
@@ -374,9 +380,11 @@ class DjangoRequestExtractor(RequestExtractor):
         return self.request.FILES
 
     def size_of_file(self, file):
+        # type: (Any) -> int
         return file.size
 
     def parsed_body(self):
+        # type: () -> Optional[Dict[str, Any]]
         try:
             return self.request.data
         except AttributeError:
@@ -424,6 +432,7 @@ def install_sql_hook():
         return
 
     def execute(self, sql, params=None):
+        # type: (CursorWrapper, Any, Optional[Any]) -> Any
         hub = Hub.current
         if hub.get_integration(DjangoIntegration) is None:
             return real_execute(self, sql, params)
@@ -434,6 +443,7 @@ def install_sql_hook():
             return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):
+        # type: (CursorWrapper, Any, List[Any]) -> Any
         hub = Hub.current
         if hub.get_integration(DjangoIntegration) is None:
             return real_executemany(self, sql, param_list)

@@ -21,6 +21,7 @@ if MYPY:
     from rq.job import Job
 
     from sentry_sdk.utils import ExcInfo
+    from sentry_sdk._types import EventProcessor
 
 
 class RqIntegration(Integration):
@@ -71,6 +72,7 @@ class RqIntegration(Integration):
         old_handle_exception = Worker.handle_exception
 
         def sentry_patched_handle_exception(self, job, *exc_info, **kwargs):
+            # type: (Worker, Any, *Any, **Any) -> Any
             _capture_exception(exc_info)  # type: ignore
             return old_handle_exception(self, job, *exc_info, **kwargs)
 
@@ -79,6 +81,7 @@ class RqIntegration(Integration):
         old_enqueue_job = Queue.enqueue_job
 
         def sentry_patched_enqueue_job(self, job, **kwargs):
+            # type: (Queue, Any, **Any) -> Any
             hub = Hub.current
             if hub.get_integration(RqIntegration) is not None:
                 job.meta["_sentry_trace_headers"] = dict(
@@ -91,7 +94,7 @@ class RqIntegration(Integration):
 
 
 def _make_event_processor(weak_job):
-    # type: (Callable[[], Job]) -> Callable
+    # type: (Callable[[], Job]) -> EventProcessor
     def event_processor(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         job = weak_job()

@@ -26,6 +26,7 @@ if MYPY:
     from typing import Optional
     from typing import Union
     from typing import Tuple
+    from typing import Dict
 
     from sanic.request import Request, RequestParameters
 
@@ -98,7 +99,7 @@ class SanicIntegration(Integration):
         old_error_handler_lookup = ErrorHandler.lookup
 
         def sentry_error_handler_lookup(self, exception):
-            # type: (Any, Exception) -> Optional[Callable]
+            # type: (Any, Exception) -> Optional[object]
             _capture_exception(exception)
             old_error_handler = old_error_handler_lookup(self, exception)
 
@@ -193,6 +194,7 @@ class SanicRequestExtractor(RequestExtractor):
         return len(self.request.body)
 
     def cookies(self):
+        # type: () -> Dict[str, str]
         return dict(self.request.cookies)
 
     def raw_data(self):
@@ -204,6 +206,7 @@ class SanicRequestExtractor(RequestExtractor):
         return self.request.form
 
     def is_json(self):
+        # type: () -> bool
         raise NotImplementedError()
 
     def json(self):
@@ -215,4 +218,5 @@ class SanicRequestExtractor(RequestExtractor):
         return self.request.files
 
     def size_of_file(self, file):
+        # type: (Any) -> int
         return len(file.body or ())

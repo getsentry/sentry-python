@@ -22,9 +22,9 @@ if MYPY:
     from typing import Union
     from typing import Generator
 
-    # https://github.com/python/mypy/issues/5710
-    _NotImplemented = Any
-    ReprProcessor = Callable[[Any, Dict[str, Any]], Union[_NotImplemented, str]]
+    from sentry_sdk._types import NotImplementedType
+
+    ReprProcessor = Callable[[Any, Dict[str, Any]], Union[NotImplementedType, str]]
     Segment = Union[str, int]
 
 

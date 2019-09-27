@@ -21,8 +21,12 @@ if MYPY:
         Event,
         EventProcessor,
         ErrorProcessor,
+        ExcInfo,
         Hint,
+        Type,
     )
+
+    from sentry_sdk.tracing import Span
 
     F = TypeVar("F", bound=Callable[..., Any])
     T = TypeVar("T")
@@ -37,6 +41,7 @@ def add_global_event_processor(processor):
 
 
 def _attr_setter(fn):
+    # type: (Any) -> Any
     return property(fset=fn, doc=fn.__doc__)
 
 
@@ -85,18 +90,38 @@ class Scope(object):
         self._name = None  # type: Optional[str]
         self.clear()
 
+    def clear(self):
+        # type: () -> None
+        """Clears the entire scope."""
+        self._level = None  # type: Optional[str]
+        self._fingerprint = None  # type: Optional[List[str]]
+        self._transaction = None  # type: Optional[str]
+        self._user = None  # type: Optional[Dict[str, Any]]
+
+        self._tags = {}  # type: Dict[str, Any]
+        self._contexts = {}  # type: Dict[str, Dict[str, Any]]
+        self._extras = {}  # type: Dict[str, Any]
+
+        self.clear_breadcrumbs()
+        self._should_capture = True
+
+        self._span = None  # type: Optional[Span]
+
     @_attr_setter
     def level(self, value):
+        # type: (Optional[str]) -> None
         """When set this overrides the level."""
         self._level = value
 
     @_attr_setter
     def fingerprint(self, value):
+        # type: (Optional[List[str]]) -> None
         """When set this overrides the default fingerprint."""
         self._fingerprint = value
 
     @_attr_setter
     def transaction(self, value):
+        # type: (Optional[str]) -> None
         """When set this forces a specific transaction name to be set."""
         self._transaction = value
         if self._span:
@@ -104,16 +129,19 @@ class Scope(object):
 
     @_attr_setter
     def user(self, value):
+        # type: (Dict[str, Any]) -> None
         """When set a specific user is bound to the scope."""
         self._user = value
 
     @property
     def span(self):
+        # type: () -> Optional[Span]
         """Get/set current tracing span."""
         return self._span
 
     @span.setter
     def span(self, span):
+        # type: (Optional[Span]) -> None
         self._span = span
         if span is not None and span.transaction:
             self._transaction = span.transaction
@@ -166,23 +194,6 @@ class Scope(object):
         """Removes a specific extra key."""
         self._extras.pop(key, None)
 
-    def clear(self):
-        # type: () -> None
-        """Clears the entire scope."""
-        self._level = None
-        self._fingerprint = None
-        self._transaction = None
-        self._user = None
-
-        self._tags = {}  # type: Dict[str, Any]
-        self._contexts = {}  # type: Dict[str, Dict[str, Any]]
-        self._extras = {}  # type: Dict[str, Any]
-
-        self.clear_breadcrumbs()
-        self._should_capture = True
-
-        self._span = None
-
     def clear_breadcrumbs(self):
         # type: () -> None
         """Clears breadcrumb buffer."""
@@ -208,7 +219,7 @@ class Scope(object):
     def add_error_processor(
         self,
         func,  # type: ErrorProcessor
-        cls=None,  # type: Optional[type]
+        cls=None,  # type: Optional[Type[BaseException]]
     ):
         # type: (...) -> None
         """Register a scope local error processor on the scope.
@@ -222,6 +233,7 @@ class Scope(object):
             real_func = func
 
             def func(event, exc_info):
+                # type: (Event, ExcInfo) -> Optional[Event]
                 try:
                     is_inst = isinstance(exc_info[1], cls_)
                 except Exception:
