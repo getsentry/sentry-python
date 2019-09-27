@@ -13,6 +13,7 @@ class SparkIntegration(Integration):
         # type: () -> None
         patch_spark_context()
 
+
 def patch_spark_context():
     from pyspark import SparkContext # type: ignore
     from pyspark.java_gateway import ensure_callback_server_started # type: ignore
@@ -54,6 +55,8 @@ class SparkListener(object):
         pass
     def onApplicationStart(self, applicationStart):
         pass
+    def onBlockManagerAdded(self, blockManagerAdded):
+        pass
     def onBlockManagerRemoved(self, blockManagerRemoved):
         pass
     def onBlockUpdated(self, blockUpdated):
@@ -61,6 +64,10 @@ class SparkListener(object):
     def onEnvironmentUpdate(self, environmentUpdate):
         pass
     def onExecutorAdded(self, executorAdded):
+        pass
+    def onExecutorBlacklisted(self, executorBlacklisted):
+        pass
+    def onExecutorBlacklistedForStage(self, executorBlacklistedForStage):
         pass
     def onExecutorMetricsUpdate(self, executorMetricsUpdate):
         pass
@@ -70,7 +77,15 @@ class SparkListener(object):
         pass
     def onJobStart(self, jobStart):
         pass
+    def onNodeBlacklisted(self, nodeBlacklisted):
+        pass
+    def onNodeBlacklistedForStage(self, nodeBlacklistedForStage):
+        pass
+    def onNodeUnblacklisted(self, nodeUnblacklisted):
+        pass
     def onOtherEvent(self, event):
+        pass
+    def onSpeculativeTaskSubmitted(self, speculativeTask):
         pass
     def onStageCompleted(self, stageCompleted):
         pass

@@ -39,7 +39,7 @@ def raise_exception(client):
 import pyspark.daemon as original_daemon
 
 if __name__ == '__main__':
-    sentry_sdk.init("")
+    sentry_sdk.init("https://78732f6a71db437986307ceb758337a1@sentry.io/1731008")
     try:
         original_daemon.manager()
     except Exception as e:
