@@ -440,8 +440,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         kwargs.setdefault("hub", self)
 
         if span is None:
-            if scope.span is not None:
-                span = scope.span.new_span(**kwargs)
+            span = scope.span
+            if span is not None:
+                span = span.new_span(**kwargs)
             else:
                 span = Span(**kwargs)
 
@@ -570,7 +571,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         # type: () -> Generator[Tuple[str, str], None, None]
         # TODO: Document
         client, scope = self._stack[-1]
-        if scope._span is None:
+        span = scope.span
+
+        if span is None:
             return
 
         propagate_traces = client and client.options["propagate_traces"]
@@ -578,9 +581,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return
 
         if client and client.options["traceparent_v2"]:
-            traceparent = scope._span.to_traceparent()
+            traceparent = span.to_traceparent()
         else:
-            traceparent = scope._span.to_legacy_traceparent()
+            traceparent = span.to_legacy_traceparent()
 
         yield "sentry-trace", traceparent
 
