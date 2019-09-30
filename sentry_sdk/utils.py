@@ -3,7 +3,6 @@ import sys
 import linecache
 import logging
 
-from contextlib import contextmanager
 from datetime import datetime
 
 from sentry_sdk._compat import urlparse, text_type, implements_str, PY2
@@ -16,13 +15,14 @@ if MYPY:
     from typing import Any
     from typing import Callable
     from typing import Dict
-    from typing import Generator
+    from typing import ContextManager
     from typing import Iterator
     from typing import List
     from typing import Optional
     from typing import Set
     from typing import Tuple
     from typing import Union
+    from typing import Type
 
     import sentry_sdk
 
@@ -44,15 +44,34 @@ def _get_debug_hub():
     pass
 
 
-@contextmanager
+class CaptureInternalException(object):
+    __slots__ = ()
+
+    def __enter__(self):
+        # type: () -> ContextManager[Any]
+        return self
+
+    def __exit__(self, ty, value, tb):
+        # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[TracebackType]) -> bool
+        if ty is not None:
+            capture_internal_exception()
+
+        return True
+
+
+_CAPTURE_INTERNAL_EXCEPTION = CaptureInternalException()
+
+
 def capture_internal_exceptions():
-    # type: () -> Generator[None, None, None]
-    try:
-        yield
-    except Exception:
-        hub = _get_debug_hub()
-        if hub is not None:
-            hub._capture_internal_exception(sys.exc_info())
+    # type: () -> ContextManager[Any]
+    return _CAPTURE_INTERNAL_EXCEPTION
+
+
+def capture_internal_exception():
+    # type: () -> None
+    hub = _get_debug_hub()
+    if hub is not None:
+        hub._capture_internal_exception(sys.exc_info())
 
 
 def to_timestamp(value):

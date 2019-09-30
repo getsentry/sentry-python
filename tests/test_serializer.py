@@ -5,7 +5,7 @@ import hypothesis.strategies as st
 
 import pytest
 
-from sentry_sdk.serializer import Serializer
+from sentry_sdk.serializer import serialize
 
 
 @given(
@@ -13,9 +13,7 @@ from sentry_sdk.serializer import Serializer
 )
 @example(dt=datetime(2001, 1, 1, 0, 0, 0, 999500))
 def test_datetime_precision(dt, semaphore_normalize):
-    serializer = Serializer()
-
-    event = serializer.serialize_event({"timestamp": dt})
+    event = serialize({"timestamp": dt})
     normalized = semaphore_normalize(event)
 
     if normalized is None:

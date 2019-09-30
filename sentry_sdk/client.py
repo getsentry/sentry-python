@@ -12,7 +12,7 @@ from sentry_sdk.utils import (
     current_stacktrace,
     logger,
 )
-from sentry_sdk.serializer import Serializer
+from sentry_sdk.serializer import serialize
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO, ClientConstructor
 from sentry_sdk.integrations import setup_integrations
@@ -171,7 +171,7 @@ class _Client(object):
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
-            event = Serializer().serialize_event(event)
+            event = serialize(event)
 
         before_send = self.options["before_send"]
         if before_send is not None:
