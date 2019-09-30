@@ -11,8 +11,44 @@ class SparkIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        patch_spark_context()
+        # patch_spark_context()
+        patch_write_with_length()
 
+def _capture_exception(exc_info, hub):
+    """
+    Send Beam exception to Sentry.
+    """
+    client = hub.client
+    event, hint = event_from_exception(
+        exc_info,
+        client_options=client.options,
+        mechanism={"type": "spark", "handled": False},
+    )
+    print('testing')
+    hub.capture_event(event, hint=hint)
+
+
+def raise_exception(exec_info):
+    """
+    Raise an exception. If the client is not in the hub, rebind it.
+    """
+    hub = Hub.current
+    # exc_info = sys.exc_info()
+    with capture_internal_exceptions():
+        _capture_exception(exec_info, hub)
+    reraise(*exec_info)
+
+def patch_write_with_length():
+    import pyspark.serializers as serializers
+
+    old_write_with_length = serializers.write_with_length
+
+    def _sentry_wrapped_write_with_length(exec_info, *args, **kwargs):
+        val = old_write_with_length(exec_info, *args, **kwargs)
+        raise_exception(exec_info)
+        return val
+    
+    serializers.write_with_length = _sentry_wrapped_write_with_length
 
 def patch_spark_context():
     from pyspark import SparkContext # type: ignore
