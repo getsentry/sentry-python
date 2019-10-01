@@ -68,9 +68,10 @@ class RequestExtractor(object):
                     {"rem": [["!raw", "x", 0, content_length]], "len": content_length},
                 )
             else:
-                return
+                data = None
 
-        request_info["data"] = data
+        if data is not None:
+            request_info["data"] = data
 
         event["request"] = partial_serialize(client, request_info)
 

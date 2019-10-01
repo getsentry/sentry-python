@@ -282,7 +282,7 @@ def serialize(event, **kwargs):
     disable_capture_event.set(True)
     try:
         rv = _serialize_node(event, **kwargs)
-        if meta_stack:
+        if meta_stack and isinstance(rv, dict):
             rv["_meta"] = meta_stack[0]
         return rv
     finally:
@@ -302,8 +302,9 @@ def partial_serialize(client, data, should_repr_strings=True, is_databag=True):
             data, should_repr_strings=should_repr_strings, is_databag=is_databag
         )
 
-        # TODO: Bring back _meta annotations
-        data.pop("_meta", None)
+        if isinstance(data, dict):
+            # TODO: Bring back _meta annotations
+            data.pop("_meta", None)
         return data
 
     return data
