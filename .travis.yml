@@ -20,15 +20,9 @@ branches:
     - /^release\/.+$/
 
 matrix:
-  allow_failures:
-    - python: "3.8-dev"
-
   include:
     - python: "3.7"
       dist: xenial
-    - python: "3.8-dev"
-      dist: xenial
-
     - name: Linting
       python: "3.6"
       install:
