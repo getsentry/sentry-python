@@ -1,3 +1,4 @@
+import sys
 import itertools
 
 from datetime import datetime
@@ -55,21 +56,21 @@ def add_global_repr_processor(processor):
 
 
 class Memo(object):
-    __slots__ = ("_inner", "_obj")
+    __slots__ = ("_inner", "_objs")
 
     def __init__(self):
         # type: () -> None
         self._inner = {}  # type: Dict[int, Any]
-        self._obj = None  # type: Optional[Any]
+        self._objs = []  # type: List[Any]
 
     def memoize(self, obj):
         # type: (Any) -> ContextManager[bool]
-        self._obj = obj
+        self._objs.append(obj)
         return self
 
     def __enter__(self):
         # type: () -> bool
-        obj = self._obj
+        obj = self._objs[-1]
         if id(obj) in self._inner:
             return True
         else:
@@ -83,7 +84,7 @@ class Memo(object):
         tb,  # type: Optional[TracebackType]
     ):
         # type: (...) -> None
-        self._inner.pop(id(self._obj), None)
+        self._inner.pop(id(self._objs.pop()), None)
 
 
 def serialize(event):
@@ -144,7 +145,7 @@ def serialize(event):
                     should_repr_strings=should_repr_strings,
                 )
         except BaseException:
-            capture_internal_exception()
+            capture_internal_exception(sys.exc_info())
 
             if is_databag:
                 return u"<failed to serialize, use init(debug=True) to see error logs>"
@@ -228,7 +229,7 @@ def serialize(event):
                 _annotate(len=len(obj))
             else:
                 if type(obj) is dict:
-                    rv_dict = dict(obj)  # type: ignore
+                    rv_dict = dict(obj)
                 else:
                     rv_dict = dict(iteritems(obj))
 

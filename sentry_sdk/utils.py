@@ -53,8 +53,8 @@ class CaptureInternalException(object):
 
     def __exit__(self, ty, value, tb):
         # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[TracebackType]) -> bool
-        if ty is not None:
-            capture_internal_exception()
+        if ty is not None and value is not None:
+            capture_internal_exception((ty, value, tb))
 
         return True
 
@@ -67,11 +67,11 @@ def capture_internal_exceptions():
     return _CAPTURE_INTERNAL_EXCEPTION
 
 
-def capture_internal_exception():
-    # type: () -> None
+def capture_internal_exception(exc_info):
+    # type: (ExcInfo) -> None
     hub = _get_debug_hub()
     if hub is not None:
-        hub._capture_internal_exception(sys.exc_info())
+        hub._capture_internal_exception(exc_info)
 
 
 def to_timestamp(value):

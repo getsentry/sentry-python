@@ -10,6 +10,7 @@ import eventlet
 import sentry_sdk
 from sentry_sdk._compat import reraise, string_types, iteritems
 from sentry_sdk.transport import Transport
+from sentry_sdk.utils import capture_internal_exceptions
 
 from tests import _warning_recorder, _warning_recorder_mgr
 
@@ -118,8 +119,9 @@ def monkeypatch_test_transport(monkeypatch, semaphore_normalize):
                 if isinstance(value, dict):
                     check_string_keys(value)
 
-        check_string_keys(event)
-        semaphore_normalize(event)
+        with capture_internal_exceptions():
+            check_string_keys(event)
+            semaphore_normalize(event)
 
     def inner(client):
         monkeypatch.setattr(client, "transport", TestTransport(check_event))
