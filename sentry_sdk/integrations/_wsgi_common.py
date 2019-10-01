@@ -1,6 +1,6 @@
 import json
 
-from sentry_sdk.serializer import serialize_databag
+from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue
 from sentry_sdk._compat import text_type, iteritems
@@ -72,7 +72,7 @@ class RequestExtractor(object):
 
         request_info["data"] = data
 
-        event["request"] = serialize_databag(client, request_info)
+        event["request"] = partial_serialize(client, request_info)
 
     def content_length(self):
         # type: () -> int

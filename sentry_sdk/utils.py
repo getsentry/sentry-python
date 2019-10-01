@@ -416,7 +416,7 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
         "post_context": post_context,
     }  # type: Dict[str, Any]
     if with_locals:
-        rv["vars"] = sentry_sdk.serializer.serialize_databag(
+        rv["vars"] = sentry_sdk.serializer.partial_serialize(
             sentry_sdk.Hub.current.client, frame.f_locals
         )
     return rv

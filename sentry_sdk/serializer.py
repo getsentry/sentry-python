@@ -289,7 +289,7 @@ def serialize(event, **kwargs):
         disable_capture_event.set(False)
 
 
-def serialize_databag(client, data, should_repr_strings=True, is_databag=True):
+def partial_serialize(client, data, should_repr_strings=True, is_databag=True):
     # type: (Optional[Client], Any, bool, bool) -> Any
     is_recursive = disable_capture_event.get(None)
     if is_recursive:

@@ -4,7 +4,7 @@ import logging
 import datetime
 
 from sentry_sdk.hub import Hub
-from sentry_sdk.serializer import serialize_databag
+from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.utils import (
     to_string,
     event_from_exception,
@@ -205,7 +205,7 @@ class EventHandler(logging.Handler, object):
         event["level"] = _logging_to_event_level(record.levelname)
         event["logger"] = record.name
         event["logentry"] = {"message": to_string(record.msg), "params": record.args}
-        event["extra"] = serialize_databag(
+        event["extra"] = partial_serialize(
             Hub.current.client, _extra_from_record(record), should_repr_strings=False
         )
 

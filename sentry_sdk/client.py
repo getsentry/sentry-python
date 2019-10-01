@@ -13,7 +13,7 @@ from sentry_sdk.utils import (
     disable_capture_event,
     logger,
 )
-from sentry_sdk.serializer import serialize, serialize_databag
+from sentry_sdk.serializer import serialize, partial_serialize
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO, ClientConstructor
 from sentry_sdk.integrations import setup_integrations
@@ -127,7 +127,7 @@ class _Client(object):
         client = self  # type: Client  # type: ignore
 
         if event.get("timestamp") is None:
-            event["timestamp"] = serialize_databag(
+            event["timestamp"] = partial_serialize(
                 client, datetime.utcnow(), is_databag=False, should_repr_strings=False
             )
 

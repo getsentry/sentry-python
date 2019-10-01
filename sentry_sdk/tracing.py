@@ -6,7 +6,7 @@ from datetime import datetime
 
 import sentry_sdk
 
-from sentry_sdk.serializer import serialize_databag
+from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.utils import capture_internal_exceptions, logger
 from sentry_sdk._compat import PY2
 from sentry_sdk._types import MYPY
@@ -256,13 +256,13 @@ class Span(object):
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
-        self._tags[key] = serialize_databag(
+        self._tags[key] = partial_serialize(
             sentry_sdk.Hub.current.client, value, should_repr_strings=False
         )
 
     def set_data(self, key, value):
         # type: (str, Any) -> None
-        self._data[key] = serialize_databag(
+        self._data[key] = partial_serialize(
             sentry_sdk.Hub.current.client, value, should_repr_strings=False
         )
 
@@ -322,10 +322,10 @@ class Span(object):
                 "type": "transaction",
                 "transaction": self.transaction,
                 "contexts": {"trace": self.get_trace_context()},
-                "timestamp": serialize_databag(
+                "timestamp": partial_serialize(
                     client, self.timestamp, is_databag=False, should_repr_strings=False
                 ),
-                "start_timestamp": serialize_databag(
+                "start_timestamp": partial_serialize(
                     client,
                     self.start_timestamp,
                     is_databag=False,
@@ -349,13 +349,13 @@ class Span(object):
             "transaction": self.transaction,
             "op": self.op,
             "description": self.description,
-            "start_timestamp": serialize_databag(
+            "start_timestamp": partial_serialize(
                 client,
                 self.start_timestamp,
                 is_databag=False,
                 should_repr_strings=False,
             ),
-            "timestamp": serialize_databag(
+            "timestamp": partial_serialize(
                 client, self.timestamp, is_databag=False, should_repr_strings=False
             ),
             "tags": self._tags,
