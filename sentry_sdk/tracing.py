@@ -26,8 +26,6 @@ if MYPY:
     from typing import List
     from typing import Tuple
 
-    import sentry_sdk
-
 _traceparent_header_format_re = re.compile(
     "^[ \t]*"  # whitespace
     "([0-9a-f]{32})?"  # trace_id
