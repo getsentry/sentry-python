@@ -1,45 +1,73 @@
-# import os
-# import imp
+from __future__ import absolute_import
 
-import sentry_sdk
+import sys
+import os
+
+from sentry_sdk import configure_scope
 from sentry_sdk.hub import Hub
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
-# from sentry_sdk.integrations import SparkIntegration
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    exc_info_from_error,
+    single_exception_from_error_tuple,
+    walk_exception_chain,
+    event_hint_with_exc_info,
+)
 
-# # This is a hack to always refer the main code rather than built zip.
-# # main_code_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-# # daemon = imp.load_source("daemon", "%s/pyspark/daemon.py" % main_code_dir)
-# # worker = imp.load_source("worker", "%s/pyspark/worker.py" % main_code_dir)
 
 def _capture_exception(exc_info, hub):
     """
-    Send Beam exception to Sentry.
+    Send exception to Sentry.
     """
-    integration = hub.get_integration(SparkIntegration)
-    if integration:
-        client = hub.client
-        event, hint = event_from_exception(
-            exc_info,
-            client_options=client.options,
-            mechanism={"type": "spark", "handled": False},
-        )
+    from pyspark.taskcontext import TaskContext
+
+    client = hub.client
+
+    client_options = client.options
+    mechanism = {"type": "spark", "handled": False}
+
+    exc_info = exc_info_from_error(exc_info)
+
+    exc_type, exc_value, tb = exc_info
+    rv = []
+
+    for exc_type, exc_value, tb in walk_exception_chain(exc_info):
+        if exc_type not in (SystemExit, EOFError, ConnectionResetError):
+            rv.append(
+                single_exception_from_error_tuple(
+                    exc_type, exc_value, tb, client_options, mechanism
+                )
+            )
+
+    if rv:
+        rv.reverse()
+        hint = event_hint_with_exc_info(exc_info)
+        event = {"level": "error", "exception": {"values": rv}}
+
+        taskContext = TaskContext._getOrCreate()
+
+        with configure_scope() as scope:
+            scope.set_tag("stageId", taskContext.stageId())
+            scope.set_tag("partitionId", taskContext.partitionId())
+            scope.set_tag("attemptNumber", taskContext.attemptNumber())
+            scope.set_tag("taskAttemptId", taskContext.taskAttemptId())
+            scope.set_tag("stage_id", taskContext.stageId())
+            scope.set_tag("stage_id", taskContext.stageId())
+            scope.set_tag("app_name", taskContext._localProperties["app_name"])
+            scope.set_tag(
+                "application_id", taskContext._localProperties["application_id"]
+            )
+            scope.set_extra("callSite", taskContext._localProperties["callSite.short"])
+
         hub.capture_event(event, hint=hint)
 
 
-def raise_exception(client):
-    """
-    Raise an exception. If the client is not in the hub, rebind it.
-    """
-    hub = Hub.current
-    exc_info = sys.exc_info()
-    with capture_internal_exceptions():
-        _capture_exception(exc_info, hub)
-    reraise(*exc_info)
+def sentry_worker_main(*args, **kwargs):
+    import pyspark.worker as original_worker
 
-import pyspark.daemon as original_daemon
-
-if __name__ == '__main__':
     try:
-        original_daemon.manager()
-    except Exception as e:
-        raise_exception(client)
+        original_worker.main(*args, **kwargs)
+    except SystemExit:
+        hub = Hub.current
+        exc_info = sys.exc_info()
+        with capture_internal_exceptions():
+            _capture_exception(exc_info, hub)
