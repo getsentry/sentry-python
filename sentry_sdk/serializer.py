@@ -227,9 +227,10 @@ def serialize(event):
                 rv_dict = dict(itertools.islice(iteritems(obj), None, max_breadth))
                 _annotate(len=len(obj))
             else:
-                rv_dict = obj
-                if type(rv_dict) is not dict:
-                    rv_dict = dict(iteritems(rv_dict))
+                if type(obj) is dict:
+                    rv_dict = dict(obj)  # type: ignore
+                else:
+                    rv_dict = dict(iteritems(obj))
 
             for k in list(rv_dict):
                 str_k = text_type(k)
@@ -250,9 +251,7 @@ def serialize(event):
                 rv_list = list(obj)[:max_breadth]
                 _annotate(len=len(obj))
             else:
-                rv_list = obj
-                if type(rv_list) is not list:
-                    rv_list = list(rv_list)
+                rv_list = list(obj)
 
             for i in range(len(rv_list)):
                 rv_list[i] = _serialize_node(
