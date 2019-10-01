@@ -1,6 +1,7 @@
 import os
 import subprocess
 import json
+import uuid
 
 import pytest
 
@@ -158,7 +159,7 @@ def semaphore_normalize(tmpdir):
         # Disable subprocess integration
         with sentry_sdk.Hub(None):
             # not dealing with the subprocess API right now
-            file = tmpdir.join("event")
+            file = tmpdir.join("event-{}".format(uuid.uuid4().hex))
             file.write(json.dumps(dict(event)))
             output = json.loads(
                 subprocess.check_output(
