@@ -420,7 +420,7 @@ def record_http_request(hub, url, method):
     # type: (sentry_sdk.Hub, str, str) -> Generator[Dict[str, str], None, None]
     data_dict = {"url": url, "method": method}
 
-    with hub.start_span(op="http", description="%s %s" % (url, method)) as span:
+    with hub.start_span(op="http", description="%s %s" % (method, url)) as span:
         try:
             yield data_dict
         finally:
