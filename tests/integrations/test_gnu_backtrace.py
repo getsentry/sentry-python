@@ -94,9 +94,8 @@ def test_basic(sentry_init, capture_events, input):
     )
     frame, = exception["stacktrace"]["frames"][1:]
 
-    if "function" not in frame:
+    if frame.get("function") is None:
         assert "clickhouse-server()" in input or "pthread" in input
     else:
-        assert frame["function"]
         assert ")" not in frame["function"] and "(" not in frame["function"]
         assert frame["function"] in input

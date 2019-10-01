@@ -6,6 +6,7 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -130,7 +131,11 @@ def _make_request_processor(weak_request):
             request_info["query_string"] = request.query_string
             request_info["method"] = request.method
             request_info["env"] = {"REMOTE_ADDR": request.remote}
-            request_info["headers"] = _filter_headers(dict(request.headers))
+            request_info["headers"] = partial_serialize(
+                Hub.current.client,
+                _filter_headers(dict(request.headers)),
+                should_repr_strings=False,
+            )
 
         return event
 

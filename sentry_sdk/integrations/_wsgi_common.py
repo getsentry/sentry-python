@@ -1,5 +1,6 @@
 import json
 
+from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue
 from sentry_sdk._compat import text_type, iteritems
@@ -42,7 +43,7 @@ class RequestExtractor(object):
         data = None  # type: Optional[Union[AnnotatedValue, Dict[str, Any]]]
 
         content_length = self.content_length()
-        request_info = event.setdefault("request", {})
+        request_info = event.get("request", {})
 
         if _should_send_default_pii():
             request_info["cookies"] = dict(self.cookies())
@@ -67,9 +68,12 @@ class RequestExtractor(object):
                     {"rem": [["!raw", "x", 0, content_length]], "len": content_length},
                 )
             else:
-                return
+                data = None
 
-        request_info["data"] = data
+        if data is not None:
+            request_info["data"] = data
+
+        event["request"] = partial_serialize(client, request_info)
 
     def content_length(self):
         # type: () -> int

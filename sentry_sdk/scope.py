@@ -3,7 +3,11 @@ from collections import deque
 from functools import wraps
 from itertools import chain
 
+import sentry_sdk
+
 from sentry_sdk.utils import logger, capture_internal_exceptions
+from sentry_sdk.serializer import partial_serialize
+
 
 from sentry_sdk._types import MYPY
 
@@ -162,7 +166,9 @@ class Scope(object):
     ):
         # type: (...) -> None
         """Sets a tag for a key to a specific value."""
-        self._tags[key] = value
+        self._tags[key] = partial_serialize(
+            sentry_sdk.Hub.current.client, value, should_repr_strings=False
+        )
 
     def remove_tag(
         self, key  # type: str
@@ -178,7 +184,9 @@ class Scope(object):
     ):
         # type: (...) -> None
         """Binds a context at a certain key to a specific value."""
-        self._contexts[key] = value
+        self._contexts[key] = partial_serialize(
+            sentry_sdk.Hub.current.client, value, should_repr_strings=False
+        )
 
     def remove_context(
         self, key  # type: str
@@ -194,7 +202,9 @@ class Scope(object):
     ):
         # type: (...) -> None
         """Sets an extra key to a specific value."""
-        self._extras[key] = value
+        self._extras[key] = partial_serialize(
+            sentry_sdk.Hub.current.client, value, should_repr_strings=False
+        )
 
     def remove_extra(
         self, key  # type: str

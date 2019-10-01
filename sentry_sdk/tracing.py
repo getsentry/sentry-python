@@ -5,6 +5,8 @@ import contextlib
 from datetime import datetime
 
 import sentry_sdk
+
+from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.utils import capture_internal_exceptions, logger
 from sentry_sdk._compat import PY2
 from sentry_sdk._types import MYPY
@@ -252,11 +254,15 @@ class Span(object):
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
-        self._tags[key] = value
+        self._tags[key] = partial_serialize(
+            sentry_sdk.Hub.current.client, value, should_repr_strings=False
+        )
 
     def set_data(self, key, value):
         # type: (str, Any) -> None
-        self._data[key] = value
+        self._data[key] = partial_serialize(
+            sentry_sdk.Hub.current.client, value, should_repr_strings=False
+        )
 
     def set_failure(self):
         # type: () -> None
@@ -292,7 +298,9 @@ class Span(object):
             # transaction for this span that would be flushed out eventually.
             return None
 
-        if hub.client is None:
+        client = hub.client
+
+        if client is None:
             # We have no client and therefore nowhere to send this transaction
             # event.
             return None
@@ -312,18 +320,25 @@ class Span(object):
                 "type": "transaction",
                 "transaction": self.transaction,
                 "contexts": {"trace": self.get_trace_context()},
-                "timestamp": self.timestamp,
-                "start_timestamp": self.start_timestamp,
+                "timestamp": partial_serialize(
+                    client, self.timestamp, is_databag=False, should_repr_strings=False
+                ),
+                "start_timestamp": partial_serialize(
+                    client,
+                    self.start_timestamp,
+                    is_databag=False,
+                    should_repr_strings=False,
+                ),
                 "spans": [
-                    s.to_json()
+                    s.to_json(client)
                     for s in self._span_recorder.finished_spans
                     if s is not self
                 ],
             }
         )
 
-    def to_json(self):
-        # type: () -> Any
+    def to_json(self, client):
+        # type: (Optional[sentry_sdk.Client]) -> Any
         rv = {
             "trace_id": self.trace_id,
             "span_id": self.span_id,
@@ -332,8 +347,15 @@ class Span(object):
             "transaction": self.transaction,
             "op": self.op,
             "description": self.description,
-            "start_timestamp": self.start_timestamp,
-            "timestamp": self.timestamp,
+            "start_timestamp": partial_serialize(
+                client,
+                self.start_timestamp,
+                is_databag=False,
+                should_repr_strings=False,
+            ),
+            "timestamp": partial_serialize(
+                client, self.timestamp, is_databag=False, should_repr_strings=False
+            ),
             "tags": self._tags,
             "data": self._data,
         }

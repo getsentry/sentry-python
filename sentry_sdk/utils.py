@@ -3,9 +3,9 @@ import sys
 import linecache
 import logging
 
-from contextlib import contextmanager
 from datetime import datetime
 
+import sentry_sdk
 from sentry_sdk._compat import urlparse, text_type, implements_str, PY2
 
 from sentry_sdk._types import MYPY
@@ -16,15 +16,14 @@ if MYPY:
     from typing import Any
     from typing import Callable
     from typing import Dict
-    from typing import Generator
+    from typing import ContextManager
     from typing import Iterator
     from typing import List
     from typing import Optional
     from typing import Set
     from typing import Tuple
     from typing import Union
-
-    import sentry_sdk
+    from typing import Type
 
     from sentry_sdk._types import ExcInfo
 
@@ -44,15 +43,34 @@ def _get_debug_hub():
     pass
 
 
-@contextmanager
+class CaptureInternalException(object):
+    __slots__ = ()
+
+    def __enter__(self):
+        # type: () -> ContextManager[Any]
+        return self
+
+    def __exit__(self, ty, value, tb):
+        # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[TracebackType]) -> bool
+        if ty is not None and value is not None:
+            capture_internal_exception((ty, value, tb))
+
+        return True
+
+
+_CAPTURE_INTERNAL_EXCEPTION = CaptureInternalException()
+
+
 def capture_internal_exceptions():
-    # type: () -> Generator[None, None, None]
-    try:
-        yield
-    except Exception:
-        hub = _get_debug_hub()
-        if hub is not None:
-            hub._capture_internal_exception(sys.exc_info())
+    # type: () -> ContextManager[Any]
+    return _CAPTURE_INTERNAL_EXCEPTION
+
+
+def capture_internal_exception(exc_info):
+    # type: (ExcInfo) -> None
+    hub = _get_debug_hub()
+    if hub is not None:
+        hub._capture_internal_exception(exc_info)
 
 
 def to_timestamp(value):
@@ -398,7 +416,9 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
         "post_context": post_context,
     }  # type: Dict[str, Any]
     if with_locals:
-        rv["vars"] = frame.f_locals
+        rv["vars"] = sentry_sdk.serializer.partial_serialize(
+            sentry_sdk.Hub.current.client, frame.f_locals
+        )
     return rv
 
 
@@ -772,3 +792,6 @@ def transaction_from_function(func):
 
     # Possibly a lambda
     return func_qualname
+
+
+disable_capture_event = ContextVar("disable_capture_event")

@@ -4,7 +4,7 @@ from threading import Thread
 
 import pytest
 
-from sentry_sdk import configure_scope
+from sentry_sdk import configure_scope, capture_message
 from sentry_sdk.integrations.threading import ThreadingIntegration
 
 
@@ -88,6 +88,11 @@ def test_circular_references(sentry_init, request):
 def test_double_patching(sentry_init, capture_events):
     sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
     events = capture_events()
+
+    # XXX: Workaround for race condition in the py library's magic import
+    # system (py is a dependency of pytest)
+    capture_message("hi")
+    del events[:]
 
     class MyThread(Thread):
         def run(self):

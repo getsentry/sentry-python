@@ -1,6 +1,7 @@
 import os
 import subprocess
 import json
+import uuid
 
 import pytest
 
@@ -10,6 +11,7 @@ import eventlet
 import sentry_sdk
 from sentry_sdk._compat import reraise, string_types, iteritems
 from sentry_sdk.transport import Transport
+from sentry_sdk.utils import capture_internal_exceptions
 
 from tests import _warning_recorder, _warning_recorder_mgr
 
@@ -67,6 +69,11 @@ def _capture_internal_warnings():
         except NameError:
             pass
 
+        if "sentry_sdk" not in str(warning.filename) and "sentry-sdk" not in str(
+            warning.filename
+        ):
+            continue
+
         # pytest-django
         if "getfuncargvalue" in str(warning.message):
             continue
@@ -118,8 +125,9 @@ def monkeypatch_test_transport(monkeypatch, semaphore_normalize):
                 if isinstance(value, dict):
                     check_string_keys(value)
 
-        check_string_keys(event)
-        semaphore_normalize(event)
+        with capture_internal_exceptions():
+            check_string_keys(event)
+            semaphore_normalize(event)
 
     def inner(client):
         monkeypatch.setattr(client, "transport", TestTransport(check_event))
@@ -156,7 +164,7 @@ def semaphore_normalize(tmpdir):
         # Disable subprocess integration
         with sentry_sdk.Hub(None):
             # not dealing with the subprocess API right now
-            file = tmpdir.join("event")
+            file = tmpdir.join("event-{}".format(uuid.uuid4().hex))
             file.write(json.dumps(dict(event)))
             output = json.loads(
                 subprocess.check_output(
@@ -170,11 +178,12 @@ def semaphore_normalize(tmpdir):
     return inner
 
 
-@pytest.fixture
-def sentry_init(monkeypatch_test_transport):
+@pytest.fixture(params=[True, False], ids=["fast_serializer", "default_serializer"])
+def sentry_init(monkeypatch_test_transport, request):
     def inner(*a, **kw):
         hub = sentry_sdk.Hub.current
         client = sentry_sdk.Client(*a, **kw)
+        client.options["_experiments"]["fast_serializer"] = request.param
         hub.bind_client(client)
         monkeypatch_test_transport(sentry_sdk.Hub.current.client)
 
