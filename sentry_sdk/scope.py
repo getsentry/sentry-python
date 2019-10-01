@@ -66,6 +66,12 @@ class Scope(object):
     events that belong to it.
     """
 
+    # NOTE: Even though it should not happen, the scope needs to not crash when
+    # accessed by multiple threads. It's fine if it's full of races, but those
+    # races should never make the user application crash.
+    #
+    # The same needs to hold for any accesses of the scope the SDK makes.
+
     __slots__ = (
         "_level",
         "_name",
@@ -124,8 +130,9 @@ class Scope(object):
         # type: (Optional[str]) -> None
         """When set this forces a specific transaction name to be set."""
         self._transaction = value
-        if self._span:
-            self._span.transaction = value
+        span = self._span
+        if span:
+            span.transaction = value
 
     @_attr_setter
     def user(self, value):
@@ -143,8 +150,10 @@ class Scope(object):
     def span(self, span):
         # type: (Optional[Span]) -> None
         self._span = span
-        if span is not None and span.transaction:
-            self._transaction = span.transaction
+        if span is not None:
+            span_transaction = span.transaction
+            if span_transaction:
+                self._transaction = span_transaction
 
     def set_tag(
         self,
