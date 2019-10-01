@@ -49,7 +49,7 @@ class ClientConstructor(object):
         # DO NOT ENABLE THIS RIGHT NOW UNLESS YOU WANT TO EXCEED YOUR EVENT QUOTA IMMEDIATELY
         traces_sample_rate=0.0,  # type: float
         traceparent_v2=False,  # type: bool
-        _experiments={"fast_serialize": False},  # type: Dict[str, Any]
+        _experiments={},  # type: Dict[str, Any]
     ):
         # type: (...) -> None
         pass
