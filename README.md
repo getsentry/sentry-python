@@ -15,7 +15,7 @@ This is the next line of the Python SDK for [Sentry](http://sentry.io/), intende
 ```python
 from sentry_sdk import init, capture_message
 
-init("mydsn@sentry.io/123")
+init("https://mydsn@sentry.io/123")
 
 capture_message("Hello World")  # Will create an event.
 
