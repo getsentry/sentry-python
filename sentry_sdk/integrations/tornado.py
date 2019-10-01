@@ -2,6 +2,7 @@ import weakref
 from inspect import iscoroutinefunction
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
+from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     event_from_exception,
@@ -151,7 +152,9 @@ def _make_event_processor(weak_handler):
                 request.path,
             )
 
-            request_info["query_string"] = request.query
+            request_info["query_string"] = partial_serialize(
+                Hub.current.client, request.query, should_repr_strings=False
+            )
             request_info["method"] = request.method
             request_info["env"] = {"REMOTE_ADDR": request.remote_ip}
             request_info["headers"] = _filter_headers(dict(request.headers))

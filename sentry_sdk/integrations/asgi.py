@@ -10,6 +10,7 @@ import urllib
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.utils import ContextVar, event_from_exception, transaction_from_function
 from sentry_sdk.tracing import Span
 
@@ -96,7 +97,7 @@ class SentryAsgiMiddleware:
 
     def event_processor(self, event, hint, asgi_scope):
         # type: (Event, Hint, Any) -> Optional[Event]
-        request_info = event.setdefault("request", {})
+        request_info = event.get("request", {})
 
         if asgi_scope["type"] in ("http", "websocket"):
             request_info["url"] = self.get_url(asgi_scope)
@@ -112,6 +113,11 @@ class SentryAsgiMiddleware:
             # done, which is sometime after the request has started. If we have
             # an endpoint, overwrite our path-based transaction name.
             event["transaction"] = self.get_transaction(asgi_scope)
+
+        event["request"] = partial_serialize(
+            Hub.current.client, request_info, should_repr_strings=False
+        )
+
         return event
 
     def get_url(self, scope):

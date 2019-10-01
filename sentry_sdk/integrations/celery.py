@@ -166,6 +166,7 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
             extra["celery-job"] = partial_serialize(
                 Hub.current.client,
                 {"task_name": task.name, "args": args, "kwargs": kwargs},
+                should_repr_strings=False,
             )
 
         if "exc_info" in hint:
