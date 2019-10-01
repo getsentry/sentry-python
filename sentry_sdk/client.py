@@ -10,9 +10,10 @@ from sentry_sdk.utils import (
     get_type_name,
     capture_internal_exceptions,
     current_stacktrace,
+    disable_capture_event,
     logger,
 )
-from sentry_sdk.serializer import serialize
+from sentry_sdk.serializer import serialize, serialize_databag
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO, ClientConstructor
 from sentry_sdk.integrations import setup_integrations
@@ -31,7 +32,6 @@ if MYPY:
 
 
 _client_init_debug = ContextVar("client_init_debug")
-_client_in_capture_event = ContextVar("client_in_capture_event")
 
 
 def _get_options(*args, **kwargs):
@@ -123,8 +123,13 @@ class _Client(object):
         scope,  # type: Optional[Scope]
     ):
         # type: (...) -> Optional[Event]
+
+        client = self  # type: Client  # type: ignore
+
         if event.get("timestamp") is None:
-            event["timestamp"] = datetime.utcnow()
+            event["timestamp"] = serialize_databag(
+                client, datetime.utcnow(), is_databag=False, should_repr_strings=False
+            )
 
         hint = dict(hint or ())  # type: Hint
 
@@ -170,7 +175,9 @@ class _Client(object):
 
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
-        if event is not None:
+        if event is not None and not self.options["_experiments"].get(
+            "fast_serialize", False
+        ):
             event = serialize(event)
 
         before_send = self.options["before_send"]
@@ -241,29 +248,23 @@ class _Client(object):
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
-        is_recursive = _client_in_capture_event.get(False)
-        if is_recursive:
+        if disable_capture_event.get(False):
             return None
 
-        _client_in_capture_event.set(True)
-
-        try:
-            if self.transport is None:
-                return None
-            if hint is None:
-                hint = {}
-            event_id = event.get("event_id")
-            if event_id is None:
-                event["event_id"] = event_id = uuid.uuid4().hex
-            if not self._should_capture(event, hint, scope):
-                return None
-            event_opt = self._prepare_event(event, hint, scope)
-            if event_opt is None:
-                return None
-            self.transport.capture_event(event_opt)
-            return event_id
-        finally:
-            _client_in_capture_event.set(False)
+        if self.transport is None:
+            return None
+        if hint is None:
+            hint = {}
+        event_id = event.get("event_id")
+        if event_id is None:
+            event["event_id"] = event_id = uuid.uuid4().hex
+        if not self._should_capture(event, hint, scope):
+            return None
+        event_opt = self._prepare_event(event, hint, scope)
+        if event_opt is None:
+            return None
+        self.transport.capture_event(event_opt)
+        return event_id
 
     def close(
         self,

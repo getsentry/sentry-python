@@ -69,6 +69,11 @@ def _capture_internal_warnings():
         except NameError:
             pass
 
+        if "sentry_sdk" not in str(warning.filename) and "sentry-sdk" not in str(
+            warning.filename
+        ):
+            continue
+
         # pytest-django
         if "getfuncargvalue" in str(warning.message):
             continue
@@ -173,11 +178,12 @@ def semaphore_normalize(tmpdir):
     return inner
 
 
-@pytest.fixture
-def sentry_init(monkeypatch_test_transport):
+@pytest.fixture(params=[True, False], ids=["fast_serializer", "default_serializer"])
+def sentry_init(monkeypatch_test_transport, request):
     def inner(*a, **kw):
         hub = sentry_sdk.Hub.current
         client = sentry_sdk.Client(*a, **kw)
+        client.options["_experiments"]["fast_serializer"] = request.param
         hub.bind_client(client)
         monkeypatch_test_transport(sentry_sdk.Hub.current.client)
 

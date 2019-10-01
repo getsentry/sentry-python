@@ -5,6 +5,7 @@ import logging
 
 from datetime import datetime
 
+import sentry_sdk
 from sentry_sdk._compat import urlparse, text_type, implements_str, PY2
 
 from sentry_sdk._types import MYPY
@@ -23,8 +24,6 @@ if MYPY:
     from typing import Tuple
     from typing import Union
     from typing import Type
-
-    import sentry_sdk
 
     from sentry_sdk._types import ExcInfo
 
@@ -417,7 +416,9 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
         "post_context": post_context,
     }  # type: Dict[str, Any]
     if with_locals:
-        rv["vars"] = frame.f_locals
+        rv["vars"] = sentry_sdk.serializer.serialize_databag(
+            sentry_sdk.Hub.current.client, frame.f_locals
+        )
     return rv
 
 
@@ -791,3 +792,6 @@ def transaction_from_function(func):
 
     # Possibly a lambda
     return func_qualname
+
+
+disable_capture_event = ContextVar("disable_capture_event")

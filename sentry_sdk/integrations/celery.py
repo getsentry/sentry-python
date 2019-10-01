@@ -11,6 +11,7 @@ from celery.exceptions import (  # type: ignore
 )
 
 from sentry_sdk.hub import Hub
+from sentry_sdk.serializer import serialize_databag
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.tracing import Span
 from sentry_sdk._compat import reraise
@@ -162,11 +163,10 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
         # type: (Event, Hint) -> Optional[Event]
         with capture_internal_exceptions():
             extra = event.setdefault("extra", {})
-            extra["celery-job"] = {
-                "task_name": task.name,
-                "args": args,
-                "kwargs": kwargs,
-            }
+            extra["celery-job"] = serialize_databag(
+                Hub.current.client,
+                {"task_name": task.name, "args": args, "kwargs": kwargs},
+            )
 
         if "exc_info" in hint:
             with capture_internal_exceptions():

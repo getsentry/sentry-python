@@ -6,6 +6,7 @@ from datetime import datetime
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exception,
+    disable_capture_event,
     safe_repr,
     strip_string,
 )
@@ -27,6 +28,7 @@ if MYPY:
     from typing import ContextManager
     from typing import Type
 
+    from sentry_sdk import Client
     from sentry_sdk._types import NotImplementedType, Event
 
     ReprProcessor = Callable[[Any, Dict[str, Any]], Union[NotImplementedType, str]]
@@ -87,8 +89,8 @@ class Memo(object):
         self._inner.pop(id(self._objs.pop()), None)
 
 
-def serialize(event):
-    # type: (Event) -> Event
+def serialize(event, **kwargs):
+    # type: (Event, **Any) -> Event
     memo = Memo()
     path = []  # type: List[Segment]
     meta_stack = []  # type: List[Dict[str, Any]]
@@ -277,7 +279,31 @@ def serialize(event):
 
         return _flatten_annotated(strip_string(obj))
 
-    rv = _serialize_node(event)
-    if meta_stack:
-        rv["_meta"] = meta_stack[0]
-    return rv
+    disable_capture_event.set(True)
+    try:
+        rv = _serialize_node(event, **kwargs)
+        if meta_stack:
+            rv["_meta"] = meta_stack[0]
+        return rv
+    finally:
+        disable_capture_event.set(False)
+
+
+def serialize_databag(client, data, should_repr_strings=True, is_databag=True):
+    # type: (Optional[Client], Any, bool, bool) -> Any
+    is_recursive = disable_capture_event.get(None)
+    if is_recursive:
+        return CYCLE_MARKER
+
+    if client is not None and client.options["_experiments"].get(
+        "fast_serialize", False
+    ):
+        data = serialize(
+            data, should_repr_strings=should_repr_strings, is_databag=is_databag
+        )
+
+        # TODO: Bring back _meta annotations
+        data.pop("_meta", None)
+        return data
+
+    return data

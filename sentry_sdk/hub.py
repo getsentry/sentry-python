@@ -11,6 +11,7 @@ from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
 from sentry_sdk.tracing import Span
+from sentry_sdk.serializer import serialize_databag
 from sentry_sdk.utils import (
     exc_info_from_error,
     event_from_exception,
@@ -332,7 +333,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return None
         if level is None:
             level = "info"
-        return self.capture_event({"message": message, "level": level})
+        return self.capture_event(
+            {
+                "message": serialize_databag(
+                    self.client, message, should_repr_strings=False
+                ),
+                "level": level,
+            }
+        )
 
     def capture_exception(
         self, error=None  # type: Optional[Union[BaseException, ExcInfo]]
@@ -403,6 +411,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             crumb["timestamp"] = datetime.utcnow()
         if crumb.get("type") is None:
             crumb["type"] = "default"
+
+        crumb = serialize_databag(client, crumb, should_repr_strings=False)
 
         if client.options["before_breadcrumb"] is not None:
             new_crumb = client.options["before_breadcrumb"](crumb, hint)
