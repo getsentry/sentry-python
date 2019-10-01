@@ -26,7 +26,7 @@ if MYPY:
     from typing import List
     from typing import Tuple
 
-    from sentry_sdk import Client
+    import sentry_sdk
 
 _traceparent_header_format_re = re.compile(
     "^[ \t]*"  # whitespace
@@ -340,7 +340,7 @@ class Span(object):
         )
 
     def to_json(self, client):
-        # type: (Optional[Client]) -> Any
+        # type: (Optional[sentry_sdk.Client]) -> Any
         rv = {
             "trace_id": self.trace_id,
             "span_id": self.span_id,

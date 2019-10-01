@@ -18,6 +18,8 @@ from sentry_sdk._types import MYPY
 if MYPY:
     from types import TracebackType
 
+    import sentry_sdk
+
     from typing import Any
     from typing import Dict
     from typing import List
@@ -28,7 +30,6 @@ if MYPY:
     from typing import ContextManager
     from typing import Type
 
-    from sentry_sdk import Client
     from sentry_sdk._types import NotImplementedType, Event
 
     ReprProcessor = Callable[[Any, Dict[str, Any]], Union[NotImplementedType, str]]
@@ -290,7 +291,7 @@ def serialize(event, **kwargs):
 
 
 def partial_serialize(client, data, should_repr_strings=True, is_databag=True):
-    # type: (Optional[Client], Any, bool, bool) -> Any
+    # type: (Optional[sentry_sdk.Client], Any, bool, bool) -> Any
     is_recursive = disable_capture_event.get(None)
     if is_recursive:
         return CYCLE_MARKER
