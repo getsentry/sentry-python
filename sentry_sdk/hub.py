@@ -1,11 +1,9 @@
 import copy
 import random
 import sys
-import weakref
 
 from datetime import datetime
 from contextlib import contextmanager
-from warnings import warn
 
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
@@ -48,7 +46,6 @@ else:
 
 
 _local = ContextVar("sentry_current_hub")
-_initial_client = None  # type: Optional[weakref.ReferenceType[Client]]
 
 
 def _should_send_default_pii():
@@ -81,12 +78,9 @@ def _init(*args, **kwargs):
 
     This takes the same arguments as the client constructor.
     """
-    global _initial_client
     client = Client(*args, **kwargs)  # type: ignore
     Hub.current.bind_client(client)
     rv = _InitGuard(client)
-    if client is not None:
-        _initial_client = weakref.ref(client)
     return rv
 
 
@@ -113,7 +107,7 @@ else:
 
 class HubMeta(type):
     @property
-    def current(self):
+    def current(cls):
         # type: () -> Hub
         """Returns the current instance of the hub."""
         rv = _local.get(None)
@@ -123,7 +117,7 @@ class HubMeta(type):
         return rv
 
     @property
-    def main(self):
+    def main(cls):
         # type: () -> Hub
         """Returns the main instance of the hub."""
         return GLOBAL_HUB
@@ -262,26 +256,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             rv = client.integrations.get(integration_name)
             if rv is not None:
                 return rv
-
-        if _initial_client is not None:
-            initial_client = _initial_client()
-        else:
-            initial_client = None
-
-        if (
-            initial_client is not None
-            and initial_client is not client
-            and initial_client.integrations.get(integration_name) is not None
-        ):
-            warning = (
-                "Integration %r attempted to run but it was only "
-                "enabled on init() but not the client that "
-                "was bound to the current flow.  Earlier versions of "
-                "the SDK would consider these integrations enabled but "
-                "this is no longer the case." % (name_or_class,)
-            )
-            warn(Warning(warning), stacklevel=3)
-            logger.warning(warning)
 
     @property
     def client(self):

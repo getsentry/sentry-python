@@ -28,9 +28,9 @@ class ClientConstructor(object):
         environment=None,  # type: Optional[str]
         server_name=None,  # type: Optional[str]
         shutdown_timeout=2,  # type: int
-        integrations=[],  # type: Sequence[Integration]
-        in_app_include=[],  # type: List[str]
-        in_app_exclude=[],  # type: List[str]
+        integrations=[],  # type: Sequence[Integration]  # noqa: B006
+        in_app_include=[],  # type: List[str]  # noqa: B006
+        in_app_exclude=[],  # type: List[str]  # noqa: B006
         default_integrations=True,  # type: bool
         dist=None,  # type: Optional[str]
         transport=None,  # type: Optional[Union[Transport, Type[Transport], Callable[[Event], None]]]
@@ -38,7 +38,7 @@ class ClientConstructor(object):
         send_default_pii=False,  # type: bool
         http_proxy=None,  # type: Optional[str]
         https_proxy=None,  # type: Optional[str]
-        ignore_errors=[],  # type: List[Union[type, str]]
+        ignore_errors=[],  # type: List[Union[type, str]]  # noqa: B006
         request_bodies="medium",  # type: str
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
@@ -49,7 +49,7 @@ class ClientConstructor(object):
         # DO NOT ENABLE THIS RIGHT NOW UNLESS YOU WANT TO EXCEED YOUR EVENT QUOTA IMMEDIATELY
         traces_sample_rate=0.0,  # type: float
         traceparent_v2=False,  # type: bool
-        _experiments={},  # type: Dict[str, Any]
+        _experiments={},  # type: Dict[str, Any]  # noqa: B006
     ):
         # type: (...) -> None
         pass
@@ -72,7 +72,7 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "0.12.2"
+VERSION = "0.12.3"
 SDK_INFO = {
     "name": "sentry.python",
     "version": VERSION,

@@ -1,4 +1,3 @@
 sphinx
 sphinx-rtd-theme
-git+https://github.com/agronholm/sphinx-autodoc-typehints
-typed_ast
+sphinx-autodoc-typehints[type_comments]>=1.8.0

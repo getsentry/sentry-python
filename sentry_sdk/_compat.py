@@ -60,7 +60,7 @@ else:
 def with_metaclass(meta, *bases):
     # type: (Any, *Any) -> Any
     class metaclass(type):
-        def __new__(cls, name, this_bases, d):
+        def __new__(metacls, name, this_bases, d):
             # type: (Any, Any, Any, Any) -> Any
             return meta(name, bases, d)
 
