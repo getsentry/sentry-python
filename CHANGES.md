@@ -27,6 +27,13 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.12.3
+
+* Various performance improvements to event sending.
+* Avoid crashes when scope or hub is racy.
+* Revert a change that broke applications using gevent and channels (in the same virtualenv, but different processes).
+* Fix a bug that made the SDK crash on unicode in SQL.
+
 ## 0.12.2
 
 * Fix a crash with ASGI (Django Channels) when the ASGI request type is neither HTTP nor Websockets.
