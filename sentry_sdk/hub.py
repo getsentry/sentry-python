@@ -301,6 +301,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """Binds a new client to the hub."""
         top = self._stack[-1]
         self._stack[-1] = (new, top[1])
+        if not new or new.options["_experiments"].get("fast_serialize", False):
+            top[1].clear_breadcrumbs()
 
     def capture_event(
         self,

@@ -123,6 +123,7 @@ def test_subprocess_basic(
     assert message_event["message"] == "hi"
 
     data = {"subprocess.cwd": os.getcwd()} if with_cwd else {}
+
     crumb, = message_event["breadcrumbs"]
     assert crumb == {
         "category": "subprocess",

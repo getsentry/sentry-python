@@ -338,13 +338,12 @@ class Span(object):
         )
 
     def to_json(self, client):
-        # type: (Optional[sentry_sdk.Client]) -> Any
+        # type: (Optional[sentry_sdk.Client]) -> Dict[str, Any]
         rv = {
             "trace_id": self.trace_id,
             "span_id": self.span_id,
             "parent_span_id": self.parent_span_id,
             "same_process_as_parent": self.same_process_as_parent,
-            "transaction": self.transaction,
             "op": self.op,
             "description": self.description,
             "start_timestamp": partial_serialize(
@@ -356,9 +355,19 @@ class Span(object):
             "timestamp": partial_serialize(
                 client, self.timestamp, is_databag=False, should_repr_strings=False
             ),
-            "tags": self._tags,
-            "data": self._data,
-        }
+        }  # type: Dict[str, Any]
+
+        transaction = self.transaction
+        if transaction:
+            rv["transaction"] = transaction
+
+        tags = self._tags
+        if tags:
+            rv["tags"] = tags
+
+        data = self._data
+        if data:
+            rv["data"] = data
 
         return rv
 
@@ -460,17 +469,11 @@ def _maybe_create_breadcrumbs_from_span(hub, span):
             message=span.description, type="redis", category="redis", data=span._tags
         )
     elif span.op == "http" and span.is_success():
-        hub.add_breadcrumb(
-            type="http",
-            category="httplib",
-            data=span._data,
-            hint={"httplib_response": span._data.pop("httplib_response", None)},
-        )
+        hub.add_breadcrumb(type="http", category="httplib", data=span._data)
     elif span.op == "subprocess":
         hub.add_breadcrumb(
             type="subprocess",
             category="subprocess",
             message=span.description,
             data=span._data,
-            hint={"popen_instance": span._data.pop("popen_instance", None)},
         )
