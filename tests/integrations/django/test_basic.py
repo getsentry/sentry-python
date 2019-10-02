@@ -183,7 +183,11 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
 
     from django.db import connection
 
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        _experiments={"record_sql_params": True},
+    )
 
     events = capture_events()
 
