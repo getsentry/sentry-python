@@ -9,7 +9,7 @@ from django import VERSION as DJANGO_VERSION
 from django.core import signals
 
 from sentry_sdk._types import MYPY
-from sentry_sdk.utils import HAS_REAL_CONTEXTVARS
+from sentry_sdk.utils import HAS_REAL_CONTEXTVARS, logger
 
 if MYPY:
     from typing import Any
@@ -287,7 +287,10 @@ def _patch_channels():
     if not HAS_REAL_CONTEXTVARS:
         # We better have contextvars or we're going to leak state between
         # requests.
-        raise RuntimeError(
+        #
+        # We cannot hard-raise here because channels may not be used at all in
+        # the current process.
+        logger.warning(
             "We detected that you are using Django channels 2.0. To get proper "
             "instrumentation for ASGI requests, the Sentry SDK requires "
             "Python 3.7+ or the aiocontextvars package from PyPI."
