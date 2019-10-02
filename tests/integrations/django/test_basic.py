@@ -189,10 +189,11 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
 
     events = capture_events()
 
-    with connection.cursor() as sql:
-        with pytest.raises(OperationalError):
-            # table doesn't even exist
-            sql.execute("""SELECT count(*) FROM people_person WHERE foo = %s""", [123])
+    sql = connection.cursor()
+
+    with pytest.raises(OperationalError):
+        # table doesn't even exist
+        sql.execute("""SELECT count(*) FROM people_person WHERE foo = %s""", [123])
 
     capture_message("HI")
 
