@@ -48,10 +48,14 @@ def _capture_exception(exc_info, hub):
             scope.set_tag("taskAttemptId", taskContext.taskAttemptId())
             scope.set_tag("stage_id", taskContext.stageId())
             scope.set_tag("stage_id", taskContext.stageId())
-            scope.set_tag("app_name", taskContext._localProperties["app_name"])
-            scope.set_tag(
-                "application_id", taskContext._localProperties["application_id"]
-            )
+
+            # app_name and application_id set by driver Spark Integration
+            if "app_name" in taskContext._localProperties:
+                scope.set_tag("app_name", taskContext._localProperties["app_name"])
+                scope.set_tag(
+                    "application_id", taskContext._localProperties["application_id"]
+                )
+
             scope.set_extra("callSite", taskContext._localProperties["callSite.short"])
 
         hub.capture_event(event, hint=hint)

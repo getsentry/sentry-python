@@ -22,16 +22,18 @@ def patch_spark_context_init():
     def _sentry_patched_spark_context_init(self, *args, **kwargs):
         init = spark_context_init(self, *args, **kwargs)
 
+        if Hub.current.get_integration(SparkIntegration) is None:
+            return init
+
         if not getattr(self, "_sentry_is_patched", False):
             # So workers have access to app_name and id
             self.setLocalProperty("app_name", self.appName)
             self.setLocalProperty("application_id", self.applicationId)
 
             # Initialize Sentry Listener to start recording breadcrumbs
-            hub = Hub.current
             gw = self._gateway
             ensure_callback_server_started(gw)
-            listener = SentryListener(hub)
+            listener = SentryListener()
             self._jsc.sc().addSparkListener(listener)
 
             with configure_scope() as scope:
@@ -133,26 +135,21 @@ class SparkListener(object):
 
 
 class SentryListener(SparkListener):
-    current_hub = None
-
-    def __init__(self, hub):
-        self.current_hub = hub
-
     def onJobStart(self, jobStart):
         message = "Job {} Started".format(jobStart.jobId())
-        self.current_hub.add_breadcrumb(level="info", message=message)
+        Hub.current.add_breadcrumb(level="info", message=message)
 
     def onJobEnd(self, jobEnd):
         message = "Job {} Ended".format(jobEnd.jobId())
         data = {"result": jobEnd.jobResult().toString()}
         level = "info" if jobEnd.jobResult().toString() == "JobSucceeded" else "warning"
-        self.current_hub.add_breadcrumb(level=level, message=message, data=data)
+        Hub.current.add_breadcrumb(level=level, message=message, data=data)
 
     def onStageSubmitted(self, stageSubmitted):
         stageInfo = stageSubmitted.stageInfo()
         message = "Stage {} Submitted".format(stageInfo.stageId())
         data = {"attemptId": stageInfo.attemptId(), "name": stageInfo.name()}
-        self.current_hub.add_breadcrumb(level="info", message=message, data=data)
+        Hub.current.add_breadcrumb(level="info", message=message, data=data)
 
     def onStageCompleted(self, stageCompleted):
         from py4j.protocol import Py4JJavaError
@@ -171,4 +168,4 @@ class SentryListener(SparkListener):
             message = "Stage {} Completed".format(stageInfo.stageId())
             level = "info"
 
-        self.current_hub.add_breadcrumb(level=level, message=message, data=data)
+        Hub.current.add_breadcrumb(level=level, message=message, data=data)
