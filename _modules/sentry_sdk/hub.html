@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.hub &#8212; sentry-python 0.12.2 documentation</title>
+    <title>sentry_sdk.hub &#8212; sentry-python 0.12.3 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -44,6 +44,7 @@
 <span class="kn">from</span> <span class="nn">sentry_sdk.scope</span> <span class="k">import</span> <span class="n">Scope</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.client</span> <span class="k">import</span> <span class="n">Client</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.tracing</span> <span class="k">import</span> <span class="n">Span</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.serializer</span> <span class="k">import</span> <span class="n">partial_serialize</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="k">import</span> <span class="p">(</span>
     <span class="n">exc_info_from_error</span><span class="p">,</span>
     <span class="n">event_from_exception</span><span class="p">,</span>
@@ -79,7 +80,7 @@
         <span class="k">return</span> <span class="n">x</span>
 
 
-<span class="n">_local</span> <span class="o">=</span> <span class="n">ContextVar</span><span class="p">(</span><span class="s2">&quot;sentry_current_hub&quot;</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+<span class="n">_local</span> <span class="o">=</span> <span class="n">ContextVar</span><span class="p">(</span><span class="s2">&quot;sentry_current_hub&quot;</span><span class="p">)</span>
 <span class="n">_initial_client</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[weakref.ReferenceType[Client]]</span>
 
 
@@ -332,7 +333,9 @@
         <span class="c1"># type: (...) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Binds a new client to the hub.&quot;&quot;&quot;</span>
         <span class="n">top</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">new</span><span class="p">,</span> <span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">new</span><span class="p">,</span> <span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">new</span> <span class="ow">or</span> <span class="n">new</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;_experiments&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;fast_serialize&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">clear_breadcrumbs</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="Hub.capture_event"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.capture_event">[docs]</a>    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -365,7 +368,14 @@
             <span class="k">return</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="n">level</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">level</span> <span class="o">=</span> <span class="s2">&quot;info&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">capture_event</span><span class="p">({</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">message</span><span class="p">,</span> <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="n">level</span><span class="p">})</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">partial_serialize</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="n">should_repr_strings</span><span class="o">=</span><span class="kc">False</span>
+                <span class="p">),</span>
+                <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="n">level</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">)</span></div>
 
 <div class="viewcode-block" id="Hub.capture_exception"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.capture_exception">[docs]</a>    <span class="k">def</span> <span class="nf">capture_exception</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[Union[BaseException, ExcInfo]]</span>
@@ -380,10 +390,10 @@
         <span class="n">client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span>
         <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span>
-        <span class="k">if</span> <span class="n">error</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">exc_info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
-        <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">error</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">exc_info</span> <span class="o">=</span> <span class="n">exc_info_from_error</span><span class="p">(</span><span class="n">error</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">exc_info</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()</span>
 
         <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span><span class="n">exc_info</span><span class="p">,</span> <span class="n">client_options</span><span class="o">=</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
@@ -403,7 +413,7 @@
 
 <span class="sd">        These exceptions do not end up in Sentry and are just logged instead.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Internal error in sentry_sdk&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="n">exc_info</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Internal error in sentry_sdk&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="n">exc_info</span><span class="p">)</span>
 
 <div class="viewcode-block" id="Hub.add_breadcrumb"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.add_breadcrumb">[docs]</a>    <span class="k">def</span> <span class="nf">add_breadcrumb</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -436,6 +446,8 @@
             <span class="n">crumb</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">crumb</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">crumb</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span>
+
+        <span class="n">crumb</span> <span class="o">=</span> <span class="n">partial_serialize</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">crumb</span><span class="p">,</span> <span class="n">should_repr_strings</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;before_breadcrumb&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">new_crumb</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;before_breadcrumb&quot;</span><span class="p">](</span><span class="n">crumb</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
@@ -473,8 +485,9 @@
         <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;hub&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="n">span</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">span</span><span class="o">.</span><span class="n">new_span</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="n">span</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">span</span>
+            <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">span</span> <span class="o">=</span> <span class="n">span</span><span class="o">.</span><span class="n">new_span</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">span</span> <span class="o">=</span> <span class="n">Span</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
@@ -603,7 +616,9 @@
         <span class="c1"># type: () -&gt; Generator[Tuple[str, str], None, None]</span>
         <span class="c1"># TODO: Document</span>
         <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">span</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">span</span>
+
+        <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span>
 
         <span class="n">propagate_traces</span> <span class="o">=</span> <span class="n">client</span> <span class="ow">and</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;propagate_traces&quot;</span><span class="p">]</span>
@@ -611,9 +626,9 @@
             <span class="k">return</span>
 
         <span class="k">if</span> <span class="n">client</span> <span class="ow">and</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;traceparent_v2&quot;</span><span class="p">]:</span>
-            <span class="n">traceparent</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span><span class="o">.</span><span class="n">to_traceparent</span><span class="p">()</span>
+            <span class="n">traceparent</span> <span class="o">=</span> <span class="n">span</span><span class="o">.</span><span class="n">to_traceparent</span><span class="p">()</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">traceparent</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span><span class="o">.</span><span class="n">to_legacy_traceparent</span><span class="p">()</span>
+            <span class="n">traceparent</span> <span class="o">=</span> <span class="n">span</span><span class="o">.</span><span class="n">to_legacy_traceparent</span><span class="p">()</span>
 
         <span class="k">yield</span> <span class="s2">&quot;sentry-trace&quot;</span><span class="p">,</span> <span class="n">traceparent</span></div>
 

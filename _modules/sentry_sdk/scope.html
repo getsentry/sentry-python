@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.scope &#8212; sentry-python 0.12.2 documentation</title>
+    <title>sentry_sdk.scope &#8212; sentry-python 0.12.3 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -36,7 +36,11 @@
 <span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">wraps</span>
 <span class="kn">from</span> <span class="nn">itertools</span> <span class="k">import</span> <span class="n">chain</span>
 
+<span class="kn">import</span> <span class="nn">sentry_sdk</span>
+
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="k">import</span> <span class="n">logger</span><span class="p">,</span> <span class="n">capture_internal_exceptions</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.serializer</span> <span class="k">import</span> <span class="n">partial_serialize</span>
+
 
 <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="k">import</span> <span class="n">MYPY</span>
 
@@ -54,10 +58,15 @@
         <span class="n">Event</span><span class="p">,</span>
         <span class="n">EventProcessor</span><span class="p">,</span>
         <span class="n">ErrorProcessor</span><span class="p">,</span>
+        <span class="n">ExcInfo</span><span class="p">,</span>
         <span class="n">Hint</span><span class="p">,</span>
+        <span class="n">Type</span><span class="p">,</span>
     <span class="p">)</span>
 
+    <span class="kn">from</span> <span class="nn">sentry_sdk.tracing</span> <span class="k">import</span> <span class="n">Span</span>
+
     <span class="n">F</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;F&quot;</span><span class="p">,</span> <span class="n">bound</span><span class="o">=</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span>
+    <span class="n">T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;T&quot;</span><span class="p">)</span>
 
 
 <span class="n">global_event_processors</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># type: List[EventProcessor]</span>
@@ -69,6 +78,7 @@
 
 
 <span class="k">def</span> <span class="nf">_attr_setter</span><span class="p">(</span><span class="n">fn</span><span class="p">):</span>
+    <span class="c1"># type: (Any) -&gt; Any</span>
     <span class="k">return</span> <span class="nb">property</span><span class="p">(</span><span class="n">fset</span><span class="o">=</span><span class="n">fn</span><span class="p">,</span> <span class="n">doc</span><span class="o">=</span><span class="n">fn</span><span class="o">.</span><span class="vm">__doc__</span><span class="p">)</span>
 
 
@@ -92,6 +102,12 @@
     <span class="sd">&quot;&quot;&quot;The scope holds extra information that should be sent with all</span>
 <span class="sd">    events that belong to it.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># NOTE: Even though it should not happen, the scope needs to not crash when</span>
+    <span class="c1"># accessed by multiple threads. It&#39;s fine if it&#39;s full of races, but those</span>
+    <span class="c1"># races should never make the user application crash.</span>
+    <span class="c1">#</span>
+    <span class="c1"># The same needs to hold for any accesses of the scope the SDK makes.</span>
 
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span>
         <span class="s2">&quot;_level&quot;</span><span class="p">,</span>
@@ -117,38 +133,64 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[str]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
 
+<div class="viewcode-block" id="Scope.clear"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.clear">[docs]</a>    <span class="k">def</span> <span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; None</span>
+        <span class="sd">&quot;&quot;&quot;Clears the entire scope.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[str]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[List[str]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[str]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Any]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Dict[str, Any]]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Any]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">clear_breadcrumbs</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_span</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[Span]</span></div>
+
     <span class="nd">@_attr_setter</span>
     <span class="k">def</span> <span class="nf">level</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="c1"># type: (Optional[str]) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;When set this overrides the level.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">value</span>
 
     <span class="nd">@_attr_setter</span>
     <span class="k">def</span> <span class="nf">fingerprint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="c1"># type: (Optional[List[str]]) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;When set this overrides the default fingerprint.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="n">value</span>
 
     <span class="nd">@_attr_setter</span>
     <span class="k">def</span> <span class="nf">transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="c1"># type: (Optional[str]) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;When set this forces a specific transaction name to be set.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="n">value</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_span</span><span class="o">.</span><span class="n">transaction</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="n">span</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span>
+        <span class="k">if</span> <span class="n">span</span><span class="p">:</span>
+            <span class="n">span</span><span class="o">.</span><span class="n">transaction</span> <span class="o">=</span> <span class="n">value</span>
 
     <span class="nd">@_attr_setter</span>
     <span class="k">def</span> <span class="nf">user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="c1"># type: (Dict[str, Any]) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;When set a specific user is bound to the scope.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="n">value</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">span</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Optional[Span]</span>
         <span class="sd">&quot;&quot;&quot;Get/set current tracing span.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span>
 
     <span class="nd">@span</span><span class="o">.</span><span class="n">setter</span>
     <span class="k">def</span> <span class="nf">span</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="p">):</span>
+        <span class="c1"># type: (Optional[Span]) -&gt; None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_span</span> <span class="o">=</span> <span class="n">span</span>
-        <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">span</span><span class="o">.</span><span class="n">transaction</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="n">span</span><span class="o">.</span><span class="n">transaction</span>
+        <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">span_transaction</span> <span class="o">=</span> <span class="n">span</span><span class="o">.</span><span class="n">transaction</span>
+            <span class="k">if</span> <span class="n">span_transaction</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="n">span_transaction</span>
 
 <div class="viewcode-block" id="Scope.set_tag"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_tag">[docs]</a>    <span class="k">def</span> <span class="nf">set_tag</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -157,7 +199,9 @@
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Sets a tag for a key to a specific value.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">partial_serialize</span><span class="p">(</span>
+            <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">client</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">should_repr_strings</span><span class="o">=</span><span class="kc">False</span>
+        <span class="p">)</span></div>
 
 <div class="viewcode-block" id="Scope.remove_tag"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_tag">[docs]</a>    <span class="k">def</span> <span class="nf">remove_tag</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">key</span>  <span class="c1"># type: str</span>
@@ -173,7 +217,9 @@
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Binds a context at a certain key to a specific value.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">partial_serialize</span><span class="p">(</span>
+            <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">client</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">should_repr_strings</span><span class="o">=</span><span class="kc">False</span>
+        <span class="p">)</span></div>
 
 <div class="viewcode-block" id="Scope.remove_context"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_context">[docs]</a>    <span class="k">def</span> <span class="nf">remove_context</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">key</span>  <span class="c1"># type: str</span>
@@ -189,7 +235,9 @@
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Sets an extra key to a specific value.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">partial_serialize</span><span class="p">(</span>
+            <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">client</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">should_repr_strings</span><span class="o">=</span><span class="kc">False</span>
+        <span class="p">)</span></div>
 
 <div class="viewcode-block" id="Scope.remove_extra"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_extra">[docs]</a>    <span class="k">def</span> <span class="nf">remove_extra</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">key</span>  <span class="c1"># type: str</span>
@@ -197,23 +245,6 @@
         <span class="c1"># type: (...) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Removes a specific extra key.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span></div>
-
-<div class="viewcode-block" id="Scope.clear"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.clear">[docs]</a>    <span class="k">def</span> <span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="c1"># type: () -&gt; None</span>
-        <span class="sd">&quot;&quot;&quot;Clears the entire scope.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="kc">None</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Any]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Dict[str, Any]]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Any]</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">clear_breadcrumbs</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span> <span class="o">=</span> <span class="kc">True</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">_span</span> <span class="o">=</span> <span class="kc">None</span></div>
 
 <div class="viewcode-block" id="Scope.clear_breadcrumbs"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.clear_breadcrumbs">[docs]</a>    <span class="k">def</span> <span class="nf">clear_breadcrumbs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; None</span>
@@ -240,7 +271,7 @@
 <div class="viewcode-block" id="Scope.add_error_processor"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.add_error_processor">[docs]</a>    <span class="k">def</span> <span class="nf">add_error_processor</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">func</span><span class="p">,</span>  <span class="c1"># type: ErrorProcessor</span>
-        <span class="bp">cls</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[type]</span>
+        <span class="bp">cls</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Type[BaseException]]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Register a scope local error processor on the scope.</span>
@@ -254,6 +285,7 @@
             <span class="n">real_func</span> <span class="o">=</span> <span class="n">func</span>
 
             <span class="k">def</span> <span class="nf">func</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">):</span>
+                <span class="c1"># type: (Event, ExcInfo) -&gt; Optional[Event]</span>
                 <span class="k">try</span><span class="p">:</span>
                     <span class="n">is_inst</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">cls_</span><span class="p">)</span>
                 <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
