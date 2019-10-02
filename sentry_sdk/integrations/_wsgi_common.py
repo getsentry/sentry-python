@@ -1,14 +1,32 @@
 import json
 
+from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue
-from sentry_sdk._compat import text_type
+from sentry_sdk._compat import text_type, iteritems
 
-if False:
+from sentry_sdk._types import MYPY
+
+if MYPY:
     from typing import Any
     from typing import Dict
     from typing import Optional
     from typing import Union
+
+
+SENSITIVE_ENV_KEYS = (
+    "REMOTE_ADDR",
+    "HTTP_X_FORWARDED_FOR",
+    "HTTP_SET_COOKIE",
+    "HTTP_COOKIE",
+    "HTTP_AUTHORIZATION",
+    "HTTP_X_FORWARDED_FOR",
+    "HTTP_X_REAL_IP",
+)
+
+SENSITIVE_HEADERS = tuple(
+    x[len("HTTP_") :] for x in SENSITIVE_ENV_KEYS if x.startswith("HTTP_")
+)
 
 
 class RequestExtractor(object):
@@ -25,7 +43,7 @@ class RequestExtractor(object):
         data = None  # type: Optional[Union[AnnotatedValue, Dict[str, Any]]]
 
         content_length = self.content_length()
-        request_info = event.setdefault("request", {})
+        request_info = event.get("request", {})
 
         if _should_send_default_pii():
             request_info["cookies"] = dict(self.cookies())
@@ -50,9 +68,14 @@ class RequestExtractor(object):
                     {"rem": [["!raw", "x", 0, content_length]], "len": content_length},
                 )
             else:
-                return
+                data = None
 
-        request_info["data"] = data
+        if data is not None:
+            request_info["data"] = data
+
+        event["request"] = partial_serialize(
+            client, request_info, should_repr_strings=False
+        )
 
     def content_length(self):
         # type: () -> int
@@ -62,12 +85,15 @@ class RequestExtractor(object):
             return 0
 
     def cookies(self):
+        # type: () -> Dict[str, Any]
         raise NotImplementedError()
 
     def raw_data(self):
+        # type: () -> Optional[Union[str, bytes]]
         raise NotImplementedError()
 
     def form(self):
+        # type: () -> Optional[Dict[str, Any]]
         raise NotImplementedError()
 
     def parsed_body(self):
@@ -75,8 +101,8 @@ class RequestExtractor(object):
         form = self.form()
         files = self.files()
         if form or files:
-            data = dict(form.items())
-            for k, v in files.items():
+            data = dict(iteritems(form))
+            for k, v in iteritems(files):
                 size = self.size_of_file(v)
                 data[k] = AnnotatedValue(
                     "", {"len": size, "rem": [["!raw", "x", 0, size]]}
@@ -93,28 +119,37 @@ class RequestExtractor(object):
     def json(self):
         # type: () -> Optional[Any]
         try:
-            if self.is_json():
-                raw_data = self.raw_data()
-                if not isinstance(raw_data, text_type):
-                    raw_data = raw_data.decode("utf-8")
+            if not self.is_json():
+                return None
+
+            raw_data = self.raw_data()
+            if raw_data is None:
+                return None
+
+            if isinstance(raw_data, text_type):
                 return json.loads(raw_data)
+            else:
+                return json.loads(raw_data.decode("utf-8"))
         except ValueError:
             pass
 
         return None
 
     def files(self):
+        # type: () -> Optional[Dict[str, Any]]
         raise NotImplementedError()
 
     def size_of_file(self, file):
+        # type: (Any) -> int
         raise NotImplementedError()
 
     def env(self):
+        # type: () -> Dict[str, Any]
         raise NotImplementedError()
 
 
 def _is_json_content_type(ct):
-    # type: (str) -> bool
+    # type: (Optional[str]) -> bool
     mt = (ct or "").split(";", 1)[0]
     return (
         mt == "application/json"
@@ -129,7 +164,10 @@ def _filter_headers(headers):
         return headers
 
     return {
-        k: v
-        for k, v in headers.items()
-        if k.lower().replace("_", "-") not in ("set-cookie", "cookie", "authorization")
+        k: (
+            v
+            if k.upper().replace("-", "_") not in SENSITIVE_HEADERS
+            else AnnotatedValue("", {"rem": [["!config", "x", 0, len(v)]]})
+        )
+        for k, v in iteritems(headers)
     }

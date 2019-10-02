@@ -4,6 +4,7 @@ import logging
 import datetime
 
 from sentry_sdk.hub import Hub
+from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.utils import (
     to_string,
     event_from_exception,
@@ -11,8 +12,11 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
 )
 from sentry_sdk.integrations import Integration
+from sentry_sdk._compat import iteritems
 
-if False:
+from sentry_sdk._types import MYPY
+
+if MYPY:
     from logging import LogRecord
     from typing import Any
     from typing import Dict
@@ -24,11 +28,16 @@ DEFAULT_EVENT_LEVEL = logging.ERROR
 _IGNORED_LOGGERS = set(["sentry_sdk.errors"])
 
 
-def ignore_logger(name):
-    # type: (str) -> None
-    """This disables the breadcrumb integration for a logger of a specific
-    name.  This primary use is for some integrations to disable breadcrumbs
-    of this integration.
+def ignore_logger(
+    name  # type: str
+):
+    # type: (...) -> None
+    """This disables recording (both in breadcrumbs and as events) calls to
+    a logger of a specific name.  Among other uses, many of our integrations
+    use this to prevent their actions being recorded as breadcrumbs. Exposed
+    to users as a way to quiet spammy loggers.
+
+    :param name: The name of the logger to ignore (same string you would pass to ``logging.getLogger``).
     """
     _IGNORED_LOGGERS.add(name)
 
@@ -37,7 +46,7 @@ class LoggingIntegration(Integration):
     identifier = "logging"
 
     def __init__(self, level=DEFAULT_LEVEL, event_level=DEFAULT_EVENT_LEVEL):
-        # type: (int, int) -> None
+        # type: (Optional[int], Optional[int]) -> None
         self._handler = None
         self._breadcrumb_handler = None
 
@@ -92,7 +101,7 @@ def _breadcrumb_from_record(record):
         "level": _logging_to_event_level(record.levelname),
         "category": record.name,
         "message": record.message,
-        "timestamp": datetime.datetime.fromtimestamp(record.created),
+        "timestamp": datetime.datetime.utcfromtimestamp(record.created),
         "data": _extra_from_record(record),
     }
 
@@ -135,12 +144,19 @@ def _extra_from_record(record):
     # type: (LogRecord) -> Dict[str, None]
     return {
         k: v
-        for k, v in vars(record).items()
-        if k not in COMMON_RECORD_ATTRS and not k.startswith("_")
+        for k, v in iteritems(vars(record))
+        if k not in COMMON_RECORD_ATTRS
+        and (not isinstance(k, str) or not k.startswith("_"))
     }
 
 
 class EventHandler(logging.Handler, object):
+    """
+    A logging handler that emits Sentry events for each log record
+
+    Note that you do not have to use this class if the logging integration is enabled, which it is by default.
+    """
+
     def emit(self, record):
         # type: (LogRecord) -> Any
         with capture_internal_exceptions():
@@ -156,7 +172,6 @@ class EventHandler(logging.Handler, object):
         if hub.client is None:
             return
 
-        hint = None  # type: Optional[Dict[str, Any]]
         client_options = hub.client.options
 
         # exc_info might be None or (None, None, None)
@@ -168,7 +183,7 @@ class EventHandler(logging.Handler, object):
             )
         elif record.exc_info and record.exc_info[0] is None:
             event = {}
-            hint = None
+            hint = {}
             with capture_internal_exceptions():
                 event["threads"] = {
                     "values": [
@@ -183,11 +198,21 @@ class EventHandler(logging.Handler, object):
                 }
         else:
             event = {}
+            hint = {}
+
+        hint["log_record"] = record
+
+        client = Hub.current.client
 
         event["level"] = _logging_to_event_level(record.levelname)
         event["logger"] = record.name
-        event["logentry"] = {"message": to_string(record.msg), "params": record.args}
-        event["extra"] = _extra_from_record(record)
+        event["logentry"] = {
+            "message": to_string(record.msg),
+            "params": partial_serialize(client, record.args, should_repr_strings=False),
+        }
+        event["extra"] = partial_serialize(
+            client, _extra_from_record(record), should_repr_strings=False
+        )
 
         hub.capture_event(event, hint=hint)
 
@@ -197,6 +222,12 @@ SentryHandler = EventHandler
 
 
 class BreadcrumbHandler(logging.Handler, object):
+    """
+    A logging handler that records breadcrumbs for each log record.
+
+    Note that you do not have to use this class if the logging integration is enabled, which it is by default.
+    """
+
     def emit(self, record):
         # type: (LogRecord) -> Any
         with capture_internal_exceptions():

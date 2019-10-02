@@ -8,18 +8,23 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.utils import logger
 from sentry_sdk.integrations import Integration
 
-if False:
+from sentry_sdk._types import MYPY
+
+if MYPY:
+
     from typing import Any
     from typing import Optional
 
 
 def default_callback(pending, timeout):
+    # type: (int, int) -> None
     """This is the default shutdown callback that is set on the options.
     It prints out a message to stderr that informs the user that some events
     are still pending and the process is waiting for them to flush out.
     """
 
     def echo(msg):
+        # type: (str) -> None
         sys.stderr.write(msg + "\n")
 
     echo("Sentry is attempting to send %i pending error messages" % pending)
@@ -42,9 +47,13 @@ class AtexitIntegration(Integration):
         # type: () -> None
         @atexit.register
         def _shutdown():
+            # type: () -> None
             logger.debug("atexit: got shutdown signal")
             hub = Hub.main
             integration = hub.get_integration(AtexitIntegration)
             if integration is not None:
                 logger.debug("atexit: shutting down client")
-                hub.client.close(callback=integration.callback)
+
+                # If an integration is there, a client has to be there.
+                client = hub.client  # type: Any
+                client.close(callback=integration.callback)

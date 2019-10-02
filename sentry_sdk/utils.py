@@ -3,44 +3,29 @@ import sys
 import linecache
 import logging
 
-from contextlib import contextmanager
 from datetime import datetime
 
-from sentry_sdk._compat import (
-    urlparse,
-    text_type,
-    implements_str,
-    string_types,
-    number_types,
-    int_types,
-    PY2,
-)
+import sentry_sdk
+from sentry_sdk._compat import urlparse, text_type, implements_str, PY2
 
-if False:
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from types import FrameType
+    from types import TracebackType
     from typing import Any
+    from typing import Callable
     from typing import Dict
-    from typing import Union
+    from typing import ContextManager
     from typing import Iterator
-    from typing import Tuple
-    from typing import Optional
     from typing import List
+    from typing import Optional
     from typing import Set
+    from typing import Tuple
+    from typing import Union
     from typing import Type
 
-    from sentry_sdk.consts import ClientOptions
-
-    ExcInfo = Tuple[
-        Optional[Type[BaseException]], Optional[BaseException], Optional[Any]
-    ]
-
-if PY2:
-    # Importing ABCs from collections is deprecated, and will stop working in 3.8
-    # https://github.com/python/cpython/blob/master/Lib/collections/__init__.py#L49
-    from collections import Mapping, Sequence
-else:
-    # New in 3.3
-    # https://docs.python.org/3/library/collections.abc.html
-    from collections.abc import Mapping, Sequence
+    from sentry_sdk._types import ExcInfo
 
 epoch = datetime(1970, 1, 1)
 
@@ -48,38 +33,53 @@ epoch = datetime(1970, 1, 1)
 # The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
 
-CYCLE_MARKER = object()
-
-
-global_repr_processors = []
-
-
-def add_global_repr_processor(processor):
-    global_repr_processors.append(processor)
+MAX_STRING_LENGTH = 512
+MAX_FORMAT_PARAM_LENGTH = 128
 
 
 def _get_debug_hub():
+    # type: () -> Optional[sentry_sdk.Hub]
     # This function is replaced by debug.py
     pass
 
 
-@contextmanager
+class CaptureInternalException(object):
+    __slots__ = ()
+
+    def __enter__(self):
+        # type: () -> ContextManager[Any]
+        return self
+
+    def __exit__(self, ty, value, tb):
+        # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[TracebackType]) -> bool
+        if ty is not None and value is not None:
+            capture_internal_exception((ty, value, tb))
+
+        return True
+
+
+_CAPTURE_INTERNAL_EXCEPTION = CaptureInternalException()
+
+
 def capture_internal_exceptions():
-    # type: () -> Iterator
-    try:
-        yield
-    except Exception:
-        hub = _get_debug_hub()
-        if hub is not None:
-            hub._capture_internal_exception(sys.exc_info())
+    # type: () -> ContextManager[Any]
+    return _CAPTURE_INTERNAL_EXCEPTION
+
+
+def capture_internal_exception(exc_info):
+    # type: (ExcInfo) -> None
+    hub = _get_debug_hub()
+    if hub is not None:
+        hub._capture_internal_exception(exc_info)
 
 
 def to_timestamp(value):
+    # type: (datetime) -> float
     return (value - epoch).total_seconds()
 
 
 def event_hint_with_exc_info(exc_info=None):
-    # type: (ExcInfo) -> Dict[str, Optional[ExcInfo]]
+    # type: (Optional[ExcInfo]) -> Dict[str, Optional[ExcInfo]]
     """Creates a hint with the exc info filled in."""
     if exc_info is None:
         exc_info = sys.exc_info()
@@ -99,6 +99,7 @@ class Dsn(object):
     """Represents a DSN."""
 
     def __init__(self, value):
+        # type: (Union[Dsn, str]) -> None
         if isinstance(value, Dsn):
             self.__dict__ = dict(value.__dict__)
             return
@@ -126,6 +127,7 @@ class Dsn(object):
 
     @property
     def netloc(self):
+        # type: () -> str
         """The netloc part of a DSN."""
         rv = self.host
         if (self.scheme, self.port) not in (("http", 80), ("https", 443)):
@@ -133,6 +135,7 @@ class Dsn(object):
         return rv
 
     def to_auth(self, client=None):
+        # type: (Optional[Any]) -> Auth
         """Returns the auth info object for this dsn."""
         return Auth(
             scheme=self.scheme,
@@ -145,6 +148,7 @@ class Dsn(object):
         )
 
     def __str__(self):
+        # type: () -> str
         return "%s://%s%s@%s%s%s" % (
             self.scheme,
             self.public_key,
@@ -169,6 +173,7 @@ class Auth(object):
         client=None,
         path="/",
     ):
+        # type: (str, str, str, str, Optional[str], int, Optional[Any], str) -> None
         self.scheme = scheme
         self.host = host
         self.path = path
@@ -180,6 +185,7 @@ class Auth(object):
 
     @property
     def store_api_url(self):
+        # type: () -> str
         """Returns the API url for storing events."""
         return "%s://%s%sapi/%s/store/" % (
             self.scheme,
@@ -189,6 +195,7 @@ class Auth(object):
         )
 
     def to_header(self, timestamp=None):
+        # type: (Optional[datetime]) -> str
         """Returns the auth header a string."""
         rv = [("sentry_key", self.public_key), ("sentry_version", self.version)]
         if timestamp is not None:
@@ -200,13 +207,27 @@ class Auth(object):
         return u"Sentry " + u", ".join("%s=%s" % (key, value) for key, value in rv)
 
 
+class AnnotatedValue(object):
+    def __init__(self, value, metadata):
+        # type: (Optional[Any], Dict[str, Any]) -> None
+        self.value = value
+        self.metadata = metadata
+
+
+if MYPY:
+    from typing import TypeVar
+
+    T = TypeVar("T")
+    Annotated = Union[AnnotatedValue, T]
+
+
 def get_type_name(cls):
-    # type: (Any) -> str
+    # type: (Optional[type]) -> Optional[str]
     return getattr(cls, "__qualname__", None) or getattr(cls, "__name__", None)
 
 
 def get_type_module(cls):
-    # type: (Any) -> Optional[Any]
+    # type: (Optional[type]) -> Optional[str]
     mod = getattr(cls, "__module__", None)
     if mod not in (None, "builtins", "__builtins__"):
         return mod
@@ -214,10 +235,11 @@ def get_type_module(cls):
 
 
 def should_hide_frame(frame):
-    # type: (Any) -> bool
+    # type: (FrameType) -> bool
     try:
         mod = frame.f_globals["__name__"]
-        return mod.startswith("sentry_sdk.")
+        if mod.startswith("sentry_sdk."):
+            return True
     except (AttributeError, KeyError):
         pass
 
@@ -232,34 +254,26 @@ def should_hide_frame(frame):
 
 
 def iter_stacks(tb):
-    # type: (Any) -> Iterator[Any]
-    while tb is not None:
-        if not should_hide_frame(tb.tb_frame):
-            yield tb
-        tb = tb.tb_next
-
-
-def slim_string(value, length=512):
-    # type: (str, int) -> str
-    if not value:
-        return value
-    if len(value) > length:
-        return value[: length - 3] + "..."
-    return value[:length]
+    # type: (Optional[TracebackType]) -> Iterator[TracebackType]
+    tb_ = tb  # type: Optional[TracebackType]
+    while tb_ is not None:
+        if not should_hide_frame(tb_.tb_frame):
+            yield tb_
+        tb_ = tb_.tb_next
 
 
 def get_lines_from_file(
     filename,  # type: str
     lineno,  # type: int
-    loader=None,  # type: Any
-    module=None,  # type: str
+    loader=None,  # type: Optional[Any]
+    module=None,  # type: Optional[str]
 ):
-    # type: (...) -> Tuple[List[str], Optional[str], List[str]]
+    # type: (...) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]
     context_lines = 5
     source = None
     if loader is not None and hasattr(loader, "get_source"):
         try:
-            source_str = loader.get_source(module)
+            source_str = loader.get_source(module)  # type: Optional[str]
         except (ImportError, IOError):
             source_str = None
         if source_str is not None:
@@ -279,11 +293,11 @@ def get_lines_from_file(
 
     try:
         pre_context = [
-            slim_string(line.strip("\r\n")) for line in source[lower_bound:lineno]
+            strip_string(line.strip("\r\n")) for line in source[lower_bound:lineno]
         ]
-        context_line = slim_string(source[lineno].strip("\r\n"))
+        context_line = strip_string(source[lineno].strip("\r\n"))
         post_context = [
-            slim_string(line.strip("\r\n"))
+            strip_string(line.strip("\r\n"))
             for line in source[(lineno + 1) : upper_bound]
         ]
         return pre_context, context_line, post_context
@@ -292,10 +306,13 @@ def get_lines_from_file(
         return [], None, []
 
 
-def get_source_context(frame, tb_lineno):
-    # type: (Any, int) -> Tuple[List[str], Optional[str], List[str]]
+def get_source_context(
+    frame,  # type: FrameType
+    tb_lineno,  # type: int
+):
+    # type: (...) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]
     try:
-        abs_path = frame.f_code.co_filename
+        abs_path = frame.f_code.co_filename  # type: Optional[str]
     except Exception:
         abs_path = None
     try:
@@ -348,56 +365,11 @@ def safe_repr(value):
         return u"<broken repr>"
 
 
-def object_to_json(obj, remaining_depth=4, memo=None):
-    with capture_internal_exceptions():
-        if memo is None:
-            memo = Memo()
-        if memo.memoize(obj):
-            return CYCLE_MARKER
-
-        try:
-            if remaining_depth > 0:
-                hints = {"memo": memo, "remaining_depth": remaining_depth}
-                for processor in global_repr_processors:
-                    with capture_internal_exceptions():
-                        result = processor(obj, hints)
-                        if result is not NotImplemented:
-                            return result
-
-                if isinstance(obj, (list, tuple)):
-                    # It is not safe to iterate over another sequence types as this may raise errors or
-                    # bring undesired side-effects (e.g. Django querysets are executed during iteration)
-                    return [
-                        object_to_json(
-                            x, remaining_depth=remaining_depth - 1, memo=memo
-                        )
-                        for x in obj
-                    ]
-
-                if isinstance(obj, Mapping):
-                    return {
-                        safe_str(k): object_to_json(
-                            v, remaining_depth=remaining_depth - 1, memo=memo
-                        )
-                        for k, v in list(obj.items())
-                    }
-
-            return safe_repr(obj)
-        finally:
-            memo.unmemoize(obj)
-    return u"<broken repr>"
-
-
-def extract_locals(frame):
-    # type: (Any) -> Dict[str, Any]
-    rv = {}
-    for key, value in frame.f_locals.items():
-        rv[str(key)] = object_to_json(value)
-    return rv
-
-
 def filename_for_module(module, abs_path):
-    # type: (str, str) -> str
+    # type: (Optional[str], Optional[str]) -> Optional[str]
+    if not abs_path or not module:
+        return abs_path
+
     try:
         if abs_path.endswith(".pyc"):
             abs_path = abs_path[:-1]
@@ -415,14 +387,14 @@ def filename_for_module(module, abs_path):
 
 
 def serialize_frame(frame, tb_lineno=None, with_locals=True):
-    # type: (Any, int, bool) -> Dict[str, Any]
+    # type: (FrameType, Optional[int], bool) -> Dict[str, Any]
     f_code = getattr(frame, "f_code", None)
-    if f_code:
-        abs_path = frame.f_code.co_filename
-        function = frame.f_code.co_name
-    else:
+    if not f_code:
         abs_path = None
         function = None
+    else:
+        abs_path = frame.f_code.co_filename
+        function = frame.f_code.co_name
     try:
         module = frame.f_globals["__name__"]
     except Exception:
@@ -442,14 +414,16 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
         "pre_context": pre_context,
         "context_line": context_line,
         "post_context": post_context,
-    }
+    }  # type: Dict[str, Any]
     if with_locals:
-        rv["vars"] = extract_locals(frame)
+        rv["vars"] = sentry_sdk.serializer.partial_serialize(
+            sentry_sdk.Hub.current.client, frame.f_locals
+        )
     return rv
 
 
 def stacktrace_from_traceback(tb=None, with_locals=True):
-    # type: (Any, bool) -> Dict[str, List[Dict[str, Any]]]
+    # type: (Optional[TracebackType], bool) -> Dict[str, List[Dict[str, Any]]]
     return {
         "frames": [
             serialize_frame(
@@ -461,6 +435,7 @@ def stacktrace_from_traceback(tb=None, with_locals=True):
 
 
 def current_stacktrace(with_locals=True):
+    # type: (bool) -> Any
     __tracebackhide__ = True
     frames = []
 
@@ -483,9 +458,9 @@ def get_errno(exc_value):
 def single_exception_from_error_tuple(
     exc_type,  # type: Optional[type]
     exc_value,  # type: Optional[BaseException]
-    tb,  # type: Optional[Any]
-    client_options=None,  # type: Optional[ClientOptions]
-    mechanism=None,  # type: Dict[str, Any]
+    tb,  # type: Optional[TracebackType]
+    client_options=None,  # type: Optional[Dict[str, Any]]
+    mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> Dict[str, Any]
     if exc_value is not None:
@@ -537,7 +512,7 @@ if HAS_CHAINED_EXCEPTIONS:
             seen_exceptions.append(exc_value)
             seen_exception_ids.add(id(exc_value))
 
-            if exc_value.__suppress_context__:  # type: ignore
+            if exc_value.__suppress_context__:
                 cause = exc_value.__cause__
             else:
                 cause = exc_value.__context__
@@ -557,8 +532,8 @@ else:
 
 def exceptions_from_error_tuple(
     exc_info,  # type: ExcInfo
-    client_options=None,  # type: Optional[ClientOptions]
-    mechanism=None,  # type: Dict[str, Any]
+    client_options=None,  # type: Optional[Dict[str, Any]]
+    mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> List[Dict[str, Any]]
     exc_type, exc_value, tb = exc_info
@@ -605,7 +580,7 @@ def iter_event_frames(event):
 
 
 def handle_in_app(event, in_app_exclude=None, in_app_include=None):
-    # type: (Dict[str, Any], List, List) -> Dict[str, Any]
+    # type: (Dict[str, Any], Optional[List[str]], Optional[List[str]]) -> Dict[str, Any]
     for stacktrace in iter_event_stacktraces(event):
         handle_in_app_impl(
             stacktrace.get("frames"),
@@ -617,8 +592,9 @@ def handle_in_app(event, in_app_exclude=None, in_app_include=None):
 
 
 def handle_in_app_impl(frames, in_app_exclude, in_app_include):
+    # type: (Any, Optional[List[str]], Optional[List[str]]) -> Optional[Any]
     if not frames:
-        return
+        return None
 
     any_in_app = False
     for frame in frames:
@@ -669,8 +645,8 @@ def exc_info_from_error(error):
 
 def event_from_exception(
     exc_info,  # type: Union[BaseException, ExcInfo]
-    client_options=None,  # type: Optional[ClientOptions]
-    mechanism=None,  # type: Dict[str, Any]
+    client_options=None,  # type: Optional[Dict[str, Any]]
+    mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> Tuple[Dict[str, Any], Dict[str, Any]]
     exc_info = exc_info_from_error(exc_info)
@@ -689,7 +665,7 @@ def event_from_exception(
 
 
 def _module_in_set(name, set):
-    # type: (str, Optional[List]) -> bool
+    # type: (str, Optional[List[str]]) -> bool
     if not set:
         return False
     for item in set or ():
@@ -698,170 +674,18 @@ def _module_in_set(name, set):
     return False
 
 
-class AnnotatedValue(object):
-    def __init__(self, value, metadata):
-        # type: (Optional[Any], Dict[str, Any]) -> None
-        self.value = value
-        self.metadata = metadata
-
-
-def flatten_metadata(obj):
-    # type: (Dict[str, Any]) -> Dict[str, Any]
-    def inner(obj):
-        # type: (Any) -> Any
-        if isinstance(obj, Mapping):
-            dict_rv = {}
-            meta = {}
-            for k, v in obj.items():
-                # if we actually have "" keys in our data, throw them away. It's
-                # unclear how we would tell them apart from metadata
-                if k == "":
-                    continue
-
-                dict_rv[k], meta[k] = inner(v)
-                if meta[k] is None:
-                    del meta[k]
-                if dict_rv[k] is None:
-                    del dict_rv[k]
-            return dict_rv, (meta or None)
-        if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
-            list_rv = []
-            meta = {}
-            for i, v in enumerate(obj):
-                new_v, meta[str(i)] = inner(v)
-                list_rv.append(new_v)
-                if meta[str(i)] is None:
-                    del meta[str(i)]
-            return list_rv, (meta or None)
-        if isinstance(obj, AnnotatedValue):
-            return (inner(obj.value)[0], {"": obj.metadata})
-        return obj, None
-
-    obj, meta = inner(obj)
-    if meta is not None:
-        obj["_meta"] = meta
-    return obj
-
-
-def strip_event_mut(event):
-    # type: (Dict[str, Any]) -> None
-    strip_stacktrace_mut(event.get("stacktrace", None))
-    exception = event.get("exception", None)
-    if exception:
-        for exception in exception.get("values", None) or ():
-            strip_stacktrace_mut(exception.get("stacktrace", None))
-
-    strip_request_mut(event.get("request", None))
-    strip_breadcrumbs_mut(event.get("breadcrumbs", None))
-
-
-def strip_stacktrace_mut(stacktrace):
-    # type: (Optional[Dict[str, List[Dict[str, Any]]]]) -> None
-    if not stacktrace:
-        return
-    for frame in stacktrace.get("frames", None) or ():
-        strip_frame_mut(frame)
-
-
-def strip_request_mut(request):
-    # type: (Dict[str, Any]) -> None
-    if not request:
-        return
-    data = request.get("data", None)
-    if not data:
-        return
-    request["data"] = strip_databag(data)
-
-
-def strip_breadcrumbs_mut(breadcrumbs):
-    if not breadcrumbs:
-        return
-
-    for i in range(len(breadcrumbs)):
-        breadcrumbs[i] = strip_databag(breadcrumbs[i])
-
-
-def strip_frame_mut(frame):
-    # type: (Dict[str, Any]) -> None
-    if "vars" in frame:
-        frame["vars"] = strip_databag(frame["vars"])
-
-
-class Memo(object):
-    def __init__(self):
-        self._inner = {}
-
-    def memoize(self, obj):
-        if id(obj) in self._inner:
-            return True
-        self._inner[id(obj)] = obj
-        return False
-
-    def unmemoize(self, obj):
-        self._inner.pop(id(obj), None)
-
-
-def convert_types(obj):
-    # type: (Any) -> Any
-    if obj is None:
-        return None
-    if obj is CYCLE_MARKER:
-        return u"<cyclic>"
-    if isinstance(obj, datetime):
-        return text_type(obj.strftime("%Y-%m-%dT%H:%M:%SZ"))
-    if isinstance(obj, Mapping):
-        return {k: convert_types(v) for k, v in obj.items()}
-    if isinstance(obj, Sequence) and not isinstance(obj, (text_type, bytes)):
-        return [convert_types(v) for v in obj]
-    if isinstance(obj, AnnotatedValue):
-        return AnnotatedValue(convert_types(obj.value), obj.metadata)
-
-    if not isinstance(obj, string_types + number_types):
-        return safe_repr(obj)
-    if isinstance(obj, bytes):
-        return obj.decode("utf-8", "replace")
-
-    return obj
-
-
-def strip_databag(obj, remaining_depth=20, max_breadth=20):
-    # type: (Any, int, int) -> Any
-    assert not isinstance(obj, bytes), "bytes should have been normalized before"
-    if remaining_depth <= 0:
-        return AnnotatedValue(None, {"rem": [["!limit", "x"]]})
-    if isinstance(obj, text_type):
-        return strip_string(obj)
-    if isinstance(obj, Mapping):
-        rv_dict = {}  # type: Dict[Any, Any]
-        for i, (k, v) in enumerate(obj.items()):
-            if i >= max_breadth:
-                return AnnotatedValue(rv_dict, {"len": max_breadth})
-            rv_dict[k] = strip_databag(
-                v, remaining_depth=remaining_depth - 1, max_breadth=max_breadth
-            )
-
-        return rv_dict
-    if isinstance(obj, Sequence):
-        rv_list = []  # type: List[Any]
-        for i, v in enumerate(obj):
-            if i >= max_breadth:
-                return AnnotatedValue(rv_list, {"len": max_breadth})
-            rv_list.append(
-                strip_databag(
-                    v, remaining_depth=remaining_depth - 1, max_breadth=max_breadth
-                )
-            )
-
-        return rv_list
-    return obj
-
-
-def strip_string(value, max_length=512):
-    # type: (str, int) -> Union[AnnotatedValue, str]
+def strip_string(value, max_length=None):
+    # type: (str, Optional[int]) -> Union[AnnotatedValue, str]
     # TODO: read max_length from config
     if not value:
         return value
+
+    if max_length is None:
+        # This is intentionally not just the default such that one can patch `MAX_STRING_LENGTH` and affect `strip_string`.
+        max_length = MAX_STRING_LENGTH
+
     length = len(value)
+
     if length > max_length:
         return AnnotatedValue(
             value=value[: max_length - 3] + u"...",
@@ -873,95 +697,78 @@ def strip_string(value, max_length=512):
     return value
 
 
-def format_and_strip(template, params, strip_string=strip_string):
-    """Format a string containing %s for placeholders and call `strip_string`
-    on each parameter. The string template itself does not have a maximum
-    length.
+def _is_threading_local_monkey_patched():
+    # type: () -> bool
+    try:
+        from gevent.monkey import is_object_patched  # type: ignore
 
-    TODO: handle other placeholders, not just %s
+        if is_object_patched("threading", "local"):
+            return True
+    except ImportError:
+        pass
+
+    try:
+        from eventlet.patcher import is_monkey_patched  # type: ignore
+
+        if is_monkey_patched("thread"):
+            return True
+    except ImportError:
+        pass
+
+    return False
+
+
+def _get_contextvars():
+    # type: () -> Tuple[bool, type]
     """
-    chunks = template.split(u"%s")
-    if not chunks:
-        raise ValueError("No formatting placeholders found")
+    Try to import contextvars and use it if it's deemed safe. We should not use
+    contextvars if gevent or eventlet have patched thread locals, as
+    contextvars are unaffected by that patch.
 
-    params = list(reversed(params))
-    rv_remarks = []
-    rv_original_length = 0
-    rv_length = 0
-    rv = []
+    https://github.com/gevent/gevent/issues/1407
+    """
+    if not _is_threading_local_monkey_patched():
+        try:
+            from contextvars import ContextVar
 
-    def realign_remark(remark):
-        return [
-            (rv_length + x if isinstance(x, int_types) and i < 4 else x)
-            for i, x in enumerate(remark)
-        ]
+            if not PY2 and sys.version_info < (3, 7):
+                import aiocontextvars  # noqa
 
-    for chunk in chunks[:-1]:
-        rv.append(chunk)
-        rv_length += len(chunk)
-        rv_original_length += len(chunk)
-        if not params:
-            raise ValueError("Not enough params.")
-        param = params.pop()
-
-        stripped_param = strip_string(param)
-        if isinstance(stripped_param, AnnotatedValue):
-            rv_remarks.extend(
-                realign_remark(remark) for remark in stripped_param.metadata["rem"]
-            )
-            stripped_param = stripped_param.value
-
-        rv_original_length += len(param)
-        rv_length += len(stripped_param)
-        rv.append(stripped_param)
-
-    rv.append(chunks[-1])
-    rv_length += len(chunks[-1])
-    rv_original_length += len(chunks[-1])
-
-    rv = u"".join(rv)
-    assert len(rv) == rv_length
-
-    if not rv_remarks:
-        return rv
-
-    return AnnotatedValue(
-        value=rv, metadata={"len": rv_original_length, "rem": rv_remarks}
-    )
-
-
-HAS_REAL_CONTEXTVARS = True
-
-try:
-    from contextvars import ContextVar  # type: ignore
-
-    if not PY2 and sys.version_info < (3, 7):
-        import aiocontextvars  # type: ignore # noqa
-except ImportError:
-    HAS_REAL_CONTEXTVARS = False
+            return True, ContextVar
+        except ImportError:
+            pass
 
     from threading import local
 
-    class ContextVar(object):  # type: ignore
+    class ContextVar(object):
         # Super-limited impl of ContextVar
 
         def __init__(self, name):
+            # type: (str) -> None
             self._name = name
             self._local = local()
 
         def get(self, default):
+            # type: (Any) -> Any
             return getattr(self._local, "value", default)
 
         def set(self, value):
+            # type: (Any) -> None
             setattr(self._local, "value", value)
+
+    return False, ContextVar
+
+
+HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()
 
 
 def transaction_from_function(func):
+    # type: (Callable[..., Any]) -> Optional[str]
     # Methods in Python 2
     try:
         return "%s.%s.%s" % (
-            func.im_class.__module__,
-            func.im_class.__name__,
+            func.im_class.__module__,  # type: ignore
+            func.im_class.__name__,  # type: ignore
             func.__name__,
         )
     except Exception:
@@ -969,7 +776,7 @@ def transaction_from_function(func):
 
     func_qualname = (
         getattr(func, "__qualname__", None) or getattr(func, "__name__", None) or None
-    )
+    )  # type: Optional[str]
 
     if not func_qualname:
         # No idea what it is
@@ -985,3 +792,6 @@ def transaction_from_function(func):
 
     # Possibly a lambda
     return func_qualname
+
+
+disable_capture_event = ContextVar("disable_capture_event")

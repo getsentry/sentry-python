@@ -8,12 +8,12 @@ import gzip
 
 from datetime import datetime, timedelta
 
-from sentry_sdk.consts import VERSION
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 
-if False:
-    from sentry_sdk.consts import ClientOptions
+from sentry_sdk._types import MYPY
+
+if MYPY:
     from typing import Type
     from typing import Any
     from typing import Optional
@@ -21,7 +21,9 @@ if False:
     from typing import Union
     from typing import Callable
     from urllib3.poolmanager import PoolManager  # type: ignore
-    from urllib3.poolmanager import ProxyManager  # type: ignore
+    from urllib3.poolmanager import ProxyManager
+
+    from sentry_sdk._types import Event
 
 try:
     from urllib.request import getproxies
@@ -35,23 +37,33 @@ class Transport(object):
     A transport is used to send an event to sentry.
     """
 
-    parsed_dsn = None  # type: Dsn
+    parsed_dsn = None  # type: Optional[Dsn]
 
-    def __init__(self, options=None):
-        # type: (Optional[ClientOptions]) -> None
+    def __init__(
+        self, options=None  # type: Optional[Dict[str, Any]]
+    ):
+        # type: (...) -> None
         self.options = options
-        if options and options["dsn"]:
+        if options and options["dsn"] is not None and options["dsn"]:
             self.parsed_dsn = Dsn(options["dsn"])
         else:
-            self.parsed_dsn = None  # type: ignore
+            self.parsed_dsn = None
 
-    def capture_event(self, event):
+    def capture_event(
+        self, event  # type: Event
+    ):
+        # type: (...) -> None
         """This gets invoked with the event dictionary when an event should
         be sent to sentry.
         """
         raise NotImplementedError()
 
-    def flush(self, timeout, callback=None):
+    def flush(
+        self,
+        timeout,  # type: float
+        callback=None,  # type: Optional[Any]
+    ):
+        # type: (...) -> None
         """Wait `timeout` seconds for the current events to be sent out."""
         pass
 
@@ -71,9 +83,14 @@ class Transport(object):
 class HttpTransport(Transport):
     """The default HTTP transport."""
 
-    def __init__(self, options):
-        # type: (ClientOptions) -> None
+    def __init__(
+        self, options  # type: Dict[str, Any]
+    ):
+        # type: (...) -> None
+        from sentry_sdk.consts import VERSION
+
         Transport.__init__(self, options)
+        assert self.parsed_dsn is not None
         self._worker = BackgroundWorker()
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
         self._disabled_until = None  # type: Optional[datetime]
@@ -91,8 +108,10 @@ class HttpTransport(Transport):
 
         self.hub_cls = Hub
 
-    def _send_event(self, event):
-        # type: (Dict[str, Any]) -> None
+    def _send_event(
+        self, event  # type: Event
+    ):
+        # type: (...) -> None
         if self._disabled_until is not None:
             if datetime.utcnow() < self._disabled_until:
                 return
@@ -102,13 +121,15 @@ class HttpTransport(Transport):
         with gzip.GzipFile(fileobj=body, mode="w") as f:
             f.write(json.dumps(event, allow_nan=False).encode("utf-8"))
 
+        assert self.parsed_dsn is not None
         logger.debug(
-            "Sending %s event [%s] to %s project:%s"
+            "Sending event, type:%s level:%s event_id:%s project:%s host:%s"
             % (
-                event.get("level") or "error",
-                event["event_id"],
-                self.parsed_dsn.host,
+                event.get("type") or "null",
+                event.get("level") or "null",
+                event.get("event_id") or "null",
                 self.parsed_dsn.project_id,
+                self.parsed_dsn.host,
             )
         )
         response = self._pool.request(
@@ -116,6 +137,7 @@ class HttpTransport(Transport):
             str(self._auth.store_api_url),
             body=body.getvalue(),
             headers={
+                "User-Agent": str(self._auth.client),
                 "X-Sentry-Auth": str(self._auth.to_header()),
                 "Content-Type": "application/json",
                 "Content-Encoding": "gzip",
@@ -173,8 +195,10 @@ class HttpTransport(Transport):
         else:
             return urllib3.PoolManager(**opts)
 
-    def capture_event(self, event):
-        # type: (Dict[str, Any]) -> None
+    def capture_event(
+        self, event  # type: Event
+    ):
+        # type: (...) -> None
         hub = self.hub_cls.current
 
         def send_event_wrapper():
@@ -185,8 +209,12 @@ class HttpTransport(Transport):
 
         self._worker.submit(send_event_wrapper)
 
-    def flush(self, timeout, callback=None):
-        # type: (float, Optional[Any]) -> None
+    def flush(
+        self,
+        timeout,  # type: float
+        callback=None,  # type: Optional[Any]
+    ):
+        # type: (...) -> None
         logger.debug("Flushing HTTP transport")
         if timeout > 0:
             self._worker.flush(timeout, callback)
@@ -198,35 +226,34 @@ class HttpTransport(Transport):
 
 
 class _FunctionTransport(Transport):
-    def __init__(self, func):
-        # type: (Callable[[Dict[str, Any]], None]) -> None
+    def __init__(
+        self, func  # type: Callable[[Event], None]
+    ):
+        # type: (...) -> None
         Transport.__init__(self)
         self._func = func
 
-    def capture_event(self, event):
-        # type: (Dict[str, Any]) -> None
+    def capture_event(
+        self, event  # type: Event
+    ):
+        # type: (...) -> None
         self._func(event)
         return None
 
 
 def make_transport(options):
-    # type: (ClientOptions) -> Optional[Transport]
+    # type: (Dict[str, Any]) -> Optional[Transport]
     ref_transport = options["transport"]
 
     # If no transport is given, we use the http transport class
     if ref_transport is None:
         transport_cls = HttpTransport  # type: Type[Transport]
-    else:
-        try:
-            issubclass(ref_transport, type)  # type: ignore
-        except TypeError:
-            # if we are not a class but we are a callable, assume a
-            # function that acts as capture_event
-            if callable(ref_transport):
-                return _FunctionTransport(ref_transport)
-            # otherwise assume an object fulfilling the transport contract
-            return ref_transport
-        transport_cls = ref_transport  # type: ignore
+    elif isinstance(ref_transport, Transport):
+        return ref_transport
+    elif isinstance(ref_transport, type) and issubclass(ref_transport, Transport):
+        transport_cls = ref_transport
+    elif callable(ref_transport):
+        return _FunctionTransport(ref_transport)  # type: ignore
 
     # if a transport class is given only instanciate it if the dsn is not
     # empty or None

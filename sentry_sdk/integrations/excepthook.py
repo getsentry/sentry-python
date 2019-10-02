@@ -4,8 +4,25 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 
-if False:
+from sentry_sdk._types import MYPY
+
+if MYPY:
     from typing import Callable
+    from typing import Any
+    from typing import Type
+
+    from types import TracebackType
+
+    from mypy_extensions import Arg
+
+    Excepthook = Callable[
+        [
+            Arg(Type[BaseException], "type_"),
+            Arg(BaseException, "value"),
+            Arg(TracebackType, "traceback"),
+        ],
+        None,
+    ]
 
 
 class ExcepthookIntegration(Integration):
@@ -30,26 +47,31 @@ class ExcepthookIntegration(Integration):
 
 
 def _make_excepthook(old_excepthook):
-    # type: (Callable) -> Callable
-    def sentry_sdk_excepthook(exctype, value, traceback):
+    # type: (Excepthook) -> Excepthook
+    def sentry_sdk_excepthook(type_, value, traceback):
+        # type: (Type[BaseException], BaseException, TracebackType) -> None
         hub = Hub.current
         integration = hub.get_integration(ExcepthookIntegration)
 
         if integration is not None and _should_send(integration.always_run):
+            # If an integration is there, a client has to be there.
+            client = hub.client  # type: Any
+
             with capture_internal_exceptions():
                 event, hint = event_from_exception(
-                    (exctype, value, traceback),
-                    client_options=hub.client.options,
+                    (type_, value, traceback),
+                    client_options=client.options,
                     mechanism={"type": "excepthook", "handled": False},
                 )
                 hub.capture_event(event, hint=hint)
 
-        return old_excepthook(exctype, value, traceback)
+        return old_excepthook(type_, value, traceback)
 
     return sentry_sdk_excepthook
 
 
 def _should_send(always_run=False):
+    # type: (bool) -> bool
     if always_run:
         return True
 

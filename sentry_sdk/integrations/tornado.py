@@ -2,6 +2,7 @@ import weakref
 from inspect import iscoroutinefunction
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
+from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     event_from_exception,
@@ -15,16 +16,20 @@ from sentry_sdk.integrations._wsgi_common import (
     _is_json_content_type,
 )
 from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk._compat import iteritems
 
-from tornado.web import RequestHandler, HTTPError  # type: ignore
-from tornado.gen import coroutine  # type: ignore
+from tornado.web import RequestHandler, HTTPError
+from tornado.gen import coroutine
 
-if False:
+from sentry_sdk._types import MYPY
+
+if MYPY:
     from typing import Any
-    from typing import List
     from typing import Optional
     from typing import Dict
     from typing import Callable
+
+    from sentry_sdk._types import EventProcessor
 
 
 class TornadoIntegration(Integration):
@@ -33,7 +38,7 @@ class TornadoIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        import tornado  # type: ignore
+        import tornado
 
         tornado_version = getattr(tornado, "version_info", None)
         if tornado_version is None or tornado_version < (5, 0):
@@ -57,7 +62,7 @@ class TornadoIntegration(Integration):
             # Starting Tornado 6 RequestHandler._execute method is a standard Python coroutine (async/await)
             # In that case our method should be a coroutine function too
             async def sentry_execute_request_handler(self, *args, **kwargs):
-                # type: (Any, *List, **Any) -> Any
+                # type: (Any, *Any, **Any) -> Any
                 hub = Hub.current
                 integration = hub.get_integration(TornadoIntegration)
                 if integration is None:
@@ -75,6 +80,7 @@ class TornadoIntegration(Integration):
 
             @coroutine  # type: ignore
             def sentry_execute_request_handler(self, *args, **kwargs):
+                # type: (RequestHandler, *Any, **Any) -> Any
                 hub = Hub.current
                 integration = hub.get_integration(TornadoIntegration)
                 if integration is None:
@@ -108,9 +114,12 @@ def _capture_exception(ty, value, tb):
     if isinstance(value, HTTPError):
         return
 
+    # If an integration is there, a client has to be there.
+    client = hub.client  # type: Any
+
     event, hint = event_from_exception(
         (ty, value, tb),
-        client_options=hub.client.options,
+        client_options=client.options,
         mechanism={"type": "tornado", "handled": False},
     )
 
@@ -118,7 +127,7 @@ def _capture_exception(ty, value, tb):
 
 
 def _make_event_processor(weak_handler):
-    # type: (Callable[[], RequestHandler]) -> Callable
+    # type: (Callable[[], RequestHandler]) -> EventProcessor
     def tornado_processor(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         handler = weak_handler()
@@ -143,7 +152,9 @@ def _make_event_processor(weak_handler):
                 request.path,
             )
 
-            request_info["query_string"] = request.query
+            request_info["query_string"] = partial_serialize(
+                Hub.current.client, request.query, should_repr_strings=False
+            )
             request_info["method"] = request.method
             request_info["env"] = {"REMOTE_ADDR": request.remote_ip}
             request_info["headers"] = _filter_headers(dict(request.headers))
@@ -165,18 +176,18 @@ class TornadoRequestExtractor(RequestExtractor):
         return len(self.request.body)
 
     def cookies(self):
-        # type: () -> Dict
-        return {k: v.value for k, v in self.request.cookies.items()}
+        # type: () -> Dict[str, str]
+        return {k: v.value for k, v in iteritems(self.request.cookies)}
 
     def raw_data(self):
         # type: () -> bytes
         return self.request.body
 
     def form(self):
-        # type: () -> Optional[Any]
+        # type: () -> Dict[str, Any]
         return {
             k: [v.decode("latin1", "replace") for v in vs]
-            for k, vs in self.request.body_arguments.items()
+            for k, vs in iteritems(self.request.body_arguments)
         }
 
     def is_json(self):
@@ -184,8 +195,9 @@ class TornadoRequestExtractor(RequestExtractor):
         return _is_json_content_type(self.request.headers.get("content-type"))
 
     def files(self):
-        # type: () -> Dict
-        return {k: v[0] for k, v in self.request.files.items() if v}
+        # type: () -> Dict[str, Any]
+        return {k: v[0] for k, v in iteritems(self.request.files) if v}
 
     def size_of_file(self, file):
+        # type: (Any) -> int
         return len(file.body or ())

@@ -2,6 +2,7 @@ import sys
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk._compat import reraise
+from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -11,13 +12,30 @@ from sentry_sdk.utils import (
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from typing import Any
+    from typing import TypeVar
+    from typing import Callable
+    from typing import Optional
+
+    from sentry_sdk._types import EventProcessor, Event, Hint
+
+    F = TypeVar("F", bound=Callable[..., Any])
+
 
 def _wrap_handler(handler):
+    # type: (F) -> F
     def sentry_handler(event, context, *args, **kwargs):
+        # type: (Any, Any, *Any, **Any) -> Any
         hub = Hub.current
         integration = hub.get_integration(AwsLambdaIntegration)
         if integration is None:
             return handler(event, context, *args, **kwargs)
+
+        # If an integration is there, a client has to be there.
+        client = hub.client  # type: Any
 
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
@@ -31,23 +49,24 @@ def _wrap_handler(handler):
                 exc_info = sys.exc_info()
                 event, hint = event_from_exception(
                     exc_info,
-                    client_options=hub.client.options,
+                    client_options=client.options,
                     mechanism={"type": "aws_lambda", "handled": False},
                 )
                 hub.capture_event(event, hint=hint)
                 reraise(*exc_info)
 
-    return sentry_handler
+    return sentry_handler  # type: ignore
 
 
 def _drain_queue():
+    # type: () -> None
     with capture_internal_exceptions():
         hub = Hub.current
         integration = hub.get_integration(AwsLambdaIntegration)
         if integration is not None:
             # Flush out the event queue before AWS kills the
             # process.
-            hub.client.flush()
+            hub.flush()
 
 
 class AwsLambdaIntegration(Integration):
@@ -55,6 +74,7 @@ class AwsLambdaIntegration(Integration):
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         import __main__ as lambda_bootstrap  # type: ignore
 
         pre_37 = True  # Python 3.6 or 2.7
@@ -78,6 +98,7 @@ class AwsLambdaIntegration(Integration):
             old_handle_event_request = lambda_bootstrap.handle_event_request
 
             def sentry_handle_event_request(request_handler, *args, **kwargs):
+                # type: (Any, *Any, **Any) -> Any
                 request_handler = _wrap_handler(request_handler)
                 return old_handle_event_request(request_handler, *args, **kwargs)
 
@@ -86,6 +107,7 @@ class AwsLambdaIntegration(Integration):
             old_handle_http_request = lambda_bootstrap.handle_http_request
 
             def sentry_handle_http_request(request_handler, *args, **kwargs):
+                # type: (Any, *Any, **Any) -> Any
                 request_handler = _wrap_handler(request_handler)
                 return old_handle_http_request(request_handler, *args, **kwargs)
 
@@ -97,6 +119,7 @@ class AwsLambdaIntegration(Integration):
             old_to_json = lambda_bootstrap.to_json
 
             def sentry_to_json(*args, **kwargs):
+                # type: (*Any, **Any) -> Any
                 _drain_queue()
                 return old_to_json(*args, **kwargs)
 
@@ -118,11 +141,13 @@ class AwsLambdaIntegration(Integration):
             # even when the SDK is initialized inside of the handler
 
             def _wrap_post_function(f):
+                # type: (F) -> F
                 def inner(*args, **kwargs):
+                    # type: (*Any, **Any) -> Any
                     _drain_queue()
                     return f(*args, **kwargs)
 
-                return inner
+                return inner  # type: ignore
 
             lambda_bootstrap.LambdaRuntimeClient.post_invocation_result = _wrap_post_function(
                 lambda_bootstrap.LambdaRuntimeClient.post_invocation_result
@@ -133,7 +158,9 @@ class AwsLambdaIntegration(Integration):
 
 
 def _make_request_event_processor(aws_event, aws_context):
+    # type: (Any, Any) -> EventProcessor
     def event_processor(event, hint):
+        # type: (Event, Hint) -> Optional[Event]
         extra = event.setdefault("extra", {})
         extra["lambda"] = {
             "remaining_time_in_millis": aws_context.get_remaining_time_in_millis(),
@@ -143,7 +170,7 @@ def _make_request_event_processor(aws_event, aws_context):
             "aws_request_id": aws_context.aws_request_id,
         }
 
-        request = event.setdefault("request", {})
+        request = event.get("request", {})
 
         if "httpMethod" in aws_event:
             request["method"] = aws_event["httpMethod"]
@@ -172,12 +199,17 @@ def _make_request_event_processor(aws_event, aws_context):
             if ip is not None:
                 user_info["ip_address"] = ip
 
+        event["request"] = partial_serialize(
+            Hub.current.client, request, should_repr_strings=False
+        )
+
         return event
 
     return event_processor
 
 
 def _get_url(event, context):
+    # type: (Any, Any) -> str
     path = event.get("path", None)
     headers = event.get("headers", {})
     host = headers.get("Host", None)

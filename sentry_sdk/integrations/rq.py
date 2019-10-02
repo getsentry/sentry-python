@@ -4,20 +4,25 @@ import weakref
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
+from sentry_sdk.tracing import Span
+from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
-from rq.timeouts import JobTimeoutException  # type: ignore
-from rq.worker import Worker  # type: ignore
+from rq.timeouts import JobTimeoutException
+from rq.worker import Worker
+from rq.queue import Queue
 
-if False:
+from sentry_sdk._types import MYPY
+
+if MYPY:
     from typing import Any
     from typing import Dict
     from typing import Callable
 
-    from rq.job import Job  # type: ignore
-    from rq.queue import Queue  # type: ignore
+    from rq.job import Job
 
     from sentry_sdk.utils import ExcInfo
+    from sentry_sdk._types import EventProcessor
 
 
 class RqIntegration(Integration):
@@ -37,16 +42,29 @@ class RqIntegration(Integration):
             if integration is None:
                 return old_perform_job(self, job, *args, **kwargs)
 
+            client = hub.client
+            assert client is not None
+
             with hub.push_scope() as scope:
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
-                rv = old_perform_job(self, job, *args, **kwargs)
+
+                span = Span.continue_from_headers(
+                    job.meta.get("_sentry_trace_headers") or {}
+                )
+                span.op = "rq.task"
+
+                with capture_internal_exceptions():
+                    span.transaction = job.func_name
+
+                with hub.start_span(span):
+                    rv = old_perform_job(self, job, *args, **kwargs)
 
             if self.is_horse:
                 # We're inside of a forked process and RQ is
                 # about to call `os._exit`. Make sure that our
                 # events get sent out.
-                hub.client.flush()
+                client.flush()
 
             return rv
 
@@ -55,30 +73,46 @@ class RqIntegration(Integration):
         old_handle_exception = Worker.handle_exception
 
         def sentry_patched_handle_exception(self, job, *exc_info, **kwargs):
-            _capture_exception(exc_info)
+            # type: (Worker, Any, *Any, **Any) -> Any
+            _capture_exception(exc_info)  # type: ignore
             return old_handle_exception(self, job, *exc_info, **kwargs)
 
         Worker.handle_exception = sentry_patched_handle_exception
 
+        old_enqueue_job = Queue.enqueue_job
+
+        def sentry_patched_enqueue_job(self, job, **kwargs):
+            # type: (Queue, Any, **Any) -> Any
+            hub = Hub.current
+            if hub.get_integration(RqIntegration) is not None:
+                job.meta["_sentry_trace_headers"] = dict(
+                    hub.iter_trace_propagation_headers()
+                )
+
+            return old_enqueue_job(self, job, **kwargs)
+
+        Queue.enqueue_job = sentry_patched_enqueue_job
+
 
 def _make_event_processor(weak_job):
-    # type: (Callable[[], Job]) -> Callable
+    # type: (Callable[[], Job]) -> EventProcessor
     def event_processor(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         job = weak_job()
         if job is not None:
             with capture_internal_exceptions():
-                event["transaction"] = job.func_name
-
-            with capture_internal_exceptions():
                 extra = event.setdefault("extra", {})
-                extra["rq-job"] = {
-                    "job_id": job.id,
-                    "func": job.func_name,
-                    "args": job.args,
-                    "kwargs": job.kwargs,
-                    "description": job.description,
-                }
+                extra["rq-job"] = partial_serialize(
+                    Hub.current.client,
+                    {
+                        "job_id": job.id,
+                        "func": job.func_name,
+                        "args": job.args,
+                        "kwargs": job.kwargs,
+                        "description": job.description,
+                    },
+                    should_repr_strings=False,
+                )
 
         if "exc_info" in hint:
             with capture_internal_exceptions():
@@ -95,9 +129,13 @@ def _capture_exception(exc_info, **kwargs):
     hub = Hub.current
     if hub.get_integration(RqIntegration) is None:
         return
+
+    # If an integration is there, a client has to be there.
+    client = hub.client  # type: Any
+
     event, hint = event_from_exception(
         exc_info,
-        client_options=hub.client.options,
+        client_options=client.options,
         mechanism={"type": "rq", "handled": False},
     )
 

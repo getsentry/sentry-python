@@ -12,8 +12,6 @@ from sentry_sdk.utils import (
     Dsn,
     safe_repr,
     exceptions_from_error_tuple,
-    format_and_strip,
-    strip_string,
     filename_for_module,
     handle_in_app_impl,
     iter_event_stacktraces,
@@ -53,55 +51,6 @@ def test_abs_path():
 
     assert frame1["filename"] == "tests/utils/test_general.py"
     assert frame2["filename"] == "test.py"
-
-
-def test_non_string_variables():
-    """There is some extremely terrible code in the wild that
-    inserts non-strings as variable names into `locals()`."""
-
-    try:
-        locals()[42] = True
-        1 / 0
-    except ZeroDivisionError:
-        exceptions = exceptions_from_error_tuple(sys.exc_info())
-
-    exception, = exceptions
-    assert exception["type"] == "ZeroDivisionError"
-    frame, = exception["stacktrace"]["frames"]
-    assert frame["vars"]["42"] == "True"
-
-
-def test_format_and_strip():
-    max_length = None
-
-    def x(template, params):
-        return format_and_strip(
-            template,
-            params,
-            strip_string=lambda x: strip_string(x, max_length=max_length),
-        )
-
-    max_length = 3
-
-    assert x("", []) == ""
-    assert x("f", []) == "f"
-    pytest.raises(ValueError, lambda: x("%s", []))
-
-    # Don't raise errors on leftover params, some django extensions send too
-    # many SQL parameters.
-    assert x("", [123]) == ""
-    assert x("foo%s", ["bar"]) == "foobar"
-
-    rv = x("foo%s", ["baer"])
-    assert rv.value == "foo..."
-    assert rv.metadata == {"len": 7, "rem": [["!limit", "x", 3, 6]]}
-
-    rv = x("foo%sbar%s", ["baer", "boor"])
-    assert rv.value == "foo...bar..."
-    assert rv.metadata == {
-        "len": 14,
-        "rem": [["!limit", "x", 3, 6], ["!limit", "x", 9, 12]],
-    }
 
 
 def test_filename():

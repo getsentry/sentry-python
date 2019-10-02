@@ -1,12 +1,19 @@
 import os
 import subprocess
 import json
+import uuid
 
 import pytest
 
+import gevent
+import eventlet
+
 import sentry_sdk
-from sentry_sdk._compat import reraise, string_types
+from sentry_sdk._compat import reraise, string_types, iteritems
 from sentry_sdk.transport import Transport
+from sentry_sdk.utils import capture_internal_exceptions
+
+from tests import _warning_recorder, _warning_recorder_mgr
 
 SEMAPHORE = "./semaphore"
 
@@ -14,8 +21,21 @@ if not os.path.isfile(SEMAPHORE):
     SEMAPHORE = None
 
 
+try:
+    import pytest_benchmark
+except ImportError:
+
+    @pytest.fixture
+    def benchmark():
+        return lambda x: x()
+
+
+else:
+    del pytest_benchmark
+
+
 @pytest.fixture(autouse=True)
-def reraise_internal_exceptions(request, monkeypatch):
+def internal_exceptions(request, monkeypatch):
     errors = []
     if "tests_internal_exceptions" in request.keywords:
         return
@@ -32,18 +52,82 @@ def reraise_internal_exceptions(request, monkeypatch):
         sentry_sdk.Hub, "_capture_internal_exception", _capture_internal_exception
     )
 
+    return errors
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _capture_internal_warnings():
+    yield
+
+    _warning_recorder_mgr.__exit__(None, None, None)
+    recorder = _warning_recorder
+
+    for warning in recorder:
+        try:
+            if isinstance(warning.message, ResourceWarning):
+                continue
+        except NameError:
+            pass
+
+        if "sentry_sdk" not in str(warning.filename) and "sentry-sdk" not in str(
+            warning.filename
+        ):
+            continue
+
+        # pytest-django
+        if "getfuncargvalue" in str(warning.message):
+            continue
+
+        # Happens when re-initializing the SDK
+        if "but it was only enabled on init()" in str(warning.message):
+            continue
+
+        # sanic's usage of aiohttp for test client
+        if "verify_ssl is deprecated, use ssl=False instead" in str(warning.message):
+            continue
+
+        if "getargspec" in str(warning.message) and warning.filename.endswith(
+            ("pyramid/config/util.py", "pyramid/config/views.py")
+        ):
+            continue
+
+        if "isAlive() is deprecated" in str(
+            warning.message
+        ) and warning.filename.endswith("celery/utils/timer2.py"):
+            continue
+
+        if "collections.abc" in str(warning.message) and warning.filename.endswith(
+            ("celery/canvas.py", "werkzeug/datastructures.py", "tornado/httputil.py")
+        ):
+            continue
+
+        # Django 1.7 emits a (seemingly) false-positive warning for our test
+        # app and suggests to use a middleware that does not exist in later
+        # Django versions.
+        if "SessionAuthenticationMiddleware" in str(warning.message):
+            continue
+
+        if "Something has already installed a non-asyncio" in str(warning.message):
+            continue
+
+        if "dns.hash" in str(warning.message) or "dns/namedict" in warning.filename:
+            continue
+
+        raise AssertionError(warning)
+
 
 @pytest.fixture
-def monkeypatch_test_transport(monkeypatch, assert_semaphore_acceptance):
+def monkeypatch_test_transport(monkeypatch, semaphore_normalize):
     def check_event(event):
         def check_string_keys(map):
-            for key, value in map.items():
+            for key, value in iteritems(map):
                 assert isinstance(key, string_types)
                 if isinstance(value, dict):
                     check_string_keys(value)
 
-        check_string_keys(event)
-        assert_semaphore_acceptance(event)
+        with capture_internal_exceptions():
+            check_string_keys(event)
+            semaphore_normalize(event)
 
     def inner(client):
         monkeypatch.setattr(client, "transport", TestTransport(check_event))
@@ -72,45 +156,44 @@ def _no_errors_in_semaphore_response(obj):
 
 
 @pytest.fixture
-def assert_semaphore_acceptance(tmpdir):
+def semaphore_normalize(tmpdir):
     def inner(event):
         if not SEMAPHORE:
             return
-        # not dealing with the subprocess API right now
-        file = tmpdir.join("event")
-        file.write(json.dumps(dict(event)))
-        output = json.loads(
-            subprocess.check_output(
-                [SEMAPHORE, "process-event"], stdin=file.open()
-            ).decode("utf-8")
-        )
-        _no_errors_in_semaphore_response(output)
-        output.pop("_meta", None)
+
+        # Disable subprocess integration
+        with sentry_sdk.Hub(None):
+            # not dealing with the subprocess API right now
+            file = tmpdir.join("event-{}".format(uuid.uuid4().hex))
+            file.write(json.dumps(dict(event)))
+            output = json.loads(
+                subprocess.check_output(
+                    [SEMAPHORE, "process-event"], stdin=file.open()
+                ).decode("utf-8")
+            )
+            _no_errors_in_semaphore_response(output)
+            output.pop("_meta", None)
+            return output
 
     return inner
+
+
+@pytest.fixture(params=[True, False], ids=["fast_serialize", "default_serialize"])
+def fast_serialize(request):
+    return request.param
 
 
 @pytest.fixture
-def sentry_init(monkeypatch_test_transport, monkeypatch):
+def sentry_init(monkeypatch_test_transport, fast_serialize):
     def inner(*a, **kw):
         hub = sentry_sdk.Hub.current
         client = sentry_sdk.Client(*a, **kw)
-        monkeypatch.setattr(hub, "_stack", [(client, sentry_sdk.Scope())])
+        client.options["_experiments"]["fast_serialize"] = fast_serialize
+        hub.bind_client(client)
         monkeypatch_test_transport(sentry_sdk.Hub.current.client)
 
-    return inner
-
-
-@pytest.fixture(autouse=True)
-def _assert_no_client(request, monkeypatch):
-    assert sentry_sdk.Hub.current.client is None
-    assert sentry_sdk.Hub.main.client is None
-
-    @request.addfinalizer
-    def _check_no_client():
-        monkeypatch.undo()  # tear down sentry_init
-        assert sentry_sdk.Hub.current.client is None
-        assert sentry_sdk.Hub.main.client is None
+    with sentry_sdk.Hub(None):
+        yield inner
 
 
 class TestTransport(Transport):
@@ -173,3 +256,33 @@ class EventStreamReader(object):
 
     def read_flush(self):
         assert self.file.readline() == b"flush\n"
+
+
+# scope=session ensures that fixture is run earlier
+@pytest.fixture(
+    scope="session",
+    params=[None, "eventlet", "gevent"],
+    ids=("threads", "eventlet", "greenlet"),
+)
+def maybe_monkeypatched_threading(request):
+    if request.param == "eventlet":
+        try:
+            eventlet.monkey_patch()
+        except AttributeError as e:
+            if "'thread.RLock' object has no attribute" in str(e):
+                # https://bitbucket.org/pypy/pypy/issues/2962/gevent-cannot-patch-rlock-under-pypy-27-7
+                pytest.skip("https://github.com/eventlet/eventlet/issues/546")
+            else:
+                raise
+    elif request.param == "gevent":
+        try:
+            gevent.monkey.patch_all()
+        except Exception as e:
+            if "_RLock__owner" in str(e):
+                pytest.skip("https://github.com/gevent/gevent/issues/1380")
+            else:
+                raise
+    else:
+        assert request.param is None
+
+    return request.param

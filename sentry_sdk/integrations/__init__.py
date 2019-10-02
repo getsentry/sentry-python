@@ -6,7 +6,9 @@ from threading import Lock
 from sentry_sdk._compat import iteritems
 from sentry_sdk.utils import logger
 
-if False:
+from sentry_sdk._types import MYPY
+
+if MYPY:
     from typing import Iterator
     from typing import Dict
     from typing import List
@@ -33,9 +35,7 @@ def _generate_default_integrations_iterator(*import_strings):
 
     if isinstance(iter_default_integrations.__doc__, str):
         for import_string in import_strings:
-            iter_default_integrations.__doc__ += "\n- `{}`".format(  # type: ignore
-                import_string
-            )
+            iter_default_integrations.__doc__ += "\n- `{}`".format(import_string)
 
     return iter_default_integrations
 
@@ -82,7 +82,7 @@ def setup_integrations(integrations, with_defaults=True):
                     type(integration).setup_once()
                 except NotImplementedError:
                     if getattr(integration, "install", None) is not None:
-                        logger.warn(
+                        logger.warning(
                             "Integration %s: The install method is "
                             "deprecated. Use `setup_once`.",
                             identifier,
@@ -113,6 +113,7 @@ class Integration(object):
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         """
         Initialize the integration.
 

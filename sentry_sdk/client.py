@@ -2,51 +2,55 @@ import os
 import uuid
 import random
 from datetime import datetime
+import socket
 
-from sentry_sdk._compat import string_types, text_type
+from sentry_sdk._compat import string_types, text_type, iteritems
 from sentry_sdk.utils import (
-    strip_event_mut,
-    flatten_metadata,
-    convert_types,
     handle_in_app,
     get_type_name,
     capture_internal_exceptions,
     current_stacktrace,
+    disable_capture_event,
     logger,
 )
+from sentry_sdk.serializer import serialize, partial_serialize
 from sentry_sdk.transport import make_transport
-from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO
+from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO, ClientConstructor
 from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 
-if False:
-    from sentry_sdk.consts import ClientOptions
-    from sentry_sdk.scope import Scope
+from sentry_sdk._types import MYPY
+
+if MYPY:
     from typing import Any
+    from typing import Callable
     from typing import Dict
     from typing import Optional
+
+    from sentry_sdk.scope import Scope
+    from sentry_sdk._types import Event, Hint
 
 
 _client_init_debug = ContextVar("client_init_debug")
 
 
-def get_options(*args, **kwargs):
-    # type: (*str, **ClientOptions) -> ClientOptions
-    if args and (isinstance(args[0], string_types) or args[0] is None):
+def _get_options(*args, **kwargs):
+    # type: (*Optional[str], **Any) -> Dict[str, Any]
+    if args and (isinstance(args[0], (text_type, bytes, str)) or args[0] is None):
         dsn = args[0]  # type: Optional[str]
         args = args[1:]
     else:
         dsn = None
 
     rv = dict(DEFAULT_OPTIONS)
-    options = dict(*args, **kwargs)  # type: ignore
+    options = dict(*args, **kwargs)
     if dsn is not None and options.get("dsn") is None:
-        options["dsn"] = dsn  # type: ignore
+        options["dsn"] = dsn
 
-    for key, value in options.items():
+    for key, value in iteritems(options):
         if key not in rv:
             raise TypeError("Unknown option %r" % (key,))
-        rv[key] = value  # type: ignore
+        rv[key] = value
 
     if rv["dsn"] is None:
         rv["dsn"] = os.environ.get("SENTRY_DSN")
@@ -57,10 +61,13 @@ def get_options(*args, **kwargs):
     if rv["environment"] is None:
         rv["environment"] = os.environ.get("SENTRY_ENVIRONMENT")
 
-    return rv  # type: ignore
+    if rv["server_name"] is None and hasattr(socket, "gethostname"):
+        rv["server_name"] = socket.gethostname()
+
+    return rv
 
 
-class Client(object):
+class _Client(object):
     """The client is internally responsible for capturing the events and
     forwarding them to sentry through the configured transport.  It takes
     the client options as keyword arguments and optionally the DSN as first
@@ -68,15 +75,28 @@ class Client(object):
     """
 
     def __init__(self, *args, **kwargs):
-        # type: (*str, **ClientOptions) -> None
+        # type: (*Any, **Any) -> None
+        self.options = get_options(*args, **kwargs)  # type: Dict[str, Any]
+        self._init_impl()
+
+    def __getstate__(self):
+        # type: () -> Any
+        return {"options": self.options}
+
+    def __setstate__(self, state):
+        # type: (Any) -> None
+        self.options = state["options"]
+        self._init_impl()
+
+    def _init_impl(self):
+        # type: () -> None
         old_debug = _client_init_debug.get(False)
         try:
-            self.options = options = get_options(*args, **kwargs)
-            _client_init_debug.set(options["debug"])
-            self.transport = make_transport(options)
+            _client_init_debug.set(self.options["debug"])
+            self.transport = make_transport(self.options)
 
             request_bodies = ("always", "never", "small", "medium")
-            if options["request_bodies"] not in request_bodies:
+            if self.options["request_bodies"] not in request_bodies:
                 raise ValueError(
                     "Invalid value for request_bodies. Must be one of {}".format(
                         request_bodies
@@ -84,30 +104,40 @@ class Client(object):
                 )
 
             self.integrations = setup_integrations(
-                options["integrations"], with_defaults=options["default_integrations"]
+                self.options["integrations"],
+                with_defaults=self.options["default_integrations"],
             )
         finally:
             _client_init_debug.set(old_debug)
 
     @property
     def dsn(self):
+        # type: () -> Optional[str]
         """Returns the configured DSN as string."""
         return self.options["dsn"]
 
     def _prepare_event(
         self,
-        event,  # type: Dict[str, Any]
-        hint,  # type: Optional[Dict[str, Any]]
+        event,  # type: Event
+        hint,  # type: Optional[Hint]
         scope,  # type: Optional[Scope]
     ):
-        # type: (...) -> Optional[Dict[str, Any]]
+        # type: (...) -> Optional[Event]
+
+        client = self  # type: Client  # type: ignore
+
         if event.get("timestamp") is None:
-            event["timestamp"] = datetime.utcnow()
+            event["timestamp"] = partial_serialize(
+                client, datetime.utcnow(), is_databag=False, should_repr_strings=False
+            )
+
+        hint = dict(hint or ())  # type: Hint
 
         if scope is not None:
-            event = scope.apply_to_event(event, hint)
-            if event is None:
-                return
+            event_ = scope.apply_to_event(event, hint)
+            if event_ is None:
+                return None
+            event = event_
 
         if (
             self.options["attach_stacktrace"]
@@ -129,8 +159,8 @@ class Client(object):
                 }
 
         for key in "release", "environment", "server_name", "dist":
-            if event.get(key) is None and self.options[key] is not None:  # type: ignore
-                event[key] = text_type(self.options[key]).strip()  # type: ignore
+            if event.get(key) is None and self.options[key] is not None:
+                event[key] = text_type(self.options[key]).strip()
         if event.get("sdk") is None:
             sdk_info = dict(SDK_INFO)
             sdk_info["integrations"] = sorted(self.integrations.keys())
@@ -145,16 +175,16 @@ class Client(object):
 
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
-        if event is not None:
-            event = convert_types(event)
-            strip_event_mut(event)
-            event = flatten_metadata(event)
+        if event is not None and not self.options["_experiments"].get(
+            "fast_serialize", False
+        ):
+            event = serialize(event)
 
         before_send = self.options["before_send"]
         if before_send is not None:
             new_event = None
             with capture_internal_exceptions():
-                new_event = before_send(event, hint)
+                new_event = before_send(event, hint or {})
             if new_event is None:
                 logger.info("before send dropped event (%s)", event)
             event = new_event  # type: ignore
@@ -162,7 +192,7 @@ class Client(object):
         return event
 
     def _is_ignored_error(self, event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> bool
+        # type: (Event, Hint) -> bool
         exc_info = hint.get("exc_info")
         if exc_info is None:
             return False
@@ -184,9 +214,9 @@ class Client(object):
 
     def _should_capture(
         self,
-        event,  # type: Dict[str, Any]
-        hint,  # type: Dict[str, Any]
-        scope=None,  # type: Scope
+        event,  # type: Event
+        hint,  # type: Hint
+        scope=None,  # type: Optional[Scope]
     ):
         # type: (...) -> bool
         if scope is not None and not scope._should_capture:
@@ -203,51 +233,66 @@ class Client(object):
 
         return True
 
-    def capture_event(self, event, hint=None, scope=None):
-        # type: (Dict[str, Any], Any, Scope) -> Optional[str]
+    def capture_event(
+        self,
+        event,  # type: Event
+        hint=None,  # type: Optional[Hint]
+        scope=None,  # type: Optional[Scope]
+    ):
+        # type: (...) -> Optional[str]
         """Captures an event.
 
-        This takes the ready made event and an optoinal hint and scope.  The
-        hint is internally used to further customize the representation of the
-        error.  When provided it's a dictionary of optional information such
-        as exception info.
+        :param event: A ready-made event that can be directly sent to Sentry.
 
-        If the transport is not set nothing happens, otherwise the return
-        value of this function will be the ID of the captured event.
+        :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
+
+        :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
+        if disable_capture_event.get(False):
+            return None
+
         if self.transport is None:
             return None
         if hint is None:
             hint = {}
-        rv = event.get("event_id")
-        if rv is None:
-            event["event_id"] = rv = uuid.uuid4().hex
+        event_id = event.get("event_id")
+        if event_id is None:
+            event["event_id"] = event_id = uuid.uuid4().hex
         if not self._should_capture(event, hint, scope):
             return None
-        event = self._prepare_event(event, hint, scope)  # type: ignore
-        if event is None:
+        event_opt = self._prepare_event(event, hint, scope)
+        if event_opt is None:
             return None
-        self.transport.capture_event(event)
-        return rv
+        self.transport.capture_event(event_opt)
+        return event_id
 
-    def close(self, timeout=None, callback=None):
+    def close(
+        self,
+        timeout=None,  # type: Optional[float]
+        callback=None,  # type: Optional[Callable[[int, float], None]]
+    ):
+        # type: (...) -> None
         """
         Close the client and shut down the transport. Arguments have the same
-        semantics as `self.flush()`.
+        semantics as :py:meth:`Client.flush`.
         """
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
             self.transport.kill()
             self.transport = None
 
-    def flush(self, timeout=None, callback=None):
+    def flush(
+        self,
+        timeout=None,  # type: Optional[float]
+        callback=None,  # type: Optional[Callable[[int, float], None]]
+    ):
+        # type: (...) -> None
         """
-        Wait `timeout` seconds for the current events to be sent. If no
-        `timeout` is provided, the `shutdown_timeout` option value is used.
+        Wait for the current events to be sent.
 
-        The `callback` is invoked with two arguments: the number of pending
-        events and the configured timeout.  For instance the default atexit
-        integration will use this to render out a message on stderr.
+        :param timeout: Wait for at most `timeout` seconds. If no `timeout` is provided, the `shutdown_timeout` option value is used.
+
+        :param callback: Is invoked with the number of pending events and the configured timeout.
         """
         if self.transport is not None:
             if timeout is None:
@@ -255,7 +300,35 @@ class Client(object):
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):
+        # type: () -> _Client
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
+        # type: (Any, Any, Any) -> None
         self.close()
+
+
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    # Make mypy, PyCharm and other static analyzers think `get_options` is a
+    # type to have nicer autocompletion for params.
+    #
+    # Use `ClientConstructor` to define the argument types of `init` and
+    # `Dict[str, Any]` to tell static analyzers about the return type.
+
+    class get_options(ClientConstructor, Dict[str, Any]):
+        pass
+
+    class Client(ClientConstructor, _Client):
+        pass
+
+
+else:
+    # Alias `get_options` for actual usage. Go through the lambda indirection
+    # to throw PyCharm off of the weakly typed signature (it would otherwise
+    # discover both the weakly typed signature of `_init` and our faked `init`
+    # type).
+
+    get_options = (lambda: _get_options)()
+    Client = (lambda: _Client)()

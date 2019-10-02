@@ -1,5 +1,6 @@
 from django.contrib.auth import login
 from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse, HttpResponseServerError, HttpResponseNotFound
 from django.shortcuts import render
 from django.views.generic import ListView
@@ -11,6 +12,19 @@ try:
     def rest_framework_exc(request):
         1 / 0
 
+    @api_view(["POST"])
+    def rest_framework_read_body_and_exc(request):
+        request.data
+        1 / 0
+
+    @api_view(["GET"])
+    def rest_hello(request):
+        return HttpResponse("ok")
+
+    @api_view(["GET"])
+    def rest_permission_denied_exc(request):
+        raise PermissionDenied("bye")
+
 
 except ImportError:
     pass
@@ -20,6 +34,11 @@ import sentry_sdk
 
 
 def view_exc(request):
+    1 / 0
+
+
+def read_body_and_view_exc(request):
+    request.read()
     1 / 0
 
 
@@ -59,3 +78,7 @@ def handler404(*args, **kwargs):
 
 def template_exc(request, *args, **kwargs):
     return render(request, "error.html")
+
+
+def permission_denied_exc(*args, **kwargs):
+    raise PermissionDenied("bye")

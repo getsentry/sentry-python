@@ -8,26 +8,36 @@ from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
-if False:
+from sentry_sdk._types import MYPY
+
+if MYPY:
     from typing import Any
-    from typing import Callable
     from typing import Dict
+    from typing import Optional
+
+    from sentry_sdk._types import EventProcessor
 
 
 class FalconRequestExtractor(RequestExtractor):
     def env(self):
+        # type: () -> Dict[str, Any]
         return self.request.env
 
     def cookies(self):
+        # type: () -> Dict[str, Any]
         return self.request.cookies
 
     def form(self):
+        # type: () -> None
         return None  # No such concept in Falcon
 
     def files(self):
+        # type: () -> None
         return None  # No such concept in Falcon
 
     def raw_data(self):
+        # type: () -> Optional[str]
+
         # As request data can only be read once we won't make this available
         # to Sentry. Just send back a dummy string in case there was a
         # content length.
@@ -39,6 +49,7 @@ class FalconRequestExtractor(RequestExtractor):
             return None
 
     def json(self):
+        # type: () -> Optional[Dict[str, Any]]
         try:
             return self.request.media
         except falcon.errors.HTTPBadRequest:
@@ -53,6 +64,7 @@ class SentryFalconMiddleware(object):
     """Captures exceptions in Falcon requests and send to Sentry"""
 
     def process_request(self, req, resp, *args, **kwargs):
+        # type: (Any, Any, *Any, **Any) -> None
         hub = Hub.current
         integration = hub.get_integration(FalconIntegration)
         if integration is None:
@@ -87,9 +99,11 @@ class FalconIntegration(Integration):
 
 
 def _patch_wsgi_app():
+    # type: () -> None
     original_wsgi_app = falcon.API.__call__
 
     def sentry_patched_wsgi_app(self, env, start_response):
+        # type: (falcon.API, Any, Any) -> Any
         hub = Hub.current
         integration = hub.get_integration(FalconIntegration)
         if integration is None:
@@ -105,9 +119,11 @@ def _patch_wsgi_app():
 
 
 def _patch_handle_exception():
+    # type: () -> None
     original_handle_exception = falcon.API._handle_exception
 
     def sentry_patched_handle_exception(self, *args):
+        # type: (falcon.API, *Any) -> Any
         # NOTE(jmagnusson): falcon 2.0 changed falcon.API._handle_exception
         # method signature from `(ex, req, resp, params)` to
         # `(req, resp, ex, params)`
@@ -122,9 +138,12 @@ def _patch_handle_exception():
         integration = hub.get_integration(FalconIntegration)
 
         if integration is not None and not _is_falcon_http_error(ex):
+            # If an integration is there, a client has to be there.
+            client = hub.client  # type: Any
+
             event, hint = event_from_exception(
                 ex,
-                client_options=hub.client.options,
+                client_options=client.options,
                 mechanism={"type": "falcon", "handled": False},
             )
             hub.capture_event(event, hint=hint)
@@ -135,11 +154,13 @@ def _patch_handle_exception():
 
 
 def _patch_prepare_middleware():
+    # type: () -> None
     original_prepare_middleware = falcon.api_helpers.prepare_middleware
 
     def sentry_patched_prepare_middleware(
         middleware=None, independent_middleware=False
     ):
+        # type: (Any, Any) -> Any
         hub = Hub.current
         integration = hub.get_integration(FalconIntegration)
         if integration is not None:
@@ -150,11 +171,12 @@ def _patch_prepare_middleware():
 
 
 def _is_falcon_http_error(ex):
+    # type: (BaseException) -> bool
     return isinstance(ex, (falcon.HTTPError, falcon.http_status.HTTPStatus))
 
 
 def _make_request_event_processor(req, integration):
-    # type: (falcon.Request, FalconIntegration) -> Callable
+    # type: (falcon.Request, FalconIntegration) -> EventProcessor
 
     def inner(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]

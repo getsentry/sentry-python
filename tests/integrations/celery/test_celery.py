@@ -6,7 +6,7 @@ pytest.importorskip("celery")
 
 from sentry_sdk import Hub, configure_scope
 from sentry_sdk.integrations.celery import CeleryIntegration
-from sentry_sdk.tracing import SpanContext
+from sentry_sdk._compat import text_type
 
 from celery import Celery, VERSION
 from celery.bin import worker
@@ -23,8 +23,11 @@ def connect_signal(request):
 
 @pytest.fixture
 def init_celery(sentry_init):
-    def inner(propagate_traces=True):
-        sentry_init(integrations=[CeleryIntegration(propagate_traces=propagate_traces)])
+    def inner(propagate_traces=True, **kwargs):
+        sentry_init(
+            integrations=[CeleryIntegration(propagate_traces=propagate_traces)],
+            **kwargs
+        )
         celery = Celery(__name__)
         if VERSION < (4,):
             celery.conf.CELERY_ALWAYS_EAGER = True
@@ -40,22 +43,30 @@ def celery(init_celery):
     return init_celery()
 
 
-@pytest.mark.parametrize(
-    "invocation,expected_context",
-    [
-        [lambda task, x, y: task.delay(x, y), {"args": [1, 0], "kwargs": {}}],
-        [lambda task, x, y: task.apply_async((x, y)), {"args": [1, 0], "kwargs": {}}],
-        [
-            lambda task, x, y: task.apply_async(args=(x, y)),
-            {"args": [1, 0], "kwargs": {}},
-        ],
-        [
-            lambda task, x, y: task.apply_async(kwargs=dict(x=x, y=y)),
-            {"args": [], "kwargs": {"x": 1, "y": 0}},
-        ],
-    ],
+@pytest.fixture(
+    params=[
+        lambda task, x, y: (task.delay(x, y), {"args": [x, y], "kwargs": {}}),
+        lambda task, x, y: (task.apply_async((x, y)), {"args": [x, y], "kwargs": {}}),
+        lambda task, x, y: (
+            task.apply_async(args=(x, y)),
+            {"args": [x, y], "kwargs": {}},
+        ),
+        lambda task, x, y: (
+            task.apply_async(kwargs=dict(x=x, y=y)),
+            {"args": [], "kwargs": {"x": x, "y": y}},
+        ),
+    ]
 )
-def test_simple(capture_events, celery, invocation, expected_context):
+def celery_invocation(request):
+    """
+    Invokes a task in multiple ways Celery allows you to (testing our apply_async monkeypatch).
+
+    Currently limited to a task signature of the form foo(x, y)
+    """
+    return request.param
+
+
+def test_simple(capture_events, celery, celery_invocation):
     events = capture_events()
 
     @celery.task(name="dummy_task")
@@ -63,16 +74,14 @@ def test_simple(capture_events, celery, invocation, expected_context):
         foo = 42  # noqa
         return x / y
 
-    span_context = SpanContext.start_trace()
-    with configure_scope() as scope:
-        scope.set_span_context(span_context)
-
-    invocation(dummy_task, 1, 2)
-    invocation(dummy_task, 1, 0)
+    with Hub.current.start_span() as span:
+        celery_invocation(dummy_task, 1, 2)
+        _, expected_context = celery_invocation(dummy_task, 1, 0)
 
     event, = events
-    assert event["contexts"]["trace"]["trace_id"] == span_context.trace_id
-    assert event["contexts"]["trace"]["span_id"] != span_context.span_id
+
+    assert event["contexts"]["trace"]["trace_id"] == span.trace_id
+    assert event["contexts"]["trace"]["span_id"] != span.span_id
     assert event["transaction"] == "dummy_task"
     assert event["extra"]["celery-job"] == dict(
         task_name="dummy_task", **expected_context
@@ -84,6 +93,81 @@ def test_simple(capture_events, celery, invocation, expected_context):
     assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
 
 
+@pytest.mark.parametrize("task_fails", [True, False], ids=["error", "success"])
+def test_transaction_events(capture_events, init_celery, celery_invocation, task_fails):
+    celery = init_celery(traces_sample_rate=1.0)
+
+    @celery.task(name="dummy_task")
+    def dummy_task(x, y):
+        return x / y
+
+    # XXX: For some reason the first call does not get instrumented properly.
+    celery_invocation(dummy_task, 1, 1)
+
+    events = capture_events()
+
+    with Hub.current.start_span(transaction="submission") as span:
+        celery_invocation(dummy_task, 1, 0 if task_fails else 1)
+
+    if task_fails:
+        error_event = events.pop(0)
+        assert error_event["contexts"]["trace"]["trace_id"] == span.trace_id
+        assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+
+    execution_event, submission_event = events
+
+    assert execution_event["transaction"] == "dummy_task"
+    assert submission_event["transaction"] == "submission"
+
+    assert execution_event["type"] == submission_event["type"] == "transaction"
+    assert execution_event["contexts"]["trace"]["trace_id"] == span.trace_id
+    assert submission_event["contexts"]["trace"]["trace_id"] == span.trace_id
+
+    if task_fails:
+        assert execution_event["contexts"]["trace"]["status"] == "failure"
+    else:
+        assert "status" not in execution_event["contexts"]["trace"]
+
+    assert execution_event["spans"] == []
+    assert submission_event["spans"] == [
+        {
+            u"description": u"dummy_task",
+            u"op": "celery.submit",
+            u"parent_span_id": submission_event["contexts"]["trace"]["span_id"],
+            u"same_process_as_parent": True,
+            u"span_id": submission_event["spans"][0]["span_id"],
+            u"start_timestamp": submission_event["spans"][0]["start_timestamp"],
+            u"timestamp": submission_event["spans"][0]["timestamp"],
+            u"trace_id": text_type(span.trace_id),
+        }
+    ]
+
+
+def test_no_stackoverflows(celery):
+    """We used to have a bug in the Celery integration where its monkeypatching
+    was repeated for every task invocation, leading to stackoverflows.
+
+    See https://github.com/getsentry/sentry-python/issues/265
+    """
+
+    results = []
+
+    @celery.task(name="dummy_task")
+    def dummy_task():
+        with configure_scope() as scope:
+            scope.set_tag("foo", "bar")
+
+        results.append(42)
+
+    for _ in range(10000):
+        dummy_task.delay()
+
+    assert results == [42] * 10000
+
+    with configure_scope() as scope:
+        assert not scope._tags
+
+
 def test_simple_no_propagation(capture_events, init_celery):
     celery = init_celery(propagate_traces=False)
     events = capture_events()
@@ -92,13 +176,11 @@ def test_simple_no_propagation(capture_events, init_celery):
     def dummy_task():
         1 / 0
 
-    span_context = SpanContext.start_trace()
-    with configure_scope() as scope:
-        scope.set_span_context(span_context)
-    dummy_task.delay()
+    with Hub.current.start_span() as span:
+        dummy_task.delay()
 
     event, = events
-    assert event["contexts"]["trace"]["trace_id"] != span_context.trace_id
+    assert event["contexts"]["trace"]["trace_id"] != span.trace_id
     assert event["transaction"] == "dummy_task"
     exception, = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"

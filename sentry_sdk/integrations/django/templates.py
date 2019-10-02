@@ -1,16 +1,20 @@
-from django.template import TemplateSyntaxError  # type: ignore
+from django.template import TemplateSyntaxError
 
-if False:
+from sentry_sdk._types import MYPY
+
+if MYPY:
     from typing import Any
     from typing import Dict
     from typing import Optional
+    from typing import Iterator
+    from typing import Tuple
 
 try:
     # support Django 1.9
-    from django.template.base import Origin  # type: ignore
+    from django.template.base import Origin
 except ImportError:
     # backward compatibility
-    from django.template.loader import LoaderOrigin as Origin  # type: ignore
+    from django.template.loader import LoaderOrigin as Origin
 
 
 def get_template_frame_from_exception(exc_value):
@@ -31,7 +35,7 @@ def get_template_frame_from_exception(exc_value):
     if isinstance(exc_value, TemplateSyntaxError) and hasattr(exc_value, "source"):
         source = exc_value.source
         if isinstance(source, (tuple, list)) and isinstance(source[0], Origin):
-            return _get_template_frame_from_source(source)
+            return _get_template_frame_from_source(source)  # type: ignore
 
     return None
 
@@ -69,6 +73,7 @@ def _get_template_frame_from_debug(debug):
 
 
 def _linebreak_iter(template_source):
+    # type: (str) -> Iterator[int]
     yield 0
     p = template_source.find("\n")
     while p >= 0:
@@ -77,6 +82,7 @@ def _linebreak_iter(template_source):
 
 
 def _get_template_frame_from_source(source):
+    # type: (Tuple[Origin, Tuple[int, int]]) -> Optional[Dict[str, Any]]
     if not source:
         return None
 

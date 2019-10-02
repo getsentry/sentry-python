@@ -3,10 +3,12 @@ from sentry_sdk.utils import ContextVar
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 
-if False:
-    from typing import Any
-    from typing import Dict
+from sentry_sdk._types import MYPY
+
+if MYPY:
     from typing import Optional
+
+    from sentry_sdk._types import Event, Hint
 
 
 class DedupeIntegration(Integration):
@@ -21,13 +23,21 @@ class DedupeIntegration(Integration):
         # type: () -> None
         @add_global_event_processor
         def processor(event, hint):
-            # type: (Dict[str, Any], Dict[str, Any]) -> Optional[Dict[str, Any]]
+            # type: (Event, Optional[Hint]) -> Optional[Event]
+            if hint is None:
+                return event
+
             integration = Hub.current.get_integration(DedupeIntegration)
-            if integration is not None:
-                exc_info = hint.get("exc_info", None)
-                if exc_info is not None:
-                    exc = exc_info[1]
-                    if integration._last_seen.get(None) is exc:
-                        return None
-                    integration._last_seen.set(exc)
+
+            if integration is None:
+                return event
+
+            exc_info = hint.get("exc_info", None)
+            if exc_info is None:
+                return event
+
+            exc = exc_info[1]
+            if integration._last_seen.get(None) is exc:
+                return None
+            integration._last_seen.set(exc)
             return event

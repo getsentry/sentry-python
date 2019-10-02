@@ -12,24 +12,26 @@ def crashing_app():
     return app
 
 
-@pytest.fixture
-def crashing_env_modifing_app():
-    class TooSmartClass(object):
-        def __init__(self, environ):
-            self.environ = environ
+class IterableApp(object):
+    def __init__(self, iterable):
+        self.iterable = iterable
 
-        def __repr__(self):
-            if "my_representation" in self.environ:
-                return self.environ["my_representation"]
+    def __call__(self, environ, start_response):
+        return self.iterable
 
-            self.environ["my_representation"] = "<This is me>"
-            return self.environ["my_representation"]
 
-    def app(environ, start_response):
-        environ["tsc"] = TooSmartClass(environ)
-        1 / 0
+class ExitingIterable(object):
+    def __init__(self, exc_func):
+        self._exc_func = exc_func
 
-    return app
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        raise self._exc_func()
+
+    def next(self):
+        return type(self).__next__(self)
 
 
 def test_basic(sentry_init, crashing_app, capture_events):
@@ -43,22 +45,67 @@ def test_basic(sentry_init, crashing_app, capture_events):
 
     event, = events
 
+    assert event["transaction"] == "generic WSGI request"
+
     assert event["request"] == {
         "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
-        "headers": {"Content-Length": "0", "Content-Type": "", "Host": "localhost"},
+        "headers": {"Host": "localhost"},
         "method": "GET",
         "query_string": "",
         "url": "http://localhost/",
     }
 
 
-def test_env_modifing_app(sentry_init, crashing_env_modifing_app, capture_events):
+@pytest.fixture(params=[0, None])
+def test_systemexit_zero_is_ignored(sentry_init, capture_events, request):
+    zero_code = request.param
     sentry_init(send_default_pii=True)
-    app = SentryWsgiMiddleware(crashing_env_modifing_app)
+    iterable = ExitingIterable(lambda: SystemExit(zero_code))
+    app = SentryWsgiMiddleware(IterableApp(iterable))
     client = Client(app)
     events = capture_events()
 
-    with pytest.raises(ZeroDivisionError):
+    with pytest.raises(SystemExit):
         client.get("/")
 
-    assert len(events) == 1  # only one exception is raised
+    assert len(events) == 0
+
+
+@pytest.fixture(params=["", "foo", 1, 2])
+def test_systemexit_nonzero_is_captured(sentry_init, capture_events, request):
+    nonzero_code = request.param
+    sentry_init(send_default_pii=True)
+    iterable = ExitingIterable(lambda: SystemExit(nonzero_code))
+    app = SentryWsgiMiddleware(IterableApp(iterable))
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(SystemExit):
+        client.get("/")
+
+    event, = events
+
+    assert "exception" in event
+    exc = event["exception"]["values"][-1]
+    assert exc["type"] == "SystemExit"
+    assert exc["value"] == nonzero_code
+    assert event["level"] == "error"
+
+
+def test_keyboard_interrupt_is_captured(sentry_init, capture_events):
+    sentry_init(send_default_pii=True)
+    iterable = ExitingIterable(lambda: KeyboardInterrupt())
+    app = SentryWsgiMiddleware(IterableApp(iterable))
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(KeyboardInterrupt):
+        client.get("/")
+
+    event, = events
+
+    assert "exception" in event
+    exc = event["exception"]["values"][-1]
+    assert exc["type"] == "KeyboardInterrupt"
+    assert exc["value"] == ""
+    assert event["level"] == "error"

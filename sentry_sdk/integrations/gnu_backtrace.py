@@ -5,7 +5,9 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import capture_internal_exceptions
 
-if False:
+from sentry_sdk._types import MYPY
+
+if MYPY:
     from typing import Any
     from typing import Dict
 
@@ -20,7 +22,7 @@ FRAME_RE = r"""
 (?P<package>{MODULE_RE})\(
   (?P<retval>{TYPE_RE}\ )?
   ((?P<function>{TYPE_RE})
-    (?P<args>\([^)]*\))?
+    (?P<args>\(.*\))?
   )?
   ((?P<constoffset>\ const)?\+0x(?P<offset>{HEXVAL_RE}))?
 \)\s
@@ -37,8 +39,10 @@ class GnuBacktraceIntegration(Integration):
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         @add_global_event_processor
         def process_gnu_backtrace(event, hint):
+            # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
             with capture_internal_exceptions():
                 return _process_gnu_backtrace(event, hint)
 
@@ -88,13 +92,8 @@ def _process_gnu_backtrace(event, hint):
                         },
                     )
                 )
-            elif additional_frames and line.strip():
-                # If we already started parsing a stacktrace, it must be at the
-                # end of the message and must not contain random garbage lines
-                # between the frames
-                del additional_frames[:]
-                break
             else:
+                # Put garbage lines back into message, not sure what to do with them.
                 new_msg.append(line)
 
         if additional_frames:

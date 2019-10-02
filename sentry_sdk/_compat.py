@@ -1,10 +1,16 @@
 import sys
 
-if False:
+from sentry_sdk._types import MYPY
+
+if MYPY:
     from typing import Optional
     from typing import Tuple
     from typing import Any
     from typing import Type
+
+    from typing import TypeVar
+
+    T = TypeVar("T")
 
 
 PY2 = sys.version_info[0] == 2
@@ -18,9 +24,10 @@ if PY2:
     string_types = (str, text_type)
     number_types = (int, long, float)  # noqa
     int_types = (int, long)  # noqa
-    iteritems = lambda x: x.iteritems()
+    iteritems = lambda x: x.iteritems()  # noqa: B301
 
     def implements_str(cls):
+        # type: (T) -> T
         cls.__unicode__ = cls.__str__
         cls.__str__ = lambda x: unicode(x).encode("utf-8")  # noqa
         return cls
@@ -38,10 +45,8 @@ else:
     int_types = (int,)  # noqa
     iteritems = lambda x: x.items()
 
-    def _identity(x):
-        return x
-
     def implements_str(x):
+        # type: (T) -> T
         return x
 
     def reraise(tp, value, tb=None):
@@ -53,8 +58,10 @@ else:
 
 
 def with_metaclass(meta, *bases):
+    # type: (Any, *Any) -> Any
     class metaclass(type):
         def __new__(cls, name, this_bases, d):
+            # type: (Any, Any, Any, Any) -> Any
             return meta(name, bases, d)
 
     return type.__new__(metaclass, "temporary_class", (), {})

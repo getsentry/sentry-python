@@ -24,18 +24,43 @@ from . import views
 
 urlpatterns = [
     path("view-exc", views.view_exc, name="view_exc"),
+    path(
+        "read-body-and-view-exc",
+        views.read_body_and_view_exc,
+        name="read_body_and_view_exc",
+    ),
     path("middleware-exc", views.message, name="middleware_exc"),
     path("message", views.message, name="message"),
     path("mylogin", views.mylogin, name="mylogin"),
     path("classbased", views.ClassBasedView.as_view(), name="classbased"),
     path("post-echo", views.post_echo, name="post_echo"),
     path("template-exc", views.template_exc, name="template_exc"),
+    path(
+        "permission-denied-exc",
+        views.permission_denied_exc,
+        name="permission_denied_exc",
+    ),
 ]
 
 
 try:
     urlpatterns.append(
         path("rest-framework-exc", views.rest_framework_exc, name="rest_framework_exc")
+    )
+    urlpatterns.append(
+        path(
+            "rest-framework-read-body-and-exc",
+            views.rest_framework_read_body_and_exc,
+            name="rest_framework_read_body_and_exc",
+        )
+    )
+    urlpatterns.append(path("rest-hello", views.rest_hello, name="rest_hello"))
+    urlpatterns.append(
+        path(
+            "rest-permission-denied-exc",
+            views.rest_permission_denied_exc,
+            name="rest_permission_denied_exc",
+        )
     )
 except AttributeError:
     pass

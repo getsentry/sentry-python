@@ -10,6 +10,15 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.0/ref/settings/
 """
 
+
+# We shouldn't access settings while setting up integrations. Initialize SDK
+# here to provoke any errors that might occur.
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
+
+sentry_sdk.init(integrations=[DjangoIntegration()])
+
+
 import os
 
 try:
@@ -86,7 +95,7 @@ TEMPLATES = [
     }
 ]
 
-WSGI_APPLICATION = "tests.django.myapp.wsgi.application"
+WSGI_APPLICATION = "tests.integrations.django.myapp.wsgi.application"
 
 
 # Database
@@ -141,3 +150,6 @@ TEMPLATE_DEBUG = True
 # https://docs.djangoproject.com/en/2.0/howto/static-files/
 
 STATIC_URL = "/static/"
+
+# django-channels specific
+ASGI_APPLICATION = "tests.integrations.django.myapp.routing.application"

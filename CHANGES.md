@@ -1,6 +1,147 @@
-## 0.7.15
+# Changelog and versioning
+
+## Versioning Policy
+
+This project follows [semver](https://semver.org/), with three additions:
+
+* Semver says that major version `0` can include breaking changes at any time.
+  Still, it is common practice to assume that only `0.x` releases (minor
+  versions) can contain breaking changes while `0.x.y` releases (patch
+  versions) are used for backwards-compatible changes (bugfixes and features).
+  This project also follows that practice.
+
+* All undocumented APIs are considered internal. They are not part of this
+  contract.
+
+* Certain features (e.g. integrations) may be explicitly called out as
+  "experimental" or "unstable" in the documentation. They come with their own
+  versioning policy described in the documentation.
+
+We recommend to pin your version requirements against `0.x.*` or `0.x.y`.
+Either one of the following is fine:
+
+```
+sentry-sdk>=0.10.0,<0.11.0
+sentry-sdk==0.10.1
+```
+
+A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
+
+## 0.12.2
+
+* Fix a crash with ASGI (Django Channels) when the ASGI request type is neither HTTP nor Websockets.
+
+## 0.12.1
+
+* Temporarily remove sending of SQL parameters (as part of breadcrumbs or spans for APM) to Sentry to avoid memory consumption issues.
+
+## 0.12.0
+
+* Sentry now has a [Discord server](https://discord.gg/cWnMQeA)! Join the server to get involved into SDK development and ask questions.
+* Fix a bug where the response object for httplib (or requests) was held onto for an unnecessarily long amount of time.
+* APM: Add spans for more methods on `subprocess.Popen` objects.
+* APM: Add spans for Django middlewares.
+* APM: Add spans for ASGI requests.
+* Automatically inject the ASGI middleware for Django Channels 2.0. This will **break your Channels 2.0 application if it is running on Python 3.5 or 3.6** (while previously it would "only" leak a lot of memory for each ASGI request). **Install `aiocontextvars` from PyPI to make it work again.**
+
+## 0.11.2
+
+* Fix a bug where the SDK would throw an exception on shutdown when running under eventlet.
+* Add missing data to Redis breadcrumbs.
+
+## 0.11.1
+
+* Remove a faulty assertion (observed in environment with Django Channels and ASGI).
+
+## 0.11.0
+
+* Fix type hints for the logging integration. Thansk Steven Dignam!
+* Fix an issue where scope/context data would leak in applications that use `gevent` with its threading monkeypatch. The fix is to avoid usage of contextvars in such environments. Thanks Ran Benita!
+* Fix a reference cycle in the `ThreadingIntegration` that led to exceptions on interpreter shutdown. Thanks Guang Tian Li!
+* Fix a series of bugs in the stdlib integration that broke usage of `subprocess`.
+* More instrumentation for APM.
+* New integration for SQLAlchemy (creates breadcrumbs from queries).
+* New (experimental) integration for Apache Beam.
+* Fix a bug in the `LoggingIntegration` that would send breadcrumbs timestamps in the wrong timezone.
+* The `AiohttpIntegration` now sets the event's transaction name.
+* Fix a bug that caused infinite recursion when serializing local variables that logged errors or otherwise created Sentry events.
+
+## 0.10.2
+
+* Fix a bug where a log record with non-strings as `extra` keys would make the SDK crash.
+* Added ASGI integration for better hub propagation, request data for your events and capturing uncaught exceptions. Using this middleware explicitly in your code will also fix a few issues with Django Channels.
+* Fix a bug where `celery-once` was deadlocking when used in combination with the celery integration.
+* Fix a memory leak in the new tracing feature when it is not enabled.
+
+## 0.10.1
+
+* Fix bug where the SDK would yield a deprecation warning about
+  `collections.abc` vs `collections`.
+* Fix bug in stdlib integration that would cause spawned subprocesses to not
+  inherit the environment variables from the parent process.
+
+## 0.10.0
+
+* Massive refactor in preparation to tracing. There are no intentional breaking
+  changes, but there is a risk of breakage (hence the minor version bump). Two
+  new client options `traces_sample_rate` and `traceparent_v2` have been added.
+  Do not change the defaults in production, they will bring your application
+  down or at least fill your Sentry project up with nonsense events.
+
+## 0.9.5
+
+* Do not use ``getargspec`` on Python 3 to evade deprecation
+  warning.
+
+## 0.9.4
+
+* Revert a change in 0.9.3 that prevented passing a ``unicode``
+  string as DSN to ``init()``.
+
+## 0.9.3
+
+* Add type hints for ``init()``.
+* Include user agent header when sending events.
+
+## 0.9.2
+
+* Fix a bug in the Django integration that would prevent the user
+  from initializing the SDK at the top of `settings.py`.
+
+  This bug was introduced in 0.9.1 for all Django versions, but has been there
+  for much longer for Django 1.6 in particular.
+
+## 0.9.1
+
+* Fix a bug on Python 3.7 where gunicorn with gevent would cause the SDK to
+  leak event data between requests.
+* Fix a bug where the GNU backtrace integration would not parse certain frames.
+* Fix a bug where the SDK would not pick up request bodies for Django Rest
+  Framework based apps.
+* Remove a few more headers containing sensitive data per default.
+* Various improvements to type hints. Thanks Ran Benita!
+* Add a event hint to access the log record from `before_send`.
+* Fix a bug that would ignore `__tracebackhide__`. Thanks Matt Millican!
+* Fix distribution information for mypy support (add `py.typed` file). Thanks
+  Ran Benita!
+
+## 0.9.0
+
+* The SDK now captures `SystemExit` and other `BaseException`s when coming from
+  within a WSGI app (Flask, Django, ...)
+* Pyramid: No longer report an exception if there exists an exception view for
+  it.
+
+## 0.8.1
+
+* Fix infinite recursion bug in Celery integration.
+
+## 0.8.0
 
 * Add the always_run option in excepthook integration.
+* Fix performance issues when attaching large data to events. This is not
+  really intended to be a breaking change, but this release does include a
+  rewrite of a larger chunk of code, therefore the minor version bump.
 
 ## 0.7.14
 

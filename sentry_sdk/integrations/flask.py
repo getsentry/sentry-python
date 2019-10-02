@@ -8,7 +8,9 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 
-if False:
+from sentry_sdk._types import MYPY
+
+if MYPY:
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from typing import Any
     from typing import Dict
@@ -17,6 +19,8 @@ if False:
     from werkzeug.datastructures import FileStorage
     from typing import Union
     from typing import Callable
+
+    from sentry_sdk._types import EventProcessor
 
 try:
     import flask_login  # type: ignore
@@ -58,7 +62,7 @@ class FlaskIntegration(Integration):
         old_app = Flask.__call__
 
         def sentry_patched_wsgi_app(self, environ, start_response):
-            # type: (Any, Dict[str, str], Callable) -> _ScopedResponse
+            # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
             if Hub.current.get_integration(FlaskIntegration) is None:
                 return old_app(self, environ, start_response)
 
@@ -99,12 +103,21 @@ def _request_started(sender, **kwargs):
     app = _app_ctx_stack.top.app
     with hub.configure_scope() as scope:
         request = _request_ctx_stack.top.request
+
+        # Rely on WSGI middleware to start a trace
+        try:
+            if integration.transaction_style == "endpoint":
+                scope.transaction = request.url_rule.endpoint
+            elif integration.transaction_style == "url":
+                scope.transaction = request.url_rule.rule
+        except Exception:
+            pass
+
         weak_request = weakref.ref(request)
-        scope.add_event_processor(
-            _make_request_event_processor(  # type: ignore
-                app, weak_request, integration
-            )
+        evt_processor = _make_request_event_processor(
+            app, weak_request, integration  # type: ignore
         )
+        scope.add_event_processor(evt_processor)
 
 
 class FlaskRequestExtractor(RequestExtractor):
@@ -113,12 +126,12 @@ class FlaskRequestExtractor(RequestExtractor):
         return self.request.environ
 
     def cookies(self):
-        # type: () -> ImmutableTypeConversionDict
+        # type: () -> ImmutableTypeConversionDict[Any, Any]
         return self.request.cookies
 
     def raw_data(self):
         # type: () -> bytes
-        return self.request.data
+        return self.request.get_data()
 
     def form(self):
         # type: () -> ImmutableMultiDict
@@ -129,9 +142,11 @@ class FlaskRequestExtractor(RequestExtractor):
         return self.request.files
 
     def is_json(self):
+        # type: () -> bool
         return self.request.is_json
 
     def json(self):
+        # type: () -> Any
         return self.request.get_json()
 
     def size_of_file(self, file):
@@ -140,7 +155,7 @@ class FlaskRequestExtractor(RequestExtractor):
 
 
 def _make_request_event_processor(app, weak_request, integration):
-    # type: (Flask, Callable[[], Request], FlaskIntegration) -> Callable
+    # type: (Flask, Callable[[], Request], FlaskIntegration) -> EventProcessor
     def inner(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         request = weak_request()
@@ -150,14 +165,6 @@ def _make_request_event_processor(app, weak_request, integration):
         # another thread.
         if request is None:
             return event
-
-        try:
-            if integration.transaction_style == "endpoint":
-                event["transaction"] = request.url_rule.endpoint  # type: ignore
-            elif integration.transaction_style == "url":
-                event["transaction"] = request.url_rule.rule  # type: ignore
-        except Exception:
-            pass
 
         with capture_internal_exceptions():
             FlaskRequestExtractor(request).extract_into_event(event)
@@ -176,9 +183,13 @@ def _capture_exception(sender, exception, **kwargs):
     hub = Hub.current
     if hub.get_integration(FlaskIntegration) is None:
         return
+
+    # If an integration is there, a client has to be there.
+    client = hub.client  # type: Any
+
     event, hint = event_from_exception(
         exception,
-        client_options=hub.client.options,
+        client_options=client.options,
         mechanism={"type": "flask", "handled": False},
     )
 

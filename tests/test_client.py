@@ -1,21 +1,12 @@
 # coding: utf-8
 import json
-import logging
 import pytest
 import subprocess
 import sys
 import time
 
-from datetime import datetime
 from textwrap import dedent
-from sentry_sdk import (
-    Hub,
-    Client,
-    configure_scope,
-    capture_message,
-    add_breadcrumb,
-    capture_exception,
-)
+from sentry_sdk import Hub, Client, configure_scope, capture_message, capture_exception
 from sentry_sdk.transport import Transport
 from sentry_sdk._compat import reraise, text_type, PY2
 from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
@@ -40,6 +31,7 @@ class _TestTransport(Transport):
 
 
 def test_transport_option(monkeypatch):
+    monkeypatch.delenv("SENTRY_DSN")
     dsn = "https://foo@sentry.io/123"
     dsn2 = "https://bar@sentry.io/124"
     assert str(Client(dsn=dsn).dsn) == dsn
@@ -335,44 +327,6 @@ def test_configure_scope_available(sentry_init, request, monkeypatch):
     assert calls[0] is Hub.current._stack[-1][1]
 
 
-def test_configure_scope_unavailable(monkeypatch):
-    assert Hub.current
-
-    calls = []
-
-    def callback(scope):
-        calls.append(scope)
-        scope.set_tag("foo", "bar")
-
-    with configure_scope() as scope:
-        scope.set_tag("foo", "bar")
-
-    assert configure_scope(callback) is None
-    assert not calls
-
-
-@pytest.mark.parametrize("debug", (True, False))
-def test_transport_works(httpserver, request, capsys, caplog, debug):
-    httpserver.serve_content("ok", 200)
-    caplog.set_level(logging.DEBUG)
-
-    client = Client(
-        "http://foobar@{}/123".format(httpserver.url[len("http://") :]), debug=debug
-    )
-    Hub.current.bind_client(client)
-    request.addfinalizer(lambda: Hub.current.bind_client(None))
-
-    add_breadcrumb(level="info", message="i like bread", timestamp=datetime.now())
-    capture_message("löl")
-    client.close()
-
-    out, err = capsys.readouterr()
-    assert not err and not out
-    assert httpserver.requests
-
-    assert any("Sending info event" in record.msg for record in caplog.records) == debug
-
-
 @pytest.mark.tests_internal_exceptions
 def test_client_debug_option_enabled(sentry_init, caplog):
     sentry_init(debug=True)
@@ -467,37 +421,65 @@ def test_cyclic_data(sentry_init, capture_events):
     event, = events
 
     data = event["extra"]["foo"]
-    assert data == {"not_cyclic2": "''", "not_cyclic": "''", "is_cyclic": "<cyclic>"}
+    assert data == {"not_cyclic2": "", "not_cyclic": "", "is_cyclic": "<cyclic>"}
 
 
-def test_databag_stripping(sentry_init, capture_events):
+def test_databag_depth_stripping(sentry_init, capture_events, benchmark):
     sentry_init()
     events = capture_events()
 
-    try:
-        a = "A" * 16000  # noqa
-        1 / 0
-    except Exception:
-        capture_exception()
+    value = ["a"]
+    for _ in range(100000):
+        value = [value]
 
-    event, = events
+    @benchmark
+    def inner():
+        del events[:]
+        try:
+            a = value  # noqa
+            1 / 0
+        except Exception:
+            capture_exception()
 
-    assert len(json.dumps(event)) < 10000
+        event, = events
+
+        assert len(json.dumps(event)) < 10000
 
 
-def test_databag_breadth_stripping(sentry_init, capture_events):
+def test_databag_string_stripping(sentry_init, capture_events, benchmark):
     sentry_init()
     events = capture_events()
 
-    try:
-        a = ["a"] * 16000  # noqa
-        1 / 0
-    except Exception:
-        capture_exception()
+    @benchmark
+    def inner():
+        del events[:]
+        try:
+            a = "A" * 1000000  # noqa
+            1 / 0
+        except Exception:
+            capture_exception()
 
-    event, = events
+        event, = events
 
-    assert len(json.dumps(event)) < 10000
+        assert len(json.dumps(event)) < 10000
+
+
+def test_databag_breadth_stripping(sentry_init, capture_events, benchmark):
+    sentry_init()
+    events = capture_events()
+
+    @benchmark
+    def inner():
+        del events[:]
+        try:
+            a = ["a"] * 1000000  # noqa
+            1 / 0
+        except Exception:
+            capture_exception()
+
+        event, = events
+
+        assert len(json.dumps(event)) < 10000
 
 
 @pytest.mark.skipif(not HAS_CHAINED_EXCEPTIONS, reason="Only works on 3.3+")
@@ -551,7 +533,69 @@ def test_broken_mapping(sentry_init, capture_events):
     event, = events
     assert (
         event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"]
-        == "<broken repr>"
+        == "<failed to serialize, use init(debug=True) to see error logs>"
+    )
+
+
+def test_mapping_sends_exception(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    class C(Mapping):
+        def __iter__(self):
+            try:
+                1 / 0
+            except ZeroDivisionError:
+                capture_exception()
+            yield "hi"
+
+        def __len__(self):
+            """List length"""
+            return 1
+
+        def __getitem__(self, ii):
+            """Get a list item"""
+            if ii == "hi":
+                return "hi"
+
+            raise KeyError()
+
+    try:
+        a = C()  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    event, = events
+
+    assert event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"] == {
+        "hi": "'hi'"
+    }
+
+
+def test_object_sends_exception(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    class C(object):
+        def __repr__(self):
+            try:
+                1 / 0
+            except ZeroDivisionError:
+                capture_exception()
+            return "hi, i am a repr"
+
+    try:
+        a = C()  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    event, = events
+
+    assert (
+        event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"]
+        == "hi, i am a repr"
     )
 
 
@@ -568,3 +612,78 @@ def test_errno_errors(sentry_init, capture_events):
 
     exception, = event["exception"]["values"]
     assert exception["mechanism"]["meta"]["errno"]["number"] == 69
+
+
+def test_non_string_variables(sentry_init, capture_events):
+    """There is some extremely terrible code in the wild that
+    inserts non-strings as variable names into `locals()`."""
+
+    sentry_init()
+    events = capture_events()
+
+    try:
+        locals()[42] = True
+        1 / 0
+    except ZeroDivisionError:
+        capture_exception()
+
+    event, = events
+
+    exception, = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+    frame, = exception["stacktrace"]["frames"]
+    assert frame["vars"]["42"] == "True"
+
+
+def test_dict_changed_during_iteration(sentry_init, capture_events):
+    """
+    Some versions of Bottle modify the WSGI environment inside of this __repr__
+    impl: https://github.com/bottlepy/bottle/blob/0.12.16/bottle.py#L1386
+
+    See https://github.com/getsentry/sentry-python/pull/298 for discussion
+    """
+    sentry_init(send_default_pii=True)
+    events = capture_events()
+
+    class TooSmartClass(object):
+        def __init__(self, environ):
+            self.environ = environ
+
+        def __repr__(self):
+            if "my_representation" in self.environ:
+                return self.environ["my_representation"]
+
+            self.environ["my_representation"] = "<This is me>"
+            return self.environ["my_representation"]
+
+    try:
+        environ = {}
+        environ["a"] = TooSmartClass(environ)
+        1 / 0
+    except ZeroDivisionError:
+        capture_exception()
+
+    event, = events
+    exception, = event["exception"]["values"]
+    frame, = exception["stacktrace"]["frames"]
+    assert frame["vars"]["environ"] == {"a": "<This is me>"}
+
+
+@pytest.mark.parametrize(
+    "dsn",
+    [
+        "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2",
+        u"http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2",
+    ],
+)
+def test_init_string_types(dsn, sentry_init):
+    # Allow unicode strings on Python 3 and both on Python 2 (due to
+    # unicode_literals)
+    #
+    # Supporting bytes on Python 3 is not really wrong but probably would be
+    # extra code
+    sentry_init(dsn)
+    assert (
+        Hub.current.client.dsn
+        == "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2"
+    )

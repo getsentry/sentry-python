@@ -13,21 +13,24 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
 
-from sanic import Sanic, __version__ as VERSION  # type: ignore
-from sanic.exceptions import SanicException  # type: ignore
-from sanic.router import Router  # type: ignore
-from sanic.handlers import ErrorHandler  # type: ignore
+from sanic import Sanic, __version__ as VERSION
+from sanic.exceptions import SanicException
+from sanic.router import Router
+from sanic.handlers import ErrorHandler
 
-if False:
-    from sanic.request import Request  # type: ignore
+from sentry_sdk._types import MYPY
 
+if MYPY:
     from typing import Any
     from typing import Callable
-    from typing import Dict
     from typing import Optional
     from typing import Union
     from typing import Tuple
-    from sanic.request import RequestParameters
+    from typing import Dict
+
+    from sanic.request import Request, RequestParameters
+
+    from sentry_sdk._types import Event, EventProcessor, Hint
 
 
 class SanicIntegration(Integration):
@@ -96,7 +99,7 @@ class SanicIntegration(Integration):
         old_error_handler_lookup = ErrorHandler.lookup
 
         def sentry_error_handler_lookup(self, exception):
-            # type: (Any, Exception) -> Optional[Callable]
+            # type: (Any, Exception) -> Optional[object]
             _capture_exception(exception)
             old_error_handler = old_error_handler_lookup(self, exception)
 
@@ -133,22 +136,25 @@ def _capture_exception(exception):
     if integration is None:
         return
 
+    # If an integration is there, a client has to be there.
+    client = hub.client  # type: Any
+
     with capture_internal_exceptions():
         event, hint = event_from_exception(
             exception,
-            client_options=hub.client.options,
+            client_options=client.options,
             mechanism={"type": "sanic", "handled": False},
         )
         hub.capture_event(event, hint=hint)
 
 
 def _make_request_processor(weak_request):
-    # type: (Callable[[], Request]) -> Callable
+    # type: (Callable[[], Request]) -> EventProcessor
     def sanic_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Optional[Dict[str, Any]]
+        # type: (Event, Optional[Hint]) -> Optional[Event]
 
         try:
-            if issubclass(hint["exc_info"][0], SanicException):
+            if hint and issubclass(hint["exc_info"][0], SanicException):
                 return None
         except KeyError:
             pass
@@ -188,6 +194,7 @@ class SanicRequestExtractor(RequestExtractor):
         return len(self.request.body)
 
     def cookies(self):
+        # type: () -> Dict[str, str]
         return dict(self.request.cookies)
 
     def raw_data(self):
@@ -199,6 +206,7 @@ class SanicRequestExtractor(RequestExtractor):
         return self.request.form
 
     def is_json(self):
+        # type: () -> bool
         raise NotImplementedError()
 
     def json(self):
@@ -210,4 +218,5 @@ class SanicRequestExtractor(RequestExtractor):
         return self.request.files
 
     def size_of_file(self, file):
+        # type: (Any) -> int
         return len(file.body or ())

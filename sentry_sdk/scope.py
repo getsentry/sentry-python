@@ -3,30 +3,54 @@ from collections import deque
 from functools import wraps
 from itertools import chain
 
-from sentry_sdk.utils import logger, capture_internal_exceptions, object_to_json
+import sentry_sdk
 
-if False:
+from sentry_sdk.utils import logger, capture_internal_exceptions
+from sentry_sdk.serializer import partial_serialize
+
+
+from sentry_sdk._types import MYPY
+
+if MYPY:
     from typing import Any
-    from typing import Callable
     from typing import Dict
     from typing import Optional
     from typing import Deque
     from typing import List
+    from typing import Callable
+    from typing import TypeVar
+
+    from sentry_sdk._types import (
+        Breadcrumb,
+        Event,
+        EventProcessor,
+        ErrorProcessor,
+        ExcInfo,
+        Hint,
+        Type,
+    )
+
+    from sentry_sdk.tracing import Span
+
+    F = TypeVar("F", bound=Callable[..., Any])
+    T = TypeVar("T")
 
 
-global_event_processors = []
+global_event_processors = []  # type: List[EventProcessor]
 
 
 def add_global_event_processor(processor):
-    # type: (Callable) -> None
+    # type: (EventProcessor) -> None
     global_event_processors.append(processor)
 
 
 def _attr_setter(fn):
+    # type: (Any) -> Any
     return property(fset=fn, doc=fn.__doc__)
 
 
 def _disable_capture(fn):
+    # type: (F) -> F
     @wraps(fn)
     def wrapper(self, *args, **kwargs):
         # type: (Any, *Dict[str, Any], **Any) -> Any
@@ -38,13 +62,19 @@ def _disable_capture(fn):
         finally:
             self._should_capture = True
 
-    return wrapper
+    return wrapper  # type: ignore
 
 
 class Scope(object):
     """The scope holds extra information that should be sent with all
     events that belong to it.
     """
+
+    # NOTE: Even though it should not happen, the scope needs to not crash when
+    # accessed by multiple threads. It's fine if it's full of races, but those
+    # races should never make the user application crash.
+    #
+    # The same needs to hold for any accesses of the scope the SDK makes.
 
     __slots__ = (
         "_level",
@@ -63,103 +93,168 @@ class Scope(object):
     )
 
     def __init__(self):
-        self._event_processors = []  # type: List[Callable]
-        self._error_processors = []  # type: List[Callable]
+        # type: () -> None
+        self._event_processors = []  # type: List[EventProcessor]
+        self._error_processors = []  # type: List[ErrorProcessor]
 
-        self._name = None
+        self._name = None  # type: Optional[str]
         self.clear()
-
-    @_attr_setter
-    def level(self, value):
-        """When set this overrides the level."""
-        self._level = value
-
-    @_attr_setter
-    def fingerprint(self, value):
-        """When set this overrides the default fingerprint."""
-        self._fingerprint = value
-
-    @_attr_setter
-    def transaction(self, value):
-        """When set this forces a specific transaction name to be set."""
-        self._transaction = value
-
-    @_attr_setter
-    def user(self, value):
-        """When set a specific user is bound to the scope."""
-        self._user = value
-
-    def set_span_context(self, span_context):
-        """Sets the span context."""
-        self._span = span_context
-
-    def set_tag(self, key, value):
-        """Sets a tag for a key to a specific value."""
-        self._tags[key] = value
-
-    def remove_tag(self, key):
-        """Removes a specific tag."""
-        self._tags.pop(key, None)
-
-    def set_context(self, key, value):
-        """Binds a context at a certain key to a specific value."""
-        self._contexts[key] = value
-
-    def remove_context(self, key):
-        """Removes a context."""
-        self._contexts.pop(key, None)
-
-    def set_extra(self, key, value):
-        """Sets an extra key to a specific value."""
-        self._extras[key] = value
-
-    def remove_extra(self, key):
-        """Removes a specific extra key."""
-        self._extras.pop(key, None)
 
     def clear(self):
         # type: () -> None
         """Clears the entire scope."""
-        self._level = None
-        self._fingerprint = None
-        self._transaction = None
-        self._user = None
+        self._level = None  # type: Optional[str]
+        self._fingerprint = None  # type: Optional[List[str]]
+        self._transaction = None  # type: Optional[str]
+        self._user = None  # type: Optional[Dict[str, Any]]
 
         self._tags = {}  # type: Dict[str, Any]
-        self._contexts = {}  # type: Dict[str, Dict]
+        self._contexts = {}  # type: Dict[str, Dict[str, Any]]
         self._extras = {}  # type: Dict[str, Any]
 
         self.clear_breadcrumbs()
         self._should_capture = True
 
-        self._span = None
+        self._span = None  # type: Optional[Span]
+
+    @_attr_setter
+    def level(self, value):
+        # type: (Optional[str]) -> None
+        """When set this overrides the level."""
+        self._level = value
+
+    @_attr_setter
+    def fingerprint(self, value):
+        # type: (Optional[List[str]]) -> None
+        """When set this overrides the default fingerprint."""
+        self._fingerprint = value
+
+    @_attr_setter
+    def transaction(self, value):
+        # type: (Optional[str]) -> None
+        """When set this forces a specific transaction name to be set."""
+        self._transaction = value
+        span = self._span
+        if span:
+            span.transaction = value
+
+    @_attr_setter
+    def user(self, value):
+        # type: (Dict[str, Any]) -> None
+        """When set a specific user is bound to the scope."""
+        self._user = value
+
+    @property
+    def span(self):
+        # type: () -> Optional[Span]
+        """Get/set current tracing span."""
+        return self._span
+
+    @span.setter
+    def span(self, span):
+        # type: (Optional[Span]) -> None
+        self._span = span
+        if span is not None:
+            span_transaction = span.transaction
+            if span_transaction:
+                self._transaction = span_transaction
+
+    def set_tag(
+        self,
+        key,  # type: str
+        value,  # type: Any
+    ):
+        # type: (...) -> None
+        """Sets a tag for a key to a specific value."""
+        self._tags[key] = partial_serialize(
+            sentry_sdk.Hub.current.client, value, should_repr_strings=False
+        )
+
+    def remove_tag(
+        self, key  # type: str
+    ):
+        # type: (...) -> None
+        """Removes a specific tag."""
+        self._tags.pop(key, None)
+
+    def set_context(
+        self,
+        key,  # type: str
+        value,  # type: Any
+    ):
+        # type: (...) -> None
+        """Binds a context at a certain key to a specific value."""
+        self._contexts[key] = partial_serialize(
+            sentry_sdk.Hub.current.client, value, should_repr_strings=False
+        )
+
+    def remove_context(
+        self, key  # type: str
+    ):
+        # type: (...) -> None
+        """Removes a context."""
+        self._contexts.pop(key, None)
+
+    def set_extra(
+        self,
+        key,  # type: str
+        value,  # type: Any
+    ):
+        # type: (...) -> None
+        """Sets an extra key to a specific value."""
+        self._extras[key] = partial_serialize(
+            sentry_sdk.Hub.current.client, value, should_repr_strings=False
+        )
+
+    def remove_extra(
+        self, key  # type: str
+    ):
+        # type: (...) -> None
+        """Removes a specific extra key."""
+        self._extras.pop(key, None)
 
     def clear_breadcrumbs(self):
         # type: () -> None
         """Clears breadcrumb buffer."""
-        self._breadcrumbs = deque()  # type: Deque[Dict]
+        self._breadcrumbs = deque()  # type: Deque[Breadcrumb]
 
-    def add_event_processor(self, func):
-        # type: (Callable) -> None
-        """"Register a scope local event processor on the scope.
+    def add_event_processor(
+        self, func  # type: EventProcessor
+    ):
+        # type: (...) -> None
+        """Register a scope local event processor on the scope.
 
-        This function behaves like `before_send.`
+        :param func: This function behaves like `before_send.`
         """
+        if len(self._event_processors) > 20:
+            logger.warning(
+                "Too many event processors on scope! Clearing list to free up some memory: %r",
+                self._event_processors,
+            )
+            del self._event_processors[:]
+
         self._event_processors.append(func)
 
-    def add_error_processor(self, func, cls=None):
-        # type: (Callable, Optional[type]) -> None
-        """"Register a scope local error processor on the scope.
+    def add_error_processor(
+        self,
+        func,  # type: ErrorProcessor
+        cls=None,  # type: Optional[Type[BaseException]]
+    ):
+        # type: (...) -> None
+        """Register a scope local error processor on the scope.
 
-        The error processor works similar to an event processor but is
-        invoked with the original exception info triple as second argument.
+        :param func: A callback that works similar to an event processor but is invoked with the original exception info triple as second argument.
+
+        :param cls: Optionally, only process exceptions of this type.
         """
         if cls is not None:
+            cls_ = cls  # For mypy.
             real_func = func
 
             def func(event, exc_info):
+                # type: (Event, ExcInfo) -> Optional[Event]
                 try:
-                    is_inst = isinstance(exc_info[1], cls)
+                    is_inst = isinstance(exc_info[1], cls_)
                 except Exception:
                     is_inst = False
                 if is_inst:
@@ -169,19 +264,25 @@ class Scope(object):
         self._error_processors.append(func)
 
     @_disable_capture
-    def apply_to_event(self, event, hint=None):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Optional[Dict[str, Any]]
+    def apply_to_event(
+        self,
+        event,  # type: Event
+        hint,  # type: Hint
+    ):
+        # type: (...) -> Optional[Event]
         """Applies the information contained on the scope to the given event."""
 
         def _drop(event, cause, ty):
-            # type: (Dict[str, Any], Callable, str) -> Optional[Any]
+            # type: (Dict[str, Any], Any, str) -> Optional[Any]
             logger.info("%s (%s) dropped event (%s)", ty, cause, event)
             return None
 
         if self._level is not None:
             event["level"] = self._level
 
-        event.setdefault("breadcrumbs", []).extend(self._breadcrumbs)
+        if event.get("type") != "transaction":
+            event.setdefault("breadcrumbs", []).extend(self._breadcrumbs)
+
         if event.get("user") is None and self._user is not None:
             event["user"] = self._user
 
@@ -192,7 +293,7 @@ class Scope(object):
             event["fingerprint"] = self._fingerprint
 
         if self._extras:
-            event.setdefault("extra", {}).update(object_to_json(self._extras))
+            event.setdefault("extra", {}).update(self._extras)
 
         if self._tags:
             event.setdefault("tags", {}).update(self._tags)
@@ -201,32 +302,31 @@ class Scope(object):
             event.setdefault("contexts", {}).update(self._contexts)
 
         if self._span is not None:
-            event.setdefault("contexts", {})["trace"] = {
-                "trace_id": self._span.trace_id,
-                "span_id": self._span.span_id,
-            }
+            contexts = event.setdefault("contexts", {})
+            if not contexts.get("trace"):
+                contexts["trace"] = self._span.get_trace_context()
 
-        exc_info = hint.get("exc_info") if hint is not None else None
+        exc_info = hint.get("exc_info")
         if exc_info is not None:
-            for processor in self._error_processors:
-                new_event = processor(event, exc_info)
+            for error_processor in self._error_processors:
+                new_event = error_processor(event, exc_info)
                 if new_event is None:
-                    return _drop(event, processor, "error processor")
+                    return _drop(event, error_processor, "error processor")
                 event = new_event
 
-        for processor in chain(global_event_processors, self._event_processors):
+        for event_processor in chain(global_event_processors, self._event_processors):
             new_event = event
             with capture_internal_exceptions():
-                new_event = processor(event, hint)
+                new_event = event_processor(event, hint)
             if new_event is None:
-                return _drop(event, processor, "event processor")
+                return _drop(event, event_processor, "event processor")
             event = new_event
 
         return event
 
     def __copy__(self):
         # type: () -> Scope
-        rv = object.__new__(self.__class__)
+        rv = object.__new__(self.__class__)  # type: Scope
 
         rv._level = self._level
         rv._name = self._name
@@ -248,6 +348,7 @@ class Scope(object):
         return rv
 
     def __repr__(self):
+        # type: () -> str
         return "<%s id=%s name=%s>" % (
             self.__class__.__name__,
             hex(id(self)),

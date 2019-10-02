@@ -1,6 +1,8 @@
-import sys
 import copy
+import random
+import sys
 import weakref
+
 from datetime import datetime
 from contextlib import contextmanager
 from warnings import warn
@@ -8,6 +10,8 @@ from warnings import warn
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
+from sentry_sdk.tracing import Span
+from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.utils import (
     exc_info_from_error,
     event_from_exception,
@@ -15,26 +19,36 @@ from sentry_sdk.utils import (
     ContextVar,
 )
 
+from sentry_sdk._types import MYPY
 
-if False:
+if MYPY:
     from typing import Union
     from typing import Any
     from typing import Optional
-    from typing import Dict
     from typing import Tuple
     from typing import List
     from typing import Callable
+    from typing import Generator
+    from typing import Type
+    from typing import TypeVar
     from typing import overload
-    from contextlib import ContextManager
+    from typing import ContextManager
+
     from sentry_sdk.integrations import Integration
+    from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint, ExcInfo
+    from sentry_sdk.consts import ClientConstructor
+
+    T = TypeVar("T")
+
 else:
 
     def overload(x):
+        # type: (T) -> T
         return x
 
 
 _local = ContextVar("sentry_current_hub")
-_initial_client = None
+_initial_client = None  # type: Optional[weakref.ReferenceType[Client]]
 
 
 def _should_send_default_pii():
@@ -47,29 +61,54 @@ def _should_send_default_pii():
 
 class _InitGuard(object):
     def __init__(self, client):
+        # type: (Client) -> None
         self._client = client
 
     def __enter__(self):
+        # type: () -> _InitGuard
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
+        # type: (Any, Any, Any) -> None
         c = self._client
         if c is not None:
             c.close()
 
 
-def init(*args, **kwargs):
+def _init(*args, **kwargs):
+    # type: (*Optional[str], **Any) -> ContextManager[Any]
     """Initializes the SDK and optionally integrations.
 
     This takes the same arguments as the client constructor.
     """
     global _initial_client
-    client = Client(*args, **kwargs)
+    client = Client(*args, **kwargs)  # type: ignore
     Hub.current.bind_client(client)
     rv = _InitGuard(client)
     if client is not None:
         _initial_client = weakref.ref(client)
     return rv
+
+
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    # Make mypy, PyCharm and other static analyzers think `init` is a type to
+    # have nicer autocompletion for params.
+    #
+    # Use `ClientConstructor` to define the argument types of `init` and
+    # `ContextManager[Any]` to tell static analyzers about the return type.
+
+    class init(ClientConstructor, ContextManager[Any]):
+        pass
+
+
+else:
+    # Alias `init` for actual usage. Go through the lambda indirection to throw
+    # PyCharm off of the weakly typed signature (it would otherwise discover
+    # both the weakly typed signature of `_init` and our faked `init` type).
+
+    init = (lambda: _init)()
 
 
 class HubMeta(type):
@@ -85,21 +124,14 @@ class HubMeta(type):
 
     @property
     def main(self):
+        # type: () -> Hub
         """Returns the main instance of the hub."""
         return GLOBAL_HUB
 
 
-class _HubManager(object):
-    def __init__(self, hub):
-        self._old = Hub.current
-        _local.set(hub)
-
-    def __exit__(self, exc_type, exc_value, tb):
-        _local.set(self._old)
-
-
 class _ScopeManager(object):
     def __init__(self, hub):
+        # type: (Hub) -> None
         self._hub = hub
         self._original_len = len(hub._stack)
         self._layer = hub._stack[-1]
@@ -111,6 +143,7 @@ class _ScopeManager(object):
         return scope
 
     def __exit__(self, exc_type, exc_value, tb):
+        # type: (Any, Any, Any) -> None
         current_len = len(self._hub._stack)
         if current_len < self._original_len:
             logger.error(
@@ -154,8 +187,18 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     _stack = None  # type: List[Tuple[Optional[Client], Scope]]
 
-    def __init__(self, client_or_hub=None, scope=None):
-        # type: (Union[Hub, Client], Optional[Any]) -> None
+    # Mypy doesn't pick up on the metaclass.
+
+    if MYPY:
+        current = None  # type: Hub
+        main = None  # type: Hub
+
+    def __init__(
+        self,
+        client_or_hub=None,  # type: Optional[Union[Hub, Client]]
+        scope=None,  # type: Optional[Any]
+    ):
+        # type: (...) -> None
         if isinstance(client_or_hub, Hub):
             hub = client_or_hub
             client, other_scope = hub._stack[-1]
@@ -186,15 +229,20 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         old = self._old_hubs.pop()
         _local.set(old)
 
-    def run(self, callback):
+    def run(
+        self, callback  # type: Callable[[], T]
+    ):
+        # type: (...) -> T
         """Runs a callback in the context of the hub.  Alternatively the
         with statement can be used on the hub directly.
         """
         with self:
             return callback()
 
-    def get_integration(self, name_or_class):
-        # type: (Union[str, Integration]) -> Any
+    def get_integration(
+        self, name_or_class  # type: Union[str, Type[Integration]]
+    ):
+        # type: (...) -> Any
         """Returns the integration for this hub by name or class.  If there
         is no client bound or the client does not have that integration
         then `None` is returned.
@@ -215,14 +263,15 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             if rv is not None:
                 return rv
 
-        initial_client = _initial_client
-        if initial_client is not None:
-            initial_client = initial_client()
+        if _initial_client is not None:
+            initial_client = _initial_client()
+        else:
+            initial_client = None
 
         if (
             initial_client is not None
             and initial_client is not client
-            and initial_client.integrations.get(name_or_class) is not None
+            and initial_client.integrations.get(integration_name) is not None
         ):
             warning = (
                 "Integration %r attempted to run but it was only "
@@ -245,19 +294,23 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """Returns the last event ID."""
         return self._last_event_id
 
-    def bind_client(self, new):
+    def bind_client(
+        self, new  # type: Optional[Client]
+    ):
+        # type: (...) -> None
         """Binds a new client to the hub."""
         top = self._stack[-1]
         self._stack[-1] = (new, top[1])
+        if not new or new.options["_experiments"].get("fast_serialize", False):
+            top[1].clear_breadcrumbs()
 
-    def capture_event(self, event, hint=None):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Optional[str]
-        """Captures an event.  The return value is the ID of the event.
-
-        The event is a dictionary following the Sentry v7/v8 protocol
-        specification.  Optionally an event hint dict can be passed that
-        is used by processors to extract additional information from it.
-        Typically the event hint object would contain exception information.
+    def capture_event(
+        self,
+        event,  # type: Event
+        hint=None,  # type: Optional[Hint]
+    ):
+        # type: (...) -> Optional[str]
+        """Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`.
         """
         client, scope = self._stack[-1]
         if client is not None:
@@ -267,32 +320,47 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return rv
         return None
 
-    def capture_message(self, message, level=None):
-        # type: (str, Optional[Any]) -> Optional[str]
+    def capture_message(
+        self,
+        message,  # type: str
+        level=None,  # type: Optional[str]
+    ):
+        # type: (...) -> Optional[str]
         """Captures a message.  The message is just a string.  If no level
         is provided the default level is `info`.
+
+        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
         if self.client is None:
             return None
         if level is None:
             level = "info"
-        return self.capture_event({"message": message, "level": level})
+        return self.capture_event(
+            {
+                "message": partial_serialize(
+                    self.client, message, should_repr_strings=False
+                ),
+                "level": level,
+            }
+        )
 
-    def capture_exception(self, error=None):
-        # type: (Optional[BaseException]) -> Optional[str]
+    def capture_exception(
+        self, error=None  # type: Optional[Union[BaseException, ExcInfo]]
+    ):
+        # type: (...) -> Optional[str]
         """Captures an exception.
 
-        The argument passed can be `None` in which case the last exception
-        will be reported, otherwise an exception object or an `exc_info`
-        tuple.
+        :param error: An exception to catch. If `None`, `sys.exc_info()` will be used.
+
+        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
         client = self.client
         if client is None:
             return None
-        if error is None:
-            exc_info = sys.exc_info()
-        else:
+        if error is not None:
             exc_info = exc_info_from_error(error)
+        else:
+            exc_info = sys.exc_info()
 
         event, hint = event_from_exception(exc_info, client_options=client.options)
         try:
@@ -302,62 +370,132 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return None
 
-    def _capture_internal_exception(self, exc_info):
-        """Capture an exception that is likely caused by a bug in the SDK
-        itself."""
+    def _capture_internal_exception(
+        self, exc_info  # type: Any
+    ):
+        # type: (...) -> Any
+        """
+        Capture an exception that is likely caused by a bug in the SDK
+        itself.
+
+        These exceptions do not end up in Sentry and are just logged instead.
+        """
         logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
-    def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
-        # type: (Dict[str, Any], Dict[str, Any], **Any) -> None
-        """Adds a breadcrumb.  The breadcrumbs are a dictionary with the
-        data as the sentry v7/v8 protocol expects.  `hint` is an optional
-        value that can be used by `before_breadcrumb` to customize the
-        breadcrumbs that are emitted.
+    def add_breadcrumb(
+        self,
+        crumb=None,  # type: Optional[Breadcrumb]
+        hint=None,  # type: Optional[BreadcrumbHint]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> None
+        """
+        Adds a breadcrumb.
+
+        :param crumb: Dictionary with the data as the sentry v7/v8 protocol expects.
+
+        :param hint: An optional value that can be used by `before_breadcrumb`
+            to customize the breadcrumbs that are emitted.
         """
         client, scope = self._stack[-1]
         if client is None:
             logger.info("Dropped breadcrumb because no client bound")
             return
 
-        crumb = dict(crumb or ())  # type: Dict[str, Any]
+        crumb = dict(crumb or ())  # type: Breadcrumb
         crumb.update(kwargs)
         if not crumb:
             return
 
-        hint = dict(hint or ())
+        hint = dict(hint or ())  # type: Hint
 
         if crumb.get("timestamp") is None:
             crumb["timestamp"] = datetime.utcnow()
         if crumb.get("type") is None:
             crumb["type"] = "default"
 
-        original_crumb = crumb
-        if client.options["before_breadcrumb"] is not None:
-            crumb = client.options["before_breadcrumb"](crumb, hint)
+        crumb = partial_serialize(client, crumb, should_repr_strings=False)
 
-        if crumb is not None:
-            scope._breadcrumbs.append(crumb)
+        if client.options["before_breadcrumb"] is not None:
+            new_crumb = client.options["before_breadcrumb"](crumb, hint)
         else:
-            logger.info("before breadcrumb dropped breadcrumb (%s)", original_crumb)
+            new_crumb = crumb
+
+        if new_crumb is not None:
+            scope._breadcrumbs.append(new_crumb)
+        else:
+            logger.info("before breadcrumb dropped breadcrumb (%s)", crumb)
 
         max_breadcrumbs = client.options["max_breadcrumbs"]  # type: int
         while len(scope._breadcrumbs) > max_breadcrumbs:
             scope._breadcrumbs.popleft()
 
+    def start_span(
+        self,
+        span=None,  # type: Optional[Span]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Span
+        """
+        Create a new span whose parent span is the currently active
+        span, if any. The return value is the span object that can
+        be used as a context manager to start and stop timing.
+
+        Note that you will not see any span that is not contained
+        within a transaction. Create a transaction with
+        ``start_span(transaction="my transaction")`` if an
+        integration doesn't already do this for you.
+        """
+
+        client, scope = self._stack[-1]
+
+        kwargs.setdefault("hub", self)
+
+        if span is None:
+            span = scope.span
+            if span is not None:
+                span = span.new_span(**kwargs)
+            else:
+                span = Span(**kwargs)
+
+        if span.sampled is None and span.transaction is not None:
+            sample_rate = client and client.options["traces_sample_rate"] or 0
+            span.sampled = random.random() < sample_rate
+
+        if span.sampled:
+            max_spans = (
+                client and client.options["_experiments"].get("max_spans") or 1000
+            )
+            span.init_finished_spans(maxlen=max_spans)
+
+        return span
+
     @overload  # noqa
-    def push_scope(self):
-        # type: () -> ContextManager[Scope]
+    def push_scope(
+        self, callback=None  # type: Optional[None]
+    ):
+        # type: (...) -> ContextManager[Scope]
         pass
 
     @overload  # noqa
-    def push_scope(self, callback):
-        # type: (Callable[[Scope], None]) -> None
+    def push_scope(
+        self, callback  # type: Callable[[Scope], None]
+    ):
+        # type: (...) -> None
         pass
 
-    def push_scope(self, callback=None):  # noqa
-        """Pushes a new layer on the scope stack. Returns a context manager
-        that should be used to pop the scope again.  Alternatively a callback
-        can be provided that is executed in the context of the scope.
+    def push_scope(  # noqa
+        self, callback=None  # type: Optional[Callable[[Scope], None]]
+    ):
+        # type: (...) -> Optional[ContextManager[Scope]]
+        """
+        Pushes a new layer on the scope stack.
+
+        :param callback: If provided, this method pushes a scope, calls
+            `callback`, and pops the scope again.
+
+        :returns: If no `callback` is provided, a context manager that should
+            be used to pop the scope again.
         """
 
         if callback is not None:
@@ -374,24 +512,42 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     scope = push_scope
 
     def pop_scope_unsafe(self):
-        """Pops a scope layer from the stack. Try to use the context manager
-        `push_scope()` instead."""
+        # type: () -> Tuple[Optional[Client], Scope]
+        """
+        Pops a scope layer from the stack.
+
+        Try to use the context manager :py:meth:`push_scope` instead.
+        """
         rv = self._stack.pop()
         assert self._stack, "stack must have at least one layer"
         return rv
 
     @overload  # noqa
-    def configure_scope(self):
-        # type: () -> ContextManager[Scope]
+    def configure_scope(
+        self, callback=None  # type: Optional[None]
+    ):
+        # type: (...) -> ContextManager[Scope]
         pass
 
     @overload  # noqa
-    def configure_scope(self, callback):
-        # type: (Callable[[Scope], None]) -> None
+    def configure_scope(
+        self, callback  # type: Callable[[Scope], None]
+    ):
+        # type: (...) -> None
         pass
 
-    def configure_scope(self, callback=None):  # noqa
-        """Reconfigures the scope."""
+    def configure_scope(  # noqa
+        self, callback=None  # type: Optional[Callable[[Scope], None]]
+    ):  # noqa
+        # type: (...) -> Optional[ContextManager[Scope]]
+
+        """
+        Reconfigures the scope.
+
+        :param callback: If provided, call the callback with the current scope.
+
+        :returns: If no callback is provided, returns a context manager that returns the scope.
+        """
 
         client, scope = self._stack[-1]
         if callback is not None:
@@ -402,6 +558,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         @contextmanager
         def inner():
+            # type: () -> Generator[Scope, None, None]
             if client is not None:
                 yield scope
             else:
@@ -409,23 +566,38 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return inner()
 
-    def flush(self, timeout=None, callback=None):
-        """Alias for self.client.flush"""
+    def flush(
+        self,
+        timeout=None,  # type: Optional[float]
+        callback=None,  # type: Optional[Callable[[int, float], None]]
+    ):
+        # type: (...) -> None
+        """
+        Alias for :py:meth:`sentry_sdk.Client.flush`
+        """
         client, scope = self._stack[-1]
         if client is not None:
             return client.flush(timeout=timeout, callback=callback)
 
     def iter_trace_propagation_headers(self):
+        # type: () -> Generator[Tuple[str, str], None, None]
+        # TODO: Document
         client, scope = self._stack[-1]
-        if scope._span is None:
+        span = scope.span
+
+        if span is None:
             return
 
         propagate_traces = client and client.options["propagate_traces"]
         if not propagate_traces:
             return
 
-        for item in scope._span.iter_headers():
-            yield item
+        if client and client.options["traceparent_v2"]:
+            traceparent = span.to_traceparent()
+        else:
+            traceparent = span.to_legacy_traceparent()
+
+        yield "sentry-trace", traceparent
 
 
 GLOBAL_HUB = Hub()

@@ -14,7 +14,7 @@ help:
 	@false
 
 .venv:
-	virtualenv $(VENV_PATH)
+	virtualenv -ppython3 $(VENV_PATH)
 	$(VENV_PATH)/bin/pip install tox
 
 dist: .venv
@@ -50,17 +50,22 @@ lint: .venv
 
 apidocs: .venv
 	@$(VENV_PATH)/bin/pip install --editable .
-	@$(VENV_PATH)/bin/pip install pdoc==0.3.2 pygments
-	@$(VENV_PATH)/bin/pdoc --overwrite --html --html-dir build/apidocs sentry_sdk
+	@$(VENV_PATH)/bin/pip install -U -r ./docs-requirements.txt
+	@$(VENV_PATH)/bin/sphinx-build -W -b html docs/ docs/_build
 .PHONY: apidocs
+
+apidocs-hotfix: apidocs
+	@$(VENV_PATH)/bin/pip install ghp-import
+	@$(VENV_PATH)/bin/ghp-import -pf docs/_build
+.PHONY: apidocs-hotfix
 
 install-zeus-cli:
 	npm install -g @zeus-ci/cli
 .PHONY: install-zeus-cli
 
 travis-upload-docs: apidocs install-zeus-cli
-	cd build/apidocs && zip -r gh-pages ./sentry_sdk
-	zeus upload -t "application/zip+docs" build/apidocs/gh-pages.zip \
+	cd docs/_build && zip -r gh-pages ./
+	zeus upload -t "application/zip+docs" docs/_build/gh-pages.zip \
 		|| [[ ! "$(TRAVIS_BRANCH)" =~ ^release/ ]]
 .PHONY: travis-upload-docs
 

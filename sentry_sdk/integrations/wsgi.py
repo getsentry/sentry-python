@@ -1,21 +1,36 @@
+import functools
 import sys
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
-from sentry_sdk._compat import PY2, reraise
-from sentry_sdk.tracing import SpanContext
+from sentry_sdk.utils import (
+    ContextVar,
+    capture_internal_exceptions,
+    event_from_exception,
+)
+from sentry_sdk._compat import PY2, reraise, iteritems
+from sentry_sdk.tracing import Span
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
-if False:
+from sentry_sdk._types import MYPY
+
+if MYPY:
     from typing import Callable
     from typing import Dict
-    from typing import List
     from typing import Iterator
     from typing import Any
     from typing import Tuple
     from typing import Optional
+    from typing import TypeVar
 
     from sentry_sdk.utils import ExcInfo
+    from sentry_sdk._types import EventProcessor
+
+    T = TypeVar("T")
+    U = TypeVar("U")
+    E = TypeVar("E")
+
+
+_wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
 
 
 if PY2:
@@ -70,27 +85,56 @@ class SentryWsgiMiddleware(object):
     __slots__ = ("app",)
 
     def __init__(self, app):
-        # type: (Callable) -> None
+        # type: (Callable[[Dict[str, str], Callable[..., Any]], Any]) -> None
         self.app = app
 
     def __call__(self, environ, start_response):
-        # type: (Dict[str, str], Callable) -> _ScopedResponse
-        hub = Hub(Hub.current)
+        # type: (Dict[str, str], Callable[..., Any]) -> _ScopedResponse
+        if _wsgi_middleware_applied.get(False):
+            return self.app(environ, start_response)
 
-        with hub:
-            with capture_internal_exceptions():
-                with hub.configure_scope() as scope:
-                    scope.clear_breadcrumbs()
-                    scope._name = "wsgi"
-                    scope.set_span_context(SpanContext.continue_from_environ(environ))
-                    scope.add_event_processor(_make_wsgi_event_processor(environ))
+        _wsgi_middleware_applied.set(True)
+        try:
+            hub = Hub(Hub.current)
 
-            try:
-                rv = self.app(environ, start_response)
-            except Exception:
-                reraise(*_capture_exception(hub))
+            with hub:
+                with capture_internal_exceptions():
+                    with hub.configure_scope() as scope:
+                        scope.clear_breadcrumbs()
+                        scope._name = "wsgi"
+                        scope.add_event_processor(_make_wsgi_event_processor(environ))
+
+                span = Span.continue_from_environ(environ)
+                span.op = "http.server"
+                span.transaction = "generic WSGI request"
+
+                with hub.start_span(span) as span:
+                    try:
+                        rv = self.app(
+                            environ,
+                            functools.partial(
+                                _sentry_start_response, start_response, span
+                            ),
+                        )
+                    except BaseException:
+                        reraise(*_capture_exception(hub))
+        finally:
+            _wsgi_middleware_applied.set(False)
 
         return _ScopedResponse(hub, rv)
+
+
+def _sentry_start_response(
+    old_start_response, span, status, response_headers, exc_info=None
+):
+    # type: (Callable[[str, U, Optional[E]], T], Span, str, U, Optional[E]) -> T
+    with capture_internal_exceptions():
+        status_int = int(status.split(" ", 1)[0])
+        span.set_tag("http.status_code", status_int)
+        if 500 <= status_int < 600:
+            span.set_failure()
+
+    return old_start_response(status, response_headers, exc_info)
 
 
 def _get_environ(environ):
@@ -100,8 +144,9 @@ def _get_environ(environ):
     """
     keys = ["SERVER_NAME", "SERVER_PORT"]
     if _should_send_default_pii():
-        # Add all three headers here to make debugging of proxy setup easier.
-        keys += ["REMOTE_ADDR", "HTTP_X_FORWARDED_FOR", "HTTP_X_REAL_IP"]
+        # make debugging of proxy setup easier. Proxy headers are
+        # in headers.
+        keys += ["REMOTE_ADDR"]
 
     for key in keys:
         if key in environ:
@@ -118,7 +163,7 @@ def _get_headers(environ):
     Returns only proper HTTP headers.
 
     """
-    for key, value in environ.items():
+    for key, value in iteritems(environ):
         key = str(key)
         if key.startswith("HTTP_") and key not in (
             "HTTP_CONTENT_TYPE",
@@ -151,15 +196,22 @@ def get_client_ip(environ):
 
 def _capture_exception(hub):
     # type: (Hub) -> ExcInfo
+    exc_info = sys.exc_info()
+
     # Check client here as it might have been unset while streaming response
     if hub.client is not None:
-        exc_info = sys.exc_info()
-        event, hint = event_from_exception(
-            exc_info,
-            client_options=hub.client.options,
-            mechanism={"type": "wsgi", "handled": False},
-        )
-        hub.capture_event(event, hint=hint)
+        e = exc_info[1]
+
+        # SystemExit(0) is the only uncaught exception that is expected behavior
+        should_skip_capture = isinstance(e, SystemExit) and e.code in (0, None)
+        if not should_skip_capture:
+            event, hint = event_from_exception(
+                exc_info,
+                client_options=hub.client.options,
+                mechanism={"type": "wsgi", "handled": False},
+            )
+            hub.capture_event(event, hint=hint)
+
     return exc_info
 
 
@@ -167,7 +219,7 @@ class _ScopedResponse(object):
     __slots__ = ("_response", "_hub")
 
     def __init__(self, hub, response):
-        # type: (Hub, List[bytes]) -> None
+        # type: (Hub, Iterator[bytes]) -> None
         self._hub = hub
         self._response = response
 
@@ -181,23 +233,24 @@ class _ScopedResponse(object):
                     chunk = next(iterator)
                 except StopIteration:
                     break
-                except Exception:
+                except BaseException:
                     reraise(*_capture_exception(self._hub))
 
             yield chunk
 
     def close(self):
+        # type: () -> None
         with self._hub:
             try:
-                self._response.close()
+                self._response.close()  # type: ignore
             except AttributeError:
                 pass
-            except Exception:
+            except BaseException:
                 reraise(*_capture_exception(self._hub))
 
 
 def _make_wsgi_event_processor(environ):
-    # type: (Dict[str, str]) -> Callable
+    # type: (Dict[str, str]) -> EventProcessor
     # It's a bit unfortunate that we have to extract and parse the request data
     # from the environ so eagerly, but there are a few good reasons for this.
     #
@@ -225,7 +278,8 @@ def _make_wsgi_event_processor(environ):
 
             if _should_send_default_pii():
                 user_info = event.setdefault("user", {})
-                user_info["ip_address"] = client_ip
+                if client_ip:
+                    user_info["ip_address"] = client_ip
 
             request_info["url"] = request_url
             request_info["query_string"] = query_string

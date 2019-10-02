@@ -1,0 +1,4 @@
+sphinx
+sphinx-rtd-theme
+git+https://github.com/agronholm/sphinx-autodoc-typehints
+typed_ast

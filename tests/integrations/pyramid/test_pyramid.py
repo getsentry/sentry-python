@@ -1,20 +1,24 @@
 import json
+import logging
+import pkg_resources
+import pytest
 
 from io import BytesIO
 
-import logging
-
-import pytest
-
-from pyramid.authorization import ACLAuthorizationPolicy
 import pyramid.testing
 
+from pyramid.authorization import ACLAuthorizationPolicy
 from pyramid.response import Response
-
-from werkzeug.test import Client
 
 from sentry_sdk import capture_message, add_breadcrumb
 from sentry_sdk.integrations.pyramid import PyramidIntegration
+
+from werkzeug.test import Client
+
+
+PYRAMID_VERSION = tuple(
+    map(int, pkg_resources.get_distribution("pyramid").version.split("."))
+)
 
 
 def hi(request):
@@ -97,7 +101,7 @@ def test_has_context(route, get_client, sentry_init, capture_events):
     assert event["message"] == "yoo"
     assert event["request"] == {
         "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
-        "headers": {"Content-Length": "0", "Content-Type": "", "Host": "localhost"},
+        "headers": {"Host": "localhost"},
         "method": "GET",
         "query_string": "",
         "url": "http://localhost/message/yoo",
@@ -122,7 +126,9 @@ def test_transaction_style(
     assert event["transaction"] == expected_transaction
 
 
-def test_large_json_request(sentry_init, capture_events, route, get_client):
+def test_large_json_request(
+    sentry_init, capture_events, route, get_client, fast_serialize
+):
     sentry_init(integrations=[PyramidIntegration()])
 
     data = {"foo": {"bar": "a" * 2000}}
@@ -141,9 +147,10 @@ def test_large_json_request(sentry_init, capture_events, route, get_client):
     client.post("/", content_type="application/json", data=json.dumps(data))
 
     event, = events
-    assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
-    }
+    if not fast_serialize:
+        assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
+            "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        }
     assert len(event["request"]["data"]["foo"]["bar"]) == 512
 
 
@@ -169,7 +176,7 @@ def test_flask_empty_json_request(sentry_init, capture_events, route, get_client
     assert event["request"]["data"] == data
 
 
-def test_files_and_form(sentry_init, capture_events, route, get_client):
+def test_files_and_form(sentry_init, capture_events, route, get_client, fast_serialize):
     sentry_init(integrations=[PyramidIntegration()], request_bodies="always")
 
     data = {"foo": "a" * 2000, "file": (BytesIO(b"hello"), "hello.txt")}
@@ -185,14 +192,16 @@ def test_files_and_form(sentry_init, capture_events, route, get_client):
     client.post("/", data=data)
 
     event, = events
-    assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
-    }
+    if not fast_serialize:
+        assert event["_meta"]["request"]["data"]["foo"] == {
+            "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        }
     assert len(event["request"]["data"]["foo"]) == 512
 
-    assert event["_meta"]["request"]["data"]["file"] == {
-        "": {"len": 0, "rem": [["!raw", "x", 0, 0]]}
-    }
+    if not fast_serialize:
+        assert event["_meta"]["request"]["data"]["file"] == {
+            "": {"len": 0, "rem": [["!raw", "x", 0, 0]]}
+        }
     assert not event["request"]["data"]["file"]
 
 
@@ -219,7 +228,7 @@ def test_bad_request_not_captured(
     assert not events
 
 
-def test_errorhandler(
+def test_errorhandler_ok(
     sentry_init, pyramid_config, capture_exceptions, route, get_client
 ):
     sentry_init(integrations=[PyramidIntegration()])
@@ -237,8 +246,36 @@ def test_errorhandler(
     client = get_client()
     client.get("/")
 
+    assert not errors
+
+
+@pytest.mark.skipif(
+    PYRAMID_VERSION < (1, 9),
+    reason="We don't have the right hooks in older Pyramid versions",
+)
+def test_errorhandler_500(
+    sentry_init, pyramid_config, capture_exceptions, route, get_client
+):
+    sentry_init(integrations=[PyramidIntegration()])
+    errors = capture_exceptions()
+
+    @route("/")
+    def index(request):
+        1 / 0
+
+    def errorhandler(exc, request):
+        return Response("bad request", status=500)
+
+    pyramid_config.add_view(errorhandler, context=Exception)
+
+    client = get_client()
+    app_iter, status, headers = client.get("/")
+    assert b"".join(app_iter) == b"bad request"
+    assert status.lower() == "500 internal server error"
+
     error, = errors
-    assert type(error) is Exception
+
+    assert isinstance(error, ZeroDivisionError)
 
 
 def test_error_in_errorhandler(
@@ -262,12 +299,9 @@ def test_error_in_errorhandler(
     with pytest.raises(ZeroDivisionError):
         client.get("/")
 
-    event1, event2 = events
+    event, = events
 
-    exception, = event1["exception"]["values"]
-    assert exception["type"] == "ValueError"
-
-    exception = event2["exception"]["values"][-1]
+    exception = event["exception"]["values"][-1]
     assert exception["type"] == "ZeroDivisionError"
 
 
@@ -298,3 +332,35 @@ def test_error_in_authenticated_userid(
     client.get("/message")
 
     assert len(events) == 1
+
+
+def tween_factory(handler, registry):
+    def tween(request):
+        try:
+            response = handler(request)
+        except Exception:
+            mroute = request.matched_route
+            if mroute and mroute.name in ("index",):
+                return Response("bad request", status_code=400)
+        return response
+
+    return tween
+
+
+def test_tween_ok(sentry_init, pyramid_config, capture_exceptions, route, get_client):
+    sentry_init(integrations=[PyramidIntegration()])
+    errors = capture_exceptions()
+
+    @route("/")
+    def index(request):
+        raise Exception()
+
+    pyramid_config.add_tween(
+        "tests.integrations.pyramid.test_pyramid.tween_factory",
+        under=pyramid.tweens.INGRESS,
+    )
+
+    client = get_client()
+    client.get("/")
+
+    assert not errors

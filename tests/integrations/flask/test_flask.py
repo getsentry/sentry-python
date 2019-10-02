@@ -6,6 +6,7 @@ from io import BytesIO
 flask = pytest.importorskip("flask")
 
 from flask import Flask, Response, request, abort, stream_with_context
+from flask.views import View
 
 from flask_login import LoginManager, login_user
 
@@ -188,15 +189,15 @@ def test_flask_login_configured(
         assert event["user"]["id"] == str(user_id)
 
 
-def test_flask_large_json_request(sentry_init, capture_events, app):
+def test_flask_large_json_request(sentry_init, capture_events, app, fast_serialize):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     data = {"foo": {"bar": "a" * 2000}}
 
     @app.route("/", methods=["POST"])
     def index():
-        assert request.json == data
-        assert request.data == json.dumps(data).encode("ascii")
+        assert request.get_json() == data
+        assert request.get_data() == json.dumps(data).encode("ascii")
         assert not request.form
         capture_message("hi")
         return "ok"
@@ -208,9 +209,10 @@ def test_flask_large_json_request(sentry_init, capture_events, app):
     assert response.status_code == 200
 
     event, = events
-    assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
-    }
+    if not fast_serialize:
+        assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
+            "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        }
     assert len(event["request"]["data"]["foo"]["bar"]) == 512
 
 
@@ -220,8 +222,8 @@ def test_flask_empty_json_request(sentry_init, capture_events, app, data):
 
     @app.route("/", methods=["POST"])
     def index():
-        assert request.json == data
-        assert request.data == json.dumps(data).encode("ascii")
+        assert request.get_json() == data
+        assert request.get_data() == json.dumps(data).encode("ascii")
         assert not request.form
         capture_message("hi")
         return "ok"
@@ -236,7 +238,9 @@ def test_flask_empty_json_request(sentry_init, capture_events, app, data):
     assert event["request"]["data"] == data
 
 
-def test_flask_medium_formdata_request(sentry_init, capture_events, app):
+def test_flask_medium_formdata_request(
+    sentry_init, capture_events, app, fast_serialize
+):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     data = {"foo": "a" * 2000}
@@ -244,8 +248,8 @@ def test_flask_medium_formdata_request(sentry_init, capture_events, app):
     @app.route("/", methods=["POST"])
     def index():
         assert request.form["foo"] == data["foo"]
-        assert not request.data
-        assert not request.json
+        assert not request.get_data()
+        assert not request.get_json()
         capture_message("hi")
         return "ok"
 
@@ -256,14 +260,17 @@ def test_flask_medium_formdata_request(sentry_init, capture_events, app):
     assert response.status_code == 200
 
     event, = events
-    assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
-    }
+    if not fast_serialize:
+        assert event["_meta"]["request"]["data"]["foo"] == {
+            "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        }
     assert len(event["request"]["data"]["foo"]) == 512
 
 
 @pytest.mark.parametrize("input_char", [u"a", b"a"])
-def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, app):
+def test_flask_too_large_raw_request(
+    sentry_init, input_char, capture_events, app, fast_serialize
+):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="small")
 
     data = input_char * 2000
@@ -272,10 +279,10 @@ def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, ap
     def index():
         assert not request.form
         if isinstance(data, bytes):
-            assert request.data == data
+            assert request.get_data() == data
         else:
-            assert request.data == data.encode("ascii")
-        assert not request.json
+            assert request.get_data() == data.encode("ascii")
+        assert not request.get_json()
         capture_message("hi")
         return "ok"
 
@@ -286,13 +293,14 @@ def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, ap
     assert response.status_code == 200
 
     event, = events
-    assert event["_meta"]["request"]["data"] == {
-        "": {"len": 2000, "rem": [["!config", "x", 0, 2000]]}
-    }
+    if not fast_serialize:
+        assert event["_meta"]["request"]["data"] == {
+            "": {"len": 2000, "rem": [["!config", "x", 0, 2000]]}
+        }
     assert not event["request"]["data"]
 
 
-def test_flask_files_and_form(sentry_init, capture_events, app):
+def test_flask_files_and_form(sentry_init, capture_events, app, fast_serialize):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="always")
 
     data = {"foo": "a" * 2000, "file": (BytesIO(b"hello"), "hello.txt")}
@@ -301,7 +309,7 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
     def index():
         assert list(request.form) == ["foo"]
         assert list(request.files) == ["file"]
-        assert not request.json
+        assert not request.get_json()
         capture_message("hi")
         return "ok"
 
@@ -312,14 +320,16 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
     assert response.status_code == 200
 
     event, = events
-    assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
-    }
+    if not fast_serialize:
+        assert event["_meta"]["request"]["data"]["foo"] == {
+            "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        }
     assert len(event["request"]["data"]["foo"]) == 512
 
-    assert event["_meta"]["request"]["data"]["file"] == {
-        "": {"len": 0, "rem": [["!raw", "x", 0, 0]]}
-    }
+    if not fast_serialize:
+        assert event["_meta"]["request"]["data"]["file"] == {
+            "": {"len": 0, "rem": [["!raw", "x", 0, 0]]}
+        }
     assert not event["request"]["data"]["file"]
 
 
@@ -554,3 +564,69 @@ def test_errorhandler_for_exception_swallows_exception(
         assert response.status_code == 200
 
     assert not events
+
+
+def test_tracing_success(sentry_init, capture_events, app):
+    sentry_init(traces_sample_rate=1.0, integrations=[flask_sentry.FlaskIntegration()])
+
+    events = capture_events()
+
+    with app.test_client() as client:
+        response = client.get("/message")
+        assert response.status_code == 200
+
+    message_event, transaction_event = events
+
+    assert transaction_event["type"] == "transaction"
+    assert transaction_event["transaction"] == "hi"
+    assert "status" not in transaction_event["contexts"]["trace"]
+
+    assert message_event["message"] == "hi"
+    assert message_event["transaction"] == "hi"
+
+
+def test_tracing_error(sentry_init, capture_events, app):
+    sentry_init(traces_sample_rate=1.0, integrations=[flask_sentry.FlaskIntegration()])
+
+    events = capture_events()
+
+    @app.route("/error")
+    def error():
+        1 / 0
+
+    with pytest.raises(ZeroDivisionError):
+        with app.test_client() as client:
+            response = client.get("/error")
+            assert response.status_code == 500
+
+    error_event, transaction_event = events
+
+    assert transaction_event["type"] == "transaction"
+    assert transaction_event["transaction"] == "error"
+    assert transaction_event["contexts"]["trace"]["status"] == "failure"
+
+    assert error_event["transaction"] == "error"
+    exception, = error_event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+
+
+def test_class_based_views(sentry_init, app, capture_events):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    events = capture_events()
+
+    @app.route("/")
+    class HelloClass(View):
+        def dispatch_request(self):
+            capture_message("hi")
+            return "ok"
+
+    app.add_url_rule("/hello-class/", view_func=HelloClass.as_view("hello_class"))
+
+    with app.test_client() as client:
+        response = client.get("/hello-class/")
+        assert response.status_code == 200
+
+    event, = events
+
+    assert event["message"] == "hi"
+    assert event["transaction"] == "hello_class"
