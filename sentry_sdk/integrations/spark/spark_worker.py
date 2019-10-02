@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 
 import sys
-import os
 
 from sentry_sdk import configure_scope
 from sentry_sdk.hub import Hub
@@ -15,9 +14,6 @@ from sentry_sdk.utils import (
 
 
 def _capture_exception(exc_info, hub):
-    """
-    Send exception to Sentry.
-    """
     from pyspark.taskcontext import TaskContext
 
     client = hub.client

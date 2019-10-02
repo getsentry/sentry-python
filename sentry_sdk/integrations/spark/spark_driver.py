@@ -1,6 +1,5 @@
 from sentry_sdk import configure_scope
 from sentry_sdk.hub import Hub
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration
 
 
@@ -14,9 +13,9 @@ class SparkIntegration(Integration):
 
 
 def patch_spark_context_init():
+    # type: () -> None
     from pyspark import SparkContext  # type: ignore
     from pyspark.java_gateway import ensure_callback_server_started  # type: ignore
-    from py4j.java_gateway import java_import  # type: ignore
 
     spark_context_init = SparkContext._do_init
 
@@ -160,7 +159,6 @@ class SentryListener(SparkListener):
 
         stageInfo = stageCompleted.stageInfo()
         message = ""
-        failureReason = ""
         level = ""
         data = {"attemptId": stageInfo.attemptId(), "name": stageInfo.name()}
 
