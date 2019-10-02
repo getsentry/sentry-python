@@ -123,6 +123,7 @@ def test_subprocess_basic(
     assert message_event["message"] == "hi"
 
     data = {"subprocess.cwd": os.getcwd()} if with_cwd else {}
+
     crumb, = message_event["breadcrumbs"]
     assert crumb == {
         "category": "subprocess",
@@ -163,7 +164,7 @@ def test_subprocess_basic(
     )
 
     # data of init span
-    assert subprocess_init_span["data"] == data
+    assert subprocess_init_span.get("data", {}) == data
     if iterator:
         assert "iterator" in subprocess_init_span["description"]
         assert subprocess_init_span["description"].startswith("<")

@@ -108,7 +108,6 @@ def _install_httplib():
             rv = real_getresponse(self, *args, **kwargs)
 
             if data_dict is not None:
-                data_dict["httplib_response"] = rv
                 data_dict["status_code"] = rv.status
                 data_dict["reason"] = rv.reason
         except TypeError:
@@ -200,7 +199,8 @@ def _install_subprocess():
             env["SUBPROCESS_" + k.upper().replace("-", "_")] = v
 
         with hub.start_span(op="subprocess", description=description) as span:
-            span.set_data("subprocess.cwd", cwd)
+            if cwd:
+                span.set_data("subprocess.cwd", cwd)
 
             rv = old_popen_init(self, *a, **kw)  # type: ignore
 

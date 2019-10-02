@@ -202,11 +202,16 @@ class EventHandler(logging.Handler, object):
 
         hint["log_record"] = record
 
+        client = Hub.current.client
+
         event["level"] = _logging_to_event_level(record.levelname)
         event["logger"] = record.name
-        event["logentry"] = {"message": to_string(record.msg), "params": record.args}
+        event["logentry"] = {
+            "message": to_string(record.msg),
+            "params": partial_serialize(client, record.args, should_repr_strings=False),
+        }
         event["extra"] = partial_serialize(
-            Hub.current.client, _extra_from_record(record), should_repr_strings=False
+            client, _extra_from_record(record), should_repr_strings=False
         )
 
         hub.capture_event(event, hint=hint)

@@ -73,7 +73,9 @@ class RequestExtractor(object):
         if data is not None:
             request_info["data"] = data
 
-        event["request"] = partial_serialize(client, request_info)
+        event["request"] = partial_serialize(
+            client, request_info, should_repr_strings=False
+        )
 
     def content_length(self):
         # type: () -> int

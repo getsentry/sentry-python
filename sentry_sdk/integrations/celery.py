@@ -161,10 +161,12 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
     # type: (Any, Any, Any, Any, Optional[Any]) -> EventProcessor
     def event_processor(event, hint):
         # type: (Event, Hint) -> Optional[Event]
+        client = Hub.current.client
+
         with capture_internal_exceptions():
             extra = event.setdefault("extra", {})
             extra["celery-job"] = partial_serialize(
-                Hub.current.client,
+                client,
                 {"task_name": task.name, "args": args, "kwargs": kwargs},
                 should_repr_strings=False,
             )
@@ -175,7 +177,11 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
                     event["fingerprint"] = [
                         "celery",
                         "SoftTimeLimitExceeded",
-                        getattr(task, "name", task),
+                        partial_serialize(
+                            client,
+                            getattr(task, "name", task),
+                            should_repr_strings=False,
+                        ),
                     ]
 
         return event

@@ -189,7 +189,7 @@ def test_flask_login_configured(
         assert event["user"]["id"] == str(user_id)
 
 
-def test_flask_large_json_request(sentry_init, capture_events, app):
+def test_flask_large_json_request(sentry_init, capture_events, app, fast_serialize):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     data = {"foo": {"bar": "a" * 2000}}
@@ -209,9 +209,10 @@ def test_flask_large_json_request(sentry_init, capture_events, app):
     assert response.status_code == 200
 
     event, = events
-    assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
-    }
+    if not fast_serialize:
+        assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
+            "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        }
     assert len(event["request"]["data"]["foo"]["bar"]) == 512
 
 
@@ -237,7 +238,9 @@ def test_flask_empty_json_request(sentry_init, capture_events, app, data):
     assert event["request"]["data"] == data
 
 
-def test_flask_medium_formdata_request(sentry_init, capture_events, app):
+def test_flask_medium_formdata_request(
+    sentry_init, capture_events, app, fast_serialize
+):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     data = {"foo": "a" * 2000}
@@ -257,14 +260,17 @@ def test_flask_medium_formdata_request(sentry_init, capture_events, app):
     assert response.status_code == 200
 
     event, = events
-    assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
-    }
+    if not fast_serialize:
+        assert event["_meta"]["request"]["data"]["foo"] == {
+            "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        }
     assert len(event["request"]["data"]["foo"]) == 512
 
 
 @pytest.mark.parametrize("input_char", [u"a", b"a"])
-def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, app):
+def test_flask_too_large_raw_request(
+    sentry_init, input_char, capture_events, app, fast_serialize
+):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="small")
 
     data = input_char * 2000
@@ -287,13 +293,14 @@ def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, ap
     assert response.status_code == 200
 
     event, = events
-    assert event["_meta"]["request"]["data"] == {
-        "": {"len": 2000, "rem": [["!config", "x", 0, 2000]]}
-    }
+    if not fast_serialize:
+        assert event["_meta"]["request"]["data"] == {
+            "": {"len": 2000, "rem": [["!config", "x", 0, 2000]]}
+        }
     assert not event["request"]["data"]
 
 
-def test_flask_files_and_form(sentry_init, capture_events, app):
+def test_flask_files_and_form(sentry_init, capture_events, app, fast_serialize):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="always")
 
     data = {"foo": "a" * 2000, "file": (BytesIO(b"hello"), "hello.txt")}
@@ -313,14 +320,16 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
     assert response.status_code == 200
 
     event, = events
-    assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
-    }
+    if not fast_serialize:
+        assert event["_meta"]["request"]["data"]["foo"] == {
+            "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        }
     assert len(event["request"]["data"]["foo"]) == 512
 
-    assert event["_meta"]["request"]["data"]["file"] == {
-        "": {"len": 0, "rem": [["!raw", "x", 0, 0]]}
-    }
+    if not fast_serialize:
+        assert event["_meta"]["request"]["data"]["file"] == {
+            "": {"len": 0, "rem": [["!raw", "x", 0, 0]]}
+        }
     assert not event["request"]["data"]["file"]
 
 
