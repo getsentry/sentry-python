@@ -208,6 +208,8 @@ class Auth(object):
 
 
 class AnnotatedValue(object):
+    __slots__ = ("value", "metadata")
+
     def __init__(self, value, metadata):
         # type: (Optional[Any], Dict[str, Any]) -> None
         self.value = value
@@ -754,7 +756,7 @@ def _get_contextvars():
 
         def set(self, value):
             # type: (Any) -> None
-            setattr(self._local, "value", value)
+            self._local.value = value
 
     return False, ContextVar
 

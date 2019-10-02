@@ -36,7 +36,7 @@ class A:
     def __init__(self, fn):
         self.r = "We are in A"
         self.fn = fn
-        setattr(self, "_inspect_fn", _wrap_inspect_call(self, "fn"))
+        self._inspect_fn = _wrap_inspect_call(self, "fn")
 
     def process(self):
         return self.fn()

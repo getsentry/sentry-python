@@ -1,11 +1,9 @@
 import copy
 import random
 import sys
-import weakref
 
 from datetime import datetime
 from contextlib import contextmanager
-from warnings import warn
 
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
@@ -109,7 +107,7 @@ else:
 
 class HubMeta(type):
     @property
-    def current(self):
+    def current(cls):
         # type: () -> Hub
         """Returns the current instance of the hub."""
         rv = _local.get(None)
@@ -119,7 +117,7 @@ class HubMeta(type):
         return rv
 
     @property
-    def main(self):
+    def main(cls):
         # type: () -> Hub
         """Returns the main instance of the hub."""
         return GLOBAL_HUB
