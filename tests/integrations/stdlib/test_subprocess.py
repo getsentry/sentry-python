@@ -164,7 +164,7 @@ def test_subprocess_basic(
     )
 
     # data of init span
-    assert subprocess_init_span["data"] == data
+    assert subprocess_init_span.get("data", {}) == data
     if iterator:
         assert "iterator" in subprocess_init_span["description"]
         assert subprocess_init_span["description"].startswith("<")
