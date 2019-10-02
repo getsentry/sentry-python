@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 
 import sentry_sdk
-from sentry_sdk._compat import urlparse, text_type, implements_str, PY2
+from sentry_sdk._compat import urlparse, text_type, implements_str, PY2, iteritems
 
 from sentry_sdk._types import MYPY
 
@@ -824,10 +824,10 @@ def push_scope_decorator(user=None, level=None, tags=None, extras=None):
                 if level:
                     current_scope.level = level
                 if tags:
-                    for key, value in tags.iteritems():
+                    for key, value in iteritems(tags):
                         current_scope.set_tag(key, value)
                 if extras:
-                    for key, value in extras.iteritems():
+                    for key, value in iteritems(extras):
                         current_scope.set_extra(key, value)
                 f(*args, **kwargs)
         return __inner
