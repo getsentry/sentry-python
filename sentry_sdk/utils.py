@@ -1,3 +1,4 @@
+import functools
 import os
 import sys
 import linecache
@@ -797,3 +798,37 @@ def transaction_from_function(func):
 
 
 disable_capture_event = ContextVar("disable_capture_event")
+
+
+def push_scope_decorator(user=None, level=None, tags=None, extras=None):
+    """
+    Wrap function in a push_scope.
+    :param user: dictionary containing id, username, email, and/or ip_address attributes.
+    :param level: (str) scope level (e.g. 'error')
+    :param tags: dictionary of key/value pairs for scope tags
+    :param extras: dictionary of key/value pairs for scope extras
+    :return: A proxy method that wraps the decorated function in a usage of the push_scope
+    context manager.
+    """
+    if tags is not None and type(tags) is not dict:
+        raise Exception("tags must be a dictionary")
+    if extras is not None and type(extras) is not dict:
+        raise Exception("extra must be a dictionary")
+
+    def create_sentry_push_scope(f):
+        @functools.wraps(f)
+        def __inner(*args, **kwargs):
+            with sentry_sdk.push_scope() as current_scope:
+                if user:
+                    current_scope.user = user
+                if level:
+                    current_scope.level = level
+                if tags:
+                    for key, value in tags.iteritems():
+                        current_scope.set_tag(key, value)
+                if extras:
+                    for key, value in extras.iteritems():
+                        current_scope.set_extra(key, value)
+                f(*args, **kwargs)
+        return __inner
+    return create_sentry_push_scope
