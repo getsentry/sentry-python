@@ -23,34 +23,6 @@ from tests.integrations.django.myapp.wsgi import application
 
 
 @pytest.fixture
-def django_clear_caches():
-    """Invalidate the connection caches.
-
-    https://github.com/pytest-dev/pytest-django/issues/587
-    """
-    from django.db import connections
-
-    connections._connections = threading.local()
-    # this will clear the cached property
-    connections.__dict__.pop("databases", None)
-
-
-@pytest.fixture(autouse=True)
-def setup_app_tables(request):
-    if request.node.get_closest_marker("django_db") is None:
-        return
-
-    # Honestly no idea why pytest-django does not do this
-    from django import VERSION
-    from django.core import management
-
-    if VERSION < (2, 0):
-        management.call_command("migrate", noinput=True)
-    else:
-        management.call_command("migrate", no_input=True)
-
-
-@pytest.fixture
 def client():
     return Client(application)
 
@@ -112,7 +84,8 @@ def test_transaction_with_class_view(sentry_init, client, capture_events):
     assert event["message"] == "hi"
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.forked
+@pytest.mark.django_db
 def test_user_captured(sentry_init, client, capture_events):
 
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
@@ -135,7 +108,8 @@ def test_user_captured(sentry_init, client, capture_events):
     }
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.forked
+@pytest.mark.django_db
 def test_queryset_repr(sentry_init, capture_events):
     from django.contrib.auth.models import User
 
@@ -192,6 +166,7 @@ def test_500(sentry_init, client, capture_events):
     assert content == "Sentry error: %s" % event_id
 
 
+@pytest.mark.forked
 def test_management_command_raises():
     # This just checks for our assumption that Django passes through all
     # exceptions by default, so our excepthook can be used for management
@@ -200,7 +175,8 @@ def test_management_command_raises():
         execute_from_command_line(["manage.py", "mycrash"])
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.forked
+@pytest.mark.django_db
 @pytest.mark.parametrize("with_integration", [True, False])
 def test_sql_queries(sentry_init, capture_events, with_integration):
     sentry_init(
@@ -233,7 +209,8 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
         assert crumb["data"]["db.params"] == [123]
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.forked
+@pytest.mark.django_db
 def test_sql_dict_query_params(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -274,6 +251,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
         lambda sql: sql.SQL('SELECT %(my_param)s FROM "foobar"'),
     ],
 )
+@pytest.mark.forked
 @pytest.mark.django_db
 def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     sentry_init(
@@ -302,6 +280,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     assert crumb["data"]["db.params"] == {"my_param": 10}
 
 
+@pytest.mark.forked
 @pytest.mark.django_db
 def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     sentry_init(

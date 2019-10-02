@@ -271,6 +271,7 @@ def test_retry(celery, capture_events):
         assert e["type"] == "ZeroDivisionError"
 
 
+@pytest.mark.forked
 @pytest.mark.skipif(VERSION < (4,), reason="in-memory backend broken")
 def test_transport_shutdown(request, celery, capture_events_forksafe, tmpdir):
     events = capture_events_forksafe()
