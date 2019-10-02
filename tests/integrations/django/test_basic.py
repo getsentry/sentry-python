@@ -7,6 +7,7 @@ import json
 
 from werkzeug.test import Client
 from django import VERSION as DJANGO_VERSION
+from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError, ProgrammingError, DataError
 
@@ -87,9 +88,7 @@ def test_transaction_with_class_view(sentry_init, client, capture_events):
 @pytest.mark.forked
 @pytest.mark.django_db
 def test_user_captured(sentry_init, client, capture_events):
-
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
-
     events = capture_events()
     content, status, headers = client.get(reverse("mylogin"))
     assert b"".join(content) == b"ok"
@@ -111,10 +110,7 @@ def test_user_captured(sentry_init, client, capture_events):
 @pytest.mark.forked
 @pytest.mark.django_db
 def test_queryset_repr(sentry_init, capture_events):
-    from django.contrib.auth.models import User
-
     sentry_init(integrations=[DjangoIntegration()])
-
     events = capture_events()
     User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
 
@@ -186,14 +182,12 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
     )
 
     from django.db import connection
-    from django.db.backends.utils import CursorWrapper
 
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
 
     events = capture_events()
 
     with connection.cursor() as sql:
-        assert type(sql) is CursorWrapper
         with pytest.raises(OperationalError):
             # table doesn't even exist
             sql.execute("""SELECT count(*) FROM people_person WHERE foo = %s""", [123])
