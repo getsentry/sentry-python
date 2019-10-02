@@ -7,7 +7,7 @@ from datetime import datetime
 import sentry_sdk
 
 from sentry_sdk.serializer import partial_serialize
-from sentry_sdk.utils import capture_internal_exceptions, logger
+from sentry_sdk.utils import capture_internal_exceptions, logger, to_string
 from sentry_sdk._compat import PY2
 from sentry_sdk._types import MYPY
 
@@ -404,7 +404,7 @@ def _format_sql(cursor, sql):
     except Exception:
         real_sql = None
 
-    return real_sql or str(sql)
+    return real_sql or to_string(sql)
 
 
 @contextlib.contextmanager
