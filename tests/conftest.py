@@ -179,11 +179,16 @@ def semaphore_normalize(tmpdir):
 
 
 @pytest.fixture(params=[True, False], ids=["fast_serialize", "default_serialize"])
-def sentry_init(monkeypatch_test_transport, request):
+def fast_serialize(request):
+    return request.param
+
+
+@pytest.fixture
+def sentry_init(monkeypatch_test_transport, fast_serialize):
     def inner(*a, **kw):
         hub = sentry_sdk.Hub.current
         client = sentry_sdk.Client(*a, **kw)
-        client.options["_experiments"]["fast_serialize"] = request.param
+        client.options["_experiments"]["fast_serialize"] = fast_serialize
         hub.bind_client(client)
         monkeypatch_test_transport(sentry_sdk.Hub.current.client)
 

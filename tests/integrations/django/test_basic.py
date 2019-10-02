@@ -341,7 +341,7 @@ def test_transaction_style(
     assert event["transaction"] == expected_transaction
 
 
-def test_request_body(sentry_init, client, capture_events):
+def test_request_body(sentry_init, client, capture_events, fast_serialize):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
     content, status, headers = client.post(
@@ -354,10 +354,11 @@ def test_request_body(sentry_init, client, capture_events):
 
     assert event["message"] == "hi"
     assert event["request"]["data"] == ""
-    assert event["_meta"]["request"]["data"][""] == {
-        "len": 6,
-        "rem": [["!raw", "x", 0, 6]],
-    }
+    if not fast_serialize:
+        assert event["_meta"]["request"]["data"][""] == {
+            "len": 6,
+            "rem": [["!raw", "x", 0, 6]],
+        }
 
     del events[:]
 

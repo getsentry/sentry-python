@@ -278,7 +278,8 @@ def _make_wsgi_event_processor(environ):
 
             if _should_send_default_pii():
                 user_info = event.setdefault("user", {})
-                user_info["ip_address"] = client_ip
+                if client_ip:
+                    user_info["ip_address"] = client_ip
 
             request_info["url"] = request_url
             request_info["query_string"] = query_string

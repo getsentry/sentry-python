@@ -98,7 +98,7 @@ def test_errors(sentry_init, capture_exceptions, capture_events):
     assert event["exception"]["values"][0]["mechanism"]["type"] == "falcon"
 
 
-def test_falcon_large_json_request(sentry_init, capture_events):
+def test_falcon_large_json_request(sentry_init, capture_events, fast_serialize):
     sentry_init(integrations=[FalconIntegration()])
 
     data = {"foo": {"bar": "a" * 2000}}
@@ -119,9 +119,10 @@ def test_falcon_large_json_request(sentry_init, capture_events):
     assert response.status == falcon.HTTP_200
 
     event, = events
-    assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
-    }
+    if not fast_serialize:
+        assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
+            "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        }
     assert len(event["request"]["data"]["foo"]["bar"]) == 512
 
 
