@@ -52,5 +52,5 @@ class ModulesIntegration(Integration):
             if Hub.current.get_integration(ModulesIntegration) is None:
                 return event
 
-            event["modules"] = dict(_get_installed_modules())
+            event["modules"] = _get_installed_modules()
             return event
