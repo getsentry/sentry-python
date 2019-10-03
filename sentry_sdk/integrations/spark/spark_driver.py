@@ -30,7 +30,6 @@ def patch_spark_context_init():
             self.setLocalProperty("app_name", self.appName)
             self.setLocalProperty("application_id", self.applicationId)
 
-            # Initialize Sentry Listener to start recording breadcrumbs
             gw = self._gateway
             ensure_callback_server_started(gw)
             listener = SentryListener()
@@ -135,21 +134,24 @@ class SparkListener(object):
 
 
 class SentryListener(SparkListener):
+    def __init__(self):
+        self.hub = Hub.current
+
     def onJobStart(self, jobStart):
         message = "Job {} Started".format(jobStart.jobId())
-        Hub.current.add_breadcrumb(level="info", message=message)
+        self.hub.add_breadcrumb(level="info", message=message)
 
     def onJobEnd(self, jobEnd):
         message = "Job {} Ended".format(jobEnd.jobId())
         data = {"result": jobEnd.jobResult().toString()}
         level = "info" if jobEnd.jobResult().toString() == "JobSucceeded" else "warning"
-        Hub.current.add_breadcrumb(level=level, message=message, data=data)
+        self.hub.add_breadcrumb(level=level, message=message, data=data)
 
     def onStageSubmitted(self, stageSubmitted):
         stageInfo = stageSubmitted.stageInfo()
         message = "Stage {} Submitted".format(stageInfo.stageId())
         data = {"attemptId": stageInfo.attemptId(), "name": stageInfo.name()}
-        Hub.current.add_breadcrumb(level="info", message=message, data=data)
+        self.hub.add_breadcrumb(level="info", message=message, data=data)
 
     def onStageCompleted(self, stageCompleted):
         from py4j.protocol import Py4JJavaError
@@ -168,4 +170,4 @@ class SentryListener(SparkListener):
             message = "Stage {} Completed".format(stageInfo.stageId())
             level = "info"
 
-        Hub.current.add_breadcrumb(level=level, message=message, data=data)
+        self.hub.add_breadcrumb(level=level, message=message, data=data)
