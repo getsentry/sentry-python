@@ -801,10 +801,11 @@ disable_capture_event = ContextVar("disable_capture_event")
 
 
 def push_scope_decorator(user=None, level=None, tags=None, extras=None):
+    # type: (Optional[Dict[str, str]], Optional[str], Optional[Dict[str, str]], Optional[Dict[str, str]]) -> Callable[..., Any]  # noqa
     """
     Wrap function in a push_scope.
     :param user: dictionary containing id, username, email, and/or ip_address attributes.
-    :param level: (str) scope level (e.g. 'error')
+    :param level: scope level (e.g. 'error')
     :param tags: dictionary of key/value pairs for scope tags
     :param extras: dictionary of key/value pairs for scope extras
     :return: A proxy method that wraps the decorated function in a usage of the push_scope
@@ -816,8 +817,10 @@ def push_scope_decorator(user=None, level=None, tags=None, extras=None):
         raise Exception("extra must be a dictionary")
 
     def create_sentry_push_scope(f):
+        # type: (Callable[..., Any]) -> Callable[..., None]
         @functools.wraps(f)
         def __inner(*args, **kwargs):
+            # type: (*Any, **Any) -> None
             with sentry_sdk.push_scope() as current_scope:
                 if user:
                     current_scope.user = user
@@ -830,5 +833,7 @@ def push_scope_decorator(user=None, level=None, tags=None, extras=None):
                     for key, value in iteritems(extras):
                         current_scope.set_extra(key, value)
                 f(*args, **kwargs)
+
         return __inner
+
     return create_sentry_push_scope
