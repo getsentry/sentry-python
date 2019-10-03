@@ -56,7 +56,8 @@ def _capture_exception(exc_info, hub):
                     "application_id", taskContext._localProperties["application_id"]
                 )
 
-            scope.set_extra("callSite", taskContext._localProperties["callSite.short"])
+            if "callSite.short" in taskContext._localProperties:
+                scope.set_extra("callSite", taskContext._localProperties["callSite.short"])
 
         hub.capture_event(event, hint=hint)
 
