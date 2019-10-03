@@ -49,6 +49,9 @@ def _capture_exception(exc_info, hub):
             scope.set_tag("stage_id", taskContext.stageId())
             scope.set_tag("stage_id", taskContext.stageId())
 
+            print('testing123')
+            print(taskContext)
+
             # app_name and application_id set by driver Spark Integration
             if "app_name" in taskContext._localProperties:
                 scope.set_tag("app_name", taskContext._localProperties["app_name"])

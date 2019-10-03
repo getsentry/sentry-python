@@ -10,6 +10,42 @@ class SparkIntegration(Integration):
     def setup_once():
         # type: () -> None
         patch_spark_context_init()
+        patch_spark_streaming_context_init()
+
+def patch_spark_streaming_context_init():
+    from pyspark.streaming import StreamingContext, StreamingListener
+
+    class SentryStreamingListener(StreamingListener):
+        def onReceiverStarted(self, receiverStarted):
+            info = receiverStarted.receiverInfo()
+
+            lol = {
+                "active": info.active(),
+                "executorId": info.executorId(),
+                "lastError": info.lastError(),
+                "lastErrorMessage": info.lastErrorMessage(),
+                "lastErrorTime": info.lastErrorTime(),
+                "location": info.location(),
+                "name": info.name(),
+                "streamId": info.streamId(),
+            }
+
+            print('testingkappa1289391273')
+            print(lol)
+    
+    spark_streaming_context_init = StreamingContext.__init__
+
+    def _sentry_patched_spark_streaming_context_init(self, *args, **kwargs):
+        init = spark_streaming_context_init(self, *args, **kwargs)
+
+        if Hub.current.get_integration(SparkIntegration) is None:
+            return init
+
+        streamingListener = SentryStreamingListener()
+        self.addStreamingListener(streamingListener)
+        return init
+
+    StreamingContext.__init__ = _sentry_patched_spark_streaming_context_init
 
 
 def patch_spark_context_init():
@@ -25,31 +61,29 @@ def patch_spark_context_init():
         if Hub.current.get_integration(SparkIntegration) is None:
             return init
 
-        if not getattr(self, "_sentry_is_patched", False):
-            # So workers have access to app_name and id
-            self.setLocalProperty("app_name", self.appName)
-            self.setLocalProperty("application_id", self.applicationId)
+        # So workers have access to app_name and id
+        self.setLocalProperty("app_name", self.appName)
+        self.setLocalProperty("application_id", self.applicationId)
 
-            gw = self._gateway
-            ensure_callback_server_started(gw)
-            listener = SentryListener()
-            self._jsc.sc().addSparkListener(listener)
+        gw = self._gateway
+        ensure_callback_server_started(gw)
+        listener = SentryListener()
+        self._jsc.sc().addSparkListener(listener)
 
-            with configure_scope() as scope:
-                scope.user = {"id": self.sparkUser()}
-                scope.set_tag("executor.id", self._conf.get("spark.executor.id"))
-                scope.set_tag(
-                    "spark.submit.deployMode", self._conf.get("spark.submit.deployMode")
-                )
-                scope.set_tag("driver.port", self._conf.get("spark.driver.port"))
-                scope.set_tag("driver.host", self._conf.get("spark.driver.host"))
-                scope.set_tag("spark_version", self.version)
-                scope.set_tag("app_name", self.appName)
-                scope.set_tag("application_id", self.applicationId)
+        with configure_scope() as scope:
+            scope.user = {"id": self.sparkUser()}
+            scope.set_tag("executor.id", self._conf.get("spark.executor.id"))
+            scope.set_tag(
+                "spark.submit.deployMode", self._conf.get("spark.submit.deployMode")
+            )
+            scope.set_tag("driver.port", self._conf.get("spark.driver.port"))
+            scope.set_tag("driver.host", self._conf.get("spark.driver.host"))
+            scope.set_tag("spark_version", self.version)
+            scope.set_tag("app_name", self.appName)
+            scope.set_tag("application_id", self.applicationId)
 
-                scope.set_extra("start_time", self.startTime)
-                scope.set_extra("web_url", self.uiWebUrl)
-        self._sentry_is_patched = True
+            scope.set_extra("start_time", self.startTime)
+            scope.set_extra("web_url", self.uiWebUrl)
 
         return init
 
