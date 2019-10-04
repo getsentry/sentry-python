@@ -1,10 +1,9 @@
 import copy
-import functools
 import random
 import sys
 
 from datetime import datetime
-from contextlib import contextmanager
+from contextlib import ContextDecorator, contextmanager
 
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
@@ -124,7 +123,7 @@ class HubMeta(type):
         return GLOBAL_HUB
 
 
-class _PushScopeContextDecorator(object):
+class _PushScopeContextDecorator(ContextDecorator):
     def __init__(self, hub):
         # type: (Hub) -> None
         self._hub = hub
@@ -142,16 +141,6 @@ class _PushScopeContextDecorator(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         # type: (Any, Any, Any) -> None
         self._scope_manager_instance.__exit__(exc_type, exc_val, exc_tb)
-
-    def __call__(self, f):
-        # type: (Callable[..., Any]) -> Callable[..., None]
-        @functools.wraps(f)
-        def decorated(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
-            with self:
-                return f(*args, **kwargs)
-
-        return decorated
 
 
 class _ScopeManager(object):
