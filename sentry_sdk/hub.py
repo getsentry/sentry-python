@@ -123,7 +123,7 @@ class HubMeta(type):
         return GLOBAL_HUB
 
 
-class _PushScopeContextDecorator(ContextDecorator):
+class _ScopeManager(ContextDecorator):
     def __init__(self, hub):
         # type: (Hub) -> None
         self._hub = hub
@@ -134,24 +134,9 @@ class _PushScopeContextDecorator(ContextDecorator):
         new_layer = (client, copy.copy(scope))
         self._hub._stack.append(new_layer)
 
-        self._scope_manager_instance = _ScopeManager(self._hub)
-        sm_scope = self._scope_manager_instance.__enter__()
-        return sm_scope
+        self._original_len = len(self._hub._stack)
+        self._layer = self._hub._stack[-1]
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        # type: (Any, Any, Any) -> None
-        self._scope_manager_instance.__exit__(exc_type, exc_val, exc_tb)
-
-
-class _ScopeManager(object):
-    def __init__(self, hub):
-        # type: (Hub) -> None
-        self._hub = hub
-        self._original_len = len(hub._stack)
-        self._layer = hub._stack[-1]
-
-    def __enter__(self):
-        # type: () -> Scope
         scope = self._layer[1]
         assert scope is not None
         return scope
@@ -487,14 +472,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def push_scope(  # noqa
         self, callback=None  # type: Optional[Callable[[Scope], None]]
     ):
-        # type: (...) -> Optional[ContextManager[Scope]]
+        # type: (...) -> Optional[ContextDecorator[Scope]]
         """
         Pushes a new layer on the scope stack.
 
         :param callback: If provided, this method pushes a scope, calls
             `callback`, and pops the scope again.
 
-        :returns: If no `callback` is provided, a context manager that should
+        :returns: If no `callback` is provided, a ContextDecorator that should
             be used to pop the scope again.
         """
 
@@ -503,7 +488,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
                 callback(scope)
             return None
 
-        return _PushScopeContextDecorator(self)
+        return _ScopeManager(self)
 
     scope = push_scope
 
