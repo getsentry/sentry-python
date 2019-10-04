@@ -26,6 +26,7 @@ def _capture_exception(exc_info, hub):
     exc_type, exc_value, tb = exc_info
     rv = []
 
+    # On Exception worker will call sys.exit(-1), so we can ignore SystemExit and similar errors
     for exc_type, exc_value, tb in walk_exception_chain(exc_info):
         if exc_type not in (SystemExit, EOFError, ConnectionResetError):
             rv.append(
@@ -49,10 +50,6 @@ def _capture_exception(exc_info, hub):
             scope.set_tag("stage_id", taskContext.stageId())
             scope.set_tag("stage_id", taskContext.stageId())
 
-            print('testing123')
-            print(taskContext)
-
-            # app_name and application_id set by driver Spark Integration
             if "app_name" in taskContext._localProperties:
                 scope.set_tag("app_name", taskContext._localProperties["app_name"])
                 scope.set_tag(
@@ -60,7 +57,9 @@ def _capture_exception(exc_info, hub):
                 )
 
             if "callSite.short" in taskContext._localProperties:
-                scope.set_extra("callSite", taskContext._localProperties["callSite.short"])
+                scope.set_extra(
+                    "callSite", taskContext._localProperties["callSite.short"]
+                )
 
         hub.capture_event(event, hint=hint)
 

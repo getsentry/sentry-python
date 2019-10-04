@@ -12,27 +12,25 @@ class SparkIntegration(Integration):
         patch_spark_context_init()
         patch_spark_streaming_context_init()
 
+
+def set_app_properties():
+    from pyspark import SparkContext
+
+    sparkContext = SparkContext._active_spark_context
+    if sparkContext:
+        print("setting this stuff app_name, application_id")
+        sparkContext.setLocalProperty("app_name", sparkContext.appName)
+        sparkContext.setLocalProperty("application_id", sparkContext.applicationId)
+
+
 def patch_spark_streaming_context_init():
     from pyspark.streaming import StreamingContext, StreamingListener
 
     class SentryStreamingListener(StreamingListener):
-        def onReceiverStarted(self, receiverStarted):
-            info = receiverStarted.receiverInfo()
+        def onBatchStarted(self, batchStarted):
+            # So workers in streaming batch have access to app_name and application_id
+            set_app_properties()
 
-            lol = {
-                "active": info.active(),
-                "executorId": info.executorId(),
-                "lastError": info.lastError(),
-                "lastErrorMessage": info.lastErrorMessage(),
-                "lastErrorTime": info.lastErrorTime(),
-                "location": info.location(),
-                "name": info.name(),
-                "streamId": info.streamId(),
-            }
-
-            print('testingkappa1289391273')
-            print(lol)
-    
     spark_streaming_context_init = StreamingContext.__init__
 
     def _sentry_patched_spark_streaming_context_init(self, *args, **kwargs):
@@ -40,6 +38,9 @@ def patch_spark_streaming_context_init():
 
         if Hub.current.get_integration(SparkIntegration) is None:
             return init
+
+        # Set so initial workers have access to app_name and application_id
+        set_app_properties()
 
         streamingListener = SentryStreamingListener()
         self.addStreamingListener(streamingListener)
@@ -62,8 +63,7 @@ def patch_spark_context_init():
             return init
 
         # So workers have access to app_name and id
-        self.setLocalProperty("app_name", self.appName)
-        self.setLocalProperty("application_id", self.applicationId)
+        set_app_properties()
 
         gw = self._gateway
         ensure_callback_server_started(gw)
