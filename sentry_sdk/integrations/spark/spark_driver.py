@@ -18,7 +18,6 @@ def set_app_properties():
 
     sparkContext = SparkContext._active_spark_context
     if sparkContext:
-        print("setting this stuff app_name, application_id")
         sparkContext.setLocalProperty("app_name", sparkContext.appName)
         sparkContext.setLocalProperty("application_id", sparkContext.applicationId)
 
@@ -27,7 +26,7 @@ def patch_spark_streaming_context_init():
     from pyspark.streaming import StreamingContext, StreamingListener
 
     class SentryStreamingListener(StreamingListener):
-        def onBatchStarted(self, batchStarted):
+        def onBatchSubmitted(self, batchSubmitted):
             # So workers in streaming batch have access to app_name and application_id
             set_app_properties()
 
