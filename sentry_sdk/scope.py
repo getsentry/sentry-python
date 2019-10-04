@@ -124,6 +124,12 @@ class Scope(object):
         self._level = value
 
     @_attr_setter
+    def set_level(self, value):
+        # type: (Optional[str]) -> None
+        """When set this overrides the level."""
+        self._level = value
+
+    @_attr_setter
     def fingerprint(self, value):
         # type: (Optional[List[str]]) -> None
         """When set this overrides the default fingerprint."""
@@ -140,6 +146,12 @@ class Scope(object):
 
     @_attr_setter
     def user(self, value):
+        # type: (Dict[str, Any]) -> None
+        """When set a specific user is bound to the scope."""
+        self._user = value
+
+    @_attr_setter
+    def set_user(self, value):
         # type: (Dict[str, Any]) -> None
         """When set a specific user is bound to the scope."""
         self._user = value

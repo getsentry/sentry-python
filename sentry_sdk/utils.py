@@ -1,4 +1,3 @@
-import functools
 import os
 import sys
 import linecache
@@ -7,7 +6,7 @@ import logging
 from datetime import datetime
 
 import sentry_sdk
-from sentry_sdk._compat import urlparse, text_type, implements_str, PY2, iteritems
+from sentry_sdk._compat import urlparse, text_type, implements_str, PY2
 
 from sentry_sdk._types import MYPY
 
@@ -798,42 +797,3 @@ def transaction_from_function(func):
 
 
 disable_capture_event = ContextVar("disable_capture_event")
-
-
-def push_scope_decorator(user=None, level=None, tags=None, extras=None):
-    # type: (Optional[Dict[str, str]], Optional[str], Optional[Dict[str, str]], Optional[Dict[str, str]]) -> Callable[..., Any]  # noqa
-    """
-    Wrap function in a push_scope.
-    :param user: dictionary containing id, username, email, and/or ip_address attributes.
-    :param level: scope level (e.g. 'error')
-    :param tags: dictionary of key/value pairs for scope tags
-    :param extras: dictionary of key/value pairs for scope extras
-    :return: A proxy method that wraps the decorated function in a usage of the push_scope
-    context manager.
-    """
-    if tags is not None and type(tags) is not dict:
-        raise Exception("tags must be a dictionary")
-    if extras is not None and type(extras) is not dict:
-        raise Exception("extra must be a dictionary")
-
-    def create_sentry_push_scope(f):
-        # type: (Callable[..., Any]) -> Callable[..., None]
-        @functools.wraps(f)
-        def __inner(*args, **kwargs):
-            # type: (*Any, **Any) -> None
-            with sentry_sdk.push_scope() as current_scope:
-                if user:
-                    current_scope.user = user
-                if level:
-                    current_scope.level = level
-                if tags:
-                    for key, value in iteritems(tags):
-                        current_scope.set_tag(key, value)
-                if extras:
-                    for key, value in iteritems(extras):
-                        current_scope.set_extra(key, value)
-                f(*args, **kwargs)
-
-        return __inner
-
-    return create_sentry_push_scope

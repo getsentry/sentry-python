@@ -1,4 +1,5 @@
 import copy
+import functools
 import random
 import sys
 
@@ -121,6 +122,36 @@ class HubMeta(type):
         # type: () -> Hub
         """Returns the main instance of the hub."""
         return GLOBAL_HUB
+
+
+class _PushScopeContextDecorator(object):
+    def __init__(self, hub):
+        # type: (Hub) -> None
+        self._hub = hub
+
+    def __enter__(self):
+        # type: () -> Scope
+        client, scope = self._hub._stack[-1]
+        new_layer = (client, copy.copy(scope))
+        self._hub._stack.append(new_layer)
+
+        self._scope_manager_instance = _ScopeManager(self._hub)
+        sm_scope = self._scope_manager_instance.__enter__()
+        return sm_scope
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # type: (Any, Any, Any) -> None
+        self._scope_manager_instance.__exit__(exc_type, exc_val, exc_tb)
+
+    def __call__(self, f):
+        # type: (Callable[..., Any]) -> Callable[..., None]
+        @functools.wraps(f)
+        def decorated(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+            with self:
+                return f(*args, **kwargs)
+
+        return decorated
 
 
 class _ScopeManager(object):
@@ -262,6 +293,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         # type: () -> Optional[Client]
         """Returns the current client on the hub."""
         return self._stack[-1][0]
+
+    @property
+    def current_scope(self):
+        # type: () -> Scope
+        """Returns the current scope on the hub."""
+        return self._stack[-1][1]
 
     def last_event_id(self):
         # type: () -> Optional[str]
@@ -477,11 +514,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
                 callback(scope)
             return None
 
-        client, scope = self._stack[-1]
-        new_layer = (client, copy.copy(scope))
-        self._stack.append(new_layer)
-
-        return _ScopeManager(self)
+        return _PushScopeContextDecorator(self)
 
     scope = push_scope
 
