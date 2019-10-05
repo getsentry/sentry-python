@@ -459,7 +459,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def push_scope(
         self, callback=None  # type: Optional[None]
     ):
-        # type: (...) -> ContextManager[Scope]
+        # type: (...) -> _ScopeManager
         pass
 
     @overload  # noqa
@@ -472,7 +472,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def push_scope(  # noqa
         self, callback=None  # type: Optional[Callable[[Scope], None]]
     ):
-        # type: (...) -> Optional[ContextDecorator[Scope]]
+        # type: (...) -> Optional[_ScopeManager]
         """
         Pushes a new layer on the scope stack.
 
