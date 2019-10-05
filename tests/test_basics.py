@@ -240,23 +240,6 @@ def test_client_initialized_within_scope(sentry_init, caplog):
     assert record.msg.startswith("init() called inside of pushed scope.")
 
 
-def test_scope_leaks_cleaned_up(sentry_init, caplog):
-    caplog.set_level(logging.WARNING)
-
-    sentry_init(debug=True)
-
-    old_stack = list(Hub.current._stack)
-
-    with push_scope():
-        push_scope()
-
-    assert Hub.current._stack == old_stack
-
-    record, = (x for x in caplog.records if x.levelname == "WARNING")
-
-    assert record.message.startswith("Leaked 1 scopes:")
-
-
 def test_scope_popped_too_soon(sentry_init, caplog):
     caplog.set_level(logging.ERROR)
 

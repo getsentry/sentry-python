@@ -123,7 +123,6 @@ class Scope(object):
         """When set this overrides the level."""
         self._level = value
 
-    @_attr_setter
     def set_level(self, value):
         # type: (Optional[str]) -> None
         """When set this overrides the level."""
@@ -150,7 +149,6 @@ class Scope(object):
         """When set a specific user is bound to the scope."""
         self._user = value
 
-    @_attr_setter
     def set_user(self, value):
         # type: (Dict[str, Any]) -> None
         """When set a specific user is bound to the scope."""
