@@ -1,7 +1,7 @@
 import inspect
 from contextlib import contextmanager
 
-from sentry_sdk.hub import Hub
+from sentry_sdk.hub import Hub, ScopeManager
 from sentry_sdk.scope import Scope
 
 from sentry_sdk._types import MYPY
@@ -145,7 +145,7 @@ def configure_scope(
 
 @overload  # noqa
 def push_scope():
-    # type: () -> ContextManager[Scope]
+    # type: () -> ScopeManager
     pass
 
 
@@ -161,7 +161,7 @@ def push_scope(
 def push_scope(
     callback=None  # type: Optional[Callable[[Scope], None]]
 ):
-    # type: (...) -> Optional[ContextManager[Scope]]
+    # type: (...) -> Optional[ScopeManager]
     hub = Hub.current
     if hub is not None:
         return hub.push_scope(callback)

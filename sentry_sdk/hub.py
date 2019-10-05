@@ -3,9 +3,9 @@ import random
 import sys
 
 from datetime import datetime
-from contextlib import ContextDecorator, contextmanager
+from contextlib import contextmanager
 
-from sentry_sdk._compat import with_metaclass
+from sentry_sdk._compat import with_metaclass, ContextDecorator
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
 from sentry_sdk.tracing import Span
@@ -123,7 +123,7 @@ class HubMeta(type):
         return GLOBAL_HUB
 
 
-class _ScopeManager(ContextDecorator):
+class ScopeManager(ContextDecorator):
     def __init__(self, hub):
         # type: (Hub) -> None
         self._hub = hub
@@ -459,7 +459,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def push_scope(
         self, callback=None  # type: Optional[None]
     ):
-        # type: (...) -> _ScopeManager
+        # type: (...) -> ScopeManager
         pass
 
     @overload  # noqa
@@ -472,7 +472,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def push_scope(  # noqa
         self, callback=None  # type: Optional[Callable[[Scope], None]]
     ):
-        # type: (...) -> Optional[_ScopeManager]
+        # type: (...) -> Optional[ScopeManager]
         """
         Pushes a new layer on the scope stack.
 
@@ -488,7 +488,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
                 callback(scope)
             return None
 
-        return _ScopeManager(self)
+        return ScopeManager(self)
 
     scope = push_scope
 
