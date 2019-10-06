@@ -11,6 +11,7 @@ from sentry_sdk import (
     add_breadcrumb,
     last_event_id,
     Hub,
+    set_level,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
 
@@ -172,6 +173,30 @@ def test_push_scope_callback(sentry_init, null_client, capture_events):
 
     # Assert scope gets popped correctly
     assert Hub.current._stack[-1][1] is outer_scope
+
+
+def test_push_scope_as_decorator(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    Hub.current.bind_client(None)
+
+    outer_scope = Hub.current._stack[-1][1]
+
+    @push_scope()
+    def foo():
+        set_level("warning")
+        try:
+            1 / 0
+        except Exception as e:
+            capture_exception(e)
+
+    foo()
+
+    event, = events
+    assert outer_scope._level != "warning"
+    assert event["level"] == "warning"
+    assert "exception" in event
 
 
 def test_breadcrumbs(sentry_init, capture_events):

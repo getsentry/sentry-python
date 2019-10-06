@@ -20,7 +20,6 @@ if not PY2 and sys.version_info >= (3, 2):
 else:
     from functools import wraps
 
-
     class ContextDecorator(object):
         "A base class or mixin that enables context managers to work as decorators."
 
@@ -43,6 +42,7 @@ else:
                     return func(*args, **kwds)
 
             return inner
+
 
 if PY2:
     import urlparse  # noqa
