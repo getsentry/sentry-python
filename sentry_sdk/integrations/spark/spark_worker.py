@@ -14,7 +14,6 @@ from sentry_sdk.utils import (
 
 
 def _capture_exception(exc_info, hub):
-    from pyspark.taskcontext import TaskContext
 
     client = hub.client
 
@@ -40,15 +39,21 @@ def _capture_exception(exc_info, hub):
         hint = event_hint_with_exc_info(exc_info)
         event = {"level": "error", "exception": {"values": rv}}
 
-        taskContext = TaskContext._getOrCreate()
+        tag_task_context()
 
+        hub.capture_event(event, hint=hint)
+
+def tag_task_context():
+    from pyspark.taskcontext import TaskContext
+
+    taskContext = TaskContext.get()
+
+    if taskContext:
         with configure_scope() as scope:
             scope.set_tag("stageId", taskContext.stageId())
             scope.set_tag("partitionId", taskContext.partitionId())
             scope.set_tag("attemptNumber", taskContext.attemptNumber())
             scope.set_tag("taskAttemptId", taskContext.taskAttemptId())
-            scope.set_tag("stage_id", taskContext.stageId())
-            scope.set_tag("stage_id", taskContext.stageId())
 
             if "app_name" in taskContext._localProperties:
                 scope.set_tag("app_name", taskContext._localProperties["app_name"])
@@ -60,8 +65,6 @@ def _capture_exception(exc_info, hub):
                 scope.set_extra(
                     "callSite", taskContext._localProperties["callSite.short"]
                 )
-
-        hub.capture_event(event, hint=hint)
 
 
 def sentry_worker_main(*args, **kwargs):
