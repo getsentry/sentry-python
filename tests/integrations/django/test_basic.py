@@ -433,58 +433,28 @@ def test_template_exception(sentry_init, client, capture_events):
     "route", ["rest_framework_exc", "rest_framework_read_body_and_exc"]
 )
 @pytest.mark.parametrize(
-    "type,event_request",
+    "ct,body",
     [
-        [
-            "json",
-            lambda route: {
-                "cookies": {},
-                "data": {"foo": "bar"},
-                "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
-                "headers": {
-                    "Content-Length": "14",
-                    "Content-Type": "application/json",
-                    "Host": "localhost",
-                },
-                "method": "POST",
-                "query_string": "",
-                "url": "http://localhost/{}".format(route.replace("_", "-")),
-            },
-        ],
-        [
-            "formdata",
-            lambda route: {
-                "cookies": {},
-                "data": {"foo": "bar"},
-                "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
-                "headers": {
-                    "Content-Length": "7",
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Host": "localhost",
-                },
-                "method": "POST",
-                "query_string": "",
-                "url": "http://localhost/{}".format(route.replace("_", "-")),
-            },
-        ],
+        ["application/json", {"foo": "bar"}],
+        ["application/json", 1],
+        ["application/json", "foo"],
+        ["application/x-www-form-urlencoded", {"foo": "bar"}],
     ],
 )
 def test_rest_framework_basic(
-    sentry_init, client, capture_events, capture_exceptions, type, event_request, route
+    sentry_init, client, capture_events, capture_exceptions, ct, body, route
 ):
     pytest.importorskip("rest_framework")
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     exceptions = capture_exceptions()
     events = capture_events()
 
-    if type == "json":
+    if ct == "application/json":
         client.post(
-            reverse(route),
-            data=json.dumps({"foo": "bar"}),
-            content_type="application/json",
+            reverse(route), data=json.dumps(body), content_type="application/json"
         )
-    elif type == "formdata":
-        client.post(reverse(route), data={"foo": "bar"})
+    elif ct == "application/x-www-form-urlencoded":
+        client.post(reverse(route), data=body)
     else:
         assert False
 
@@ -494,7 +464,8 @@ def test_rest_framework_basic(
     event, = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "django"
 
-    assert event["request"] == event_request(route)
+    assert event["request"]["data"] == body
+    assert event["request"]["headers"]["Content-Type"] == ct
 
 
 @pytest.mark.parametrize(
