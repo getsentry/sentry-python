@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import pytest
 import json
 
@@ -81,6 +83,7 @@ def test_transaction_with_class_view(sentry_init, client, capture_events):
     assert event["message"] == "hi"
 
 
+@pytest.mark.forked
 @pytest.mark.django_db
 def test_user_captured(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
@@ -102,6 +105,7 @@ def test_user_captured(sentry_init, client, capture_events):
     }
 
 
+@pytest.mark.forked
 @pytest.mark.django_db
 def test_queryset_repr(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
@@ -156,6 +160,7 @@ def test_500(sentry_init, client, capture_events):
     assert content == "Sentry error: %s" % event_id
 
 
+@pytest.mark.forked
 def test_management_command_raises():
     # This just checks for our assumption that Django passes through all
     # exceptions by default, so our excepthook can be used for management
@@ -164,6 +169,7 @@ def test_management_command_raises():
         execute_from_command_line(["manage.py", "mycrash"])
 
 
+@pytest.mark.forked
 @pytest.mark.django_db
 @pytest.mark.parametrize("with_integration", [True, False])
 def test_sql_queries(sentry_init, capture_events, with_integration):
@@ -175,9 +181,16 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
 
     from django.db import connection
 
-    sql = connection.cursor()
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        _experiments={"record_sql_params": True},
+    )
 
     events = capture_events()
+
+    sql = connection.cursor()
+
     with pytest.raises(OperationalError):
         # table doesn't even exist
         sql.execute("""SELECT count(*) FROM people_person WHERE foo = %s""", [123])
@@ -193,6 +206,7 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
         assert crumb["data"]["db.params"] == [123]
 
 
+@pytest.mark.forked
 @pytest.mark.django_db
 def test_sql_dict_query_params(sentry_init, capture_events):
     sentry_init(
@@ -234,6 +248,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
         lambda sql: sql.SQL('SELECT %(my_param)s FROM "foobar"'),
     ],
 )
+@pytest.mark.forked
 @pytest.mark.django_db
 def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     sentry_init(
@@ -262,6 +277,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     assert crumb["data"]["db.params"] == {"my_param": 10}
 
 
+@pytest.mark.forked
 @pytest.mark.django_db
 def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     sentry_init(

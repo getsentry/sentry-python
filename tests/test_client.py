@@ -1,4 +1,5 @@
 # coding: utf-8
+import os
 import json
 import pytest
 import subprocess
@@ -31,6 +32,9 @@ class _TestTransport(Transport):
 
 
 def test_transport_option(monkeypatch):
+    if "SENTRY_DSN" in os.environ:
+        monkeypatch.delenv("SENTRY_DSN")
+
     dsn = "https://foo@sentry.io/123"
     dsn2 = "https://bar@sentry.io/124"
     assert str(Client(dsn=dsn).dsn) == dsn

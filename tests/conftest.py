@@ -184,7 +184,7 @@ def fast_serialize(request):
 
 
 @pytest.fixture
-def sentry_init(monkeypatch_test_transport, fast_serialize):
+def sentry_init(monkeypatch_test_transport, fast_serialize, request):
     def inner(*a, **kw):
         hub = sentry_sdk.Hub.current
         client = sentry_sdk.Client(*a, **kw)
@@ -192,7 +192,14 @@ def sentry_init(monkeypatch_test_transport, fast_serialize):
         hub.bind_client(client)
         monkeypatch_test_transport(sentry_sdk.Hub.current.client)
 
-    return inner
+    if request.node.get_closest_marker("forked"):
+        # Do not run isolation if the test is already running in
+        # ultimate isolation (seems to be required for celery tests that
+        # fork)
+        yield inner
+    else:
+        with sentry_sdk.Hub(None):
+            yield inner
 
 
 class TestTransport(Transport):
@@ -258,7 +265,11 @@ class EventStreamReader(object):
 
 
 # scope=session ensures that fixture is run earlier
-@pytest.fixture(scope="session", params=[None, "eventlet", "gevent"])
+@pytest.fixture(
+    scope="session",
+    params=[None, "eventlet", "gevent"],
+    ids=("threads", "eventlet", "greenlet"),
+)
 def maybe_monkeypatched_threading(request):
     if request.param == "eventlet":
         try:

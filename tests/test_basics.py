@@ -205,26 +205,21 @@ def test_breadcrumbs(sentry_init, capture_events):
     assert len(event["breadcrumbs"]) == 0
 
 
-def test_integration_scoping():
+def test_integration_scoping(sentry_init, capture_events):
     logger = logging.getLogger("test_basics")
-    events = []
-    logging_integration = LoggingIntegration(event_level=logging.WARNING)
 
     # This client uses the logging integration
-    client_with_logging = Client(
-        transport=events.append,
-        default_integrations=False,
-        integrations=[logging_integration],
-    )
-    Hub.current.bind_client(client_with_logging)
+    logging_integration = LoggingIntegration(event_level=logging.WARNING)
+    sentry_init(default_integrations=False, integrations=[logging_integration])
+    events = capture_events()
     logger.warning("This is a warning")
+    assert len(events) == 1
 
     # This client does not
-    client_without_logging = Client(transport=events.append, default_integrations=False)
-    Hub.current.bind_client(client_without_logging)
+    sentry_init(default_integrations=False)
+    events = capture_events()
     logger.warning("This is not a warning")
-
-    assert len(events) == 1
+    assert not events
 
 
 def test_client_initialized_within_scope(sentry_init, caplog):
@@ -233,7 +228,7 @@ def test_client_initialized_within_scope(sentry_init, caplog):
     sentry_init(debug=True)
 
     with push_scope():
-        sentry_init()
+        Hub.current.bind_client(Client())
 
     record, = (x for x in caplog.records if x.levelname == "WARNING")
 

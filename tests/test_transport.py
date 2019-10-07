@@ -21,6 +21,7 @@ def make_client(request):
     return inner
 
 
+@pytest.mark.forked
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("client_flush_method", ["close", "flush"])
 def test_transport_works(
