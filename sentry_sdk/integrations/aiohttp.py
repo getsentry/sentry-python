@@ -136,6 +136,7 @@ def _make_request_processor(weak_request):
                 _filter_headers(dict(request.headers)),
                 should_repr_strings=False,
             )
+            request_info["data"] = get_aiohttp_request_data(request)
 
         return event
 
@@ -152,3 +153,10 @@ def _capture_exception(hub):
     )
     hub.capture_event(event, hint=hint)
     return exc_info
+
+
+def get_aiohttp_request_data(request):
+    # type: (Request) -> str
+    bytes_body = request._read_bytes or b""
+    encoding = request.charset or "utf-8"
+    return bytes_body.decode(encoding)
