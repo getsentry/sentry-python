@@ -30,6 +30,12 @@ def patch_spark_streaming_context_init():
             # So workers in streaming batch have access to app_name and application_id
             set_app_properties()
 
+        def onReceiverStarted(self, receiverStarted):
+            set_app_properties()
+
+        def onBatchStarted(self, batchStarted):
+            set_app_properties()
+
     spark_streaming_context_init = StreamingContext.__init__
 
     def _sentry_patched_spark_streaming_context_init(self, *args, **kwargs):

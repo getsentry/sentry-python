@@ -43,6 +43,7 @@ def _capture_exception(exc_info, hub):
 
         hub.capture_event(event, hint=hint)
 
+
 def tag_task_context():
     from pyspark.taskcontext import TaskContext
 
