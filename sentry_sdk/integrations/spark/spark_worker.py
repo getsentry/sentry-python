@@ -50,12 +50,12 @@ def _capture_exception(exc_info, hub):
         hint = event_hint_with_exc_info(exc_info)
         event = {"level": "error", "exception": {"values": rv}}
 
-        tag_task_context()
+        _tag_task_context()
 
         hub.capture_event(event, hint=hint)
 
 
-def tag_task_context():
+def _tag_task_context():
     from pyspark.taskcontext import TaskContext
 
     taskContext = TaskContext.get()

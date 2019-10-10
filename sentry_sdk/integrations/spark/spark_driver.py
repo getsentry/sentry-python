@@ -57,7 +57,6 @@ def patch_spark_context_init():
             scope.set_tag("app_name", self.appName)
             scope.set_tag("application_id", self.applicationId)
 
-            scope.set_extra("start_time", self.startTime)
             scope.set_extra("web_url", self.uiWebUrl)
 
         return init
@@ -152,9 +151,17 @@ class SentryListener(SparkListener):
         _set_app_properties()
 
     def onJobEnd(self, jobEnd):
-        message = "Job {} Ended".format(jobEnd.jobId())
+        level = ""
+        message = ""
         data = {"result": jobEnd.jobResult().toString()}
-        level = "info" if jobEnd.jobResult().toString() == "JobSucceeded" else "warning"
+
+        if jobEnd.jobResult().toString() == "JobSucceeded":
+            level = "info"
+            message = "Job {} Ended".format(jobEnd.jobId())
+        else:
+            level = "warning"
+            message = "Job {} Failed".format(jobEnd.jobId())
+
         self.hub.add_breadcrumb(level=level, message=message, data=data)
 
     def onStageSubmitted(self, stageSubmitted):
