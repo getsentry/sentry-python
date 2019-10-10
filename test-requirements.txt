@@ -1,6 +1,6 @@
 hypothesis==3.69.9
 pytest==3.7.3
-git+https://github.com/untitaker/pytest-forked@forked-marker#egg=pytest-forked
+pytest-forked==1.1.0
 tox==3.7.0
 Werkzeug==0.15.3
 pytest-localserver==0.4.1
