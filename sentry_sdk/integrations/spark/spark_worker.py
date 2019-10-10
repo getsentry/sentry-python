@@ -14,7 +14,6 @@ from sentry_sdk.utils import (
 
 
 def _capture_exception(exc_info, hub):
-
     client = hub.client
 
     client_options = client.options

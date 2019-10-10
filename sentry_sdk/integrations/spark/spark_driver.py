@@ -10,10 +10,9 @@ class SparkIntegration(Integration):
     def setup_once():
         # type: () -> None
         patch_spark_context_init()
-        patch_spark_streaming_context_init()
 
 
-def set_app_properties():
+def _set_app_properties():
     from pyspark import SparkContext
 
     sparkContext = SparkContext._active_spark_context
@@ -22,42 +21,18 @@ def set_app_properties():
         sparkContext.setLocalProperty("application_id", sparkContext.applicationId)
 
 
-def patch_spark_streaming_context_init():
-    from pyspark.streaming import StreamingContext, StreamingListener
+def _start_sentry_listener(sc):
+    from pyspark.java_gateway import ensure_callback_server_started  # type: ignore
 
-    class SentryStreamingListener(StreamingListener):
-        def onBatchSubmitted(self, batchSubmitted):
-            # So workers in streaming batch have access to app_name and application_id
-            set_app_properties()
-
-        def onReceiverStarted(self, receiverStarted):
-            set_app_properties()
-
-        def onBatchStarted(self, batchStarted):
-            set_app_properties()
-
-    spark_streaming_context_init = StreamingContext.__init__
-
-    def _sentry_patched_spark_streaming_context_init(self, *args, **kwargs):
-        init = spark_streaming_context_init(self, *args, **kwargs)
-
-        if Hub.current.get_integration(SparkIntegration) is None:
-            return init
-
-        # Set so initial workers have access to app_name and application_id
-        set_app_properties()
-
-        streamingListener = SentryStreamingListener()
-        self.addStreamingListener(streamingListener)
-        return init
-
-    StreamingContext.__init__ = _sentry_patched_spark_streaming_context_init
+    gw = sc._gateway
+    ensure_callback_server_started(gw)
+    listener = SentryListener()
+    sc._jsc.sc().addSparkListener(listener)
 
 
 def patch_spark_context_init():
     # type: () -> None
     from pyspark import SparkContext  # type: ignore
-    from pyspark.java_gateway import ensure_callback_server_started  # type: ignore
 
     spark_context_init = SparkContext._do_init
 
@@ -67,13 +42,7 @@ def patch_spark_context_init():
         if Hub.current.get_integration(SparkIntegration) is None:
             return init
 
-        # So workers have access to app_name and id
-        set_app_properties()
-
-        gw = self._gateway
-        ensure_callback_server_started(gw)
-        listener = SentryListener()
-        self._jsc.sc().addSparkListener(listener)
+        _start_sentry_listener(self)
 
         with configure_scope() as scope:
             scope.user = {"id": self.sparkUser()}
@@ -179,6 +148,7 @@ class SentryListener(SparkListener):
     def onJobStart(self, jobStart):
         message = "Job {} Started".format(jobStart.jobId())
         self.hub.add_breadcrumb(level="info", message=message)
+        _set_app_properties()
 
     def onJobEnd(self, jobEnd):
         message = "Job {} Ended".format(jobEnd.jobId())
@@ -191,6 +161,7 @@ class SentryListener(SparkListener):
         message = "Stage {} Submitted".format(stageInfo.stageId())
         data = {"attemptId": stageInfo.attemptId(), "name": stageInfo.name()}
         self.hub.add_breadcrumb(level="info", message=message, data=data)
+        _set_app_properties()
 
     def onStageCompleted(self, stageCompleted):
         from py4j.protocol import Py4JJavaError
