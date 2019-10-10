@@ -184,4 +184,3 @@ def test_sentry_listener_on_stage_completed_failure(
     assert "sample-stage-id-submit" in mockHub.kwargs["message"]
     assert mockHub.kwargs["data"]["attemptId"] == 14
     assert mockHub.kwargs["data"]["name"] == "run-job"
-

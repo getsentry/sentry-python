@@ -43,6 +43,7 @@ def patch_spark_context_init():
             return init
 
         _start_sentry_listener(self)
+        _set_app_properties()
 
         with configure_scope() as scope:
             scope.user = {"id": self.sparkUser()}

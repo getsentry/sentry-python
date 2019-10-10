@@ -4,6 +4,7 @@ import sys
 
 from sentry_sdk import configure_scope
 from sentry_sdk.hub import Hub
+from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     exc_info_from_error,
@@ -11,6 +12,17 @@ from sentry_sdk.utils import (
     walk_exception_chain,
     event_hint_with_exc_info,
 )
+
+
+class SparkWorkerIntegration(Integration):
+    identifier = "spark_worker"
+
+    @staticmethod
+    def setup_once():
+        # type: () -> None
+        import pyspark.daemon as original_daemon
+
+        original_daemon.worker_main = _sentry_worker_main
 
 
 def _capture_exception(exc_info, hub):
@@ -67,13 +79,14 @@ def tag_task_context():
                 )
 
 
-def sentry_worker_main(*args, **kwargs):
+def _sentry_worker_main(*args, **kwargs):
     import pyspark.worker as original_worker
 
     try:
         original_worker.main(*args, **kwargs)
     except SystemExit:
-        hub = Hub.current
-        exc_info = sys.exc_info()
-        with capture_internal_exceptions():
-            _capture_exception(exc_info, hub)
+        if Hub.current.get_integration(SparkWorkerIntegration) is not None:
+            hub = Hub.current
+            exc_info = sys.exc_info()
+            with capture_internal_exceptions():
+                _capture_exception(exc_info, hub)
