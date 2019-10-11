@@ -1,4 +1,5 @@
 import pytest
+import sys
 
 import pdb
 
@@ -9,6 +10,10 @@ from sentry_sdk.integrations.spark.spark_driver import (
     SentryListener,
     patch_spark_context_init,
     SparkIntegration,
+)
+
+from sentry_sdk.integrations.spark.spark_worker import (
+    SparkWorkerIntegration,
 )
 
 
@@ -230,31 +235,6 @@ def pi_job():
     return inner
 
 
-# @pytest.mark.parametrize(
-#     "tag",
-#     [
-#         "executor.id",
-#         "spark.submit.deployMode",
-#         "driver.port",
-#         "driver.host",
-#         "spark_version",
-#         "app_name",
-#         "application_id",
-#     ],
-# )
-# def test_spark_context_tagging(sentry_init, pi_job, tag):
-#     sentry_init(integrations=[SparkIntegration()])
-
-#     try:
-#         with pytest.raises(Py4JJavaError):
-#             pi_job()
-#     finally:
-#         with configure_scope() as scope:e
-#             assert tag in scope._tags
-#             assert scope._tags["executor.id"] == "driver"
-#             assert scope._tags["app_name"] == "PythonPi"
-
-
 def test_spark_context_breadcrumbs(sentry_init, pi_job):
     sentry_init(integrations=[SparkIntegration()])
 
@@ -282,3 +262,43 @@ def test_spark_context_breadcrumbs(sentry_init, pi_job):
 ################
 # WORKER TESTS #
 ################
+
+def test_spark_worker(monkeypatch, sentry_init, capture_events, capture_exceptions):
+    import pyspark.worker as original_worker
+    import pyspark.daemon as original_daemon
+
+    from pyspark.taskcontext import TaskContext
+
+    taskContext = TaskContext._getOrCreate()
+
+    def mockMain():
+        taskContext._stageId = 0
+        taskContext._attemptNumber = 1
+        taskContext._partitionId = 2
+        taskContext._taskAttemptId = 3
+
+        try:
+            raise ZeroDivisionError
+        except ZeroDivisionError:
+            sys.exit(-1)
+
+    monkeypatch.setattr(original_worker, "main", mockMain)
+
+    sentry_init(integrations=[SparkWorkerIntegration()])
+
+    events = capture_events()
+    exceptions = capture_exceptions()
+
+    original_daemon.worker_main()
+
+    # SystemExit called, but not recorded as part of event
+    assert type(exceptions.pop()) == SystemExit
+    assert len(events[0]["exception"]["values"]) == 1
+    assert events[0]["exception"]["values"][0]["type"] == "ZeroDivisionError"
+
+    assert events[0]["tags"] == {
+        "stageId": 0,
+        "attemptNumber": 1,
+        "partitionId": 2,
+        "taskAttemptId": 3,
+    }

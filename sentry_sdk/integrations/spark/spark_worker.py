@@ -73,19 +73,20 @@ def _tag_task_context():
             event["tags"].setdefault("attemptNumber", taskContext.attemptNumber())
             event["tags"].setdefault("taskAttemptId", taskContext.taskAttemptId())
 
-            if "sentry_app_name" in taskContext._localProperties:
-                event["tags"].setdefault(
-                    "app_name", taskContext._localProperties["sentry_app_name"]
-                )
-                event["tags"].setdefault(
-                    "application_id",
-                    taskContext._localProperties["sentry_application_id"],
-                )
+            if taskContext._localProperties:
+                if "sentry_app_name" in taskContext._localProperties:
+                    event["tags"].setdefault(
+                        "app_name", taskContext._localProperties["sentry_app_name"]
+                    )
+                    event["tags"].setdefault(
+                        "application_id",
+                        taskContext._localProperties["sentry_application_id"],
+                    )
 
-            if "callSite.short" in taskContext._localProperties:
-                event.setdefault("extra", {}).setdefault(
-                    "callSite", taskContext._localProperties["callSite.short"]
-                )
+                if "callSite.short" in taskContext._localProperties:
+                    event.setdefault("extra", {}).setdefault(
+                        "callSite", taskContext._localProperties["callSite.short"]
+                    )
 
             return event
 
