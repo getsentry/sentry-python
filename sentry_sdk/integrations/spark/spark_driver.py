@@ -13,15 +13,24 @@ class SparkIntegration(Integration):
 
 
 def _set_app_properties():
+    """
+    Set properties in driver that propagate to worker processes, allowing for workers to have access to those properties.
+    This allows worker integration to have access to app_name and application_id.
+    """
     from pyspark import SparkContext
 
     sparkContext = SparkContext._active_spark_context
     if sparkContext:
-        sparkContext.setLocalProperty("app_name", sparkContext.appName)
-        sparkContext.setLocalProperty("application_id", sparkContext.applicationId)
+        sparkContext.setLocalProperty("sentry_app_name", sparkContext.appName)
+        sparkContext.setLocalProperty(
+            "sentry_application_id", sparkContext.applicationId
+        )
 
 
 def _start_sentry_listener(sc):
+    """
+    Start java gateway server to add custom `SparkListener`
+    """
     from pyspark.java_gateway import ensure_callback_server_started  # type: ignore
 
     gw = sc._gateway
@@ -46,18 +55,35 @@ def patch_spark_context_init():
         _set_app_properties()
 
         with configure_scope() as scope:
-            scope.user = {"id": self.sparkUser()}
-            scope.set_tag("executor.id", self._conf.get("spark.executor.id"))
-            scope.set_tag(
-                "spark.submit.deployMode", self._conf.get("spark.submit.deployMode")
-            )
-            scope.set_tag("driver.port", self._conf.get("spark.driver.port"))
-            scope.set_tag("driver.host", self._conf.get("spark.driver.host"))
-            scope.set_tag("spark_version", self.version)
-            scope.set_tag("app_name", self.appName)
-            scope.set_tag("application_id", self.applicationId)
 
-            scope.set_extra("web_url", self.uiWebUrl)
+            @scope.add_event_processor
+            def process_event(event, hint):
+                if Hub.current.get_integration(SparkIntegration) is None:
+                    return event
+
+                event.setdefault("user", {}).setdefault("id", self.sparkUser())
+
+                event.setdefault("tags", {}).setdefault(
+                    "executor.id", self._conf.get("spark.executor.id")
+                )
+                event["tags"].setdefault(
+                    "spark.submit.deployMode", self._conf.get("spark.submit.deployMode")
+                )
+                event["tags"].setdefault(
+                    "driver.host", self._conf.get("spark.driver.host")
+                )
+                event["tags"].setdefault(
+                    "driver.port", self._conf.get("spark.driver.port")
+                )
+                event["tags"].setdefault("spark_version", self.version)
+                event["tags"].setdefault("app_name", self.appName)
+                event["tags"].setdefault("application_id", self.applicationId)
+                event["tags"].setdefault("master", self.master)
+                event["tags"].setdefault("spark.home", self.sparkHome)
+
+                event.setdefault("extra", {}).setdefault("web_url", self.uiWebUrl)
+
+                return event
 
         return init
 
