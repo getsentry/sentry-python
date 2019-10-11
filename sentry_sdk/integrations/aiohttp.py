@@ -24,6 +24,7 @@ if MYPY:
     from aiohttp.abc import AbstractMatchInfo
     from typing import Any
     from typing import Dict
+    from typing import Optional
     from typing import Tuple
     from typing import Callable
 
@@ -136,6 +137,7 @@ def _make_request_processor(weak_request):
                 _filter_headers(dict(request.headers)),
                 should_repr_strings=False,
             )
+            request_info["data"] = get_aiohttp_request_data(request)
 
         return event
 
@@ -152,3 +154,23 @@ def _capture_exception(hub):
     )
     hub.capture_event(event, hint=hint)
     return exc_info
+
+
+BODY_NOT_READ_MESSAGE = "[Can't show request body due to implementation details.]"
+
+
+def get_aiohttp_request_data(request):
+    # type: (Request) -> Optional[str]
+    bytes_body = request._read_bytes
+
+    if bytes_body is not None:
+        # we have body to show
+        encoding = request.charset or "utf-8"
+        return bytes_body.decode(encoding)
+
+    if request.can_read_body:
+        # body exists but we can't show it
+        return BODY_NOT_READ_MESSAGE
+
+    # request has no body
+    return None
