@@ -156,6 +156,9 @@ def _capture_exception(hub):
     return exc_info
 
 
+BODY_NOT_READ_MESSAGE = "[Can't show request body due to implementation details.]"
+
+
 def get_aiohttp_request_data(request):
     # type: (Request) -> Optional[str]
     bytes_body = request._read_bytes
@@ -167,7 +170,7 @@ def get_aiohttp_request_data(request):
 
     if request.can_read_body:
         # body exists but we can't show it
-        return "[Can't show request body due to implementation details.]"
+        return BODY_NOT_READ_MESSAGE
 
     # request has no body
     return None
