@@ -53,7 +53,7 @@ script:
   - coverage erase
   - ./scripts/runtox.sh '' --cov=sentry_sdk --cov-report= --cov-branch
   - coverage combine .coverage*
-  - coverage xml
+  - coverage xml -i
   - codecov --file coverage.xml
 
 notifications:
