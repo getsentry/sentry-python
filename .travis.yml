@@ -52,7 +52,9 @@ install:
 script:
   - coverage erase
   - ./scripts/runtox.sh '' --cov=sentry_sdk --cov-report= --cov-branch
-  - codecov --file .coverage*
+  - coverage combine .coverage*
+  - coverage xml
+  - codecov --file coverage.xml
 
 notifications:
   webhooks:
