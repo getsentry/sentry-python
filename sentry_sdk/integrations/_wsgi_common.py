@@ -8,6 +8,8 @@ from sentry_sdk._compat import text_type, iteritems
 from sentry_sdk._types import MYPY
 
 if MYPY:
+    import sentry_sdk
+
     from typing import Any
     from typing import Dict
     from typing import Optional
@@ -29,6 +31,19 @@ SENSITIVE_HEADERS = tuple(
 )
 
 
+def request_body_within_bounds(client, content_length):
+    # type: (Optional[sentry_sdk.Client], int) -> bool
+    if client is None:
+        return False
+
+    bodies = client.options["request_bodies"]
+    return not (
+        bodies == "never"
+        or (bodies == "small" and content_length > 10 ** 3)
+        or (bodies == "medium" and content_length > 10 ** 4)
+    )
+
+
 class RequestExtractor(object):
     def __init__(self, request):
         # type: (Any) -> None
@@ -48,12 +63,7 @@ class RequestExtractor(object):
         if _should_send_default_pii():
             request_info["cookies"] = dict(self.cookies())
 
-        bodies = client.options["request_bodies"]
-        if (
-            bodies == "never"
-            or (bodies == "small" and content_length > 10 ** 3)
-            or (bodies == "medium" and content_length > 10 ** 4)
-        ):
+        if not request_body_within_bounds(client, content_length):
             data = AnnotatedValue(
                 "",
                 {"rem": [["!config", "x", 0, content_length]], "len": content_length},

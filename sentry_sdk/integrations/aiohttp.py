@@ -5,13 +5,17 @@ from sentry_sdk._compat import reraise
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.integrations._wsgi_common import (
+    _filter_headers,
+    request_body_within_bounds,
+)
 from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     transaction_from_function,
     HAS_REAL_CONTEXTVARS,
+    AnnotatedValue,
 )
 
 import asyncio
@@ -27,6 +31,7 @@ if MYPY:
     from typing import Optional
     from typing import Tuple
     from typing import Callable
+    from typing import Union
 
     from sentry_sdk.utils import ExcInfo
     from sentry_sdk._types import EventProcessor
@@ -118,9 +123,6 @@ def _make_request_processor(weak_request):
             return event
 
         with capture_internal_exceptions():
-            # TODO: Figure out what to do with request body. Methods on request
-            # are async, but event processors are not.
-
             request_info = event.setdefault("request", {})
 
             request_info["url"] = "%s://%s%s" % (
@@ -132,12 +134,18 @@ def _make_request_processor(weak_request):
             request_info["query_string"] = request.query_string
             request_info["method"] = request.method
             request_info["env"] = {"REMOTE_ADDR": request.remote}
+
+            hub = Hub.current
             request_info["headers"] = partial_serialize(
-                Hub.current.client,
+                hub.client,
                 _filter_headers(dict(request.headers)),
                 should_repr_strings=False,
             )
-            request_info["data"] = get_aiohttp_request_data(request)
+
+            # Just attach raw data here if it is within bounds, if available.
+            # Unfortunately there's no way to get structured data from aiohttp
+            # without awaiting on some coroutine.
+            request_info["data"] = get_aiohttp_request_data(hub, request)
 
         return event
 
@@ -159,14 +167,20 @@ def _capture_exception(hub):
 BODY_NOT_READ_MESSAGE = "[Can't show request body due to implementation details.]"
 
 
-def get_aiohttp_request_data(request):
-    # type: (Request) -> Optional[str]
+def get_aiohttp_request_data(hub, request):
+    # type: (Hub, Request) -> Union[Optional[str], AnnotatedValue]
     bytes_body = request._read_bytes
 
     if bytes_body is not None:
         # we have body to show
+        if not request_body_within_bounds(hub.client, len(bytes_body)):
+
+            return AnnotatedValue(
+                "",
+                {"rem": [["!config", "x", 0, len(bytes_body)]], "len": len(bytes_body)},
+            )
         encoding = request.charset or "utf-8"
-        return bytes_body.decode(encoding)
+        return bytes_body.decode(encoding, "replace")
 
     if request.can_read_body:
         # body exists but we can't show it
