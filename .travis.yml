@@ -51,7 +51,7 @@ install:
 
 script:
   - coverage erase
-  - ./scripts/runtox.sh '' --cov=sentry_sdk --cov-report= --cov-branch
+  - ./scripts/runtox.sh '' --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
   - coverage combine .coverage*
   - coverage xml -i
   - codecov --file coverage.xml
