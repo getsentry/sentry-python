@@ -15,3 +15,15 @@ def test_copying():
     assert "bam" not in s2._tags
 
     assert s1._fingerprint is s2._fingerprint
+
+
+def test_set_extras():
+    scope = Scope()
+
+    extras = {"foo": "bar", "bar": "foo"}
+    scope.set_extras(extras)
+
+    assert "foo" in scope._extras
+    assert "bar" in scope._extras
+    assert scope._extras["foo"] == "bar"
+    assert scope._extras["bar"] == "foo"

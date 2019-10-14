@@ -205,6 +205,14 @@ class Scope(object):
         """Sets an extra key to a specific value."""
         self._extras[key] = value
 
+    def set_extras(
+        self, extras  # type: Dict[str, Any]
+    ):
+        # type: (...) -> None
+        """Adds the keys and values of a dict in the extras."""
+        for key, value in extras.items():
+            self._extras[key] = value
+
     def remove_extra(
         self, key  # type: str
     ):
