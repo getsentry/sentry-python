@@ -1,20 +1,15 @@
 import pytest
 import sys
 
-import pdb
-
 from sentry_sdk import configure_scope
 from sentry_sdk.integrations.spark.spark_driver import (
     _set_app_properties,
     _start_sentry_listener,
     SentryListener,
-    patch_spark_context_init,
     SparkIntegration,
 )
 
-from sentry_sdk.integrations.spark.spark_worker import (
-    SparkWorkerIntegration,
-)
+from sentry_sdk.integrations.spark.spark_worker import SparkWorkerIntegration
 
 
 pytest.importorskip("pyspark")
@@ -223,7 +218,7 @@ def pi_job():
 
         def add(a, b):
             n = 5 / 0
-            return a + b
+            return a + b + n
 
         count = (
             spark.sparkContext.parallelize(range(1, n + 1), partitions)
@@ -262,6 +257,7 @@ def test_spark_context_breadcrumbs(sentry_init, pi_job):
 ################
 # WORKER TESTS #
 ################
+
 
 def test_spark_worker(monkeypatch, sentry_init, capture_events, capture_exceptions):
     import pyspark.worker as original_worker

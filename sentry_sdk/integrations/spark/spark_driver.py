@@ -169,6 +169,7 @@ class SparkListener(object):
 
 class SentryListener(SparkListener):
     def __init__(self):
+        # type: () -> None
         self.hub = Hub.current
 
     def onJobStart(self, jobStart):
