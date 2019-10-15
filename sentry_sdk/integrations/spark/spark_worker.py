@@ -13,6 +13,14 @@ from sentry_sdk.utils import (
     event_hint_with_exc_info,
 )
 
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from typing import Any
+    from typing import Optional
+
+    from sentry_sdk._types import ExcInfo, Event, Hint
+
 
 class SparkWorkerIntegration(Integration):
     identifier = "spark_worker"
@@ -20,15 +28,17 @@ class SparkWorkerIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        import pyspark.daemon as original_daemon
+        import pyspark.daemon as original_daemon  # type: ignore
 
         original_daemon.worker_main = _sentry_worker_main
 
 
 def _capture_exception(exc_info, hub):
+    # type: (ExcInfo, Hub) -> None
     client = hub.client
 
-    client_options = client.options
+    client_options = client.options  # type: ignore
+
     mechanism = {"type": "spark", "handled": False}
 
     exc_info = exc_info_from_error(exc_info)
@@ -56,13 +66,15 @@ def _capture_exception(exc_info, hub):
 
 
 def _tag_task_context():
-    from pyspark.taskcontext import TaskContext
+    # type: () -> None
+    from pyspark.taskcontext import TaskContext  # type: ignore
 
     with capture_internal_exceptions():
         with configure_scope() as scope:
 
             @scope.add_event_processor
             def process_event(event, hint):
+                # type: (Event, Hint) -> Optional[Event]
                 integration = Hub.current.get_integration(SparkWorkerIntegration)
                 taskContext = TaskContext.get()
 
@@ -95,7 +107,8 @@ def _tag_task_context():
 
 
 def _sentry_worker_main(*args, **kwargs):
-    import pyspark.worker as original_worker
+    # type: (*Optional[Any], **Optional[Any]) -> None
+    import pyspark.worker as original_worker  # type: ignore
 
     try:
         original_worker.main(*args, **kwargs)
