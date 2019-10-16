@@ -28,7 +28,7 @@ class SparkWorkerIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        import pyspark.daemon as original_daemon  # type: ignore
+        import pyspark.daemon as original_daemon
 
         original_daemon.worker_main = _sentry_worker_main
 
@@ -67,7 +67,7 @@ def _capture_exception(exc_info, hub):
 
 def _tag_task_context():
     # type: () -> None
-    from pyspark.taskcontext import TaskContext  # type: ignore
+    from pyspark.taskcontext import TaskContext
 
     with configure_scope() as scope:
 
@@ -108,7 +108,7 @@ def _tag_task_context():
 
 def _sentry_worker_main(*args, **kwargs):
     # type: (*Optional[Any], **Optional[Any]) -> None
-    import pyspark.worker as original_worker  # type: ignore
+    import pyspark.worker as original_worker
 
     try:
         original_worker.main(*args, **kwargs)
