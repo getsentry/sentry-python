@@ -81,7 +81,8 @@ def patch_spark_context_init():
                         "executor.id", self._conf.get("spark.executor.id")
                     )
                     event["tags"].setdefault(
-                        "submit.deployMode", self._conf.get("spark.submit.deployMode")
+                        "spark-submit.deployMode",
+                        self._conf.get("spark.submit.deployMode"),
                     )
                     event["tags"].setdefault(
                         "driver.host", self._conf.get("spark.driver.host")
