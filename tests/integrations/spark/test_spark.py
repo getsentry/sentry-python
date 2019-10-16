@@ -1,12 +1,9 @@
 import pytest
 import sys
-
-from sentry_sdk import configure_scope
 from sentry_sdk.integrations.spark.spark_driver import (
     _set_app_properties,
     _start_sentry_listener,
     SentryListener,
-    SparkIntegration,
 )
 
 from sentry_sdk.integrations.spark.spark_worker import SparkWorkerIntegration
@@ -16,7 +13,6 @@ pytest.importorskip("pyspark")
 pytest.importorskip("py4j")
 
 from pyspark import SparkContext
-from pyspark.sql import SparkSession
 
 from py4j.protocol import Py4JJavaError
 
@@ -198,60 +194,6 @@ def test_sentry_listener_on_stage_completed_failure(
     assert mockHub.kwargs["data"]["attemptId"] == 14
     assert mockHub.kwargs["data"]["name"] == "run-job"
     assert mockHub.kwargs["data"]["reason"] == "failure-reason"
-
-
-# Based on https://github.com/apache/spark/blob/master/examples/src/main/python/pi.py
-@pytest.fixture
-def pi_job():
-    def inner():
-        from random import random
-
-        partitions = 2
-        n = 100000 * partitions
-
-        spark = SparkSession.builder.appName("PythonPi").getOrCreate()
-
-        def f(_):
-            x = random() * 2 - 1
-            y = random() * 2 - 1
-            return 1 if x ** 2 + y ** 2 <= 1 else 0
-
-        def add(a, b):
-            n = 5 / 0
-            return a + b + n
-
-        count = (
-            spark.sparkContext.parallelize(range(1, n + 1), partitions)
-            .map(f)
-            .reduce(add)
-        )
-        print("Pi is roughly %f" % (4.0 * count / n))
-
-    return inner
-
-
-def test_spark_context_breadcrumbs(sentry_init, pi_job):
-    sentry_init(integrations=[SparkIntegration()])
-
-    with pytest.raises(Py4JJavaError):
-        pi_job()
-
-    with configure_scope() as scope:
-        assert scope._breadcrumbs[1]["level"] == "info"
-        assert scope._breadcrumbs[1]["message"] == "Job 0 Started"
-
-        assert scope._breadcrumbs[2]["level"] == "info"
-        assert scope._breadcrumbs[2]["message"] == "Stage 0 Submitted"
-        assert "reduce" in scope._breadcrumbs[2]["data"]["name"]
-
-        assert scope._breadcrumbs[3]["level"] == "warning"
-        assert scope._breadcrumbs[3]["message"] == "Stage 0 Failed"
-        assert "reduce" in scope._breadcrumbs[3]["data"]["name"]
-        assert "ZeroDivisionError" in scope._breadcrumbs[3]["data"]["reason"]
-
-        assert scope._breadcrumbs[4]["level"] == "warning"
-        assert scope._breadcrumbs[4]["message"] == "Job 0 Failed"
-        assert "ZeroDivisionError" in scope._breadcrumbs[4]["data"]["result"]
 
 
 ################

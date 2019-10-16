@@ -27,7 +27,7 @@ def _set_app_properties():
     Set properties in driver that propagate to worker processes, allowing for workers to have access to those properties.
     This allows worker integration to have access to app_name and application_id.
     """
-    from pyspark import SparkContext  # type: ignore
+    from pyspark import SparkContext
 
     sparkContext = SparkContext._active_spark_context
     if sparkContext:
@@ -42,7 +42,7 @@ def _start_sentry_listener(sc):
     """
     Start java gateway server to add custom `SparkListener`
     """
-    from pyspark.java_gateway import ensure_callback_server_started  # type: ignore
+    from pyspark.java_gateway import ensure_callback_server_started
 
     gw = sc._gateway
     ensure_callback_server_started(gw)
@@ -81,8 +81,7 @@ def patch_spark_context_init():
                         "executor.id", self._conf.get("spark.executor.id")
                     )
                     event["tags"].setdefault(
-                        "spark.submit.deployMode",
-                        self._conf.get("spark.submit.deployMode"),
+                        "submit.deployMode", self._conf.get("spark.submit.deployMode")
                     )
                     event["tags"].setdefault(
                         "driver.host", self._conf.get("spark.driver.host")
@@ -94,7 +93,7 @@ def patch_spark_context_init():
                     event["tags"].setdefault("app_name", self.appName)
                     event["tags"].setdefault("application_id", self.applicationId)
                     event["tags"].setdefault("master", self.master)
-                    event["tags"].setdefault("spark.home", self.sparkHome)
+                    event["tags"].setdefault("spark_home", self.sparkHome)
 
                     event.setdefault("extra", {}).setdefault("web_url", self.uiWebUrl)
 
