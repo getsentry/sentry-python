@@ -166,11 +166,12 @@ def semaphore_normalize(tmpdir):
             # not dealing with the subprocess API right now
             file = tmpdir.join("event-{}".format(uuid.uuid4().hex))
             file.write(json.dumps(dict(event)))
-            output = json.loads(
-                subprocess.check_output(
-                    [SEMAPHORE, "process-event"], stdin=file.open()
-                ).decode("utf-8")
-            )
+            with file.open() as f:
+                output = json.loads(
+                    subprocess.check_output(
+                        [SEMAPHORE, "process-event"], stdin=f
+                    ).decode("utf-8")
+                )
             _no_errors_in_semaphore_response(output)
             output.pop("_meta", None)
             return output
