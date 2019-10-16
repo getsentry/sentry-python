@@ -69,12 +69,12 @@ def _tag_task_context():
     # type: () -> None
     from pyspark.taskcontext import TaskContext  # type: ignore
 
-    with capture_internal_exceptions():
-        with configure_scope() as scope:
+    with configure_scope() as scope:
 
-            @scope.add_event_processor
-            def process_event(event, hint):
-                # type: (Event, Hint) -> Optional[Event]
+        @scope.add_event_processor
+        def process_event(event, hint):
+            # type: (Event, Hint) -> Optional[Event]
+            with capture_internal_exceptions():
                 integration = Hub.current.get_integration(SparkWorkerIntegration)
                 taskContext = TaskContext.get()
 
@@ -103,7 +103,7 @@ def _tag_task_context():
                             "callSite", taskContext._localProperties["callSite.short"]
                         )
 
-                return event
+            return event
 
 
 def _sentry_worker_main(*args, **kwargs):

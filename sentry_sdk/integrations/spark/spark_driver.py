@@ -66,12 +66,12 @@ def patch_spark_context_init():
         _start_sentry_listener(self)
         _set_app_properties()
 
-        with capture_internal_exceptions():
-            with configure_scope() as scope:
+        with configure_scope() as scope:
 
-                @scope.add_event_processor
-                def process_event(event, hint):
-                    # type: (Event, Hint) -> Optional[Event]
+            @scope.add_event_processor
+            def process_event(event, hint):
+                # type: (Event, Hint) -> Optional[Event]
+                with capture_internal_exceptions():
                     if Hub.current.get_integration(SparkIntegration) is None:
                         return event
 
@@ -98,7 +98,7 @@ def patch_spark_context_init():
 
                     event.setdefault("extra", {}).setdefault("web_url", self.uiWebUrl)
 
-                    return event
+                return event
 
         return init
 
