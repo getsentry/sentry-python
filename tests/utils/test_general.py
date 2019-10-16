@@ -4,8 +4,6 @@ import os
 
 import pytest
 
-from hypothesis import given
-import hypothesis.strategies as st
 
 from sentry_sdk.utils import (
     BadDsn,
@@ -18,14 +16,20 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk._compat import text_type
 
-any_string = st.one_of(st.binary(), st.text())
 
+try:
+    from hypothesis import given
+    import hypothesis.strategies as st
+except ImportError:
+    pass
+else:
+    any_string = st.one_of(st.binary(), st.text())
 
-@given(x=any_string)
-def test_safe_repr_never_broken_for_strings(x):
-    r = safe_repr(x)
-    assert isinstance(r, text_type)
-    assert u"broken repr" not in r
+    @given(x=any_string)
+    def test_safe_repr_never_broken_for_strings(x):
+        r = safe_repr(x)
+        assert isinstance(r, text_type)
+        assert u"broken repr" not in r
 
 
 def test_safe_repr_regressions():
