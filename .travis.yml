@@ -23,15 +23,21 @@ matrix:
   include:
     - python: "3.7"
       dist: xenial
+
+    - python: "3.8"
+      dist: xenial
+
     - name: Linting
       python: "3.6"
       install:
         - pip install tox
       script: tox -e linters
+
     - python: "3.6"
       name: Distribution packages
       install: false
       script: make travis-upload-dist
+
     - python: "3.6"
       name: Build documentation
       install: false
