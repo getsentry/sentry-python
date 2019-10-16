@@ -6,6 +6,8 @@ python:
   - "3.4"
   - "3.5"
   - "3.6"
+  - "3.7"
+  - "3.8-dev"
 
 env:
   - SENTRY_PYTHON_TEST_POSTGRES_USER=postgres SENTRY_PYTHON_TEST_POSTGRES_NAME=travis_ci_test
