@@ -104,16 +104,25 @@ class Dsn(object):
             self.__dict__ = dict(value.__dict__)
             return
         parts = urlparse.urlsplit(text_type(value))
+
         if parts.scheme not in (u"http", u"https"):
             raise BadDsn("Unsupported scheme %r" % parts.scheme)
         self.scheme = parts.scheme
+
+        if parts.hostname is None:
+            raise BadDsn("Missing hostname")
+
         self.host = parts.hostname
-        self.port = parts.port
-        if self.port is None:
+
+        if parts.port is None:
             self.port = self.scheme == "https" and 443 or 80
-        self.public_key = parts.username
-        if not self.public_key:
+        else:
+            self.port = parts.port
+
+        if not parts.username:
             raise BadDsn("Missing public key")
+
+        self.public_key = parts.username
         self.secret_key = parts.password
 
         path = parts.path.rsplit("/", 1)

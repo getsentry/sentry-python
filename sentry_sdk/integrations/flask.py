@@ -134,11 +134,11 @@ class FlaskRequestExtractor(RequestExtractor):
         return self.request.get_data()
 
     def form(self):
-        # type: () -> ImmutableMultiDict
+        # type: () -> ImmutableMultiDict[str, Any]
         return self.request.form
 
     def files(self):
-        # type: () -> ImmutableMultiDict
+        # type: () -> ImmutableMultiDict[str, Any]
         return self.request.files
 
     def is_json(self):
