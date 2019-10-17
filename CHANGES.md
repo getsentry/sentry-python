@@ -27,6 +27,13 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.13.0
+
+* Remove an old deprecation warning (behavior itself already changed since a long time).
+* The AIOHTTP integration now attaches the request body to crash reports. Thanks to Vitali Rebkavets!
+* Add an experimental PySpark integration.
+* First release to be tested under Python 3.8. No code changes were necessary though, so previous releases also might have worked.
+
 ## 0.12.3
 
 * Various performance improvements to event sending.
