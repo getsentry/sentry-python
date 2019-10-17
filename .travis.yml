@@ -14,6 +14,9 @@ branches:
 
 matrix:
   include:
+    - python: "3.8"
+      dist: xenial
+
     - python: "3.6"
       name: Distribution packages
       install: false
@@ -23,6 +26,25 @@ matrix:
       name: Build documentation
       install: false
       script: make travis-upload-docs
+
+before_script:
+  - psql -c 'create database travis_ci_test;' -U postgres
+  - psql -c 'create database test_travis_ci_test;' -U postgres
+
+services:
+  - postgresql
+
+install:
+  - pip install tox
+  - pip install codecov
+  - bash scripts/download-semaphore.sh
+
+script:
+  - coverage erase
+  - ./scripts/runtox.sh '' --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+  - coverage combine .coverage*
+  - coverage xml -i
+  - codecov --file coverage.xml
 
 notifications:
   webhooks:
