@@ -34,6 +34,8 @@ jobs:
           python.version: "3.6"
         Python37:
           python.version: "3.7"
+        Python38:
+          python.version: "3.8"
         PyPy2:
           python.version: "pypy2"
 
@@ -67,7 +69,9 @@ jobs:
           set -eux
           coverage erase
           ./scripts/runtox.sh '' --cov=sentry_sdk --cov-report= --cov-branch
-          codecov --file .coverage*
+          coverage combine .coverage*
+          coverage xml -i
+          codecov --file coverage.xml
         env:
           SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
           SENTRY_PYTHON_TEST_POSTGRES_NAME: travis_ci_test
