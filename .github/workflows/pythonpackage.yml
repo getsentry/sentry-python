@@ -1,8 +1,10 @@
 name: Python tests
 
 on:
-  - push
-  - pull_request
+  push:
+    branches: [master]
+  pull_request:
+    types: [assigned, opened, synchronize, reopened]
 
 jobs:
   linters:
