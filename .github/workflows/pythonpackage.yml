@@ -2,7 +2,7 @@ name: Python tests
 
 on:
   - push
-  - pr
+  - pull_request
 
 jobs:
   linters:
