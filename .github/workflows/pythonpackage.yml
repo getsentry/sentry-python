@@ -33,7 +33,7 @@ jobs:
       matrix:
         python:
           - "2.7"
-          - "pypy"
+          - "pypy2"
           - "3.4"
           - "3.5"
           - "3.6"
