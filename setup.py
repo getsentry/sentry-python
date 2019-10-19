@@ -23,7 +23,7 @@ setup(
     package_data={"sentry_sdk": ["py.typed"]},
     zip_safe=False,
     license="BSD",
-    install_requires=["urllib3>=1.9", "certifi"],
+    install_requires=["urllib3>=1.10.0", "certifi"],
     extras_require={
         "flask": ["flask>=0.8", "blinker>=1.1"],
         "bottle": ["bottle>=0.12.13"],
