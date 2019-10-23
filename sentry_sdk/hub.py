@@ -470,8 +470,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         # type: (...) -> Optional[ContextManager[Scope]]
         """
         Pushes a new layer on the scope stack.
+
         :param callback: If provided, this method pushes a scope, calls
             `callback`, and pops the scope again.
+
         :returns: If no `callback` is provided, a context manager that should
             be used to pop the scope again.
         """
