@@ -182,7 +182,7 @@ def set_tag(key, value):
     # type: (str, Any) -> None
     hub = Hub.current
     if hub is not None:
-        hub.current_scope.set_tag(key, value)
+        hub.scope.set_tag(key, value)
 
 
 @scopemethod  # noqa
@@ -190,7 +190,7 @@ def set_extra(key, value):
     # type: (str, Any) -> None
     hub = Hub.current
     if hub is not None:
-        hub.current_scope.set_extra(key, value)
+        hub.scope.set_extra(key, value)
 
 
 @scopemethod  # noqa
@@ -198,7 +198,7 @@ def set_user(value):
     # type: (Dict[str, Any]) -> None
     hub = Hub.current
     if hub is not None:
-        hub.current_scope.set_user(value)
+        hub.scope.set_user(value)
 
 
 @scopemethod  # noqa
@@ -206,7 +206,7 @@ def set_level(value):
     # type: (str) -> None
     hub = Hub.current
     if hub is not None:
-        hub.current_scope.set_level(value)
+        hub.scope.set_level(value)
 
 
 @hubmethod
