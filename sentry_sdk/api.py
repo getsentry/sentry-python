@@ -38,6 +38,7 @@ __all__ = [
     "last_event_id",
     "start_span",
     "set_tag",
+    "set_context",
     "set_extra",
     "set_user",
     "set_level",
@@ -183,6 +184,14 @@ def set_tag(key, value):
     hub = Hub.current
     if hub is not None:
         hub.scope.set_tag(key, value)
+
+
+@scopemethod  # noqa
+def set_context(key, value):
+    # type: (str, Any) -> None
+    hub = Hub.current
+    if hub is not None:
+        hub.scope.set_context(key, value)
 
 
 @scopemethod  # noqa
