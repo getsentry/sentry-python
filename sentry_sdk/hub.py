@@ -5,7 +5,7 @@ import sys
 from datetime import datetime
 from contextlib import contextmanager
 
-from sentry_sdk._compat import with_metaclass, ContextDecorator
+from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
 from sentry_sdk.tracing import Span
@@ -123,20 +123,15 @@ class HubMeta(type):
         return GLOBAL_HUB
 
 
-class ScopeManager(ContextDecorator):
+class _ScopeManager(object):
     def __init__(self, hub):
         # type: (Hub) -> None
         self._hub = hub
+        self._original_len = len(hub._stack)
+        self._layer = hub._stack[-1]
 
     def __enter__(self):
         # type: () -> Scope
-        client, scope = self._hub._stack[-1]
-        new_layer = (client, copy.copy(scope))
-        self._hub._stack.append(new_layer)
-
-        self._original_len = len(self._hub._stack)
-        self._layer = self._hub._stack[-1]
-
         scope = self._layer[1]
         assert scope is not None
         return scope
@@ -269,7 +264,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return self._stack[-1][0]
 
     @property
-    def current_scope(self):
+    def scope(self):
         # type: () -> Scope
         """Returns the current scope on the hub."""
         return self._stack[-1][1]
@@ -459,7 +454,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def push_scope(
         self, callback=None  # type: Optional[None]
     ):
-        # type: (...) -> ScopeManager
+        # type: (...) -> ContextManager[Scope]
         pass
 
     @overload  # noqa
@@ -472,14 +467,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def push_scope(  # noqa
         self, callback=None  # type: Optional[Callable[[Scope], None]]
     ):
-        # type: (...) -> Optional[ScopeManager]
+        # type: (...) -> Optional[ContextManager[Scope]]
         """
         Pushes a new layer on the scope stack.
-
         :param callback: If provided, this method pushes a scope, calls
             `callback`, and pops the scope again.
-
-        :returns: If no `callback` is provided, a ContextDecorator that should
+        :returns: If no `callback` is provided, a context manager that should
             be used to pop the scope again.
         """
 
@@ -488,9 +481,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
                 callback(scope)
             return None
 
-        return ScopeManager(self)
+        client, scope = self._stack[-1]
+        new_layer = (client, copy.copy(scope))
+        self._stack.append(new_layer)
 
-    scope = push_scope
+        return _ScopeManager(self)
 
     def pop_scope_unsafe(self):
         # type: () -> Tuple[Optional[Client], Scope]
