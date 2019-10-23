@@ -263,6 +263,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """Returns the current client on the hub."""
         return self._stack[-1][0]
 
+    @property
+    def scope(self):
+        # type: () -> Scope
+        """Returns the current scope on the hub."""
+        return self._stack[-1][1]
+
     def last_event_id(self):
         # type: () -> Optional[str]
         """Returns the last event ID."""
@@ -482,8 +488,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self._stack.append(new_layer)
 
         return _ScopeManager(self)
-
-    scope = push_scope
 
     def pop_scope_unsafe(self):
         # type: () -> Tuple[Optional[Client], Scope]

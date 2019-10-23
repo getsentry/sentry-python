@@ -120,7 +120,12 @@ class Scope(object):
     @_attr_setter
     def level(self, value):
         # type: (Optional[str]) -> None
-        """When set this overrides the level."""
+        """When set this overrides the level. Deprecated in favor of set_level."""
+        self._level = value
+
+    def set_level(self, value):
+        # type: (Optional[str]) -> None
+        """Sets the level for the scope."""
         self._level = value
 
     @_attr_setter
@@ -141,7 +146,12 @@ class Scope(object):
     @_attr_setter
     def user(self, value):
         # type: (Dict[str, Any]) -> None
-        """When set a specific user is bound to the scope."""
+        """When set a specific user is bound to the scope. Deprecated in favor of set_user."""
+        self._user = value
+
+    def set_user(self, value):
+        # type: (Dict[str, Any]) -> None
+        """Sets a user for the scope."""
         self._user = value
 
     @property
