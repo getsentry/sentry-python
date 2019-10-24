@@ -7,7 +7,11 @@ from functools import wraps
 from django import VERSION as DJANGO_VERSION
 
 from sentry_sdk import Hub
-from sentry_sdk.utils import ContextVar, transaction_from_function
+from sentry_sdk.utils import (
+    ContextVar,
+    transaction_from_function,
+    capture_internal_exceptions,
+)
 
 from sentry_sdk._types import MYPY
 
@@ -64,29 +68,36 @@ def _wrap_middleware(middleware, middleware_name):
 
     def _get_wrapped_method(old_method):
         # type: (F) -> F
-        @wraps(old_method)
-        def sentry_wrapped_method(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
-            hub = Hub.current
-            integration = hub.get_integration(DjangoIntegration)
-            if integration is None or not integration.middleware_spans:
-                return old_method(*args, **kwargs)
+        with capture_internal_exceptions():
 
-            function_name = transaction_from_function(old_method)
+            def sentry_wrapped_method(*args, **kwargs):
+                # type: (*Any, **Any) -> Any
+                hub = Hub.current
+                integration = hub.get_integration(DjangoIntegration)
+                if integration is None or not integration.middleware_spans:
+                    return old_method(*args, **kwargs)
 
-            description = middleware_name
-            function_basename = getattr(old_method, "__name__", None)
-            if function_basename:
-                description = "{}.{}".format(description, function_basename)
+                function_name = transaction_from_function(old_method)
 
-            with hub.start_span(
-                op="django.middleware", description=description
-            ) as span:
-                span.set_tag("django.function_name", function_name)
-                span.set_tag("django.middleware_name", middleware_name)
-                return old_method(*args, **kwargs)
+                description = middleware_name
+                function_basename = getattr(old_method, "__name__", None)
+                if function_basename:
+                    description = "{}.{}".format(description, function_basename)
 
-        return sentry_wrapped_method  # type: ignore
+                with hub.start_span(
+                    op="django.middleware", description=description
+                ) as span:
+                    span.set_tag("django.function_name", function_name)
+                    span.set_tag("django.middleware_name", middleware_name)
+                    return old_method(*args, **kwargs)
+
+            try:
+                # fails for __call__ of function on Python 2 (see py2.7-django-1.11)
+                return wraps(old_method)(sentry_wrapped_method)  # type: ignore
+            except Exception:
+                return sentry_wrapped_method  # type: ignore
+
+        return old_method
 
     class SentryWrappingMiddleware(object):
         def __init__(self, *args, **kwargs):
