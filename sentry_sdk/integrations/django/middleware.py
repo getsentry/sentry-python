@@ -7,7 +7,11 @@ from functools import wraps
 from django import VERSION as DJANGO_VERSION
 
 from sentry_sdk import Hub
-from sentry_sdk.utils import ContextVar, transaction_from_function, capture_internal_exceptions
+from sentry_sdk.utils import (
+    ContextVar,
+    transaction_from_function,
+    capture_internal_exceptions,
+)
 
 from sentry_sdk._types import MYPY
 
@@ -65,6 +69,7 @@ def _wrap_middleware(middleware, middleware_name):
     def _get_wrapped_method(old_method):
         # type: (F) -> F
         with capture_internal_exceptions():
+
             def sentry_wrapped_method(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
                 hub = Hub.current

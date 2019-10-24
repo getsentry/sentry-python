@@ -69,6 +69,7 @@ class TestMiddleware(MiddlewareMixin):
 def TestFunctionMiddleware(get_response):
     def middleware(request):
         return get_response(request)
+
     return middleware
 
 
@@ -80,7 +81,7 @@ MIDDLEWARE_CLASSES = [
 
 if MiddlewareMixin is not object:
     MIDDLEWARE = MIDDLEWARE_CLASSES + [
-        "tests.integrations.django.myapp.settings.TestFunctionMiddleware",
+        "tests.integrations.django.myapp.settings.TestFunctionMiddleware"
     ]
 
 
