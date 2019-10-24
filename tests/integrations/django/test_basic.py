@@ -519,6 +519,7 @@ def test_middleware_spans(sentry_init, client, capture_events):
 
     if DJANGO_VERSION >= (1, 10):
         reference_value = [
+            "tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__",
             "tests.integrations.django.myapp.settings.TestMiddleware.__call__",
             "django.contrib.auth.middleware.AuthenticationMiddleware.__call__",
             "django.contrib.sessions.middleware.SessionMiddleware.__call__",

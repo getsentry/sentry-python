@@ -66,6 +66,12 @@ class TestMiddleware(MiddlewareMixin):
         return response
 
 
+def TestFunctionMiddleware(get_response):
+    def middleware(request):
+        return get_response(request)
+    return middleware
+
+
 MIDDLEWARE_CLASSES = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -73,7 +79,9 @@ MIDDLEWARE_CLASSES = [
 ]
 
 if MiddlewareMixin is not object:
-    MIDDLEWARE = MIDDLEWARE_CLASSES
+    MIDDLEWARE = MIDDLEWARE_CLASSES + [
+        "tests.integrations.django.myapp.settings.TestFunctionMiddleware",
+    ]
 
 
 ROOT_URLCONF = "tests.integrations.django.myapp.urls"
