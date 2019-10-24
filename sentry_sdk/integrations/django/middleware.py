@@ -93,7 +93,7 @@ def _wrap_middleware(middleware, middleware_name):
 
             try:
                 # fails for __call__ of function on Python 2 (see py2.7-django-1.11)
-                return wraps(old_method)(sentry_wrapped_method)
+                return wraps(old_method)(sentry_wrapped_method)  # type: ignore
             except Exception:
                 return sentry_wrapped_method  # type: ignore
 
