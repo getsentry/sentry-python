@@ -127,7 +127,7 @@ def test_transaction_style(
 
 
 def test_large_json_request(
-    sentry_init, capture_events, route, get_client, fast_serialize
+    sentry_init, capture_events, route, get_client
 ):
     sentry_init(integrations=[PyramidIntegration()])
 
@@ -147,10 +147,9 @@ def test_large_json_request(
     client.post("/", content_type="application/json", data=json.dumps(data))
 
     event, = events
-    if not fast_serialize:
-        assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-            "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
-        }
+    assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
+        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+    }
     assert len(event["request"]["data"]["foo"]["bar"]) == 512
 
 
@@ -176,7 +175,7 @@ def test_flask_empty_json_request(sentry_init, capture_events, route, get_client
     assert event["request"]["data"] == data
 
 
-def test_files_and_form(sentry_init, capture_events, route, get_client, fast_serialize):
+def test_files_and_form(sentry_init, capture_events, route, get_client):
     sentry_init(integrations=[PyramidIntegration()], request_bodies="always")
 
     data = {"foo": "a" * 2000, "file": (BytesIO(b"hello"), "hello.txt")}
@@ -192,16 +191,14 @@ def test_files_and_form(sentry_init, capture_events, route, get_client, fast_ser
     client.post("/", data=data)
 
     event, = events
-    if not fast_serialize:
-        assert event["_meta"]["request"]["data"]["foo"] == {
-            "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
-        }
+    assert event["_meta"]["request"]["data"]["foo"] == {
+        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+    }
     assert len(event["request"]["data"]["foo"]) == 512
 
-    if not fast_serialize:
-        assert event["_meta"]["request"]["data"]["file"] == {
-            "": {"len": 0, "rem": [["!raw", "x", 0, 0]]}
-        }
+    assert event["_meta"]["request"]["data"]["file"] == {
+        "": {"len": 0, "rem": [["!raw", "x", 0, 0]]}
+    }
     assert not event["request"]["data"]["file"]
 
 

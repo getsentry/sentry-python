@@ -17,8 +17,6 @@ from sentry_sdk._types import MYPY
 if MYPY:
     from types import TracebackType
 
-    import sentry_sdk
-
     from typing import Any
     from typing import Dict
     from typing import List
@@ -330,24 +328,3 @@ def serialize(event, **kwargs):
         return rv
     finally:
         disable_capture_event.set(False)
-
-
-def partial_serialize(client, data, should_repr_strings=True, is_databag=True):
-    # type: (Optional[sentry_sdk.Client], Any, bool, bool) -> Any
-    is_recursive = disable_capture_event.get(None)
-    if is_recursive:
-        return CYCLE_MARKER
-
-    if client is not None and client.options["_experiments"].get(
-        "fast_serialize", False
-    ):
-        data = serialize(
-            data, should_repr_strings=should_repr_strings, is_databag=is_databag
-        )
-
-        if isinstance(data, dict):
-            # TODO: Bring back _meta annotations
-            data.pop("_meta", None)
-        return data
-
-    return data

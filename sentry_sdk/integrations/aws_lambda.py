@@ -2,7 +2,6 @@ import sys
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk._compat import reraise
-from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -199,9 +198,7 @@ def _make_request_event_processor(aws_event, aws_context):
             if ip is not None:
                 user_info["ip_address"] = ip
 
-        event["request"] = partial_serialize(
-            Hub.current.client, request, should_repr_strings=False
-        )
+        event["request"] = request
 
         return event
 

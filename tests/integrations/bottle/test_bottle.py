@@ -118,7 +118,7 @@ def test_errors(
 
 
 def test_large_json_request(
-    sentry_init, capture_events, app, get_client, fast_serialize
+    sentry_init, capture_events, app, get_client
 ):
     sentry_init(integrations=[bottle_sentry.BottleIntegration()])
 
@@ -142,10 +142,9 @@ def test_large_json_request(
     assert response[1] == "200 OK"
 
     event, = events
-    if not fast_serialize:
-        assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-            "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
-        }
+    assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
+        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+    }
     assert len(event["request"]["data"]["foo"]["bar"]) == 512
 
 
@@ -174,7 +173,7 @@ def test_empty_json_request(sentry_init, capture_events, app, data, get_client):
 
 
 def test_medium_formdata_request(
-    sentry_init, capture_events, app, get_client, fast_serialize
+    sentry_init, capture_events, app, get_client
 ):
     sentry_init(integrations=[bottle_sentry.BottleIntegration()])
 
@@ -195,16 +194,15 @@ def test_medium_formdata_request(
     assert response[1] == "200 OK"
 
     event, = events
-    if not fast_serialize:
-        assert event["_meta"]["request"]["data"]["foo"] == {
-            "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
-        }
+    assert event["_meta"]["request"]["data"]["foo"] == {
+        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+    }
     assert len(event["request"]["data"]["foo"]) == 512
 
 
 @pytest.mark.parametrize("input_char", [u"a", b"a"])
 def test_too_large_raw_request(
-    sentry_init, input_char, capture_events, app, get_client, fast_serialize
+    sentry_init, input_char, capture_events, app, get_client,
 ):
     sentry_init(
         integrations=[bottle_sentry.BottleIntegration()], request_bodies="small"
@@ -231,14 +229,13 @@ def test_too_large_raw_request(
     assert response[1] == "200 OK"
 
     event, = events
-    if not fast_serialize:
-        assert event["_meta"]["request"]["data"] == {
-            "": {"len": 2000, "rem": [["!config", "x", 0, 2000]]}
-        }
+    assert event["_meta"]["request"]["data"] == {
+        "": {"len": 2000, "rem": [["!config", "x", 0, 2000]]}
+    }
     assert not event["request"]["data"]
 
 
-def test_files_and_form(sentry_init, capture_events, app, get_client, fast_serialize):
+def test_files_and_form(sentry_init, capture_events, app, get_client):
     sentry_init(
         integrations=[bottle_sentry.BottleIntegration()], request_bodies="always"
     )
@@ -262,19 +259,17 @@ def test_files_and_form(sentry_init, capture_events, app, get_client, fast_seria
     assert response[1] == "200 OK"
 
     event, = events
-    if not fast_serialize:
-        assert event["_meta"]["request"]["data"]["foo"] == {
-            "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
-        }
+    assert event["_meta"]["request"]["data"]["foo"] == {
+        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+    }
     assert len(event["request"]["data"]["foo"]) == 512
 
-    if not fast_serialize:
-        assert event["_meta"]["request"]["data"]["file"] == {
-            "": {
-                "len": -1,
-                "rem": [["!raw", "x", 0, -1]],
-            }  # bottle default content-length is -1
-        }
+    assert event["_meta"]["request"]["data"]["file"] == {
+        "": {
+            "len": -1,
+            "rem": [["!raw", "x", 0, -1]],
+        }  # bottle default content-length is -1
+    }
     assert not event["request"]["data"]["file"]
 
 

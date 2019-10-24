@@ -13,7 +13,7 @@ from sentry_sdk.utils import (
     disable_capture_event,
     logger,
 )
-from sentry_sdk.serializer import serialize, partial_serialize
+from sentry_sdk.serializer import serialize
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO, ClientConstructor
 from sentry_sdk.integrations import setup_integrations
@@ -124,12 +124,8 @@ class _Client(object):
     ):
         # type: (...) -> Optional[Event]
 
-        client = self  # type: Client  # type: ignore
-
         if event.get("timestamp") is None:
-            event["timestamp"] = partial_serialize(
-                client, datetime.utcnow(), is_databag=False, should_repr_strings=False
-            )
+            event["timestamp"] = datetime.utcnow()
 
         hint = dict(hint or ())  # type: Hint
 
@@ -175,9 +171,7 @@ class _Client(object):
 
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
-        if event is not None and not self.options["_experiments"].get(
-            "fast_serialize", False
-        ):
+        if event is not None:
             event = serialize(event)
 
         before_send = self.options["before_send"]

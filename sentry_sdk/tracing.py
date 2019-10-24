@@ -6,7 +6,6 @@ from datetime import datetime
 
 import sentry_sdk
 
-from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.utils import capture_internal_exceptions, logger, to_string
 from sentry_sdk._compat import PY2
 from sentry_sdk._types import MYPY
@@ -254,15 +253,11 @@ class Span(object):
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
-        self._tags[key] = partial_serialize(
-            sentry_sdk.Hub.current.client, value, should_repr_strings=False
-        )
+        self._tags[key] = value
 
     def set_data(self, key, value):
         # type: (str, Any) -> None
-        self._data[key] = partial_serialize(
-            sentry_sdk.Hub.current.client, value, should_repr_strings=False
-        )
+        self._data[key] = value
 
     def set_failure(self):
         # type: () -> None
@@ -320,15 +315,8 @@ class Span(object):
                 "type": "transaction",
                 "transaction": self.transaction,
                 "contexts": {"trace": self.get_trace_context()},
-                "timestamp": partial_serialize(
-                    client, self.timestamp, is_databag=False, should_repr_strings=False
-                ),
-                "start_timestamp": partial_serialize(
-                    client,
-                    self.start_timestamp,
-                    is_databag=False,
-                    should_repr_strings=False,
-                ),
+                "timestamp": self.timestamp,
+                "start_timestamp": self.start_timestamp,
                 "spans": [
                     s.to_json(client)
                     for s in self._span_recorder.finished_spans
@@ -346,15 +334,8 @@ class Span(object):
             "same_process_as_parent": self.same_process_as_parent,
             "op": self.op,
             "description": self.description,
-            "start_timestamp": partial_serialize(
-                client,
-                self.start_timestamp,
-                is_databag=False,
-                should_repr_strings=False,
-            ),
-            "timestamp": partial_serialize(
-                client, self.timestamp, is_databag=False, should_repr_strings=False
-            ),
+            "start_timestamp": self.start_timestamp,
+            "timestamp": self.timestamp,
         }  # type: Dict[str, Any]
 
         transaction = self.transaction

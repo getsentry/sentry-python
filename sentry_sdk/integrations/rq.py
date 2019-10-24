@@ -5,7 +5,6 @@ import weakref
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.tracing import Span
-from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
 from rq.timeouts import JobTimeoutException
@@ -102,17 +101,13 @@ def _make_event_processor(weak_job):
         if job is not None:
             with capture_internal_exceptions():
                 extra = event.setdefault("extra", {})
-                extra["rq-job"] = partial_serialize(
-                    Hub.current.client,
-                    {
-                        "job_id": job.id,
-                        "func": job.func_name,
-                        "args": job.args,
-                        "kwargs": job.kwargs,
-                        "description": job.description,
-                    },
-                    should_repr_strings=False,
-                )
+                extra["rq-job"] = {
+                    "job_id": job.id,
+                    "func": job.func_name,
+                    "args": job.args,
+                    "kwargs": job.kwargs,
+                    "description": job.description,
+                }
 
         if "exc_info" in hint:
             with capture_internal_exceptions():
