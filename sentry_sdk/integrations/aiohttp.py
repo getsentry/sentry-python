@@ -9,7 +9,6 @@ from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
 )
-from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -141,11 +140,7 @@ def _make_request_processor(weak_request):
             request_info["env"] = {"REMOTE_ADDR": request.remote}
 
             hub = Hub.current
-            request_info["headers"] = partial_serialize(
-                hub.client,
-                _filter_headers(dict(request.headers)),
-                should_repr_strings=False,
-            )
+            request_info["headers"] = _filter_headers(dict(request.headers))
 
             # Just attach raw data here if it is within bounds, if available.
             # Unfortunately there's no way to get structured data from aiohttp

@@ -11,7 +11,6 @@ from celery.exceptions import (  # type: ignore
 )
 
 from sentry_sdk.hub import Hub
-from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.tracing import Span
 from sentry_sdk._compat import reraise
@@ -161,15 +160,14 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
     # type: (Any, Any, Any, Any, Optional[Any]) -> EventProcessor
     def event_processor(event, hint):
         # type: (Event, Hint) -> Optional[Event]
-        client = Hub.current.client
 
         with capture_internal_exceptions():
             extra = event.setdefault("extra", {})
-            extra["celery-job"] = partial_serialize(
-                client,
-                {"task_name": task.name, "args": args, "kwargs": kwargs},
-                should_repr_strings=False,
-            )
+            extra["celery-job"] = {
+                "task_name": task.name,
+                "args": args,
+                "kwargs": kwargs,
+            }
 
         if "exc_info" in hint:
             with capture_internal_exceptions():
@@ -177,11 +175,7 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
                     event["fingerprint"] = [
                         "celery",
                         "SoftTimeLimitExceeded",
-                        partial_serialize(
-                            client,
-                            getattr(task, "name", task),
-                            should_repr_strings=False,
-                        ),
+                        getattr(task, "name", task),
                     ]
 
         return event

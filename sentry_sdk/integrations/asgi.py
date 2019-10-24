@@ -10,7 +10,6 @@ import urllib
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk.serializer import partial_serialize
 from sentry_sdk.utils import ContextVar, event_from_exception, transaction_from_function
 from sentry_sdk.tracing import Span
 
@@ -114,9 +113,7 @@ class SentryAsgiMiddleware:
             # an endpoint, overwrite our path-based transaction name.
             event["transaction"] = self.get_transaction(asgi_scope)
 
-        event["request"] = partial_serialize(
-            Hub.current.client, request_info, should_repr_strings=False
-        )
+        event["request"] = request_info
 
         return event
 
