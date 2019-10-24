@@ -163,9 +163,11 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
 
         with capture_internal_exceptions():
             extra = event.setdefault("extra", {})
-            extra["celery-job"] = (
-                {"task_name": task.name, "args": args, "kwargs": kwargs},
-            )
+            extra["celery-job"] = {
+                "task_name": task.name,
+                "args": args,
+                "kwargs": kwargs,
+            }
 
         if "exc_info" in hint:
             with capture_internal_exceptions():

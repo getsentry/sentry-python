@@ -126,9 +126,7 @@ def test_transaction_style(
     assert event["transaction"] == expected_transaction
 
 
-def test_large_json_request(
-    sentry_init, capture_events, route, get_client
-):
+def test_large_json_request(sentry_init, capture_events, route, get_client):
     sentry_init(integrations=[PyramidIntegration()])
 
     data = {"foo": {"bar": "a" * 2000}}

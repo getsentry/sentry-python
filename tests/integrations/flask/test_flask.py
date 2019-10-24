@@ -237,9 +237,7 @@ def test_flask_empty_json_request(sentry_init, capture_events, app, data):
     assert event["request"]["data"] == data
 
 
-def test_flask_medium_formdata_request(
-    sentry_init, capture_events, app
-):
+def test_flask_medium_formdata_request(sentry_init, capture_events, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     data = {"foo": "a" * 2000}
@@ -266,9 +264,7 @@ def test_flask_medium_formdata_request(
 
 
 @pytest.mark.parametrize("input_char", [u"a", b"a"])
-def test_flask_too_large_raw_request(
-    sentry_init, input_char, capture_events, app
-):
+def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="small")
 
     data = input_char * 2000

@@ -117,9 +117,7 @@ def test_errors(
     assert event["exception"]["values"][0]["mechanism"]["handled"] is False
 
 
-def test_large_json_request(
-    sentry_init, capture_events, app, get_client
-):
+def test_large_json_request(sentry_init, capture_events, app, get_client):
     sentry_init(integrations=[bottle_sentry.BottleIntegration()])
 
     data = {"foo": {"bar": "a" * 2000}}
@@ -172,9 +170,7 @@ def test_empty_json_request(sentry_init, capture_events, app, data, get_client):
     assert event["request"]["data"] == data
 
 
-def test_medium_formdata_request(
-    sentry_init, capture_events, app, get_client
-):
+def test_medium_formdata_request(sentry_init, capture_events, app, get_client):
     sentry_init(integrations=[bottle_sentry.BottleIntegration()])
 
     data = {"foo": "a" * 2000}
@@ -202,7 +198,7 @@ def test_medium_formdata_request(
 
 @pytest.mark.parametrize("input_char", [u"a", b"a"])
 def test_too_large_raw_request(
-    sentry_init, input_char, capture_events, app, get_client,
+    sentry_init, input_char, capture_events, app, get_client
 ):
     sentry_init(
         integrations=[bottle_sentry.BottleIntegration()], request_bodies="small"

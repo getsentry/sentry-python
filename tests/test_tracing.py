@@ -102,9 +102,7 @@ def test_sampling_decided_only_for_transactions(sentry_init, capture_events):
     "args,expected_refcount",
     [({"traces_sample_rate": 1.0}, 100), ({"traces_sample_rate": 0.0}, 0)],
 )
-def test_memory_usage(
-    sentry_init, capture_events, args, expected_refcount
-):
+def test_memory_usage(sentry_init, capture_events, args, expected_refcount):
     sentry_init(**args)
 
     references = weakref.WeakSet()
