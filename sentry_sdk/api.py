@@ -38,8 +38,10 @@ __all__ = [
     "last_event_id",
     "start_span",
     "set_tag",
+    "set_tags",
     "set_context",
     "set_extra",
+    "set_extras",
     "set_user",
     "set_level",
 ]
@@ -187,6 +189,14 @@ def set_tag(key, value):
 
 
 @scopemethod  # noqa
+def set_tags(tags):
+    # type: (Dict[str, Any]) -> None
+    hub = Hub.current
+    if hub is not None:
+        hub.scope.set_tags(tags)
+
+
+@scopemethod  # noqa
 def set_context(key, value):
     # type: (str, Any) -> None
     hub = Hub.current
@@ -200,6 +210,14 @@ def set_extra(key, value):
     hub = Hub.current
     if hub is not None:
         hub.scope.set_extra(key, value)
+
+
+@scopemethod  # noqa
+def set_extras(extras):
+    # type: (Dict[str, Any]) -> None
+    hub = Hub.current
+    if hub is not None:
+        hub.scope.set_extras(extras)
 
 
 @scopemethod  # noqa
