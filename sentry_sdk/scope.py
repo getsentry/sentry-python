@@ -173,6 +173,13 @@ class Scope(object):
         """Sets a tag for a key to a specific value."""
         self._tags[key] = value
 
+    def set_tags(
+        self, tags  # type: Dict[str, Any]
+    ):
+        # type: (...) -> None
+        for key, value in tags.items():
+            self._tags[key] = value
+
     def remove_tag(
         self, key  # type: str
     ):

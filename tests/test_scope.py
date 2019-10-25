@@ -27,3 +27,15 @@ def test_set_extras():
     assert "bar" in scope._extras
     assert scope._extras["foo"] == "bar"
     assert scope._extras["bar"] == "foo"
+
+
+def test_set_tags():
+    scope = Scope()
+
+    tags = {"foo": "bar", "bar": "foo"}
+    scope.set_tags(tags)
+
+    assert "foo" in scope._tags
+    assert "bar" in scope._tags
+    assert scope._tags["foo"] == "bar"
+    assert scope._tags["bar"] == "foo"
