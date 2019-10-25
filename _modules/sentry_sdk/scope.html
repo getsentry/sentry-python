@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.scope &#8212; sentry-python 0.13.0 documentation</title>
+    <title>sentry_sdk.scope &#8212; sentry-python 0.13.1 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -36,12 +36,7 @@
 <span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">wraps</span>
 <span class="kn">from</span> <span class="nn">itertools</span> <span class="k">import</span> <span class="n">chain</span>
 
-<span class="kn">import</span> <span class="nn">sentry_sdk</span>
-
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="k">import</span> <span class="n">logger</span><span class="p">,</span> <span class="n">capture_internal_exceptions</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.serializer</span> <span class="k">import</span> <span class="n">partial_serialize</span>
-
-
 <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="k">import</span> <span class="n">MYPY</span>
 
 <span class="k">if</span> <span class="n">MYPY</span><span class="p">:</span>
@@ -153,8 +148,13 @@
     <span class="nd">@_attr_setter</span>
     <span class="k">def</span> <span class="nf">level</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
         <span class="c1"># type: (Optional[str]) -&gt; None</span>
-        <span class="sd">&quot;&quot;&quot;When set this overrides the level.&quot;&quot;&quot;</span>
+        <span class="sd">&quot;&quot;&quot;When set this overrides the level. Deprecated in favor of set_level.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">value</span>
+
+<div class="viewcode-block" id="Scope.set_level"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_level">[docs]</a>    <span class="k">def</span> <span class="nf">set_level</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="c1"># type: (Optional[str]) -&gt; None</span>
+        <span class="sd">&quot;&quot;&quot;Sets the level for the scope.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">value</span></div>
 
     <span class="nd">@_attr_setter</span>
     <span class="k">def</span> <span class="nf">fingerprint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
@@ -174,8 +174,13 @@
     <span class="nd">@_attr_setter</span>
     <span class="k">def</span> <span class="nf">user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
         <span class="c1"># type: (Dict[str, Any]) -&gt; None</span>
-        <span class="sd">&quot;&quot;&quot;When set a specific user is bound to the scope.&quot;&quot;&quot;</span>
+        <span class="sd">&quot;&quot;&quot;When set a specific user is bound to the scope. Deprecated in favor of set_user.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="n">value</span>
+
+<div class="viewcode-block" id="Scope.set_user"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_user">[docs]</a>    <span class="k">def</span> <span class="nf">set_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="c1"># type: (Dict[str, Any]) -&gt; None</span>
+        <span class="sd">&quot;&quot;&quot;Sets a user for the scope.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="n">value</span></div>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">span</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -199,9 +204,7 @@
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Sets a tag for a key to a specific value.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">partial_serialize</span><span class="p">(</span>
-            <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">client</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">should_repr_strings</span><span class="o">=</span><span class="kc">False</span>
-        <span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span></div>
 
 <div class="viewcode-block" id="Scope.remove_tag"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_tag">[docs]</a>    <span class="k">def</span> <span class="nf">remove_tag</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">key</span>  <span class="c1"># type: str</span>
@@ -217,9 +220,7 @@
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Binds a context at a certain key to a specific value.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">partial_serialize</span><span class="p">(</span>
-            <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">client</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">should_repr_strings</span><span class="o">=</span><span class="kc">False</span>
-        <span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span></div>
 
 <div class="viewcode-block" id="Scope.remove_context"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_context">[docs]</a>    <span class="k">def</span> <span class="nf">remove_context</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">key</span>  <span class="c1"># type: str</span>
@@ -235,9 +236,7 @@
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Sets an extra key to a specific value.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">partial_serialize</span><span class="p">(</span>
-            <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">client</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">should_repr_strings</span><span class="o">=</span><span class="kc">False</span>
-        <span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span></div>
 
 <div class="viewcode-block" id="Scope.remove_extra"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_extra">[docs]</a>    <span class="k">def</span> <span class="nf">remove_extra</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">key</span>  <span class="c1"># type: str</span>

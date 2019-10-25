@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.hub &#8212; sentry-python 0.13.0 documentation</title>
+    <title>sentry_sdk.hub &#8212; sentry-python 0.13.1 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -42,7 +42,6 @@
 <span class="kn">from</span> <span class="nn">sentry_sdk.scope</span> <span class="k">import</span> <span class="n">Scope</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.client</span> <span class="k">import</span> <span class="n">Client</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.tracing</span> <span class="k">import</span> <span class="n">Span</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.serializer</span> <span class="k">import</span> <span class="n">partial_serialize</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="k">import</span> <span class="p">(</span>
     <span class="n">exc_info_from_error</span><span class="p">,</span>
     <span class="n">event_from_exception</span><span class="p">,</span>
@@ -296,6 +295,12 @@
         <span class="sd">&quot;&quot;&quot;Returns the current client on the hub.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
 
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">scope</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Scope</span>
+        <span class="sd">&quot;&quot;&quot;Returns the current scope on the hub.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+
 <div class="viewcode-block" id="Hub.last_event_id"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.last_event_id">[docs]</a>    <span class="k">def</span> <span class="nf">last_event_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; Optional[str]</span>
         <span class="sd">&quot;&quot;&quot;Returns the last event ID.&quot;&quot;&quot;</span>
@@ -307,9 +312,7 @@
         <span class="c1"># type: (...) -&gt; None</span>
         <span class="sd">&quot;&quot;&quot;Binds a new client to the hub.&quot;&quot;&quot;</span>
         <span class="n">top</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">new</span><span class="p">,</span> <span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">new</span> <span class="ow">or</span> <span class="n">new</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;_experiments&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;fast_serialize&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
-            <span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">clear_breadcrumbs</span><span class="p">()</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">new</span><span class="p">,</span> <span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span></div>
 
 <div class="viewcode-block" id="Hub.capture_event"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.capture_event">[docs]</a>    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -342,14 +345,7 @@
             <span class="k">return</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="n">level</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">level</span> <span class="o">=</span> <span class="s2">&quot;info&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span>
-            <span class="p">{</span>
-                <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">partial_serialize</span><span class="p">(</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="n">should_repr_strings</span><span class="o">=</span><span class="kc">False</span>
-                <span class="p">),</span>
-                <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="n">level</span><span class="p">,</span>
-            <span class="p">}</span>
-        <span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">capture_event</span><span class="p">({</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">message</span><span class="p">,</span> <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="n">level</span><span class="p">})</span></div>
 
 <div class="viewcode-block" id="Hub.capture_exception"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.capture_exception">[docs]</a>    <span class="k">def</span> <span class="nf">capture_exception</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[Union[BaseException, ExcInfo]]</span>
@@ -420,8 +416,6 @@
             <span class="n">crumb</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">crumb</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">crumb</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span>
-
-        <span class="n">crumb</span> <span class="o">=</span> <span class="n">partial_serialize</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">crumb</span><span class="p">,</span> <span class="n">should_repr_strings</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;before_breadcrumb&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">new_crumb</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;before_breadcrumb&quot;</span><span class="p">](</span><span class="n">crumb</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
@@ -515,8 +509,6 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_layer</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
-
-    <span class="n">scope</span> <span class="o">=</span> <span class="n">push_scope</span>
 
 <div class="viewcode-block" id="Hub.pop_scope_unsafe"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.pop_scope_unsafe">[docs]</a>    <span class="k">def</span> <span class="nf">pop_scope_unsafe</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; Tuple[Optional[Client], Scope]</span>

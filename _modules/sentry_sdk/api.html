@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.api &#8212; sentry-python 0.13.0 documentation</title>
+    <title>sentry_sdk.api &#8212; sentry-python 0.13.1 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -41,6 +41,7 @@
 
 <span class="k">if</span> <span class="n">MYPY</span><span class="p">:</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Any</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Dict</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Optional</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">overload</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Callable</span>
@@ -69,6 +70,11 @@
     <span class="s2">&quot;flush&quot;</span><span class="p">,</span>
     <span class="s2">&quot;last_event_id&quot;</span><span class="p">,</span>
     <span class="s2">&quot;start_span&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;set_tag&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;set_context&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;set_extra&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;set_user&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;set_level&quot;</span><span class="p">,</span>
 <span class="p">]</span>
 
 
@@ -77,6 +83,15 @@
     <span class="n">f</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="se">\n\n</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
         <span class="s2">&quot;Alias for :py:meth:`sentry_sdk.Hub.</span><span class="si">%s</span><span class="s2">`&quot;</span> <span class="o">%</span> <span class="n">f</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
         <span class="n">inspect</span><span class="o">.</span><span class="n">getdoc</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">Hub</span><span class="p">,</span> <span class="n">f</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)),</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">f</span>
+
+
+<span class="k">def</span> <span class="nf">scopemethod</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
+    <span class="c1"># type: (F) -&gt; F</span>
+    <span class="n">f</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="se">\n\n</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+        <span class="s2">&quot;Alias for :py:meth:`sentry_sdk.Scope.</span><span class="si">%s</span><span class="s2">`&quot;</span> <span class="o">%</span> <span class="n">f</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+        <span class="n">inspect</span><span class="o">.</span><span class="n">getdoc</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">Scope</span><span class="p">,</span> <span class="n">f</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)),</span>
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">f</span>
 
@@ -194,6 +209,46 @@
     <span class="k">else</span><span class="p">:</span>
         <span class="c1"># returned if user provided callback</span>
         <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="set_tag"><a class="viewcode-back" href="../../api.html#sentry_sdk.set_tag">[docs]</a><span class="nd">@scopemethod</span>  <span class="c1"># noqa</span>
+<span class="k">def</span> <span class="nf">set_tag</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+    <span class="c1"># type: (str, Any) -&gt; None</span>
+    <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+    <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">hub</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">set_tag</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="set_context"><a class="viewcode-back" href="../../api.html#sentry_sdk.set_context">[docs]</a><span class="nd">@scopemethod</span>  <span class="c1"># noqa</span>
+<span class="k">def</span> <span class="nf">set_context</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+    <span class="c1"># type: (str, Any) -&gt; None</span>
+    <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+    <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">hub</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">set_context</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="set_extra"><a class="viewcode-back" href="../../api.html#sentry_sdk.set_extra">[docs]</a><span class="nd">@scopemethod</span>  <span class="c1"># noqa</span>
+<span class="k">def</span> <span class="nf">set_extra</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+    <span class="c1"># type: (str, Any) -&gt; None</span>
+    <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+    <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">hub</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">set_extra</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="set_user"><a class="viewcode-back" href="../../api.html#sentry_sdk.set_user">[docs]</a><span class="nd">@scopemethod</span>  <span class="c1"># noqa</span>
+<span class="k">def</span> <span class="nf">set_user</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+    <span class="c1"># type: (Dict[str, Any]) -&gt; None</span>
+    <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+    <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">hub</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">set_user</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="set_level"><a class="viewcode-back" href="../../api.html#sentry_sdk.set_level">[docs]</a><span class="nd">@scopemethod</span>  <span class="c1"># noqa</span>
+<span class="k">def</span> <span class="nf">set_level</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+    <span class="c1"># type: (str) -&gt; None</span>
+    <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+    <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">hub</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">set_level</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="flush"><a class="viewcode-back" href="../../api.html#sentry_sdk.flush">[docs]</a><span class="nd">@hubmethod</span>

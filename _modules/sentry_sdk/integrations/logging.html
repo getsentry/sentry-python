@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.integrations.logging &#8212; sentry-python 0.13.0 documentation</title>
+    <title>sentry_sdk.integrations.logging &#8212; sentry-python 0.13.1 documentation</title>
     <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
@@ -37,7 +37,6 @@
 <span class="kn">import</span> <span class="nn">datetime</span>
 
 <span class="kn">from</span> <span class="nn">sentry_sdk.hub</span> <span class="k">import</span> <span class="n">Hub</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.serializer</span> <span class="k">import</span> <span class="n">partial_serialize</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="k">import</span> <span class="p">(</span>
     <span class="n">to_string</span><span class="p">,</span>
     <span class="n">event_from_exception</span><span class="p">,</span>
@@ -235,17 +234,10 @@
 
         <span class="n">hint</span><span class="p">[</span><span class="s2">&quot;log_record&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span>
 
-        <span class="n">client</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">client</span>
-
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">)</span>
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
-        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logentry&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">to_string</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="p">),</span>
-            <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="n">partial_serialize</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">,</span> <span class="n">should_repr_strings</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
-        <span class="p">}</span>
-        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;extra&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">partial_serialize</span><span class="p">(</span>
-            <span class="n">client</span><span class="p">,</span> <span class="n">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span> <span class="n">should_repr_strings</span><span class="o">=</span><span class="kc">False</span>
-        <span class="p">)</span>
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logentry&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">to_string</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="p">),</span> <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">}</span>
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;extra&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 
         <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span></div>
 

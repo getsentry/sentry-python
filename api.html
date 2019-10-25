@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>Main API &#8212; sentry-python 0.13.0 documentation</title>
+    <title>Main API &#8212; sentry-python 0.13.1 documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
@@ -175,6 +175,66 @@ integration doesn’t already do this for you.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
 <dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">Span</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="sentry_sdk.set_tag">
+<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">set_tag</code><span class="sig-paren">(</span><em class="sig-param">key</em>, <em class="sig-param">value</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#set_tag"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.set_tag" title="Permalink to this definition">¶</a></dt>
+<dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Scope.set_tag" title="sentry_sdk.Scope.set_tag"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.set_tag()</span></code></a></p>
+<p>Sets a tag for a key to a specific value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="sentry_sdk.set_context">
+<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">set_context</code><span class="sig-paren">(</span><em class="sig-param">key</em>, <em class="sig-param">value</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#set_context"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.set_context" title="Permalink to this definition">¶</a></dt>
+<dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Scope.set_context" title="sentry_sdk.Scope.set_context"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.set_context()</span></code></a></p>
+<p>Binds a context at a certain key to a specific value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="sentry_sdk.set_extra">
+<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">set_extra</code><span class="sig-paren">(</span><em class="sig-param">key</em>, <em class="sig-param">value</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#set_extra"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.set_extra" title="Permalink to this definition">¶</a></dt>
+<dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Scope.set_extra" title="sentry_sdk.Scope.set_extra"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.set_extra()</span></code></a></p>
+<p>Sets an extra key to a specific value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="sentry_sdk.set_user">
+<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">set_user</code><span class="sig-paren">(</span><em class="sig-param">value</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#set_user"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.set_user" title="Permalink to this definition">¶</a></dt>
+<dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Scope.set_user" title="sentry_sdk.Scope.set_user"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.set_user()</span></code></a></p>
+<p>Sets a user for the scope.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="sentry_sdk.set_level">
+<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">set_level</code><span class="sig-paren">(</span><em class="sig-param">value</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#set_level"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.set_level" title="Permalink to this definition">¶</a></dt>
+<dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Scope.set_level" title="sentry_sdk.Scope.set_level"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.set_level()</span></code></a></p>
+<p>Sets the level for the scope.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p>
 </dd>
 </dl>
 </dd></dl>
@@ -368,19 +428,11 @@ with statement can be used on the hub directly.</p>
 
 <dl class="method">
 <dt id="sentry_sdk.Hub.scope">
-<code class="sig-name descname">scope</code><span class="sig-paren">(</span><em class="sig-param">callback=None</em><span class="sig-paren">)</span><a class="headerlink" href="#sentry_sdk.Hub.scope" title="Permalink to this definition">¶</a></dt>
-<dd><p>Pushes a new layer on the scope stack.</p>
+<em class="property">property </em><code class="sig-name descname">scope</code><a class="headerlink" href="#sentry_sdk.Hub.scope" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the current scope on the hub.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>callback</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.8)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.8)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Callable</span></code></a>[[<code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code>], <code class="docutils literal notranslate"><span class="pre">None</span></code>]]) – If provided, this method pushes a scope, calls
-<cite>callback</cite>, and pops the scope again.</p>
-</dd>
-<dt class="field-even">Return type</dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.8)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.ContextManager" title="(in Python v3.8)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ContextManager</span></code></a>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code>]]</p>
-</dd>
-<dt class="field-odd">Returns</dt>
-<dd class="field-odd"><p>If no <cite>callback</cite> is provided, a context manager that should
-be used to pop the scope again.</p>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></p>
 </dd>
 </dl>
 </dd></dl>
@@ -482,7 +534,7 @@ events that belong to it.</p>
 <dl class="method">
 <dt id="sentry_sdk.Scope.level">
 <em class="property">property </em><code class="sig-name descname">level</code><a class="headerlink" href="#sentry_sdk.Scope.level" title="Permalink to this definition">¶</a></dt>
-<dd><p>When set this overrides the level.</p>
+<dd><p>When set this overrides the level. Deprecated in favor of set_level.</p>
 </dd></dl>
 
 <dl class="method">
@@ -541,9 +593,31 @@ events that belong to it.</p>
 </dd></dl>
 
 <dl class="method">
+<dt id="sentry_sdk.Scope.set_level">
+<code class="sig-name descname">set_level</code><span class="sig-paren">(</span><em class="sig-param">value</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.set_level"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope.set_level" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sets the level for the scope.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
 <dt id="sentry_sdk.Scope.set_tag">
 <code class="sig-name descname">set_tag</code><span class="sig-paren">(</span><em class="sig-param">key</em>, <em class="sig-param">value</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.set_tag"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope.set_tag" title="Permalink to this definition">¶</a></dt>
 <dd><p>Sets a tag for a key to a specific value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="sentry_sdk.Scope.set_user">
+<code class="sig-name descname">set_user</code><span class="sig-paren">(</span><em class="sig-param">value</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.set_user"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope.set_user" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sets a user for the scope.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
 <dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p>
@@ -571,7 +645,7 @@ events that belong to it.</p>
 <dl class="method">
 <dt id="sentry_sdk.Scope.user">
 <em class="property">property </em><code class="sig-name descname">user</code><a class="headerlink" href="#sentry_sdk.Scope.user" title="Permalink to this definition">¶</a></dt>
-<dd><p>When set a specific user is bound to the scope.</p>
+<dd><p>When set a specific user is bound to the scope. Deprecated in favor of set_user.</p>
 </dd></dl>
 
 </dd></dl>
