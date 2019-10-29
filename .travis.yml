@@ -53,6 +53,7 @@ services:
 install:
   - pip install tox
   - pip install codecov
+  - make install-zeus-cli
   - bash scripts/download-semaphore.sh
 
 script:
@@ -61,6 +62,7 @@ script:
   - coverage combine .coverage*
   - coverage xml -i
   - codecov --file coverage.xml
+  - zeus upload -t "application/x-cobertura+xml" coverage.xml
 
 notifications:
   webhooks:
