@@ -44,7 +44,7 @@ def test_transport_works(
     Hub.current.bind_client(client)
     request.addfinalizer(lambda: Hub.current.bind_client(None))
 
-    add_breadcrumb(level="info", message="i like bread", timestamp=datetime.now())
+    add_breadcrumb(level="info", message="i like bread", timestamp=datetime.utcnow())
     capture_message("löl")
 
     getattr(client, client_flush_method)()
