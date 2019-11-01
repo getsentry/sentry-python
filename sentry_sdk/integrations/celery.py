@@ -72,6 +72,10 @@ class CeleryIntegration(Integration):
         ignore_logger("celery.worker.job")
         ignore_logger("celery.app.trace")
 
+        # This is stdout/err redirected to a logger, can't deal with this
+        # (need event_level=logging.WARN to reproduce)
+        ignore_logger("celery.redirected")
+
 
 def _wrap_apply_async(task, f):
     # type: (Any, F) -> F
