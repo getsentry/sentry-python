@@ -133,7 +133,7 @@ class Span(object):
         self.hub = hub
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
-        self.start_timestamp = datetime.now()
+        self.start_timestamp = datetime.utcnow()
 
         #: End timestamp of span
         self.timestamp = None  # type: Optional[datetime]
@@ -279,7 +279,7 @@ class Span(object):
             # This transaction is already finished, so we should not flush it again.
             return None
 
-        self.timestamp = datetime.now()
+        self.timestamp = datetime.utcnow()
 
         _maybe_create_breadcrumbs_from_span(hub, self)
 
