@@ -62,7 +62,7 @@ script:
   - coverage combine .coverage*
   - coverage xml -i
   - codecov --file coverage.xml
-  - zeus upload -t "application/x-cobertura+xml" coverage.xml
+  - [ -z "$ZEUS_API_TOKEN" ] || zeus upload -t "application/x-cobertura+xml" coverage.xml
 
 notifications:
   webhooks:
