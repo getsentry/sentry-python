@@ -58,9 +58,11 @@ def test_trytonderrors_not_captured(sentry_init, app, capture_exceptions, get_cl
     sentry_init(integrations=[TrytondWSGIIntegration()])
     exceptions = capture_exceptions()
 
+    unittest.mock.sentinel.exception = exception
+
     @app.route('/usererror')
     def _(request):
-        raise exception
+        raise unittest.mock.sentinel.exception
 
     client = get_client()
     response = client.get("/usererror")
