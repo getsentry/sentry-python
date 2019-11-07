@@ -4,10 +4,7 @@ import sentry_sdk
 import sentry_sdk.integrations
 import sentry_sdk.integrations.logging
 
-from werkzeug.wrappers import Response
 from trytond.exceptions import TrytonException as TrytondBaseException
-from trytond.exceptions import UserError as TrytondUserError
-from trytond.protocols.jsonrpc import JSONRequest
 from trytond.wsgi import app
 
 

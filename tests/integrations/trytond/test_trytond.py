@@ -12,7 +12,6 @@ from trytond.exceptions import LoginException
 from trytond.wsgi import app as trytond_app
 
 from werkzeug.test import Client
-from sentry_sdk import capture_message
 from sentry_sdk import last_event_id
 from sentry_sdk.integrations.trytond import TrytondWSGIIntegration
 
@@ -44,7 +43,7 @@ def test_exceptions_captured(sentry_init, app, capture_exceptions, get_client, e
         raise unittest.mock.sentinel.exception
 
     client = get_client()
-    response = client.get("/exception")
+    _ = client.get("/exception")
 
     (e,) = exceptions
     assert e is exception
@@ -66,7 +65,7 @@ def test_trytonderrors_not_captured(sentry_init, app, capture_exceptions, get_cl
         raise unittest.mock.sentinel.exception
 
     client = get_client()
-    response = client.get("/usererror")
+    _ = client.get("/usererror")
 
     assert not exceptions
 
