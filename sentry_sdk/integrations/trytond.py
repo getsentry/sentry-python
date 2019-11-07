@@ -39,22 +39,6 @@ class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
             app.error_handlers.append(error_handler)
 
 
-def rpc_error_page(app, request, e):
-    if isinstance(e, TrytondBaseException):
-        return
-    else:
-        event_id = sentry_sdk.last_event_id()
-        data = TrytondUserError(
-            str(event_id),
-            'Event',
-            str(e)
-        )
-        return app.make_response(
-            request,
-            data
-        )
-
-
 class TrytondSentryHandler(logging.NullHandler):
 
     def __init__(self, dsn, ignore=tuple()):

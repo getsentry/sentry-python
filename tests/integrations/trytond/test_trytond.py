@@ -5,6 +5,7 @@ import unittest.mock
 
 pytest.importorskip("trytond")
 
+from trytond.exceptions import TrytonException as TrytondBaseException
 from trytond.exceptions import UserError as TrytondUserError
 from trytond.exceptions import UserWarning as TrytondUserWarning
 from trytond.exceptions import LoginException
@@ -12,8 +13,8 @@ from trytond.wsgi import app as trytond_app
 
 from werkzeug.test import Client
 from sentry_sdk import capture_message
+from sentry_sdk import last_event_id
 from sentry_sdk.integrations.trytond import TrytondWSGIIntegration
-from sentry_sdk.integrations.trytond import rpc_error_page
 
 
 @pytest.fixture(scope="function")
@@ -71,6 +72,10 @@ def test_trytonderrors_not_captured(sentry_init, app, capture_exceptions, get_cl
 
 
 def test_rpc_error_page(sentry_init, app, capture_events, get_client):
+    """Test that, after initializing the Trytond-SentrySDK integration
+    a custom error handler can be registered to the Trytond WSGI app so as to
+    inform the event identifiers to the Tryton RPC client"""
+
     sentry_init(integrations=[TrytondWSGIIntegration()])
     events = capture_events()
 
@@ -78,7 +83,14 @@ def test_rpc_error_page(sentry_init, app, capture_events, get_client):
     def _(request):
         raise Exception('foo')
 
-    app.error_handler(rpc_error_page)
+    @app.error_handler
+    def _(app, request, e):
+        if isinstance(e, TrytondBaseException):
+            return
+        else:
+            event_id = last_event_id()
+            data = TrytondUserError(str(event_id), str(e))
+            return app.make_response(request, data)
 
     client = get_client()
 
@@ -105,10 +117,10 @@ def test_rpc_error_page(sentry_init, app, capture_events, get_client):
 
     (event,) = events
     (content, status, headers) = response
+    data = json.loads(next(content))
     assert status == '200 OK'
     assert headers.get('Content-Type') == 'application/json'
-    data = json.loads(next(content))
-    # assert data == dict(
-    #     error=['UserError', [event['event_id'], 'foo']],
-    #     id=42
-    # )
+    assert data == dict(
+        id=42,
+        error=['UserError', [event['event_id'], 'foo', None]],
+    )
