@@ -1,4 +1,3 @@
-
 import logging
 import sentry_sdk
 import sentry_sdk.integrations
@@ -10,6 +9,7 @@ from trytond.wsgi import app
 
 # TODO: trytond_worker intergation
 
+
 class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
     identifier = "trytond_wsgi"
 
@@ -18,7 +18,6 @@ class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
 
     @staticmethod
     def setup_once():
-
         def error_handler(e):
             if isinstance(e, TrytondBaseException):
                 return
@@ -28,16 +27,17 @@ class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
         # Expected error handlers signature was changed
         # when the error_handler decorator was introduced
         # in Tryton-5.4
-        if hasattr(app, 'error_handler'):
+        if hasattr(app, "error_handler"):
+
             @app.error_handler
             def _(app, request, e):
                 error_handler(e)
+
         else:
             app.error_handlers.append(error_handler)
 
 
 class TrytondSentryHandler(logging.NullHandler):
-
     def __init__(self, dsn, ignore=tuple()):
         super(TrytondSentryHandler, self).__init__()
 
