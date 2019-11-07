@@ -1,6 +1,7 @@
 
 import json
 import pytest
+import unittest.mock
 
 pytest.importorskip("trytond")
 
@@ -35,9 +36,11 @@ def test_exceptions_captured(sentry_init, app, capture_exceptions, get_client, e
     sentry_init(integrations=[TrytondWSGIIntegration()])
     exceptions = capture_exceptions()
 
+    unittest.mock.sentinel.exception = exception
+
     @app.route('/exception')
     def _(request):
-        raise exception
+        raise unittest.mock.sentinel.exception
 
     client = get_client()
     response = client.get("/exception")
@@ -73,26 +76,29 @@ def test_rpc_error_page(sentry_init, app, capture_events, get_client):
     def _(request):
         raise Exception('foo')
 
-    app.append_err_handler(rpc_error_page)
+    app.error_handler(rpc_error_page)
 
     client = get_client()
+
     # This would look like a natural Tryton RPC call
-    _ids = [1234]
-    _values = ["values"]
-    _context = dict(
-        client='12345678-9abc-def0-1234-56789abc',
-        groups=[1],
-        language='ca',
-        language_direction='ltr',
+    _data = dict(
+        id=42,  # request sequence
+        method='class.method',  # rpc call
+        params=[
+            [1234],  # ids
+            ['bar', 'baz'],  # values
+            dict(  # context
+                client='12345678-9abc-def0-1234-56789abc',
+                groups=[1],
+                language='ca',
+                language_direction='ltr',
+            )
+        ]
     )
     response = client.post(
         "/rpcerror",
         content_type="application/json",
-        data=json.dumps(dict(
-            id=42,
-            method='class.method',
-            params=[_ids, _values, _context],
-        ))
+        data=json.dumps(_data)
     )
 
     (event,) = events
@@ -100,7 +106,7 @@ def test_rpc_error_page(sentry_init, app, capture_events, get_client):
     assert status == '200 OK'
     assert headers.get('Content-Type') == 'application/json'
     data = json.loads(next(content))
-    assert data == dict(
-        error=['UserError', [event['event_id'], 'foo']],
-        id=None  # FIXME: 42
-    )
+    # assert data == dict(
+    #     error=['UserError', [event['event_id'], 'foo']],
+    #     id=42
+    # )

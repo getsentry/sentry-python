@@ -5,23 +5,14 @@ import sentry_sdk.integrations
 import sentry_sdk.integrations.logging
 
 from werkzeug.wrappers import Response
-from trytond.wsgi import app
 from trytond.exceptions import TrytonException as TrytondBaseException
 from trytond.exceptions import UserError as TrytondUserError
 from trytond.protocols.jsonrpc import JSONRequest
+from trytond.wsgi import app
 
 
-def append_err_handler(self, handler):
-    self.error_handlers.append(
-        handler.__get__(self)
-    )
-    return handler
+# TODO: trytond_worker intergation
 
-
-app.append_err_handler = append_err_handler.__get__(app)
-
-
-# TODO: trytond_cron and trytond_worker intergations
 class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
     identifier = "trytond_wsgi"
 
@@ -31,38 +22,35 @@ class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
     @staticmethod
     def setup_once():
 
-        @app.append_err_handler
-        def _(self, e):
+        def error_handler(e):
             if isinstance(e, TrytondBaseException):
                 return
             else:
                 sentry_sdk.capture_exception(e)
 
+        # Expected error handlers signature was changed
+        # when the error_handler decorator was introduced
+        # in Tryton-5.4
+        if hasattr(app, 'error_handler'):
+            @app.error_handler
+            def _(app, request, e):
+                error_handler(e)
+        else:
+            app.error_handlers.append(error_handler)
 
-def rpc_error_page(self, e):
+
+def rpc_error_page(app, request, e):
     if isinstance(e, TrytondBaseException):
         return
     else:
-        _environ = dict()
-        request_stub = type('JSONRequestStub', (JSONRequest,), dict(
-            accept_mimetypes=[('json', None)],
-            parsed_data=dict(
-                id=None,
-                # FIXME: A Trtyon RPC client won't trust this response
-                # because the `id` parameter won't match the one it
-                # crafted for the request. We must gain access to the
-                # original request for error handlers
-                method=None,
-                params=None
-            ),
-        ))(_environ)
         event_id = sentry_sdk.last_event_id()
         data = TrytondUserError(
             str(event_id),
+            'Event',
             str(e)
         )
-        return self.make_response(
-            request_stub,
+        return app.make_response(
+            request,
             data
         )
 
