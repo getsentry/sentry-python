@@ -19,6 +19,7 @@ if MYPY:
     from logging import LogRecord
     from typing import Any
     from typing import Dict
+    from typing import Optional
 
 DEFAULT_LEVEL = logging.INFO
 DEFAULT_EVENT_LEVEL = logging.ERROR
@@ -26,12 +27,16 @@ DEFAULT_EVENT_LEVEL = logging.ERROR
 _IGNORED_LOGGERS = set(["sentry_sdk.errors"])
 
 
-def ignore_logger(name):
-    # type: (str) -> None
+def ignore_logger(
+    name  # type: str
+):
+    # type: (...) -> None
     """This disables recording (both in breadcrumbs and as events) calls to
     a logger of a specific name.  Among other uses, many of our integrations
     use this to prevent their actions being recorded as breadcrumbs. Exposed
     to users as a way to quiet spammy loggers.
+
+    :param name: The name of the logger to ignore (same string you would pass to ``logging.getLogger``).
     """
     _IGNORED_LOGGERS.add(name)
 
@@ -40,7 +45,7 @@ class LoggingIntegration(Integration):
     identifier = "logging"
 
     def __init__(self, level=DEFAULT_LEVEL, event_level=DEFAULT_EVENT_LEVEL):
-        # type: (int, int) -> None
+        # type: (Optional[int], Optional[int]) -> None
         self._handler = None
         self._breadcrumb_handler = None
 
@@ -95,7 +100,7 @@ def _breadcrumb_from_record(record):
         "level": _logging_to_event_level(record.levelname),
         "category": record.name,
         "message": record.message,
-        "timestamp": datetime.datetime.fromtimestamp(record.created),
+        "timestamp": datetime.datetime.utcfromtimestamp(record.created),
         "data": _extra_from_record(record),
     }
 
@@ -145,6 +150,12 @@ def _extra_from_record(record):
 
 
 class EventHandler(logging.Handler, object):
+    """
+    A logging handler that emits Sentry events for each log record
+
+    Note that you do not have to use this class if the logging integration is enabled, which it is by default.
+    """
+
     def emit(self, record):
         # type: (LogRecord) -> Any
         with capture_internal_exceptions():
@@ -203,6 +214,12 @@ SentryHandler = EventHandler
 
 
 class BreadcrumbHandler(logging.Handler, object):
+    """
+    A logging handler that records breadcrumbs for each log record.
+
+    Note that you do not have to use this class if the logging integration is enabled, which it is by default.
+    """
+
     def emit(self, record):
         # type: (LogRecord) -> Any
         with capture_internal_exceptions():

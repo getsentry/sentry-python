@@ -1,16 +1,14 @@
 import copy
 import random
 import sys
-import weakref
 
 from datetime import datetime
 from contextlib import contextmanager
-from warnings import warn
 
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
-from sentry_sdk.tracing import Span, maybe_create_breadcrumbs_from_span
+from sentry_sdk.tracing import Span
 from sentry_sdk.utils import (
     exc_info_from_error,
     event_from_exception,
@@ -46,8 +44,7 @@ else:
         return x
 
 
-_local = ContextVar("sentry_current_hub")  # type: ignore
-_initial_client = None  # type: Optional[weakref.ReferenceType[Client]]
+_local = ContextVar("sentry_current_hub")
 
 
 def _should_send_default_pii():
@@ -80,12 +77,9 @@ def _init(*args, **kwargs):
 
     This takes the same arguments as the client constructor.
     """
-    global _initial_client
     client = Client(*args, **kwargs)  # type: ignore
     Hub.current.bind_client(client)
     rv = _InitGuard(client)
-    if client is not None:
-        _initial_client = weakref.ref(client)
     return rv
 
 
@@ -112,7 +106,7 @@ else:
 
 class HubMeta(type):
     @property
-    def current(self):
+    def current(cls):
         # type: () -> Hub
         """Returns the current instance of the hub."""
         rv = _local.get(None)
@@ -122,21 +116,10 @@ class HubMeta(type):
         return rv
 
     @property
-    def main(self):
+    def main(cls):
         # type: () -> Hub
         """Returns the main instance of the hub."""
         return GLOBAL_HUB
-
-
-class _HubManager(object):
-    def __init__(self, hub):
-        # type: (Hub) -> None
-        self._old = Hub.current
-        _local.set(hub)
-
-    def __exit__(self, exc_type, exc_value, tb):
-        # type: (Any, Any, Any) -> None
-        _local.set(self._old)
 
 
 class _ScopeManager(object):
@@ -273,31 +256,17 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             if rv is not None:
                 return rv
 
-        if _initial_client is not None:
-            initial_client = _initial_client()
-        else:
-            initial_client = None
-
-        if (
-            initial_client is not None
-            and initial_client is not client
-            and initial_client.integrations.get(integration_name) is not None
-        ):
-            warning = (
-                "Integration %r attempted to run but it was only "
-                "enabled on init() but not the client that "
-                "was bound to the current flow.  Earlier versions of "
-                "the SDK would consider these integrations enabled but "
-                "this is no longer the case." % (name_or_class,)
-            )
-            warn(Warning(warning), stacklevel=3)
-            logger.warning(warning)
-
     @property
     def client(self):
         # type: () -> Optional[Client]
         """Returns the current client on the hub."""
         return self._stack[-1][0]
+
+    @property
+    def scope(self):
+        # type: () -> Scope
+        """Returns the current scope on the hub."""
+        return self._stack[-1][1]
 
     def last_event_id(self):
         # type: () -> Optional[str]
@@ -358,10 +327,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         client = self.client
         if client is None:
             return None
-        if error is None:
-            exc_info = sys.exc_info()
-        else:
+        if error is not None:
             exc_info = exc_info_from_error(error)
+        else:
+            exc_info = sys.exc_info()
 
         event, hint = event_from_exception(exc_info, client_options=client.options)
         try:
@@ -381,7 +350,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         These exceptions do not end up in Sentry and are just logged instead.
         """
-        logger.error("Internal error in sentry_sdk", exc_info=exc_info)  # type: ignore
+        logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
     def add_breadcrumb(
         self,
@@ -429,49 +398,31 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         while len(scope._breadcrumbs) > max_breadcrumbs:
             scope._breadcrumbs.popleft()
 
-    @contextmanager
-    def span(
-        self,
-        span=None,  # type: Optional[Span]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> Generator[Span, None, None]
-        # TODO: Document
-        span = self.start_span(span=span, **kwargs)
-
-        _, scope = self._stack[-1]
-        old_span = scope.span
-        scope.span = span
-
-        try:
-            yield span
-        except Exception:
-            span.set_tag("error", True)
-            raise
-        else:
-            span.set_tag("error", False)
-        finally:
-            try:
-                span.finish()
-                maybe_create_breadcrumbs_from_span(self, span)
-                self.finish_span(span)
-            except Exception:
-                self._capture_internal_exception(sys.exc_info())
-            scope.span = old_span
-
     def start_span(
         self,
         span=None,  # type: Optional[Span]
         **kwargs  # type: Any
     ):
         # type: (...) -> Span
-        # TODO: Document
+        """
+        Create a new span whose parent span is the currently active
+        span, if any. The return value is the span object that can
+        be used as a context manager to start and stop timing.
+
+        Note that you will not see any span that is not contained
+        within a transaction. Create a transaction with
+        ``start_span(transaction="my transaction")`` if an
+        integration doesn't already do this for you.
+        """
 
         client, scope = self._stack[-1]
 
+        kwargs.setdefault("hub", self)
+
         if span is None:
-            if scope.span is not None:
-                span = scope.span.new_span(**kwargs)
+            span = scope.span
+            if span is not None:
+                span = span.new_span(**kwargs)
             else:
                 span = Span(**kwargs)
 
@@ -480,51 +431,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             span.sampled = random.random() < sample_rate
 
         if span.sampled:
-            span.init_finished_spans()
+            max_spans = (
+                client and client.options["_experiments"].get("max_spans") or 1000
+            )
+            span.init_finished_spans(maxlen=max_spans)
 
         return span
-
-    def finish_span(
-        self, span  # type: Span
-    ):
-        # type: (...) -> Optional[str]
-        # TODO: Document
-        if span.timestamp is None:
-            # This transaction is not yet finished so we just finish it.
-            span.finish()
-
-        if span.transaction is None:
-            # If this has no transaction set we assume there's a parent
-            # transaction for this span that would be flushed out eventually.
-            return None
-
-        if self.client is None:
-            # We have no client and therefore nowhere to send this transaction
-            # event.
-            return None
-
-        if not span.sampled:
-            # At this point a `sampled = None` should have already been
-            # resolved to a concrete decision. If `sampled` is `None`, it's
-            # likely that somebody used `with Hub.span(..)` on a
-            # non-transaction span and later decided to make it a transaction.
-            assert (
-                span.sampled is not None
-            ), "Need to set transaction when entering span!"
-            return None
-
-        return self.capture_event(
-            {
-                "type": "transaction",
-                "transaction": span.transaction,
-                "contexts": {"trace": span.get_trace_context()},
-                "timestamp": span.timestamp,
-                "start_timestamp": span.start_timestamp,
-                "spans": [
-                    s.to_json() for s in (span._finished_spans or ()) if s is not span
-                ],
-            }
-        )
 
     @overload  # noqa
     def push_scope(
@@ -564,8 +476,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self._stack.append(new_layer)
 
         return _ScopeManager(self)
-
-    scope = push_scope
 
     def pop_scope_unsafe(self):
         # type: () -> Tuple[Optional[Client], Scope]
@@ -639,7 +549,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         # type: () -> Generator[Tuple[str, str], None, None]
         # TODO: Document
         client, scope = self._stack[-1]
-        if scope._span is None:
+        span = scope.span
+
+        if span is None:
             return
 
         propagate_traces = client and client.options["propagate_traces"]
@@ -647,9 +559,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return
 
         if client and client.options["traceparent_v2"]:
-            traceparent = scope._span.to_traceparent()
+            traceparent = span.to_traceparent()
         else:
-            traceparent = scope._span.to_legacy_traceparent()
+            traceparent = span.to_legacy_traceparent()
 
         yield "sentry-trace", traceparent
 

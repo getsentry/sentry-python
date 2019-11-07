@@ -1,3 +1,6 @@
+import platform
+import sys
+
 import pytest
 
 try:
@@ -32,16 +35,12 @@ def test_crumb_capture(sentry_init, capture_events):
         "method": "GET",
         "status_code": 200,
         "reason": "OK",
-        "httplib_response": crumb["data"]["httplib_response"],
     }
 
 
 def test_crumb_capture_hint(sentry_init, capture_events):
     def before_breadcrumb(crumb, hint):
-        if "httplib_response" in hint:
-            con = hint["httplib_response"].getheader("Connection")
-            assert con.lower() == "close"
-            crumb["data"]["extra"] = "foo"
+        crumb["data"]["extra"] = "foo"
         return crumb
 
     sentry_init(integrations=[StdlibIntegration()], before_breadcrumb=before_breadcrumb)
@@ -62,8 +61,10 @@ def test_crumb_capture_hint(sentry_init, capture_events):
         "status_code": 200,
         "reason": "OK",
         "extra": "foo",
-        "httplib_response": crumb["data"]["httplib_response"],
     }
+
+    if platform.python_implementation() != "PyPy":
+        assert sys.getrefcount(response) == 2
 
 
 def test_httplib_misuse(sentry_init, capture_events):
@@ -104,5 +105,4 @@ def test_httplib_misuse(sentry_init, capture_events):
         "method": "GET",
         "status_code": 200,
         "reason": "OK",
-        "httplib_response": crumb["data"]["httplib_response"],
     }

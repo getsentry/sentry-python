@@ -140,7 +140,6 @@ def test_large_json_request(sentry_init, capture_events, app, get_client):
     assert response[1] == "200 OK"
 
     event, = events
-    # __import__("pdb").set_trace()
     assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }

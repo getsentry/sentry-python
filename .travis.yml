@@ -20,13 +20,11 @@ branches:
     - /^release\/.+$/
 
 matrix:
-  allow_failures:
-    - python: "3.8-dev"
-
   include:
     - python: "3.7"
       dist: xenial
-    - python: "3.8-dev"
+
+    - python: "3.8"
       dist: xenial
 
     - name: Linting
@@ -34,10 +32,12 @@ matrix:
       install:
         - pip install tox
       script: tox -e linters
+
     - python: "3.6"
       name: Distribution packages
       install: false
       script: make travis-upload-dist
+
     - python: "3.6"
       name: Build documentation
       install: false
@@ -53,12 +53,16 @@ services:
 install:
   - pip install tox
   - pip install codecov
+  - make install-zeus-cli
   - bash scripts/download-semaphore.sh
 
 script:
   - coverage erase
-  - ./scripts/runtox.sh '' --cov=sentry_sdk --cov-report= --cov-branch
-  - codecov --file .coverage*
+  - ./scripts/runtox.sh '' --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+  - coverage combine .coverage*
+  - coverage xml -i
+  - codecov --file coverage.xml
+  - '[[ -z "$ZEUS_API_TOKEN" ]] || zeus upload -t "application/x-cobertura+xml" coverage.xml'
 
 notifications:
   webhooks:

@@ -34,10 +34,6 @@ jobs:
           python.version: "3.6"
         Python37:
           python.version: "3.7"
-        # Python 3.8 and PyPy will be soon added to the base VM image:
-        #   https://github.com/Microsoft/azure-pipelines-tasks/pull/9866
-        Python38:
-          python.version: "3.8-dev"
         PyPy2:
           python.version: "pypy2"
 

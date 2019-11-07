@@ -1,10 +1,11 @@
-import contextlib
+import sys
 
 from datetime import datetime
 
 from sentry_sdk.utils import (
     AnnotatedValue,
-    capture_internal_exceptions,
+    capture_internal_exception,
+    disable_capture_event,
     safe_repr,
     strip_string,
 )
@@ -14,17 +15,20 @@ from sentry_sdk._compat import text_type, PY2, string_types, number_types, iteri
 from sentry_sdk._types import MYPY
 
 if MYPY:
+    from types import TracebackType
+
     from typing import Any
     from typing import Dict
     from typing import List
     from typing import Optional
     from typing import Callable
     from typing import Union
-    from typing import Generator
+    from typing import ContextManager
+    from typing import Type
 
-    # https://github.com/python/mypy/issues/5710
-    _NotImplemented = Any
-    ReprProcessor = Callable[[Any, Dict[str, Any]], Union[_NotImplemented, str]]
+    from sentry_sdk._types import NotImplementedType, Event
+
+    ReprProcessor = Callable[[Any, Dict[str, Any]], Union[NotImplementedType, str]]
     Segment = Union[str, int]
 
 
@@ -50,248 +54,277 @@ def add_global_repr_processor(processor):
     global_repr_processors.append(processor)
 
 
-class MetaNode(object):
-    __slots__ = (
-        "_parent",
-        "_segment",
-        "_depth",
-        "_data",
-        "_is_databag",
-        "_should_repr_strings",
-    )
-
-    def __init__(self):
-        # type: () -> None
-        self._parent = None  # type: Optional[MetaNode]
-        self._segment = None  # type: Optional[Segment]
-        self._depth = 0  # type: int
-        self._data = None  # type: Optional[Dict[str, Any]]
-        self._is_databag = None  # type: Optional[bool]
-        self._should_repr_strings = None  # type: Optional[bool]
-
-    def startswith_path(self, path):
-        # type: (List[Optional[str]]) -> bool
-        if len(path) > self._depth:
-            return False
-
-        return self.is_path(path + [None] * (self._depth - len(path)))
-
-    def is_path(self, path):
-        # type: (List[Optional[str]]) -> bool
-        if len(path) != self._depth:
-            return False
-
-        cur = self
-        for segment in reversed(path):
-            if segment is not None and segment != cur._segment:
-                return False
-            assert cur._parent is not None
-            cur = cur._parent
-
-        return cur._segment is None
-
-    def enter(self, segment):
-        # type: (Segment) -> MetaNode
-        rv = MetaNode()
-        rv._parent = self
-        rv._depth = self._depth + 1
-        rv._segment = segment
-        return rv
-
-    def _create_annotations(self):
-        # type: () -> None
-        if self._data is not None:
-            return
-
-        self._data = {}
-        if self._parent is not None:
-            self._parent._create_annotations()
-            self._parent._data[str(self._segment)] = self._data  # type: ignore
-
-    def annotate(self, **meta):
-        # type: (Any) -> None
-        self._create_annotations()
-        assert self._data is not None
-        self._data.setdefault("", {}).update(meta)
-
-    def should_repr_strings(self):
-        # type: () -> bool
-        if self._should_repr_strings is None:
-            self._should_repr_strings = (
-                self.startswith_path(
-                    ["exception", "values", None, "stacktrace", "frames", None, "vars"]
-                )
-                or self.startswith_path(
-                    ["threads", "values", None, "stacktrace", "frames", None, "vars"]
-                )
-                or self.startswith_path(["stacktrace", "frames", None, "vars"])
-            )
-
-        return self._should_repr_strings
-
-    def is_databag(self):
-        # type: () -> bool
-        if self._is_databag is None:
-            self._is_databag = (
-                self.startswith_path(["request", "data"])
-                or self.startswith_path(["breadcrumbs", None])
-                or self.startswith_path(["extra"])
-                or self.startswith_path(
-                    ["exception", "values", None, "stacktrace", "frames", None, "vars"]
-                )
-                or self.startswith_path(
-                    ["threads", "values", None, "stacktrace", "frames", None, "vars"]
-                )
-                or self.startswith_path(["stacktrace", "frames", None, "vars"])
-            )
-
-        return self._is_databag
-
-
-def _flatten_annotated(obj, meta_node):
-    # type: (Any, MetaNode) -> Any
-    if isinstance(obj, AnnotatedValue):
-        meta_node.annotate(**obj.metadata)
-        obj = obj.value
-    return obj
-
-
 class Memo(object):
+    __slots__ = ("_ids", "_objs")
+
     def __init__(self):
         # type: () -> None
-        self._inner = {}  # type: Dict[int, Any]
+        self._ids = {}  # type: Dict[int, Any]
+        self._objs = []  # type: List[Any]
 
-    @contextlib.contextmanager
     def memoize(self, obj):
-        # type: (Any) -> Generator[bool, None, None]
-        if id(obj) in self._inner:
-            yield True
+        # type: (Any) -> ContextManager[bool]
+        self._objs.append(obj)
+        return self
+
+    def __enter__(self):
+        # type: () -> bool
+        obj = self._objs[-1]
+        if id(obj) in self._ids:
+            return True
         else:
-            self._inner[id(obj)] = obj
-            yield False
+            self._ids[id(obj)] = obj
+            return False
 
-            self._inner.pop(id(obj), None)
+    def __exit__(
+        self,
+        ty,  # type: Optional[Type[BaseException]]
+        value,  # type: Optional[BaseException]
+        tb,  # type: Optional[TracebackType]
+    ):
+        # type: (...) -> None
+        self._ids.pop(id(self._objs.pop()), None)
 
 
-class Serializer(object):
-    def __init__(self):
-        # type: () -> None
-        self.memo = Memo()
-        self.meta_node = MetaNode()
+def serialize(event, **kwargs):
+    # type: (Event, **Any) -> Event
+    memo = Memo()
+    path = []  # type: List[Segment]
+    meta_stack = []  # type: List[Dict[str, Any]]
 
-    @contextlib.contextmanager
-    def enter(self, segment):
-        # type: (Segment) -> Generator[None, None, None]
-        old_node = self.meta_node
-        self.meta_node = self.meta_node.enter(segment)
+    def _annotate(**meta):
+        # type: (**Any) -> None
+        while len(meta_stack) <= len(path):
+            try:
+                segment = path[len(meta_stack) - 1]
+                node = meta_stack[-1].setdefault(text_type(segment), {})
+            except IndexError:
+                node = {}
+
+            meta_stack.append(node)
+
+        meta_stack[-1].setdefault("", {}).update(meta)
+
+    def _should_repr_strings():
+        # type: () -> Optional[bool]
+        """
+        By default non-serializable objects are going through
+        safe_repr(). For certain places in the event (local vars) we
+        want to repr() even things that are JSON-serializable to
+        make their type more apparent. For example, it's useful to
+        see the difference between a unicode-string and a bytestring
+        when viewing a stacktrace.
+
+        For container-types we still don't do anything different.
+        Generally we just try to make the Sentry UI present exactly
+        what a pretty-printed repr would look like.
+
+        :returns: `True` if we are somewhere in frame variables, and `False` if
+            we are in a position where we will never encounter frame variables
+            when recursing (for example, we're in `event.extra`). `None` if we
+            are not (yet) in frame variables, but might encounter them when
+            recursing (e.g.  we're in `event.exception`)
+        """
+        try:
+            p0 = path[0]
+            if p0 == "stacktrace" and path[1] == "frames" and path[3] == "vars":
+                return True
+
+            if (
+                p0 in ("threads", "exception")
+                and path[1] == "values"
+                and path[3] == "stacktrace"
+                and path[4] == "frames"
+                and path[6] == "vars"
+            ):
+                return True
+        except IndexError:
+            return None
+
+        return False
+
+    def _is_databag():
+        # type: () -> Optional[bool]
+        """
+        A databag is any value that we need to trim.
+
+        :returns: Works like `_should_repr_strings()`. `True` for "yes",
+            `False` for :"no", `None` for "maybe soon".
+        """
+        try:
+            rv = _should_repr_strings()
+            if rv in (True, None):
+                return rv
+
+            p0 = path[0]
+            if p0 == "request" and path[1] == "data":
+                return True
+
+            if p0 == "breadcrumbs":
+                path[1]
+                return True
+
+            if p0 == "extra":
+                return True
+
+        except IndexError:
+            return None
+
+        return False
+
+    def _serialize_node(
+        obj,  # type: Any
+        is_databag=None,  # type: Optional[bool]
+        should_repr_strings=None,  # type: Optional[bool]
+        segment=None,  # type: Optional[Segment]
+        remaining_breadth=None,  # type: Optional[int]
+        remaining_depth=None,  # type: Optional[int]
+    ):
+        # type: (...) -> Any
+        if segment is not None:
+            path.append(segment)
 
         try:
-            yield
-        finally:
-            self.meta_node = old_node
-
-    def serialize_event(self, obj):
-        # type: (Any) -> Dict[str, Any]
-        rv = self._serialize_node(obj)
-        if self.meta_node._data is not None:
-            rv["_meta"] = self.meta_node._data
-        return rv
-
-    def _serialize_node(self, obj, max_depth=None, max_breadth=None):
-        # type: (Any, Optional[int], Optional[int]) -> Any
-        with capture_internal_exceptions():
-            with self.memo.memoize(obj) as result:
+            with memo.memoize(obj) as result:
                 if result:
                     return CYCLE_MARKER
 
-                return self._serialize_node_impl(
-                    obj, max_depth=max_depth, max_breadth=max_breadth
+                return _serialize_node_impl(
+                    obj,
+                    is_databag=is_databag,
+                    should_repr_strings=should_repr_strings,
+                    remaining_depth=remaining_depth,
+                    remaining_breadth=remaining_breadth,
                 )
+        except BaseException:
+            capture_internal_exception(sys.exc_info())
 
-        if self.meta_node.is_databag():
-            return u"<failed to serialize, use init(debug=True) to see error logs>"
+            if is_databag:
+                return u"<failed to serialize, use init(debug=True) to see error logs>"
 
-        return None
+            return None
+        finally:
+            if segment is not None:
+                path.pop()
+                del meta_stack[len(path) + 1 :]
 
-    def _serialize_node_impl(self, obj, max_depth, max_breadth):
-        # type: (Any, Optional[int], Optional[int]) -> Any
-        if max_depth is None and max_breadth is None and self.meta_node.is_databag():
-            max_depth = self.meta_node._depth + MAX_DATABAG_DEPTH
-            max_breadth = self.meta_node._depth + MAX_DATABAG_BREADTH
+    def _flatten_annotated(obj):
+        # type: (Any) -> Any
+        if isinstance(obj, AnnotatedValue):
+            _annotate(**obj.metadata)
+            obj = obj.value
+        return obj
 
-        if max_depth is None:
-            remaining_depth = None
-        else:
-            remaining_depth = max_depth - self.meta_node._depth
+    def _serialize_node_impl(
+        obj, is_databag, should_repr_strings, remaining_depth, remaining_breadth
+    ):
+        # type: (Any, Optional[bool], Optional[bool], Optional[int], Optional[int]) -> Any
+        if should_repr_strings is None:
+            should_repr_strings = _should_repr_strings()
 
-        obj = _flatten_annotated(obj, self.meta_node)
+        if is_databag is None:
+            is_databag = _is_databag()
+
+        if is_databag and remaining_depth is None:
+            remaining_depth = MAX_DATABAG_DEPTH
+        if is_databag and remaining_breadth is None:
+            remaining_breadth = MAX_DATABAG_BREADTH
+
+        obj = _flatten_annotated(obj)
 
         if remaining_depth is not None and remaining_depth <= 0:
-            self.meta_node.annotate(rem=[["!limit", "x"]])
-            if self.meta_node.is_databag():
-                return _flatten_annotated(strip_string(safe_repr(obj)), self.meta_node)
+            _annotate(rem=[["!limit", "x"]])
+            if is_databag:
+                return _flatten_annotated(strip_string(safe_repr(obj)))
             return None
 
-        if self.meta_node.is_databag():
-            hints = {"memo": self.memo, "remaining_depth": remaining_depth}
+        if is_databag and global_repr_processors:
+            hints = {"memo": memo, "remaining_depth": remaining_depth}
             for processor in global_repr_processors:
-                with capture_internal_exceptions():
-                    result = processor(obj, hints)
-                    if result is not NotImplemented:
-                        return _flatten_annotated(result, self.meta_node)
+                result = processor(obj, hints)
+                if result is not NotImplemented:
+                    return _flatten_annotated(result)
 
-        if isinstance(obj, Mapping):
-            # Create temporary list here to avoid calling too much code that
+        if obj is None or isinstance(obj, (bool, number_types)):
+            return obj if not should_repr_strings else safe_repr(obj)
+
+        elif isinstance(obj, datetime):
+            return (
+                text_type(obj.strftime("%Y-%m-%dT%H:%M:%S.%fZ"))
+                if not should_repr_strings
+                else safe_repr(obj)
+            )
+
+        elif isinstance(obj, Mapping):
+            # Create temporary copy here to avoid calling too much code that
             # might mutate our dictionary while we're still iterating over it.
-            items = []
-            for i, (k, v) in enumerate(iteritems(obj)):
-                if max_breadth is not None and i >= max_breadth:
-                    self.meta_node.annotate(len=max_breadth)
+            obj = dict(iteritems(obj))
+
+            rv_dict = {}
+            i = 0
+
+            for k, v in iteritems(obj):
+                if remaining_breadth is not None and i >= remaining_breadth:
+                    _annotate(len=len(obj))
                     break
 
-                items.append((k, v))
-
-            rv_dict = {}  # type: Dict[Any, Any]
-            for k, v in items:
-                k = text_type(k)
-
-                with self.enter(k):
-                    v = self._serialize_node(
-                        v, max_depth=max_depth, max_breadth=max_breadth
-                    )
-                    if v is not None:
-                        rv_dict[k] = v
+                str_k = text_type(k)
+                v = _serialize_node(
+                    v,
+                    segment=str_k,
+                    should_repr_strings=should_repr_strings,
+                    is_databag=is_databag,
+                    remaining_depth=remaining_depth - 1
+                    if remaining_depth is not None
+                    else None,
+                    remaining_breadth=remaining_breadth,
+                )
+                if v is not None:
+                    rv_dict[str_k] = v
+                    i += 1
 
             return rv_dict
-        elif isinstance(obj, Sequence) and not isinstance(obj, string_types):
-            rv_list = []  # type: List[Any]
+
+        elif not isinstance(obj, string_types) and isinstance(obj, Sequence):
+            rv_list = []
+
             for i, v in enumerate(obj):
-                if max_breadth is not None and i >= max_breadth:
-                    self.meta_node.annotate(len=max_breadth)
+                if remaining_breadth is not None and i >= remaining_breadth:
+                    _annotate(len=len(obj))
                     break
 
-                with self.enter(i):
-                    rv_list.append(
-                        self._serialize_node(
-                            v, max_depth=max_depth, max_breadth=max_breadth
-                        )
+                rv_list.append(
+                    _serialize_node(
+                        v,
+                        segment=i,
+                        should_repr_strings=should_repr_strings,
+                        is_databag=is_databag,
+                        remaining_depth=remaining_depth - 1
+                        if remaining_depth is not None
+                        else None,
+                        remaining_breadth=remaining_breadth,
                     )
+                )
 
             return rv_list
 
-        if self.meta_node.should_repr_strings():
+        if should_repr_strings:
             obj = safe_repr(obj)
         else:
-            if obj is None or isinstance(obj, (bool, number_types)):
-                return obj
-
-            if isinstance(obj, datetime):
-                return text_type(obj.strftime("%Y-%m-%dT%H:%M:%S.%fZ"))
-
             if isinstance(obj, bytes):
                 obj = obj.decode("utf-8", "replace")
 
             if not isinstance(obj, string_types):
                 obj = safe_repr(obj)
 
-        return _flatten_annotated(strip_string(obj), self.meta_node)
+        return _flatten_annotated(strip_string(obj))
+
+    disable_capture_event.set(True)
+    try:
+        rv = _serialize_node(event, **kwargs)
+        if meta_stack and isinstance(rv, dict):
+            rv["_meta"] = meta_stack[0]
+
+        return rv
+    finally:
+        disable_capture_event.set(False)

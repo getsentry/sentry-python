@@ -8,6 +8,7 @@ from sentry_sdk._types import MYPY
 
 if MYPY:
     from typing import Any
+    from typing import Dict
     from typing import Optional
     from typing import overload
     from typing import Callable
@@ -15,6 +16,7 @@ if MYPY:
     from typing import ContextManager
 
     from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint
+    from sentry_sdk.tracing import Span
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
@@ -34,6 +36,12 @@ __all__ = [
     "push_scope",
     "flush",
     "last_event_id",
+    "start_span",
+    "set_tag",
+    "set_context",
+    "set_extra",
+    "set_user",
+    "set_level",
 ]
 
 
@@ -42,6 +50,15 @@ def hubmethod(f):
     f.__doc__ = "%s\n\n%s" % (
         "Alias for :py:meth:`sentry_sdk.Hub.%s`" % f.__name__,
         inspect.getdoc(getattr(Hub, f.__name__)),
+    )
+    return f
+
+
+def scopemethod(f):
+    # type: (F) -> F
+    f.__doc__ = "%s\n\n%s" % (
+        "Alias for :py:meth:`sentry_sdk.Scope.%s`" % f.__name__,
+        inspect.getdoc(getattr(Scope, f.__name__)),
     )
     return f
 
@@ -161,6 +178,46 @@ def push_scope(
         return None
 
 
+@scopemethod  # noqa
+def set_tag(key, value):
+    # type: (str, Any) -> None
+    hub = Hub.current
+    if hub is not None:
+        hub.scope.set_tag(key, value)
+
+
+@scopemethod  # noqa
+def set_context(key, value):
+    # type: (str, Any) -> None
+    hub = Hub.current
+    if hub is not None:
+        hub.scope.set_context(key, value)
+
+
+@scopemethod  # noqa
+def set_extra(key, value):
+    # type: (str, Any) -> None
+    hub = Hub.current
+    if hub is not None:
+        hub.scope.set_extra(key, value)
+
+
+@scopemethod  # noqa
+def set_user(value):
+    # type: (Dict[str, Any]) -> None
+    hub = Hub.current
+    if hub is not None:
+        hub.scope.set_user(value)
+
+
+@scopemethod  # noqa
+def set_level(value):
+    # type: (str) -> None
+    hub = Hub.current
+    if hub is not None:
+        hub.scope.set_level(value)
+
+
 @hubmethod
 def flush(
     timeout=None,  # type: Optional[float]
@@ -179,3 +236,15 @@ def last_event_id():
     if hub is not None:
         return hub.last_event_id()
     return None
+
+
+@hubmethod
+def start_span(
+    span=None,  # type: Optional[Span]
+    **kwargs  # type: Any
+):
+    # type: (...) -> Span
+
+    # TODO: All other functions in this module check for
+    # `Hub.current is None`. That actually should never happen?
+    return Hub.current.start_span(span=span, **kwargs)

@@ -46,6 +46,11 @@ class ModulesIntegration(Integration):
         @add_global_event_processor
         def processor(event, hint):
             # type: (Event, Any) -> Dict[str, Any]
-            if Hub.current.get_integration(ModulesIntegration) is not None:
-                event["modules"] = dict(_get_installed_modules())
+            if event.get("type") == "transaction":
+                return event
+
+            if Hub.current.get_integration(ModulesIntegration) is None:
+                return event
+
+            event["modules"] = _get_installed_modules()
             return event

@@ -45,16 +45,33 @@ class BackgroundWorker(object):
         # type: (float) -> bool
         deadline = time() + timeout
         queue = self._queue
-        queue.all_tasks_done.acquire()  # type: ignore
+
+        real_all_tasks_done = getattr(
+            queue, "all_tasks_done", None
+        )  # type: Optional[Any]
+        if real_all_tasks_done is not None:
+            real_all_tasks_done.acquire()
+            all_tasks_done = real_all_tasks_done  # type: Optional[Any]
+        elif queue.__module__.startswith("eventlet."):
+            all_tasks_done = getattr(queue, "_cond", None)
+        else:
+            all_tasks_done = None
+
         try:
-            while queue.unfinished_tasks:  # type: ignore
+            while queue.unfinished_tasks:
                 delay = deadline - time()
                 if delay <= 0:
                     return False
-                queue.all_tasks_done.wait(timeout=delay)  # type: ignore
+                if all_tasks_done is not None:
+                    all_tasks_done.wait(timeout=delay)
+                else:
+                    # worst case, we just poll the number of remaining tasks
+                    sleep(0.1)
+
             return True
         finally:
-            queue.all_tasks_done.release()  # type: ignore
+            if real_all_tasks_done is not None:
+                real_all_tasks_done.release()
 
     def start(self):
         # type: () -> None

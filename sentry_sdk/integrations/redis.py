@@ -4,17 +4,24 @@ from sentry_sdk import Hub
 from sentry_sdk.utils import capture_internal_exceptions
 from sentry_sdk.integrations import Integration
 
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from typing import Any
+
 
 class RedisIntegration(Integration):
     identifier = "redis"
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         import redis
 
         old_execute_command = redis.StrictRedis.execute_command
 
         def sentry_patched_execute_command(self, name, *args, **kwargs):
+            # type: (redis.StrictRedis, str, *Any, **Any) -> Any
             hub = Hub.current
 
             if hub.get_integration(RedisIntegration) is None:
@@ -32,12 +39,15 @@ class RedisIntegration(Integration):
 
                 description = " ".join(description_parts)
 
-            with hub.span(op="redis", description=description) as span:
+            with hub.start_span(op="redis", description=description) as span:
+                if name:
+                    span.set_tag("redis.command", name)
+
                 if name and args and name.lower() in ("get", "set", "setex", "setnx"):
                     span.set_tag("redis.key", args[0])
 
                 return old_execute_command(self, name, *args, **kwargs)
 
         redis.StrictRedis.execute_command = (  # type: ignore
-            sentry_patched_execute_command
+            sentry_patched_execute_command  # type: ignore
         )

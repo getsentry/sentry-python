@@ -6,10 +6,45 @@ from sentry_sdk.utils import event_from_exception
 from sentry_sdk._compat import reraise
 
 
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from typing import Any
+    from typing import Callable
+    from typing import TypeVar
+    from typing import Union
+    from typing import Optional
+
+    from typing import overload
+
+    F = TypeVar("F", bound=Callable[..., Any])
+
+else:
+
+    def overload(x):
+        # type: (F) -> F
+        return x
+
+
+@overload
+def serverless_function(f, flush=True):
+    # type: (F, bool) -> F
+    pass
+
+
+@overload  # noqa
 def serverless_function(f=None, flush=True):
+    # type: (None, bool) -> Callable[[F], F]
+    pass
+
+
+def serverless_function(f=None, flush=True):  # noqa
+    # type: (Optional[F], bool) -> Union[F, Callable[[F], F]]
     def wrapper(f):
+        # type: (F) -> F
         @functools.wraps(f)
         def inner(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
             with Hub(Hub.current) as hub:
                 with hub.configure_scope() as scope:
                     scope.clear_breadcrumbs()
@@ -22,7 +57,7 @@ def serverless_function(f=None, flush=True):
                     if flush:
                         _flush_client()
 
-        return inner
+        return inner  # type: ignore
 
     if f is None:
         return wrapper
@@ -31,6 +66,7 @@ def serverless_function(f=None, flush=True):
 
 
 def _capture_and_reraise():
+    # type: () -> None
     exc_info = sys.exc_info()
     hub = Hub.current
     if hub is not None and hub.client is not None:
@@ -45,6 +81,7 @@ def _capture_and_reraise():
 
 
 def _flush_client():
+    # type: () -> None
     hub = Hub.current
     if hub is not None:
         hub.flush()

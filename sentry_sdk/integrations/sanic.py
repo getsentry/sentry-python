@@ -13,10 +13,10 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
 
-from sanic import Sanic, __version__ as VERSION  # type: ignore
-from sanic.exceptions import SanicException  # type: ignore
-from sanic.router import Router  # type: ignore
-from sanic.handlers import ErrorHandler  # type: ignore
+from sanic import Sanic, __version__ as VERSION
+from sanic.exceptions import SanicException
+from sanic.router import Router
+from sanic.handlers import ErrorHandler
 
 from sentry_sdk._types import MYPY
 
@@ -26,8 +26,9 @@ if MYPY:
     from typing import Optional
     from typing import Union
     from typing import Tuple
+    from typing import Dict
 
-    from sanic.request import Request, RequestParameters  # type: ignore
+    from sanic.request import Request, RequestParameters
 
     from sentry_sdk._types import Event, EventProcessor, Hint
 
@@ -98,7 +99,7 @@ class SanicIntegration(Integration):
         old_error_handler_lookup = ErrorHandler.lookup
 
         def sentry_error_handler_lookup(self, exception):
-            # type: (Any, Exception) -> Optional[Callable]
+            # type: (Any, Exception) -> Optional[object]
             _capture_exception(exception)
             old_error_handler = old_error_handler_lookup(self, exception)
 
@@ -193,6 +194,7 @@ class SanicRequestExtractor(RequestExtractor):
         return len(self.request.body)
 
     def cookies(self):
+        # type: () -> Dict[str, str]
         return dict(self.request.cookies)
 
     def raw_data(self):
@@ -204,6 +206,7 @@ class SanicRequestExtractor(RequestExtractor):
         return self.request.form
 
     def is_json(self):
+        # type: () -> bool
         raise NotImplementedError()
 
     def json(self):
@@ -215,4 +218,5 @@ class SanicRequestExtractor(RequestExtractor):
         return self.request.files
 
     def size_of_file(self, file):
+        # type: (Any) -> int
         return len(file.body or ())

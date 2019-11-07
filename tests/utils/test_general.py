@@ -4,30 +4,32 @@ import os
 
 import pytest
 
-from hypothesis import given
-import hypothesis.strategies as st
 
 from sentry_sdk.utils import (
     BadDsn,
     Dsn,
     safe_repr,
     exceptions_from_error_tuple,
-    format_and_strip,
-    strip_string,
     filename_for_module,
     handle_in_app_impl,
     iter_event_stacktraces,
 )
 from sentry_sdk._compat import text_type
 
-any_string = st.one_of(st.binary(), st.text())
 
+try:
+    from hypothesis import given
+    import hypothesis.strategies as st
+except ImportError:
+    pass
+else:
+    any_string = st.one_of(st.binary(), st.text())
 
-@given(x=any_string)
-def test_safe_repr_never_broken_for_strings(x):
-    r = safe_repr(x)
-    assert isinstance(r, text_type)
-    assert u"broken repr" not in r
+    @given(x=any_string)
+    def test_safe_repr_never_broken_for_strings(x):
+        r = safe_repr(x)
+        assert isinstance(r, text_type)
+        assert u"broken repr" not in r
 
 
 def test_safe_repr_regressions():
@@ -53,39 +55,6 @@ def test_abs_path():
 
     assert frame1["filename"] == "tests/utils/test_general.py"
     assert frame2["filename"] == "test.py"
-
-
-def test_format_and_strip():
-    max_length = None
-
-    def x(template, params):
-        return format_and_strip(
-            template,
-            params,
-            strip_string=lambda x, **_: strip_string(x, max_length=max_length),
-        )
-
-    max_length = 3
-
-    assert x("", []) == ""
-    assert x("f", []) == "f"
-    pytest.raises(ValueError, lambda: x("%s", []))
-
-    # Don't raise errors on leftover params, some django extensions send too
-    # many SQL parameters.
-    assert x("", [123]) == ""
-    assert x("foo%s", ["bar"]) == "foobar"
-
-    rv = x("foo%s", ["baer"])
-    assert rv.value == "foo..."
-    assert rv.metadata == {"len": 7, "rem": [["!limit", "x", 3, 6]]}
-
-    rv = x("foo%sbar%s", ["baer", "boor"])
-    assert rv.value == "foo...bar..."
-    assert rv.metadata == {
-        "len": 14,
-        "rem": [["!limit", "x", 3, 6], ["!limit", "x", 9, 12]],
-    }
 
 
 def test_filename():

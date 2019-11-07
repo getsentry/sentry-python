@@ -13,7 +13,6 @@ from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk._types import MYPY
 
 if MYPY:
-
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from typing import Any
     from typing import Dict
@@ -21,12 +20,9 @@ if MYPY:
     from typing import Optional
     from bottle import FileUpload, FormsDict, LocalRequest  # type: ignore
 
-from bottle import (
-    Bottle,
-    Route,
-    request as bottle_request,
-    HTTPResponse,
-)  # type: ignore
+    from sentry_sdk._types import EventProcessor
+
+from bottle import Bottle, Route, request as bottle_request, HTTPResponse
 
 
 class BottleIntegration(Integration):
@@ -52,7 +48,7 @@ class BottleIntegration(Integration):
         old_app = Bottle.__call__
 
         def sentry_patched_wsgi_app(self, environ, start_response):
-            # type: (Any, Dict[str, str], Callable) -> _ScopedResponse
+            # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
 
             hub = Hub.current
             integration = hub.get_integration(BottleIntegration)
@@ -63,12 +59,13 @@ class BottleIntegration(Integration):
                 environ, start_response
             )
 
-        Bottle.__call__ = sentry_patched_wsgi_app  # type: ignore
+        Bottle.__call__ = sentry_patched_wsgi_app
 
         # monkey patch method Bottle._handle
         old_handle = Bottle._handle
 
         def _patched_handle(self, environ):
+            # type: (Bottle, Dict[str, Any]) -> Any
             hub = Hub.current
             integration = hub.get_integration(BottleIntegration)
             if integration is None:
@@ -95,6 +92,7 @@ class BottleIntegration(Integration):
         old_make_callback = Route._make_callback
 
         def patched_make_callback(self, *args, **kwargs):
+            # type: (Route, *object, **object) -> Any
             hub = Hub.current
             integration = hub.get_integration(BottleIntegration)
             prepared_callback = old_make_callback(self, *args, **kwargs)
@@ -105,20 +103,19 @@ class BottleIntegration(Integration):
             client = hub.client  # type: Any
 
             def wrapped_callback(*args, **kwargs):
-                def capture_exception(exception):
-                    event, hint = event_from_exception(
-                        exception,
-                        client_options=client.options,
-                        mechanism={"type": "bottle", "handled": False},
-                    )
-                    hub.capture_event(event, hint=hint)
+                # type: (*object, **object) -> Any
 
                 try:
                     res = prepared_callback(*args, **kwargs)
                 except HTTPResponse:
                     raise
                 except Exception as exception:
-                    capture_exception(exception)
+                    event, hint = event_from_exception(
+                        exception,
+                        client_options=client.options,
+                        mechanism={"type": "bottle", "handled": False},
+                    )
+                    hub.capture_event(event, hint=hint)
                     raise exception
 
                 return res
@@ -160,7 +157,7 @@ class BottleRequestExtractor(RequestExtractor):
 
 
 def _make_request_event_processor(app, request, integration):
-    # type: (Bottle, LocalRequest, BottleIntegration) -> Callable
+    # type: (Bottle, LocalRequest, BottleIntegration) -> EventProcessor
     def inner(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
 
@@ -170,7 +167,7 @@ def _make_request_event_processor(app, request, integration):
                     request.route.callback
                 )
             elif integration.transaction_style == "url":
-                event["transaction"] = request.route.rule  # type: ignore
+                event["transaction"] = request.route.rule
         except Exception:
             pass
 

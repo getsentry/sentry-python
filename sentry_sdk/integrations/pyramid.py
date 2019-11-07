@@ -4,8 +4,8 @@ import os
 import sys
 import weakref
 
-from pyramid.httpexceptions import HTTPException  # type: ignore
-from pyramid.request import Request  # type: ignore
+from pyramid.httpexceptions import HTTPException
+from pyramid.request import Request
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
@@ -18,7 +18,7 @@ from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk._types import MYPY
 
 if MYPY:
-    from pyramid.response import Response  # type: ignore
+    from pyramid.response import Response
     from typing import Any
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from typing import Callable
@@ -28,6 +28,7 @@ if MYPY:
     from webob.compat import cgi_FieldStorage  # type: ignore
 
     from sentry_sdk.utils import ExcInfo
+    from sentry_sdk._types import EventProcessor
 
 
 if getattr(Request, "authenticated_userid", None):
@@ -60,8 +61,8 @@ class PyramidIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        from pyramid.router import Router  # type: ignore
-        from pyramid.request import Request  # type: ignore
+        from pyramid.router import Router
+        from pyramid.request import Request
 
         old_handle_request = Router.handle_request
 
@@ -83,6 +84,7 @@ class PyramidIntegration(Integration):
             old_invoke_exception_view = Request.invoke_exception_view
 
             def sentry_patched_invoke_exception_view(self, *args, **kwargs):
+                # type: (Request, *Any, **Any) -> Any
                 rv = old_invoke_exception_view(self, *args, **kwargs)
 
                 if (
@@ -100,13 +102,14 @@ class PyramidIntegration(Integration):
         old_wsgi_call = Router.__call__
 
         def sentry_patched_wsgi_call(self, environ, start_response):
-            # type: (Any, Dict[str, str], Callable) -> _ScopedResponse
+            # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
             hub = Hub.current
             integration = hub.get_integration(PyramidIntegration)
             if integration is None:
                 return old_wsgi_call(self, environ, start_response)
 
             def sentry_patched_inner_wsgi_call(environ, start_response):
+                # type: (Dict[str, Any], Callable[..., Any]) -> Any
                 try:
                     return old_wsgi_call(self, environ, start_response)
                 except Exception:
@@ -143,6 +146,7 @@ def _capture_exception(exc_info):
 
 class PyramidRequestExtractor(RequestExtractor):
     def url(self):
+        # type: () -> str
         return self.request.path_url
 
     def env(self):
@@ -183,7 +187,7 @@ class PyramidRequestExtractor(RequestExtractor):
 
 
 def _make_event_processor(weak_request, integration):
-    # type: (Callable[[], Request], PyramidIntegration) -> Callable
+    # type: (Callable[[], Request], PyramidIntegration) -> EventProcessor
     def event_processor(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         request = weak_request()

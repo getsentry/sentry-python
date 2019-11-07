@@ -7,9 +7,9 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
-from rq.timeouts import JobTimeoutException  # type: ignore
-from rq.worker import Worker  # type: ignore
-from rq.queue import Queue  # type: ignore
+from rq.timeouts import JobTimeoutException
+from rq.worker import Worker
+from rq.queue import Queue
 
 from sentry_sdk._types import MYPY
 
@@ -18,9 +18,10 @@ if MYPY:
     from typing import Dict
     from typing import Callable
 
-    from rq.job import Job  # type: ignore
+    from rq.job import Job
 
     from sentry_sdk.utils import ExcInfo
+    from sentry_sdk._types import EventProcessor
 
 
 class RqIntegration(Integration):
@@ -50,11 +51,12 @@ class RqIntegration(Integration):
                 span = Span.continue_from_headers(
                     job.meta.get("_sentry_trace_headers") or {}
                 )
+                span.op = "rq.task"
 
                 with capture_internal_exceptions():
                     span.transaction = job.func_name
 
-                with hub.span(span):
+                with hub.start_span(span):
                     rv = old_perform_job(self, job, *args, **kwargs)
 
             if self.is_horse:
@@ -70,6 +72,7 @@ class RqIntegration(Integration):
         old_handle_exception = Worker.handle_exception
 
         def sentry_patched_handle_exception(self, job, *exc_info, **kwargs):
+            # type: (Worker, Any, *Any, **Any) -> Any
             _capture_exception(exc_info)  # type: ignore
             return old_handle_exception(self, job, *exc_info, **kwargs)
 
@@ -78,6 +81,7 @@ class RqIntegration(Integration):
         old_enqueue_job = Queue.enqueue_job
 
         def sentry_patched_enqueue_job(self, job, **kwargs):
+            # type: (Queue, Any, **Any) -> Any
             hub = Hub.current
             if hub.get_integration(RqIntegration) is not None:
                 job.meta["_sentry_trace_headers"] = dict(
@@ -90,7 +94,7 @@ class RqIntegration(Integration):
 
 
 def _make_event_processor(weak_job):
-    # type: (Callable[[], Job]) -> Callable
+    # type: (Callable[[], Job]) -> EventProcessor
     def event_processor(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         job = weak_job()

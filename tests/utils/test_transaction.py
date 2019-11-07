@@ -2,7 +2,7 @@ from sentry_sdk.utils import transaction_from_function
 
 
 class MyClass:
-    def myfunc():
+    def myfunc(self):
         pass
 
 

@@ -1,12 +1,17 @@
 import os
 import subprocess
 import json
+import uuid
 
 import pytest
+
+import gevent
+import eventlet
 
 import sentry_sdk
 from sentry_sdk._compat import reraise, string_types, iteritems
 from sentry_sdk.transport import Transport
+from sentry_sdk.utils import capture_internal_exceptions
 
 from tests import _warning_recorder, _warning_recorder_mgr
 
@@ -64,6 +69,11 @@ def _capture_internal_warnings():
         except NameError:
             pass
 
+        if "sentry_sdk" not in str(warning.filename) and "sentry-sdk" not in str(
+            warning.filename
+        ):
+            continue
+
         # pytest-django
         if "getfuncargvalue" in str(warning.message):
             continue
@@ -100,6 +110,9 @@ def _capture_internal_warnings():
         if "Something has already installed a non-asyncio" in str(warning.message):
             continue
 
+        if "dns.hash" in str(warning.message) or "dns/namedict" in warning.filename:
+            continue
+
         raise AssertionError(warning)
 
 
@@ -112,8 +125,9 @@ def monkeypatch_test_transport(monkeypatch, semaphore_normalize):
                 if isinstance(value, dict):
                     check_string_keys(value)
 
-        check_string_keys(event)
-        semaphore_normalize(event)
+        with capture_internal_exceptions():
+            check_string_keys(event)
+            semaphore_normalize(event)
 
     def inner(client):
         monkeypatch.setattr(client, "transport", TestTransport(check_event))
@@ -150,13 +164,14 @@ def semaphore_normalize(tmpdir):
         # Disable subprocess integration
         with sentry_sdk.Hub(None):
             # not dealing with the subprocess API right now
-            file = tmpdir.join("event")
+            file = tmpdir.join("event-{}".format(uuid.uuid4().hex))
             file.write(json.dumps(dict(event)))
-            output = json.loads(
-                subprocess.check_output(
-                    [SEMAPHORE, "process-event"], stdin=file.open()
-                ).decode("utf-8")
-            )
+            with file.open() as f:
+                output = json.loads(
+                    subprocess.check_output(
+                        [SEMAPHORE, "process-event"], stdin=f
+                    ).decode("utf-8")
+                )
             _no_errors_in_semaphore_response(output)
             output.pop("_meta", None)
             return output
@@ -165,14 +180,21 @@ def semaphore_normalize(tmpdir):
 
 
 @pytest.fixture
-def sentry_init(monkeypatch_test_transport):
+def sentry_init(monkeypatch_test_transport, request):
     def inner(*a, **kw):
         hub = sentry_sdk.Hub.current
         client = sentry_sdk.Client(*a, **kw)
         hub.bind_client(client)
         monkeypatch_test_transport(sentry_sdk.Hub.current.client)
 
-    return inner
+    if request.node.get_closest_marker("forked"):
+        # Do not run isolation if the test is already running in
+        # ultimate isolation (seems to be required for celery tests that
+        # fork)
+        yield inner
+    else:
+        with sentry_sdk.Hub(None):
+            yield inner
 
 
 class TestTransport(Transport):
@@ -235,3 +257,33 @@ class EventStreamReader(object):
 
     def read_flush(self):
         assert self.file.readline() == b"flush\n"
+
+
+# scope=session ensures that fixture is run earlier
+@pytest.fixture(
+    scope="session",
+    params=[None, "eventlet", "gevent"],
+    ids=("threads", "eventlet", "greenlet"),
+)
+def maybe_monkeypatched_threading(request):
+    if request.param == "eventlet":
+        try:
+            eventlet.monkey_patch()
+        except AttributeError as e:
+            if "'thread.RLock' object has no attribute" in str(e):
+                # https://bitbucket.org/pypy/pypy/issues/2962/gevent-cannot-patch-rlock-under-pypy-27-7
+                pytest.skip("https://github.com/eventlet/eventlet/issues/546")
+            else:
+                raise
+    elif request.param == "gevent":
+        try:
+            gevent.monkey.patch_all()
+        except Exception as e:
+            if "_RLock__owner" in str(e):
+                pytest.skip("https://github.com/gevent/gevent/issues/1380")
+            else:
+                raise
+    else:
+        assert request.param is None
+
+    return request.param

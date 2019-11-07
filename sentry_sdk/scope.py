@@ -4,7 +4,6 @@ from functools import wraps
 from itertools import chain
 
 from sentry_sdk.utils import logger, capture_internal_exceptions
-
 from sentry_sdk._types import MYPY
 
 if MYPY:
@@ -21,10 +20,15 @@ if MYPY:
         Event,
         EventProcessor,
         ErrorProcessor,
+        ExcInfo,
         Hint,
+        Type,
     )
 
+    from sentry_sdk.tracing import Span
+
     F = TypeVar("F", bound=Callable[..., Any])
+    T = TypeVar("T")
 
 
 global_event_processors = []  # type: List[EventProcessor]
@@ -36,6 +40,7 @@ def add_global_event_processor(processor):
 
 
 def _attr_setter(fn):
+    # type: (Any) -> Any
     return property(fset=fn, doc=fn.__doc__)
 
 
@@ -59,6 +64,12 @@ class Scope(object):
     """The scope holds extra information that should be sent with all
     events that belong to it.
     """
+
+    # NOTE: Even though it should not happen, the scope needs to not crash when
+    # accessed by multiple threads. It's fine if it's full of races, but those
+    # races should never make the user application crash.
+    #
+    # The same needs to hold for any accesses of the scope the SDK makes.
 
     __slots__ = (
         "_level",
@@ -84,38 +95,74 @@ class Scope(object):
         self._name = None  # type: Optional[str]
         self.clear()
 
+    def clear(self):
+        # type: () -> None
+        """Clears the entire scope."""
+        self._level = None  # type: Optional[str]
+        self._fingerprint = None  # type: Optional[List[str]]
+        self._transaction = None  # type: Optional[str]
+        self._user = None  # type: Optional[Dict[str, Any]]
+
+        self._tags = {}  # type: Dict[str, Any]
+        self._contexts = {}  # type: Dict[str, Dict[str, Any]]
+        self._extras = {}  # type: Dict[str, Any]
+
+        self.clear_breadcrumbs()
+        self._should_capture = True
+
+        self._span = None  # type: Optional[Span]
+
     @_attr_setter
     def level(self, value):
-        """When set this overrides the level."""
+        # type: (Optional[str]) -> None
+        """When set this overrides the level. Deprecated in favor of set_level."""
+        self._level = value
+
+    def set_level(self, value):
+        # type: (Optional[str]) -> None
+        """Sets the level for the scope."""
         self._level = value
 
     @_attr_setter
     def fingerprint(self, value):
+        # type: (Optional[List[str]]) -> None
         """When set this overrides the default fingerprint."""
         self._fingerprint = value
 
     @_attr_setter
     def transaction(self, value):
+        # type: (Optional[str]) -> None
         """When set this forces a specific transaction name to be set."""
         self._transaction = value
-        if self._span:
-            self._span.transaction = value
+        span = self._span
+        if span:
+            span.transaction = value
 
     @_attr_setter
     def user(self, value):
-        """When set a specific user is bound to the scope."""
+        # type: (Dict[str, Any]) -> None
+        """When set a specific user is bound to the scope. Deprecated in favor of set_user."""
+        self._user = value
+
+    def set_user(self, value):
+        # type: (Dict[str, Any]) -> None
+        """Sets a user for the scope."""
         self._user = value
 
     @property
     def span(self):
+        # type: () -> Optional[Span]
         """Get/set current tracing span."""
         return self._span
 
     @span.setter
     def span(self, span):
+        # type: (Optional[Span]) -> None
         self._span = span
-        if span is not None and span.transaction:
-            self._transaction = span.transaction
+        if span is not None:
+            span_transaction = span.transaction
+            if span_transaction:
+                self._transaction = span_transaction
 
     def set_tag(
         self,
@@ -165,23 +212,6 @@ class Scope(object):
         """Removes a specific extra key."""
         self._extras.pop(key, None)
 
-    def clear(self):
-        # type: () -> None
-        """Clears the entire scope."""
-        self._level = None
-        self._fingerprint = None
-        self._transaction = None
-        self._user = None
-
-        self._tags = {}  # type: Dict[str, Any]
-        self._contexts = {}  # type: Dict[str, Dict[str, Any]]
-        self._extras = {}  # type: Dict[str, Any]
-
-        self.clear_breadcrumbs()
-        self._should_capture = True
-
-        self._span = None
-
     def clear_breadcrumbs(self):
         # type: () -> None
         """Clears breadcrumb buffer."""
@@ -195,12 +225,19 @@ class Scope(object):
 
         :param func: This function behaves like `before_send.`
         """
+        if len(self._event_processors) > 20:
+            logger.warning(
+                "Too many event processors on scope! Clearing list to free up some memory: %r",
+                self._event_processors,
+            )
+            del self._event_processors[:]
+
         self._event_processors.append(func)
 
     def add_error_processor(
         self,
         func,  # type: ErrorProcessor
-        cls=None,  # type: Optional[type]
+        cls=None,  # type: Optional[Type[BaseException]]
     ):
         # type: (...) -> None
         """Register a scope local error processor on the scope.
@@ -214,6 +251,7 @@ class Scope(object):
             real_func = func
 
             def func(event, exc_info):
+                # type: (Event, ExcInfo) -> Optional[Event]
                 try:
                     is_inst = isinstance(exc_info[1], cls_)
                 except Exception:
@@ -241,7 +279,9 @@ class Scope(object):
         if self._level is not None:
             event["level"] = self._level
 
-        event.setdefault("breadcrumbs", []).extend(self._breadcrumbs)
+        if event.get("type") != "transaction":
+            event.setdefault("breadcrumbs", []).extend(self._breadcrumbs)
+
         if event.get("user") is None and self._user is not None:
             event["user"] = self._user
 

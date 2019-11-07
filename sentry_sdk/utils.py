@@ -3,27 +3,27 @@ import sys
 import linecache
 import logging
 
-from contextlib import contextmanager
 from datetime import datetime
 
-from sentry_sdk._compat import urlparse, text_type, implements_str, int_types, PY2
+import sentry_sdk
+from sentry_sdk._compat import urlparse, text_type, implements_str, PY2
 
 from sentry_sdk._types import MYPY
 
 if MYPY:
+    from types import FrameType
+    from types import TracebackType
     from typing import Any
     from typing import Callable
     from typing import Dict
+    from typing import ContextManager
     from typing import Iterator
     from typing import List
     from typing import Optional
     from typing import Set
     from typing import Tuple
     from typing import Union
-    from types import FrameType
-    from types import TracebackType
-
-    import sentry_sdk
+    from typing import Type
 
     from sentry_sdk._types import ExcInfo
 
@@ -43,15 +43,34 @@ def _get_debug_hub():
     pass
 
 
-@contextmanager
+class CaptureInternalException(object):
+    __slots__ = ()
+
+    def __enter__(self):
+        # type: () -> ContextManager[Any]
+        return self
+
+    def __exit__(self, ty, value, tb):
+        # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[TracebackType]) -> bool
+        if ty is not None and value is not None:
+            capture_internal_exception((ty, value, tb))
+
+        return True
+
+
+_CAPTURE_INTERNAL_EXCEPTION = CaptureInternalException()
+
+
 def capture_internal_exceptions():
-    # type: () -> Iterator
-    try:
-        yield
-    except Exception:
-        hub = _get_debug_hub()
-        if hub is not None:
-            hub._capture_internal_exception(sys.exc_info())
+    # type: () -> ContextManager[Any]
+    return _CAPTURE_INTERNAL_EXCEPTION
+
+
+def capture_internal_exception(exc_info):
+    # type: (ExcInfo) -> None
+    hub = _get_debug_hub()
+    if hub is not None:
+        hub._capture_internal_exception(exc_info)
 
 
 def to_timestamp(value):
@@ -85,16 +104,25 @@ class Dsn(object):
             self.__dict__ = dict(value.__dict__)
             return
         parts = urlparse.urlsplit(text_type(value))
+
         if parts.scheme not in (u"http", u"https"):
             raise BadDsn("Unsupported scheme %r" % parts.scheme)
         self.scheme = parts.scheme
+
+        if parts.hostname is None:
+            raise BadDsn("Missing hostname")
+
         self.host = parts.hostname
-        self.port = parts.port
-        if self.port is None:
+
+        if parts.port is None:
             self.port = self.scheme == "https" and 443 or 80
-        self.public_key = parts.username
-        if not self.public_key:
+        else:
+            self.port = parts.port
+
+        if not parts.username:
             raise BadDsn("Missing public key")
+
+        self.public_key = parts.username
         self.secret_key = parts.password
 
         path = parts.path.rsplit("/", 1)
@@ -189,10 +217,19 @@ class Auth(object):
 
 
 class AnnotatedValue(object):
+    __slots__ = ("value", "metadata")
+
     def __init__(self, value, metadata):
         # type: (Optional[Any], Dict[str, Any]) -> None
         self.value = value
         self.metadata = metadata
+
+
+if MYPY:
+    from typing import TypeVar
+
+    T = TypeVar("T")
+    Annotated = Union[AnnotatedValue, T]
 
 
 def get_type_name(cls):
@@ -236,22 +273,13 @@ def iter_stacks(tb):
         tb_ = tb_.tb_next
 
 
-def slim_string(value, length=MAX_STRING_LENGTH):
-    # type: (str, int) -> str
-    if not value:
-        return value
-    if len(value) > length:
-        return value[: length - 3] + "..."
-    return value[:length]
-
-
 def get_lines_from_file(
     filename,  # type: str
     lineno,  # type: int
     loader=None,  # type: Optional[Any]
     module=None,  # type: Optional[str]
 ):
-    # type: (...) -> Tuple[List[str], Optional[str], List[str]]
+    # type: (...) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]
     context_lines = 5
     source = None
     if loader is not None and hasattr(loader, "get_source"):
@@ -276,11 +304,11 @@ def get_lines_from_file(
 
     try:
         pre_context = [
-            slim_string(line.strip("\r\n")) for line in source[lower_bound:lineno]
+            strip_string(line.strip("\r\n")) for line in source[lower_bound:lineno]
         ]
-        context_line = slim_string(source[lineno].strip("\r\n"))
+        context_line = strip_string(source[lineno].strip("\r\n"))
         post_context = [
-            slim_string(line.strip("\r\n"))
+            strip_string(line.strip("\r\n"))
             for line in source[(lineno + 1) : upper_bound]
         ]
         return pre_context, context_line, post_context
@@ -289,8 +317,11 @@ def get_lines_from_file(
         return [], None, []
 
 
-def get_source_context(frame, tb_lineno):
-    # type: (FrameType, int) -> Tuple[List[str], Optional[str], List[str]]
+def get_source_context(
+    frame,  # type: FrameType
+    tb_lineno,  # type: int
+):
+    # type: (...) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]
     try:
         abs_path = frame.f_code.co_filename  # type: Optional[str]
     except Exception:
@@ -397,6 +428,7 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
     }  # type: Dict[str, Any]
     if with_locals:
         rv["vars"] = frame.f_locals
+
     return rv
 
 
@@ -437,7 +469,7 @@ def single_exception_from_error_tuple(
     exc_type,  # type: Optional[type]
     exc_value,  # type: Optional[BaseException]
     tb,  # type: Optional[TracebackType]
-    client_options=None,  # type: Optional[dict]
+    client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> Dict[str, Any]
@@ -510,7 +542,7 @@ else:
 
 def exceptions_from_error_tuple(
     exc_info,  # type: ExcInfo
-    client_options=None,  # type: Optional[dict]
+    client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> List[Dict[str, Any]]
@@ -558,7 +590,7 @@ def iter_event_frames(event):
 
 
 def handle_in_app(event, in_app_exclude=None, in_app_include=None):
-    # type: (Dict[str, Any], Optional[List], Optional[List]) -> Dict[str, Any]
+    # type: (Dict[str, Any], Optional[List[str]], Optional[List[str]]) -> Dict[str, Any]
     for stacktrace in iter_event_stacktraces(event):
         handle_in_app_impl(
             stacktrace.get("frames"),
@@ -570,7 +602,7 @@ def handle_in_app(event, in_app_exclude=None, in_app_include=None):
 
 
 def handle_in_app_impl(frames, in_app_exclude, in_app_include):
-    # type: (Any, Optional[List], Optional[List]) -> Optional[Any]
+    # type: (Any, Optional[List[str]], Optional[List[str]]) -> Optional[Any]
     if not frames:
         return None
 
@@ -623,7 +655,7 @@ def exc_info_from_error(error):
 
 def event_from_exception(
     exc_info,  # type: Union[BaseException, ExcInfo]
-    client_options=None,  # type: Optional[dict]
+    client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> Tuple[Dict[str, Any], Dict[str, Any]]
@@ -643,7 +675,7 @@ def event_from_exception(
 
 
 def _module_in_set(name, set):
-    # type: (str, Optional[List]) -> bool
+    # type: (str, Optional[List[str]]) -> bool
     if not set:
         return False
     for item in set or ():
@@ -652,12 +684,18 @@ def _module_in_set(name, set):
     return False
 
 
-def strip_string(value, max_length=512):
-    # type: (str, int) -> Union[AnnotatedValue, str]
+def strip_string(value, max_length=None):
+    # type: (str, Optional[int]) -> Union[AnnotatedValue, str]
     # TODO: read max_length from config
     if not value:
         return value
+
+    if max_length is None:
+        # This is intentionally not just the default such that one can patch `MAX_STRING_LENGTH` and affect `strip_string`.
+        max_length = MAX_STRING_LENGTH
+
     length = len(value)
+
     if length > max_length:
         return AnnotatedValue(
             value=value[: max_length - 3] + u"...",
@@ -669,97 +707,12 @@ def strip_string(value, max_length=512):
     return value
 
 
-def format_and_strip(
-    template, params, strip_string=strip_string, max_length=MAX_FORMAT_PARAM_LENGTH
-):
-    """Format a string containing %s for placeholders and call `strip_string`
-    on each parameter. The string template itself does not have a maximum
-    length.
-
-    TODO: handle other placeholders, not just %s
-    """
-    chunks = template.split(u"%s")
-    if not chunks:
-        raise ValueError("No formatting placeholders found")
-
-    params = params[: len(chunks) - 1]
-
-    if len(params) < len(chunks) - 1:
-        raise ValueError("Not enough params.")
-
-    concat_chunks = []
-    iter_chunks = iter(chunks)  # type: Optional[Iterator]
-    iter_params = iter(params)  # type: Optional[Iterator]
-
-    while iter_chunks is not None or iter_params is not None:
-        if iter_chunks is not None:
-            try:
-                concat_chunks.append(next(iter_chunks))
-            except StopIteration:
-                iter_chunks = None
-
-        if iter_params is not None:
-            try:
-                concat_chunks.append(str(next(iter_params)))
-            except StopIteration:
-                iter_params = None
-
-    return concat_strings(
-        concat_chunks, strip_string=strip_string, max_length=max_length
-    )
-
-
-def concat_strings(
-    chunks, strip_string=strip_string, max_length=MAX_FORMAT_PARAM_LENGTH
-):
-    rv_remarks = []  # type: List[Any]
-    rv_original_length = 0
-    rv_length = 0
-    rv = []  # type: List[str]
-
-    def realign_remark(remark):
-        return [
-            (rv_length + x if isinstance(x, int_types) and i < 4 else x)
-            for i, x in enumerate(remark)
-        ]
-
-    for chunk in chunks:
-        if isinstance(chunk, AnnotatedValue):
-            # Assume it's already stripped!
-            stripped_chunk = chunk
-            chunk = chunk.value
-        else:
-            stripped_chunk = strip_string(chunk, max_length=max_length)
-
-        if isinstance(stripped_chunk, AnnotatedValue):
-            rv_remarks.extend(
-                realign_remark(remark) for remark in stripped_chunk.metadata["rem"]
-            )
-            stripped_chunk_value = stripped_chunk.value
-        else:
-            stripped_chunk_value = stripped_chunk
-
-        rv_original_length += len(chunk)
-        rv_length += len(stripped_chunk_value)  # type: ignore
-        rv.append(stripped_chunk_value)  # type: ignore
-
-    rv_joined = u"".join(rv)
-    assert len(rv_joined) == rv_length
-
-    if not rv_remarks:
-        return rv_joined
-
-    return AnnotatedValue(
-        value=rv_joined, metadata={"len": rv_original_length, "rem": rv_remarks}
-    )
-
-
 def _is_threading_local_monkey_patched():
     # type: () -> bool
     try:
         from gevent.monkey import is_object_patched  # type: ignore
 
-        if is_object_patched("_threading", "local"):
+        if is_object_patched("threading", "local"):
             return True
     except ImportError:
         pass
@@ -775,12 +728,8 @@ def _is_threading_local_monkey_patched():
     return False
 
 
-IS_THREADING_LOCAL_MONKEY_PATCHED = _is_threading_local_monkey_patched()
-del _is_threading_local_monkey_patched
-
-
 def _get_contextvars():
-    # () -> (bool, Type)
+    # type: () -> Tuple[bool, type]
     """
     Try to import contextvars and use it if it's deemed safe. We should not use
     contextvars if gevent or eventlet have patched thread locals, as
@@ -788,12 +737,12 @@ def _get_contextvars():
 
     https://github.com/gevent/gevent/issues/1407
     """
-    if not IS_THREADING_LOCAL_MONKEY_PATCHED:
+    if not _is_threading_local_monkey_patched():
         try:
-            from contextvars import ContextVar  # type: ignore
+            from contextvars import ContextVar
 
             if not PY2 and sys.version_info < (3, 7):
-                import aiocontextvars  # type: ignore  # noqa
+                import aiocontextvars  # noqa
 
             return True, ContextVar
         except ImportError:
@@ -801,24 +750,26 @@ def _get_contextvars():
 
     from threading import local
 
-    class ContextVar(object):  # type: ignore
+    class ContextVar(object):
         # Super-limited impl of ContextVar
 
         def __init__(self, name):
+            # type: (str) -> None
             self._name = name
             self._local = local()
 
         def get(self, default):
+            # type: (Any) -> Any
             return getattr(self._local, "value", default)
 
         def set(self, value):
-            setattr(self._local, "value", value)
+            # type: (Any) -> None
+            self._local.value = value
 
     return False, ContextVar
 
 
 HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()
-del _get_contextvars
 
 
 def transaction_from_function(func):
@@ -851,3 +802,6 @@ def transaction_from_function(func):
 
     # Possibly a lambda
     return func_qualname
+
+
+disable_capture_event = ContextVar("disable_capture_event")

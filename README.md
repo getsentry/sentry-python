@@ -8,13 +8,14 @@
 
 [![Build Status](https://travis-ci.com/getsentry/sentry-python.svg?branch=master)](https://travis-ci.com/getsentry/sentry-python)
 [![PyPi page link -- version](https://img.shields.io/pypi/v/sentry-sdk.svg)](https://pypi.python.org/pypi/sentry-sdk)
+[![Discord](https://img.shields.io/discord/621778831602221064)](https://discord.gg/cWnMQeA)
 
 This is the next line of the Python SDK for [Sentry](http://sentry.io/), intended to replace the `raven` package on PyPI.
 
 ```python
 from sentry_sdk import init, capture_message
 
-init("mydsn@sentry.io/123")
+init("https://mydsn@sentry.io/123")
 
 capture_message("Hello World")  # Will create an event.
 

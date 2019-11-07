@@ -25,6 +25,66 @@ sentry-sdk>=0.10.0,<0.11.0
 sentry-sdk==0.10.1
 ```
 
+A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
+
+## 0.13.1
+
+* Add new global functions for setting scope/context data.
+* Fix a bug that would make Django 1.11+ apps crash when using function-based middleware.
+
+## 0.13.0
+
+* Remove an old deprecation warning (behavior itself already changed since a long time).
+* The AIOHTTP integration now attaches the request body to crash reports. Thanks to Vitali Rebkavets!
+* Add an experimental PySpark integration.
+* First release to be tested under Python 3.8. No code changes were necessary though, so previous releases also might have worked.
+
+## 0.12.3
+
+* Various performance improvements to event sending.
+* Avoid crashes when scope or hub is racy.
+* Revert a change that broke applications using gevent and channels (in the same virtualenv, but different processes).
+* Fix a bug that made the SDK crash on unicode in SQL.
+
+## 0.12.2
+
+* Fix a crash with ASGI (Django Channels) when the ASGI request type is neither HTTP nor Websockets.
+
+## 0.12.1
+
+* Temporarily remove sending of SQL parameters (as part of breadcrumbs or spans for APM) to Sentry to avoid memory consumption issues.
+
+## 0.12.0
+
+* Sentry now has a [Discord server](https://discord.gg/cWnMQeA)! Join the server to get involved into SDK development and ask questions.
+* Fix a bug where the response object for httplib (or requests) was held onto for an unnecessarily long amount of time.
+* APM: Add spans for more methods on `subprocess.Popen` objects.
+* APM: Add spans for Django middlewares.
+* APM: Add spans for ASGI requests.
+* Automatically inject the ASGI middleware for Django Channels 2.0. This will **break your Channels 2.0 application if it is running on Python 3.5 or 3.6** (while previously it would "only" leak a lot of memory for each ASGI request). **Install `aiocontextvars` from PyPI to make it work again.**
+
+## 0.11.2
+
+* Fix a bug where the SDK would throw an exception on shutdown when running under eventlet.
+* Add missing data to Redis breadcrumbs.
+
+## 0.11.1
+
+* Remove a faulty assertion (observed in environment with Django Channels and ASGI).
+
+## 0.11.0
+
+* Fix type hints for the logging integration. Thansk Steven Dignam!
+* Fix an issue where scope/context data would leak in applications that use `gevent` with its threading monkeypatch. The fix is to avoid usage of contextvars in such environments. Thanks Ran Benita!
+* Fix a reference cycle in the `ThreadingIntegration` that led to exceptions on interpreter shutdown. Thanks Guang Tian Li!
+* Fix a series of bugs in the stdlib integration that broke usage of `subprocess`.
+* More instrumentation for APM.
+* New integration for SQLAlchemy (creates breadcrumbs from queries).
+* New (experimental) integration for Apache Beam.
+* Fix a bug in the `LoggingIntegration` that would send breadcrumbs timestamps in the wrong timezone.
+* The `AiohttpIntegration` now sets the event's transaction name.
+* Fix a bug that caused infinite recursion when serializing local variables that logged errors or otherwise created Sentry events.
+
 ## 0.10.2
 
 * Fix a bug where a log record with non-strings as `extra` keys would make the SDK crash.
