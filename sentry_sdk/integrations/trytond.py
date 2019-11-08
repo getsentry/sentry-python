@@ -3,9 +3,14 @@ import sentry_sdk
 import sentry_sdk.integrations
 import sentry_sdk.integrations.logging
 
-from trytond.exceptions import TrytonException as TrytondBaseException
-from trytond.wsgi import app
+from trytond.exceptions import TrytonException as TrytondBaseException  # type: ignore
+from trytond.wsgi import app  # type: ignore
 
+
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from typing import Tuple
 
 # TODO: trytond_worker intergation
 
@@ -13,12 +18,12 @@ from trytond.wsgi import app
 class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
     identifier = "trytond_wsgi"
 
-    def __init__(self):
+    def __init__(self):  # type: () -> None
         pass
 
     @staticmethod
-    def setup_once():
-        def error_handler(e):
+    def setup_once():  # type: () -> None
+        def error_handler(e):  # type: (Exception) -> None
             if isinstance(e, TrytondBaseException):
                 return
             else:
@@ -30,7 +35,7 @@ class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
         if hasattr(app, "error_handler"):
 
             @app.error_handler
-            def _(app, request, e):
+            def _(app, request, e):  # type: ignore
                 error_handler(e)
 
         else:
@@ -39,6 +44,7 @@ class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
 
 class TrytondSentryHandler(logging.NullHandler):
     def __init__(self, dsn, ignore=tuple()):
+        # type: (str, Tuple[str, ...]) -> None
         super(TrytondSentryHandler, self).__init__()
 
         # There is no clean way to run a static configuration code block
