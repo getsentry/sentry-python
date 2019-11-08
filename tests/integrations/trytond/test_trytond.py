@@ -4,6 +4,7 @@ import unittest.mock
 
 pytest.importorskip("trytond")
 
+import trytond
 from trytond.exceptions import TrytonException as TrytondBaseException
 from trytond.exceptions import UserError as TrytondUserError
 from trytond.exceptions import UserWarning as TrytondUserWarning
@@ -76,6 +77,9 @@ def test_trytonderrors_not_captured(
     assert not exceptions
 
 
+@pytest.mark.skipif(
+    trytond.__version__.split(".") < ["5", "4"], reason="At least Trytond-5.4 required"
+)
 def test_rpc_error_page(sentry_init, app, capture_events, get_client):
     """Test that, after initializing the Trytond-SentrySDK integration
     a custom error handler can be registered to the Trytond WSGI app so as to
