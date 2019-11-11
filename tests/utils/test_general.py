@@ -36,6 +36,19 @@ def test_safe_repr_regressions():
     assert u"лошадь" in safe_repr(u"лошадь")
 
 
+@pytest.mark.xfail(
+    sys.version_info < (3,),
+    reason="Fixing this in Python 2 would break other behaviors",
+)
+@pytest.mark.parametrize("prefix", (u"", u"abcd", u"лошадь"))
+@pytest.mark.parametrize("character", u"\x00\x07\x1b\n")
+def test_safe_repr_non_printable(prefix, character):
+    """Check that non-printable characters are escaped"""
+    string = prefix + character
+    assert character not in safe_repr(string)
+    assert character not in safe_repr(string.encode("utf-8"))
+
+
 def test_abs_path():
     """Check if abs_path is actually an absolute path. This can happen either
     with eval/exec like here, or when the file in the frame is relative to

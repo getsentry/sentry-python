@@ -36,10 +36,16 @@ if PY2:
     # Importing ABCs from collections is deprecated, and will stop working in 3.8
     # https://github.com/python/cpython/blob/master/Lib/collections/__init__.py#L49
     from collections import Mapping, Sequence
+
+    serializable_str_types = string_types
+
 else:
     # New in 3.3
     # https://docs.python.org/3/library/collections.abc.html
     from collections.abc import Mapping, Sequence
+
+    # Bytes are technically not strings in Python 3, but we can serialize them
+    serializable_str_types = (str, bytes)
 
 MAX_DATABAG_DEPTH = 5
 MAX_DATABAG_BREADTH = 10
@@ -285,7 +291,7 @@ def serialize(event, **kwargs):
 
             return rv_dict
 
-        elif not isinstance(obj, string_types) and isinstance(obj, Sequence):
+        elif not isinstance(obj, serializable_str_types) and isinstance(obj, Sequence):
             rv_list = []
 
             for i, v in enumerate(obj):
