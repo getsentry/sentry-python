@@ -50,7 +50,6 @@ class TornadoIntegration(Integration):
                 "The tornado integration for Sentry requires Python 3.6+ or the aiocontextvars package"
             )
 
-        ignore_logger("tornado.application")
         ignore_logger("tornado.access")
 
         old_execute = RequestHandler._execute
