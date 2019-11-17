@@ -54,6 +54,7 @@ def test_basic(tornado_testcase, sentry_init, capture_events):
     event, = events
     exception, = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
+    assert exception["mechanism"]["type"] == "tornado"
 
     request = event["request"]
     host = request["headers"]["Host"]
