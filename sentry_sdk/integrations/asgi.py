@@ -19,6 +19,7 @@ if MYPY:
     from typing import Dict
     from typing import Any
     from typing import Optional
+    from typing import Callable
 
     from sentry_sdk._types import Event, Hint
 
@@ -40,6 +41,7 @@ def _capture_exception(hub, exc):
 
 
 def _looks_like_asgi3(app):
+    # type: (Any) -> bool
     """
     Try to figure out if an application object supports ASGI3.
 
@@ -50,7 +52,7 @@ def _looks_like_asgi3(app):
     elif inspect.isfunction(app):
         return asyncio.iscoroutinefunction(app)
     else:
-        call = getattr(app, "__call__", None)
+        call = getattr(app, "__call__", None)  # noqa
         return asyncio.iscoroutinefunction(call)
 
 
@@ -62,11 +64,12 @@ class SentryAsgiMiddleware:
         self.app = app
 
         if _looks_like_asgi3(app):
-            self.__call__ = self._run_asgi3
+            self.__call__ = self._run_asgi3  # type: Callable[..., Any]
         else:
             self.__call__ = self._run_asgi2
 
     def _run_asgi2(self, scope):
+        # type: (Any) -> Any
         async def inner(receive, send):
             # type: (Any, Any) -> Any
             return await self._run_app(scope, lambda: self.app(scope)(receive, send))
@@ -74,6 +77,7 @@ class SentryAsgiMiddleware:
         return inner
 
     async def _run_asgi3(self, scope, receive, send):
+        # type: (Any, Any, Any) -> Any
         return await self._run_app(scope, lambda: self.app(scope, receive, send))
 
     async def _run_app(self, scope, callback):
