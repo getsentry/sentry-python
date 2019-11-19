@@ -18,36 +18,53 @@ class RedisIntegration(Integration):
         # type: () -> None
         import redis
 
-        old_execute_command = redis.StrictRedis.execute_command
+        patch_redis_client(redis.StrictRedis)
 
-        def sentry_patched_execute_command(self, name, *args, **kwargs):
-            # type: (redis.StrictRedis, str, *Any, **Any) -> Any
-            hub = Hub.current
+        try:
+            import rb.clients  # type: ignore
+        except ImportError:
+            pass
+        else:
+            patch_redis_client(rb.clients.FanoutClient)
+            patch_redis_client(rb.clients.MappingClient)
+            patch_redis_client(rb.clients.RoutingClient)
 
-            if hub.get_integration(RedisIntegration) is None:
-                return old_execute_command(self, name, *args, **kwargs)
 
-            description = name
+def patch_redis_client(cls):
+    # type: (Any) -> None
+    """
+    This function can be used to instrument custom redis client classes or
+    subclasses.
+    """
 
-            with capture_internal_exceptions():
-                description_parts = [name]
-                for i, arg in enumerate(args):
-                    if i > 10:
-                        break
+    old_execute_command = cls.execute_command
 
-                    description_parts.append(repr(arg))
+    def sentry_patched_execute_command(self, name, *args, **kwargs):
+        # type: (Any, str, *Any, **Any) -> Any
+        hub = Hub.current
 
-                description = " ".join(description_parts)
+        if hub.get_integration(RedisIntegration) is None:
+            return old_execute_command(self, name, *args, **kwargs)
 
-            with hub.start_span(op="redis", description=description) as span:
-                if name:
-                    span.set_tag("redis.command", name)
+        description = name
 
-                if name and args and name.lower() in ("get", "set", "setex", "setnx"):
-                    span.set_tag("redis.key", args[0])
+        with capture_internal_exceptions():
+            description_parts = [name]
+            for i, arg in enumerate(args):
+                if i > 10:
+                    break
 
-                return old_execute_command(self, name, *args, **kwargs)
+                description_parts.append(repr(arg))
 
-        redis.StrictRedis.execute_command = (  # type: ignore
-            sentry_patched_execute_command  # type: ignore
-        )
+            description = " ".join(description_parts)
+
+        with hub.start_span(op="redis", description=description) as span:
+            if name:
+                span.set_tag("redis.command", name)
+
+            if name and args and name.lower() in ("get", "set", "setex", "setnx"):
+                span.set_tag("redis.key", args[0])
+
+            return old_execute_command(self, name, *args, **kwargs)
+
+    cls.execute_command = sentry_patched_execute_command
