@@ -21,7 +21,7 @@ class RedisIntegration(Integration):
         patch_redis_client(redis.StrictRedis)
 
         try:
-            import rb.clients
+            import rb.clients  # type: ignore
         except ImportError:
             pass
         else:
@@ -31,6 +31,7 @@ class RedisIntegration(Integration):
 
 
 def patch_redis_client(cls):
+    # type: (Any) -> None
     """
     This function can be used to instrument custom redis client classes or
     subclasses.
@@ -39,7 +40,7 @@ def patch_redis_client(cls):
     old_execute_command = cls.execute_command
 
     def sentry_patched_execute_command(self, name, *args, **kwargs):
-        # type: (redis.StrictRedis, str, *Any, **Any) -> Any
+        # type: (Any, str, *Any, **Any) -> Any
         hub = Hub.current
 
         if hub.get_integration(RedisIntegration) is None:
@@ -66,6 +67,4 @@ def patch_redis_client(cls):
 
             return old_execute_command(self, name, *args, **kwargs)
 
-    cls.execute_command = (  # type: ignore
-        sentry_patched_execute_command  # type: ignore
-    )
+    cls.execute_command = sentry_patched_execute_command
