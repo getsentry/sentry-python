@@ -126,6 +126,9 @@ def _wrap_tracer(task, f):
             span.op = "celery.task"
             span.transaction = "unknown celery task"
 
+            # Could possibly use a better hook than this one
+            span.set_status("ok")
+
             with capture_internal_exceptions():
                 # Celery task objects are not a thing to be trusted. Even
                 # something such as attribute access can fail.
@@ -194,7 +197,12 @@ def _capture_exception(task, exc_info):
     if hub.get_integration(CeleryIntegration) is None:
         return
     if isinstance(exc_info[1], CELERY_CONTROL_FLOW_EXCEPTIONS):
+        # ??? Doesn't map to anything
+        _set_status(hub, "aborted")
         return
+
+    _set_status(hub, "internal_error")
+
     if hasattr(task, "throws") and isinstance(exc_info[1], task.throws):
         return
 
@@ -209,10 +217,14 @@ def _capture_exception(task, exc_info):
 
     hub.capture_event(event, hint=hint)
 
+
+
+def _set_status(hub, status):
+    # type: (Hub, str) -> None
     with capture_internal_exceptions():
         with hub.configure_scope() as scope:
             if scope.span is not None:
-                scope.span.set_failure()
+                scope.span.set_status(status)
 
 
 def _patch_worker_exit():

@@ -68,4 +68,4 @@ def _dbapi_error(conn, *args):
     span = getattr(conn, "_sentry_sql_span", None)  # type: Optional[Span]
 
     if span is not None:
-        span.set_failure()
+        span.set_status("internal_error")
