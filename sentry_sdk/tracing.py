@@ -342,6 +342,7 @@ class Span(object):
                 "type": "transaction",
                 "transaction": self.transaction,
                 "contexts": {"trace": self.get_trace_context()},
+                "tags": self._tags,
                 "timestamp": self.timestamp,
                 "start_timestamp": self.start_timestamp,
                 "spans": [
