@@ -14,32 +14,28 @@ boto3 = pytest.importorskip("boto3")
 LAMBDA_PRELUDE = """
 from __future__ import print_function
 
+import time
+
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 import sentry_sdk
 import json
-from sentry_sdk.transport import Transport
+from sentry_sdk.transport import HttpTransport
 
-class TestTransport(Transport):
-    def __init__(self):
-        Transport.__init__(self)
-        self._queue = []
-
-    def capture_event(self, event):
-        self._queue.append(event)
-
-    def flush(self, timeout, callback=None):
+class TestTransport(HttpTransport):
+    def _send_event(self, event):
         # Delay event output like this to test proper shutdown
         # Note that AWS Lambda trunchates the log output to 4kb, so you better
         # pray that your events are smaller than that or else tests start
         # failing.
-        for event in self._queue:
-            print("EVENT:", json.dumps(event))
-        del self._queue[:]
+        time.sleep(1)
+        print("\\nEVENT:", json.dumps(event))
 
 def init_sdk(**extra_init_args):
     sentry_sdk.init(
-        transport=TestTransport(),
+        dsn="https://123abc@example.com/123",
+        transport=TestTransport,
         integrations=[AwsLambdaIntegration()],
+        shutdown_timeout=10,
         **extra_init_args
     )
 """
@@ -58,7 +54,7 @@ def lambda_client():
     )
 
 
-@pytest.fixture(params=["python3.6", "python3.7", "python2.7"])
+@pytest.fixture(params=["python3.6", "python3.7", "python3.8", "python2.7"])
 def run_lambda_function(tmpdir, lambda_client, request, semaphore_normalize):
     def inner(code, payload):
         runtime = request.param
