@@ -260,10 +260,12 @@ class Span(object):
         self._data[key] = value
 
     def set_status(self, value):
+        # type: (str) -> None
         self.set_tag("status", value)
 
     def set_http_status(self, http_status):
-        span.set_tag("http.status_code", http_status)
+        # type: (int) -> None
+        self.set_tag("http.status_code", http_status)
 
         if http_status < 400:
             self.set_status("ok")
