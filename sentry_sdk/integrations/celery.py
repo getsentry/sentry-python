@@ -218,7 +218,6 @@ def _capture_exception(task, exc_info):
     hub.capture_event(event, hint=hint)
 
 
-
 def _set_status(hub, status):
     # type: (Hub, str) -> None
     with capture_internal_exceptions():
