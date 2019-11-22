@@ -25,7 +25,7 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
         span1, span2 = event["spans"]
         parent_span = event
-        assert span1["tags"]["status"] == "failure"
+        assert span1["tags"]["status"] == "internal_error"
         assert span1["op"] == "foo"
         assert span1["description"] == "foodesc"
         assert "status" not in span2.get("tags", {})

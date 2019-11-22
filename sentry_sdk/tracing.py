@@ -465,7 +465,7 @@ def record_http_request(hub, url, method):
         finally:
             if span is not None:
                 if "status_code" in data_dict:
-                    span.set_tag("http.status_code", data_dict["status_code"])
+                    span.set_http_status(data_dict['status_code'])
                 for k, v in data_dict.items():
                     span.set_data(k, v)
 
