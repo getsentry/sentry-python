@@ -126,7 +126,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     if task_fails:
         assert execution_event["contexts"]["trace"]["status"] == "internal_error"
     else:
-        assert "status" not in execution_event["contexts"]["trace"]
+        assert execution_event["contexts"]["trace"]["status"] == "ok"
 
     assert execution_event["spans"] == []
     assert submission_event["spans"] == [
