@@ -477,7 +477,7 @@ def _maybe_create_breadcrumbs_from_span(hub, span):
         hub.add_breadcrumb(
             message=span.description, type="redis", category="redis", data=span._tags
         )
-    elif span.op == "http" and span.is_success():
+    elif span.op == "http":
         hub.add_breadcrumb(type="http", category="httplib", data=span._data)
     elif span.op == "subprocess":
         hub.add_breadcrumb(
