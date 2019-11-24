@@ -465,8 +465,11 @@ def record_http_request(hub, url, method):
             yield data_dict
         finally:
             if span is not None:
-                if "status_code" in data_dict:
-                    span.set_http_status(data_dict["status_code"])
+                with capture_internal_exceptions():
+                    status = data_dict.get("status_code")
+                    if status:
+                        span.set_http_status(int(status))
+
                 for k, v in data_dict.items():
                     span.set_data(k, v)
 
