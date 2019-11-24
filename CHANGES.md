@@ -27,6 +27,12 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.13.3
+
+* Fix an issue with the ASGI middleware that would cause Uvicorn to infer the wrong ASGI versions and call the wrapped application with the wrong argument count.
+* Do not ignore the `tornado.application` logger.
+* The Redis integration now instruments Redis blaster for breadcrumbs and transaction spans.
+
 ## 0.13.2
 
 * Fix a bug in APM that would cause wrong durations to be displayed on non-UTC servers.
