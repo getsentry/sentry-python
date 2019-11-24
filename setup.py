@@ -25,9 +25,18 @@ setup(
     license="BSD",
     install_requires=["urllib3>=1.10.0", "certifi"],
     extras_require={
-        "flask": ["flask>=0.8", "blinker>=1.1"],
+        "flask": ["flask>=0.11", "blinker>=1.1"],
         "bottle": ["bottle>=0.12.13"],
         "falcon": ["falcon>=1.4"],
+        "django": ["django>=1.8"],
+        "sanic": ["sanic>=0.8"],
+        "celery": ["celery>=3"],
+        "beam": ["beam>=2.12"],
+        "rq": ["0.6"],
+        "aiohttp": ["aiohttp>=3.5"],
+        "tornado": ["tornado>=5"],
+        "sqlalchemy": ["sqlalchemy>=1.2"],
+        "pyspark": ["pyspark>=2.4.4"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
@@ -43,6 +52,7 @@ setup(
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
 )

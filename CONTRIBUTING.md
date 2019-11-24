@@ -44,6 +44,12 @@ The usual release process goes like this:
 
     * Allow the user to disable the integration by changing the client. Check `Hub.current.get_integration(MyIntegration)` from within your signal handlers to see if your integration is still active before you do anything impactful (such as sending an event).
 
+3. Update package metadata.
+
+    * We use `extras_require` in `setup.py` to communicate minimum version requirements for integrations. People can use this in combination with tools like Poetry or Pipenv to detect conflicts between our supported versions and their used versions programmatically.
+
+      Do not set upper-bounds on version requirements as people are often faster in adopting new versions of a web framework than we are in adding them to the test matrix or our package metadata.
+
 2. Write the [docs](https://github.com/getsentry/sentry-docs). Answer the following questions:
 
     * What does your integration do? Split in two sections: Executive summary at top and exact behavior further down.
