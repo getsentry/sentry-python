@@ -455,25 +455,6 @@ def record_sql_queries(
         yield span
 
 
-@contextlib.contextmanager
-def record_http_request(hub, url, method):
-    # type: (sentry_sdk.Hub, str, str) -> Generator[Dict[str, str], None, None]
-    data_dict = {"url": url, "method": method}
-
-    with hub.start_span(op="http", description="%s %s" % (method, url)) as span:
-        try:
-            yield data_dict
-        finally:
-            if span is not None:
-                with capture_internal_exceptions():
-                    status = data_dict.get("status_code")
-                    if status:
-                        span.set_http_status(int(status))
-
-                for k, v in data_dict.items():
-                    span.set_data(k, v)
-
-
 def _maybe_create_breadcrumbs_from_span(hub, span):
     # type: (sentry_sdk.Hub, Span) -> None
     if span.op == "redis":
