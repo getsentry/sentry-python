@@ -81,14 +81,10 @@ def _install_httplib():
         recorder = record_http_request(hub, real_url, method)
         data_dict = recorder.__enter__()
 
-        try:
-            rv = real_putrequest(self, method, url, *args, **kwargs)
+        rv = real_putrequest(self, method, url, *args, **kwargs)
 
-            for key, value in hub.iter_trace_propagation_headers():
-                self.putheader(key, value)
-        except Exception:
-            recorder.__exit__(*sys.exc_info())
-            raise
+        for key, value in hub.iter_trace_propagation_headers():
+            self.putheader(key, value)
 
         self._sentrysdk_recorder = recorder
         self._sentrysdk_data_dict = data_dict
