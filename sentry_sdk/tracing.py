@@ -272,6 +272,8 @@ class Span(object):
         elif 400 <= http_status < 500:
             if http_status == 403:
                 self.set_status("permission_denied")
+            elif http_status == 404:
+                self.set_status("not_found")
             elif http_status == 429:
                 self.set_status("resource_exhausted")
             elif http_status == 413:
