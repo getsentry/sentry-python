@@ -275,23 +275,18 @@ def serialize(event, **kwargs):
                     break
 
                 str_k = text_type(k)
-                if v is None:
-                    rv_dict[str_k] = v
-                    i += 1
-                else:
-                    v = _serialize_node(
-                        v,
-                        segment=str_k,
-                        should_repr_strings=should_repr_strings,
-                        is_databag=is_databag,
-                        remaining_depth=remaining_depth - 1
-                        if remaining_depth is not None
-                        else None,
-                        remaining_breadth=remaining_breadth,
-                    )
-                    if v is not None:
-                        rv_dict[str_k] = v
-                        i += 1
+                v = _serialize_node(
+                    v,
+                    segment=str_k,
+                    should_repr_strings=should_repr_strings,
+                    is_databag=is_databag,
+                    remaining_depth=remaining_depth - 1
+                    if remaining_depth is not None
+                    else None,
+                    remaining_breadth=remaining_breadth,
+                )
+                rv_dict[str_k] = v
+                i += 1
 
             return rv_dict
 
