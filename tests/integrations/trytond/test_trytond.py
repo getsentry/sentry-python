@@ -1,4 +1,5 @@
 import pytest
+
 pytest.importorskip("trytond")
 
 import json
