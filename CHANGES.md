@@ -27,6 +27,12 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.13.4
+
+* Fix package classifiers to mark this package as supporting Python 3.8. The SDK supported 3.8 before though.
+* Update schema sent for transaction events (transaction status).
+* Fix a bug where `None` inside request data was skipped/omitted.
+
 ## 0.13.3
 
 * Fix an issue with the ASGI middleware that would cause Uvicorn to infer the wrong ASGI versions and call the wrapped application with the wrong argument count.
