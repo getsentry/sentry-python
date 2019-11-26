@@ -414,7 +414,11 @@ def record_sql_queries(
 
     query = _format_sql(cursor, query)
 
-    data = {"db.params": params_list, "db.paramstyle": paramstyle}
+    data = {}
+    if params_list is not None:
+        data["db.params"] = params_list
+    if paramstyle is not None:
+        data["db.paramstyle"] = paramstyle
     if executemany:
         data["db.executemany"] = True
 
