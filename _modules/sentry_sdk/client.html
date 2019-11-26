@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.client &#8212; sentry-python 0.13.3 documentation</title>
+    <title>sentry_sdk.client &#8212; sentry-python 0.13.4 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -34,11 +34,11 @@
 <span></span><span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">uuid</span>
 <span class="kn">import</span> <span class="nn">random</span>
-<span class="kn">from</span> <span class="nn">datetime</span> <span class="k">import</span> <span class="n">datetime</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
 <span class="kn">import</span> <span class="nn">socket</span>
 
-<span class="kn">from</span> <span class="nn">sentry_sdk._compat</span> <span class="k">import</span> <span class="n">string_types</span><span class="p">,</span> <span class="n">text_type</span><span class="p">,</span> <span class="n">iteritems</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="k">import</span> <span class="p">(</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk._compat</span> <span class="kn">import</span> <span class="n">string_types</span><span class="p">,</span> <span class="n">text_type</span><span class="p">,</span> <span class="n">iteritems</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">handle_in_app</span><span class="p">,</span>
     <span class="n">get_type_name</span><span class="p">,</span>
     <span class="n">capture_internal_exceptions</span><span class="p">,</span>
@@ -46,22 +46,22 @@
     <span class="n">disable_capture_event</span><span class="p">,</span>
     <span class="n">logger</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.serializer</span> <span class="k">import</span> <span class="n">serialize</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.transport</span> <span class="k">import</span> <span class="n">make_transport</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="k">import</span> <span class="n">DEFAULT_OPTIONS</span><span class="p">,</span> <span class="n">SDK_INFO</span><span class="p">,</span> <span class="n">ClientConstructor</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="k">import</span> <span class="n">setup_integrations</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="k">import</span> <span class="n">ContextVar</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.serializer</span> <span class="kn">import</span> <span class="n">serialize</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.transport</span> <span class="kn">import</span> <span class="n">make_transport</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="kn">import</span> <span class="n">DEFAULT_OPTIONS</span><span class="p">,</span> <span class="n">SDK_INFO</span><span class="p">,</span> <span class="n">ClientConstructor</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">setup_integrations</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">ContextVar</span>
 
-<span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="k">import</span> <span class="n">MYPY</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">MYPY</span>
 
 <span class="k">if</span> <span class="n">MYPY</span><span class="p">:</span>
-    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Any</span>
-    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Callable</span>
-    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Dict</span>
-    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Optional</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
 
-    <span class="kn">from</span> <span class="nn">sentry_sdk.scope</span> <span class="k">import</span> <span class="n">Scope</span>
-    <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="k">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">Hint</span>
+    <span class="kn">from</span> <span class="nn">sentry_sdk.scope</span> <span class="kn">import</span> <span class="n">Scope</span>
+    <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">Hint</span>
 
 
 <span class="n">_client_init_debug</span> <span class="o">=</span> <span class="n">ContextVar</span><span class="p">(</span><span class="s2">&quot;client_init_debug&quot;</span><span class="p">)</span>
@@ -107,7 +107,7 @@
 <span class="sd">    argument.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="c1"># type: (*Any, **Any) -&gt; None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">get_options</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>  <span class="c1"># type: Dict[str, Any]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_init_impl</span><span class="p">()</span>
@@ -326,16 +326,16 @@
                 <span class="n">timeout</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;shutdown_timeout&quot;</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; _Client</span>
         <span class="k">return</span> <span class="bp">self</span>
 
-    <span class="k">def</span> <span class="nf">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
         <span class="c1"># type: (Any, Any, Any) -&gt; None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 
 
-<span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="k">import</span> <span class="n">MYPY</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">MYPY</span>
 
 <span class="k">if</span> <span class="n">MYPY</span><span class="p">:</span>
     <span class="c1"># Make mypy, PyCharm and other static analyzers think `get_options` is a</span>

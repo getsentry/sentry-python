@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.transport &#8212; sentry-python 0.13.3 documentation</title>
+    <title>sentry_sdk.transport &#8212; sentry-python 0.13.4 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -31,7 +31,7 @@
           <div class="body" role="main">
             
   <h1>Source code for sentry_sdk.transport</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="k">import</span> <span class="n">print_function</span>
+<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">print_function</span>
 
 <span class="kn">import</span> <span class="nn">json</span>
 <span class="kn">import</span> <span class="nn">io</span>
@@ -39,29 +39,29 @@
 <span class="kn">import</span> <span class="nn">certifi</span>
 <span class="kn">import</span> <span class="nn">gzip</span>
 
-<span class="kn">from</span> <span class="nn">datetime</span> <span class="k">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span>
 
-<span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="k">import</span> <span class="n">Dsn</span><span class="p">,</span> <span class="n">logger</span><span class="p">,</span> <span class="n">capture_internal_exceptions</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.worker</span> <span class="k">import</span> <span class="n">BackgroundWorker</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">Dsn</span><span class="p">,</span> <span class="n">logger</span><span class="p">,</span> <span class="n">capture_internal_exceptions</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.worker</span> <span class="kn">import</span> <span class="n">BackgroundWorker</span>
 
-<span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="k">import</span> <span class="n">MYPY</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">MYPY</span>
 
 <span class="k">if</span> <span class="n">MYPY</span><span class="p">:</span>
-    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Type</span>
-    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Any</span>
-    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Optional</span>
-    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Dict</span>
-    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Union</span>
-    <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Callable</span>
-    <span class="kn">from</span> <span class="nn">urllib3.poolmanager</span> <span class="k">import</span> <span class="n">PoolManager</span>  <span class="c1"># type: ignore</span>
-    <span class="kn">from</span> <span class="nn">urllib3.poolmanager</span> <span class="k">import</span> <span class="n">ProxyManager</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Type</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
+    <span class="kn">from</span> <span class="nn">urllib3.poolmanager</span> <span class="kn">import</span> <span class="n">PoolManager</span>  <span class="c1"># type: ignore</span>
+    <span class="kn">from</span> <span class="nn">urllib3.poolmanager</span> <span class="kn">import</span> <span class="n">ProxyManager</span>
 
-    <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="k">import</span> <span class="n">Event</span>
+    <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">Event</span>
 
 <span class="k">try</span><span class="p">:</span>
-    <span class="kn">from</span> <span class="nn">urllib.request</span> <span class="k">import</span> <span class="n">getproxies</span>
+    <span class="kn">from</span> <span class="nn">urllib.request</span> <span class="kn">import</span> <span class="n">getproxies</span>
 <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-    <span class="kn">from</span> <span class="nn">urllib</span> <span class="k">import</span> <span class="n">getproxies</span>  <span class="c1"># type: ignore</span>
+    <span class="kn">from</span> <span class="nn">urllib</span> <span class="kn">import</span> <span class="n">getproxies</span>  <span class="c1"># type: ignore</span>
 
 
 <div class="viewcode-block" id="Transport"><a class="viewcode-back" href="../../api.html#sentry_sdk.Transport">[docs]</a><span class="k">class</span> <span class="nc">Transport</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
@@ -72,7 +72,7 @@
 
     <span class="n">parsed_dsn</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[Dsn]</span>
 
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
@@ -105,7 +105,7 @@
         <span class="sd">&quot;&quot;&quot;Forcefully kills the transport.&quot;&quot;&quot;</span>
         <span class="k">pass</span></div>
 
-    <span class="k">def</span> <span class="nf">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; None</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
@@ -116,11 +116,11 @@
 <div class="viewcode-block" id="HttpTransport"><a class="viewcode-back" href="../../api.html#sentry_sdk.HttpTransport">[docs]</a><span class="k">class</span> <span class="nc">HttpTransport</span><span class="p">(</span><span class="n">Transport</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;The default HTTP transport.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">options</span>  <span class="c1"># type: Dict[str, Any]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
-        <span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="k">import</span> <span class="n">VERSION</span>
+        <span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="kn">import</span> <span class="n">VERSION</span>
 
         <span class="n">Transport</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -137,7 +137,7 @@
             <span class="n">ca_certs</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;ca_certs&quot;</span><span class="p">],</span>
         <span class="p">)</span>
 
-        <span class="kn">from</span> <span class="nn">sentry_sdk</span> <span class="k">import</span> <span class="n">Hub</span>
+        <span class="kn">from</span> <span class="nn">sentry_sdk</span> <span class="kn">import</span> <span class="n">Hub</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">hub_cls</span> <span class="o">=</span> <span class="n">Hub</span>
 
@@ -259,7 +259,7 @@
 
 
 <span class="k">class</span> <span class="nc">_FunctionTransport</span><span class="p">(</span><span class="n">Transport</span><span class="p">):</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">func</span>  <span class="c1"># type: Callable[[Event], None]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
