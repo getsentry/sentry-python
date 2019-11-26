@@ -135,6 +135,7 @@ COMMON_RECORD_ATTRS = frozenset(
         "tags",
         "thread",
         "threadName",
+        "stack_info",
     )
 )
 

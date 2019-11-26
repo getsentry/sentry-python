@@ -266,7 +266,7 @@ def serialize(event, **kwargs):
             # might mutate our dictionary while we're still iterating over it.
             obj = dict(iteritems(obj))
 
-            rv_dict = {}
+            rv_dict = {}  # type: Dict[str, Any]
             i = 0
 
             for k, v in iteritems(obj):
