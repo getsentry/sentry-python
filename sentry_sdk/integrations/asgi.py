@@ -108,6 +108,9 @@ class SentryAsgiMiddleware:
                 span.transaction = "generic ASGI request"
 
                 with hub.start_span(span) as span:
+                    # XXX: Would be cool to have correct span status, but we
+                    # would have to wrap send(). That is a bit hard to do with
+                    # the current abstraction over ASGI 2/3.
                     try:
                         return await callback()
                     except Exception as exc:

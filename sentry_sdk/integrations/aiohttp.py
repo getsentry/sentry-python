@@ -79,11 +79,15 @@ class AioHttpIntegration(Integration):
                     with hub.start_span(span):
                         try:
                             response = await old_handle(self, request)
-                        except HTTPException:
+                        except HTTPException as e:
+                            span.set_http_status(e.status_code)
                             raise
                         except Exception:
+                            # This will probably map to a 500 but seems like we
+                            # have no way to tell. Do not set span status.
                             reraise(*_capture_exception(hub))
 
+                        span.set_http_status(response.status)
                         return response
 
             # Explicitly wrap in task such that current contextvar context is

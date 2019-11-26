@@ -6,7 +6,7 @@ import platform
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.tracing import EnvironHeaders, record_http_request
+from sentry_sdk.tracing import EnvironHeaders
 from sentry_sdk.utils import capture_internal_exceptions, safe_repr
 
 from sentry_sdk._types import MYPY
@@ -78,48 +78,33 @@ def _install_httplib():
                 url,
             )
 
-        recorder = record_http_request(hub, real_url, method)
-        data_dict = recorder.__enter__()
+        span = hub.start_span(op="http", description="%s %s" % (method, real_url))
 
-        try:
-            rv = real_putrequest(self, method, url, *args, **kwargs)
+        span.set_data("method", method)
+        span.set_data("url", real_url)
 
-            for key, value in hub.iter_trace_propagation_headers():
-                self.putheader(key, value)
-        except Exception:
-            recorder.__exit__(*sys.exc_info())
-            raise
+        rv = real_putrequest(self, method, url, *args, **kwargs)
 
-        self._sentrysdk_recorder = recorder
-        self._sentrysdk_data_dict = data_dict
+        for key, value in hub.iter_trace_propagation_headers():
+            self.putheader(key, value)
+
+        self._sentrysdk_span = span
 
         return rv
 
     def getresponse(self, *args, **kwargs):
         # type: (HTTPConnection, *Any, **Any) -> Any
-        recorder = getattr(self, "_sentrysdk_recorder", None)
+        span = getattr(self, "_sentrysdk_span", None)
 
-        if recorder is None:
+        if span is None:
             return real_getresponse(self, *args, **kwargs)
 
-        data_dict = getattr(self, "_sentrysdk_data_dict", None)
+        rv = real_getresponse(self, *args, **kwargs)
 
-        try:
-            rv = real_getresponse(self, *args, **kwargs)
-
-            if data_dict is not None:
-                data_dict["status_code"] = rv.status
-                data_dict["reason"] = rv.reason
-        except TypeError:
-            # python-requests provokes a typeerror to discover py3 vs py2 differences
-            #
-            # > TypeError("getresponse() got an unexpected keyword argument 'buffering'")
-            raise
-        except Exception:
-            recorder.__exit__(*sys.exc_info())
-            raise
-        else:
-            recorder.__exit__(None, None, None)
+        span.set_data("status_code", rv.status)
+        span.set_http_status(int(rv.status))
+        span.set_data("reason", rv.reason)
+        span.finish()
 
         return rv
 

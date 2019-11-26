@@ -173,7 +173,7 @@ class Span(object):
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         if value is not None:
-            self.set_failure()
+            self._tags.setdefault("status", "internal_error")
 
         hub, scope, old_span = self._context_manager_state
         del self._context_manager_state
@@ -259,17 +259,44 @@ class Span(object):
         # type: (str, Any) -> None
         self._data[key] = value
 
-    def set_failure(self):
-        # type: () -> None
-        self.set_tag("status", "failure")
+    def set_status(self, value):
+        # type: (str) -> None
+        self.set_tag("status", value)
 
-    def set_success(self):
-        # type: () -> None
-        self.set_tag("status", "success")
+    def set_http_status(self, http_status):
+        # type: (int) -> None
+        self.set_tag("http.status_code", http_status)
+
+        if http_status < 400:
+            self.set_status("ok")
+        elif 400 <= http_status < 500:
+            if http_status == 403:
+                self.set_status("permission_denied")
+            elif http_status == 429:
+                self.set_status("resource_exhausted")
+            elif http_status == 413:
+                self.set_status("failed_precondition")
+            elif http_status == 401:
+                self.set_status("unauthenticated")
+            elif http_status == 409:
+                self.set_status("already_exists")
+            else:
+                self.set_status("invalid_argument")
+        elif 500 <= http_status < 600:
+            if http_status == 504:
+                self.set_status("deadline_exceeded")
+            elif http_status == 501:
+                self.set_status("unimplemented")
+            elif http_status == 503:
+                self.set_status("unavailable")
+            else:
+                self.set_status("internal_error")
+        else:
+            self.set_status("unknown_error")
 
     def is_success(self):
         # type: () -> bool
-        return self._tags.get("status") in (None, "success")
+        return self._tags.get("status") == "ok"
 
     def finish(self, hub=None):
         # type: (Optional[sentry_sdk.Hub]) -> Optional[str]
@@ -315,6 +342,7 @@ class Span(object):
                 "type": "transaction",
                 "transaction": self.transaction,
                 "contexts": {"trace": self.get_trace_context()},
+                "tags": self._tags,
                 "timestamp": self.timestamp,
                 "start_timestamp": self.start_timestamp,
                 "spans": [
@@ -427,29 +455,13 @@ def record_sql_queries(
         yield span
 
 
-@contextlib.contextmanager
-def record_http_request(hub, url, method):
-    # type: (sentry_sdk.Hub, str, str) -> Generator[Dict[str, str], None, None]
-    data_dict = {"url": url, "method": method}
-
-    with hub.start_span(op="http", description="%s %s" % (method, url)) as span:
-        try:
-            yield data_dict
-        finally:
-            if span is not None:
-                if "status_code" in data_dict:
-                    span.set_tag("http.status_code", data_dict["status_code"])
-                for k, v in data_dict.items():
-                    span.set_data(k, v)
-
-
 def _maybe_create_breadcrumbs_from_span(hub, span):
     # type: (sentry_sdk.Hub, Span) -> None
     if span.op == "redis":
         hub.add_breadcrumb(
             message=span.description, type="redis", category="redis", data=span._tags
         )
-    elif span.op == "http" and span.is_success():
+    elif span.op == "http":
         hub.add_breadcrumb(type="http", category="httplib", data=span._data)
     elif span.op == "subprocess":
         hub.add_breadcrumb(

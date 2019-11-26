@@ -570,7 +570,7 @@ def test_tracing_success(sentry_init, capture_events, app):
 
     assert transaction_event["type"] == "transaction"
     assert transaction_event["transaction"] == "hi"
-    assert "status" not in transaction_event["contexts"]["trace"]
+    assert transaction_event["contexts"]["trace"]["status"] == "ok"
 
     assert message_event["message"] == "hi"
     assert message_event["transaction"] == "hi"
@@ -594,7 +594,7 @@ def test_tracing_error(sentry_init, capture_events, app):
 
     assert transaction_event["type"] == "transaction"
     assert transaction_event["transaction"] == "error"
-    assert transaction_event["contexts"]["trace"]["status"] == "failure"
+    assert transaction_event["contexts"]["trace"]["status"] == "internal_error"
 
     assert error_event["transaction"] == "error"
     exception, = error_event["exception"]["values"]
