@@ -123,7 +123,9 @@ async def test_403_not_captured(sentry_init, aiohttp_client, loop, capture_event
     assert not events
 
 
-async def test_cancelled_error_not_captured(sentry_init, aiohttp_client, loop, capture_events):
+async def test_cancelled_error_not_captured(
+    sentry_init, aiohttp_client, loop, capture_events
+):
     sentry_init(integrations=[AioHttpIntegration()])
 
     async def hello(request):
