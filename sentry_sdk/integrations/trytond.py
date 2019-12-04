@@ -1,9 +1,9 @@
 import sys
 
-import sentry_sdk
 import sentry_sdk.hub
 import sentry_sdk.utils
 import sentry_sdk.integrations
+import sentry_sdk.integrations.wsgi
 
 from trytond.exceptions import TrytonException  # type: ignore
 from trytond.wsgi import app  # type: ignore
@@ -20,6 +20,9 @@ class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
 
     @staticmethod
     def setup_once():  # type: () -> None
+
+        app.wsgi_app = sentry_sdk.integrations.wsgi.SentryWsgiMiddleware(app.wsgi_app)
+
         def error_handler(e):  # type: (Exception) -> None
             hub = sentry_sdk.hub.Hub.current
             if hub.get_integration(TrytondWSGIIntegration) is None:
