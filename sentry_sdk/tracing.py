@@ -205,7 +205,8 @@ class Span(object):
         parent = cls.from_traceparent(headers.get("sentry-trace"))
         if parent is None:
             return cls()
-        return parent.new_span(same_process_as_parent=False)
+        parent.same_process_as_parent = False
+        return parent
 
     def iter_headers(self):
         # type: () -> Generator[Tuple[str, str], None, None]
@@ -236,7 +237,7 @@ class Span(object):
         else:
             sampled = None
 
-        return cls(trace_id=trace_id, span_id=span_id, sampled=sampled)
+        return cls(trace_id=trace_id, parent_span_id=span_id, sampled=sampled)
 
     def to_traceparent(self):
         # type: () -> str
