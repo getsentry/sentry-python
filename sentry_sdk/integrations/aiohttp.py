@@ -82,6 +82,9 @@ class AioHttpIntegration(Integration):
                         except HTTPException as e:
                             span.set_http_status(e.status_code)
                             raise
+                        except asyncio.CancelledError:
+                            span.set_status("cancelled")
+                            raise
                         except Exception:
                             # This will probably map to a 500 but seems like we
                             # have no way to tell. Do not set span status.

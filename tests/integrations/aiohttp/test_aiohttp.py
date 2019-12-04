@@ -1,6 +1,9 @@
+import asyncio
 import json
+from contextlib import suppress
 
 from aiohttp import web
+from aiohttp.client import ServerDisconnectedError
 
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
 
@@ -116,6 +119,28 @@ async def test_403_not_captured(sentry_init, aiohttp_client, loop, capture_event
     client = await aiohttp_client(app)
     resp = await client.get("/")
     assert resp.status == 403
+
+    assert not events
+
+
+async def test_cancelled_error_not_captured(
+    sentry_init, aiohttp_client, loop, capture_events
+):
+    sentry_init(integrations=[AioHttpIntegration()])
+
+    async def hello(request):
+        raise asyncio.CancelledError()
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    events = capture_events()
+    client = await aiohttp_client(app)
+
+    with suppress(ServerDisconnectedError):
+        # Intended `aiohttp` interaction: server will disconnect if it
+        # encounters `asyncio.CancelledError`
+        await client.get("/")
 
     assert not events
 
