@@ -1,16 +1,24 @@
 import pytest
 
+import django
 
 from channels.testing import HttpCommunicator
 
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.django import DjangoIntegration
 
-from tests.integrations.django.myapp.asgi import application
+from tests.integrations.django.myapp.asgi import channels_application
+
+APPS = [channels_application]
+if django.VERSION >= (3, 0):
+    from tests.integrations.django.myapp.asgi import asgi_application
+
+    APPS += [asgi_application]
 
 
+@pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
-async def test_basic(sentry_init, capture_events):
+async def test_basic(sentry_init, capture_events, application):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     events = capture_events()
 
