@@ -59,6 +59,8 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
     assert span is not None
     assert span.sampled == sampled
     assert span.trace_id == old_span.trace_id
+    assert span.parent_span_id == old_span.span_id
+    assert span.span_id != old_span.span_id
 
     with Hub.current.start_span(span):
         with Hub.current.configure_scope() as scope:
