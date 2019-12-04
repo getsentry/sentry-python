@@ -1,5 +1,8 @@
+import sys
+
 import sentry_sdk
 import sentry_sdk.hub
+import sentry_sdk.utils
 import sentry_sdk.integrations
 
 from trytond.exceptions import TrytonException  # type: ignore
@@ -24,7 +27,10 @@ class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
             elif isinstance(e, TrytonException):
                 return
             else:
-                sentry_sdk.capture_exception(e)
+                (event, hint) = sentry_sdk.utils.event_from_exception(
+                    sys.exc_info()
+                )
+                hub.capture_event(event, hint=hint)
 
         # Expected error handlers signature was changed
         # when the error_handler decorator was introduced
