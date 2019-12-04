@@ -236,7 +236,7 @@ class Span(object):
         else:
             sampled = None
 
-        return cls(trace_id=trace_id, span_id=span_id, sampled=sampled)
+        return cls(trace_id=trace_id, parent_span_id=span_id, sampled=sampled)
 
     def to_traceparent(self):
         # type: () -> str
