@@ -27,9 +27,7 @@ class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
             elif isinstance(e, TrytonException):
                 return
             else:
-                (event, hint) = sentry_sdk.utils.event_from_exception(
-                    sys.exc_info()
-                )
+                (event, hint) = sentry_sdk.utils.event_from_exception(sys.exc_info())
                 hub.capture_event(event, hint=hint)
 
         # Expected error handlers signature was changed
