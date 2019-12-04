@@ -205,7 +205,7 @@ class Span(object):
         parent = cls.from_traceparent(headers.get("sentry-trace"))
         if parent is None:
             return cls()
-        parent.same_process_as_parent=False
+        parent.same_process_as_parent = False
         return parent
 
     def iter_headers(self):
