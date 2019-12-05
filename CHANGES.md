@@ -27,6 +27,11 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.13.5
+
+* Fix trace continuation bugs in APM.
+* No longer report `asyncio.CancelledError` as part of AIOHTTP integration.
+
 ## 0.13.4
 
 * Fix package classifiers to mark this package as supporting Python 3.8. The SDK supported 3.8 before though.
