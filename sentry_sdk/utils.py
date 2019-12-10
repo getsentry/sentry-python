@@ -748,11 +748,20 @@ def _get_contextvars():
     https://github.com/gevent/gevent/issues/1407
     """
     if not _is_threading_local_monkey_patched():
+        # aiocontextvars is a PyPI package that ensures that the contextvars
+        # backport (also a PyPI package) works with asyncio under Python 3.6
+        #
+        # Import it if available.
+        if not PY2 and sys.version_info < (3, 7):
+            try:
+                from aiocontextvars import ContextVar  # noqa
+
+                return True, ContextVar
+            except ImportError:
+                pass
+
         try:
             from contextvars import ContextVar
-
-            if not PY2 and sys.version_info < (3, 7):
-                import aiocontextvars  # noqa
 
             return True, ContextVar
         except ImportError:
