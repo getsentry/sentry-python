@@ -12,4 +12,9 @@ os.environ.setdefault(
 )
 
 django.setup()
-application = get_default_application()
+channels_application = get_default_application()
+
+if django.VERSION >= (3, 0):
+    from django.core.asgi import get_asgi_application
+
+    asgi_application = get_asgi_application()

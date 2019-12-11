@@ -109,6 +109,8 @@ class DjangoIntegration(Integration):
 
         WSGIHandler.__call__ = sentry_patched_wsgi_handler
 
+        _patch_django_asgi_handler()
+
         # patch get_response, because at that point we have the Django request
         # object
         from django.core.handlers.base import BaseHandler
@@ -312,6 +314,30 @@ def _patch_channels():
         return middleware(self.scope)(receive, send)
 
     AsgiHandler.__call__ = sentry_patched_asgi_handler
+
+
+def _patch_django_asgi_handler():
+    # type: () -> None
+    try:
+        from django.core.handlers.asgi import ASGIHandler
+    except ImportError:
+        return
+
+    if not HAS_REAL_CONTEXTVARS:
+        # We better have contextvars or we're going to leak state between
+        # requests.
+        #
+        # We cannot hard-raise here because Django may not be used at all in
+        # the current process.
+        logger.warning(
+            "We detected that you are using Django 3. To get proper "
+            "instrumentation for ASGI requests, the Sentry SDK requires "
+            "Python 3.7+ or the aiocontextvars package from PyPI."
+        )
+
+    from sentry_sdk.integrations.django.asgi import patch_django_asgi_handler_impl
+
+    patch_django_asgi_handler_impl(ASGIHandler)
 
 
 def _make_event_processor(weak_request, integration):
