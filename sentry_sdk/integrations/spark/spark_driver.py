@@ -18,23 +18,23 @@ class SparkIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        patch_spark_context_init()
+        from pyspark import SparkContext
+
+        sparkContext = SparkContext._active_spark_context
+        if sparkContext:
+            _set_sentry_metadata(sparkContext)
+        else:
+            patch_spark_context_init()
 
 
-def _set_app_properties():
-    # type: () -> None
+def _set_app_properties(sc):
+    # type: (Any) -> None
     """
     Set properties in driver that propagate to worker processes, allowing for workers to have access to those properties.
     This allows worker integration to have access to app_name and application_id.
     """
-    from pyspark import SparkContext
-
-    sparkContext = SparkContext._active_spark_context
-    if sparkContext:
-        sparkContext.setLocalProperty("sentry_app_name", sparkContext.appName)
-        sparkContext.setLocalProperty(
-            "sentry_application_id", sparkContext.applicationId
-        )
+    sc.setLocalProperty("sentry_app_name", sc.appName)
+    sc.setLocalProperty("sentry_application_id", sc.applicationId)
 
 
 def _start_sentry_listener(sc):
@@ -46,8 +46,43 @@ def _start_sentry_listener(sc):
 
     gw = sc._gateway
     ensure_callback_server_started(gw)
-    listener = SentryListener()
+    listener = SentryListener(sc)
     sc._jsc.sc().addSparkListener(listener)
+
+
+def _set_sentry_metadata(sc):
+    # type: (Any) -> None
+    _start_sentry_listener(sc)
+    _set_app_properties(sc)
+
+    def process_event(event, hint):
+        # type: (Event, Hint) -> Optional[Event]
+        with capture_internal_exceptions():
+            if Hub.current.get_integration(SparkIntegration) is None:
+                return event
+
+            event.setdefault("user", {}).setdefault("id", sc.sparkUser())
+
+            event.setdefault("tags", {}).setdefault(
+                "executor.id", sc._conf.get("spark.executor.id")
+            )
+            event["tags"].setdefault(
+                "spark-submit.deployMode", sc._conf.get("spark.submit.deployMode")
+            )
+            event["tags"].setdefault("driver.host", sc._conf.get("spark.driver.host"))
+            event["tags"].setdefault("driver.port", sc._conf.get("spark.driver.port"))
+            event["tags"].setdefault("spark_version", sc.version)
+            event["tags"].setdefault("app_name", sc.appName)
+            event["tags"].setdefault("application_id", sc.applicationId)
+            event["tags"].setdefault("master", sc.master)
+            event["tags"].setdefault("spark_home", sc.sparkHome)
+
+            event.setdefault("extra", {}).setdefault("web_url", sc.uiWebUrl)
+
+        return event
+
+    with configure_scope() as scope:
+        scope.add_event_processor(process_event)
 
 
 def patch_spark_context_init():
@@ -63,42 +98,7 @@ def patch_spark_context_init():
         if Hub.current.get_integration(SparkIntegration) is None:
             return init
 
-        _start_sentry_listener(self)
-        _set_app_properties()
-
-        with configure_scope() as scope:
-
-            @scope.add_event_processor
-            def process_event(event, hint):
-                # type: (Event, Hint) -> Optional[Event]
-                with capture_internal_exceptions():
-                    if Hub.current.get_integration(SparkIntegration) is None:
-                        return event
-
-                    event.setdefault("user", {}).setdefault("id", self.sparkUser())
-
-                    event.setdefault("tags", {}).setdefault(
-                        "executor.id", self._conf.get("spark.executor.id")
-                    )
-                    event["tags"].setdefault(
-                        "spark-submit.deployMode",
-                        self._conf.get("spark.submit.deployMode"),
-                    )
-                    event["tags"].setdefault(
-                        "driver.host", self._conf.get("spark.driver.host")
-                    )
-                    event["tags"].setdefault(
-                        "driver.port", self._conf.get("spark.driver.port")
-                    )
-                    event["tags"].setdefault("spark_version", self.version)
-                    event["tags"].setdefault("app_name", self.appName)
-                    event["tags"].setdefault("application_id", self.applicationId)
-                    event["tags"].setdefault("master", self.master)
-                    event["tags"].setdefault("spark_home", self.sparkHome)
-
-                    event.setdefault("extra", {}).setdefault("web_url", self.uiWebUrl)
-
-                return event
+        _set_sentry_metadata(self)
 
         return init
 
@@ -207,15 +207,17 @@ class SparkListener(object):
 
 
 class SentryListener(SparkListener):
-    def __init__(self):
-        # type: () -> None
+    def __init__(self, sc):
+        # type: (Any) -> None
         self.hub = Hub.current
+        self.sc = sc
 
     def onJobStart(self, jobStart):
         # type: (Any) -> None
         message = "Job {} Started".format(jobStart.jobId())
         self.hub.add_breadcrumb(level="info", message=message)
-        _set_app_properties()
+        # Set local properties as they sometimes will get cleared based on job/worker state
+        _set_app_properties(self.sc)
 
     def onJobEnd(self, jobEnd):
         # type: (Any) -> None
@@ -238,7 +240,7 @@ class SentryListener(SparkListener):
         message = "Stage {} Submitted".format(stageInfo.stageId())
         data = {"attemptId": stageInfo.attemptId(), "name": stageInfo.name()}
         self.hub.add_breadcrumb(level="info", message=message, data=data)
-        _set_app_properties()
+        _set_app_properties(self.sc)
 
     def onStageCompleted(self, stageCompleted):
         # type: (Any) -> None
