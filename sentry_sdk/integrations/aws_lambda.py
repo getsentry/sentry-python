@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+from os import environ
 import sys
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
@@ -158,15 +160,23 @@ class AwsLambdaIntegration(Integration):
 
 def _make_request_event_processor(aws_event, aws_context):
     # type: (Any, Any) -> EventProcessor
-    def event_processor(event, hint):
+    start_time = datetime.now()
+
+    def event_processor(event, hint, start_time=start_time):
         # type: (Event, Hint) -> Optional[Event]
         extra = event.setdefault("extra", {})
         extra["lambda"] = {
-            "remaining_time_in_millis": aws_context.get_remaining_time_in_millis(),
             "function_name": aws_context.function_name,
             "function_version": aws_context.function_version,
             "invoked_function_arn": aws_context.invoked_function_arn,
+            "remaining_time_in_millis": aws_context.get_remaining_time_in_millis(),
             "aws_request_id": aws_context.aws_request_id,
+        }
+
+        extra["cloudwatch logs"] = {
+            "url": _get_cloudwatch_logs_url(aws_context, start_time),
+            "log_group": aws_context.log_group_name,
+            "log_stream": aws_context.log_stream_name,
         }
 
         request = event.get("request", {})
@@ -214,3 +224,33 @@ def _get_url(event, context):
     if proto and host and path:
         return "{}://{}{}".format(proto, host, path)
     return "awslambda:///{}".format(context.function_name)
+
+
+def _get_cloudwatch_logs_url(context, start_time):
+    # type: (LambdaContext, datetime) -> str
+    """
+    Generates a CloudWatchLogs console URL based on the LambdaContext object
+
+    Arguments:
+        context {LambdaContext} -- context from lambda handler
+
+    Returns:
+        str -- AWS Console URL to logs.
+    """
+    formatstring = "%Y-%m-%dT%H:%M:%S"
+    start_time_str = (start_time - timedelta(seconds=1)).strftime(formatstring)
+    end_time_str = (datetime.now() + timedelta(seconds=2)).strftime(formatstring)
+    url = ''.join([
+        "https://console.aws.amazon.com/cloudwatch/home?region=",
+        environ.get('AWS_REGION'),
+        "#logEventViewer:group=",
+        context.log_group_name,
+        ";stream=",
+        context.log_stream_name,
+        ";start=",
+        start_time_str,
+        ";end=",
+        end_time_str,
+    ])
+
+    return url
