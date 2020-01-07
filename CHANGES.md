@@ -27,6 +27,11 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.14.0
+
+* Show ASGI request data in Django 3.0
+* New integration for the Trytond ERP framework. Thanks n1ngu!
+
 ## 0.13.5
 
 * Fix trace continuation bugs in APM.
