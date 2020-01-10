@@ -15,10 +15,10 @@ from sentry_sdk.utils import capture_internal_exceptions
 
 from tests import _warning_recorder, _warning_recorder_mgr
 
-SEMAPHORE = "./semaphore"
+SENTRY_RELAY = "./relay"
 
-if not os.path.isfile(SEMAPHORE):
-    SEMAPHORE = None
+if not os.path.isfile(SENTRY_RELAY):
+    SENTRY_RELAY = None
 
 
 try:
@@ -117,7 +117,7 @@ def _capture_internal_warnings():
 
 
 @pytest.fixture
-def monkeypatch_test_transport(monkeypatch, semaphore_normalize):
+def monkeypatch_test_transport(monkeypatch, relay_normalize):
     def check_event(event):
         def check_string_keys(map):
             for key, value in iteritems(map):
@@ -127,7 +127,7 @@ def monkeypatch_test_transport(monkeypatch, semaphore_normalize):
 
         with capture_internal_exceptions():
             check_string_keys(event)
-            semaphore_normalize(event)
+            relay_normalize(event)
 
     def inner(client):
         monkeypatch.setattr(client, "transport", TestTransport(check_event))
@@ -135,8 +135,8 @@ def monkeypatch_test_transport(monkeypatch, semaphore_normalize):
     return inner
 
 
-def _no_errors_in_semaphore_response(obj):
-    """Assert that semaphore didn't throw any errors when processing the
+def _no_errors_in_relay_response(obj):
+    """Assert that relay didn't throw any errors when processing the
     event."""
 
     def inner(obj):
@@ -156,9 +156,9 @@ def _no_errors_in_semaphore_response(obj):
 
 
 @pytest.fixture
-def semaphore_normalize(tmpdir):
+def relay_normalize(tmpdir):
     def inner(event):
-        if not SEMAPHORE:
+        if not SENTRY_RELAY:
             return
 
         # Disable subprocess integration
@@ -169,10 +169,10 @@ def semaphore_normalize(tmpdir):
             with file.open() as f:
                 output = json.loads(
                     subprocess.check_output(
-                        [SEMAPHORE, "process-event"], stdin=f
+                        [SENTRY_RELAY, "process-event"], stdin=f
                     ).decode("utf-8")
                 )
-            _no_errors_in_semaphore_response(output)
+            _no_errors_in_relay_response(output)
             output.pop("_meta", None)
             return output
 

@@ -19,6 +19,6 @@ venv
 .vscode/tags
 .pytest_cache
 .hypothesis
-semaphore
+relay
 pip-wheel-metadata
 .mypy_cache
