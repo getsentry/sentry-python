@@ -54,7 +54,7 @@ install:
   - pip install tox
   - pip install codecov
   - make install-zeus-cli
-  - bash scripts/download-semaphore.sh
+  - bash scripts/download-relay.sh
 
 script:
   - coverage erase

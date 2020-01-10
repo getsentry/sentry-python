@@ -6,13 +6,13 @@ if { [ "$TRAVIS" == "true" ] || [ "$TF_BUILD" == "True" ]; } && [ -z "$GITHUB_AP
     exit 0;
 fi
 
-target=semaphore
+target=relay
 
-# Download the latest semaphore release for Travis
+# Download the latest relay release for Travis
 
 output="$(
     curl -s \
-    https://api.github.com/repos/getsentry/semaphore/releases/latest?access_token=$GITHUB_API_TOKEN
+    https://api.github.com/repos/getsentry/relay/releases/latest?access_token=$GITHUB_API_TOKEN
 )"
 
 echo "$output"

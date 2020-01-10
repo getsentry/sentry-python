@@ -60,7 +60,7 @@ jobs:
           pip --version
           pip install tox
           pip install codecov
-          sh scripts/download-semaphore.sh
+          sh scripts/download-relay.sh
         displayName: "Install dependencies"
 
       - script: |
