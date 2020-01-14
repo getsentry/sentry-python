@@ -21,13 +21,19 @@ if MYPY:
     from typing import Tuple
     from typing import Optional
     from typing import TypeVar
+    from typing import Protocol
 
     from sentry_sdk.utils import ExcInfo
     from sentry_sdk._types import EventProcessor
 
-    T = TypeVar("T")
-    U = TypeVar("U")
-    E = TypeVar("E")
+    WsgiResponseIter = TypeVar("WsgiResponseIter")
+    WsgiResponseHeaders = TypeVar("WsgiResponseHeaders")
+    WsgiExcInfo = TypeVar("WsgiExcInfo")
+
+    class StartResponse(Protocol):
+        def __call__(self, status, response_headers, exc_info=None):
+            # type: (str, WsgiResponseHeaders, Optional[WsgiExcInfo]) -> WsgiResponseIter
+            pass
 
 
 _wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
@@ -125,14 +131,24 @@ class SentryWsgiMiddleware(object):
 
 
 def _sentry_start_response(
-    old_start_response, span, status, response_headers, exc_info=None
+    old_start_response,  # type: StartResponse
+    span,  # type: Span
+    status,  # type: str
+    response_headers,  # type: WsgiResponseHeaders
+    exc_info=None,  # type: Optional[WsgiExcInfo]
 ):
-    # type: (Callable[[str, U, Optional[E]], T], Span, str, U, Optional[E]) -> T
+    # type: (...) -> WsgiResponseIter
     with capture_internal_exceptions():
         status_int = int(status.split(" ", 1)[0])
         span.set_http_status(status_int)
 
-    return old_start_response(status, response_headers, exc_info)
+    if exc_info is None:
+        # The Django Rest Framework WSGI test client, and likely other
+        # (incorrect) implementations, cannot deal with the exc_info argument
+        # if one is present. Avoid providing a third argument if not necessary.
+        return old_start_response(status, response_headers)
+    else:
+        return old_start_response(status, response_headers, exc_info)
 
 
 def _get_environ(environ):
