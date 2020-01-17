@@ -22,7 +22,7 @@ class BackgroundWorker(object):
     def __init__(self):
         # type: () -> None
         check_thread_support()
-        self._queue = queue.Queue(-1)  # type: Queue[Any]
+        self._queue = queue.Queue(30)  # type: Queue[Any]
         self._lock = Lock()
         self._thread = None  # type: Optional[Thread]
         self._thread_for_pid = None  # type: Optional[int]
@@ -89,7 +89,7 @@ class BackgroundWorker(object):
         logger.debug("background worker got kill request")
         with self._lock:
             if self._thread:
-                self._queue.put_nowait(_TERMINATOR)
+                self._queue.put(_TERMINATOR)
                 self._thread = None
                 self._thread_for_pid = None
 
@@ -114,7 +114,10 @@ class BackgroundWorker(object):
     def submit(self, callback):
         # type: (Callable[[], None]) -> None
         self._ensure_thread()
-        self._queue.put_nowait(callback)
+        try:
+            self._queue.put_nowait(callback)
+        except queue.Full:
+            logger.debug("background worker queue full, dropping event")
 
     def _target(self):
         # type: () -> None
