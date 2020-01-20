@@ -86,10 +86,14 @@ class BackgroundWorker(object):
 
     def kill(self):
         # type: () -> None
+        """
+        Kill worker thread. Returns immediately. Not useful for
+        waiting on shutdown for events, use `flush` for that.
+        """
         logger.debug("background worker got kill request")
         with self._lock:
             if self._thread:
-                self._queue.put(_TERMINATOR)
+                self._queue.put_nowait(_TERMINATOR)
                 self._thread = None
                 self._thread_for_pid = None
 
