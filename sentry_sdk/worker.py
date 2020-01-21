@@ -93,7 +93,11 @@ class BackgroundWorker(object):
         logger.debug("background worker got kill request")
         with self._lock:
             if self._thread:
-                self._queue.put_nowait(_TERMINATOR)
+                try:
+                    self._queue.put_nowait(_TERMINATOR)
+                except queue.Full:
+                    logger.debug("background worker queue full, kill failed")
+
                 self._thread = None
                 self._thread_for_pid = None
 
