@@ -41,7 +41,7 @@ def patch_channels_asgi_handler_impl(cls):
             return await old_app(self, receive, send)
 
         middleware = SentryAsgiMiddleware(
-            lambda _scope: old_app.__get__(self, AsgiHandler)
+            lambda _scope: old_app.__get__(self, cls)
         )
 
         return await middleware(self.scope)(receive, send)
