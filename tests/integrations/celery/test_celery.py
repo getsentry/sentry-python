@@ -83,6 +83,7 @@ def test_simple(capture_events, celery, celery_invocation):
     assert event["contexts"]["trace"]["trace_id"] == span.trace_id
     assert event["contexts"]["trace"]["span_id"] != span.span_id
     assert event["transaction"] == "dummy_task"
+    assert "celery_task_id" in event["tags"]
     assert event["extra"]["celery-job"] == dict(
         task_name="dummy_task", **expected_context
     )

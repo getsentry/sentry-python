@@ -169,6 +169,8 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
         # type: (Event, Hint) -> Optional[Event]
 
         with capture_internal_exceptions():
+            tags = event.setdefault("tags", {})
+            tags["celery_task_id"] = uuid
             extra = event.setdefault("extra", {})
             extra["celery-job"] = {
                 "task_name": task.name,
