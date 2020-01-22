@@ -40,9 +40,7 @@ def patch_channels_asgi_handler_impl(cls):
         if Hub.current.get_integration(DjangoIntegration) is None:
             return await old_app(self, receive, send)
 
-        middleware = SentryAsgiMiddleware(
-            lambda _scope: old_app.__get__(self, cls)
-        )
+        middleware = SentryAsgiMiddleware(lambda _scope: old_app.__get__(self, cls))
 
         return await middleware(self.scope)(receive, send)
 
