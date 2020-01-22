@@ -298,22 +298,9 @@ def _patch_channels():
             "Python 3.7+ or the aiocontextvars package from PyPI."
         )
 
-    from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+    from sentry_sdk.integrations.django.asgi import patch_channels_asgi_handler_impl
 
-    old_app = AsgiHandler.__call__
-
-    def sentry_patched_asgi_handler(self, receive, send):
-        # type: (AsgiHandler, Any, Any) -> Any
-        if Hub.current.get_integration(DjangoIntegration) is None:
-            return old_app(receive, send)
-
-        middleware = SentryAsgiMiddleware(
-            lambda _scope: old_app.__get__(self, AsgiHandler)
-        )
-
-        return middleware(self.scope)(receive, send)
-
-    AsgiHandler.__call__ = sentry_patched_asgi_handler
+    patch_channels_asgi_handler_impl(AsgiHandler)
 
 
 def _patch_django_asgi_handler():
