@@ -658,7 +658,7 @@ def exc_info_from_error(error):
                 exc_type = type(error)
 
     else:
-        raise ValueError()
+        raise ValueError("Expected Exception object to report, got %s!" % type(error))
 
     return exc_type, exc_value, tb
 
