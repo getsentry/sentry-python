@@ -35,12 +35,12 @@ matrix:
 
     - python: "3.6"
       name: Distribution packages
-      install: false
+      install: []
       script: make travis-upload-dist
 
     - python: "3.6"
       name: Build documentation
-      install: false
+      install: []
       script: make travis-upload-docs
 
 before_script:
