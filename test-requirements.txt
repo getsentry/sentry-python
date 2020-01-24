@@ -2,7 +2,7 @@ pytest==3.7.3
 pytest-forked==1.1.0
 tox==3.7.0
 Werkzeug==0.15.5
-pytest-localserver==0.4.1
+pytest-localserver==0.5.0
 pytest-cov==2.6.0
 gevent
 eventlet
