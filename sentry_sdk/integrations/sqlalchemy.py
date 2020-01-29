@@ -25,7 +25,7 @@ class SqlalchemyIntegration(Integration):
 
         listen(Engine, "before_cursor_execute", _before_cursor_execute)
         listen(Engine, "after_cursor_execute", _after_cursor_execute)
-        listen(Engine, "dbapi_error", _dbapi_error)
+        listen(Engine, "handle_error", _handle_error)
 
 
 def _before_cursor_execute(
@@ -63,8 +63,9 @@ def _after_cursor_execute(conn, cursor, statement, *args):
         ctx_mgr.__exit__(None, None, None)
 
 
-def _dbapi_error(conn, *args):
+def _handle_error(context, *args):
     # type: (Any, *Any) -> None
+    conn = context.connection
     span = getattr(conn, "_sentry_sql_span", None)  # type: Optional[Span]
 
     if span is not None:
