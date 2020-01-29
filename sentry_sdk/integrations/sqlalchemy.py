@@ -64,8 +64,8 @@ def _after_cursor_execute(conn, cursor, statement, *args):
 
 
 def _handle_error(context, *args):
-    conn = context.connection
     # type: (Any, *Any) -> None
+    conn = context.connection
     span = getattr(conn, "_sentry_sql_span", None)  # type: Optional[Span]
 
     if span is not None:
