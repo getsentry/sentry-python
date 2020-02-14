@@ -154,10 +154,10 @@ def test_basic(run_lambda_function):
         "/aws/lambda/test_function_"
     )
 
-    log_group_re = "^[0-9]{4}/[0-9]{2}/[0-9]{2}/\\[[^\\]]+][a-f0-9]+$"
-    log_group = event["extra"]["cloudwatch logs"]["log_stream"]
+    log_stream_re = "^[0-9]{4}/[0-9]{2}/[0-9]{2}/\\[[^\\]]+][a-f0-9]+$"
+    log_stream = event["extra"]["cloudwatch logs"]["log_stream"]
 
-    assert re.match(log_group_re, log_group)
+    assert re.match(log_stream_re, log_stream)
 
 
 def test_initialization_order(run_lambda_function):
