@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -145,6 +146,17 @@ def test_basic(run_lambda_function):
     assert exception["mechanism"] == {"type": "aws_lambda", "handled": False}
 
     assert event["extra"]["lambda"]["function_name"].startswith("test_function_")
+    assert event["extra"]["cloudwatch logs"]["url"].startswith(
+        "https://console.aws.amazon.com/cloudwatch/home?region="
+    )
+    assert event["extra"]["cloudwatch logs"]["url"]["log_group"].startswith(
+        "/aws/lambda/test_function_"
+    )
+
+    log_group_re = "^[0-9]{4}/[0-9]{2}/[0-9]{2}/\\[[^\\]]+][a-f0-9]+$"
+    log_group = event["extra"]["cloudwatch logs"]["url"]["log_stream"]
+
+    assert re.match(log_group_re, log_group)
 
 
 def test_initialization_order(run_lambda_function):
