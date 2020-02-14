@@ -163,7 +163,7 @@ def _make_request_event_processor(aws_event, aws_context):
     start_time = datetime.now()
 
     def event_processor(event, hint, start_time=start_time):
-        # type: (Event, Hint) -> Optional[Event]
+        # type: (Event, Hint, datetime) -> Optional[Event]
         extra = event.setdefault("extra", {})
         extra["lambda"] = {
             "function_name": aws_context.function_name,
@@ -227,12 +227,12 @@ def _get_url(event, context):
 
 
 def _get_cloudwatch_logs_url(context, start_time):
-    # type: (LambdaContext, datetime) -> str
+    # type: (Any, datetime) -> str
     """
-    Generates a CloudWatchLogs console URL based on the LambdaContext object
+    Generates a CloudWatchLogs console URL based on the context object
 
     Arguments:
-        context {LambdaContext} -- context from lambda handler
+        context {Any} -- context from lambda handler
 
     Returns:
         str -- AWS Console URL to logs.
@@ -244,7 +244,7 @@ def _get_cloudwatch_logs_url(context, start_time):
         "#logEventViewer:group={log_group};stream={log_stream}"
         ";start={start_time};end={end_time}"
     ).format(
-        region=environ.get('AWS_REGION'),
+        region=environ.get("AWS_REGION"),
         log_group=context.log_group_name,
         log_stream=context.log_stream_name,
         start_time=(start_time - timedelta(seconds=1)).strftime(formatstring),
