@@ -1,5 +1,5 @@
 black==19.03b0
 flake8
 flake8-import-order
-mypy==0.740
+mypy==0.761
 flake8-bugbear>=19.8.0
