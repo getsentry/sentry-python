@@ -122,6 +122,40 @@ class HttpTransport(Transport):
 
         self.hub_cls = Hub
 
+    def _send_request(
+        self,
+        body,  # type: bytes
+        headers,  # type: Dict[str, str]
+    ):
+        # type: (...) -> None
+        headers.update(
+            {
+                "User-Agent": str(self._auth.client),
+                "X-Sentry-Auth": str(self._auth.to_header()),
+            }
+        )
+        response = self._pool.request(
+            "POST", str(self._auth.store_api_url), body=body, headers=headers
+        )
+
+        try:
+            if response.status == 429:
+                self._disabled_until = datetime.utcnow() + timedelta(
+                    seconds=self._retry.get_retry_after(response) or 60
+                )
+                return
+
+            elif response.status >= 300 or response.status < 200:
+                logger.error(
+                    "Unexpected status code: %s (body: %s)",
+                    response.status,
+                    response.data,
+                )
+        finally:
+            response.close()
+
+        self._disabled_until = None
+
     def _send_event(
         self, event  # type: Event
     ):
@@ -146,35 +180,16 @@ class HttpTransport(Transport):
                 self.parsed_dsn.host,
             )
         )
-        response = self._pool.request(
-            "POST",
-            str(self._auth.store_api_url),
-            body=body.getvalue(),
-            headers={
-                "User-Agent": str(self._auth.client),
-                "X-Sentry-Auth": str(self._auth.to_header()),
-                "Content-Type": "application/json",
-                "Content-Encoding": "gzip",
-            },
+        self._send_request(
+            body,
+            headers={"Content-Type": "application/json", "Content-Encoding": "gzip"},
         )
 
-        try:
-            if response.status == 429:
-                self._disabled_until = datetime.utcnow() + timedelta(
-                    seconds=self._retry.get_retry_after(response) or 60
-                )
-                return
-
-            elif response.status >= 300 or response.status < 200:
-                logger.error(
-                    "Unexpected status code: %s (body: %s)",
-                    response.status,
-                    response.data,
-                )
-        finally:
-            response.close()
-
-        self._disabled_until = None
+    def _send_envelope(
+        self, envelope  # type: Envelope
+    ):
+        # type: (...) -> None
+        pass
 
     def _get_pool_options(self, ca_certs):
         # type: (Optional[Any]) -> Dict[str, Any]
@@ -222,6 +237,20 @@ class HttpTransport(Transport):
                     self._send_event(event)
 
         self._worker.submit(send_event_wrapper)
+
+    def capture_envelope(
+        self, envelope  # type: Envelope
+    ):
+        # type: (...) -> None
+        hub = self.hub_cls.current
+
+        def send_envelope_wrapper():
+            # type: () -> None
+            with hub:
+                with capture_internal_exceptions():
+                    self._send_envelope(envelope)
+
+        self._worker.submit(send_envelope_wrapper)
 
     def flush(
         self,
