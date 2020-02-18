@@ -156,14 +156,20 @@ class HttpTransport(Transport):
 
         self._disabled_until = None
 
+    def _check_disabled(self):
+        # type: (...) -> bool
+        if self._disabled_until is not None:
+            if datetime.utcnow() < self._disabled_until:
+                return True
+            self._disabled_until = None
+        return False
+
     def _send_event(
         self, event  # type: Event
     ):
         # type: (...) -> None
-        if self._disabled_until is not None:
-            if datetime.utcnow() < self._disabled_until:
-                return
-            self._disabled_until = None
+        if self._check_disabled():
+            return None
 
         body = io.BytesIO()
         with gzip.GzipFile(fileobj=body, mode="w") as f:
@@ -181,15 +187,30 @@ class HttpTransport(Transport):
             )
         )
         self._send_request(
-            body,
+            body.getvalue(),
             headers={"Content-Type": "application/json", "Content-Encoding": "gzip"},
         )
+        return None
 
     def _send_envelope(
         self, envelope  # type: Envelope
     ):
         # type: (...) -> None
-        pass
+        if self._check_disabled():
+            return None
+
+        body = io.BytesIO()
+        with gzip.GzipFile(fileobj=body, mode="w") as f:
+            envelope.serialize_into(f)
+
+        self._send_request(
+            body.getvalue(),
+            headers={
+                "Content-Type": "application/x-sentry-envelope",
+                "Content-Encoding": "gzip",
+            },
+        )
+        return None
 
     def _get_pool_options(self, ca_certs):
         # type: (Optional[Any]) -> Dict[str, Any]

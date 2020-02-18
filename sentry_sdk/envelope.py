@@ -3,8 +3,7 @@ import json
 import shutil
 import mimetypes
 
-from ._compat import text_type
-
+from sentry_sdk._compat import text_type
 from sentry_sdk._types import MYPY
 
 if MYPY:

@@ -29,3 +29,5 @@ if MYPY:
 
     # https://github.com/python/mypy/issues/5710
     NotImplementedType = Any
+
+    SessionStatus = Any  # Literal["ok", "exited", "crashed", "abnormal", "degraded"]
