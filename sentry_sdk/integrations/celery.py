@@ -3,18 +3,11 @@ from __future__ import absolute_import
 import functools
 import sys
 
-from celery.exceptions import (  # type: ignore
-    SoftTimeLimitExceeded,
-    Retry,
-    Ignore,
-    Reject,
-)
-
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.tracing import Span
 from sentry_sdk._compat import reraise
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk._types import MYPY
 
@@ -27,6 +20,18 @@ if MYPY:
     from sentry_sdk._types import EventProcessor, Event, Hint, ExcInfo
 
     F = TypeVar("F", bound=Callable[..., Any])
+
+
+try:
+    from celery import VERSION
+    from celery.exceptions import (  # type: ignore
+        SoftTimeLimitExceeded,
+        Retry,
+        Ignore,
+        Reject,
+    )
+except ImportError:
+    raise DidNotEnable("Celery not installed")
 
 
 CELERY_CONTROL_FLOW_EXCEPTIONS = (Retry, Ignore, Reject)
@@ -42,6 +47,9 @@ class CeleryIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+        if VERSION < (3,):
+            raise DidNotEnable("Celery 3 or newer required.")
+
         import celery.app.trace as trace  # type: ignore
 
         old_build_tracer = trace.build_tracer

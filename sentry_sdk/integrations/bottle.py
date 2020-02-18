@@ -6,7 +6,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     transaction_from_function,
 )
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 
@@ -22,7 +22,16 @@ if MYPY:
 
     from sentry_sdk._types import EventProcessor
 
-from bottle import Bottle, Route, request as bottle_request, HTTPResponse
+try:
+    from bottle import (
+        Bottle,
+        Route,
+        request as bottle_request,
+        HTTPResponse,
+        __version__ as BOTTLE_VERSION,
+    )
+except ImportError:
+    raise DidNotEnable("Bottle not installed")
 
 
 class BottleIntegration(Integration):
@@ -32,6 +41,7 @@ class BottleIntegration(Integration):
 
     def __init__(self, transaction_style="endpoint"):
         # type: (str) -> None
+
         TRANSACTION_STYLE_VALUES = ("endpoint", "url")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
@@ -43,6 +53,14 @@ class BottleIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+
+        try:
+            version = tuple(map(int, BOTTLE_VERSION.split(".")))
+        except (TypeError, ValueError):
+            raise DidNotEnable("Unparseable Bottle version: {}".format(version))
+
+        if version < (0, 12):
+            raise DidNotEnable("Bottle 0.12 or newer required.")
 
         # monkey patch method Bottle.__call__
         old_app = Bottle.__call__

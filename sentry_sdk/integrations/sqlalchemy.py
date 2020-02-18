@@ -2,11 +2,15 @@ from __future__ import absolute_import
 
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import record_sql_queries
 
-from sqlalchemy.engine import Engine  # type: ignore
-from sqlalchemy.event import listen  # type: ignore
+try:
+    from sqlalchemy.engine import Engine  # type: ignore
+    from sqlalchemy.event import listen  # type: ignore
+    from sqlalchemy import __version__ as SQLALCHEMY_VERSION
+except ImportError:
+    raise DidNotEnable("SQLAlchemy not installed.")
 
 if MYPY:
     from typing import Any
@@ -22,6 +26,16 @@ class SqlalchemyIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+
+        try:
+            version = tuple(map(int, SQLALCHEMY_VERSION.split("b")[0].split(".")))
+        except (TypeError, ValueError):
+            raise DidNotEnable(
+                "Unparseable SQLAlchemy version: {}".format(SQLALCHEMY_VERSION)
+            )
+
+        if version < (1, 2):
+            raise DidNotEnable("SQLAlchemy 1.2 or newer required.")
 
         listen(Engine, "before_cursor_execute", _before_cursor_execute)
         listen(Engine, "after_cursor_execute", _after_cursor_execute)

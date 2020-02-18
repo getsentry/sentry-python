@@ -39,6 +39,16 @@ def app():
     return app
 
 
+@pytest.fixture(params=("auto", "manual"))
+def integration_enabled_params(request):
+    if request.param == "auto":
+        return {"_experiments": {"auto_enabling_integrations": True}}
+    elif request.param == "manual":
+        return {"integrations": [flask_sentry.FlaskIntegration()]}
+    else:
+        raise ValueError(request.param)
+
+
 def test_has_context(sentry_init, app, capture_events):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
@@ -76,8 +86,16 @@ def test_transaction_style(
 
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("testing", (True, False))
-def test_errors(sentry_init, capture_exceptions, capture_events, app, debug, testing):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()], debug=True)
+def test_errors(
+    sentry_init,
+    capture_exceptions,
+    capture_events,
+    app,
+    debug,
+    testing,
+    integration_enabled_params,
+):
+    sentry_init(debug=True, **integration_enabled_params)
 
     app.debug = debug
     app.testing = testing
@@ -102,8 +120,10 @@ def test_errors(sentry_init, capture_exceptions, capture_events, app, debug, tes
     assert event["exception"]["values"][0]["mechanism"]["type"] == "flask"
 
 
-def test_flask_login_not_installed(sentry_init, app, capture_events, monkeypatch):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+def test_flask_login_not_installed(
+    sentry_init, app, capture_events, monkeypatch, integration_enabled_params
+):
+    sentry_init(**integration_enabled_params)
 
     monkeypatch.setattr(flask_sentry, "flask_login", None)
 
@@ -116,8 +136,10 @@ def test_flask_login_not_installed(sentry_init, app, capture_events, monkeypatch
     assert event.get("user", {}).get("id") is None
 
 
-def test_flask_login_not_configured(sentry_init, app, capture_events, monkeypatch):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+def test_flask_login_not_configured(
+    sentry_init, app, capture_events, monkeypatch, integration_enabled_params
+):
+    sentry_init(**integration_enabled_params)
 
     assert flask_sentry.flask_login
 
@@ -130,9 +152,9 @@ def test_flask_login_not_configured(sentry_init, app, capture_events, monkeypatc
 
 
 def test_flask_login_partially_configured(
-    sentry_init, app, capture_events, monkeypatch
+    sentry_init, app, capture_events, monkeypatch, integration_enabled_params
 ):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(**integration_enabled_params)
 
     events = capture_events()
 
@@ -149,12 +171,15 @@ def test_flask_login_partially_configured(
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("user_id", [None, "42", 3])
 def test_flask_login_configured(
-    send_default_pii, sentry_init, app, user_id, capture_events, monkeypatch
+    send_default_pii,
+    sentry_init,
+    app,
+    user_id,
+    capture_events,
+    monkeypatch,
+    integration_enabled_params,
 ):
-    sentry_init(
-        send_default_pii=send_default_pii,
-        integrations=[flask_sentry.FlaskIntegration()],
-    )
+    sentry_init(send_default_pii=send_default_pii, **integration_enabled_params)
 
     class User(object):
         is_authenticated = is_active = True
