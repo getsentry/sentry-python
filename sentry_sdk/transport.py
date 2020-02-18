@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
+from sentry_sdk.envelope import Envelope
 
 from sentry_sdk._types import MYPY
 
@@ -57,6 +58,19 @@ class Transport(object):
         be sent to sentry.
         """
         raise NotImplementedError()
+
+    def capture_envelope(
+        self, envelope  # type: Envelope
+    ):
+        # type: (...) -> None
+        """This gets invoked with an envelope when an event should
+        be sent to sentry.  The default implementation invokes `capture_event`
+        if the envelope contains an event and ignores all other envelopes.
+        """
+        event = envelope.get_event()
+        if event is not None:
+            self.capture_event(event)
+        return None
 
     def flush(
         self,
