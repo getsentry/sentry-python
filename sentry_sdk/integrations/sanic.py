@@ -43,7 +43,7 @@ class SanicIntegration(Integration):
     def setup_once():
         # type: () -> None
         try:
-            version = tuple(map(int, VERSION.split(".")))
+            version = tuple(map(int, SANIC_VERSION.split(".")))
         except (TypeError, ValueError):
             raise DidNotEnable("Unparseable Sanic version: {}".format(VERSION))
 
