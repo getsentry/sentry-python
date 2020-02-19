@@ -28,7 +28,7 @@ if MYPY:
     from sentry_sdk._types import Event, EventProcessor, Hint
 
 try:
-    from sanic import Sanic, __version__ as VERSION
+    from sanic import Sanic, __version__ as SANIC_VERSION
     from sanic.exceptions import SanicException
     from sanic.router import Router
     from sanic.handlers import ErrorHandler
