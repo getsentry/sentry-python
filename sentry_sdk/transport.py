@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.sessions import SessionFlusher
 
 from sentry_sdk._types import MYPY
 
@@ -20,14 +19,12 @@ if MYPY:
     from typing import Any
     from typing import Optional
     from typing import Dict
-    from typing import List
     from typing import Union
     from typing import Callable
     from urllib3.poolmanager import PoolManager  # type: ignore
     from urllib3.poolmanager import ProxyManager
 
     from sentry_sdk._types import Event
-    from sentry_sdk.sessions import Session
 
 try:
     from urllib.request import getproxies
@@ -75,19 +72,6 @@ class Transport(object):
             self.capture_event(event)
         return None
 
-    def capture_session(
-        self, session  # type: Session
-    ):
-        # type: (...) -> None
-        """Captures a session.  The session object can still be modified later
-        so the transport needs to convert it into json or discard it.  The
-        default implemenetation makes an envelope.  The default implementation
-        captures an envelope.
-        """
-        envelope = Envelope()
-        envelope.add_session(session)
-        self.capture_envelope(envelope)
-
     def flush(
         self,
         timeout,  # type: float
@@ -126,7 +110,6 @@ class HttpTransport(Transport):
         self._disabled_until = None  # type: Optional[datetime]
         self._retry = urllib3.util.Retry()
         self.options = options
-        self.session_flusher = SessionFlusher(flush_func=self._send_sessions)
 
         self._pool = self._make_pool(
             self.parsed_dsn,
@@ -138,16 +121,6 @@ class HttpTransport(Transport):
         from sentry_sdk import Hub
 
         self.hub_cls = Hub
-
-    def _send_sessions(
-        self, sessions  # type: List[Any]
-    ):
-        # type: (...) -> None
-        if sessions:
-            envelope = Envelope()
-            for session in sessions:
-                envelope.add_session(session)
-            self.capture_envelope(envelope)
 
     def _send_request(
         self,
@@ -300,19 +273,12 @@ class HttpTransport(Transport):
 
         self._worker.submit(send_envelope_wrapper)
 
-    def capture_session(
-        self, session  # type: Session
-    ):
-        # type: (...) -> None
-        self.session_flusher.add_session(session)
-
     def flush(
         self,
         timeout,  # type: float
         callback=None,  # type: Optional[Any]
     ):
         # type: (...) -> None
-        self.session_flusher.flush()
         logger.debug("Flushing HTTP transport")
         if timeout > 0:
             self._worker.flush(timeout, callback)
@@ -320,7 +286,6 @@ class HttpTransport(Transport):
     def kill(self):
         # type: () -> None
         logger.debug("Killing HTTP transport")
-        self.session_flusher.kill()
         self._worker.kill()
 
 

@@ -18,6 +18,8 @@ from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO, ClientConstructor
 from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
+from sentry_sdk.sessions import SessionFlusher
+from sentry_sdk.envelope import Envelope
 
 from sentry_sdk._types import MYPY
 
@@ -25,6 +27,7 @@ if MYPY:
     from typing import Any
     from typing import Callable
     from typing import Dict
+    from typing import List
     from typing import Optional
 
     from sentry_sdk.scope import Scope
@@ -92,9 +95,20 @@ class _Client(object):
     def _init_impl(self):
         # type: () -> None
         old_debug = _client_init_debug.get(False)
+
+        def _send_sessions(sessions):
+            # type: (List[Any]) -> None
+            transport = self.transport
+            if sessions and transport:
+                envelope = Envelope()
+                for session in sessions:
+                    envelope.add_session(session)
+                transport.capture_envelope(envelope)
+
         try:
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
+            self.session_flusher = SessionFlusher(flush_func=_send_sessions)
 
             request_bodies = ("always", "never", "small", "medium")
             if self.options["request_bodies"] not in request_bodies:
@@ -265,8 +279,7 @@ class _Client(object):
         self, session  # type: Session
     ):
         # type: (...) -> None
-        if self.transport is not None:
-            self.transport.capture_session(session)
+        self.session_flusher.add_session(session)
 
     def close(
         self,
@@ -280,6 +293,7 @@ class _Client(object):
         """
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
+            self.session_flusher.kill()
             self.transport.kill()
             self.transport = None
 
@@ -299,6 +313,7 @@ class _Client(object):
         if self.transport is not None:
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
+            self.session_flusher.flush()
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):
