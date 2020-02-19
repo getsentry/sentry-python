@@ -130,13 +130,13 @@ def test_basic(run_lambda_function):
 
     assert response["FunctionError"] == "Unhandled"
 
-    event, = events
+    (event,) = events
     assert event["level"] == "error"
-    exception, = event["exception"]["values"]
+    (exception,) = event["exception"]["values"]
     assert exception["type"] == "Exception"
     assert exception["value"] == "something went wrong"
 
-    frame1, = exception["stacktrace"]["frames"]
+    (frame1,) = exception["stacktrace"]["frames"]
     assert frame1["filename"] == "test_lambda.py"
     assert frame1["abs_path"] == "/var/task/test_lambda.py"
     assert frame1["function"] == "test_handler"
@@ -177,9 +177,9 @@ def test_initialization_order(run_lambda_function):
         b'{"foo": "bar"}',
     )
 
-    event, = events
+    (event,) = events
     assert event["level"] == "error"
-    exception, = event["exception"]["values"]
+    (exception,) = event["exception"]["values"]
     assert exception["type"] == "Exception"
     assert exception["value"] == "something went wrong"
 
@@ -222,7 +222,7 @@ def test_request_data(run_lambda_function):
         """,
     )
 
-    event, = events
+    (event,) = events
 
     assert event["request"] == {
         "headers": {

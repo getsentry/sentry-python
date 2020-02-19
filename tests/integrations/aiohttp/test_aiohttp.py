@@ -23,14 +23,14 @@ async def test_basic(sentry_init, aiohttp_client, loop, capture_events):
     resp = await client.get("/")
     assert resp.status == 500
 
-    event, = events
+    (event,) = events
 
     assert (
         event["transaction"]
         == "tests.integrations.aiohttp.test_aiohttp.test_basic.<locals>.hello"
     )
 
-    exception, = event["exception"]["values"]
+    (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
     request = event["request"]
     host = request["headers"]["Host"]
@@ -67,8 +67,8 @@ async def test_post_body_not_read(sentry_init, aiohttp_client, loop, capture_eve
     resp = await client.post("/", json=body)
     assert resp.status == 500
 
-    event, = events
-    exception, = event["exception"]["values"]
+    (event,) = events
+    (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
     request = event["request"]
 
@@ -95,8 +95,8 @@ async def test_post_body_read(sentry_init, aiohttp_client, loop, capture_events)
     resp = await client.post("/", json=body)
     assert resp.status == 500
 
-    event, = events
-    exception, = event["exception"]["values"]
+    (event,) = events
+    (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
     request = event["request"]
 
@@ -179,7 +179,7 @@ async def test_tracing(sentry_init, aiohttp_client, loop, capture_events):
     resp = await client.get("/")
     assert resp.status == 200
 
-    event, = events
+    (event,) = events
 
     assert event["type"] == "transaction"
     assert (

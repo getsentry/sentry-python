@@ -33,7 +33,7 @@ def test_processors(sentry_init, capture_events):
     except Exception:
         capture_exception()
 
-    event, = events
+    (event,) = events
 
     assert event["exception"]["values"][0]["value"] == "aha! whatever"
 
@@ -74,7 +74,7 @@ def test_event_id(sentry_init, capture_events):
         int(event_id, 16)
         assert len(event_id) == 32
 
-    event, = events
+    (event,) = events
     assert event["event_id"] == event_id
     assert last_event_id() == event_id
     assert Hub.current.last_event_id() == event_id
@@ -115,7 +115,7 @@ def test_option_callback(sentry_init, capture_events):
     normal, no_crumbs = events
 
     assert normal["exception"]["values"][0]["type"] == "ValueError"
-    crumb, = normal["breadcrumbs"]
+    (crumb,) = normal["breadcrumbs"]
     assert "timestamp" in crumb
     assert crumb["message"] == "Hello"
     assert crumb["data"] == {"foo": "bar"}
@@ -152,7 +152,7 @@ def test_push_scope(sentry_init, capture_events):
         except Exception as e:
             capture_exception(e)
 
-    event, = events
+    (event,) = events
 
     assert event["level"] == "warning"
     assert "exception" in event
@@ -210,7 +210,7 @@ def test_breadcrumbs(sentry_init, capture_events):
         )
 
     capture_exception(ValueError())
-    event, = events
+    (event,) = events
 
     assert len(event["breadcrumbs"]) == 10
     assert "user 10" in event["breadcrumbs"][0]["message"]
@@ -227,7 +227,7 @@ def test_breadcrumbs(sentry_init, capture_events):
         scope.clear()
 
     capture_exception(ValueError())
-    event, = events
+    (event,) = events
     assert len(event["breadcrumbs"]) == 0
 
 
@@ -256,7 +256,7 @@ def test_client_initialized_within_scope(sentry_init, caplog):
     with push_scope():
         Hub.current.bind_client(Client())
 
-    record, = (x for x in caplog.records if x.levelname == "WARNING")
+    (record,) = (x for x in caplog.records if x.levelname == "WARNING")
 
     assert record.msg.startswith("init() called inside of pushed scope.")
 
@@ -273,7 +273,7 @@ def test_scope_leaks_cleaned_up(sentry_init, caplog):
 
     assert Hub.current._stack == old_stack
 
-    record, = (x for x in caplog.records if x.levelname == "WARNING")
+    (record,) = (x for x in caplog.records if x.levelname == "WARNING")
 
     assert record.message.startswith("Leaked 1 scopes:")
 
@@ -290,7 +290,7 @@ def test_scope_popped_too_soon(sentry_init, caplog):
 
     assert Hub.current._stack == old_stack
 
-    record, = (x for x in caplog.records if x.levelname == "ERROR")
+    (record,) = (x for x in caplog.records if x.levelname == "ERROR")
 
     assert record.message == ("Scope popped too soon. Popped 1 scopes too many.")
 
@@ -319,6 +319,6 @@ def test_scope_event_processor_order(sentry_init, capture_events):
 
             capture_message("hi")
 
-    event, = events
+    (event,) = events
 
     assert event["message"] == "hifoobarbaz"

@@ -78,7 +78,7 @@ def test_simple(capture_events, celery, celery_invocation):
         celery_invocation(dummy_task, 1, 2)
         _, expected_context = celery_invocation(dummy_task, 1, 0)
 
-    event, = events
+    (event,) = events
 
     assert event["contexts"]["trace"]["trace_id"] == span.trace_id
     assert event["contexts"]["trace"]["span_id"] != span.span_id
@@ -88,7 +88,7 @@ def test_simple(capture_events, celery, celery_invocation):
         task_name="dummy_task", **expected_context
     )
 
-    exception, = event["exception"]["values"]
+    (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
     assert exception["mechanism"]["type"] == "celery"
     assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
@@ -180,10 +180,10 @@ def test_simple_no_propagation(capture_events, init_celery):
     with Hub.current.start_span() as span:
         dummy_task.delay()
 
-    event, = events
+    (event,) = events
     assert event["contexts"]["trace"]["trace_id"] != span.trace_id
     assert event["transaction"] == "dummy_task"
-    exception, = event["exception"]["values"]
+    (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
 
 
@@ -265,7 +265,7 @@ def test_retry(celery, capture_events):
     dummy_task.delay()
 
     assert len(runs) == 3
-    event, = events
+    (event,) = events
     exceptions = event["exception"]["values"]
 
     for e in exceptions:
@@ -302,7 +302,7 @@ def test_transport_shutdown(request, celery, capture_events_forksafe, tmpdir):
         res.wait()
 
     event = events.read_event()
-    exception, = event["exception"]["values"]
+    (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
 
     events.read_flush()
