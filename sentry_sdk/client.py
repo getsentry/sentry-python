@@ -29,6 +29,7 @@ if MYPY:
 
     from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
+    from sentry_sdk.sessions import Session
 
 
 _client_init_debug = ContextVar("client_init_debug")
@@ -259,6 +260,13 @@ class _Client(object):
             return None
         self.transport.capture_event(event_opt)
         return event_id
+
+    def capture_session(
+        self, session  # type: Session
+    ):
+        # type: (...) -> None
+        if self.transport is not None:
+            self.transport.capture_session(session)
 
     def close(
         self,

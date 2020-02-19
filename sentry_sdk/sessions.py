@@ -8,19 +8,7 @@ if MYPY:
     from typing import Optional
     from typing import Union
     from typing import Any
-
-
-DID_UUID = uuid.uuid5(uuid.NAMESPACE_URL, "https://sentry.io/#did")
-
-
-def _make_did(
-    did  # type: text_type
-):
-    # type: (...) -> uuid.UUID
-    try:
-        return uuid.UUID(did)
-    except ValueError:
-        return uuid.uuid5(DID_UUID, did)
+    from typing import Dict
 
 
 def _timestamp(
@@ -34,7 +22,7 @@ class Session(object):
     def __init__(
         self,
         sid=None,  # type: Optional[Union[text_type, uuid.UUID]]
-        did=None,  # type: Optional[Union[text_type, uuid.UUID]]
+        did=None,  # type: Optional[text_type]
         timestamp=None,  # type: Optional[datetime]
         started=None,  # type: Optional[datetime]
         duration=None,  # type: Optional[float]
@@ -63,7 +51,7 @@ class Session(object):
     def update(
         self,
         sid=None,  # type: Optional[Union[text_type, uuid.UUID]]
-        did=None,  # type: Optional[Union[text_type, uuid.UUID]]
+        did=None,  # type: Optional[text_type]
         timestamp=None,  # type: Optional[datetime]
         duration=None,  # type: Optional[float]
         status=None,  # type: Optional[SessionStatus]
@@ -97,10 +85,10 @@ class Session(object):
             "started": _timestamp(self.started),
             "timestamp": _timestamp(self.timestamp),
             "status": self.status,
-        }
+        }  # type: Dict[str, Any]
         attrs = {}
         if self.did is not None:
-            rv["did"] = str(self.did)
+            rv["did"] = self.did
         if self.duration is not None:
             rv["duration"] = self.duration
         if self.release is not None:

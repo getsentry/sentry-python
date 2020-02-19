@@ -25,6 +25,7 @@ if MYPY:
     from urllib3.poolmanager import ProxyManager
 
     from sentry_sdk._types import Event
+    from sentry_sdk.sessions import Session
 
 try:
     from urllib.request import getproxies
@@ -71,6 +72,19 @@ class Transport(object):
         if event is not None:
             self.capture_event(event)
         return None
+
+    def capture_session(
+        self, session  # type: Session
+    ):
+        # type: (...) -> None
+        """Captures a session.  The session object can still be modified later
+        so the transport needs to convert it into json or discard it.  The
+        default implemenetation makes an envelope.  The default implementation
+        captures an envelope.
+        """
+        envelope = Envelope()
+        envelope.add_session(session)
+        self.capture_envelope(envelope)
 
     def flush(
         self,

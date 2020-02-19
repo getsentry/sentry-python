@@ -16,6 +16,7 @@ if MYPY:
     from typing import Iterator
 
     from sentry_sdk._types import Event
+    from sentry_sdk.sessions import Session
 
 
 class Envelope(object):
@@ -39,6 +40,12 @@ class Envelope(object):
     ):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=event), type="event"))
+
+    def add_session(
+        self, session  # type: Session
+    ):
+        # type: (...) -> None
+        self.add_item(Item(payload=PayloadRef(json=session.to_json()), type="session"))
 
     def add_item(
         self, item  # type: Item

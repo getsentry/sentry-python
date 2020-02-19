@@ -12,6 +12,7 @@ if MYPY:
     from typing import Optional
     from typing import Tuple
     from typing import Type
+    from typing_extensions import Literal
 
     ExcInfo = Tuple[
         Optional[Type[BaseException]], Optional[BaseException], Optional[TracebackType]
@@ -30,4 +31,4 @@ if MYPY:
     # https://github.com/python/mypy/issues/5710
     NotImplementedType = Any
 
-    SessionStatus = Any  # Literal["ok", "exited", "crashed", "abnormal", "degraded"]
+    SessionStatus = Literal["ok", "exited", "crashed", "abnormal", "degraded"]
