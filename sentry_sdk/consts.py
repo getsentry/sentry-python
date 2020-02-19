@@ -46,6 +46,7 @@ class ClientConstructor(object):
         attach_stacktrace=False,  # type: bool
         ca_certs=None,  # type: Optional[str]
         propagate_traces=True,  # type: bool
+        auto_session_tracking=False,  # type: bool
         # DO NOT ENABLE THIS RIGHT NOW UNLESS YOU WANT TO EXCEED YOUR EVENT QUOTA IMMEDIATELY
         traces_sample_rate=0.0,  # type: float
         traceparent_v2=False,  # type: bool

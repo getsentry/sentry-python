@@ -9,6 +9,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk._compat import PY2, reraise, iteritems
 from sentry_sdk.tracing import Span
+from sentry_sdk.sessions import auto_start_session, auto_stop_session
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
 from sentry_sdk._types import MYPY
@@ -102,8 +103,9 @@ class SentryWsgiMiddleware(object):
         _wsgi_middleware_applied.set(True)
         try:
             hub = Hub(Hub.current)
-
             with hub:
+                auto_start_session()
+
                 with capture_internal_exceptions():
                     with hub.configure_scope() as scope:
                         scope.clear_breadcrumbs()
@@ -255,6 +257,7 @@ class _ScopedResponse(object):
     def close(self):
         # type: () -> None
         with self._hub:
+            auto_stop_session()
             try:
                 self._response.close()  # type: ignore
             except AttributeError:

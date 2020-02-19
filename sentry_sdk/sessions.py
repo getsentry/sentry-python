@@ -14,8 +14,26 @@ if MYPY:
     from typing import Any
     from typing import Dict
 
-    from sentry_sdk.hub import Hub
     from sentry_sdk._types import SessionStatus
+    from sentry_sdk.hub import Hub
+
+
+def auto_start_session():
+    # type: (...) -> None
+    from sentry_sdk.hub import Hub
+
+    hub = Hub.current
+    if hub.client and hub.client.options["auto_session_tracking"]:
+        hub.start_session()
+
+
+def auto_stop_session():
+    # type: (...) -> None
+    from sentry_sdk.hub import Hub
+
+    hub = Hub.current
+    if hub.client and hub.client.options["auto_session_tracking"]:
+        hub.stop_session()
 
 
 def _timestamp(
@@ -115,12 +133,12 @@ class Session(object):
             started = datetime.utcnow()
         if status is None:
             status = "ok"
-        self.did = None
+        self.did = None  # type: Optional[str]
         self.seq = 0
         self.started = started
-        self.release = None
-        self.environment = None
-        self.duration = None
+        self.release = None  # type: Optional[str]
+        self.environment = None  # type: Optional[str]
+        self.duration = None  # type: Optional[float]
 
         self.update(
             sid=sid,
