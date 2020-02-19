@@ -1,3 +1,4 @@
+import os
 import uuid
 import time
 from datetime import datetime
@@ -37,7 +38,7 @@ class SessionFlusher(object):
     def __init__(
         self,
         flush_func,  # type: Any
-        flush_interval=10,  # type: int
+        flush_interval=60,  # type: int
     ):
         # type: (...) -> None
         self.flush_func = flush_func
@@ -45,9 +46,8 @@ class SessionFlusher(object):
         self.pending = {}  # type: Dict[str, Any]
         self._thread = None  # type: Optional[Thread]
         self._thread_lock = Lock()
+        self._thread_for_pid = None  # type: Optional[int]
         self._running = True
-
-        # TODO: this needs fork handling same as `BackgroundWorker`
 
     def flush(self):
         # type: (...) -> None
@@ -57,10 +57,10 @@ class SessionFlusher(object):
 
     def _ensure_running(self):
         # type: (...) -> None
-        if self._thread is not None:
+        if self._thread_for_pid == os.getpid() and self._thread is not None:
             return None
         with self._thread_lock:
-            if self._thread is not None:
+            if self._thread_for_pid == os.getpid() and self._thread is not None:
                 return None
 
             def _thread():
@@ -74,6 +74,7 @@ class SessionFlusher(object):
             thread.daemon = True
             thread.start()
             self._thread = thread
+            self._thread_for_pid = os.getpid()
         return None
 
     def add_session(
