@@ -32,10 +32,10 @@ def test_view_exceptions(sentry_init, client, capture_exceptions, capture_events
     events = capture_events()
     client.get(reverse("view_exc"))
 
-    error, = exceptions
+    (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
 
-    event, = events
+    (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "django"
 
 
@@ -44,7 +44,7 @@ def test_middleware_exceptions(sentry_init, client, capture_exceptions):
     exceptions = capture_exceptions()
     client.get(reverse("middleware_exc"))
 
-    error, = exceptions
+    (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
 
 
@@ -54,7 +54,7 @@ def test_request_captured(sentry_init, client, capture_events):
     content, status, headers = client.get(reverse("message"))
     assert b"".join(content) == b"ok"
 
-    event, = events
+    (event,) = events
     assert event["transaction"] == "/message"
     assert event["request"] == {
         "cookies": {},
@@ -75,7 +75,7 @@ def test_transaction_with_class_view(sentry_init, client, capture_events):
     content, status, headers = client.head(reverse("classbased"))
     assert status.lower() == "200 ok"
 
-    event, = events
+    (event,) = events
 
     assert (
         event["transaction"] == "tests.integrations.django.myapp.views.ClassBasedView"
@@ -96,7 +96,7 @@ def test_user_captured(sentry_init, client, capture_events):
     content, status, headers = client.get(reverse("message"))
     assert b"".join(content) == b"ok"
 
-    event, = events
+    (event,) = events
 
     assert event["user"] == {
         "email": "lennon@thebeatles.com",
@@ -118,11 +118,11 @@ def test_queryset_repr(sentry_init, capture_events):
     except Exception:
         capture_exception()
 
-    event, = events
+    (event,) = events
 
-    exception, = event["exception"]["values"]
+    (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
-    frame, = exception["stacktrace"]["frames"]
+    (frame,) = exception["stacktrace"]["frames"]
     assert frame["vars"]["my_queryset"].startswith(
         "<QuerySet from django.db.models.query at"
     )
@@ -134,7 +134,7 @@ def test_custom_error_handler_request_context(sentry_init, client, capture_event
     content, status, headers = client.post("/404")
     assert status.lower() == "404 not found"
 
-    event, = events
+    (event,) = events
 
     assert event["message"] == "not found"
     assert event["level"] == "error"
@@ -155,7 +155,7 @@ def test_500(sentry_init, client, capture_events):
     assert status.lower() == "500 internal server error"
     content = b"".join(content).decode("utf-8")
 
-    event, = events
+    (event,) = events
     event_id = event["event_id"]
     assert content == "Sentry error: %s" % event_id
 
@@ -197,7 +197,7 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
 
     capture_message("HI")
 
-    event, = events
+    (event,) = events
 
     if with_integration:
         crumb = event["breadcrumbs"][-1]
@@ -230,7 +230,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
         )
 
     capture_message("HI")
-    event, = events
+    (event,) = events
 
     crumb = event["breadcrumbs"][-1]
     assert crumb["message"] == (
@@ -271,7 +271,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
 
     capture_message("HI")
 
-    event, = events
+    (event,) = events
     crumb = event["breadcrumbs"][-1]
     assert crumb["message"] == ('SELECT %(my_param)s FROM "foobar"')
     assert crumb["data"]["db.params"] == {"my_param": 10}
@@ -311,7 +311,7 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
 
     capture_message("HI")
 
-    event, = events
+    (event,) = events
     for crumb in event["breadcrumbs"]:
         del crumb["timestamp"]
 
@@ -353,7 +353,7 @@ def test_transaction_style(
     content, status, headers = client.get(reverse("message"))
     assert b"".join(content) == b"ok"
 
-    event, = events
+    (event,) = events
     assert event["transaction"] == expected_transaction
 
 
@@ -366,7 +366,7 @@ def test_request_body(sentry_init, client, capture_events):
     assert status.lower() == "200 ok"
     assert b"".join(content) == b"heyooo"
 
-    event, = events
+    (event,) = events
 
     assert event["message"] == "hi"
     assert event["request"]["data"] == ""
@@ -383,7 +383,7 @@ def test_request_body(sentry_init, client, capture_events):
     assert status.lower() == "200 ok"
     assert b"".join(content) == b'{"hey": 42}'
 
-    event, = events
+    (event,) = events
 
     assert event["message"] == "hi"
     assert event["request"]["data"] == {"hey": 42}
@@ -403,7 +403,7 @@ def test_read_request(sentry_init, client, capture_events):
 
     assert status.lower() == "500 internal server error"
 
-    event, = events
+    (event,) = events
 
     assert "data" not in event["request"]
 
@@ -415,7 +415,7 @@ def test_template_exception(sentry_init, client, capture_events):
     content, status, headers = client.get(reverse("template_exc"))
     assert status.lower() == "500 internal server error"
 
-    event, = events
+    (event,) = events
     exception = event["exception"]["values"][-1]
     assert exception["type"] == "TemplateSyntaxError"
 
@@ -473,10 +473,10 @@ def test_rest_framework_basic(
     else:
         assert False
 
-    error, = exceptions
+    (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
 
-    event, = events
+    (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "django"
 
     assert event["request"]["data"] == body

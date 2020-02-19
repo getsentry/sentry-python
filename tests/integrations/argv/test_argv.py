@@ -12,5 +12,5 @@ def test_basic(sentry_init, capture_events, monkeypatch):
 
     events = capture_events()
     capture_message("hi")
-    event, = events
+    (event,) = events
     assert event["extra"]["sys.argv"] == argv

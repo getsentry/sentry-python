@@ -42,7 +42,7 @@ def test_orm_queries(sentry_init, capture_events):
 
     capture_message("hi")
 
-    event, = events
+    (event,) = events
 
     for crumb in event["breadcrumbs"]:
         del crumb["timestamp"]

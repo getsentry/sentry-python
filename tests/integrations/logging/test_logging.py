@@ -22,7 +22,7 @@ def test_logging_works_with_many_loggers(sentry_init, capture_events, logger):
 
     logger.info("bread")
     logger.critical("LOL")
-    event, = events
+    (event,) = events
     assert event["level"] == "fatal"
     assert not event["logentry"]["params"]
     assert event["logentry"]["message"] == "LOL"
@@ -36,7 +36,7 @@ def test_logging_defaults(integrations, sentry_init, capture_events):
 
     logger.info("bread")
     logger.critical("LOL")
-    event, = events
+    (event,) = events
 
     assert event["level"] == "fatal"
     assert any(crumb["message"] == "bread" for crumb in event["breadcrumbs"])
@@ -51,7 +51,7 @@ def test_logging_extra_data(sentry_init, capture_events):
     logger.info("bread", extra=dict(foo=42))
     logger.critical("lol", extra=dict(bar=69))
 
-    event, = events
+    (event,) = events
 
     assert event["level"] == "fatal"
     assert event["extra"] == {"bar": 69}
@@ -67,7 +67,7 @@ def test_logging_extra_data_integer_keys(sentry_init, capture_events):
 
     logger.critical("integer in extra keys", extra={1: 1})
 
-    event, = events
+    (event,) = events
 
     assert event["extra"] == {"1": 1}
 
@@ -95,7 +95,7 @@ def test_logging_level(sentry_init, capture_events):
 
     logger.setLevel(logging.WARNING)
     logger.error("hi")
-    event, = events
+    (event,) = events
     assert event["level"] == "error"
     assert event["logentry"]["message"] == "hi"
 
@@ -124,5 +124,5 @@ def test_logging_filters(sentry_init, capture_events):
     should_log = True
     logger.error("hi")
 
-    event, = events
+    (event,) = events
     assert event["logentry"]["message"] == "hi"

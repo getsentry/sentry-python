@@ -124,7 +124,7 @@ def test_subprocess_basic(
 
     data = {"subprocess.cwd": os.getcwd()} if with_cwd else {}
 
-    crumb, = message_event["breadcrumbs"]
+    (crumb,) = message_event["breadcrumbs"]
     assert crumb == {
         "category": "subprocess",
         "data": data,
@@ -138,9 +138,11 @@ def test_subprocess_basic(
 
     assert transaction_event["type"] == "transaction"
 
-    subprocess_init_span, subprocess_wait_span, subprocess_communicate_span = transaction_event[
-        "spans"
-    ]
+    (
+        subprocess_init_span,
+        subprocess_wait_span,
+        subprocess_communicate_span,
+    ) = transaction_event["spans"]
 
     assert subprocess_init_span["op"] == "subprocess"
     assert subprocess_communicate_span["op"] == "subprocess.communicate"

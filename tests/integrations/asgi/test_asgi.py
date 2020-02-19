@@ -37,7 +37,7 @@ def test_sync_request_data(sentry_init, app, capture_events):
 
     assert response.status_code == 200
 
-    event, = events
+    (event,) = events
     assert event["transaction"] == "tests.integrations.asgi.test_asgi.app.<locals>.hi"
     assert event["request"]["env"] == {"REMOTE_ADDR": "testclient"}
     assert set(event["request"]["headers"]) == {
@@ -55,7 +55,7 @@ def test_sync_request_data(sentry_init, app, capture_events):
     # Assert that state is not leaked
     events.clear()
     capture_message("foo")
-    event, = events
+    (event,) = events
 
     assert "request" not in event
     assert "transaction" not in event
@@ -70,7 +70,7 @@ def test_async_request_data(sentry_init, app, capture_events):
 
     assert response.status_code == 200
 
-    event, = events
+    (event,) = events
     assert event["transaction"] == "tests.integrations.asgi.test_asgi.app.<locals>.hi2"
     assert event["request"]["env"] == {"REMOTE_ADDR": "testclient"}
     assert set(event["request"]["headers"]) == {
@@ -87,7 +87,7 @@ def test_async_request_data(sentry_init, app, capture_events):
     # Assert that state is not leaked
     events.clear()
     capture_message("foo")
-    event, = events
+    (event,) = events
 
     assert "request" not in event
     assert "transaction" not in event
@@ -106,12 +106,12 @@ def test_errors(sentry_init, app, capture_events):
 
     assert response.status_code == 500
 
-    event, = events
+    (event,) = events
     assert (
         event["transaction"]
         == "tests.integrations.asgi.test_asgi.test_errors.<locals>.myerror"
     )
-    exception, = event["exception"]["values"]
+    (exception,) = event["exception"]["values"]
 
     assert exception["type"] == "ValueError"
     assert exception["value"] == "oh no"

@@ -26,9 +26,9 @@ async def test_basic(sentry_init, capture_events, application):
     response = await comm.get_response()
     assert response["status"] == 500
 
-    event, = events
+    (event,) = events
 
-    exception, = event["exception"]["values"]
+    (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
 
     # Test that the ASGI middleware got set up correctly. Right now this needs
