@@ -47,7 +47,7 @@ class CeleryIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        if VERSION < (3,):
+        if CELERY_VERSION < (3,):
             raise DidNotEnable("Celery 3 or newer required.")
 
         import celery.app.trace as trace  # type: ignore
