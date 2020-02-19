@@ -4,7 +4,7 @@ from datetime import datetime
 from threading import Thread, Lock
 from weakref import ref as weakref
 
-from sentry_sdk._types import MYPY, SessionStatus
+from sentry_sdk._types import MYPY
 
 if MYPY:
     from typing import Optional
@@ -13,6 +13,7 @@ if MYPY:
     from typing import Dict
 
     from sentry_sdk.hub import Hub
+    from sentry_sdk._types import SessionStatus
 
 
 def _timestamp(
