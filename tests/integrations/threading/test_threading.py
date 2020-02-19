@@ -22,9 +22,9 @@ def test_handles_exceptions(sentry_init, capture_events, integrations):
     t.join()
 
     if integrations:
-        event, = events
+        (event,) = events
 
-        exception, = event["exception"]["values"]
+        (exception,) = event["exception"]["values"]
         assert exception["type"] == "ZeroDivisionError"
         assert exception["mechanism"] == {"type": "threading", "handled": False}
     else:
@@ -55,9 +55,9 @@ def test_propagates_hub(sentry_init, capture_events, propagate_hub):
     t.start()
     t.join()
 
-    event, = events
+    (event,) = events
 
-    exception, = event["exception"]["values"]
+    (exception,) = event["exception"]["values"]
 
     assert exception["type"] == "ZeroDivisionError"
     assert exception["mechanism"] == {"type": "threading", "handled": False}
@@ -112,5 +112,5 @@ def test_double_patching(sentry_init, capture_events):
 
     assert len(events) == 10
     for event in events:
-        exception, = event["exception"]["values"]
+        (exception,) = event["exception"]["values"]
         assert exception["type"] == "ZeroDivisionError"

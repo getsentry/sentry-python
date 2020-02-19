@@ -47,7 +47,7 @@ def test_has_context(sentry_init, app, capture_events):
     response = client.get("/message")
     assert response.status_code == 200
 
-    event, = events
+    (event,) = events
     assert event["transaction"] == "hi"
     assert "data" not in event["request"]
     assert event["request"]["url"] == "http://localhost/message"
@@ -70,7 +70,7 @@ def test_transaction_style(
     response = client.get("/message")
     assert response.status_code == 200
 
-    event, = events
+    (event,) = events
     assert event["transaction"] == expected_transaction
 
 
@@ -95,10 +95,10 @@ def test_errors(sentry_init, capture_exceptions, capture_events, app, debug, tes
     except ZeroDivisionError:
         pass
 
-    exc, = exceptions
+    (exc,) = exceptions
     assert isinstance(exc, ZeroDivisionError)
 
-    event, = events
+    (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "flask"
 
 
@@ -112,7 +112,7 @@ def test_flask_login_not_installed(sentry_init, app, capture_events, monkeypatch
     client = app.test_client()
     client.get("/message")
 
-    event, = events
+    (event,) = events
     assert event.get("user", {}).get("id") is None
 
 
@@ -125,7 +125,7 @@ def test_flask_login_not_configured(sentry_init, app, capture_events, monkeypatc
     client = app.test_client()
     client.get("/message")
 
-    event, = events
+    (event,) = events
     assert event.get("user", {}).get("id") is None
 
 
@@ -142,7 +142,7 @@ def test_flask_login_partially_configured(
     client = app.test_client()
     client.get("/message")
 
-    event, = events
+    (event,) = events
     assert event.get("user", {}).get("id") is None
 
 
@@ -182,7 +182,7 @@ def test_flask_login_configured(
 
     assert client.get("/message").status_code == 200
 
-    event, = events
+    (event,) = events
     if user_id is None or not send_default_pii:
         assert event.get("user", {}).get("id") is None
     else:
@@ -208,7 +208,7 @@ def test_flask_large_json_request(sentry_init, capture_events, app):
     response = client.post("/", content_type="application/json", data=json.dumps(data))
     assert response.status_code == 200
 
-    event, = events
+    (event,) = events
     assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
@@ -233,7 +233,7 @@ def test_flask_empty_json_request(sentry_init, capture_events, app, data):
     response = client.post("/", content_type="application/json", data=json.dumps(data))
     assert response.status_code == 200
 
-    event, = events
+    (event,) = events
     assert event["request"]["data"] == data
 
 
@@ -256,7 +256,7 @@ def test_flask_medium_formdata_request(sentry_init, capture_events, app):
     response = client.post("/", data=data)
     assert response.status_code == 200
 
-    event, = events
+    (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
@@ -286,7 +286,7 @@ def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, ap
     response = client.post("/", data=data)
     assert response.status_code == 200
 
-    event, = events
+    (event,) = events
     assert event["_meta"]["request"]["data"] == {
         "": {"len": 2000, "rem": [["!config", "x", 0, 2000]]}
     }
@@ -312,7 +312,7 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
     response = client.post("/", data=data)
     assert response.status_code == 200
 
-    event, = events
+    (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
@@ -370,7 +370,7 @@ def test_logging(sentry_init, capture_events, app):
     client = app.test_client()
     client.get("/")
 
-    event, = events
+    (event,) = events
     assert event["level"] == "error"
 
 
@@ -414,11 +414,11 @@ def test_wsgi_level_error_is_caught(
     with pytest.raises(ZeroDivisionError) as exc:
         client.get("/")
 
-    error, = exceptions
+    (error,) = exceptions
 
     assert error is exc.value
 
-    event, = events
+    (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "wsgi"
 
 
@@ -441,7 +441,7 @@ def test_500(sentry_init, capture_events, app):
     client = app.test_client()
     response = client.get("/")
 
-    event, = events
+    (event,) = events
     assert response.data.decode("utf-8") == "Sentry error: %s" % event["event_id"]
 
 
@@ -468,7 +468,7 @@ def test_error_in_errorhandler(sentry_init, capture_events, app):
 
     event1, event2 = events
 
-    exception, = event1["exception"]["values"]
+    (exception,) = event1["exception"]["values"]
     assert exception["type"] == "ValueError"
 
     exception = event2["exception"]["values"][-1]
@@ -597,7 +597,7 @@ def test_tracing_error(sentry_init, capture_events, app):
     assert transaction_event["contexts"]["trace"]["status"] == "internal_error"
 
     assert error_event["transaction"] == "error"
-    exception, = error_event["exception"]["values"]
+    (exception,) = error_event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
 
 
@@ -617,7 +617,7 @@ def test_class_based_views(sentry_init, app, capture_events):
         response = client.get("/hello-class/")
         assert response.status_code == 200
 
-    event, = events
+    (event,) = events
 
     assert event["message"] == "hi"
     assert event["transaction"] == "hello_class"

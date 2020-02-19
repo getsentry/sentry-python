@@ -51,8 +51,8 @@ def test_basic(tornado_testcase, sentry_init, capture_events):
     )
     assert response.code == 500
 
-    event, = events
-    exception, = event["exception"]["values"]
+    (event,) = events
+    (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
     assert exception["mechanism"]["type"] == "tornado"
 
@@ -121,8 +121,8 @@ def test_user_auth(tornado_testcase, sentry_init, capture_events):
     response = client.fetch("/auth")
     assert response.code == 500
 
-    event, = events
-    exception, = event["exception"]["values"]
+    (event,) = events
+    (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
 
     assert event["user"] == {"is_authenticated": True}
@@ -133,8 +133,8 @@ def test_user_auth(tornado_testcase, sentry_init, capture_events):
     response = client.fetch("/noauth")
     assert response.code == 500
 
-    event, = events
-    exception, = event["exception"]["values"]
+    (event,) = events
+    (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
 
     assert "user" not in event
@@ -159,8 +159,8 @@ def test_formdata(tornado_testcase, sentry_init, capture_events):
 
     assert response.code == 500
 
-    event, = events
-    exception, = event["exception"]["values"]
+    (event,) = events
+    (exception,) = event["exception"]["values"]
     assert exception["value"] == '["field1", "field2"]'
     assert event["request"]["data"] == {"field1": ["value1"], "field2": ["value2"]}
 
@@ -186,8 +186,8 @@ def test_json(tornado_testcase, sentry_init, capture_events):
 
     assert response.code == 500
 
-    event, = events
-    exception, = event["exception"]["values"]
+    (event,) = events
+    (exception,) = event["exception"]["values"]
     assert exception["value"] == "[]"
     assert event
     assert event["request"]["data"] == {"foo": {"bar": 42}}

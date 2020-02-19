@@ -21,7 +21,7 @@ def test_basic(sentry_init, capture_events, sample_rate):
             pass
 
     if sample_rate:
-        event, = events
+        (event,) = events
 
         span1, span2 = event["spans"]
         parent_span = event
@@ -141,7 +141,7 @@ def test_span_trimming(sentry_init, capture_events):
             with Hub.current.start_span(op="foo{}".format(i)):
                 pass
 
-    event, = events
+    (event,) = events
     span1, span2 = event["spans"]
     assert span1["op"] == "foo0"
     assert span2["op"] == "foo1"

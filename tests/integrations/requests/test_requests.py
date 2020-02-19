@@ -14,8 +14,8 @@ def test_crumb_capture(sentry_init, capture_events):
     assert response.status_code == 418
     capture_message("Testing!")
 
-    event, = events
-    crumb, = event["breadcrumbs"]
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
     assert crumb["data"] == {

@@ -19,7 +19,7 @@ def test_basic(sentry_init, capture_exceptions, monkeypatch):
     with pytest.raises(ZeroDivisionError):
         foo()
 
-    exception, = exceptions
+    (exception,) = exceptions
     assert isinstance(exception, ZeroDivisionError)
 
     assert flush_calls == [1]
@@ -40,7 +40,7 @@ def test_flush_disabled(sentry_init, capture_exceptions, monkeypatch):
     with pytest.raises(ZeroDivisionError):
         foo()
 
-    exception, = exceptions
+    (exception,) = exceptions
     assert isinstance(exception, ZeroDivisionError)
 
     assert flush_calls == []

@@ -33,7 +33,7 @@ def test_request_data(sentry_init, app, capture_events):
     request, response = app.test_client.get("/message?foo=bar")
     assert response.status == 200
 
-    event, = events
+    (event,) = events
     assert event["transaction"] == "hi"
     assert event["request"]["env"] == {"REMOTE_ADDR": ""}
     assert set(event["request"]["headers"]) >= {
@@ -49,7 +49,7 @@ def test_request_data(sentry_init, app, capture_events):
     # Assert that state is not leaked
     events.clear()
     capture_message("foo")
-    event, = events
+    (event,) = events
 
     assert "request" not in event
     assert "transaction" not in event
@@ -66,9 +66,9 @@ def test_errors(sentry_init, app, capture_events):
     request, response = app.test_client.get("/error")
     assert response.status == 500
 
-    event, = events
+    (event,) = events
     assert event["transaction"] == "myerror"
-    exception, = event["exception"]["values"]
+    (exception,) = event["exception"]["values"]
 
     assert exception["type"] == "ValueError"
     assert exception["value"] == "oh no"
@@ -109,7 +109,7 @@ def test_error_in_errorhandler(sentry_init, app, capture_events):
 
     event1, event2 = events
 
-    exception, = event1["exception"]["values"]
+    (exception,) = event1["exception"]["values"]
     assert exception["type"] == "ValueError"
     assert any(
         frame["filename"].endswith("test_sanic.py")
@@ -172,7 +172,7 @@ def test_concurrency(sentry_init, app):
             stream_callback=responses.append,
         )
 
-        r, = responses
+        (r,) = responses
         assert r.status == 200
 
     async def runner():

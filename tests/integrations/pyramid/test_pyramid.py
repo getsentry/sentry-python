@@ -76,11 +76,11 @@ def test_view_exceptions(
     with pytest.raises(ZeroDivisionError):
         client.get("/errors")
 
-    error, = exceptions
+    (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
 
-    event, = events
-    breadcrumb, = event["breadcrumbs"]
+    (event,) = events
+    (breadcrumb,) = event["breadcrumbs"]
     assert breadcrumb["message"] == "hi2"
     assert event["exception"]["values"][0]["mechanism"]["type"] == "pyramid"
 
@@ -97,7 +97,7 @@ def test_has_context(route, get_client, sentry_init, capture_events):
     client = get_client()
     client.get("/message/yoo")
 
-    event, = events
+    (event,) = events
     assert event["message"] == "yoo"
     assert event["request"] == {
         "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
@@ -122,7 +122,7 @@ def test_transaction_style(
     client = get_client()
     client.get("/message")
 
-    event, = events
+    (event,) = events
     assert event["transaction"] == expected_transaction
 
 
@@ -144,7 +144,7 @@ def test_large_json_request(sentry_init, capture_events, route, get_client):
     client = get_client()
     client.post("/", content_type="application/json", data=json.dumps(data))
 
-    event, = events
+    (event,) = events
     assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
@@ -169,7 +169,7 @@ def test_flask_empty_json_request(sentry_init, capture_events, route, get_client
     response = client.post("/", content_type="application/json", data=json.dumps(data))
     assert response[1] == "200 OK"
 
-    event, = events
+    (event,) = events
     assert event["request"]["data"] == data
 
 
@@ -188,7 +188,7 @@ def test_files_and_form(sentry_init, capture_events, route, get_client):
     client = get_client()
     client.post("/", data=data)
 
-    event, = events
+    (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
@@ -268,7 +268,7 @@ def test_errorhandler_500(
     assert b"".join(app_iter) == b"bad request"
     assert status.lower() == "500 internal server error"
 
-    error, = errors
+    (error,) = errors
 
     assert isinstance(error, ZeroDivisionError)
 
@@ -294,7 +294,7 @@ def test_error_in_errorhandler(
     with pytest.raises(ZeroDivisionError):
         client.get("/")
 
-    event, = events
+    (event,) = events
 
     exception = event["exception"]["values"][-1]
     assert exception["type"] == "ZeroDivisionError"
