@@ -570,9 +570,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if change_to is None and exception:
             for error in exception.get("values") or ():
                 mechanism = error.get("mechanism")
-                if not mechanism:
-                    continue
-                if mechanism.get("unhandled") is False:
+                if mechanism and mechanism.get("unhandled") is False:
                     change_to = "crashed"
                     break
                 else:

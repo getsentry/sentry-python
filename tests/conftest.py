@@ -11,6 +11,7 @@ import eventlet
 import sentry_sdk
 from sentry_sdk._compat import reraise, string_types, iteritems
 from sentry_sdk.transport import Transport
+from sentry_sdk.envelope import Envelope
 from sentry_sdk.utils import capture_internal_exceptions
 
 from tests import _warning_recorder, _warning_recorder_mgr
@@ -217,6 +218,31 @@ def capture_events(monkeypatch):
 
         monkeypatch.setattr(test_client.transport, "capture_event", append)
         return events
+
+    return inner
+
+
+@pytest.fixture
+def capture_envelopes(monkeypatch):
+    def inner():
+        envelopes = []
+        test_client = sentry_sdk.Hub.current.client
+        old_capture_event = test_client.transport.capture_event
+        old_capture_envelope = test_client.transport.capture_envelope
+
+        def append_event(event):
+            envelope = Envelope()
+            envelope.add_event(event)
+            envelopes.append(envelope)
+            return old_capture_event(event)
+
+        def append_envelope(envelope):
+            envelopes.append(envelope)
+            return old_capture_envelope(envelope)
+
+        monkeypatch.setattr(test_client.transport, "capture_event", append_event)
+        monkeypatch.setattr(test_client.transport, "capture_envelope", append_envelope)
+        return envelopes
 
     return inner
 

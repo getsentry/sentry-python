@@ -4,6 +4,7 @@ from datetime import datetime
 from threading import Thread, Lock
 from weakref import ref as weakref
 
+from sentry_sdk._compat import text_type
 from sentry_sdk._types import MYPY
 
 if MYPY:
@@ -113,13 +114,19 @@ class Session(object):
             started = datetime.utcnow()
         if status is None:
             status = "ok"
+        self.did = None
         self.seq = 0
         self.started = started
+        self.release = None
+        self.environment = None
+        self.duration = None
+
         self.update(
             sid=sid,
             did=did,
             timestamp=timestamp,
             duration=duration,
+            status=status,
             release=release,
             environment=environment,
             user=user,
@@ -139,6 +146,9 @@ class Session(object):
         # type: (...) -> None
         if user is not None and did is None:
             did = user.get("id") or user.get("email") or user.get("username")
+            if did is not None:
+                did = text_type(did)
+
         if sid is not None:
             self.sid = _make_uuid(sid)
         if did is not None:
@@ -154,6 +164,7 @@ class Session(object):
             self.release = release
         if environment is not None:
             self.environment = environment
+        self.duration = (datetime.utcnow() - self.started).total_seconds()
 
         # any session update bumps this
         self.seq += 1
