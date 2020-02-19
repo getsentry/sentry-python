@@ -8,7 +8,7 @@ from sentry_sdk.tracing import record_sql_queries
 try:
     from sqlalchemy.engine import Engine  # type: ignore
     from sqlalchemy.event import listen  # type: ignore
-    from sqlalchemy import __version__ as SQLALCHEMY_VERSION
+    from sqlalchemy import __version__ as SQLALCHEMY_VERSION  # type: ignore
 except ImportError:
     raise DidNotEnable("SQLAlchemy not installed.")
 
