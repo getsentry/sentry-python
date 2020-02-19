@@ -5,6 +5,7 @@ import mimetypes
 
 from sentry_sdk._compat import text_type
 from sentry_sdk._types import MYPY
+from sentry_sdk.sessions import Session
 
 if MYPY:
     from typing import Any
@@ -16,7 +17,6 @@ if MYPY:
     from typing import Iterator
 
     from sentry_sdk._types import Event
-    from sentry_sdk.sessions import Session
 
 
 class Envelope(object):
@@ -42,10 +42,12 @@ class Envelope(object):
         self.add_item(Item(payload=PayloadRef(json=event), type="event"))
 
     def add_session(
-        self, session  # type: Session
+        self, session  # type: Union[Session, Any]
     ):
         # type: (...) -> None
-        self.add_item(Item(payload=PayloadRef(json=session.to_json()), type="session"))
+        if isinstance(session, Session):
+            session = session.to_json()
+        self.add_item(Item(payload=PayloadRef(json=session), type="session"))
 
     def add_item(
         self, item  # type: Item

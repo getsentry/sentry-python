@@ -26,6 +26,7 @@ if MYPY:
     )
 
     from sentry_sdk.tracing import Span
+    from sentry_sdk.sessions import Session
 
     F = TypeVar("F", bound=Callable[..., Any])
     T = TypeVar("T")
@@ -85,6 +86,7 @@ class Scope(object):
         "_error_processors",
         "_should_capture",
         "_span",
+        "_session",
     )
 
     def __init__(self):
@@ -111,6 +113,7 @@ class Scope(object):
         self._should_capture = True
 
         self._span = None  # type: Optional[Span]
+        self._session = None  # type: Optional[Session]
 
     @_attr_setter
     def level(self, value):
@@ -142,12 +145,15 @@ class Scope(object):
     def user(self, value):
         # type: (Dict[str, Any]) -> None
         """When set a specific user is bound to the scope. Deprecated in favor of set_user."""
-        self._user = value
+        self.set_user(value)
 
     def set_user(self, value):
         # type: (Dict[str, Any]) -> None
         """Sets a user for the scope."""
         self._user = value
+        session = self._session
+        if session is not None and value:
+            session.update(user=value)
 
     @property
     def span(self):
@@ -163,6 +169,19 @@ class Scope(object):
             span_transaction = span.transaction
             if span_transaction:
                 self._transaction = span_transaction
+
+    @property
+    def session(self):
+        # type: () -> Optional[Session]
+        """Get/set current tracing session."""
+        return self._session
+
+    @session.setter
+    def session(self, session):
+        # type: (Optional[Session]) -> None
+        self._session = session
+        if session is not None:
+            session.update(user=self._user)
 
     def set_tag(
         self,
@@ -343,6 +362,7 @@ class Scope(object):
 
         rv._should_capture = self._should_capture
         rv._span = self._span
+        rv._session = self._session
 
         return rv
 

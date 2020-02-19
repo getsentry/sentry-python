@@ -9,6 +9,7 @@ from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
 from sentry_sdk.tracing import Span
+from sentry_sdk.sessions import Session
 from sentry_sdk.utils import (
     exc_info_from_error,
     event_from_exception,
@@ -32,7 +33,14 @@ if MYPY:
     from typing import ContextManager
 
     from sentry_sdk.integrations import Integration
-    from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint, ExcInfo
+    from sentry_sdk._types import (
+        Event,
+        Hint,
+        Breadcrumb,
+        BreadcrumbHint,
+        ExcInfo,
+        SessionStatus,
+    )
     from sentry_sdk.consts import ClientConstructor
 
     T = TypeVar("T")
@@ -291,6 +299,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         client, scope = self._stack[-1]
         if client is not None:
+            self._update_session_state_from_event(event)
             rv = client.capture_event(event, hint, scope)
             if rv is not None:
                 self._last_event_id = rv
@@ -531,6 +540,46 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
                 yield Scope()
 
         return inner()
+
+    def stop_session(self):
+        # type: (...) -> None
+        """Stops session tracking."""
+        session = self._stack[-1][1].session
+        if session is not None:
+            session.close()
+        self._stack[-1][1].session = None
+
+    def start_session(self):
+        # type: (...) -> None
+        """Starts a new session."""
+        self.stop_session()
+        self._stack[-1][1].session = Session(hub=self)
+
+    def _update_session_state_from_event(self, event):
+        # type: (Event) -> None
+        session = self._stack[-1][1].session
+        if not session:
+            return
+
+        change_to = None  # type: Optional[SessionStatus]
+        level = event.get("level")
+        if level == "fatal":
+            change_to = "crashed"
+
+        exception = event.get("exception")
+        if change_to is None and exception:
+            for error in exception.get("values") or ():
+                mechanism = error.get("mechanism")
+                if not mechanism:
+                    continue
+                if mechanism.get("unhandled") is False:
+                    change_to = "crashed"
+                    break
+                else:
+                    change_to = "degraded"
+
+        if change_to is not None:
+            session.mark_failed(change_to)
 
     def flush(
         self,
