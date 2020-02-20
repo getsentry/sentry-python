@@ -280,7 +280,7 @@ class _Client(object):
     ):
         # type: (...) -> None
         if not session.release:
-            logger.warning("Discarded session update because of missing release")
+            logger.info("Discarded session update because of missing release")
         else:
             self.session_flusher.add_session(session)
 

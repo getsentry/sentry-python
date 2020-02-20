@@ -4,7 +4,7 @@ from sentry_sdk import Hub
 
 
 def test_basic(sentry_init, capture_envelopes):
-    sentry_init()
+    sentry_init(release="fun-release", environment="not-fun-env")
     envelopes = capture_envelopes()
 
     hub = Hub.current
@@ -30,3 +30,7 @@ def test_basic(sentry_init, capture_envelopes):
     assert sess_event["status"] == "degraded"
     assert sess_event["duration"] > 0.1
     assert sess_event["duration"] < 1.0
+    assert sess_event["attrs"] == {
+        "release": "fun-release",
+        "environment": "not-fun-env",
+    }

@@ -168,6 +168,9 @@ class Session(object):
             if did is not None:
                 did = text_type(did)
 
+        hub = self._hub()
+        options = hub.client.options if hub and hub.client else None
+
         if sid is not None:
             self.sid = _make_uuid(sid)
         if did is not None:
@@ -179,8 +182,12 @@ class Session(object):
             self.duration = duration
         if status is not None:
             self.status = status
+        if release is None and options:
+            release = options["release"]
         if release is not None:
             self.release = release
+        if environment is None and options:
+            environment = options["environment"]
         if environment is not None:
             self.environment = environment
         self.duration = (datetime.utcnow() - self.started).total_seconds()
@@ -189,7 +196,6 @@ class Session(object):
         self.seq += 1
 
         # propagate session changes to the hub
-        hub = self._hub()
         if hub is not None:
             client = hub.client
             if client is not None:
