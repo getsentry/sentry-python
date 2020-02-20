@@ -91,6 +91,24 @@ def _init(*args, **kwargs):
     return rv
 
 
+def _assert_can_record_sessions(hub):
+    # type: (Hub) -> bool
+    client = hub.client
+
+    # No client does silently nothing
+    if not client:
+        return False
+
+    # No release means we give you a warning
+    if not client.options["release"]:
+        logger.info(
+            "cannot start and stop did not start sessions when release is not configured"
+        )
+        return False
+
+    return True
+
+
 from sentry_sdk._types import MYPY
 
 if MYPY:
@@ -544,16 +562,18 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def stop_session(self):
         # type: (...) -> None
         """Stops session tracking."""
-        session = self._stack[-1][1].session
-        if session is not None:
-            session.close()
-        self._stack[-1][1].session = None
+        if _assert_can_record_sessions(self):
+            session = self._stack[-1][1].session
+            if session is not None:
+                session.close()
+            self._stack[-1][1].session = None
 
     def start_session(self):
         # type: (...) -> None
         """Starts a new session."""
-        self.stop_session()
-        self._stack[-1][1].session = Session(hub=self)
+        if _assert_can_record_sessions(self):
+            self.stop_session()
+            self._stack[-1][1].session = Session(hub=self)
 
     def _update_session_state_from_event(self, event):
         # type: (Event) -> None
