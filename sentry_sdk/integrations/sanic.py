@@ -58,7 +58,7 @@ class SanicIntegration(Integration):
                 " or aiocontextvars package"
             )
 
-        if VERSION.startswith("0.8."):
+        if SANIC_VERSION.startswith("0.8."):
             # Sanic 0.8 and older creates a logger named "root" and puts a
             # stringified version of every exception in there (without exc_info),
             # which our error deduplication can't detect.
