@@ -56,11 +56,11 @@ class SessionFlusher(object):
     def __init__(
         self,
         flush_func,  # type: Any
-        flush_interval=60,  # type: int
+        flush_interval=10,  # type: int
     ):
         # type: (...) -> None
         self.flush_func = flush_func
-        self.flush_interval = 10
+        self.flush_interval = flush_interval
         self.pending = {}  # type: Dict[str, Any]
         self._thread = None  # type: Optional[Thread]
         self._thread_lock = Lock()
