@@ -15,6 +15,7 @@ from sentry_sdk import (
     capture_message,
     capture_exception,
     last_event_id,
+    Hub,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
 import sentry_sdk.integrations.flask as flask_sentry
@@ -213,6 +214,41 @@ def test_flask_large_json_request(sentry_init, capture_events, app):
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
     assert len(event["request"]["data"]["foo"]["bar"]) == 512
+
+
+def test_flask_session_tracking(sentry_init, capture_envelopes, app):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        release="demo-release",
+        auto_session_tracking=True,
+    )
+
+    @app.route("/")
+    def index():
+        with configure_scope() as scope:
+            scope.set_user({"ip_address": "1.2.3.4", "id": 42})
+        1 / 0
+
+    envelopes = capture_envelopes()
+
+    client = app.test_client()
+    try:
+        client.get("/")
+    except ZeroDivisionError:
+        pass
+
+    Hub.current.client.flush()
+
+    (event, session) = envelopes
+    event = event.get_event()
+    session = session.items[0].payload.json
+
+    assert event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+    assert session["status"] == "crashed"
+    assert session["did"] == "42"
+    assert session["attrs"]["release"] == "demo-release"
+    assert session["attrs"]["ip_address"] == "1.2.3.4"
+    assert session["attrs"]["user_agent"].startswith("werkzeug/")
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])

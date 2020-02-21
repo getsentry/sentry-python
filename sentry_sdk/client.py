@@ -31,7 +31,7 @@ if MYPY:
     from typing import Optional
 
     from sentry_sdk.scope import Scope
-    from sentry_sdk._types import Event, Hint
+    from sentry_sdk._types import Event, Hint, SessionStatus
     from sentry_sdk.sessions import Session
 
 
@@ -242,6 +242,43 @@ class _Client(object):
 
         return True
 
+    def _update_session_from_event(
+        self,
+        session,  # type: Session
+        event,  # type: Event
+    ):
+        # type: (...) -> None
+        change_status_to = None  # type: Optional[SessionStatus]
+        level = event.get("level")
+        if level == "fatal":
+            change_status_to = "crashed"
+
+        exception = event.get("exception")
+        if change_status_to is None and exception:
+            for error in exception.get("values") or ():
+                mechanism = error.get("mechanism")
+                if mechanism and mechanism.get("handled") is False:
+                    change_status_to = "crashed"
+                    break
+                else:
+                    change_status_to = "degraded"
+
+        # Figure out some sensible defaults if they are missing in the session
+        ip_address = None
+        user_agent = None
+        if session.ip_address is None:
+            ip_address = (event.get("user") or {}).get("ip_address")
+        if session.user_agent is None:
+            headers = (event.get("request") or {}).get("headers")
+            for (k, v) in iteritems(headers or {}):
+                if k.lower() == "user-agent":
+                    user_agent = v
+                    break
+
+        session.update(
+            status=change_status_to, ip_address=ip_address, user_agent=user_agent,
+        )
+
     def capture_event(
         self,
         event,  # type: Event
@@ -272,6 +309,13 @@ class _Client(object):
         event_opt = self._prepare_event(event, hint, scope)
         if event_opt is None:
             return None
+
+        # whenever we capture an event we also check if the session needs
+        # to be updated based on that information.
+        session = scope.session if scope else None
+        if session:
+            self._update_session_from_event(session, event)
+
         self.transport.capture_event(event_opt)
         return event_id
 

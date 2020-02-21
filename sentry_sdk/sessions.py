@@ -52,6 +52,9 @@ def _make_uuid(
     return uuid.UUID(val)
 
 
+TERMINAL_SESSION_STATES = ("exited", "abnormal", "crashed")
+
+
 class SessionFlusher(object):
     def __init__(
         self,
@@ -124,6 +127,8 @@ class Session(object):
         environment=None,  # type: Optional[str]
         user=None,  # type: Optional[Any]
         hub=None,  # type: Optional[Hub]
+        user_agent=None,  # type: Optional[str]
+        ip_address=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         self._hub = weakref(hub)
@@ -133,22 +138,26 @@ class Session(object):
             started = datetime.utcnow()
         if status is None:
             status = "ok"
+        self.status = status
         self.did = None  # type: Optional[str]
         self.seq = 0
         self.started = started
         self.release = None  # type: Optional[str]
         self.environment = None  # type: Optional[str]
         self.duration = None  # type: Optional[float]
+        self.user_agent = None  # type: Optional[str]
+        self.ip_address = None  # type: Optional[str]
 
         self.update(
             sid=sid,
             did=did,
             timestamp=timestamp,
             duration=duration,
-            status=status,
             release=release,
             environment=environment,
             user=user,
+            user_agent=user_agent,
+            ip_address=ip_address,
         )
 
     def update(
@@ -161,12 +170,17 @@ class Session(object):
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
         user=None,  # type: Optional[Any]
+        user_agent=None,  # type: Optional[str]
+        ip_address=None,  # type: Optional[str]
     ):
         # type: (...) -> None
-        if user is not None and did is None:
-            did = user.get("id") or user.get("email") or user.get("username")
-            if did is not None:
-                did = text_type(did)
+        if user is not None:
+            if did is None:
+                did = user.get("id") or user.get("email") or user.get("username")
+                if did is not None:
+                    did = text_type(did)
+            if ip_address is None:
+                ip_address = user.get("ip_address")
 
         hub = self._hub()
         options = hub.client.options if hub and hub.client else None
@@ -180,8 +194,6 @@ class Session(object):
         self.timestamp = timestamp
         if duration is not None:
             self.duration = duration
-        if status is not None:
-            self.status = status
         if release is None and options:
             release = options["release"]
         if release is not None:
@@ -190,7 +202,19 @@ class Session(object):
             environment = options["environment"]
         if environment is not None:
             self.environment = environment
+        if ip_address is not None:
+            self.ip_address = ip_address
+        if user_agent is not None:
+            self.user_agent = user_agent
         self.duration = (datetime.utcnow() - self.started).total_seconds()
+
+        # status can only transition in certain ways
+        if status is not None:
+            if self.status is None:
+                self.status = status
+            elif status == "degraded" or status in TERMINAL_SESSION_STATES:
+                if self.status not in TERMINAL_SESSION_STATES:
+                    self.status = status
 
         # any session update bumps this
         self.seq += 1
@@ -210,17 +234,6 @@ class Session(object):
         if status is not None:
             self.update(status=status)
 
-    def mark_failed(
-        self, status  # type: SessionStatus
-    ):
-        # type: (...) -> Any
-        if status == "crashed":
-            if self.status != "crashed":
-                self.update(status="crashed")
-        elif status == "degraded":
-            if self.status not in ("degraded", "crashed", "abnormal"):
-                self.update(status="degraded")
-
     def to_json(self):
         # type: (...) -> Any
         rv = {
@@ -238,6 +251,10 @@ class Session(object):
             attrs["release"] = self.release
         if self.environment is not None:
             attrs["environment"] = self.environment
+        if self.ip_address is not None:
+            attrs["ip_address"] = self.ip_address
+        if self.user_agent is not None:
+            attrs["user_agent"] = self.user_agent
         if attrs:
             rv["attrs"] = attrs
         return rv

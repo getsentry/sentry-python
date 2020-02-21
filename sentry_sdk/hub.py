@@ -39,7 +39,6 @@ if MYPY:
         Breadcrumb,
         BreadcrumbHint,
         ExcInfo,
-        SessionStatus,
     )
     from sentry_sdk.consts import ClientConstructor
 
@@ -299,7 +298,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         client, scope = self._stack[-1]
         if client is not None:
-            self._update_session_state_from_event(event)
             rv = client.capture_event(event, hint, scope)
             if rv is not None:
                 self._last_event_id = rv
@@ -554,30 +552,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """Starts a new session."""
         self.stop_session()
         self._stack[-1][1].session = Session(hub=self)
-
-    def _update_session_state_from_event(self, event):
-        # type: (Event) -> None
-        session = self._stack[-1][1].session
-        if not session:
-            return
-
-        change_to = None  # type: Optional[SessionStatus]
-        level = event.get("level")
-        if level == "fatal":
-            change_to = "crashed"
-
-        exception = event.get("exception")
-        if change_to is None and exception:
-            for error in exception.get("values") or ():
-                mechanism = error.get("mechanism")
-                if mechanism and mechanism.get("unhandled") is False:
-                    change_to = "crashed"
-                    break
-                else:
-                    change_to = "degraded"
-
-        if change_to is not None:
-            session.mark_failed(change_to)
 
     def flush(
         self,
