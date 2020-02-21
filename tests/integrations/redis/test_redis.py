@@ -13,8 +13,8 @@ def test_basic(sentry_init, capture_events):
     connection.get("foobar")
     capture_message("hi")
 
-    event, = events
-    crumb, = event["breadcrumbs"]
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]
 
     assert crumb == {
         "category": "redis",

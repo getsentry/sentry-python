@@ -60,7 +60,7 @@ def test_abs_path():
     except Exception:
         exceptions = exceptions_from_error_tuple(sys.exc_info())
 
-    exception, = exceptions
+    (exception,) = exceptions
     frame1, frame2 = frames = exception["stacktrace"]["frames"]
 
     for frame in frames:

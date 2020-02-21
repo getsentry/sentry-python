@@ -46,7 +46,7 @@ def test_has_context(sentry_init, capture_events, make_client):
     response = client.simulate_get("/message")
     assert response.status == falcon.HTTP_200
 
-    event, = events
+    (event,) = events
     assert event["transaction"] == "/message"  # Falcon URI template
     assert "data" not in event["request"]
     assert event["request"]["url"] == "http://falconframework.org/message"
@@ -67,7 +67,7 @@ def test_transaction_style(
     response = client.simulate_get("/message")
     assert response.status == falcon.HTTP_200
 
-    event, = events
+    (event,) = events
     assert event["transaction"] == expected_transaction
 
 
@@ -91,10 +91,10 @@ def test_errors(sentry_init, capture_exceptions, capture_events):
     except ZeroDivisionError:
         pass
 
-    exc, = exceptions
+    (exc,) = exceptions
     assert isinstance(exc, ZeroDivisionError)
 
-    event, = events
+    (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "falcon"
 
 
@@ -118,7 +118,7 @@ def test_falcon_large_json_request(sentry_init, capture_events):
     response = client.simulate_post("/", json=data)
     assert response.status == falcon.HTTP_200
 
-    event, = events
+    (event,) = events
     assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
@@ -144,7 +144,7 @@ def test_falcon_empty_json_request(sentry_init, capture_events, data):
     response = client.simulate_post("/", json=data)
     assert response.status == falcon.HTTP_200
 
-    event, = events
+    (event,) = events
     assert event["request"]["data"] == data
 
 
@@ -165,7 +165,7 @@ def test_falcon_raw_data_request(sentry_init, capture_events):
     response = client.simulate_post("/", body="hi")
     assert response.status == falcon.HTTP_200
 
-    event, = events
+    (event,) = events
     assert event["request"]["headers"]["Content-Length"] == "2"
     assert event["request"]["data"] == ""
 
@@ -191,7 +191,7 @@ def test_logging(sentry_init, capture_events):
     client = falcon.testing.TestClient(app)
     client.simulate_get("/")
 
-    event, = events
+    (event,) = events
     assert event["level"] == "error"
 
 
@@ -217,7 +217,7 @@ def test_500(sentry_init, capture_events):
     client = falcon.testing.TestClient(app)
     response = client.simulate_get("/")
 
-    event, = events
+    (event,) = events
     assert response.json == {"message": "Sentry error: %s" % event["event_id"]}
 
 
@@ -244,7 +244,7 @@ def test_error_in_errorhandler(sentry_init, capture_events):
     with pytest.raises(ZeroDivisionError):
         client.simulate_get("/")
 
-    event, = events
+    (event,) = events
 
     last_ex_values = event["exception"]["values"][-1]
     assert last_ex_values["type"] == "ZeroDivisionError"

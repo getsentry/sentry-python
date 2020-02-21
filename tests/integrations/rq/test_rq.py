@@ -18,9 +18,9 @@ def test_basic(sentry_init, capture_events):
     queue.enqueue(crashing_job, foo=42)
     worker.work(burst=True)
 
-    event, = events
+    (event,) = events
 
-    exception, = event["exception"]["values"]
+    (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
     assert exception["mechanism"]["type"] == "rq"
     assert exception["stacktrace"]["frames"][-1]["vars"]["foo"] == "42"
@@ -49,5 +49,5 @@ def test_transport_shutdown(sentry_init, capture_events_forksafe):
     event = events.read_event()
     events.read_flush()
 
-    exception, = event["exception"]["values"]
+    (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"

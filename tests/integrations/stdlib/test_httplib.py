@@ -26,8 +26,8 @@ def test_crumb_capture(sentry_init, capture_events):
     assert response.getcode() == 200
     capture_message("Testing!")
 
-    event, = events
-    crumb, = event["breadcrumbs"]
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
     assert crumb["data"] == {
@@ -51,8 +51,8 @@ def test_crumb_capture_hint(sentry_init, capture_events):
     assert response.getcode() == 200
     capture_message("Testing!")
 
-    event, = events
-    crumb, = event["breadcrumbs"]
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
     assert crumb["data"] == {
@@ -95,8 +95,8 @@ def test_httplib_misuse(sentry_init, capture_events):
 
     capture_message("Testing!")
 
-    event, = events
-    crumb, = event["breadcrumbs"]
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]
 
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"

@@ -43,7 +43,7 @@ def test_basic(sentry_init, crashing_app, capture_events):
     with pytest.raises(ZeroDivisionError):
         client.get("/")
 
-    event, = events
+    (event,) = events
 
     assert event["transaction"] == "generic WSGI request"
 
@@ -83,7 +83,7 @@ def test_systemexit_nonzero_is_captured(sentry_init, capture_events, request):
     with pytest.raises(SystemExit):
         client.get("/")
 
-    event, = events
+    (event,) = events
 
     assert "exception" in event
     exc = event["exception"]["values"][-1]
@@ -102,7 +102,7 @@ def test_keyboard_interrupt_is_captured(sentry_init, capture_events):
     with pytest.raises(KeyboardInterrupt):
         client.get("/")
 
-    event, = events
+    (event,) = events
 
     assert "exception" in event
     exc = event["exception"]["values"][-1]

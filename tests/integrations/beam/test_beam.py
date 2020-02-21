@@ -197,7 +197,7 @@ def test_invoker_exception(init_beam, capture_events, capture_exceptions, fn):
     except Exception:
         pass
 
-    event, = events
-    exception, = event["exception"]["values"]
+    (event,) = events
+    (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
     assert exception["mechanism"]["type"] == "beam"

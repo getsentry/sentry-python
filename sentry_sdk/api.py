@@ -89,7 +89,7 @@ def capture_message(
 
 @hubmethod
 def capture_exception(
-    error=None  # type: Optional[BaseException]
+    error=None,  # type: Optional[BaseException]
 ):
     # type: (...) -> Optional[str]
     hub = Hub.current
@@ -118,7 +118,7 @@ def configure_scope():
 
 @overload  # noqa
 def configure_scope(
-    callback  # type: Callable[[Scope], None]
+    callback,  # type: Callable[[Scope], None]
 ):
     # type: (...) -> None
     pass
@@ -126,7 +126,7 @@ def configure_scope(
 
 @hubmethod  # noqa
 def configure_scope(
-    callback=None  # type: Optional[Callable[[Scope], None]]
+    callback=None,  # type: Optional[Callable[[Scope], None]]
 ):
     # type: (...) -> Optional[ContextManager[Scope]]
     hub = Hub.current
@@ -152,7 +152,7 @@ def push_scope():
 
 @overload  # noqa
 def push_scope(
-    callback  # type: Callable[[Scope], None]
+    callback,  # type: Callable[[Scope], None]
 ):
     # type: (...) -> None
     pass
@@ -160,7 +160,7 @@ def push_scope(
 
 @hubmethod  # noqa
 def push_scope(
-    callback=None  # type: Optional[Callable[[Scope], None]]
+    callback=None,  # type: Optional[Callable[[Scope], None]]
 ):
     # type: (...) -> Optional[ContextManager[Scope]]
     hub = Hub.current

@@ -48,7 +48,7 @@ def test_has_context(sentry_init, app, capture_events, get_client):
     response = client.get("/message")
     assert response[1] == "200 OK"
 
-    event, = events
+    (event,) = events
     assert event["message"] == "hi"
     assert "data" not in event["request"]
     assert event["request"]["url"] == "http://localhost/message"
@@ -82,7 +82,7 @@ def test_transaction_style(
     response = client.get("/message")
     assert response[1] == "200 OK"
 
-    event, = events
+    (event,) = events
     assert event["transaction"].endswith(expected_transaction)
 
 
@@ -109,10 +109,10 @@ def test_errors(
     except ZeroDivisionError:
         pass
 
-    exc, = exceptions
+    (exc,) = exceptions
     assert isinstance(exc, ZeroDivisionError)
 
-    event, = events
+    (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "bottle"
     assert event["exception"]["values"][0]["mechanism"]["handled"] is False
 
@@ -139,7 +139,7 @@ def test_large_json_request(sentry_init, capture_events, app, get_client):
     response = client.post("/", content_type="application/json", data=json.dumps(data))
     assert response[1] == "200 OK"
 
-    event, = events
+    (event,) = events
     assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
@@ -166,7 +166,7 @@ def test_empty_json_request(sentry_init, capture_events, app, data, get_client):
     response = client.post("/", content_type="application/json", data=json.dumps(data))
     assert response[1] == "200 OK"
 
-    event, = events
+    (event,) = events
     assert event["request"]["data"] == data
 
 
@@ -189,7 +189,7 @@ def test_medium_formdata_request(sentry_init, capture_events, app, get_client):
     response = client.post("/", data=data)
     assert response[1] == "200 OK"
 
-    event, = events
+    (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
@@ -224,7 +224,7 @@ def test_too_large_raw_request(
     response = client.post("/", data=data)
     assert response[1] == "200 OK"
 
-    event, = events
+    (event,) = events
     assert event["_meta"]["request"]["data"] == {
         "": {"len": 2000, "rem": [["!config", "x", 0, 2000]]}
     }
@@ -254,7 +254,7 @@ def test_files_and_form(sentry_init, capture_events, app, get_client):
     response = client.post("/", data=data)
     assert response[1] == "200 OK"
 
-    event, = events
+    (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
@@ -321,7 +321,7 @@ def test_logging(sentry_init, capture_events, app, get_client):
     client = get_client()
     client.get("/")
 
-    event, = events
+    (event,) = events
     assert event["level"] == "error"
 
 
@@ -343,11 +343,11 @@ def test_mount(app, capture_exceptions, capture_events, sentry_init, get_client)
     with pytest.raises(ZeroDivisionError) as exc:
         client.get("/wsgi/")
 
-    error, = exceptions
+    (error,) = exceptions
 
     assert error is exc.value
 
-    event, = events
+    (event,) = events
     assert event["exception"]["values"][0]["mechanism"] == {
         "type": "bottle",
         "handled": False,
@@ -402,7 +402,7 @@ def test_error_in_errorhandler(sentry_init, capture_events, app, get_client):
 
     event1, event2 = events
 
-    exception, = event1["exception"]["values"]
+    (exception,) = event1["exception"]["values"]
     assert exception["type"] == "ValueError"
 
     exception = event2["exception"]["values"][0]

@@ -17,7 +17,7 @@ if MYPY:
     from django.urls.resolvers import URLPattern
     from typing import Tuple
     from typing import Union
-    from re import Pattern  # type: ignore
+    from re import Pattern
 
 try:
     from django.urls import get_resolver
@@ -26,7 +26,7 @@ except ImportError:
 
 
 def get_regex(resolver_or_pattern):
-    # type: (Union[URLPattern, URLResolver]) -> Pattern
+    # type: (Union[URLPattern, URLResolver]) -> Pattern[str]
     """Utility method for django's deprecated resolver.regex"""
     try:
         regex = resolver_or_pattern.regex
@@ -99,9 +99,9 @@ class RavenResolver(object):
         for pattern in resolver.url_patterns:
             # this is an include()
             if not pattern.callback:
-                match = self._resolve(pattern, new_path, parents)
-                if match:
-                    return match
+                match_ = self._resolve(pattern, new_path, parents)
+                if match_:
+                    return match_
                 continue
             elif not get_regex(pattern).search(new_path):
                 continue

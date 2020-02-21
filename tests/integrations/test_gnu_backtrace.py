@@ -85,14 +85,14 @@ def test_basic(sentry_init, capture_events, input):
     except ValueError:
         capture_exception()
 
-    event, = events
-    exception, = event["exception"]["values"]
+    (event,) = events
+    (exception,) = event["exception"]["values"]
 
     assert (
         exception["value"]
         == "<stacktrace parsed and removed by GnuBacktraceIntegration>"
     )
-    frame, = exception["stacktrace"]["frames"][1:]
+    (frame,) = exception["stacktrace"]["frames"][1:]
 
     if frame.get("function") is None:
         assert "clickhouse-server()" in input or "pthread" in input

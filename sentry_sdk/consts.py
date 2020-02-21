@@ -66,7 +66,8 @@ def _get_default_options():
         getargspec = inspect.getargspec  # type: ignore
 
     a = getargspec(ClientConstructor.__init__)
-    return dict(zip(a.args[-len(a.defaults) :], a.defaults))
+    defaults = a.defaults or ()
+    return dict(zip(a.args[-len(defaults) :], defaults))
 
 
 DEFAULT_OPTIONS = _get_default_options()

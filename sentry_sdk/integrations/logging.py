@@ -28,7 +28,7 @@ _IGNORED_LOGGERS = set(["sentry_sdk.errors"])
 
 
 def ignore_logger(
-    name  # type: str
+    name,  # type: str
 ):
     # type: (...) -> None
     """This disables recording (both in breadcrumbs and as events) calls to

@@ -185,7 +185,7 @@ def test_with_locals_enabled():
     except Exception:
         hub.capture_exception()
 
-    event, = events
+    (event,) = events
 
     assert all(
         frame["vars"]
@@ -201,7 +201,7 @@ def test_with_locals_disabled():
     except Exception:
         hub.capture_exception()
 
-    event, = events
+    (event,) = events
 
     assert all(
         "vars" not in frame
@@ -221,8 +221,8 @@ def test_attach_stacktrace_enabled():
 
     foo()
 
-    event, = events
-    thread, = event["threads"]["values"]
+    (event,) = events
+    (thread,) = event["threads"]["values"]
     functions = [x["function"] for x in thread["stacktrace"]["frames"]]
     assert functions[-2:] == ["foo", "bar"]
 
@@ -241,8 +241,8 @@ def test_attach_stacktrace_enabled_no_locals():
 
     foo()
 
-    event, = events
-    thread, = event["threads"]["values"]
+    (event,) = events
+    (thread,) = event["threads"]["values"]
     local_vars = [x.get("vars") for x in thread["stacktrace"]["frames"]]
     assert local_vars[-2:] == [None, None]
 
@@ -253,8 +253,8 @@ def test_attach_stacktrace_in_app(sentry_init, capture_events):
 
     capture_message("hi")
 
-    event, = events
-    thread, = event["threads"]["values"]
+    (event,) = events
+    (thread,) = event["threads"]["values"]
     frames = thread["stacktrace"]["frames"]
     pytest_frames = [f for f in frames if f["module"].startswith("_pytest")]
     assert pytest_frames
@@ -267,7 +267,7 @@ def test_attach_stacktrace_disabled():
     hub = Hub(Client(attach_stacktrace=False, transport=events.append))
     hub.capture_message("HI")
 
-    event, = events
+    (event,) = events
     assert "threads" not in event
 
 
@@ -361,7 +361,7 @@ def test_scope_initialized_before_client(sentry_init, capture_events):
 
     events = capture_events()
     capture_message("hi")
-    event, = events
+    (event,) = events
 
     assert "tags" not in event
 
@@ -370,7 +370,7 @@ def test_weird_chars(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
     capture_message(u"föö".encode("latin1"))
-    event, = events
+    (event,) = events
     assert json.loads(json.dumps(event)) == event
 
 
@@ -384,9 +384,9 @@ def test_nan(sentry_init, capture_events):
     except Exception:
         capture_exception()
 
-    event, = events
+    (event,) = events
     frames = event["exception"]["values"][0]["stacktrace"]["frames"]
-    frame, = frames
+    (frame,) = frames
     assert frame["vars"]["nan"] == "nan"
 
 
@@ -401,7 +401,7 @@ def test_cyclic_frame_vars(sentry_init, capture_events):
     except Exception:
         capture_exception()
 
-    event, = events
+    (event,) = events
     assert event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"] == {
         "a": "<cyclic>"
     }
@@ -421,7 +421,7 @@ def test_cyclic_data(sentry_init, capture_events):
         scope.set_extra("foo", data)
 
     capture_message("hi")
-    event, = events
+    (event,) = events
 
     data = event["extra"]["foo"]
     assert data == {"not_cyclic2": "", "not_cyclic": "", "is_cyclic": "<cyclic>"}
@@ -444,7 +444,7 @@ def test_databag_depth_stripping(sentry_init, capture_events, benchmark):
         except Exception:
             capture_exception()
 
-        event, = events
+        (event,) = events
 
         assert len(json.dumps(event)) < 10000
 
@@ -462,7 +462,7 @@ def test_databag_string_stripping(sentry_init, capture_events, benchmark):
         except Exception:
             capture_exception()
 
-        event, = events
+        (event,) = events
 
         assert len(json.dumps(event)) < 10000
 
@@ -480,7 +480,7 @@ def test_databag_breadth_stripping(sentry_init, capture_events, benchmark):
         except Exception:
             capture_exception()
 
-        event, = events
+        (event,) = events
 
         assert len(json.dumps(event)) < 10000
 
@@ -498,7 +498,7 @@ def test_chained_exceptions(sentry_init, capture_events):
     except Exception:
         capture_exception()
 
-    event, = events
+    (event,) = events
 
     e1, e2 = event["exception"]["values"]
 
@@ -533,7 +533,7 @@ def test_broken_mapping(sentry_init, capture_events):
     except Exception:
         capture_exception()
 
-    event, = events
+    (event,) = events
     assert (
         event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"]
         == "<failed to serialize, use init(debug=True) to see error logs>"
@@ -569,7 +569,7 @@ def test_mapping_sends_exception(sentry_init, capture_events):
     except Exception:
         capture_exception()
 
-    event, = events
+    (event,) = events
 
     assert event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"] == {
         "hi": "'hi'"
@@ -594,7 +594,7 @@ def test_object_sends_exception(sentry_init, capture_events):
     except Exception:
         capture_exception()
 
-    event, = events
+    (event,) = events
 
     assert (
         event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"]
@@ -611,9 +611,9 @@ def test_errno_errors(sentry_init, capture_events):
 
     capture_exception(Foo())
 
-    event, = events
+    (event,) = events
 
-    exception, = event["exception"]["values"]
+    (exception,) = event["exception"]["values"]
     assert exception["mechanism"]["meta"]["errno"]["number"] == 69
 
 
@@ -630,11 +630,11 @@ def test_non_string_variables(sentry_init, capture_events):
     except ZeroDivisionError:
         capture_exception()
 
-    event, = events
+    (event,) = events
 
-    exception, = event["exception"]["values"]
+    (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
-    frame, = exception["stacktrace"]["frames"]
+    (frame,) = exception["stacktrace"]["frames"]
     assert frame["vars"]["42"] == "True"
 
 
@@ -666,9 +666,9 @@ def test_dict_changed_during_iteration(sentry_init, capture_events):
     except ZeroDivisionError:
         capture_exception()
 
-    event, = events
-    exception, = event["exception"]["values"]
-    frame, = exception["stacktrace"]["frames"]
+    (event,) = events
+    (exception,) = event["exception"]["values"]
+    (frame,) = exception["stacktrace"]["frames"]
     assert frame["vars"]["environ"] == {"a": "<This is me>"}
 
 
