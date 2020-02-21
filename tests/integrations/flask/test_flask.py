@@ -233,7 +233,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
 
     client = app.test_client()
     try:
-        client.get("/")
+        client.get("/", headers={"User-Agent": "blafasel/1.0"})
     except ZeroDivisionError:
         pass
 
@@ -248,7 +248,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     assert session["did"] == "42"
     assert session["attrs"]["release"] == "demo-release"
     assert session["attrs"]["ip_address"] == "1.2.3.4"
-    assert session["attrs"]["user_agent"].startswith("werkzeug/")
+    assert session["attrs"]["user_agent"] == "blafasel/1.0"
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
