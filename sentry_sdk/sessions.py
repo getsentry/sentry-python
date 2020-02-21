@@ -37,14 +37,14 @@ def auto_stop_session():
 
 
 def _timestamp(
-    dt  # type: datetime
+    dt,  # type: datetime
 ):
     # type: (...) -> str
     return dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def _make_uuid(
-    val  # type: Union[str, uuid.UUID]
+    val,  # type: Union[str, uuid.UUID]
 ):
     # type: (...) -> uuid.UUID
     if isinstance(val, uuid.UUID):
