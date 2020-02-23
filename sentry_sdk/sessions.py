@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 from threading import Thread, Lock
 from weakref import ref as weakref
+from contextlib import contextmanager
 
 from sentry_sdk._compat import text_type
 from sentry_sdk._types import MYPY
@@ -18,22 +19,17 @@ if MYPY:
     from sentry_sdk.hub import Hub
 
 
-def auto_start_session():
+@contextmanager
+def auto_session_tracking(hub):
     # type: (...) -> None
-    from sentry_sdk.hub import Hub
-
-    hub = Hub.current
-    if hub.client and hub.client.options["auto_session_tracking"]:
+    should_track = hub.client and hub.client.options["auto_session_tracking"]
+    if should_track:
         hub.start_session()
-
-
-def auto_stop_session():
-    # type: (...) -> None
-    from sentry_sdk.hub import Hub
-
-    hub = Hub.current
-    if hub.client and hub.client.options["auto_session_tracking"]:
-        hub.stop_session()
+    try:
+        yield
+    finally:
+        if should_track:
+            hub.end_session()
 
 
 def _timestamp(
@@ -125,10 +121,10 @@ class Session(object):
         status=None,  # type: Optional[SessionStatus]
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
-        user=None,  # type: Optional[Any]
         hub=None,  # type: Optional[Hub]
         user_agent=None,  # type: Optional[str]
         ip_address=None,  # type: Optional[str]
+        errors=None,  # type: Optional[int]
     ):
         # type: (...) -> None
         self._hub = weakref(hub)
@@ -140,13 +136,13 @@ class Session(object):
             status = "ok"
         self.status = status
         self.did = None  # type: Optional[str]
-        self.seq = 0
         self.started = started
         self.release = None  # type: Optional[str]
         self.environment = None  # type: Optional[str]
         self.duration = None  # type: Optional[float]
         self.user_agent = None  # type: Optional[str]
         self.ip_address = None  # type: Optional[str]
+        self.errors = 0
 
         self.update(
             sid=sid,
@@ -155,9 +151,9 @@ class Session(object):
             duration=duration,
             release=release,
             environment=environment,
-            user=user,
             user_agent=user_agent,
             ip_address=ip_address,
+            errors=errors,
         )
 
     def update(
@@ -169,26 +165,18 @@ class Session(object):
         status=None,  # type: Optional[SessionStatus]
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
-        user=None,  # type: Optional[Any]
         user_agent=None,  # type: Optional[str]
         ip_address=None,  # type: Optional[str]
+        errors=None,  # type: Optional[int]
     ):
         # type: (...) -> None
-        if user is not None:
-            if did is None:
-                did = user.get("id") or user.get("email") or user.get("username")
-                if did is not None:
-                    did = text_type(did)
-            if ip_address is None:
-                ip_address = user.get("ip_address")
-
         hub = self._hub()
         options = hub.client.options if hub and hub.client else None
 
         if sid is not None:
             self.sid = _make_uuid(sid)
         if did is not None:
-            self.did = did
+            self.did = str(did)
         if timestamp is None:
             timestamp = datetime.utcnow()
         self.timestamp = timestamp
@@ -206,24 +194,11 @@ class Session(object):
             self.ip_address = ip_address
         if user_agent is not None:
             self.user_agent = user_agent
-        self.duration = (datetime.utcnow() - self.started).total_seconds()
+        if errors is not None:
+            self.errors = errors
 
-        # status can only transition in certain ways
         if status is not None:
-            if self.status is None:
-                self.status = status
-            elif status == "degraded" or status in TERMINAL_SESSION_STATES:
-                if self.status not in TERMINAL_SESSION_STATES:
-                    self.status = status
-
-        # any session update bumps this
-        self.seq += 1
-
-        # propagate session changes to the hub
-        if hub is not None:
-            client = hub.client
-            if client is not None:
-                client.capture_session(self)
+            self.status = status
 
     def close(
         self, status=None  # type: Optional[SessionStatus]
@@ -234,19 +209,32 @@ class Session(object):
         if status is not None:
             self.update(status=status)
 
+        # sessions get flushed in this SDK only when they close (single
+        # session update).
+        hub = self._hub()
+        if hub is not None:
+            client = hub.client
+            if client is not None:
+                client.capture_session(self)
+
     def to_json(self):
         # type: (...) -> Any
         rv = {
             "sid": str(self.sid),
+            # single session update means seq is always 0.
+            "seq": 0,
             "started": _timestamp(self.started),
             "timestamp": _timestamp(self.timestamp),
             "status": self.status,
         }  # type: Dict[str, Any]
-        attrs = {}
+        if self.errors:
+            rv["errors"] = self.errors
         if self.did is not None:
             rv["did"] = self.did
         if self.duration is not None:
             rv["duration"] = self.duration
+
+        attrs = {}
         if self.release is not None:
             attrs["release"] = self.release
         if self.environment is not None:

@@ -472,7 +472,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         :returns: If no `callback` is provided, a context manager that should
             be used to pop the scope again.
         """
-
         if callback is not None:
             with self.push_scope() as scope:
                 callback(scope)
@@ -539,9 +538,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return inner()
 
-    def stop_session(self):
+    def end_session(self):
         # type: (...) -> None
-        """Stops session tracking."""
+        """Ends the current session if there is one."""
         session = self._stack[-1][1].session
         if session is not None:
             session.close()
@@ -550,7 +549,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def start_session(self):
         # type: (...) -> None
         """Starts a new session."""
-        self.stop_session()
+        self.end_session()
         self._stack[-1][1].session = Session(hub=self)
 
     def flush(

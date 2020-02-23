@@ -1,5 +1,6 @@
 import json
 import pytest
+import logging
 
 from io import BytesIO
 
@@ -227,25 +228,32 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     def index():
         with configure_scope() as scope:
             scope.set_user({"ip_address": "1.2.3.4", "id": 42})
+        try:
+            raise ValueError("stuff")
+        except Exception:
+            logging.exception("stuff happened")
         1 / 0
 
     envelopes = capture_envelopes()
 
-    client = app.test_client()
-    try:
-        client.get("/", headers={"User-Agent": "blafasel/1.0"})
-    except ZeroDivisionError:
-        pass
+    with app.test_client() as client:
+        try:
+            client.get("/", headers={"User-Agent": "blafasel/1.0"})
+        except ZeroDivisionError:
+            pass
 
     Hub.current.client.flush()
 
-    (event, session) = envelopes
-    event = event.get_event()
+    (first_event, error_event, session) = envelopes
+    first_event = first_event.get_event()
+    error_event = error_event.get_event()
     session = session.items[0].payload.json
 
-    assert event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+    assert first_event["exception"]["values"][0]["type"] == "ValueError"
+    assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
     assert session["status"] == "crashed"
     assert session["did"] == "42"
+    assert session["errors"] == 2
     assert session["attrs"]["release"] == "demo-release"
     assert session["attrs"]["ip_address"] == "1.2.3.4"
     assert session["attrs"]["user_agent"] == "blafasel/1.0"

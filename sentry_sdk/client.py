@@ -253,17 +253,18 @@ class _Client(object):
         if level == "fatal":
             change_status_to = "crashed"
 
+        error_inc = 0
         exception = event.get("exception")
         if change_status_to is None and exception:
+            error_inc += 1
             for error in exception.get("values") or ():
                 mechanism = error.get("mechanism")
                 if mechanism and mechanism.get("handled") is False:
                     change_status_to = "crashed"
                     break
-                else:
-                    change_status_to = "degraded"
 
         # Figure out some sensible defaults if they are missing in the session
+        did = None
         ip_address = None
         user_agent = None
         if session.ip_address is None:
@@ -274,9 +275,17 @@ class _Client(object):
                 if k.lower() == "user-agent":
                     user_agent = v
                     break
+        if session.did is None:
+            user = event.get("user")
+            if user:
+                did = user.get("id") or user.get("email") or user.get("username")
 
         session.update(
-            status=change_status_to, ip_address=ip_address, user_agent=user_agent,
+            status=change_status_to,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            did=did,
+            errors=session.errors + error_inc,
         )
 
     def capture_event(
