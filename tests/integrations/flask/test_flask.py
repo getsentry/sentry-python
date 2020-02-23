@@ -254,6 +254,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     assert session["status"] == "crashed"
     assert session["did"] == "42"
     assert session["errors"] == 2
+    assert session["init"]
     assert session["attrs"]["release"] == "demo-release"
     assert session["attrs"]["ip_address"] == "1.2.3.4"
     assert session["attrs"]["user_agent"] == "blafasel/1.0"

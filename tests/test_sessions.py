@@ -27,6 +27,7 @@ def test_basic(sentry_init, capture_envelopes):
     sess_event = sess.items[0].payload.json
 
     assert sess_event["did"] == "42"
+    assert sess_event["init"]
     assert sess_event["status"] == "exited"
     assert sess_event["errors"] == 1
     assert sess_event["attrs"] == {

@@ -109,7 +109,9 @@ class SentryWsgiMiddleware(object):
                         with hub.configure_scope() as scope:
                             scope.clear_breadcrumbs()
                             scope._name = "wsgi"
-                            scope.add_event_processor(_make_wsgi_event_processor(environ))
+                            scope.add_event_processor(
+                                _make_wsgi_event_processor(environ)
+                            )
 
                     span = Span.continue_from_environ(environ)
                     span.op = "http.server"

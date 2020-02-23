@@ -221,8 +221,7 @@ class Session(object):
         # type: (...) -> Any
         rv = {
             "sid": str(self.sid),
-            # single session update means seq is always 0.
-            "seq": 0,
+            "init": True,
             "started": _timestamp(self.started),
             "timestamp": _timestamp(self.timestamp),
             "status": self.status,

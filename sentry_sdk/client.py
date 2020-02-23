@@ -248,25 +248,28 @@ class _Client(object):
         event,  # type: Event
     ):
         # type: (...) -> None
-        change_status_to = None  # type: Optional[SessionStatus]
-        level = event.get("level")
-        if level == "fatal":
-            change_status_to = "crashed"
 
-        error_inc = 0
-        exception = event.get("exception")
-        if change_status_to is None and exception:
-            error_inc += 1
-            for error in exception.get("values") or ():
-                mechanism = error.get("mechanism")
-                if mechanism and mechanism.get("handled") is False:
-                    change_status_to = "crashed"
-                    break
-
-        # Figure out some sensible defaults if they are missing in the session
+        crashed = False
         did = None
         ip_address = None
         user_agent = None
+        error_inc = 0
+
+        # Figure out if this counts as an error and if we should mark the
+        # session as crashed.
+        level = event.get("level")
+        if level == "fatal":
+            crashed = True
+        exceptions = (event.get("exception") or {}).get("values")
+        if not crashed and exceptions:
+            error_inc += 1
+            for error in exceptions:
+                mechanism = error.get("mechanism")
+                if mechanism and mechanism.get("handled") is False:
+                    crashed = True
+                    break
+
+        # Figure out some sensible defaults if they are missing in the session
         if session.ip_address is None:
             ip_address = (event.get("user") or {}).get("ip_address")
         if session.user_agent is None:
@@ -281,7 +284,7 @@ class _Client(object):
                 did = user.get("id") or user.get("email") or user.get("username")
 
         session.update(
-            status=change_status_to,
+            status="crashed" if crashed else None,
             ip_address=ip_address,
             user_agent=user_agent,
             did=did,
