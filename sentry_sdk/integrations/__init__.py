@@ -52,6 +52,20 @@ def _generate_default_integrations_iterator(integrations, auto_enabling_integrat
     return iter_default_integrations
 
 
+_AUTO_ENABLING_INTEGRATIONS = (
+    "sentry_sdk.integrations.django.DjangoIntegration",
+    "sentry_sdk.integrations.flask.FlaskIntegration",
+    "sentry_sdk.integrations.bottle.BottleIntegration",
+    "sentry_sdk.integrations.falcon.FalconIntegration",
+    "sentry_sdk.integrations.sanic.SanicIntegration",
+    "sentry_sdk.integrations.celery.CeleryIntegration",
+    "sentry_sdk.integrations.rq.RqIntegration",
+    "sentry_sdk.integrations.aiohttp.AioHttpIntegration",
+    "sentry_sdk.integrations.tornado.TornadoIntegration",
+    "sentry_sdk.integrations.sqlalchemy.SqlalchemyIntegration",
+)
+
+
 iter_default_integrations = _generate_default_integrations_iterator(
     integrations=(
         # stdlib/base runtime integrations
@@ -64,19 +78,7 @@ iter_default_integrations = _generate_default_integrations_iterator(
         "sentry_sdk.integrations.argv.ArgvIntegration",
         "sentry_sdk.integrations.threading.ThreadingIntegration",
     ),
-    auto_enabling_integrations=(
-        # "auto-enabling" integrations
-        "sentry_sdk.integrations.django.DjangoIntegration",
-        "sentry_sdk.integrations.flask.FlaskIntegration",
-        "sentry_sdk.integrations.bottle.BottleIntegration",
-        "sentry_sdk.integrations.falcon.FalconIntegration",
-        "sentry_sdk.integrations.sanic.SanicIntegration",
-        "sentry_sdk.integrations.celery.CeleryIntegration",
-        "sentry_sdk.integrations.rq.RqIntegration",
-        "sentry_sdk.integrations.aiohttp.AioHttpIntegration",
-        "sentry_sdk.integrations.tornado.TornadoIntegration",
-        "sentry_sdk.integrations.sqlalchemy.SqlalchemyIntegration",
-    ),
+    auto_enabling_integrations=_AUTO_ENABLING_INTEGRATIONS,
 )
 
 del _generate_default_integrations_iterator
