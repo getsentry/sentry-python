@@ -125,6 +125,7 @@ class Session(object):
         user_agent=None,  # type: Optional[str]
         ip_address=None,  # type: Optional[str]
         errors=None,  # type: Optional[int]
+        user=None,  # type: Optional[Any]
     ):
         # type: (...) -> None
         self._hub = weakref(hub)
@@ -154,6 +155,7 @@ class Session(object):
             user_agent=user_agent,
             ip_address=ip_address,
             errors=errors,
+            user=user,
         )
 
     def update(
@@ -168,10 +170,18 @@ class Session(object):
         user_agent=None,  # type: Optional[str]
         ip_address=None,  # type: Optional[str]
         errors=None,  # type: Optional[int]
+        user=None,  # type: Optional[Any]
     ):
         # type: (...) -> None
         hub = self._hub()
         options = hub.client.options if hub and hub.client else None
+
+        # If a user is supplied we pull some data form it
+        if user:
+            if ip_address is None:
+                ip_address = user.get("ip_address")
+            if did is None:
+                did = user.get("id") or user.get("email") or user.get("username")
 
         if sid is not None:
             self.sid = _make_uuid(sid)

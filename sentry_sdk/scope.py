@@ -151,6 +151,8 @@ class Scope(object):
         # type: (Dict[str, Any]) -> None
         """Sets a user for the scope."""
         self._user = value
+        if self._session is not None:
+            self._session.update(user=user)
 
     @property
     def span(self):

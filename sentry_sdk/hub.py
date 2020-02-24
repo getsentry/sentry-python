@@ -550,7 +550,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         # type: (...) -> None
         """Starts a new session."""
         self.end_session()
-        self._stack[-1][1].session = Session(hub=self)
+        scope = self._stack[-1][1]
+        scope.session = Session(hub=self, user=scope._user)
 
     def flush(
         self,

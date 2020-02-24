@@ -251,8 +251,6 @@ class _Client(object):
 
         crashed = False
         errored = False
-        did = None
-        ip_address = None
         user_agent = None
 
         # Figure out if this counts as an error and if we should mark the
@@ -270,25 +268,19 @@ class _Client(object):
                         crashed = True
                         break
 
-        # Figure out some sensible defaults if they are missing in the session
-        if session.ip_address is None:
-            ip_address = (event.get("user") or {}).get("ip_address")
+        user = event.get("user")
+
         if session.user_agent is None:
             headers = (event.get("request") or {}).get("headers")
             for (k, v) in iteritems(headers or {}):
                 if k.lower() == "user-agent":
                     user_agent = v
                     break
-        if session.did is None:
-            user = event.get("user")
-            if user:
-                did = user.get("id") or user.get("email") or user.get("username")
 
         session.update(
             status="crashed" if crashed else None,
-            ip_address=ip_address,
+            user=user,
             user_agent=user_agent,
-            did=did,
             errors=session.errors + (errored or crashed),
         )
 
