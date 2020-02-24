@@ -225,7 +225,12 @@ class HttpTransport(Transport):
         self, envelope  # type: Envelope
     ):
         # type: (...) -> None
-        if any(self._check_disabled(item.data_category) for item in envelope.items):
+
+        # remove all items from the envelope which are over quota
+        envelope.items[:] = [
+            x for x in envelope.items if not self._check_disabled(x.data_category)
+        ]
+        if not envelope.items:
             return None
 
         body = io.BytesIO()
