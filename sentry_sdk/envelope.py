@@ -16,7 +16,20 @@ if MYPY:
     from typing import List
     from typing import Iterator
 
-    from sentry_sdk._types import Event
+    from sentry_sdk._types import Event, EventDataCategory
+
+
+def get_event_data_category(event):
+    # type: (Event) -> EventDataCategory
+    ty = event.get("type")
+    if ty in ("default", "error", "transaction"):
+        return ty
+    for key in ("csp", "hpkp", "expectct", "expectstaple"):
+        if event.get(key):
+            return "security"
+    if event.get("exception"):
+        return "error"
+    return "default"
 
 
 class Envelope(object):
@@ -205,7 +218,24 @@ class Item(object):
 
     def __repr__(self):
         # type: (...) -> str
-        return "<Item headers=%r payload=%r>" % (self.headers, self.payload)
+        return "<Item headers=%r payload=%r data_category=%r>" % (
+            self.headers,
+            self.payload,
+            self.data_category,
+        )
+
+    @property
+    def data_category(self):
+        # type: (...) -> EventDataCategory
+        rv = "default"  # type: Any
+        event = self.get_event()
+        if event is not None:
+            rv = get_event_data_category(event)
+        else:
+            ty = self.headers.get("type")
+            if ty in ("session", "attachment"):
+                rv = ty
+        return rv
 
     def get_bytes(self):
         # type: (...) -> bytes

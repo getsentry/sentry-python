@@ -6,7 +6,6 @@ from threading import Thread, Lock
 from weakref import ref as weakref
 from contextlib import contextmanager
 
-from sentry_sdk._compat import text_type
 from sentry_sdk._types import MYPY
 
 if MYPY:
@@ -14,6 +13,7 @@ if MYPY:
     from typing import Union
     from typing import Any
     from typing import Dict
+    from typing import Generator
 
     from sentry_sdk._types import SessionStatus
     from sentry_sdk.hub import Hub
@@ -21,7 +21,7 @@ if MYPY:
 
 @contextmanager
 def auto_session_tracking(hub):
-    # type: (...) -> None
+    # type: (Hub) -> Generator[None, None, None]
     should_track = hub.client and hub.client.options["auto_session_tracking"]
     if should_track:
         hub.start_session()

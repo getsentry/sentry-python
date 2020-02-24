@@ -31,4 +31,7 @@ if MYPY:
     # https://github.com/python/mypy/issues/5710
     NotImplementedType = Any
 
+    EventDataCategory = Literal[
+        "default", "error", "crash", "transaction", "security", "attachment", "session"
+    ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal", "degraded"]

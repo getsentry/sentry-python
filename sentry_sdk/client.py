@@ -31,7 +31,7 @@ if MYPY:
     from typing import Optional
 
     from sentry_sdk.scope import Scope
-    from sentry_sdk._types import Event, Hint, SessionStatus
+    from sentry_sdk._types import Event, Hint
     from sentry_sdk.sessions import Session
 
 
@@ -250,24 +250,25 @@ class _Client(object):
         # type: (...) -> None
 
         crashed = False
+        errored = False
         did = None
         ip_address = None
         user_agent = None
-        error_inc = 0
 
         # Figure out if this counts as an error and if we should mark the
         # session as crashed.
         level = event.get("level")
         if level == "fatal":
             crashed = True
-        exceptions = (event.get("exception") or {}).get("values")
-        if not crashed and exceptions:
-            error_inc += 1
-            for error in exceptions:
-                mechanism = error.get("mechanism")
-                if mechanism and mechanism.get("handled") is False:
-                    crashed = True
-                    break
+        if not crashed:
+            exceptions = (event.get("exception") or {}).get("values")
+            if exceptions:
+                errored = True
+                for error in exceptions:
+                    mechanism = error.get("mechanism")
+                    if mechanism and mechanism.get("handled") is False:
+                        crashed = True
+                        break
 
         # Figure out some sensible defaults if they are missing in the session
         if session.ip_address is None:
@@ -288,7 +289,7 @@ class _Client(object):
             ip_address=ip_address,
             user_agent=user_agent,
             did=did,
-            errors=session.errors + error_inc,
+            errors=session.errors + (errored or crashed),
         )
 
     def capture_event(

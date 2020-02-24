@@ -1,5 +1,3 @@
-import time
-
 from sentry_sdk import Hub
 
 
