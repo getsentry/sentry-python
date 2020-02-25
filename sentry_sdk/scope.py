@@ -323,6 +323,49 @@ class Scope(object):
 
         return event
 
+    def update_from_scope(self, scope):
+        # type: (Scope) -> None
+        if scope._level is not None:
+            self._level = scope._level
+        if scope._fingerprint is not None:
+            self._fingerprint = scope._fingerprint
+        if scope._transaction is not None:
+            self._transaction = scope._transaction
+        if scope._user is not None:
+            self._user = scope._user
+        if scope._tags:
+            self._tags.update(scope._tags)
+        if scope._contexts:
+            self._contexts.update(scope._contexts)
+        if scope._extras:
+            self._extras.update(scope._extras)
+        if scope._breadcrumbs:
+            self._breadcrumbs.extend(scope._breadcrumbs)
+        if scope._span:
+            self._span = scope._span
+
+    def update_from_kwargs(
+        self,
+        user=None,  # type: Optional[Any]
+        level=None,  # type: Optional[str]
+        extras=None,  # type: Optional[Dict[str, Any]]
+        contexts=None,  # type: Optional[Dict[str, Any]]
+        tags=None,  # type: Optional[Dict[str, str]]
+        fingerprint=None,  # type: Optional[List[str]]
+    ):
+        if level is not None:
+            self._level = level
+        if user is not None:
+            self._user = user
+        if extras is not None:
+            self._extras.update(extras)
+        if contexts is not None:
+            self._contexts.update(contexts)
+        if tags is not None:
+            self._tags.update(tags)
+        if fingerprint is not None:
+            self._fingerprint = fingerprint
+
     def __copy__(self):
         # type: () -> Scope
         rv = object.__new__(self.__class__)  # type: Scope

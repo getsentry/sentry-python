@@ -23,6 +23,7 @@ if MYPY:
     from typing import Any
     from typing import Optional
     from typing import Tuple
+    from typing import Dict
     from typing import List
     from typing import Callable
     from typing import Generator
@@ -45,6 +46,24 @@ else:
 
 
 _local = ContextVar("sentry_current_hub")
+
+
+def _update_scope(base, scope_change, scope_kwargs):
+    # type: (Scope, Optional[Any], Dict[str, Any]) -> Scope
+    if scope_change and scope_kwargs:
+        raise TypeError("cannot provide scope and kwargs")
+    if scope_change is not None:
+        final_scope = copy.copy(base)
+        if callable(scope_change):
+            scope_change(final_scope)
+        else:
+            final_scope.update_from_scope(scope_change)
+    elif scope_kwargs:
+        final_scope = copy.copy(base)
+        final_scope.update_from_kwargs(scope_kwargs)
+    else:
+        final_scope = base
+    return final_scope
 
 
 def _should_send_default_pii():
@@ -285,11 +304,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self,
         event,  # type: Event
         hint=None,  # type: Optional[Hint]
+        scope=None,  # type: Optional[Any]
+        **scope_args  # type: Dict[str, Any]
     ):
         # type: (...) -> Optional[str]
         """Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`.
         """
-        client, scope = self._stack[-1]
+        client, top_scope = self._stack[-1]
+        scope = _update_scope(top_scope, scope, scope_args)
         if client is not None:
             rv = client.capture_event(event, hint, scope)
             if rv is not None:
@@ -301,6 +323,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self,
         message,  # type: str
         level=None,  # type: Optional[str]
+        scope=None,  # type: Optional[Any]
+        **scope_args  # type: Dict[str, Any]
     ):
         # type: (...) -> Optional[str]
         """Captures a message.  The message is just a string.  If no level
@@ -312,10 +336,15 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return None
         if level is None:
             level = "info"
-        return self.capture_event({"message": message, "level": level})
+        return self.capture_event(
+            {"message": message, "level": level}, scope=scope, **scope_args
+        )
 
     def capture_exception(
-        self, error=None  # type: Optional[Union[BaseException, ExcInfo]]
+        self,
+        error=None,  # type: Optional[Union[BaseException, ExcInfo]]
+        scope=None,  # type: Optional[Any]
+        **scope_args  # type: Dict[str, Any]
     ):
         # type: (...) -> Optional[str]
         """Captures an exception.
@@ -334,7 +363,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         event, hint = event_from_exception(exc_info, client_options=client.options)
         try:
-            return self.capture_event(event, hint=hint)
+            return self.capture_event(event, hint=hint, scope=scope, **scope_args)
         except Exception:
             self._capture_internal_exception(sys.exc_info())
 
