@@ -3,13 +3,18 @@ from __future__ import absolute_import
 import weakref
 
 from sentry_sdk.hub import Hub
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
-from rq.timeouts import JobTimeoutException
-from rq.worker import Worker
-from rq.queue import Queue
+
+try:
+    from rq.version import VERSION as RQ_VERSION
+    from rq.timeouts import JobTimeoutException
+    from rq.worker import Worker
+    from rq.queue import Queue
+except ImportError:
+    raise DidNotEnable("RQ not installed")
 
 from sentry_sdk._types import MYPY
 
@@ -30,6 +35,14 @@ class RqIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+
+        try:
+            version = tuple(map(int, RQ_VERSION.split(".")[:3]))
+        except (ValueError, TypeError):
+            raise DidNotEnable("Unparseable RQ version: {}".format(RQ_VERSION))
+
+        if version < (0, 6):
+            raise DidNotEnable("RQ 0.6 or newer is required.")
 
         old_perform_job = Worker.perform_job
 

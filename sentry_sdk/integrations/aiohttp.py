@@ -3,7 +3,7 @@ import weakref
 
 from sentry_sdk._compat import reraise
 from sentry_sdk.hub import Hub
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
@@ -18,8 +18,13 @@ from sentry_sdk.utils import (
     AnnotatedValue,
 )
 
-import asyncio
-from aiohttp.web import Application, HTTPException, UrlDispatcher
+try:
+    import asyncio
+
+    from aiohttp import __version__ as AIOHTTP_VERSION
+    from aiohttp.web import Application, HTTPException, UrlDispatcher
+except ImportError:
+    raise DidNotEnable("AIOHTTP not installed")
 
 from sentry_sdk._types import MYPY
 
@@ -43,6 +48,15 @@ class AioHttpIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+
+        try:
+            version = tuple(map(int, AIOHTTP_VERSION.split(".")))
+        except (TypeError, ValueError):
+            raise DidNotEnable("AIOHTTP version unparseable: {}".format(version))
+
+        if version < (3, 4):
+            raise DidNotEnable("AIOHTTP 3.4 or newer required.")
+
         if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between
             # requests.

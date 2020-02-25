@@ -9,11 +9,26 @@ if MYPY:
     from typing import Dict
     from typing import Any
     from typing import Sequence
+    from typing_extensions import TypedDict
 
     from sentry_sdk.transport import Transport
     from sentry_sdk.integrations import Integration
 
     from sentry_sdk._types import Event, EventProcessor, BreadcrumbProcessor
+
+    # Experiments are feature flags to enable and disable certain unstable SDK
+    # functionality. Changing them from the defaults (`None`) in production
+    # code is highly discouraged. They are not subject to any stability
+    # guarantees such as the ones from semantic versioning.
+    Experiments = TypedDict(
+        "Experiments",
+        {
+            "max_spans": Optional[int],
+            "record_sql_params": Optional[bool],
+            "auto_enabling_integrations": Optional[bool],
+        },
+        total=False,
+    )
 
 
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
@@ -49,7 +64,7 @@ class ClientConstructor(object):
         # DO NOT ENABLE THIS RIGHT NOW UNLESS YOU WANT TO EXCEED YOUR EVENT QUOTA IMMEDIATELY
         traces_sample_rate=0.0,  # type: float
         traceparent_v2=False,  # type: bool
-        _experiments={},  # type: Dict[str, Any]  # noqa: B006
+        _experiments={},  # type: Experiments  # noqa: B006
     ):
         # type: (...) -> None
         pass

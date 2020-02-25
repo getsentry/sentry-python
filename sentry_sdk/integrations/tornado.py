@@ -8,7 +8,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     transaction_from_function,
 )
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import (
     RequestExtractor,
     _filter_headers,
@@ -17,8 +17,12 @@ from sentry_sdk.integrations._wsgi_common import (
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk._compat import iteritems
 
-from tornado.web import RequestHandler, HTTPError
-from tornado.gen import coroutine
+try:
+    from tornado import version_info as TORNADO_VERSION
+    from tornado.web import RequestHandler, HTTPError
+    from tornado.gen import coroutine
+except ImportError:
+    raise DidNotEnable("Tornado not installed")
 
 from sentry_sdk._types import MYPY
 
@@ -37,16 +41,13 @@ class TornadoIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        import tornado
-
-        tornado_version = getattr(tornado, "version_info", None)
-        if tornado_version is None or tornado_version < (5, 0):
-            raise RuntimeError("Tornado 5+ required")
+        if TORNADO_VERSION < (5, 0):
+            raise DidNotEnable("Tornado 5+ required")
 
         if not HAS_REAL_CONTEXTVARS:
             # Tornado is async. We better have contextvars or we're going to leak
             # state between requests.
-            raise RuntimeError(
+            raise DidNotEnable(
                 "The tornado integration for Sentry requires Python 3.6+ or the aiocontextvars package"
             )
 
