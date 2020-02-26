@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.api &#8212; sentry-python 0.14.1 documentation</title>
+    <title>sentry_sdk.api &#8212; sentry-python 0.14.2 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -122,7 +122,7 @@
 
 <div class="viewcode-block" id="capture_exception"><a class="viewcode-back" href="../../api.html#sentry_sdk.capture_exception">[docs]</a><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">capture_exception</span><span class="p">(</span>
-    <span class="n">error</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[BaseException]</span>
+    <span class="n">error</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[BaseException]</span>
 <span class="p">):</span>
     <span class="c1"># type: (...) -&gt; Optional[str]</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
@@ -151,7 +151,7 @@
 
 <span class="nd">@overload</span>  <span class="c1"># noqa</span>
 <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>
-    <span class="n">callback</span>  <span class="c1"># type: Callable[[Scope], None]</span>
+    <span class="n">callback</span><span class="p">,</span>  <span class="c1"># type: Callable[[Scope], None]</span>
 <span class="p">):</span>
     <span class="c1"># type: (...) -&gt; None</span>
     <span class="k">pass</span>
@@ -159,7 +159,7 @@
 
 <div class="viewcode-block" id="configure_scope"><a class="viewcode-back" href="../../api.html#sentry_sdk.configure_scope">[docs]</a><span class="nd">@hubmethod</span>  <span class="c1"># noqa</span>
 <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>
-    <span class="n">callback</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
+    <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
 <span class="p">):</span>
     <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
@@ -185,7 +185,7 @@
 
 <span class="nd">@overload</span>  <span class="c1"># noqa</span>
 <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>
-    <span class="n">callback</span>  <span class="c1"># type: Callable[[Scope], None]</span>
+    <span class="n">callback</span><span class="p">,</span>  <span class="c1"># type: Callable[[Scope], None]</span>
 <span class="p">):</span>
     <span class="c1"># type: (...) -&gt; None</span>
     <span class="k">pass</span>
@@ -193,7 +193,7 @@
 
 <div class="viewcode-block" id="push_scope"><a class="viewcode-back" href="../../api.html#sentry_sdk.push_scope">[docs]</a><span class="nd">@hubmethod</span>  <span class="c1"># noqa</span>
 <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>
-    <span class="n">callback</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
+    <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
 <span class="p">):</span>
     <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
     <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>

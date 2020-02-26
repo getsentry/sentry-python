@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.client &#8212; sentry-python 0.14.1 documentation</title>
+    <title>sentry_sdk.client &#8212; sentry-python 0.14.2 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -139,6 +139,9 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">integrations</span> <span class="o">=</span> <span class="n">setup_integrations</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;integrations&quot;</span><span class="p">],</span>
                 <span class="n">with_defaults</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;default_integrations&quot;</span><span class="p">],</span>
+                <span class="n">with_auto_enabling_integrations</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;_experiments&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="s2">&quot;auto_enabling_integrations&quot;</span><span class="p">,</span> <span class="kc">False</span>
+                <span class="p">),</span>
             <span class="p">)</span>
         <span class="k">finally</span><span class="p">:</span>
             <span class="n">_client_init_debug</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">old_debug</span><span class="p">)</span>
