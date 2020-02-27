@@ -59,12 +59,12 @@ else:
 
 def with_metaclass(meta, *bases):
     # type: (Any, *Any) -> Any
-    class metaclass(type):
+    class MetaClass(type):
         def __new__(metacls, name, this_bases, d):
             # type: (Any, Any, Any, Any) -> Any
             return meta(name, bases, d)
 
-    return type.__new__(metaclass, "temporary_class", (), {})
+    return type.__new__(MetaClass, "temporary_class", (), {})
 
 
 def check_thread_support():

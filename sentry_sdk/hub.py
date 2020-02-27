@@ -92,7 +92,7 @@ if MYPY:
     # Use `ClientConstructor` to define the argument types of `init` and
     # `ContextManager[Any]` to tell static analyzers about the return type.
 
-    class init(ClientConstructor, ContextManager[Any]):
+    class init(ClientConstructor, ContextManager[Any]):  # noqa: N801
         pass
 
 

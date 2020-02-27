@@ -34,6 +34,9 @@ except ImportError:
     raise DidNotEnable("Bottle not installed")
 
 
+TRANSACTION_STYLE_VALUES = ("endpoint", "url")
+
+
 class BottleIntegration(Integration):
     identifier = "bottle"
 
@@ -42,7 +45,6 @@ class BottleIntegration(Integration):
     def __init__(self, transaction_style="endpoint"):
         # type: (str) -> None
 
-        TRANSACTION_STYLE_VALUES = ("endpoint", "url")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"

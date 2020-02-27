@@ -314,7 +314,7 @@ if MYPY:
     # Use `ClientConstructor` to define the argument types of `init` and
     # `Dict[str, Any]` to tell static analyzers about the return type.
 
-    class get_options(ClientConstructor, Dict[str, Any]):
+    class get_options(ClientConstructor, Dict[str, Any]):  # noqa: N801
         pass
 
     class Client(ClientConstructor, _Client):

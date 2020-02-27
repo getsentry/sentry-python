@@ -43,6 +43,9 @@ else:
     from pyramid.security import authenticated_userid  # type: ignore
 
 
+TRANSACTION_STYLE_VALUES = ("route_name", "route_pattern")
+
+
 class PyramidIntegration(Integration):
     identifier = "pyramid"
 
@@ -50,7 +53,6 @@ class PyramidIntegration(Integration):
 
     def __init__(self, transaction_style="route_name"):
         # type: (str) -> None
-        TRANSACTION_STYLE_VALUES = ("route_name", "route_pattern")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"

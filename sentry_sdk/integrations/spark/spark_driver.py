@@ -29,11 +29,11 @@ def _set_app_properties():
     """
     from pyspark import SparkContext
 
-    sparkContext = SparkContext._active_spark_context
-    if sparkContext:
-        sparkContext.setLocalProperty("sentry_app_name", sparkContext.appName)
-        sparkContext.setLocalProperty(
-            "sentry_application_id", sparkContext.applicationId
+    spark_context = SparkContext._active_spark_context
+    if spark_context:
+        spark_context.setLocalProperty("sentry_app_name", spark_context.appName)
+        spark_context.setLocalProperty(
+            "sentry_application_id", spark_context.applicationId
         )
 
 
@@ -106,99 +106,101 @@ def patch_spark_context_init():
 
 
 class SparkListener(object):
-    def onApplicationEnd(self, applicationEnd):
+    def onApplicationEnd(self, applicationEnd):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onApplicationStart(self, applicationStart):
+    def onApplicationStart(self, applicationStart):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onBlockManagerAdded(self, blockManagerAdded):
+    def onBlockManagerAdded(self, blockManagerAdded):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onBlockManagerRemoved(self, blockManagerRemoved):
+    def onBlockManagerRemoved(self, blockManagerRemoved):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onBlockUpdated(self, blockUpdated):
+    def onBlockUpdated(self, blockUpdated):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onEnvironmentUpdate(self, environmentUpdate):
+    def onEnvironmentUpdate(self, environmentUpdate):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onExecutorAdded(self, executorAdded):
+    def onExecutorAdded(self, executorAdded):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onExecutorBlacklisted(self, executorBlacklisted):
+    def onExecutorBlacklisted(self, executorBlacklisted):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onExecutorBlacklistedForStage(self, executorBlacklistedForStage):
+    def onExecutorBlacklistedForStage(  # noqa: N802
+        self, executorBlacklistedForStage  # noqa: N803
+    ):
         # type: (Any) -> None
         pass
 
-    def onExecutorMetricsUpdate(self, executorMetricsUpdate):
+    def onExecutorMetricsUpdate(self, executorMetricsUpdate):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onExecutorRemoved(self, executorRemoved):
+    def onExecutorRemoved(self, executorRemoved):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onJobEnd(self, jobEnd):
+    def onJobEnd(self, jobEnd):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onJobStart(self, jobStart):
+    def onJobStart(self, jobStart):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onNodeBlacklisted(self, nodeBlacklisted):
+    def onNodeBlacklisted(self, nodeBlacklisted):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onNodeBlacklistedForStage(self, nodeBlacklistedForStage):
+    def onNodeBlacklistedForStage(self, nodeBlacklistedForStage):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onNodeUnblacklisted(self, nodeUnblacklisted):
+    def onNodeUnblacklisted(self, nodeUnblacklisted):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onOtherEvent(self, event):
+    def onOtherEvent(self, event):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onSpeculativeTaskSubmitted(self, speculativeTask):
+    def onSpeculativeTaskSubmitted(self, speculativeTask):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onStageCompleted(self, stageCompleted):
+    def onStageCompleted(self, stageCompleted):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onStageSubmitted(self, stageSubmitted):
+    def onStageSubmitted(self, stageSubmitted):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onTaskEnd(self, taskEnd):
+    def onTaskEnd(self, taskEnd):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onTaskGettingResult(self, taskGettingResult):
+    def onTaskGettingResult(self, taskGettingResult):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onTaskStart(self, taskStart):
+    def onTaskStart(self, taskStart):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
-    def onUnpersistRDD(self, unpersistRDD):
+    def onUnpersistRDD(self, unpersistRDD):  # noqa: N802,N803
         # type: (Any) -> None
         pass
 
@@ -211,13 +213,13 @@ class SentryListener(SparkListener):
         # type: () -> None
         self.hub = Hub.current
 
-    def onJobStart(self, jobStart):
+    def onJobStart(self, jobStart):  # noqa: N802,N803
         # type: (Any) -> None
         message = "Job {} Started".format(jobStart.jobId())
         self.hub.add_breadcrumb(level="info", message=message)
         _set_app_properties()
 
-    def onJobEnd(self, jobEnd):
+    def onJobEnd(self, jobEnd):  # noqa: N802,N803
         # type: (Any) -> None
         level = ""
         message = ""
@@ -232,30 +234,30 @@ class SentryListener(SparkListener):
 
         self.hub.add_breadcrumb(level=level, message=message, data=data)
 
-    def onStageSubmitted(self, stageSubmitted):
+    def onStageSubmitted(self, stageSubmitted):  # noqa: N802,N803
         # type: (Any) -> None
-        stageInfo = stageSubmitted.stageInfo()
-        message = "Stage {} Submitted".format(stageInfo.stageId())
-        data = {"attemptId": stageInfo.attemptId(), "name": stageInfo.name()}
+        stage_info = stageSubmitted.stageInfo()
+        message = "Stage {} Submitted".format(stage_info.stageId())
+        data = {"attemptId": stage_info.attemptId(), "name": stage_info.name()}
         self.hub.add_breadcrumb(level="info", message=message, data=data)
         _set_app_properties()
 
-    def onStageCompleted(self, stageCompleted):
+    def onStageCompleted(self, stageCompleted):  # noqa: N802,N803
         # type: (Any) -> None
         from py4j.protocol import Py4JJavaError  # type: ignore
 
-        stageInfo = stageCompleted.stageInfo()
+        stage_info = stageCompleted.stageInfo()
         message = ""
         level = ""
-        data = {"attemptId": stageInfo.attemptId(), "name": stageInfo.name()}
+        data = {"attemptId": stage_info.attemptId(), "name": stage_info.name()}
 
         # Have to Try Except because stageInfo.failureReason() is typed with Scala Option
         try:
-            data["reason"] = stageInfo.failureReason().get()
-            message = "Stage {} Failed".format(stageInfo.stageId())
+            data["reason"] = stage_info.failureReason().get()
+            message = "Stage {} Failed".format(stage_info.stageId())
             level = "warning"
         except Py4JJavaError:
-            message = "Stage {} Completed".format(stageInfo.stageId())
+            message = "Stage {} Completed".format(stage_info.stageId())
             level = "info"
 
         self.hub.add_breadcrumb(level=level, message=message, data=data)

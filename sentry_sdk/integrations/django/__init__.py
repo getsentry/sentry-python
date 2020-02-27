@@ -71,6 +71,9 @@ else:
         return request_user.is_authenticated
 
 
+TRANSACTION_STYLE_VALUES = ("function_name", "url")
+
+
 class DjangoIntegration(Integration):
     identifier = "django"
 
@@ -79,7 +82,6 @@ class DjangoIntegration(Integration):
 
     def __init__(self, transaction_style="url", middleware_spans=True):
         # type: (str, bool) -> None
-        TRANSACTION_STYLE_VALUES = ("function_name", "url")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
