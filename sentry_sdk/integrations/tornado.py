@@ -158,7 +158,7 @@ def _make_event_processor(weak_handler):
 
         with capture_internal_exceptions():
             if handler.current_user and _should_send_default_pii():
-                event.setdefault("user", {})["is_authenticated"] = True
+                event.setdefault("user", {}).setdefault("is_authenticated", True)
 
         return event
 
