@@ -320,8 +320,8 @@ class Span(object):
             return None
 
         try:
-            durationSeconds = time.perf_counter() - self._start_timestamp_monotonic
-            self.timestamp = self.start_timestamp + timedelta(seconds=durationSeconds)
+            duration_seconds = time.perf_counter() - self._start_timestamp_monotonic
+            self.timestamp = self.start_timestamp + timedelta(seconds=duration_seconds)
         except AttributeError:
             self.timestamp = datetime.utcnow()
 
