@@ -230,7 +230,7 @@ def _add_user_to_event(event):
         user_info = event.setdefault("user", {})
 
         try:
-            user_info["id"] = user.get_id()
+            user_info.setdefault("id", user.get_id())
             # TODO: more configurable user attrs here
         except AttributeError:
             # might happen if:
@@ -247,11 +247,12 @@ def _add_user_to_event(event):
         # https://github.com/lingthio/Flask-User/blob/a379fa0a281789618c484b459cb41236779b95b1/docs/source/data_models.rst#fixed-data-model-property-names
 
         try:
-            user_info["email"] = user_info["username"] = user.email
+            user_info.setdefault("email", user.email)
         except Exception:
             pass
 
         try:
-            user_info["username"] = user.username
+            user_info.setdefault("username", user.username)
+            user_info.setdefault("username", user.email)
         except Exception:
             pass

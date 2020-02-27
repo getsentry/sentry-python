@@ -425,17 +425,17 @@ def _set_user_info(request, event):
         return
 
     try:
-        user_info["id"] = str(user.pk)
+        user_info.setdefault("id", str(user.pk))
     except Exception:
         pass
 
     try:
-        user_info["email"] = user.email
+        user_info.setdefault("email", user.email)
     except Exception:
         pass
 
     try:
-        user_info["username"] = user.get_username()
+        user_info.setdefault("username", user.get_username())
     except Exception:
         pass
 
