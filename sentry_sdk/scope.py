@@ -152,7 +152,7 @@ class Scope(object):
         """Sets a user for the scope."""
         self._user = value
         if self._session is not None:
-            self._session.update(user=user)
+            self._session.update(user=value)
 
     @property
     def span(self):

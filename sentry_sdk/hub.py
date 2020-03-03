@@ -541,17 +541,24 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def end_session(self):
         # type: (...) -> None
         """Ends the current session if there is one."""
-        session = self._stack[-1][1].session
+        client, scope = self._stack[-1]
+        session = scope.session
         if session is not None:
             session.close()
+            if client is not None:
+                client.capture_session(session)
         self._stack[-1][1].session = None
 
     def start_session(self):
         # type: (...) -> None
         """Starts a new session."""
         self.end_session()
-        scope = self._stack[-1][1]
-        scope.session = Session(hub=self, user=scope._user)
+        client, scope = self._stack[-1]
+        scope.session = Session(
+            release=client.options["release"] if client else None,
+            environment=client.options["environment"] if client else None,
+            user=scope._user,
+        )
 
     def flush(
         self,

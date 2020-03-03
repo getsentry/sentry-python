@@ -3,7 +3,6 @@ import uuid
 import time
 from datetime import datetime
 from threading import Thread, Lock
-from weakref import ref as weakref
 from contextlib import contextmanager
 
 from sentry_sdk._types import MYPY
@@ -121,14 +120,12 @@ class Session(object):
         status=None,  # type: Optional[SessionStatus]
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
-        hub=None,  # type: Optional[Hub]
         user_agent=None,  # type: Optional[str]
         ip_address=None,  # type: Optional[str]
         errors=None,  # type: Optional[int]
         user=None,  # type: Optional[Any]
     ):
         # type: (...) -> None
-        self._hub = weakref(hub)
         if sid is None:
             sid = uuid.uuid4()
         if started is None:
@@ -173,9 +170,6 @@ class Session(object):
         user=None,  # type: Optional[Any]
     ):
         # type: (...) -> None
-        hub = self._hub()
-        options = hub.client.options if hub and hub.client else None
-
         # If a user is supplied we pull some data form it
         if user:
             if ip_address is None:
@@ -192,12 +186,8 @@ class Session(object):
         self.timestamp = timestamp
         if duration is not None:
             self.duration = duration
-        if release is None and options:
-            release = options["release"]
         if release is not None:
             self.release = release
-        if environment is None and options:
-            environment = options["environment"]
         if environment is not None:
             self.environment = environment
         if ip_address is not None:
@@ -218,14 +208,6 @@ class Session(object):
             status = "exited"
         if status is not None:
             self.update(status=status)
-
-        # sessions get flushed in this SDK only when they close (single
-        # session update).
-        hub = self._hub()
-        if hub is not None:
-            client = hub.client
-            if client is not None:
-                client.capture_session(self)
 
     def to_json(self):
         # type: (...) -> Any
