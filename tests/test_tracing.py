@@ -12,7 +12,8 @@ def test_basic(sentry_init, capture_events, sample_rate):
     sentry_init(traces_sample_rate=sample_rate)
     events = capture_events()
 
-    with Hub.current.start_span(transaction="hi"):
+    with Hub.current.start_span(transaction="hi") as span:
+        span.set_status('ok')
         with pytest.raises(ZeroDivisionError):
             with Hub.current.start_span(op="foo", description="foodesc"):
                 1 / 0
@@ -32,6 +33,8 @@ def test_basic(sentry_init, capture_events, sample_rate):
         assert span2["op"] == "bar"
         assert span2["description"] == "bardesc"
         assert parent_span["transaction"] == "hi"
+        assert "status" not in event["tags"]
+        assert event["contexts"]["trace"]["status"] == "ok"
     else:
         assert not events
 

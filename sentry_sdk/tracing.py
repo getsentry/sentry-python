@@ -408,7 +408,7 @@ class Span(object):
         }
 
         if "status" in self._tags:
-            rv["status"] = self._tags["status"]
+            rv["status"] = self._tags.pop("status")
 
         return rv
 
