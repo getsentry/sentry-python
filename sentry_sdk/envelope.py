@@ -48,6 +48,13 @@ class Envelope(object):
             items = list(items)
         self.items = items
 
+    @property
+    def description(self):
+        return "envelope with %s items (%s)" % (
+            len(self.items),
+            ", ".join(x.data_category for x in self.items),
+        )
+
     def add_event(
         self, event  # type: Event
     ):
