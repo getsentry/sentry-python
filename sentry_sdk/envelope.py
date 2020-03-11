@@ -21,15 +21,9 @@ if MYPY:
 
 def get_event_data_category(event):
     # type: (Event) -> EventDataCategory
-    ty = event.get("type")
-    if ty in ("default", "error", "transaction"):
-        return ty
-    for key in ("csp", "hpkp", "expectct", "expectstaple"):
-        if event.get(key):
-            return "security"
-    if event.get("exception"):
-        return "error"
-    return "default"
+    if event.get("type") == "transaction":
+        return "transaction"
+    return "error"
 
 
 class Envelope(object):
