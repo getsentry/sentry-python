@@ -239,11 +239,7 @@ class HttpTransport(Transport):
 
         logger.debug(
             "Sending envelope [%s] project:%s host:%s"
-            % (
-                envelope.description,
-                self.parsed_dsn.project_id,
-                self.parsed_dsn.host,
-            )
+            % (envelope.description, self.parsed_dsn.project_id, self.parsed_dsn.host,)
         )
         self._send_request(
             body.getvalue(),
