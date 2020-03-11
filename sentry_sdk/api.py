@@ -67,11 +67,13 @@ def scopemethod(f):
 def capture_event(
     event,  # type: Event
     hint=None,  # type: Optional[Hint]
+    scope=None,  # type: Optional[Any]
+    **scope_args  # type: Dict[str, Any]
 ):
     # type: (...) -> Optional[str]
     hub = Hub.current
     if hub is not None:
-        return hub.capture_event(event, hint)
+        return hub.capture_event(event, hint, scope=scope, **scope_args)
     return None
 
 
@@ -79,22 +81,26 @@ def capture_event(
 def capture_message(
     message,  # type: str
     level=None,  # type: Optional[str]
+    scope=None,  # type: Optional[Any]
+    **scope_args  # type: Dict[str, Any]
 ):
     # type: (...) -> Optional[str]
     hub = Hub.current
     if hub is not None:
-        return hub.capture_message(message, level)
+        return hub.capture_message(message, level, scope=scope, **scope_args)
     return None
 
 
 @hubmethod
 def capture_exception(
     error=None,  # type: Optional[BaseException]
+    scope=None,  # type: Optional[Any]
+    **scope_args  # type: Dict[str, Any]
 ):
     # type: (...) -> Optional[str]
     hub = Hub.current
     if hub is not None:
-        return hub.capture_exception(error)
+        return hub.capture_exception(error, scope=scope, **scope_args)
     return None
 
 
