@@ -13,7 +13,7 @@ def test_basic(sentry_init, capture_events, sample_rate):
     events = capture_events()
 
     with Hub.current.start_span(transaction="hi") as span:
-        span.set_status('ok')
+        span.set_status("ok")
         with pytest.raises(ZeroDivisionError):
             with Hub.current.start_span(op="foo", description="foodesc"):
                 1 / 0
