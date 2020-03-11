@@ -15,12 +15,11 @@ if MYPY:
     from typing import Generator
 
     from sentry_sdk._types import SessionStatus
-    from sentry_sdk.hub import Hub
 
 
 @contextmanager
 def auto_session_tracking(hub):
-    # type: (Hub) -> Generator[None, None, None]
+    # type: (sentry_sdk.hub.Hub) -> Generator[None, None, None]
     exp = hub.client.options["_experiments"] if hub.client else {}
     should_track = exp.get("auto_session_tracking")
     if should_track:
