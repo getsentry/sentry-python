@@ -8,6 +8,8 @@ from contextlib import contextmanager
 from sentry_sdk._types import MYPY
 
 if MYPY:
+    import sentry_sdk
+
     from typing import Optional
     from typing import Union
     from typing import Any
@@ -19,7 +21,7 @@ if MYPY:
 
 @contextmanager
 def auto_session_tracking(hub):
-    # type: (sentry_sdk.hub.Hub) -> Generator[None, None, None]
+    # type: (sentry_sdk.Hub) -> Generator[None, None, None]
     exp = hub.client.options["_experiments"] if hub.client else {}
     should_track = exp.get("auto_session_tracking")
     if should_track:
