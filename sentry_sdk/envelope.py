@@ -50,6 +50,7 @@ class Envelope(object):
 
     @property
     def description(self):
+        # type: (...) -> str
         return "envelope with %s items (%s)" % (
             len(self.items),
             ", ".join(x.data_category for x in self.items),
