@@ -34,4 +34,4 @@ if MYPY:
     EventDataCategory = Literal[
         "default", "error", "crash", "transaction", "security", "attachment", "session"
     ]
-    SessionStatus = Literal["ok", "exited", "crashed", "abnormal", "degraded"]
+    SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
