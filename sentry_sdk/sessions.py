@@ -21,7 +21,8 @@ if MYPY:
 @contextmanager
 def auto_session_tracking(hub):
     # type: (Hub) -> Generator[None, None, None]
-    should_track = hub.client and hub.client.options["auto_session_tracking"]
+    exp = hub.client.options["_experiments"] if hub.client else {}
+    should_track = exp.get("auto_session_tracking")
     if should_track:
         hub.start_session()
     try:
