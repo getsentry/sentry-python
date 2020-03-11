@@ -78,6 +78,11 @@ def to_timestamp(value):
     return (value - epoch).total_seconds()
 
 
+def format_timestamp(value):
+    # type: (datetime) -> str
+    return value.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
 def event_hint_with_exc_info(exc_info=None):
     # type: (Optional[ExcInfo]) -> Dict[str, Optional[ExcInfo]]
     """Creates a hint with the exc info filled in."""

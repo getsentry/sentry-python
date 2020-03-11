@@ -9,6 +9,7 @@ from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
 from sentry_sdk.tracing import Span
+from sentry_sdk.sessions import Session
 from sentry_sdk.utils import (
     exc_info_from_error,
     event_from_exception,
@@ -33,7 +34,13 @@ if MYPY:
     from typing import ContextManager
 
     from sentry_sdk.integrations import Integration
-    from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint, ExcInfo
+    from sentry_sdk._types import (
+        Event,
+        Hint,
+        Breadcrumb,
+        BreadcrumbHint,
+        ExcInfo,
+    )
     from sentry_sdk.consts import ClientConstructor
 
     T = TypeVar("T")
@@ -494,7 +501,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         :returns: If no `callback` is provided, a context manager that should
             be used to pop the scope again.
         """
-
         if callback is not None:
             with self.push_scope() as scope:
                 callback(scope)
@@ -560,6 +566,28 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
                 yield Scope()
 
         return inner()
+
+    def end_session(self):
+        # type: (...) -> None
+        """Ends the current session if there is one."""
+        client, scope = self._stack[-1]
+        session = scope.session
+        if session is not None:
+            session.close()
+            if client is not None:
+                client.capture_session(session)
+        self._stack[-1][1].session = None
+
+    def start_session(self):
+        # type: (...) -> None
+        """Starts a new session."""
+        self.end_session()
+        client, scope = self._stack[-1]
+        scope.session = Session(
+            release=client.options["release"] if client else None,
+            environment=client.options["environment"] if client else None,
+            user=scope._user,
+        )
 
     def flush(
         self,

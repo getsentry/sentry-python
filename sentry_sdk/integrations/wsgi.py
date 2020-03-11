@@ -9,6 +9,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk._compat import PY2, reraise, iteritems
 from sentry_sdk.tracing import Span
+from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
 from sentry_sdk._types import MYPY
@@ -102,28 +103,30 @@ class SentryWsgiMiddleware(object):
         _wsgi_middleware_applied.set(True)
         try:
             hub = Hub(Hub.current)
+            with auto_session_tracking(hub):
+                with hub:
+                    with capture_internal_exceptions():
+                        with hub.configure_scope() as scope:
+                            scope.clear_breadcrumbs()
+                            scope._name = "wsgi"
+                            scope.add_event_processor(
+                                _make_wsgi_event_processor(environ)
+                            )
 
-            with hub:
-                with capture_internal_exceptions():
-                    with hub.configure_scope() as scope:
-                        scope.clear_breadcrumbs()
-                        scope._name = "wsgi"
-                        scope.add_event_processor(_make_wsgi_event_processor(environ))
+                    span = Span.continue_from_environ(environ)
+                    span.op = "http.server"
+                    span.transaction = "generic WSGI request"
 
-                span = Span.continue_from_environ(environ)
-                span.op = "http.server"
-                span.transaction = "generic WSGI request"
-
-                with hub.start_span(span) as span:
-                    try:
-                        rv = self.app(
-                            environ,
-                            functools.partial(
-                                _sentry_start_response, start_response, span
-                            ),
-                        )
-                    except BaseException:
-                        reraise(*_capture_exception(hub))
+                    with hub.start_span(span) as span:
+                        try:
+                            rv = self.app(
+                                environ,
+                                functools.partial(
+                                    _sentry_start_response, start_response, span
+                                ),
+                            )
+                        except BaseException:
+                            reraise(*_capture_exception(hub))
         finally:
             _wsgi_middleware_applied.set(False)
 

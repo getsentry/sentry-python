@@ -8,6 +8,7 @@ from sentry_sdk.utils import (
     disable_capture_event,
     safe_repr,
     strip_string,
+    format_timestamp,
 )
 
 from sentry_sdk._compat import text_type, PY2, string_types, number_types, iteritems
@@ -256,7 +257,7 @@ def serialize(event, **kwargs):
 
         elif isinstance(obj, datetime):
             return (
-                text_type(obj.strftime("%Y-%m-%dT%H:%M:%S.%fZ"))
+                text_type(format_timestamp(obj))
                 if not should_repr_strings
                 else safe_repr(obj)
             )

@@ -1,5 +1,6 @@
 import json
 import pytest
+import logging
 
 from io import BytesIO
 
@@ -15,6 +16,7 @@ from sentry_sdk import (
     capture_message,
     capture_exception,
     last_event_id,
+    Hub,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
 import sentry_sdk.integrations.flask as flask_sentry
@@ -238,6 +240,49 @@ def test_flask_large_json_request(sentry_init, capture_events, app):
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
     assert len(event["request"]["data"]["foo"]["bar"]) == 512
+
+
+def test_flask_session_tracking(sentry_init, capture_envelopes, app):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        release="demo-release",
+        _experiments=dict(auto_session_tracking=True,),
+    )
+
+    @app.route("/")
+    def index():
+        with configure_scope() as scope:
+            scope.set_user({"ip_address": "1.2.3.4", "id": 42})
+        try:
+            raise ValueError("stuff")
+        except Exception:
+            logging.exception("stuff happened")
+        1 / 0
+
+    envelopes = capture_envelopes()
+
+    with app.test_client() as client:
+        try:
+            client.get("/", headers={"User-Agent": "blafasel/1.0"})
+        except ZeroDivisionError:
+            pass
+
+    Hub.current.client.flush()
+
+    (first_event, error_event, session) = envelopes
+    first_event = first_event.get_event()
+    error_event = error_event.get_event()
+    session = session.items[0].payload.json
+
+    assert first_event["exception"]["values"][0]["type"] == "ValueError"
+    assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+    assert session["status"] == "crashed"
+    assert session["did"] == "42"
+    assert session["errors"] == 2
+    assert session["init"]
+    assert session["attrs"]["release"] == "demo-release"
+    assert session["attrs"]["ip_address"] == "1.2.3.4"
+    assert session["attrs"]["user_agent"] == "blafasel/1.0"
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])

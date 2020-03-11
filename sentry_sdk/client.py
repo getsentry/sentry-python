@@ -18,6 +18,8 @@ from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO, ClientConstructor
 from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
+from sentry_sdk.sessions import SessionFlusher
+from sentry_sdk.envelope import Envelope
 
 from sentry_sdk._types import MYPY
 
@@ -25,10 +27,12 @@ if MYPY:
     from typing import Any
     from typing import Callable
     from typing import Dict
+    from typing import List
     from typing import Optional
 
     from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
+    from sentry_sdk.sessions import Session
 
 
 _client_init_debug = ContextVar("client_init_debug")
@@ -91,9 +95,20 @@ class _Client(object):
     def _init_impl(self):
         # type: () -> None
         old_debug = _client_init_debug.get(False)
+
+        def _send_sessions(sessions):
+            # type: (List[Any]) -> None
+            transport = self.transport
+            if sessions and transport:
+                envelope = Envelope()
+                for session in sessions:
+                    envelope.add_session(session)
+                transport.capture_envelope(envelope)
+
         try:
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
+            self.session_flusher = SessionFlusher(flush_func=_send_sessions)
 
             request_bodies = ("always", "never", "small", "medium")
             if self.options["request_bodies"] not in request_bodies:
@@ -230,6 +245,48 @@ class _Client(object):
 
         return True
 
+    def _update_session_from_event(
+        self,
+        session,  # type: Session
+        event,  # type: Event
+    ):
+        # type: (...) -> None
+
+        crashed = False
+        errored = False
+        user_agent = None
+
+        # Figure out if this counts as an error and if we should mark the
+        # session as crashed.
+        level = event.get("level")
+        if level == "fatal":
+            crashed = True
+        if not crashed:
+            exceptions = (event.get("exception") or {}).get("values")
+            if exceptions:
+                errored = True
+                for error in exceptions:
+                    mechanism = error.get("mechanism")
+                    if mechanism and mechanism.get("handled") is False:
+                        crashed = True
+                        break
+
+        user = event.get("user")
+
+        if session.user_agent is None:
+            headers = (event.get("request") or {}).get("headers")
+            for (k, v) in iteritems(headers or {}):
+                if k.lower() == "user-agent":
+                    user_agent = v
+                    break
+
+        session.update(
+            status="crashed" if crashed else None,
+            user=user,
+            user_agent=user_agent,
+            errors=session.errors + (errored or crashed),
+        )
+
     def capture_event(
         self,
         event,  # type: Event
@@ -260,8 +317,24 @@ class _Client(object):
         event_opt = self._prepare_event(event, hint, scope)
         if event_opt is None:
             return None
+
+        # whenever we capture an event we also check if the session needs
+        # to be updated based on that information.
+        session = scope.session if scope else None
+        if session:
+            self._update_session_from_event(session, event)
+
         self.transport.capture_event(event_opt)
         return event_id
+
+    def capture_session(
+        self, session  # type: Session
+    ):
+        # type: (...) -> None
+        if not session.release:
+            logger.info("Discarded session update because of missing release")
+        else:
+            self.session_flusher.add_session(session)
 
     def close(
         self,
@@ -275,6 +348,7 @@ class _Client(object):
         """
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
+            self.session_flusher.kill()
             self.transport.kill()
             self.transport = None
 
@@ -294,6 +368,7 @@ class _Client(object):
         if self.transport is not None:
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
+            self.session_flusher.flush()
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):

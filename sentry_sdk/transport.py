@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
+from sentry_sdk.envelope import Envelope, get_event_data_category
 
 from sentry_sdk._types import MYPY
 
@@ -58,6 +59,19 @@ class Transport(object):
         """
         raise NotImplementedError()
 
+    def capture_envelope(
+        self, envelope  # type: Envelope
+    ):
+        # type: (...) -> None
+        """This gets invoked with an envelope when an event should
+        be sent to sentry.  The default implementation invokes `capture_event`
+        if the envelope contains an event and ignores all other envelopes.
+        """
+        event = envelope.get_event()
+        if event is not None:
+            self.capture_event(event)
+        return None
+
     def flush(
         self,
         timeout,  # type: float
@@ -93,7 +107,7 @@ class HttpTransport(Transport):
         assert self.parsed_dsn is not None
         self._worker = BackgroundWorker()
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
-        self._disabled_until = None  # type: Optional[datetime]
+        self._disabled_until = {}  # type: Dict[Any, datetime]
         self._retry = urllib3.util.Retry()
         self.options = options
 
@@ -108,14 +122,83 @@ class HttpTransport(Transport):
 
         self.hub_cls = Hub
 
+    def _update_rate_limits(self, response):
+        # type: (urllib3.HTTPResponse) -> None
+
+        # new sentries with more rate limit insights.  We honor this header
+        # no matter of the status code to update our internal rate limits.
+        header = response.headers.get("x-sentry-rate-limit")
+        if header:
+            for limit in header.split(","):
+                try:
+                    retry_after, categories, _ = limit.strip().split(":", 2)
+                    if retry_after.startswith("+"):
+                        retry_after = datetime.utcnow() + timedelta(
+                            seconds=int(retry_after)
+                        )
+                    else:
+                        retry_after = datetime.utcfromtimestamp(int(retry_after))
+                    for category in categories.split(";") or (None,):
+                        self._disabled_until[category] = retry_after
+                except (LookupError, ValueError):
+                    continue
+
+        # old sentries only communicate global rate limit hits via the
+        # retry-after header on 429.  This header can also be emitted on new
+        # sentries if a proxy in front wants to globally slow things down.
+        elif response.status == 429:
+            self._disabled_until[None] = datetime.utcnow() + timedelta(
+                seconds=self._retry.get_retry_after(response) or 60
+            )
+
+    def _send_request(
+        self,
+        body,  # type: bytes
+        headers,  # type: Dict[str, str]
+    ):
+        # type: (...) -> None
+        headers.update(
+            {
+                "User-Agent": str(self._auth.client),
+                "X-Sentry-Auth": str(self._auth.to_header()),
+            }
+        )
+        response = self._pool.request(
+            "POST", str(self._auth.store_api_url), body=body, headers=headers
+        )
+
+        try:
+            self._update_rate_limits(response)
+
+            if response.status == 429:
+                # if we hit a 429.  Something was rate limited but we already
+                # acted on this in `self._update_rate_limits`.
+                pass
+
+            elif response.status >= 300 or response.status < 200:
+                logger.error(
+                    "Unexpected status code: %s (body: %s)",
+                    response.status,
+                    response.data,
+                )
+        finally:
+            response.close()
+
+    def _check_disabled(self, category):
+        # type: (str) -> bool
+        def _disabled(bucket):
+            # type: (Any) -> bool
+            ts = self._disabled_until.get(bucket)
+            return ts is not None and ts > datetime.utcnow()
+
+        return _disabled(category) or _disabled(None)
+
     def _send_event(
         self, event  # type: Event
     ):
         # type: (...) -> None
-        if self._disabled_until is not None:
-            if datetime.utcnow() < self._disabled_until:
-                return
-            self._disabled_until = None
+        if self._check_disabled(get_event_data_category(event)):
+            return None
 
         body = io.BytesIO()
         with gzip.GzipFile(fileobj=body, mode="w") as f:
@@ -132,35 +215,43 @@ class HttpTransport(Transport):
                 self.parsed_dsn.host,
             )
         )
-        response = self._pool.request(
-            "POST",
-            str(self._auth.store_api_url),
-            body=body.getvalue(),
+        self._send_request(
+            body.getvalue(),
+            headers={"Content-Type": "application/json", "Content-Encoding": "gzip"},
+        )
+        return None
+
+    def _send_envelope(
+        self, envelope  # type: Envelope
+    ):
+        # type: (...) -> None
+
+        # remove all items from the envelope which are over quota
+        envelope.items[:] = [
+            x for x in envelope.items if not self._check_disabled(x.data_category)
+        ]
+        if not envelope.items:
+            return None
+
+        body = io.BytesIO()
+        with gzip.GzipFile(fileobj=body, mode="w") as f:
+            envelope.serialize_into(f)
+
+        assert self.parsed_dsn is not None
+        logger.debug(
+            "Sending envelope [%s] project:%s host:%s",
+            envelope.description,
+            self.parsed_dsn.project_id,
+            self.parsed_dsn.host,
+        )
+        self._send_request(
+            body.getvalue(),
             headers={
-                "User-Agent": str(self._auth.client),
-                "X-Sentry-Auth": str(self._auth.to_header()),
-                "Content-Type": "application/json",
+                "Content-Type": "application/x-sentry-envelope",
                 "Content-Encoding": "gzip",
             },
         )
-
-        try:
-            if response.status == 429:
-                self._disabled_until = datetime.utcnow() + timedelta(
-                    seconds=self._retry.get_retry_after(response) or 60
-                )
-                return
-
-            elif response.status >= 300 or response.status < 200:
-                logger.error(
-                    "Unexpected status code: %s (body: %s)",
-                    response.status,
-                    response.data,
-                )
-        finally:
-            response.close()
-
-        self._disabled_until = None
+        return None
 
     def _get_pool_options(self, ca_certs):
         # type: (Optional[Any]) -> Dict[str, Any]
@@ -208,6 +299,20 @@ class HttpTransport(Transport):
                     self._send_event(event)
 
         self._worker.submit(send_event_wrapper)
+
+    def capture_envelope(
+        self, envelope  # type: Envelope
+    ):
+        # type: (...) -> None
+        hub = self.hub_cls.current
+
+        def send_envelope_wrapper():
+            # type: () -> None
+            with hub:
+                with capture_internal_exceptions():
+                    self._send_envelope(envelope)
+
+        self._worker.submit(send_envelope_wrapper)
 
     def flush(
         self,
