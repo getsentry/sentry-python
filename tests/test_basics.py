@@ -12,6 +12,8 @@ from sentry_sdk import (
     last_event_id,
     Hub,
 )
+
+from sentry_sdk.integrations import _AUTO_ENABLING_INTEGRATIONS
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 
@@ -35,6 +37,20 @@ def test_processors(sentry_init, capture_events):
     (event,) = events
 
     assert event["exception"]["values"][0]["value"] == "aha! whatever"
+
+
+def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
+    caplog.set_level(logging.DEBUG)
+
+    sentry_init(_experiments={"auto_enabling_integrations": True}, debug=True)
+
+    for import_string in _AUTO_ENABLING_INTEGRATIONS:
+        assert any(
+            record.message.startswith(
+                "Did not import default integration {}:".format(import_string)
+            )
+            for record in caplog.records
+        )
 
 
 def test_event_id(sentry_init, capture_events):

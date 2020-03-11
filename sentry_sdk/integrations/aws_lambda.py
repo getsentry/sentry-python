@@ -202,11 +202,11 @@ def _make_request_event_processor(aws_event, aws_context):
 
             id = aws_event.get("identity", {}).get("userArn")
             if id is not None:
-                user_info["id"] = id
+                user_info.setdefault("id", id)
 
             ip = aws_event.get("identity", {}).get("sourceIp")
             if ip is not None:
-                user_info["ip_address"] = ip
+                user_info.setdefault("ip_address", ip)
 
         event["request"] = request
 

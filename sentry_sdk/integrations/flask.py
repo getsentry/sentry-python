@@ -4,7 +4,7 @@ import weakref
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 
@@ -22,18 +22,28 @@ if MYPY:
 
     from sentry_sdk._types import EventProcessor
 
+
 try:
     import flask_login  # type: ignore
 except ImportError:
     flask_login = None
 
-from flask import Request, Flask, _request_ctx_stack, _app_ctx_stack  # type: ignore
-from flask.signals import (
-    appcontext_pushed,
-    appcontext_tearing_down,
-    got_request_exception,
-    request_started,
-)
+try:
+    from flask import (  # type: ignore
+        Request,
+        Flask,
+        _request_ctx_stack,
+        _app_ctx_stack,
+        __version__ as FLASK_VERSION,
+    )
+    from flask.signals import (
+        appcontext_pushed,
+        appcontext_tearing_down,
+        got_request_exception,
+        request_started,
+    )
+except ImportError:
+    raise DidNotEnable("Flask is not installed")
 
 
 class FlaskIntegration(Integration):
@@ -54,6 +64,14 @@ class FlaskIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+        try:
+            version = tuple(map(int, FLASK_VERSION.split(".")[:3]))
+        except (ValueError, TypeError):
+            raise DidNotEnable("Unparseable Flask version: {}".format(FLASK_VERSION))
+
+        if version < (0, 11):
+            raise DidNotEnable("Flask 0.11 or newer is required.")
+
         appcontext_pushed.connect(_push_appctx)
         appcontext_tearing_down.connect(_pop_appctx)
         request_started.connect(_request_started)
@@ -212,7 +230,7 @@ def _add_user_to_event(event):
         user_info = event.setdefault("user", {})
 
         try:
-            user_info["id"] = user.get_id()
+            user_info.setdefault("id", user.get_id())
             # TODO: more configurable user attrs here
         except AttributeError:
             # might happen if:
@@ -229,11 +247,12 @@ def _add_user_to_event(event):
         # https://github.com/lingthio/Flask-User/blob/a379fa0a281789618c484b459cb41236779b95b1/docs/source/data_models.rst#fixed-data-model-property-names
 
         try:
-            user_info["email"] = user_info["username"] = user.email
+            user_info.setdefault("email", user.email)
         except Exception:
             pass
 
         try:
-            user_info["username"] = user.username
+            user_info.setdefault("username", user.username)
+            user_info.setdefault("username", user.email)
         except Exception:
             pass

@@ -9,14 +9,9 @@ from sentry_sdk.utils import (
     event_from_exception,
     HAS_REAL_CONTEXTVARS,
 )
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
-
-from sanic import Sanic, __version__ as VERSION
-from sanic.exceptions import SanicException
-from sanic.router import Router
-from sanic.handlers import ErrorHandler
 
 from sentry_sdk._types import MYPY
 
@@ -32,6 +27,14 @@ if MYPY:
 
     from sentry_sdk._types import Event, EventProcessor, Hint
 
+try:
+    from sanic import Sanic, __version__ as SANIC_VERSION
+    from sanic.exceptions import SanicException
+    from sanic.router import Router
+    from sanic.handlers import ErrorHandler
+except ImportError:
+    raise DidNotEnable("Sanic not installed")
+
 
 class SanicIntegration(Integration):
     identifier = "sanic"
@@ -39,15 +42,23 @@ class SanicIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+        try:
+            version = tuple(map(int, SANIC_VERSION.split(".")))
+        except (TypeError, ValueError):
+            raise DidNotEnable("Unparseable Sanic version: {}".format(SANIC_VERSION))
+
+        if version < (0, 8):
+            raise DidNotEnable("Sanic 0.8 or newer required.")
+
         if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between
             # requests.
-            raise RuntimeError(
+            raise DidNotEnable(
                 "The sanic integration for Sentry requires Python 3.7+ "
                 " or aiocontextvars package"
             )
 
-        if VERSION.startswith("0.8."):
+        if SANIC_VERSION.startswith("0.8."):
             # Sanic 0.8 and older creates a logger named "root" and puts a
             # stringified version of every exception in there (without exc_info),
             # which our error deduplication can't detect.

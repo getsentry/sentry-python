@@ -5,11 +5,40 @@ import sys
 import threading
 import weakref
 
-from django import VERSION as DJANGO_VERSION
-from django.core import signals
-
 from sentry_sdk._types import MYPY
-from sentry_sdk.utils import HAS_REAL_CONTEXTVARS, logger
+from sentry_sdk.hub import Hub, _should_send_default_pii
+from sentry_sdk.scope import add_global_event_processor
+from sentry_sdk.serializer import add_global_repr_processor
+from sentry_sdk.tracing import record_sql_queries
+from sentry_sdk.utils import (
+    HAS_REAL_CONTEXTVARS,
+    logger,
+    capture_internal_exceptions,
+    event_from_exception,
+    transaction_from_function,
+    walk_exception_chain,
+)
+from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.integrations._wsgi_common import RequestExtractor
+
+try:
+    from django import VERSION as DJANGO_VERSION
+    from django.core import signals
+
+    try:
+        from django.urls import resolve
+    except ImportError:
+        from django.core.urlresolvers import resolve
+except ImportError:
+    raise DidNotEnable("Django not installed")
+
+
+from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
+from sentry_sdk.integrations.django.templates import get_template_frame_from_exception
+from sentry_sdk.integrations.django.middleware import patch_django_middlewares
+
 
 if MYPY:
     from typing import Any
@@ -26,31 +55,6 @@ if MYPY:
 
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from sentry_sdk._types import Event, Hint, EventProcessor, NotImplementedType
-
-
-try:
-    from django.urls import resolve
-except ImportError:
-    from django.core.urlresolvers import resolve
-
-from sentry_sdk import Hub
-from sentry_sdk.hub import _should_send_default_pii
-from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.serializer import add_global_repr_processor
-from sentry_sdk.tracing import record_sql_queries
-from sentry_sdk.utils import (
-    capture_internal_exceptions,
-    event_from_exception,
-    transaction_from_function,
-    walk_exception_chain,
-)
-from sentry_sdk.integrations import Integration
-from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.integrations._wsgi_common import RequestExtractor
-from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
-from sentry_sdk.integrations.django.templates import get_template_frame_from_exception
-from sentry_sdk.integrations.django.middleware import patch_django_middlewares
 
 
 if DJANGO_VERSION < (1, 10):
@@ -87,6 +91,10 @@ class DjangoIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+
+        if DJANGO_VERSION < (1, 6):
+            raise DidNotEnable("Django 1.6 or newer is required.")
+
         install_sql_hook()
         # Patch in our custom middleware.
 
@@ -417,17 +425,17 @@ def _set_user_info(request, event):
         return
 
     try:
-        user_info["id"] = str(user.pk)
+        user_info.setdefault("id", str(user.pk))
     except Exception:
         pass
 
     try:
-        user_info["email"] = user.email
+        user_info.setdefault("email", user.email)
     except Exception:
         pass
 
     try:
-        user_info["username"] = user.get_username()
+        user_info.setdefault("username", user.get_username())
     except Exception:
         pass
 

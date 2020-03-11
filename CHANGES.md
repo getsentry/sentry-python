@@ -27,6 +27,11 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.14.2
+
+* Fix a crash in Django Channels instrumentation when SDK is reinitialized.
+* More contextual data for AWS Lambda (cloudwatch logs link).
+
 ## 0.14.1
 
 * Fix a crash in the Django integration when used in combination with Django Rest Framework's test utilities for request.

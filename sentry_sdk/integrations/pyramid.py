@@ -208,7 +208,7 @@ def _make_event_processor(weak_request, integration):
         if _should_send_default_pii():
             with capture_internal_exceptions():
                 user_info = event.setdefault("user", {})
-                user_info["id"] = authenticated_userid(request)
+                user_info.setdefault("id", authenticated_userid(request))
 
         return event
 
