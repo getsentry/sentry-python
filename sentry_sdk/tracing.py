@@ -391,7 +391,7 @@ class Span(object):
             rv["transaction"] = transaction
 
         if self.status:
-            self._tags['status'] = self.status
+            self._tags["status"] = self.status
 
         tags = self._tags
         if tags:
