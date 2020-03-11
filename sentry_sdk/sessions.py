@@ -6,6 +6,7 @@ from threading import Thread, Lock
 from contextlib import contextmanager
 
 from sentry_sdk._types import MYPY
+from sentry_sdk.utils import format_timestamp
 
 if MYPY:
     import sentry_sdk
@@ -31,13 +32,6 @@ def auto_session_tracking(hub):
     finally:
         if should_track:
             hub.end_session()
-
-
-def _timestamp(
-    dt,  # type: datetime
-):
-    # type: (...) -> str
-    return dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def _make_uuid(
@@ -216,8 +210,8 @@ class Session(object):
         rv = {
             "sid": str(self.sid),
             "init": True,
-            "started": _timestamp(self.started),
-            "timestamp": _timestamp(self.timestamp),
+            "started": format_timestamp(self.started),
+            "timestamp": format_timestamp(self.timestamp),
             "status": self.status,
         }  # type: Dict[str, Any]
         if self.errors:
