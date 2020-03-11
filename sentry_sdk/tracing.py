@@ -103,6 +103,7 @@ class Span(object):
         "description",
         "start_timestamp",
         "_start_timestamp_monotonic",
+        "status",
         "timestamp",
         "_tags",
         "_data",
@@ -122,6 +123,7 @@ class Span(object):
         op=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
         hub=None,  # type: Optional[sentry_sdk.Hub]
+        status=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -132,6 +134,7 @@ class Span(object):
         self.transaction = transaction
         self.op = op
         self.description = description
+        self.status = status
         self.hub = hub
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
@@ -183,7 +186,7 @@ class Span(object):
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         if value is not None:
-            self._tags.setdefault("status", "internal_error")
+            self.set_status("internal_error")
 
         hub, scope, old_span = self._context_manager_state
         del self._context_manager_state
@@ -272,7 +275,7 @@ class Span(object):
 
     def set_status(self, value):
         # type: (str) -> None
-        self.set_tag("status", value)
+        self.status = value
 
     def set_http_status(self, http_status):
         # type: (int) -> None
@@ -309,7 +312,7 @@ class Span(object):
 
     def is_success(self):
         # type: () -> bool
-        return self._tags.get("status") == "ok"
+        return self.status == "ok"
 
     def finish(self, hub=None):
         # type: (Optional[sentry_sdk.Hub]) -> Optional[str]
@@ -387,6 +390,9 @@ class Span(object):
         if transaction:
             rv["transaction"] = transaction
 
+        if self.status:
+            self._tags['status'] = self.status
+
         tags = self._tags
         if tags:
             rv["tags"] = tags
@@ -406,9 +412,8 @@ class Span(object):
             "op": self.op,
             "description": self.description,
         }
-
-        if "status" in self._tags:
-            rv["status"] = self._tags.pop("status")
+        if self.status:
+            rv["status"] = self.status
 
         return rv
 
