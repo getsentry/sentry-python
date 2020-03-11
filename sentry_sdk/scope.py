@@ -353,6 +353,7 @@ class Scope(object):
         tags=None,  # type: Optional[Dict[str, str]]
         fingerprint=None,  # type: Optional[List[str]]
     ):
+        # type: (...) -> None
         if level is not None:
             self._level = level
         if user is not None:
