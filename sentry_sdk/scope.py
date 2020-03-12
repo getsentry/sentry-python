@@ -87,6 +87,7 @@ class Scope(object):
         "_should_capture",
         "_span",
         "_session",
+        "_force_auto_session_tracking",
     )
 
     def __init__(self):
@@ -114,6 +115,7 @@ class Scope(object):
 
         self._span = None  # type: Optional[Span]
         self._session = None  # type: Optional[Session]
+        self._force_auto_session_tracking = None  # type: Optional[bool]
 
     @_attr_setter
     def level(self, value):
@@ -168,17 +170,6 @@ class Scope(object):
             span_transaction = span.transaction
             if span_transaction:
                 self._transaction = span_transaction
-
-    @property
-    def session(self):
-        # type: () -> Optional[Session]
-        """Get/set current tracing session."""
-        return self._session
-
-    @session.setter
-    def session(self, session):
-        # type: (Optional[Session]) -> None
-        self._session = session
 
     def set_tag(
         self,
@@ -404,6 +395,7 @@ class Scope(object):
         rv._should_capture = self._should_capture
         rv._span = self._span
         rv._session = self._session
+        rv._force_auto_session_tracking = self._force_auto_session_tracking
 
         return rv
 

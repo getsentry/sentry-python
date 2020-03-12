@@ -567,27 +567,47 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return inner()
 
-    def end_session(self):
-        # type: (...) -> None
-        """Ends the current session if there is one."""
-        client, scope = self._stack[-1]
-        session = scope.session
-        if session is not None:
-            session.close()
-            if client is not None:
-                client.capture_session(session)
-        self._stack[-1][1].session = None
-
     def start_session(self):
         # type: (...) -> None
         """Starts a new session."""
         self.end_session()
         client, scope = self._stack[-1]
-        scope.session = Session(
+        scope._session = Session(
             release=client.options["release"] if client else None,
             environment=client.options["environment"] if client else None,
             user=scope._user,
         )
+
+    def end_session(self):
+        # type: (...) -> None
+        """Ends the current session if there is one."""
+        client, scope = self._stack[-1]
+        session = scope._session
+        if session is not None:
+            session.close()
+            if client is not None:
+                client.capture_session(session)
+        self._stack[-1][1]._session = None
+
+    def stop_auto_session_tracking(self):
+        # type: (...) -> None
+        """Stops automatic session tracking.
+
+        This temporarily session tracking for the current scope when called.
+        To resume session tracking call `resume_auto_session_tracking`.
+        """
+        self.end_session()
+        client, scope = self._stack[-1]
+        scope._force_auto_session_tracking = False
+
+    def resume_auto_session_tracking(self):
+        # type: (...) -> None
+        """Resumes automatic session tracking for the current scope if
+        disabled earlier.  This requires that generally automatic session
+        tracking is enabled.
+        """
+        client, scope = self._stack[-1]
+        scope._force_auto_session_tracking = None
 
     def flush(
         self,

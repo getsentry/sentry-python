@@ -54,6 +54,9 @@ class AtexitIntegration(Integration):
             if integration is not None:
                 logger.debug("atexit: shutting down client")
 
+                # If there is a session on the hub, close it now.
+                hub.end_session()
+
                 # If an integration is there, a client has to be there.
                 client = hub.client  # type: Any
                 client.close(callback=integration.callback)
