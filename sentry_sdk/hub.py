@@ -596,8 +596,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         This temporarily session tracking for the current scope when called.
         To resume session tracking call `resume_auto_session_tracking`.
         """
-        if not value:
-            self.end_session()
+        self.end_session()
         client, scope = self._stack[-1]
         scope._force_auto_session_tracking = False
 
