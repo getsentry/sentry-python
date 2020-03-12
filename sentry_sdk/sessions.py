@@ -21,8 +21,8 @@ if MYPY:
 
 
 def is_auto_session_tracking_enabled(hub=None):
-    """Utility function to find out if session tracking is enabled."""
     # type: (Optional[sentry_sdk.Hub]) -> bool
+    """Utility function to find out if session tracking is enabled."""
     if hub is None:
         hub = sentry_sdk.Hub.current
     should_track = hub.scope._force_auto_session_tracking
@@ -34,8 +34,10 @@ def is_auto_session_tracking_enabled(hub=None):
 
 @contextmanager
 def auto_session_tracking(hub=None):
-    """Starts and stops a session automatically around a block."""
     # type: (Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
+    """Starts and stops a session automatically around a block."""
+    if hub is None:
+        hub = sentry_sdk.Hub.current
     should_track = is_auto_session_tracking_enabled(hub)
     if should_track:
         hub.start_session()

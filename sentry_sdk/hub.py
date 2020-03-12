@@ -590,7 +590,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self._stack[-1][1]._session = None
 
     def stop_auto_session_tracking(self):
-        # type: (bool) -> None
+        # type: (...) -> None
         """Stops automatic session tracking.
 
         This temporarily session tracking for the current scope when called.
@@ -601,7 +601,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         scope._force_auto_session_tracking = False
 
     def resume_auto_session_tracking(self):
-        # type: (bool) -> None
+        # type: (...) -> None
         """Resumes automatic session tracking for the current scope if
         disabled earlier.  This requires that generally automatic session
         tracking is enabled.
