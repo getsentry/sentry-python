@@ -320,7 +320,7 @@ class _Client(object):
 
         # whenever we capture an event we also check if the session needs
         # to be updated based on that information.
-        session = scope.session if scope else None
+        session = scope._session if scope else None
         if session:
             self._update_session_from_event(session, event)
 
