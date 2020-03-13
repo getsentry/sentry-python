@@ -224,12 +224,32 @@ class DjangoIntegration(Integration):
                 id(value),
             )
 
+        _patch_db_connect()
         _patch_channels()
         patch_django_middlewares()
 
 
 _DRF_PATCHED = False
 _DRF_PATCH_LOCK = threading.Lock()
+
+
+def _patch_db_connect():
+    from django.db.backends.base.base import BaseDatabaseWrapper
+
+    old_connect = BaseDatabaseWrapper.connect
+
+    def connect(self):
+        hub = Hub.current
+        integration = hub.get_integration(DjangoIntegration)
+        if integration is None:
+            return old_connect(self)
+        else:
+            description = "%s.connect - %s" % (
+                self.settings_dict.get("ENGINE") or "django.db", self.alias)
+            with hub.start_span(op="db", description=description):
+                return old_connect(self)
+
+    BaseDatabaseWrapper.connect = connect
 
 
 def _patch_drf():
