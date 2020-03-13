@@ -234,7 +234,10 @@ _DRF_PATCH_LOCK = threading.Lock()
 
 
 def _patch_db_connect():
-    from django.db.backends.base.base import BaseDatabaseWrapper
+    try:
+        from django.db.backends.base.base import BaseDatabaseWrapper
+    except ImportError:
+        from django.db.backends import BaseDatabaseWrapper
 
     old_connect = BaseDatabaseWrapper.connect
 
