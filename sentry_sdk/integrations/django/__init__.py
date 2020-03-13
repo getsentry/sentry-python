@@ -248,7 +248,9 @@ def _patch_db_connect():
             return old_connect(self)
         else:
             description = "%s.connect - %s" % (
-                self.settings_dict.get("ENGINE") or "django.db", self.alias)
+                self.settings_dict.get("ENGINE") or "django.db",
+                self.alias,
+            )
             with hub.start_span(op="db", description=description):
                 return old_connect(self)
 
