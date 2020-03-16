@@ -13,7 +13,7 @@ def test_orm_queries(sentry_init, capture_events):
     )
     events = capture_events()
 
-    Base = declarative_base()
+    Base = declarative_base()  # noqa: N806
 
     class Person(Base):
         __tablename__ = "person"
@@ -32,7 +32,7 @@ def test_orm_queries(sentry_init, capture_events):
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
 
-    Session = sessionmaker(bind=engine)
+    Session = sessionmaker(bind=engine)  # noqa: N806
     session = Session()
 
     bob = Person(name="Bob")

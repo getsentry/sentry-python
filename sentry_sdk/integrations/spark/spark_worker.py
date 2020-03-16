@@ -76,31 +76,31 @@ def _tag_task_context():
             # type: (Event, Hint) -> Optional[Event]
             with capture_internal_exceptions():
                 integration = Hub.current.get_integration(SparkWorkerIntegration)
-                taskContext = TaskContext.get()
+                task_context = TaskContext.get()
 
-                if integration is None or taskContext is None:
+                if integration is None or task_context is None:
                     return event
 
                 event.setdefault("tags", {}).setdefault(
-                    "stageId", taskContext.stageId()
+                    "stageId", task_context.stageId()
                 )
-                event["tags"].setdefault("partitionId", taskContext.partitionId())
-                event["tags"].setdefault("attemptNumber", taskContext.attemptNumber())
-                event["tags"].setdefault("taskAttemptId", taskContext.taskAttemptId())
+                event["tags"].setdefault("partitionId", task_context.partitionId())
+                event["tags"].setdefault("attemptNumber", task_context.attemptNumber())
+                event["tags"].setdefault("taskAttemptId", task_context.taskAttemptId())
 
-                if taskContext._localProperties:
-                    if "sentry_app_name" in taskContext._localProperties:
+                if task_context._localProperties:
+                    if "sentry_app_name" in task_context._localProperties:
                         event["tags"].setdefault(
-                            "app_name", taskContext._localProperties["sentry_app_name"]
+                            "app_name", task_context._localProperties["sentry_app_name"]
                         )
                         event["tags"].setdefault(
                             "application_id",
-                            taskContext._localProperties["sentry_application_id"],
+                            task_context._localProperties["sentry_application_id"],
                         )
 
-                    if "callSite.short" in taskContext._localProperties:
+                    if "callSite.short" in task_context._localProperties:
                         event.setdefault("extra", {}).setdefault(
-                            "callSite", taskContext._localProperties["callSite.short"]
+                            "callSite", task_context._localProperties["callSite.short"]
                         )
 
             return event

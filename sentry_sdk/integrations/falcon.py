@@ -81,6 +81,9 @@ class SentryFalconMiddleware(object):
             scope.add_event_processor(_make_request_event_processor(req, integration))
 
 
+TRANSACTION_STYLE_VALUES = ("uri_template", "path")
+
+
 class FalconIntegration(Integration):
     identifier = "falcon"
 
@@ -88,7 +91,6 @@ class FalconIntegration(Integration):
 
     def __init__(self, transaction_style="uri_template"):
         # type: (str) -> None
-        TRANSACTION_STYLE_VALUES = ("uri_template", "path")
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
