@@ -464,7 +464,7 @@ def current_stacktrace(with_locals=True):
     __tracebackhide__ = True
     frames = []
 
-    f = sys._getframe()
+    f = sys._getframe()  # type: Optional[FrameType]
     while f is not None:
         if not should_hide_frame(f):
             frames.append(serialize_frame(f, with_locals=with_locals))

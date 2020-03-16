@@ -18,7 +18,7 @@ from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk._compat import iteritems
 
 try:
-    from tornado import version_info as TORNADO_VERSION
+    from tornado import version_info as TORNADO_VERSION  # type: ignore
     from tornado.web import RequestHandler, HTTPError
     from tornado.gen import coroutine
 except ImportError:
@@ -53,7 +53,7 @@ class TornadoIntegration(Integration):
 
         ignore_logger("tornado.access")
 
-        old_execute = RequestHandler._execute
+        old_execute = RequestHandler._execute  # type: ignore
 
         awaitable = iscoroutinefunction(old_execute)
 
@@ -72,7 +72,8 @@ class TornadoIntegration(Integration):
                 with Hub(hub) as hub:
                     with hub.configure_scope() as scope:
                         scope.clear_breadcrumbs()
-                        scope.add_event_processor(_make_event_processor(weak_handler))
+                        processor = _make_event_processor(weak_handler)  # type: ignore
+                        scope.add_event_processor(processor)
                     return await old_execute(self, *args, **kwargs)
 
         else:
@@ -89,20 +90,22 @@ class TornadoIntegration(Integration):
 
                 with Hub(hub) as hub:
                     with hub.configure_scope() as scope:
-                        scope.add_event_processor(_make_event_processor(weak_handler))
+                        scope.clear_breadcrumbs()
+                        processor = _make_event_processor(weak_handler)  # type: ignore
+                        scope.add_event_processor(processor)
                     result = yield from old_execute(self, *args, **kwargs)
                     return result
 
-        RequestHandler._execute = sentry_execute_request_handler
+        RequestHandler._execute = sentry_execute_request_handler  # type: ignore
 
         old_log_exception = RequestHandler.log_exception
 
         def sentry_log_exception(self, ty, value, tb, *args, **kwargs):
             # type: (Any, type, BaseException, Any, *Any, **Any) -> Optional[Any]
             _capture_exception(ty, value, tb)
-            return old_log_exception(self, ty, value, tb, *args, **kwargs)
+            return old_log_exception(self, ty, value, tb, *args, **kwargs)  # type: ignore
 
-        RequestHandler.log_exception = sentry_log_exception
+        RequestHandler.log_exception = sentry_log_exception  # type: ignore
 
 
 def _capture_exception(ty, value, tb):
