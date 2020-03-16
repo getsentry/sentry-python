@@ -13,15 +13,8 @@ if MYPY:
 
     from types import TracebackType
 
-    from mypy_extensions import Arg
-
     Excepthook = Callable[
-        [
-            Arg(Type[BaseException], "type_"),
-            Arg(BaseException, "value"),
-            Arg(TracebackType, "traceback"),
-        ],
-        None,
+        [Type[BaseException], BaseException, TracebackType], Any,
     ]
 
 
