@@ -132,12 +132,9 @@ class HttpTransport(Transport):
             for limit in header.split(","):
                 try:
                     retry_after, categories, _ = limit.strip().split(":", 2)
-                    if retry_after.startswith("+"):
-                        retry_after = datetime.utcnow() + timedelta(
-                            seconds=int(retry_after)
-                        )
-                    else:
-                        retry_after = datetime.utcfromtimestamp(int(retry_after))
+                    retry_after = datetime.utcnow() + timedelta(
+                        seconds=int(retry_after)
+                    )
                     for category in categories.split(";") or (None,):
                         self._disabled_until[category] = retry_after
                 except (LookupError, ValueError):
