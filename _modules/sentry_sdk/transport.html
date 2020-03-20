@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.transport &#8212; sentry-python 0.14.2 documentation</title>
+    <title>sentry_sdk.transport &#8212; sentry-python 0.14.3 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -43,6 +43,7 @@
 
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">Dsn</span><span class="p">,</span> <span class="n">logger</span><span class="p">,</span> <span class="n">capture_internal_exceptions</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.worker</span> <span class="kn">import</span> <span class="n">BackgroundWorker</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.envelope</span> <span class="kn">import</span> <span class="n">Envelope</span><span class="p">,</span> <span class="n">get_event_data_category</span>
 
 <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">MYPY</span>
 
@@ -91,6 +92,19 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
 
+<div class="viewcode-block" id="Transport.capture_envelope"><a class="viewcode-back" href="../../api.html#sentry_sdk.Transport.capture_envelope">[docs]</a>    <span class="k">def</span> <span class="nf">capture_envelope</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span>  <span class="c1"># type: Envelope</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; None</span>
+        <span class="sd">&quot;&quot;&quot;This gets invoked with an envelope when an event should</span>
+<span class="sd">        be sent to sentry.  The default implementation invokes `capture_event`</span>
+<span class="sd">        if the envelope contains an event and ignores all other envelopes.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">event</span> <span class="o">=</span> <span class="n">envelope</span><span class="o">.</span><span class="n">get_event</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
 <div class="viewcode-block" id="Transport.flush"><a class="viewcode-back" href="../../api.html#sentry_sdk.Transport.flush">[docs]</a>    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">timeout</span><span class="p">,</span>  <span class="c1"># type: float</span>
@@ -126,7 +140,7 @@
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span> <span class="o">=</span> <span class="n">BackgroundWorker</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_auth</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">to_auth</span><span class="p">(</span><span class="s2">&quot;sentry.python/</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">VERSION</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[datetime]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[Any, datetime]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_retry</span> <span class="o">=</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">Retry</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
 
@@ -141,14 +155,80 @@
 
         <span class="bp">self</span><span class="o">.</span><span class="n">hub_cls</span> <span class="o">=</span> <span class="n">Hub</span>
 
+    <span class="k">def</span> <span class="nf">_update_rate_limits</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">response</span><span class="p">):</span>
+        <span class="c1"># type: (urllib3.HTTPResponse) -&gt; None</span>
+
+        <span class="c1"># new sentries with more rate limit insights.  We honor this header</span>
+        <span class="c1"># no matter of the status code to update our internal rate limits.</span>
+        <span class="n">header</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;x-sentry-rate-limit&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">header</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">limit</span> <span class="ow">in</span> <span class="n">header</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">retry_after</span><span class="p">,</span> <span class="n">categories</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">limit</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+                    <span class="n">retry_after</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span>
+                        <span class="n">seconds</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">retry_after</span><span class="p">)</span>
+                    <span class="p">)</span>
+                    <span class="k">for</span> <span class="n">category</span> <span class="ow">in</span> <span class="n">categories</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;;&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="kc">None</span><span class="p">,):</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span><span class="p">[</span><span class="n">category</span><span class="p">]</span> <span class="o">=</span> <span class="n">retry_after</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">LookupError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+                    <span class="k">continue</span>
+
+        <span class="c1"># old sentries only communicate global rate limit hits via the</span>
+        <span class="c1"># retry-after header on 429.  This header can also be emitted on new</span>
+        <span class="c1"># sentries if a proxy in front wants to globally slow things down.</span>
+        <span class="k">elif</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="mi">429</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span><span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span>
+                <span class="n">seconds</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_retry</span><span class="o">.</span><span class="n">get_retry_after</span><span class="p">(</span><span class="n">response</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">60</span>
+            <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_send_request</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">body</span><span class="p">,</span>  <span class="c1"># type: bytes</span>
+        <span class="n">headers</span><span class="p">,</span>  <span class="c1"># type: Dict[str, str]</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; None</span>
+        <span class="n">headers</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;User-Agent&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="o">.</span><span class="n">client</span><span class="p">),</span>
+                <span class="s2">&quot;X-Sentry-Auth&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="o">.</span><span class="n">to_header</span><span class="p">()),</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span><span class="o">.</span><span class="n">request</span><span class="p">(</span>
+            <span class="s2">&quot;POST&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="o">.</span><span class="n">store_api_url</span><span class="p">),</span> <span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span>
+        <span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_update_rate_limits</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="mi">429</span><span class="p">:</span>
+                <span class="c1"># if we hit a 429.  Something was rate limited but we already</span>
+                <span class="c1"># acted on this in `self._update_rate_limits`.</span>
+                <span class="k">pass</span>
+
+            <span class="k">elif</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">&gt;=</span> <span class="mi">300</span> <span class="ow">or</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">&lt;</span> <span class="mi">200</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                    <span class="s2">&quot;Unexpected status code: </span><span class="si">%s</span><span class="s2"> (body: </span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span>
+                    <span class="n">response</span><span class="o">.</span><span class="n">status</span><span class="p">,</span>
+                    <span class="n">response</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+                <span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">response</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_check_disabled</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">category</span><span class="p">):</span>
+        <span class="c1"># type: (str) -&gt; bool</span>
+        <span class="k">def</span> <span class="nf">_disabled</span><span class="p">(</span><span class="n">bucket</span><span class="p">):</span>
+            <span class="c1"># type: (Any) -&gt; bool</span>
+            <span class="n">ts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">bucket</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">ts</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">ts</span> <span class="o">&gt;</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">_disabled</span><span class="p">(</span><span class="n">category</span><span class="p">)</span> <span class="ow">or</span> <span class="n">_disabled</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+
     <span class="k">def</span> <span class="nf">_send_event</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">event</span>  <span class="c1"># type: Event</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span><span class="p">:</span>
-                <span class="k">return</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_disabled</span><span class="p">(</span><span class="n">get_event_data_category</span><span class="p">(</span><span class="n">event</span><span class="p">)):</span>
+            <span class="k">return</span> <span class="kc">None</span>
 
         <span class="n">body</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
         <span class="k">with</span> <span class="n">gzip</span><span class="o">.</span><span class="n">GzipFile</span><span class="p">(</span><span class="n">fileobj</span><span class="o">=</span><span class="n">body</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
@@ -165,35 +245,43 @@
                 <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="p">)</span>
-        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span><span class="o">.</span><span class="n">request</span><span class="p">(</span>
-            <span class="s2">&quot;POST&quot;</span><span class="p">,</span>
-            <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="o">.</span><span class="n">store_api_url</span><span class="p">),</span>
-            <span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="o">.</span><span class="n">getvalue</span><span class="p">(),</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_send_request</span><span class="p">(</span>
+            <span class="n">body</span><span class="o">.</span><span class="n">getvalue</span><span class="p">(),</span>
+            <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;Content-Type&quot;</span><span class="p">:</span> <span class="s2">&quot;application/json&quot;</span><span class="p">,</span> <span class="s2">&quot;Content-Encoding&quot;</span><span class="p">:</span> <span class="s2">&quot;gzip&quot;</span><span class="p">},</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="nf">_send_envelope</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span>  <span class="c1"># type: Envelope</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; None</span>
+
+        <span class="c1"># remove all items from the envelope which are over quota</span>
+        <span class="n">envelope</span><span class="o">.</span><span class="n">items</span><span class="p">[:]</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">envelope</span><span class="o">.</span><span class="n">items</span> <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_disabled</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">data_category</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">envelope</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">body</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+        <span class="k">with</span> <span class="n">gzip</span><span class="o">.</span><span class="n">GzipFile</span><span class="p">(</span><span class="n">fileobj</span><span class="o">=</span><span class="n">body</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">envelope</span><span class="o">.</span><span class="n">serialize_into</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;Sending envelope [</span><span class="si">%s</span><span class="s2">] project:</span><span class="si">%s</span><span class="s2"> host:</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">envelope</span><span class="o">.</span><span class="n">description</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">project_id</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_send_request</span><span class="p">(</span>
+            <span class="n">body</span><span class="o">.</span><span class="n">getvalue</span><span class="p">(),</span>
             <span class="n">headers</span><span class="o">=</span><span class="p">{</span>
-                <span class="s2">&quot;User-Agent&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="o">.</span><span class="n">client</span><span class="p">),</span>
-                <span class="s2">&quot;X-Sentry-Auth&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="o">.</span><span class="n">to_header</span><span class="p">()),</span>
-                <span class="s2">&quot;Content-Type&quot;</span><span class="p">:</span> <span class="s2">&quot;application/json&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;Content-Type&quot;</span><span class="p">:</span> <span class="s2">&quot;application/x-sentry-envelope&quot;</span><span class="p">,</span>
                 <span class="s2">&quot;Content-Encoding&quot;</span><span class="p">:</span> <span class="s2">&quot;gzip&quot;</span><span class="p">,</span>
             <span class="p">},</span>
         <span class="p">)</span>
-
-        <span class="k">try</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="mi">429</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span>
-                    <span class="n">seconds</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_retry</span><span class="o">.</span><span class="n">get_retry_after</span><span class="p">(</span><span class="n">response</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">60</span>
-                <span class="p">)</span>
-                <span class="k">return</span>
-
-            <span class="k">elif</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">&gt;=</span> <span class="mi">300</span> <span class="ow">or</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">&lt;</span> <span class="mi">200</span><span class="p">:</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-                    <span class="s2">&quot;Unexpected status code: </span><span class="si">%s</span><span class="s2"> (body: </span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span>
-                    <span class="n">response</span><span class="o">.</span><span class="n">status</span><span class="p">,</span>
-                    <span class="n">response</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
-                <span class="p">)</span>
-        <span class="k">finally</span><span class="p">:</span>
-            <span class="n">response</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="kc">None</span>
 
     <span class="k">def</span> <span class="nf">_get_pool_options</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ca_certs</span><span class="p">):</span>
         <span class="c1"># type: (Optional[Any]) -&gt; Dict[str, Any]</span>
@@ -241,6 +329,20 @@
                     <span class="bp">self</span><span class="o">.</span><span class="n">_send_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">send_event_wrapper</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="HttpTransport.capture_envelope"><a class="viewcode-back" href="../../api.html#sentry_sdk.HttpTransport.capture_envelope">[docs]</a>    <span class="k">def</span> <span class="nf">capture_envelope</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span>  <span class="c1"># type: Envelope</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; None</span>
+        <span class="n">hub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hub_cls</span><span class="o">.</span><span class="n">current</span>
+
+        <span class="k">def</span> <span class="nf">send_envelope_wrapper</span><span class="p">():</span>
+            <span class="c1"># type: () -&gt; None</span>
+            <span class="k">with</span> <span class="n">hub</span><span class="p">:</span>
+                <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_send_envelope</span><span class="p">(</span><span class="n">envelope</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">send_envelope_wrapper</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="HttpTransport.flush"><a class="viewcode-back" href="../../api.html#sentry_sdk.HttpTransport.flush">[docs]</a>    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
