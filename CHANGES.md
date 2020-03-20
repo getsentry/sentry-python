@@ -27,6 +27,13 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.14.3
+
+* Attempt to use a monotonic clock to measure span durations in Performance/APM.
+* Avoid overwriting explicitly set user data in web framework integrations.
+* Allow to pass keyword arguments to `capture_event` instead of configuring the scope.
+* Feature development for session tracking.
+
 ## 0.14.2
 
 * Fix a crash in Django Channels instrumentation when SDK is reinitialized.
