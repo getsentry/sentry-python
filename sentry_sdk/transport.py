@@ -15,16 +15,21 @@ from sentry_sdk.envelope import Envelope, get_event_data_category
 from sentry_sdk._types import MYPY
 
 if MYPY:
-    from typing import Type
     from typing import Any
-    from typing import Optional
-    from typing import Dict
-    from typing import Union
     from typing import Callable
+    from typing import Dict
+    from typing import Iterable
+    from typing import Optional
+    from typing import Tuple
+    from typing import Type
+    from typing import Union
+
     from urllib3.poolmanager import PoolManager  # type: ignore
     from urllib3.poolmanager import ProxyManager
 
     from sentry_sdk._types import Event
+
+    DataCategory = Optional[str]
 
 try:
     from urllib.request import getproxies
@@ -94,6 +99,21 @@ class Transport(object):
             pass
 
 
+def _parse_rate_limits(header, now=None):
+    # type: (Any, Optional[datetime]) -> Iterable[Tuple[DataCategory, datetime]]
+    if now is None:
+        now = datetime.utcnow()
+
+    for limit in header.split(","):
+        try:
+            retry_after, categories, _ = limit.strip().split(":", 2)
+            retry_after = now + timedelta(seconds=int(retry_after))
+            for category in categories and categories.split(";") or (None,):
+                yield category, retry_after
+        except (LookupError, ValueError):
+            continue
+
+
 class HttpTransport(Transport):
     """The default HTTP transport."""
 
@@ -107,7 +127,7 @@ class HttpTransport(Transport):
         assert self.parsed_dsn is not None
         self._worker = BackgroundWorker()
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
-        self._disabled_until = {}  # type: Dict[Any, datetime]
+        self._disabled_until = {}  # type: Dict[DataCategory, datetime]
         self._retry = urllib3.util.Retry()
         self.options = options
 
@@ -129,16 +149,7 @@ class HttpTransport(Transport):
         # no matter of the status code to update our internal rate limits.
         header = response.headers.get("x-sentry-rate-limit")
         if header:
-            for limit in header.split(","):
-                try:
-                    retry_after, categories, _ = limit.strip().split(":", 2)
-                    retry_after = datetime.utcnow() + timedelta(
-                        seconds=int(retry_after)
-                    )
-                    for category in categories.split(";") or (None,):
-                        self._disabled_until[category] = retry_after
-                except (LookupError, ValueError):
-                    continue
+            self._disabled_until.update(_parse_rate_limits(header))
 
         # old sentries only communicate global rate limit hits via the
         # retry-after header on 429.  This header can also be emitted on new
