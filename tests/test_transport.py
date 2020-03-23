@@ -8,6 +8,7 @@ import pytest
 
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message
 from sentry_sdk.transport import _parse_rate_limits
+from sentry_sdk.integrations.logging import LoggingIntegration
 
 
 @pytest.fixture(params=[True, False])
@@ -55,6 +56,23 @@ def test_transport_works(
     assert httpserver.requests
 
     assert any("Sending event" in record.msg for record in caplog.records) == debug
+
+
+def test_transport_infinite_loop(httpserver, request):
+    httpserver.serve_content("ok", 200)
+
+    client = Client(
+        "http://foobar@{}/123".format(httpserver.url[len("http://") :]),
+        debug=True,
+        # Make sure we cannot create events from our own logging
+        integrations=[LoggingIntegration(event_level=logging.DEBUG)],
+    )
+
+    with Hub(client):
+        capture_message("hi")
+        client.flush()
+
+    assert len(httpserver.requests) == 1
 
 
 NOW = datetime(2014, 6, 2)
