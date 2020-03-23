@@ -140,3 +140,30 @@ def test_data_category_limits(httpserver, capsys, caplog, response_code):
     client.flush()
 
     assert len(httpserver.requests) == 1
+
+
+@pytest.mark.parametrize("response_code", [200, 429])
+def test_complex_limits_without_data_category(
+    httpserver, capsys, caplog, response_code
+):
+    client = Client(
+        dict(dsn="http://foobar@{}/123".format(httpserver.url[len("http://") :]))
+    )
+    httpserver.serve_content(
+        "hm", response_code, headers={"X-Sentry-Rate-Limit": "4711::organization"},
+    )
+
+    client.capture_event({"type": "transaction"})
+    client.flush()
+
+    assert len(httpserver.requests) == 1
+    del httpserver.requests[:]
+
+    assert set(client.transport._disabled_until) == set([None])
+
+    client.transport.capture_event({"type": "transaction"})
+    client.transport.capture_event({"type": "transaction"})
+    client.capture_event({"type": "event"})
+    client.flush()
+
+    assert len(httpserver.requests) == 0
