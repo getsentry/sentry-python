@@ -150,6 +150,9 @@ def _capture_exception(exception):
     # If an integration is there, a client has to be there.
     client = hub.client  # type: Any
 
+    if client and exception in client.ignore_errors:
+        return
+
     with capture_internal_exceptions():
         event, hint = event_from_exception(
             exception,
