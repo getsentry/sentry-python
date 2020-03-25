@@ -24,7 +24,13 @@ if MYPY:
 DEFAULT_LEVEL = logging.INFO
 DEFAULT_EVENT_LEVEL = logging.ERROR
 
-_IGNORED_LOGGERS = set(["sentry_sdk.errors"])
+# Capturing events from those loggers causes recursion errors. We cannot allow
+# the user to unconditionally create events from those loggers under any
+# circumstances.
+#
+# Note: Ignoring by logger name here is better than mucking with thread-locals.
+# We do not necessarily know whether thread-locals work 100% correctly in the user's environment.
+_IGNORED_LOGGERS = set(["sentry_sdk.errors", "urllib3.connectionpool"])
 
 
 def ignore_logger(
