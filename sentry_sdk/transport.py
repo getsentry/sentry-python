@@ -147,7 +147,7 @@ class HttpTransport(Transport):
 
         # new sentries with more rate limit insights.  We honor this header
         # no matter of the status code to update our internal rate limits.
-        header = response.headers.get("x-sentry-rate-limit")
+        header = response.headers.get("x-sentry-rate-limits")
         if header:
             self._disabled_until.update(_parse_rate_limits(header))
 

@@ -137,7 +137,7 @@ def test_data_category_limits(httpserver, capsys, caplog, response_code):
     httpserver.serve_content(
         "hm",
         response_code,
-        headers={"X-Sentry-Rate-Limit": "4711:transaction:organization"},
+        headers={"X-Sentry-Rate-Limits": "4711:transaction:organization"},
     )
 
     client.capture_event({"type": "transaction"})
@@ -168,7 +168,7 @@ def test_complex_limits_without_data_category(
         dict(dsn="http://foobar@{}/123".format(httpserver.url[len("http://") :]))
     )
     httpserver.serve_content(
-        "hm", response_code, headers={"X-Sentry-Rate-Limit": "4711::organization"},
+        "hm", response_code, headers={"X-Sentry-Rate-Limits": "4711::organization"},
     )
 
     client.capture_event({"type": "transaction"})
