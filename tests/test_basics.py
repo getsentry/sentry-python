@@ -6,6 +6,7 @@ from sentry_sdk import (
     Client,
     push_scope,
     configure_scope,
+    capture_event,
     capture_exception,
     capture_message,
     add_breadcrumb,
@@ -312,3 +313,12 @@ def test_scope_event_processor_order(sentry_init, capture_events):
     (event,) = events
 
     assert event["message"] == "hifoobarbaz"
+
+
+def test_capture_event_with_scope_kwargs(sentry_init, capture_events):
+    sentry_init(debug=True)
+    events = capture_events()
+    capture_event({}, level="info", extras={"foo": "bar"})
+    (event,) = events
+    assert event["level"] == "info"
+    assert event["extra"]["foo"] == "bar"

@@ -67,7 +67,7 @@ def _update_scope(base, scope_change, scope_kwargs):
             final_scope.update_from_scope(scope_change)
     elif scope_kwargs:
         final_scope = copy.copy(base)
-        final_scope.update_from_kwargs(scope_kwargs)
+        final_scope.update_from_kwargs(**scope_kwargs)
     else:
         final_scope = base
     return final_scope
