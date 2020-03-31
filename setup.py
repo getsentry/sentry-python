@@ -32,7 +32,7 @@ setup(
         "sanic": ["sanic>=0.8"],
         "celery": ["celery>=3"],
         "beam": ["beam>=2.12"],
-        "rq": ["0.6"],
+        "rq": ["rq>=0.6"],
         "aiohttp": ["aiohttp>=3.5"],
         "tornado": ["tornado>=5"],
         "sqlalchemy": ["sqlalchemy>=1.2"],
