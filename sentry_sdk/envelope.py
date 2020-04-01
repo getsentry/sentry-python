@@ -86,7 +86,7 @@ class Envelope(object):
         self, f  # type: Any
     ):
         # type: (...) -> None
-        f.write(json.dumps(self.headers).encode("utf-8"))
+        f.write(json.dumps(self.headers, allow_nan=False).encode("utf-8"))
         f.write(b"\n")
         for item in self.items:
             item.serialize_into(f)
@@ -142,7 +142,7 @@ class PayloadRef(object):
                 with open(self.path, "rb") as f:
                     self.bytes = f.read()
             elif self.json is not None:
-                self.bytes = json.dumps(self.json).encode("utf-8")
+                self.bytes = json.dumps(self.json, allow_nan=False).encode("utf-8")
             else:
                 self.bytes = b""
         return self.bytes
@@ -256,7 +256,7 @@ class Item(object):
         headers = dict(self.headers)
         length, writer = self.payload._prepare_serialize()
         headers["length"] = length
-        f.write(json.dumps(headers).encode("utf-8"))
+        f.write(json.dumps(headers, allow_nan=False).encode("utf-8"))
         f.write(b"\n")
         writer(f)
         f.write(b"\n")
