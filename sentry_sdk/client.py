@@ -2,6 +2,7 @@ import os
 import uuid
 import random
 from datetime import datetime
+from itertools import islice
 import socket
 
 from sentry_sdk._compat import string_types, text_type, iteritems
@@ -99,10 +100,15 @@ class _Client(object):
         def _send_sessions(sessions):
             # type: (List[Any]) -> None
             transport = self.transport
-            if sessions and transport:
+            if not transport or not sessions:
+                return
+            sessions_iter = iter(sessions)
+            while True:
                 envelope = Envelope()
-                for session in sessions:
+                for session in islice(sessions_iter, 100):
                     envelope.add_session(session)
+                if not envelope.items:
+                    break
                 transport.capture_envelope(envelope)
 
         try:

@@ -170,6 +170,7 @@ class Session(object):
         sid=None,  # type: Optional[Union[str, uuid.UUID]]
         did=None,  # type: Optional[str]
         timestamp=None,  # type: Optional[datetime]
+        started=None,  # type: Optional[datetime]
         duration=None,  # type: Optional[float]
         status=None,  # type: Optional[SessionStatus]
         release=None,  # type: Optional[str]
@@ -194,6 +195,8 @@ class Session(object):
         if timestamp is None:
             timestamp = datetime.utcnow()
         self.timestamp = timestamp
+        if started is not None:
+            self.started = started
         if duration is not None:
             self.duration = duration
         if release is not None:
