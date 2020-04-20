@@ -71,46 +71,41 @@ class AioHttpIntegration(Integration):
 
         async def sentry_app_handle(self, request, *args, **kwargs):
             # type: (Any, Request, *Any, **Any) -> Any
-            async def inner():
-                # type: () -> Any
-                hub = Hub.current
-                if hub.get_integration(AioHttpIntegration) is None:
-                    return await old_handle(self, request, *args, **kwargs)
+            hub = Hub.current
+            if hub.get_integration(AioHttpIntegration) is None:
+                return await old_handle(self, request, *args, **kwargs)
 
-                weak_request = weakref.ref(request)
+            weak_request = weakref.ref(request)
 
-                with Hub(Hub.current) as hub:
-                    with hub.configure_scope() as scope:
-                        scope.clear_breadcrumbs()
-                        scope.add_event_processor(_make_request_processor(weak_request))
+            with Hub(Hub.current) as hub:
+                # Scope data will not leak between requests because aiohttp
+                # create a task to wrap each request.
+                with hub.configure_scope() as scope:
+                    scope.clear_breadcrumbs()
+                    scope.add_event_processor(_make_request_processor(weak_request))
 
-                    span = Span.continue_from_headers(request.headers)
-                    span.op = "http.server"
-                    # If this transaction name makes it to the UI, AIOHTTP's
-                    # URL resolver did not find a route or died trying.
-                    span.transaction = "generic AIOHTTP request"
+                span = Span.continue_from_headers(request.headers)
+                span.op = "http.server"
+                # If this transaction name makes it to the UI, AIOHTTP's
+                # URL resolver did not find a route or died trying.
+                span.transaction = "generic AIOHTTP request"
 
-                    with hub.start_span(span):
-                        try:
-                            response = await old_handle(self, request)
-                        except HTTPException as e:
-                            span.set_http_status(e.status_code)
-                            raise
-                        except asyncio.CancelledError:
-                            span.set_status("cancelled")
-                            raise
-                        except Exception:
-                            # This will probably map to a 500 but seems like we
-                            # have no way to tell. Do not set span status.
-                            reraise(*_capture_exception(hub))
+                with hub.start_span(span):
+                    try:
+                        response = await old_handle(self, request)
+                    except HTTPException as e:
+                        span.set_http_status(e.status_code)
+                        raise
+                    except asyncio.CancelledError:
+                        span.set_status("cancelled")
+                        raise
+                    except Exception:
+                        # This will probably map to a 500 but seems like we
+                        # have no way to tell. Do not set span status.
+                        reraise(*_capture_exception(hub))
 
-                        span.set_http_status(response.status)
-                        return response
-
-            # Explicitly wrap in task such that current contextvar context is
-            # copied. Just doing `return await inner()` will leak scope data
-            # between requests.
-            return await asyncio.get_event_loop().create_task(inner())
+                    span.set_http_status(response.status)
+                    return response
 
         Application._handle = sentry_app_handle
 
