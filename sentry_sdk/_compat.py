@@ -87,6 +87,6 @@ def check_thread_support():
                 "We detected the use of uwsgi with disabled threads.  "
                 "This will cause issues with the transport you are "
                 "trying to use.  Please enable threading for uwsgi.  "
-                '(Enable the "enable-threads" flag).'
+                '(Add the "enable-threads" flag).'
             )
         )
