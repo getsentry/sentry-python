@@ -92,9 +92,7 @@ class SentryAsgiMiddleware:
                 with hub.configure_scope() as sentry_scope:
                     sentry_scope.clear_breadcrumbs()
                     sentry_scope._name = "asgi"
-                    processor = functools.partial(
-                        self.event_processor, asgi_scope=scope
-                    )
+                    processor = partial(self.event_processor, asgi_scope=scope)
                     sentry_scope.add_event_processor(processor)
 
                 if scope["type"] in ("http", "websocket"):

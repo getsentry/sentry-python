@@ -1,5 +1,4 @@
 import threading
-import functools
 
 import pytest
 
@@ -314,9 +313,7 @@ def test_transport_shutdown(request, celery, capture_events_forksafe, tmpdir):
 
 @pytest.mark.forked
 @pytest.mark.parametrize("newrelic_order", ["sentry_first", "sentry_last"])
-def test_newrelic_interference(
-    capture_events, init_celery, newrelic_order, celery_invocation
-):
+def test_newrelic_interference(init_celery, newrelic_order, celery_invocation):
     def instrument_newrelic():
         import celery.app.trace as celery_mod
         from newrelic.hooks.application_celery import instrument_celery_execute_trace
@@ -332,8 +329,6 @@ def test_newrelic_interference(
         celery = init_celery()
     else:
         raise ValueError(newrelic_order)
-
-    events = capture_events()
 
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self, x, y):
