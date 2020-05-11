@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 import sys
 import types
-from functools import wraps
+from sentry_sdk._functools import wraps
 
 from sentry_sdk.hub import Hub
 from sentry_sdk._compat import reraise

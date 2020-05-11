@@ -5,10 +5,10 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`_.
 """
 
 import asyncio
-import functools
 import inspect
 import urllib
 
+from sentry_sdk._functools import partial
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers

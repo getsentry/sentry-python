@@ -1,9 +1,9 @@
-import functools
 import sys
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import event_from_exception
 from sentry_sdk._compat import reraise
+from sentry_sdk._functools import wraps
 
 
 from sentry_sdk._types import MYPY
@@ -42,7 +42,7 @@ def serverless_function(f=None, flush=True):  # noqa
     # type: (Optional[F], bool) -> Union[F, Callable[[F], F]]
     def wrapper(f):
         # type: (F) -> F
-        @functools.wraps(f)
+        @wraps(f)
         def inner(*args, **kwargs):
             # type: (*Any, **Any) -> Any
             with Hub(Hub.current) as hub:

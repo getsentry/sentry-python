@@ -2,18 +2,12 @@
 Create spans from Django middleware invocations
 """
 
-from functools import wraps
-
 from django import VERSION as DJANGO_VERSION
 
 from sentry_sdk import Hub
-from sentry_sdk.utils import (
-    ContextVar,
-    transaction_from_function,
-    capture_internal_exceptions,
-)
-
+from sentry_sdk._functools import wraps
 from sentry_sdk._types import MYPY
+from sentry_sdk.utils import ( ContextVar, transaction_from_function, capture_internal_exceptions,)
 
 if MYPY:
     from typing import Any
