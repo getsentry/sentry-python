@@ -1,4 +1,5 @@
-""" A backport of Python 3 functools to Python 2/3. The only important change
+"""
+A backport of Python 3 functools to Python 2/3. The only important change
 we rely upon is that `update_wrapper` handles AttributeError gracefully.
 """
 
