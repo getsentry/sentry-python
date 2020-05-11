@@ -6,4 +6,4 @@ pytest-localserver==0.5.0
 pytest-cov==2.8.1
 gevent==20.5.0
 eventlet==0.25.2
-newrelic==5.12
+newrelic==5.12.1.141
