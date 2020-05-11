@@ -4,6 +4,6 @@ tox==3.7.0
 Werkzeug==0.15.5
 pytest-localserver==0.5.0
 pytest-cov==2.8.1
-gevent==20.5.0
-eventlet==0.25.2
+gevent
+eventlet
 newrelic==5.12.1.141
