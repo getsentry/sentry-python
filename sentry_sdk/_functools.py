@@ -4,13 +4,19 @@ we rely upon is that `update_wrapper` handles AttributeError gracefully.
 
 from functools import partial
 
-WRAPPER_ASSIGNMENTS = ('__module__', '__name__', '__qualname__', '__doc__',
-                       '__annotations__')
-WRAPPER_UPDATES = ('__dict__',)
-def update_wrapper(wrapper,
-                   wrapped,
-                   assigned = WRAPPER_ASSIGNMENTS,
-                   updated = WRAPPER_UPDATES):
+WRAPPER_ASSIGNMENTS = (
+    "__module__",
+    "__name__",
+    "__qualname__",
+    "__doc__",
+    "__annotations__",
+)
+WRAPPER_UPDATES = ("__dict__",)
+
+
+def update_wrapper(
+    wrapper, wrapped, assigned=WRAPPER_ASSIGNMENTS, updated=WRAPPER_UPDATES
+):
     """Update a wrapper function to look like the wrapped function
 
        wrapper is the function to be updated
@@ -37,9 +43,8 @@ def update_wrapper(wrapper,
     # Return the wrapper so this can be used as a decorator via partial()
     return wrapper
 
-def wraps(wrapped,
-          assigned = WRAPPER_ASSIGNMENTS,
-          updated = WRAPPER_UPDATES):
+
+def wraps(wrapped, assigned=WRAPPER_ASSIGNMENTS, updated=WRAPPER_UPDATES):
     """Decorator factory to apply update_wrapper() to a wrapper function
 
        Returns a decorator that invokes update_wrapper() with the decorated
@@ -48,5 +53,4 @@ def wraps(wrapped,
        This is a convenience function to simplify applying partial() to
        update_wrapper().
     """
-    return partial(update_wrapper, wrapped=wrapped,
-                   assigned=assigned, updated=updated)
+    return partial(update_wrapper, wrapped=wrapped, assigned=assigned, updated=updated)

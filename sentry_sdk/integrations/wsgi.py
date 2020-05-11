@@ -121,9 +121,7 @@ class SentryWsgiMiddleware(object):
                         try:
                             rv = self.app(
                                 environ,
-                                partial(
-                                    _sentry_start_response, start_response, span
-                                ),
+                                partial(_sentry_start_response, start_response, span),
                             )
                         except BaseException:
                             reraise(*_capture_exception(hub))

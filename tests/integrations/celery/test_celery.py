@@ -55,7 +55,7 @@ def celery(init_celery):
         lambda task, x, y: (
             task.apply_async(kwargs=dict(x=x, y=y)),
             {"args": [], "kwargs": {"x": x, "y": y}},
-        )
+        ),
     ]
 )
 def celery_invocation(request):
@@ -314,14 +314,15 @@ def test_transport_shutdown(request, celery, capture_events_forksafe, tmpdir):
 
 @pytest.mark.forked
 @pytest.mark.parametrize("newrelic_order", ["sentry_first", "sentry_last"])
-def test_newrelic_interference(capture_events, init_celery, newrelic_order, celery_invocation):
+def test_newrelic_interference(
+    capture_events, init_celery, newrelic_order, celery_invocation
+):
     def instrument_newrelic():
         import celery.app.trace as celery_mod
         from newrelic.hooks.application_celery import instrument_celery_execute_trace
+
         assert hasattr(celery_mod, "build_tracer")
         instrument_celery_execute_trace(celery_mod)
-
-
 
     if newrelic_order == "sentry_first":
         celery = init_celery()
