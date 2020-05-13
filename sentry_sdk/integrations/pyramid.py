@@ -72,8 +72,17 @@ class PyramidIntegration(Integration):
             # type: (Any, Request, *Any, **Any) -> Response
             hub = Hub.current
             integration = hub.get_integration(PyramidIntegration)
+
             if integration is not None:
                 with hub.configure_scope() as scope:
+                    try:
+                        if integration.transaction_style == "route_name":
+                            scope.transaction = request.matched_route.name
+                        elif integration.transaction_style == "route_pattern":
+                            scope.transaction = request.matched_route.pattern
+                    except Exception:
+                        pass
+
                     scope.add_event_processor(
                         _make_event_processor(weakref.ref(request), integration)
                     )
@@ -195,14 +204,6 @@ def _make_event_processor(weak_request, integration):
         request = weak_request()
         if request is None:
             return event
-
-        try:
-            if integration.transaction_style == "route_name":
-                event["transaction"] = request.matched_route.name
-            elif integration.transaction_style == "route_pattern":
-                event["transaction"] = request.matched_route.pattern
-        except Exception:
-            pass
 
         with capture_internal_exceptions():
             PyramidRequestExtractor(request).extract_into_event(event)
