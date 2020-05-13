@@ -5,10 +5,10 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`_.
 """
 
 import asyncio
-import functools
 import inspect
 import urllib
 
+from sentry_sdk._functools import partial
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
@@ -92,9 +92,7 @@ class SentryAsgiMiddleware:
                 with hub.configure_scope() as sentry_scope:
                     sentry_scope.clear_breadcrumbs()
                     sentry_scope._name = "asgi"
-                    processor = functools.partial(
-                        self.event_processor, asgi_scope=scope
-                    )
+                    processor = partial(self.event_processor, asgi_scope=scope)
                     sentry_scope.add_event_processor(processor)
 
                 if scope["type"] in ("http", "websocket"):

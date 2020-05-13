@@ -309,3 +309,30 @@ def test_transport_shutdown(request, celery, capture_events_forksafe, tmpdir):
 
     # if this is nonempty, the worker never really forked
     assert not runs
+
+
+@pytest.mark.forked
+@pytest.mark.parametrize("newrelic_order", ["sentry_first", "sentry_last"])
+def test_newrelic_interference(init_celery, newrelic_order, celery_invocation):
+    def instrument_newrelic():
+        import celery.app.trace as celery_mod
+        from newrelic.hooks.application_celery import instrument_celery_execute_trace
+
+        assert hasattr(celery_mod, "build_tracer")
+        instrument_celery_execute_trace(celery_mod)
+
+    if newrelic_order == "sentry_first":
+        celery = init_celery()
+        instrument_newrelic()
+    elif newrelic_order == "sentry_last":
+        instrument_newrelic()
+        celery = init_celery()
+    else:
+        raise ValueError(newrelic_order)
+
+    @celery.task(name="dummy_task", bind=True)
+    def dummy_task(self, x, y):
+        return x / y
+
+    assert dummy_task.apply(kwargs={"x": 1, "y": 1}).wait() == 1
+    assert celery_invocation(dummy_task, 1, 1)[0].wait() == 1

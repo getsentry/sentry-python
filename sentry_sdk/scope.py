@@ -1,10 +1,10 @@
 from copy import copy
 from collections import deque
-from functools import wraps
 from itertools import chain
 
-from sentry_sdk.utils import logger, capture_internal_exceptions
+from sentry_sdk._functools import wraps
 from sentry_sdk._types import MYPY
+from sentry_sdk.utils import logger, capture_internal_exceptions
 
 if MYPY:
     from typing import Any
