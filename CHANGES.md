@@ -27,6 +27,18 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.14.4
+
+* Fix bugs in transport rate limit enforcement for specific data categories.
+  The bug should not have affected anybody because we do not yet emit rate
+  limits for specific event types/data categories.
+* Fix a bug in `capture_event` where it would crash if given additional kwargs.
+  Thanks to Tatiana Vasilevskaya!
+* Fix a bug where contextvars from the request handler were inaccessible in
+  AIOHTTP error handlers.
+* Fix a bug where the Celery integration would crash if newrelic instrumented Celery as well.
+
+
 ## 0.14.3
 
 * Attempt to use a monotonic clock to measure span durations in Performance/APM.
