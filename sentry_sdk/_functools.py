@@ -5,6 +5,13 @@ we rely upon is that `update_wrapper` handles AttributeError gracefully.
 
 from functools import partial
 
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from typing import Any
+    from typing import Callable
+
+
 WRAPPER_ASSIGNMENTS = (
     "__module__",
     "__name__",
@@ -18,6 +25,7 @@ WRAPPER_UPDATES = ("__dict__",)
 def update_wrapper(
     wrapper, wrapped, assigned=WRAPPER_ASSIGNMENTS, updated=WRAPPER_UPDATES
 ):
+    # type: (Any, Any, Any, Any) -> Any
     """Update a wrapper function to look like the wrapped function
 
        wrapper is the function to be updated
@@ -46,6 +54,7 @@ def update_wrapper(
 
 
 def wraps(wrapped, assigned=WRAPPER_ASSIGNMENTS, updated=WRAPPER_UPDATES):
+    # type: (Callable[..., Any], Any, Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]
     """Decorator factory to apply update_wrapper() to a wrapper function
 
        Returns a decorator that invokes update_wrapper() with the decorated
