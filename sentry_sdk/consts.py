@@ -89,7 +89,6 @@ def _get_default_options():
 DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
-AUTH_VERSION = 7  # type: Final[int]
 VERSION = "0.14.4"
 SDK_INFO = {
     "name": "sentry.python",

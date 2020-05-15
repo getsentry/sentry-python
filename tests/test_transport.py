@@ -9,7 +9,7 @@ import pytest
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message
 from sentry_sdk.transport import _parse_rate_limits
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.consts import VERSION, AUTH_VERSION
+from sentry_sdk.consts import VERSION
 
 
 @pytest.fixture(params=[True, False])
@@ -199,7 +199,7 @@ def test_http_headers(httpserver, capsys, caplog):
     assert request.headers[
         "X_SENTRY_AUTH"
     ] == "Sentry sentry_key=foobar, sentry_version=%s, sentry_client=sentry.python/%s" % (
-        AUTH_VERSION,
+        7,
         VERSION,
     )
 
@@ -226,7 +226,7 @@ def test_http_headers_overrides(httpserver, capsys, caplog):
     assert request.headers[
         "X_SENTRY_AUTH"
     ] == "Sentry sentry_key=foobar, sentry_version=%s, sentry_client=sentry.python/%s" % (
-        AUTH_VERSION,
+        7,
         VERSION,
     )
     assert request.headers["AUTHORIZATION"] == "Bearer MY_TOKEN"

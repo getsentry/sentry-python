@@ -6,7 +6,6 @@ import logging
 from datetime import datetime
 
 import sentry_sdk
-from sentry_sdk.consts import AUTH_VERSION
 from sentry_sdk._compat import urlparse, text_type, implements_str, PY2
 
 from sentry_sdk._types import MYPY
@@ -184,7 +183,7 @@ class Auth(object):
         project_id,
         public_key,
         secret_key=None,
-        version=AUTH_VERSION,
+        version=7,
         client=None,
         path="/",
     ):
