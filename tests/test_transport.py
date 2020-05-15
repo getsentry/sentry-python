@@ -230,3 +230,4 @@ def test_http_headers_overrides(httpserver, capsys, caplog):
         VERSION,
     )
     assert request.headers["AUTHORIZATION"] == "Bearer MY_TOKEN"
+    assert request.headers["X_SOME_EXTRA_HEADER"] == "value1=1, value2=2"
