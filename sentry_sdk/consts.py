@@ -9,7 +9,7 @@ if MYPY:
     from typing import Dict
     from typing import Any
     from typing import Sequence
-    from typing_extensions import TypedDict
+    from typing_extensions import Final, TypedDict
 
     from sentry_sdk.transport import Transport
     from sentry_sdk.integrations import Integration
@@ -54,6 +54,7 @@ class ClientConstructor(object):
         send_default_pii=False,  # type: bool
         http_proxy=None,  # type: Optional[str]
         https_proxy=None,  # type: Optional[str]
+        http_headers=None,  # type: Optional[Dict[str, str]]
         ignore_errors=[],  # type: List[Union[type, str]]  # noqa: B006
         request_bodies="medium",  # type: str
         before_send=None,  # type: Optional[EventProcessor]
@@ -88,7 +89,7 @@ def _get_default_options():
 DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
-
+AUTH_VERSION = 7  # type: Final[int]
 VERSION = "0.14.4"
 SDK_INFO = {
     "name": "sentry.python",

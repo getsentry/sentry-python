@@ -9,6 +9,7 @@ import pytest
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message
 from sentry_sdk.transport import _parse_rate_limits
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.consts import VERSION, AUTH_VERSION
 
 
 @pytest.fixture(params=[True, False])
@@ -131,9 +132,7 @@ def test_simple_rate_limits(httpserver, capsys, caplog):
 
 @pytest.mark.parametrize("response_code", [200, 429])
 def test_data_category_limits(httpserver, capsys, caplog, response_code):
-    client = Client(
-        dict(dsn="http://foobar@{}/123".format(httpserver.url[len("http://") :]))
-    )
+    client = Client(dsn="http://foobar@{}/123".format(httpserver.url[len("http://") :]))
     httpserver.serve_content(
         "hm",
         response_code,
@@ -164,9 +163,7 @@ def test_data_category_limits(httpserver, capsys, caplog, response_code):
 def test_complex_limits_without_data_category(
     httpserver, capsys, caplog, response_code
 ):
-    client = Client(
-        dict(dsn="http://foobar@{}/123".format(httpserver.url[len("http://") :]))
-    )
+    client = Client(dsn="http://foobar@{}/123".format(httpserver.url[len("http://") :]))
     httpserver.serve_content(
         "hm", response_code, headers={"X-Sentry-Rate-Limits": "4711::organization"},
     )
@@ -185,3 +182,51 @@ def test_complex_limits_without_data_category(
     client.flush()
 
     assert len(httpserver.requests) == 0
+
+
+def test_http_headers(httpserver, capsys, caplog):
+    client = Client(dsn="http://foobar@{}/123".format(httpserver.url[len("http://") :]))
+    httpserver.serve_content(
+        "hm", 200, headers={"X-Sentry-Rate-Limits": "4711:transaction:organization"},
+    )
+
+    client.capture_event({"type": "transaction"})
+    client.flush()
+
+    assert len(httpserver.requests) == 1
+    request = httpserver.requests[0]
+    assert request.headers["USER_AGENT"] == "sentry.python/%s" % VERSION
+    assert request.headers[
+        "X_SENTRY_AUTH"
+    ] == "Sentry sentry_key=foobar, sentry_version=%s, sentry_client=sentry.python/%s" % (
+        AUTH_VERSION,
+        VERSION,
+    )
+
+
+def test_http_headers_overrides(httpserver, capsys, caplog):
+    client = Client(
+        dsn="http://foobar@{}/123".format(httpserver.url[len("http://") :]),
+        http_headers={
+            "User-Agent": "sentry.custom/v1.0",
+            "Authorization": "Bearer MY_TOKEN",
+            "X-Some-Extra-Header": "value1=1, value2=2",
+        },
+    )
+    httpserver.serve_content(
+        "hm", 200, headers={"X-Sentry-Rate-Limits": "4711:transaction:organization"},
+    )
+
+    client.capture_event({"type": "transaction"})
+    client.flush()
+
+    assert len(httpserver.requests) == 1
+    request = httpserver.requests[0]
+    assert request.headers["USER_AGENT"] == "sentry.custom/v1.0"
+    assert request.headers[
+        "X_SENTRY_AUTH"
+    ] == "Sentry sentry_key=foobar, sentry_version=%s, sentry_client=sentry.python/%s" % (
+        AUTH_VERSION,
+        VERSION,
+    )
+    assert request.headers["AUTHORIZATION"] == "Bearer MY_TOKEN"

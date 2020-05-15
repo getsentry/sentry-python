@@ -171,6 +171,15 @@ class HttpTransport(Transport):
                 "X-Sentry-Auth": str(self._auth.to_header()),
             }
         )
+
+        # Override headers from options:
+        if (
+            self.options
+            and "http_headers" in self.options
+            and isinstance(self.options["http_headers"], dict)
+        ):
+            headers.update(self.options["http_headers"])
+
         response = self._pool.request(
             "POST", str(self._auth.store_api_url), body=body, headers=headers
         )
