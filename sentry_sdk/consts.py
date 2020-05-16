@@ -9,7 +9,7 @@ if MYPY:
     from typing import Dict
     from typing import Any
     from typing import Sequence
-    from typing_extensions import Final, TypedDict
+    from typing_extensions import TypedDict
 
     from sentry_sdk.transport import Transport
     from sentry_sdk.integrations import Integration
