@@ -63,12 +63,12 @@ class PyramidIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        from pyramid.router import Router
+        from pyramid import router
         from pyramid.request import Request
 
-        old_handle_request = Router.handle_request
+        old_call_view = router._call_view
 
-        def sentry_patched_handle_request(self, request, *args, **kwargs):
+        def sentry_patched_call_view(registry, request, *args, **kwargs):
             # type: (Any, Request, *Any, **Any) -> Response
             hub = Hub.current
             integration = hub.get_integration(PyramidIntegration)
@@ -81,15 +81,15 @@ class PyramidIntegration(Integration):
                         elif integration.transaction_style == "route_pattern":
                             scope.transaction = request.matched_route.pattern
                     except Exception:
-                        pass
+                        raise
 
                     scope.add_event_processor(
                         _make_event_processor(weakref.ref(request), integration)
                     )
 
-            return old_handle_request(self, request, *args, **kwargs)
+            return old_call_view(self, request, *args, **kwargs)
 
-        Router.handle_request = sentry_patched_handle_request
+        router._call_view = sentry_patched_call_view
 
         if hasattr(Request, "invoke_exception_view"):
             old_invoke_exception_view = Request.invoke_exception_view
