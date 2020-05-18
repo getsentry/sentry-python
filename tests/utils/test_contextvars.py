@@ -3,17 +3,6 @@ import random
 import time
 
 
-from sentry_sdk.utils import _is_threading_local_monkey_patched
-
-
-@pytest.mark.forked
-def test_thread_local_is_patched(maybe_monkeypatched_threading):
-    if maybe_monkeypatched_threading is None:
-        assert not _is_threading_local_monkey_patched()
-    else:
-        assert _is_threading_local_monkey_patched()
-
-
 @pytest.mark.forked
 def test_leaks(maybe_monkeypatched_threading):
     import threading
