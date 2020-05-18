@@ -722,12 +722,15 @@ def strip_string(value, max_length=None):
     return value
 
 
-def _is_threading_local_monkey_patched():
+def _is_contextvars_broken():
     # type: () -> bool
     try:
         from gevent.monkey import is_object_patched  # type: ignore
 
         if is_object_patched("threading", "local"):
+            if is_object_patched("contextvars", "ContextVar"):
+                return False
+
             return True
     except ImportError:
         pass
@@ -752,7 +755,7 @@ def _get_contextvars():
 
     https://github.com/gevent/gevent/issues/1407
     """
-    if not _is_threading_local_monkey_patched():
+    if not _is_contextvars_broken():
         # aiocontextvars is a PyPI package that ensures that the contextvars
         # backport (also a PyPI package) works with asyncio under Python 3.6
         #
