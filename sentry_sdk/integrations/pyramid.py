@@ -87,7 +87,7 @@ class PyramidIntegration(Integration):
                         _make_event_processor(weakref.ref(request), integration)
                     )
 
-            return old_call_view(self, request, *args, **kwargs)
+            return old_call_view(registry, request, *args, **kwargs)
 
         router._call_view = sentry_patched_call_view
 
@@ -110,7 +110,7 @@ class PyramidIntegration(Integration):
 
             Request.invoke_exception_view = sentry_patched_invoke_exception_view
 
-        old_wsgi_call = Router.__call__
+        old_wsgi_call = router.Router.__call__
 
         def sentry_patched_wsgi_call(self, environ, start_response):
             # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
@@ -132,7 +132,7 @@ class PyramidIntegration(Integration):
                 environ, start_response
             )
 
-        Router.__call__ = sentry_patched_wsgi_call
+        router.Router.__call__ = sentry_patched_wsgi_call
 
 
 def _capture_exception(exc_info):
