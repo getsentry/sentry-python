@@ -97,7 +97,6 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
     Session = sessionmaker(bind=engine)  # noqa: N806
     session = Session()
 
-
     with sentry_sdk.start_span(transaction="test_transaction", sampled=True):
         with session.begin_nested():
             session.query(Person).first()
@@ -111,9 +110,11 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
         with session.begin_nested():
             session.query(Person).first()
 
-    event, = events
+    (event,) = events
 
-    assert render_span_tree(event) == """\
+    assert (
+        render_span_tree(event)
+        == """\
 - op=None: description=None
   - op='db': description='SAVEPOINT sa_savepoint_1'
   - op='db': description='SELECT person.id AS person_id, person.name AS person_name \\nFROM person\\n LIMIT ? OFFSET ?'
@@ -128,3 +129,4 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
   - op='db': description='SELECT person.id AS person_id, person.name AS person_name \\nFROM person\\n LIMIT ? OFFSET ?'
   - op='db': description='RELEASE SAVEPOINT sa_savepoint_4'\
 """
+    )
