@@ -84,3 +84,14 @@ def _handle_error(context, *args):
 
     if span is not None:
         span.set_status("internal_error")
+
+    # _after_cursor_execute does not get called for crashing SQL stmts. Judging
+    # from SQLAlchemy codebase it does seem like any error coming into this
+    # handler is going to be fatal.
+    ctx_mgr = getattr(
+        conn, "_sentry_sql_span_manager", None
+    )  # type: ContextManager[Any]
+
+    if ctx_mgr is not None:
+        conn._sentry_sql_span_manager = None
+        ctx_mgr.__exit__(None, None, None)

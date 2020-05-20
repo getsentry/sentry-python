@@ -313,3 +313,28 @@ def maybe_monkeypatched_threading(request):
         assert request.param is None
 
     return request.param
+
+
+@pytest.fixture
+def render_span_tree():
+    def inner(event):
+        assert event["type"] == "transaction"
+
+        by_parent = {}
+        for span in event["spans"]:
+            by_parent.setdefault(span["parent_span_id"], []).append(span)
+
+        def render_span(span):
+            yield "- op={!r}: description={!r}".format(
+                span.get("op"), span.get("description")
+            )
+            for subspan in by_parent.get(span["span_id"]) or ():
+                for line in render_span(subspan):
+                    yield "  {}".format(line)
+
+        root_span = event["contexts"]["trace"]
+
+        # Return a list instead of a multiline string because black will know better how to format that
+        return "\n".join(render_span(root_span))
+
+    return inner
