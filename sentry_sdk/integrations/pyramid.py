@@ -63,24 +63,33 @@ class PyramidIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        from pyramid.router import Router
+        from pyramid import router
         from pyramid.request import Request
 
-        old_handle_request = Router.handle_request
+        old_call_view = router._call_view
 
-        def sentry_patched_handle_request(self, request, *args, **kwargs):
+        def sentry_patched_call_view(registry, request, *args, **kwargs):
             # type: (Any, Request, *Any, **Any) -> Response
             hub = Hub.current
             integration = hub.get_integration(PyramidIntegration)
+
             if integration is not None:
                 with hub.configure_scope() as scope:
+                    try:
+                        if integration.transaction_style == "route_name":
+                            scope.transaction = request.matched_route.name
+                        elif integration.transaction_style == "route_pattern":
+                            scope.transaction = request.matched_route.pattern
+                    except Exception:
+                        raise
+
                     scope.add_event_processor(
                         _make_event_processor(weakref.ref(request), integration)
                     )
 
-            return old_handle_request(self, request, *args, **kwargs)
+            return old_call_view(registry, request, *args, **kwargs)
 
-        Router.handle_request = sentry_patched_handle_request
+        router._call_view = sentry_patched_call_view
 
         if hasattr(Request, "invoke_exception_view"):
             old_invoke_exception_view = Request.invoke_exception_view
@@ -101,7 +110,7 @@ class PyramidIntegration(Integration):
 
             Request.invoke_exception_view = sentry_patched_invoke_exception_view
 
-        old_wsgi_call = Router.__call__
+        old_wsgi_call = router.Router.__call__
 
         def sentry_patched_wsgi_call(self, environ, start_response):
             # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
@@ -123,7 +132,7 @@ class PyramidIntegration(Integration):
                 environ, start_response
             )
 
-        Router.__call__ = sentry_patched_wsgi_call
+        router.Router.__call__ = sentry_patched_wsgi_call
 
 
 def _capture_exception(exc_info):
@@ -195,14 +204,6 @@ def _make_event_processor(weak_request, integration):
         request = weak_request()
         if request is None:
             return event
-
-        try:
-            if integration.transaction_style == "route_name":
-                event["transaction"] = request.matched_route.name
-            elif integration.transaction_style == "route_pattern":
-                event["transaction"] = request.matched_route.pattern
-        except Exception:
-            pass
 
         with capture_internal_exceptions():
             PyramidRequestExtractor(request).extract_into_event(event)
