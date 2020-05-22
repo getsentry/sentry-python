@@ -13,8 +13,23 @@ The public-facing channels for support and development of Sentry SDKs can be fou
 Make sure you have `virtualenv` installed, and the Python versions you care
 about. You should have Python 2.7 and the latest Python 3 installed.
 
-You don't need to `workon` or `activate` anything, the `Makefile` will create
-one for you. Run `make` or `make help` to list commands.
+We have a `Makefile` that is supposed to help people get started with hacking
+on the SDK without having to know or understand the Python ecosystem. You don't
+need to `workon` or `bin/activate` anything, the `Makefile` will do everything
+for you. Run `make` or `make help` to list commands.
+
+Of course you can always run the underlying commands yourself, which is
+particularly useful when wanting to provide arguments to `pytest` to run
+specific tests. If you want to do that, we expect you to know your way around
+Python development, and you can run the following to get started with `pytest`:
+
+    # This is "advanced mode". Use `make help` if you have no clue what's
+    # happening here!
+
+    pip install -e .
+    pip install -r test-requirements.txt
+
+    pytest tests/
 
 ## Releasing a new version
 

@@ -37,6 +37,10 @@ To learn about internals:
 
 - [API Reference](https://getsentry.github.io/sentry-python/)
 
+# Contributing to the SDK
+
+Please refer to [CONTRIBUTING.md](./CONTRIBUTING.md).
+
 # License
 
 Licensed under the BSD license, see `LICENSE`
