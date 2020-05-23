@@ -760,20 +760,22 @@ def _get_contextvars():
         # backport (also a PyPI package) works with asyncio under Python 3.6
         #
         # Import it if available.
-        if not PY2 and sys.version_info < (3, 7):
+        if sys.version_info < (3, 7):
+            # `aiocontextvars` is absolutely required for functional
+            # contextvars on Python 3.6.
             try:
                 from aiocontextvars import ContextVar  # noqa
 
                 return True, ContextVar
             except ImportError:
                 pass
+        else:
+            try:
+                from contextvars import ContextVar
 
-        try:
-            from contextvars import ContextVar
-
-            return True, ContextVar
-        except ImportError:
-            pass
+                return True, ContextVar
+            except ImportError:
+                pass
 
     from threading import local
 
@@ -797,6 +799,25 @@ def _get_contextvars():
 
 
 HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()
+
+CONTEXTVARS_ERROR_MESSAGE = """
+
+With asyncio/ASGI applications, the Sentry SDK requires a functional
+installation of `contextvars` to avoid leaking scope/context data across
+requests.
+
+- For Python 3.7 `contextvars` is fully functional and part of stdlib.
+- For Python 3.6 and below, `aiocontextvars` can be installed from PyPI.
+
+On top of that, gevent's and eventlet's magic may break `contextvars`:
+
+- When gunicorn is used with gevent (or gevent is otherwise enabled with
+  monkeypatches), please upgrade to at least gevent 20.5 to get asyncio support
+  from Sentry.
+
+- Eventlet is only monkeypatching the threading module and at the moment
+  completely incompatible with asyncio.
+"""
 
 
 def transaction_from_function(func):

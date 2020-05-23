@@ -12,7 +12,13 @@ from sentry_sdk._functools import partial
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk.utils import ContextVar, event_from_exception, transaction_from_function
+from sentry_sdk.utils import (
+    ContextVar,
+    event_from_exception,
+    transaction_from_function,
+    HAS_REAL_CONTEXTVARS,
+    CONTEXTVARS_ERROR_MESSAGE,
+)
 from sentry_sdk.tracing import Span
 
 if MYPY:
@@ -21,10 +27,14 @@ if MYPY:
     from typing import Optional
     from typing import Callable
 
+    from typing_extensions import Literal
+
     from sentry_sdk._types import Event, Hint
 
 
 _asgi_middleware_applied = ContextVar("sentry_asgi_middleware_applied")
+
+TRANSACTION_SENTINEL = "generic ASGI request"
 
 
 def _capture_exception(hub, exc):
@@ -59,8 +69,19 @@ def _looks_like_asgi3(app):
 class SentryAsgiMiddleware:
     __slots__ = ("app", "__call__")
 
-    def __init__(self, app):
-        # type: (Any) -> None
+    def __init__(self, app, unsafe_context_data=False):
+        # type: (Any, bool) -> None
+
+        if not unsafe_context_data and not HAS_REAL_CONTEXTVARS:
+            # We better have contextvars or we're going to leak state between
+            # requests.
+            raise RuntimeError(
+                "The ASGI middleware for Sentry requires Python 3.7+ "
+                "or the aiocontextvars package."
+                + CONTEXTVARS_ERROR_MESSAGE
+                + "\nIf you know what you are doing you can disable this warning "
+                "with `SentryAsgiMiddleware(..., unsafe_context_data=True)`"
+            )
         self.app = app
 
         if _looks_like_asgi3(app):
@@ -95,15 +116,17 @@ class SentryAsgiMiddleware:
                     processor = partial(self.event_processor, asgi_scope=scope)
                     sentry_scope.add_event_processor(processor)
 
-                if scope["type"] in ("http", "websocket"):
+                ty = scope["type"]
+
+                if ty in ("http", "websocket"):
                     span = Span.continue_from_headers(dict(scope["headers"]))
-                    span.op = "{}.server".format(scope["type"])
+                    span.op = "{}.server".format(ty)
                 else:
                     span = Span()
                     span.op = "asgi.server"
 
-                span.set_tag("asgi.type", scope["type"])
-                span.transaction = "generic ASGI request"
+                span.set_tag("asgi.type", ty)
+                span.transaction = TRANSACTION_SENTINEL
 
                 with hub.start_span(span) as span:
                     # XXX: Would be cool to have correct span status, but we
@@ -121,38 +144,52 @@ class SentryAsgiMiddleware:
         # type: (Event, Hint, Any) -> Optional[Event]
         request_info = event.get("request", {})
 
-        if asgi_scope["type"] in ("http", "websocket"):
-            request_info["url"] = self.get_url(asgi_scope)
-            request_info["method"] = asgi_scope["method"]
-            request_info["headers"] = _filter_headers(self.get_headers(asgi_scope))
-            request_info["query_string"] = self.get_query(asgi_scope)
+        ty = asgi_scope["type"]
+        if ty in ("http", "websocket"):
+            request_info["method"] = asgi_scope.get("method")
+            request_info["headers"] = headers = _filter_headers(
+                self._get_headers(asgi_scope)
+            )
+            request_info["query_string"] = self._get_query(asgi_scope)
 
-        if asgi_scope.get("client") and _should_send_default_pii():
-            request_info["env"] = {"REMOTE_ADDR": asgi_scope["client"][0]}
+            request_info["url"] = self._get_url(
+                asgi_scope, "http" if ty == "http" else "ws", headers.get("host")
+            )
 
-        if asgi_scope.get("endpoint"):
+        client = asgi_scope.get("client")
+        if client and _should_send_default_pii():
+            request_info["env"] = {"REMOTE_ADDR": client[0]}
+
+        if event.get("transaction", TRANSACTION_SENTINEL) == TRANSACTION_SENTINEL:
+            endpoint = asgi_scope.get("endpoint")
             # Webframeworks like Starlette mutate the ASGI env once routing is
             # done, which is sometime after the request has started. If we have
-            # an endpoint, overwrite our path-based transaction name.
-            event["transaction"] = self.get_transaction(asgi_scope)
+            # an endpoint, overwrite our generic transaction name.
+            if endpoint:
+                event["transaction"] = transaction_from_function(endpoint)
 
         event["request"] = request_info
 
         return event
 
-    def get_url(self, scope):
-        # type: (Any) -> str
+    # Helper functions for extracting request data.
+    #
+    # Note: Those functions are not public API. If you want to mutate request
+    # data to your liking it's recommended to use the `before_send` callback
+    # for that.
+
+    def _get_url(self, scope, default_scheme, host):
+        # type: (Dict[str, Any], Literal["ws", "http"], Optional[str]) -> str
         """
         Extract URL from the ASGI scope, without also including the querystring.
         """
-        scheme = scope.get("scheme", "http")
-        server = scope.get("server", None)
-        path = scope.get("root_path", "") + scope["path"]
+        scheme = scope.get("scheme", default_scheme)
 
-        for key, value in scope["headers"]:
-            if key == b"host":
-                host_header = value.decode("latin-1")
-                return "%s://%s%s" % (scheme, host_header, path)
+        server = scope.get("server", None)
+        path = scope.get("root_path", "") + scope.get("path", "")
+
+        if host:
+            return "%s://%s%s" % (scheme, host, path)
 
         if server is not None:
             host, port = server
@@ -162,15 +199,18 @@ class SentryAsgiMiddleware:
             return "%s://%s%s" % (scheme, host, path)
         return path
 
-    def get_query(self, scope):
+    def _get_query(self, scope):
         # type: (Any) -> Any
         """
         Extract querystring from the ASGI scope, in the format that the Sentry protocol expects.
         """
-        return urllib.parse.unquote(scope["query_string"].decode("latin-1"))
+        qs = scope.get("query_string")
+        if not qs:
+            return None
+        return urllib.parse.unquote(qs.decode("latin-1"))
 
-    def get_headers(self, scope):
-        # type: (Any) -> Dict[str, Any]
+    def _get_headers(self, scope):
+        # type: (Any) -> Dict[str, str]
         """
         Extract headers from the ASGI scope, in the format that the Sentry protocol expects.
         """
@@ -183,10 +223,3 @@ class SentryAsgiMiddleware:
             else:
                 headers[key] = value
         return headers
-
-    def get_transaction(self, scope):
-        # type: (Any) -> Optional[str]
-        """
-        Return a transaction string to identify the routed endpoint.
-        """
-        return transaction_from_function(scope["endpoint"])

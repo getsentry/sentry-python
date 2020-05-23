@@ -8,6 +8,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     HAS_REAL_CONTEXTVARS,
+    CONTEXTVARS_ERROR_MESSAGE,
 )
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
@@ -55,7 +56,7 @@ class SanicIntegration(Integration):
             # requests.
             raise DidNotEnable(
                 "The sanic integration for Sentry requires Python 3.7+ "
-                " or aiocontextvars package"
+                " or the aiocontextvars package." + CONTEXTVARS_ERROR_MESSAGE
             )
 
         if SANIC_VERSION.startswith("0.8."):
