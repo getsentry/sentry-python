@@ -15,7 +15,7 @@ if MYPY:
     from typing import TypeVar
     from typing import ContextManager
 
-    from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint
+    from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint, ExcInfo
     from sentry_sdk.tracing import Span
 
     T = TypeVar("T")
@@ -93,7 +93,7 @@ def capture_message(
 
 @hubmethod
 def capture_exception(
-    error=None,  # type: Optional[BaseException]
+    error=None,  # type: Optional[Union[BaseException, ExcInfo]]
     scope=None,  # type: Optional[Any]
     **scope_args  # type: Dict[str, Any]
 ):
