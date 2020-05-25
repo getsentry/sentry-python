@@ -14,6 +14,7 @@ if MYPY:
     from typing import Callable
     from typing import TypeVar
     from typing import ContextManager
+    from typing import Union
 
     from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint, ExcInfo
     from sentry_sdk.tracing import Span
