@@ -148,3 +148,10 @@ def test_span_trimming(sentry_init, capture_events):
     span1, span2 = event["spans"]
     assert span1["op"] == "foo0"
     assert span2["op"] == "foo1"
+
+
+def test_nested_span_sampling_override():
+    with Hub.current.start_span(transaction="outer", sampled=True) as span:
+        assert span.sampled is True
+        with Hub.current.start_span(transaction="inner", sampled=False) as span:
+            assert span.sampled is False
