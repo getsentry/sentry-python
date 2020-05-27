@@ -196,12 +196,9 @@ class Span(object):
 
     def new_span(self, **kwargs):
         # type: (**Any) -> Span
+        kwargs.setdefault("sampled", self.sampled)
         rv = type(self)(
-            trace_id=self.trace_id,
-            span_id=None,
-            parent_span_id=self.span_id,
-            sampled=self.sampled,
-            **kwargs
+            trace_id=self.trace_id, span_id=None, parent_span_id=self.span_id, **kwargs
         )
 
         rv._span_recorder = self._span_recorder
