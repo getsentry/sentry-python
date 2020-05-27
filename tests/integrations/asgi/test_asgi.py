@@ -6,6 +6,7 @@ from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
 from starlette.testclient import TestClient
+from starlette.websockets import WebSocket
 
 
 @pytest.fixture
@@ -119,3 +120,29 @@ def test_errors(sentry_init, app, capture_events):
         frame["filename"].endswith("tests/integrations/asgi/test_asgi.py")
         for frame in exception["stacktrace"]["frames"]
     )
+
+
+def test_websocket(sentry_init, capture_events):
+    sentry_init(debug=True, send_default_pii=True)
+    events = capture_events()
+
+    from starlette.testclient import TestClient
+
+    def message():
+        return "Hello, World!"
+
+    async def app(scope, receive, send):
+        assert scope["type"] == "websocket"
+        websocket = WebSocket(scope, receive=receive, send=send)
+        await websocket.accept()
+        await websocket.send_text(message())
+        await websocket.close()
+
+    app = SentryAsgiMiddleware(app)
+
+    client = TestClient(app)
+    with client.websocket_connect("/") as websocket:
+        data = websocket.receive_text()
+        assert data == "Hello, World!"
+
+    assert not events

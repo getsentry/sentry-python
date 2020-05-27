@@ -34,7 +34,7 @@ if MYPY:
 
 _asgi_middleware_applied = ContextVar("sentry_asgi_middleware_applied")
 
-TRANSACTION_SENTINEL = "generic ASGI request"
+_DEFAULT_TRANSACTION_NAME = "generic ASGI request"
 
 
 def _capture_exception(hub, exc):
@@ -71,16 +71,20 @@ class SentryAsgiMiddleware:
 
     def __init__(self, app, unsafe_context_data=False):
         # type: (Any, bool) -> None
+        """
+        Instrument an ASGI application with Sentry. Provides HTTP/websocket
+        data to sent events and basic handling for exceptions bubbling up
+        through the middleware.
+
+        :param unsafe_context_data: Disable errors when a proper contextvars installation could not be found. We do not recommend changing this from the default.
+        """
 
         if not unsafe_context_data and not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between
             # requests.
             raise RuntimeError(
                 "The ASGI middleware for Sentry requires Python 3.7+ "
-                "or the aiocontextvars package."
-                + CONTEXTVARS_ERROR_MESSAGE
-                + "\nIf you know what you are doing you can disable this warning "
-                "with `SentryAsgiMiddleware(..., unsafe_context_data=True)`"
+                "or the aiocontextvars package." + CONTEXTVARS_ERROR_MESSAGE
             )
         self.app = app
 
@@ -126,7 +130,7 @@ class SentryAsgiMiddleware:
                     span.op = "asgi.server"
 
                 span.set_tag("asgi.type", ty)
-                span.transaction = TRANSACTION_SENTINEL
+                span.transaction = _DEFAULT_TRANSACTION_NAME
 
                 with hub.start_span(span) as span:
                     # XXX: Would be cool to have correct span status, but we
@@ -160,7 +164,10 @@ class SentryAsgiMiddleware:
         if client and _should_send_default_pii():
             request_info["env"] = {"REMOTE_ADDR": client[0]}
 
-        if event.get("transaction", TRANSACTION_SENTINEL) == TRANSACTION_SENTINEL:
+        if (
+            event.get("transaction", _DEFAULT_TRANSACTION_NAME)
+            == _DEFAULT_TRANSACTION_NAME
+        ):
             endpoint = asgi_scope.get("endpoint")
             # Webframeworks like Starlette mutate the ASGI env once routing is
             # done, which is sometime after the request has started. If we have

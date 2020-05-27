@@ -724,10 +724,15 @@ def strip_string(value, max_length=None):
 
 def _is_contextvars_broken():
     # type: () -> bool
+    """
+    Returns whether gevent/eventlet have patched the stdlib in a way where thread locals are now more "correct" than contextvars.
+    """
     try:
         from gevent.monkey import is_object_patched  # type: ignore
 
         if is_object_patched("threading", "local"):
+            # Gevent 20.5 is able to patch both thread locals and contextvars,
+            # in that case all is good.
             if is_object_patched("contextvars", "ContextVar"):
                 return False
 
@@ -749,11 +754,10 @@ def _is_contextvars_broken():
 def _get_contextvars():
     # type: () -> Tuple[bool, type]
     """
-    Try to import contextvars and use it if it's deemed safe. We should not use
-    contextvars if gevent or eventlet have patched thread locals, as
-    contextvars are unaffected by that patch.
+    Figure out the "right" contextvars installation to use. Returns a
+    `contextvars.ContextVar`-like class with a limited API.
 
-    https://github.com/gevent/gevent/issues/1407
+    See https://docs.sentry.io/platforms/python/contextvars/ for more information.
     """
     if not _is_contextvars_broken():
         # aiocontextvars is a PyPI package that ensures that the contextvars
@@ -770,12 +774,15 @@ def _get_contextvars():
             except ImportError:
                 pass
         else:
+            # On Python 3.7 contextvars are functional.
             try:
                 from contextvars import ContextVar
 
                 return True, ContextVar
             except ImportError:
                 pass
+
+    # Fall back to basic thread-local usage.
 
     from threading import local
 
@@ -806,17 +813,7 @@ With asyncio/ASGI applications, the Sentry SDK requires a functional
 installation of `contextvars` to avoid leaking scope/context data across
 requests.
 
-- For Python 3.7 `contextvars` is fully functional and part of stdlib.
-- For Python 3.6 and below, `aiocontextvars` can be installed from PyPI.
-
-On top of that, gevent's and eventlet's magic may break `contextvars`:
-
-- When gunicorn is used with gevent (or gevent is otherwise enabled with
-  monkeypatches), please upgrade to at least gevent 20.5 to get asyncio support
-  from Sentry.
-
-- Eventlet is only monkeypatching the threading module and at the moment
-  completely incompatible with asyncio.
+Please refer to https://docs.sentry.io/platforms/python/contextvars/ for more information.
 """
 
 
