@@ -7,3 +7,5 @@ pytest-cov==2.8.1
 gevent
 eventlet
 newrelic
+starlette
+requests
