@@ -747,6 +747,7 @@ def _is_contextvars_broken():
 
 
 def _make_threadlocal_contextvars(local):
+    # type: (type) -> type
     class ContextVar(object):
         # Super-limited impl of ContextVar
 
@@ -786,13 +787,13 @@ def _get_contextvars():
     # API for integrations to swap out implementations dynamically. Django and
     # ASGI may be used in one process, but unused in another.
     try:
-        from asgiref.local import Local as asgiref_local
+        from asgiref.local import Local
     except ImportError:
         pass
     else:
         # Return True here because asgiref.local works correctly for ASGI
         # environments
-        return True, _make_threadlocal_contextvars(asgiref_local)
+        return True, _make_threadlocal_contextvars(Local)
 
     if not _is_contextvars_broken():
         # aiocontextvars is a PyPI package that ensures that the contextvars
@@ -814,10 +815,7 @@ def _get_contextvars():
         except ImportError:
             pass
 
-    if asgiref_local is not None:
-        local = asgiref_local
-    else:
-        from threading import local
+    from threading import local
 
     return False, _make_threadlocal_contextvars(local)
 

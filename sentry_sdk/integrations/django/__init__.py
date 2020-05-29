@@ -308,6 +308,7 @@ def _patch_django_asgi_handler():
 
 
 def _before_get_response(request):
+    # type: (WSGIRequest) -> None
     hub = Hub.current
     integration = hub.get_integration(DjangoIntegration)
     if integration is None:
@@ -333,6 +334,7 @@ def _before_get_response(request):
 
 
 def _patch_get_response():
+    # type: () -> None
     """
     patch get_response, because at that point wea have the Django request object
     """
@@ -349,6 +351,7 @@ def _patch_get_response():
 
     if hasattr(BaseHandler, "get_response_async"):
         from sentry_sdk.integrations.django.asgi import patch_get_response_async
+
         patch_get_response_async(BaseHandler, _before_get_response)
 
 
