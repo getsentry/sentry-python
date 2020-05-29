@@ -746,15 +746,54 @@ def _is_contextvars_broken():
     return False
 
 
+def _make_threadlocal_contextvars(local):
+    class ContextVar(object):
+        # Super-limited impl of ContextVar
+
+        def __init__(self, name):
+            # type: (str) -> None
+            self._name = name
+            self._local = local()
+
+        def get(self, default):
+            # type: (Any) -> Any
+            return getattr(self._local, "value", default)
+
+        def set(self, value):
+            # type: (Any) -> None
+            self._local.value = value
+
+    return ContextVar
+
+
 def _get_contextvars():
     # type: () -> Tuple[bool, type]
     """
     Try to import contextvars and use it if it's deemed safe. We should not use
-    contextvars if gevent or eventlet have patched thread locals, as
-    contextvars are unaffected by that patch.
+    contextvars if:
 
-    https://github.com/gevent/gevent/issues/1407
+    * gevent or eventlet have patched thread locals as contextvars are unaffected by that patch
+
+      https://github.com/gevent/gevent/issues/1407
+
+    * Django is used as it uses asgiref which has its own concept of context locals
     """
+    # Django 3+ uses asgiref which has its own context locals implementation.
+    # Starting with Django 3.1 `asgiref.local` is actually required to have
+    # your errorhandlers be called in the right context.
+    #
+    # XXX: This entire import-time detection is broken. We should figure out an
+    # API for integrations to swap out implementations dynamically. Django and
+    # ASGI may be used in one process, but unused in another.
+    try:
+        from asgiref.local import Local as asgiref_local
+    except ImportError:
+        pass
+    else:
+        # Return True here because asgiref.local works correctly for ASGI
+        # environments
+        return True, _make_threadlocal_contextvars(asgiref_local)
+
     if not _is_contextvars_broken():
         # aiocontextvars is a PyPI package that ensures that the contextvars
         # backport (also a PyPI package) works with asyncio under Python 3.6
@@ -775,25 +814,12 @@ def _get_contextvars():
         except ImportError:
             pass
 
-    from threading import local
+    if asgiref_local is not None:
+        local = asgiref_local
+    else:
+        from threading import local
 
-    class ContextVar(object):
-        # Super-limited impl of ContextVar
-
-        def __init__(self, name):
-            # type: (str) -> None
-            self._name = name
-            self._local = local()
-
-        def get(self, default):
-            # type: (Any) -> Any
-            return getattr(self._local, "value", default)
-
-        def set(self, value):
-            # type: (Any) -> None
-            self._local.value = value
-
-    return False, ContextVar
+    return False, _make_threadlocal_contextvars(local)
 
 
 HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()

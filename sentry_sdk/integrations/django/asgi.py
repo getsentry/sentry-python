@@ -31,6 +31,17 @@ def patch_django_asgi_handler_impl(cls):
     cls.__call__ = sentry_patched_asgi_handler
 
 
+def patch_get_response_async(cls, _before_get_response):
+    old_get_response_async = cls.get_response_async
+
+    async def sentry_patched_get_response_async(self, request):
+        # type: (Any, WSGIRequest) -> Union[HttpResponse, BaseException]
+        _before_get_response(request)
+        return await old_get_response_async(self, request)
+
+    cls.get_response_async = sentry_patched_get_response_async
+
+
 def patch_channels_asgi_handler_impl(cls):
     # type: (Any) -> None
     old_app = cls.__call__
