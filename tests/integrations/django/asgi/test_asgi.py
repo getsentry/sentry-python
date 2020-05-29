@@ -4,7 +4,7 @@ import django
 
 from channels.testing import HttpCommunicator
 
-from sentry_sdk import capture_message
+from sentry_sdk import Hub, capture_message
 from sentry_sdk.integrations.django import DjangoIntegration
 
 from tests.integrations.django.myapp.asgi import channels_application
@@ -18,8 +18,11 @@ if django.VERSION >= (3, 0):
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
-async def test_basic(sentry_init, capture_events, application):
+async def test_basic(sentry_init, capture_events, application, request):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    Hub.main.bind_client(Hub.current.client)
+    request.addfinalizer(lambda: Hub.main.bind_client(None))
+
     events = capture_events()
 
     comm = HttpCommunicator(application, "GET", "/view-exc?test=query")
