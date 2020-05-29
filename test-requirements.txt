@@ -7,3 +7,4 @@ pytest-cov==2.8.1
 gevent
 eventlet
 newrelic
+pytest-randomly==1.2.3
