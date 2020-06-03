@@ -15,6 +15,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     transaction_from_function,
     HAS_REAL_CONTEXTVARS,
+    CONTEXTVARS_ERROR_MESSAGE,
     AnnotatedValue,
 )
 
@@ -60,9 +61,9 @@ class AioHttpIntegration(Integration):
         if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between
             # requests.
-            raise RuntimeError(
+            raise DidNotEnable(
                 "The aiohttp integration for Sentry requires Python 3.7+ "
-                " or aiocontextvars package"
+                " or aiocontextvars package." + CONTEXTVARS_ERROR_MESSAGE
             )
 
         ignore_logger("aiohttp.server")

@@ -25,7 +25,9 @@ def patch_django_asgi_handler_impl(cls):
         if Hub.current.get_integration(DjangoIntegration) is None:
             return await old_app(self, scope, receive, send)
 
-        middleware = SentryAsgiMiddleware(old_app.__get__(self, cls))._run_asgi3
+        middleware = SentryAsgiMiddleware(
+            old_app.__get__(self, cls), unsafe_context_data=True
+        )._run_asgi3
         return await middleware(scope, receive, send)
 
     cls.__call__ = sentry_patched_asgi_handler
@@ -40,7 +42,9 @@ def patch_channels_asgi_handler_impl(cls):
         if Hub.current.get_integration(DjangoIntegration) is None:
             return await old_app(self, receive, send)
 
-        middleware = SentryAsgiMiddleware(lambda _scope: old_app.__get__(self, cls))
+        middleware = SentryAsgiMiddleware(
+            lambda _scope: old_app.__get__(self, cls), unsafe_context_data=True
+        )
 
         return await middleware(self.scope)(receive, send)
 
