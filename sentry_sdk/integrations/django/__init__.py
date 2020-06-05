@@ -336,7 +336,7 @@ def _before_get_response(request):
 def _patch_get_response():
     # type: () -> None
     """
-    patch get_response, because at that point wea have the Django request object
+    patch get_response, because at that point we have the Django request object
     """
     from django.core.handlers.base import BaseHandler
 
