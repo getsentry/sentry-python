@@ -153,11 +153,11 @@ def test_span_trimming(sentry_init, capture_events):
     assert span2["op"] == "foo1"
 
 
-def test_nested_span_sampling_override():
-    with start_transaction(name="outer", sampled=True) as span:
-        assert span.sampled is True
-        with start_transaction(name="inner", sampled=False) as span2:
-            assert span2.sampled is False
+def test_nested_transaction_sampling_override():
+    with start_transaction(name="outer", sampled=True) as outer_transaction:
+        assert outer_transaction.sampled is True
+        with start_transaction(name="inner", sampled=False) as inner_transaction:
+            assert inner_transaction.sampled is False
 
         assert span.sampled is True
 
