@@ -12,6 +12,7 @@ from sentry_sdk.serializer import add_global_repr_processor
 from sentry_sdk.tracing import record_sql_queries
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
+    CONTEXTVARS_ERROR_MESSAGE,
     logger,
     capture_internal_exceptions,
     event_from_exception,
@@ -271,11 +272,12 @@ def _patch_channels():
         # requests.
         #
         # We cannot hard-raise here because channels may not be used at all in
-        # the current process.
+        # the current process. That is the case when running traditional WSGI
+        # workers in gunicorn+gevent and the websocket stuff in a separate
+        # process.
         logger.warning(
-            "We detected that you are using Django channels 2.0. To get proper "
-            "instrumentation for ASGI requests, the Sentry SDK requires "
-            "Python 3.7+ or the aiocontextvars package from PyPI."
+            "We detected that you are using Django channels 2.0."
+            + CONTEXTVARS_ERROR_MESSAGE
         )
 
     from sentry_sdk.integrations.django.asgi import patch_channels_asgi_handler_impl
@@ -294,12 +296,10 @@ def _patch_django_asgi_handler():
         # We better have contextvars or we're going to leak state between
         # requests.
         #
-        # We cannot hard-raise here because Django may not be used at all in
-        # the current process.
+        # We cannot hard-raise here because Django's ASGI stuff may not be used
+        # at all.
         logger.warning(
-            "We detected that you are using Django 3. To get proper "
-            "instrumentation for ASGI requests, the Sentry SDK requires "
-            "Python 3.7+ or the aiocontextvars package from PyPI."
+            "We detected that you are using Django 3." + CONTEXTVARS_ERROR_MESSAGE
         )
 
     from sentry_sdk.integrations.django.asgi import patch_django_asgi_handler_impl

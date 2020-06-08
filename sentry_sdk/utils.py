@@ -724,10 +724,15 @@ def strip_string(value, max_length=None):
 
 def _is_contextvars_broken():
     # type: () -> bool
+    """
+    Returns whether gevent/eventlet have patched the stdlib in a way where thread locals are now more "correct" than contextvars.
+    """
     try:
         from gevent.monkey import is_object_patched  # type: ignore
 
         if is_object_patched("threading", "local"):
+            # Gevent 20.5 is able to patch both thread locals and contextvars,
+            # in that case all is good.
             if is_object_patched("contextvars", "ContextVar"):
                 return False
 
@@ -770,14 +775,10 @@ def _make_threadlocal_contextvars(local):
 def _get_contextvars():
     # type: () -> Tuple[bool, type]
     """
-    Try to import contextvars and use it if it's deemed safe. We should not use
-    contextvars if:
+    Figure out the "right" contextvars installation to use. Returns a
+    `contextvars.ContextVar`-like class with a limited API.
 
-    * gevent or eventlet have patched thread locals as contextvars are unaffected by that patch
-
-      https://github.com/gevent/gevent/issues/1407
-
-    * Django is used as it uses asgiref which has its own concept of context locals
+    See https://docs.sentry.io/platforms/python/contextvars/ for more information.
     """
     # Django 3+ uses asgiref which has its own context locals implementation.
     # Starting with Django 3.1 `asgiref.local` is actually required to have
@@ -800,20 +801,25 @@ def _get_contextvars():
         # backport (also a PyPI package) works with asyncio under Python 3.6
         #
         # Import it if available.
-        if not PY2 and sys.version_info < (3, 7):
+        if sys.version_info < (3, 7):
+            # `aiocontextvars` is absolutely required for functional
+            # contextvars on Python 3.6.
             try:
                 from aiocontextvars import ContextVar  # noqa
 
                 return True, ContextVar
             except ImportError:
                 pass
+        else:
+            # On Python 3.7 contextvars are functional.
+            try:
+                from contextvars import ContextVar
 
-        try:
-            from contextvars import ContextVar
+                return True, ContextVar
+            except ImportError:
+                pass
 
-            return True, ContextVar
-        except ImportError:
-            pass
+    # Fall back to basic thread-local usage.
 
     from threading import local
 
@@ -821,6 +827,15 @@ def _get_contextvars():
 
 
 HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()
+
+CONTEXTVARS_ERROR_MESSAGE = """
+
+With asyncio/ASGI applications, the Sentry SDK requires a functional
+installation of `contextvars` to avoid leaking scope/context data across
+requests.
+
+Please refer to https://docs.sentry.io/platforms/python/contextvars/ for more information.
+"""
 
 
 def transaction_from_function(func):
