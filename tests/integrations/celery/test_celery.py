@@ -236,7 +236,7 @@ def test_broken_prerun(init_celery, connect_signal):
 
 
 @pytest.mark.xfail(
-    (4, 2, 0) <= VERSION < (4,4,3),
+    (4, 2, 0) <= VERSION < (4, 4, 3),
     strict=True,
     reason="https://github.com/celery/celery/issues/4661",
 )
