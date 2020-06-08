@@ -141,7 +141,7 @@ def _make_event_processor(weak_handler):
         request = handler.request
 
         with capture_internal_exceptions():
-            method = getattr(handler, handler.request.method.lower())
+            method = getattr(handler, handler.request.method.lower())  # type: ignore
             event["transaction"] = transaction_from_function(method)
 
         with capture_internal_exceptions():
