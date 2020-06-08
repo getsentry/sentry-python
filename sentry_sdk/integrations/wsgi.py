@@ -8,7 +8,7 @@ from sentry_sdk.utils import (
     event_from_exception,
 )
 from sentry_sdk._compat import PY2, reraise, iteritems
-from sentry_sdk.tracing import Span
+from sentry_sdk.tracing import Transaction
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
@@ -113,11 +113,11 @@ class SentryWsgiMiddleware(object):
                                 _make_wsgi_event_processor(environ)
                             )
 
-                    span = Span.continue_from_environ(environ)
-                    span.op = "http.server"
-                    span.transaction = "generic WSGI request"
+                    span = Transaction.continue_from_environ(
+                        environ, op="http.server", name="generic WSGI request"
+                    )
 
-                    with hub.start_span(span) as span:
+                    with hub.start_transaction(span) as span:
                         try:
                             rv = self.app(
                                 environ,
@@ -133,7 +133,7 @@ class SentryWsgiMiddleware(object):
 
 def _sentry_start_response(
     old_start_response,  # type: StartResponse
-    span,  # type: Span
+    span,  # type: Transaction
     status,  # type: str
     response_headers,  # type: WsgiResponseHeaders
     exc_info=None,  # type: Optional[WsgiExcInfo]

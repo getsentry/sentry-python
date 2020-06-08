@@ -9,7 +9,7 @@ from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
 )
-from sentry_sdk.tracing import Span
+from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -85,13 +85,15 @@ class AioHttpIntegration(Integration):
                     scope.clear_breadcrumbs()
                     scope.add_event_processor(_make_request_processor(weak_request))
 
-                span = Span.continue_from_headers(request.headers)
-                span.op = "http.server"
-                # If this transaction name makes it to the UI, AIOHTTP's
-                # URL resolver did not find a route or died trying.
-                span.transaction = "generic AIOHTTP request"
+                span = Transaction.continue_from_headers(
+                    request.headers,
+                    op="http.server",
+                    # If this transaction name makes it to the UI, AIOHTTP's
+                    # URL resolver did not find a route or died trying.
+                    name="generic AIOHTTP request",
+                )
 
-                with hub.start_span(span):
+                with hub.start_transaction(span):
                     try:
                         response = await old_handle(self, request)
                     except HTTPException as e:

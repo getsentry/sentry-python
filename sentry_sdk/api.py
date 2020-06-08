@@ -17,7 +17,7 @@ if MYPY:
     from typing import Union
 
     from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint, ExcInfo
-    from sentry_sdk.tracing import Span
+    from sentry_sdk.tracing import Span, Transaction
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
@@ -38,6 +38,7 @@ __all__ = [
     "flush",
     "last_event_id",
     "start_span",
+    "start_transaction",
     "set_tag",
     "set_context",
     "set_extra",
@@ -255,3 +256,15 @@ def start_span(
     # TODO: All other functions in this module check for
     # `Hub.current is None`. That actually should never happen?
     return Hub.current.start_span(span=span, **kwargs)
+
+
+@hubmethod
+def start_transaction(
+    span_or_name=None,  # type: Optional[Union[Span, str]]
+    **kwargs  # type: Any
+):
+    # type: (...) -> Transaction
+
+    # TODO: All other functions in this module check for
+    # `Hub.current is None`. That actually should never happen?
+    return Hub.current.start_transaction(span_or_name=span_or_name, **kwargs)

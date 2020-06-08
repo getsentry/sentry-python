@@ -3,8 +3,14 @@ import gc
 
 import pytest
 
-from sentry_sdk import Hub, capture_message
-from sentry_sdk.tracing import Span
+from sentry_sdk import (
+    Hub,
+    capture_message,
+    start_span,
+    start_transaction,
+    configure_scope,
+)
+from sentry_sdk.tracing import Transaction
 
 
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
@@ -12,13 +18,13 @@ def test_basic(sentry_init, capture_events, sample_rate):
     sentry_init(traces_sample_rate=sample_rate)
     events = capture_events()
 
-    with Hub.current.start_span(transaction="hi") as span:
+    with start_transaction(name="hi") as span:
         span.set_status("ok")
         with pytest.raises(ZeroDivisionError):
-            with Hub.current.start_span(op="foo", description="foodesc"):
+            with start_span(op="foo", description="foodesc"):
                 1 / 0
 
-        with Hub.current.start_span(op="bar", description="bardesc"):
+        with start_span(op="bar", description="bardesc"):
             pass
 
     if sample_rate:
@@ -44,8 +50,8 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
     sentry_init(traces_sample_rate=1.0, traceparent_v2=True)
     events = capture_events()
 
-    with Hub.current.start_span(transaction="hi"):
-        with Hub.current.start_span() as old_span:
+    with start_transaction(name="hi"):
+        with start_span() as old_span:
             old_span.sampled = sampled
             headers = dict(Hub.current.iter_trace_propagation_headers())
 
@@ -57,8 +63,7 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
     if sampled is None:
         assert header.endswith("-")
 
-    span = Span.continue_from_headers(headers)
-    span.transaction = "WRONG"
+    span = Transaction.continue_from_headers(headers, name="WRONG")
     assert span is not None
     assert span.sampled == sampled
     assert span.trace_id == old_span.trace_id
@@ -66,8 +71,8 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
     assert span.parent_span_id == old_span.span_id
     assert span.span_id != old_span.span_id
 
-    with Hub.current.start_span(span):
-        with Hub.current.configure_scope() as scope:
+    with start_transaction(span):
+        with configure_scope() as scope:
             scope.transaction = "ho"
         capture_message("hello")
 
@@ -94,13 +99,13 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
 def test_sampling_decided_only_for_transactions(sentry_init, capture_events):
     sentry_init(traces_sample_rate=0.5)
 
-    with Hub.current.start_span(transaction="hi") as trace:
+    with start_transaction(name="hi") as trace:
         assert trace.sampled is not None
 
-        with Hub.current.start_span() as span:
+        with start_span() as span:
             assert span.sampled == trace.sampled
 
-    with Hub.current.start_span() as span:
+    with start_span() as span:
         assert span.sampled is None
 
 
@@ -113,11 +118,9 @@ def test_memory_usage(sentry_init, capture_events, args, expected_refcount):
 
     references = weakref.WeakSet()
 
-    with Hub.current.start_span(transaction="hi"):
+    with start_transaction(name="hi"):
         for i in range(100):
-            with Hub.current.start_span(
-                op="helloworld", description="hi {}".format(i)
-            ) as span:
+            with start_span(op="helloworld", description="hi {}".format(i)) as span:
 
                 def foo():
                     pass
@@ -139,9 +142,9 @@ def test_span_trimming(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0, _experiments={"max_spans": 3})
     events = capture_events()
 
-    with Hub.current.start_span(transaction="hi"):
+    with start_transaction(name="hi"):
         for i in range(10):
-            with Hub.current.start_span(op="foo{}".format(i)):
+            with start_span(op="foo{}".format(i)):
                 pass
 
     (event,) = events
@@ -151,7 +154,31 @@ def test_span_trimming(sentry_init, capture_events):
 
 
 def test_nested_span_sampling_override():
-    with Hub.current.start_span(transaction="outer", sampled=True) as span:
+    with start_transaction(name="outer", sampled=True) as span:
         assert span.sampled is True
-        with Hub.current.start_span(transaction="inner", sampled=False) as span:
-            assert span.sampled is False
+        with start_transaction(name="inner", sampled=False) as span2:
+            assert span2.sampled is False
+
+        assert span.sampled is True
+
+
+def test_transaction_method_signature(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with pytest.raises(TypeError):
+        start_span(name="foo")
+
+    with pytest.raises(ValueError):
+        start_transaction()
+
+    with start_transaction(name="a"):
+        pass
+
+    with start_transaction("b"):
+        pass
+
+    with start_transaction(Transaction(name="c")):
+        pass
+
+    assert len(events) == 3

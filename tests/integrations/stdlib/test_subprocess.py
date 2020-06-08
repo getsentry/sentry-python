@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from sentry_sdk import Hub, capture_message
+from sentry_sdk import capture_message, start_transaction
 from sentry_sdk._compat import PY2
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 
@@ -63,7 +63,7 @@ def test_subprocess_basic(
     sentry_init(integrations=[StdlibIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
-    with Hub.current.start_span(transaction="foo", op="foo") as span:
+    with start_transaction(name="foo") as span:
         args = [
             sys.executable,
             "-c",

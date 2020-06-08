@@ -19,7 +19,7 @@ from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
 )
-from sentry_sdk.tracing import Span
+from sentry_sdk.tracing import Transaction
 
 if MYPY:
     from typing import Dict
@@ -123,16 +123,17 @@ class SentryAsgiMiddleware:
                 ty = scope["type"]
 
                 if ty in ("http", "websocket"):
-                    span = Span.continue_from_headers(dict(scope["headers"]))
-                    span.op = "{}.server".format(ty)
+                    span = Transaction.continue_from_headers(
+                        dict(scope["headers"]),
+                        name=_DEFAULT_TRANSACTION_NAME,
+                        op="{}.server".format(ty),
+                    )
                 else:
-                    span = Span()
-                    span.op = "asgi.server"
+                    span = Transaction(name=_DEFAULT_TRANSACTION_NAME, op="asgi.server")
 
                 span.set_tag("asgi.type", ty)
-                span.transaction = _DEFAULT_TRANSACTION_NAME
 
-                with hub.start_span(span) as span:
+                with hub.start_transaction(span):
                     # XXX: Would be cool to have correct span status, but we
                     # would have to wrap send(). That is a bit hard to do with
                     # the current abstraction over ASGI 2/3.

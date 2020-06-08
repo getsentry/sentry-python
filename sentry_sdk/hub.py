@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
-from sentry_sdk.tracing import Span
+from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.sessions import Session
 from sentry_sdk.utils import (
     exc_info_from_error,
@@ -445,10 +445,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         span, if any. The return value is the span object that can
         be used as a context manager to start and stop timing.
 
-        Note that you will not see any span that is not contained
-        within a transaction. Create a transaction with
-        ``start_span(transaction="my transaction")`` if an
-        integration doesn't already do this for you.
+        Note that you will not see any span that is not contained within a
+        transaction. Most integrations already do this for you, but create a
+        transaction with `start_transaction` otherwise.
         """
 
         client, scope = self._stack[-1]
@@ -462,17 +461,56 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             else:
                 span = Span(**kwargs)
 
-        if span.sampled is None and span.transaction is not None:
-            sample_rate = client and client.options["traces_sample_rate"] or 0
-            span.sampled = random.random() < sample_rate
+        elif isinstance(span, Transaction):
+            raise ValueError("Pass transactions to start_transaction instead")
 
-        if span.sampled:
+        return span
+
+    def start_transaction(
+        self,
+        span_or_name=None,  # type: Optional[Union[Span, str]]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Transaction
+        """
+        Create a new transaction detached from the current span. The return
+        value is the `Transaction` object which for the most part works like a
+        span.
+        """
+
+        kwargs.setdefault("hub", self)
+
+        if isinstance(span_or_name, str):
+            if "name" in kwargs:
+                raise ValueError("Cannot specify transaction name twice.")
+            kwargs["name"] = span_or_name
+            transaction = Transaction(**kwargs)
+
+        elif span_or_name is None and "name" in kwargs:
+            transaction = Transaction(**kwargs)
+
+        elif isinstance(span_or_name, Transaction):
+            transaction = span_or_name
+
+        elif span_or_name is None and "span" in kwargs:
+            transaction = kwargs.pop("span")
+
+        else:
+            raise ValueError("transaction object or name required.")
+
+        client, scope = self._stack[-1]
+
+        if transaction.sampled is None:
+            sample_rate = client and client.options["traces_sample_rate"] or 0
+            transaction.sampled = random.random() < sample_rate
+
+        if transaction.sampled:
             max_spans = (
                 client and client.options["_experiments"].get("max_spans") or 1000
             )
-            span.init_finished_spans(maxlen=max_spans)
+            transaction.init_span_recorder(maxlen=max_spans)
 
-        return span
+        return transaction
 
     @overload  # noqa
     def push_scope(

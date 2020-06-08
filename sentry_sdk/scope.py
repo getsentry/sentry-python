@@ -5,6 +5,7 @@ from itertools import chain
 from sentry_sdk._functools import wraps
 from sentry_sdk._types import MYPY
 from sentry_sdk.utils import logger, capture_internal_exceptions
+from sentry_sdk.tracing import Transaction
 
 if MYPY:
     from typing import Any
@@ -140,8 +141,8 @@ class Scope(object):
         """When set this forces a specific transaction name to be set."""
         self._transaction = value
         span = self._span
-        if span:
-            span.transaction = value
+        if span and isinstance(span, Transaction) and value:
+            span.name = value
 
     @_attr_setter
     def user(self, value):
@@ -166,8 +167,8 @@ class Scope(object):
     def span(self, span):
         # type: (Optional[Span]) -> None
         self._span = span
-        if span is not None:
-            span_transaction = span.transaction
+        if isinstance(span, Transaction):
+            span_transaction = span.name
             if span_transaction:
                 self._transaction = span_transaction
 
