@@ -51,9 +51,11 @@ class AioHttpIntegration(Integration):
         # type: () -> None
 
         try:
-            version = tuple(map(int, AIOHTTP_VERSION.split(".")))
+            version = tuple(map(int, AIOHTTP_VERSION.split(".")[:2]))
         except (TypeError, ValueError):
-            raise DidNotEnable("AIOHTTP version unparseable: {}".format(version))
+            raise DidNotEnable(
+                "AIOHTTP version unparseable: {}".format(AIOHTTP_VERSION)
+            )
 
         if version < (3, 4):
             raise DidNotEnable("AIOHTTP 3.4 or newer required.")
