@@ -155,7 +155,8 @@ def _sentry_start_response(
 def _get_environ(environ):
     # type: (Dict[str, str]) -> Iterator[Tuple[str, str]]
     """
-    Returns our whitelisted environment variables.
+    Returns our explicitly included environment variables we want to
+    capture (server name, port and remote addr if pii is enabled).
     """
     keys = ["SERVER_NAME", "SERVER_PORT"]
     if _should_send_default_pii():
