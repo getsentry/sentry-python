@@ -20,8 +20,6 @@ if django.VERSION >= (3, 0):
 @pytest.mark.asyncio
 async def test_basic(sentry_init, capture_events, application, request):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
-    Hub.main.bind_client(Hub.current.client)
-    request.addfinalizer(lambda: Hub.main.bind_client(None))
 
     events = capture_events()
 
