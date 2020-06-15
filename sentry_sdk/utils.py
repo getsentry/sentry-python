@@ -780,22 +780,6 @@ def _get_contextvars():
 
     See https://docs.sentry.io/platforms/python/contextvars/ for more information.
     """
-    # Django 3+ uses asgiref which has its own context locals implementation.
-    # Starting with Django 3.1 `asgiref.local` is actually required to have
-    # your errorhandlers be called in the right context.
-    #
-    # XXX: This entire import-time detection is broken. We should figure out an
-    # API for integrations to swap out implementations dynamically. Django and
-    # ASGI may be used in one process, but unused in another.
-    try:
-        from asgiref.local import Local
-    except ImportError:
-        pass
-    else:
-        # Return True here because asgiref.local works correctly for ASGI
-        # environments
-        return True, _make_threadlocal_contextvars(Local)
-
     if not _is_contextvars_broken():
         # aiocontextvars is a PyPI package that ensures that the contextvars
         # backport (also a PyPI package) works with asyncio under Python 3.6
