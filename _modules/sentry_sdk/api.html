@@ -4,7 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.api &#8212; sentry-python 0.14.4 documentation</title>
+    <title>sentry_sdk.api &#8212; sentry-python 0.15.0 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -47,8 +47,9 @@
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TypeVar</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">ContextManager</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span>
 
-    <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">Hint</span><span class="p">,</span> <span class="n">Breadcrumb</span><span class="p">,</span> <span class="n">BreadcrumbHint</span>
+    <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">Hint</span><span class="p">,</span> <span class="n">Breadcrumb</span><span class="p">,</span> <span class="n">BreadcrumbHint</span><span class="p">,</span> <span class="n">ExcInfo</span>
     <span class="kn">from</span> <span class="nn">sentry_sdk.tracing</span> <span class="kn">import</span> <span class="n">Span</span>
 
     <span class="n">T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;T&quot;</span><span class="p">)</span>
@@ -126,7 +127,7 @@
 
 <div class="viewcode-block" id="capture_exception"><a class="viewcode-back" href="../../api.html#sentry_sdk.capture_exception">[docs]</a><span class="nd">@hubmethod</span>
 <span class="k">def</span> <span class="nf">capture_exception</span><span class="p">(</span>
-    <span class="n">error</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[BaseException]</span>
+    <span class="n">error</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Union[BaseException, ExcInfo]]</span>
     <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
     <span class="o">**</span><span class="n">scope_args</span>  <span class="c1"># type: Dict[str, Any]</span>
 <span class="p">):</span>
@@ -345,7 +346,7 @@
       &copy;2019, Sentry Team and Contributors.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.3</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.0.4</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
     </div>
