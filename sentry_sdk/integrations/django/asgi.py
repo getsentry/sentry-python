@@ -14,6 +14,9 @@ from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
 if MYPY:
     from typing import Any
+    from typing import Union
+
+    from django.http.response import HttpResponse
 
 
 def patch_django_asgi_handler_impl(cls):
@@ -31,6 +34,18 @@ def patch_django_asgi_handler_impl(cls):
         return await middleware(scope, receive, send)
 
     cls.__call__ = sentry_patched_asgi_handler
+
+
+def patch_get_response_async(cls, _before_get_response):
+    # type: (Any, Any) -> None
+    old_get_response_async = cls.get_response_async
+
+    async def sentry_patched_get_response_async(self, request):
+        # type: (Any, Any) -> Union[HttpResponse, BaseException]
+        _before_get_response(request)
+        return await old_get_response_async(self, request)
+
+    cls.get_response_async = sentry_patched_get_response_async
 
 
 def patch_channels_asgi_handler_impl(cls):

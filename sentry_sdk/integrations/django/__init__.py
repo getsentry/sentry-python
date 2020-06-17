@@ -120,39 +120,9 @@ class DjangoIntegration(Integration):
 
         WSGIHandler.__call__ = sentry_patched_wsgi_handler
 
+        _patch_get_response()
+
         _patch_django_asgi_handler()
-
-        # patch get_response, because at that point we have the Django request
-        # object
-        from django.core.handlers.base import BaseHandler
-
-        old_get_response = BaseHandler.get_response
-
-        def sentry_patched_get_response(self, request):
-            # type: (Any, WSGIRequest) -> Union[HttpResponse, BaseException]
-            hub = Hub.current
-            integration = hub.get_integration(DjangoIntegration)
-            if integration is not None:
-                _patch_drf()
-
-                with hub.configure_scope() as scope:
-                    # Rely on WSGI middleware to start a trace
-                    try:
-                        if integration.transaction_style == "function_name":
-                            scope.transaction = transaction_from_function(
-                                resolve(request.path).func
-                            )
-                        elif integration.transaction_style == "url":
-                            scope.transaction = LEGACY_RESOLVER.resolve(request.path)
-                    except Exception:
-                        pass
-
-                    scope.add_event_processor(
-                        _make_event_processor(weakref.ref(request), integration)
-                    )
-            return old_get_response(self, request)
-
-        BaseHandler.get_response = sentry_patched_get_response
 
         signals.got_request_exception.connect(_got_request_exception)
 
@@ -335,6 +305,54 @@ def _patch_django_asgi_handler():
     from sentry_sdk.integrations.django.asgi import patch_django_asgi_handler_impl
 
     patch_django_asgi_handler_impl(ASGIHandler)
+
+
+def _before_get_response(request):
+    # type: (WSGIRequest) -> None
+    hub = Hub.current
+    integration = hub.get_integration(DjangoIntegration)
+    if integration is None:
+        return
+
+    _patch_drf()
+
+    with hub.configure_scope() as scope:
+        # Rely on WSGI middleware to start a trace
+        try:
+            if integration.transaction_style == "function_name":
+                scope.transaction = transaction_from_function(
+                    resolve(request.path).func
+                )
+            elif integration.transaction_style == "url":
+                scope.transaction = LEGACY_RESOLVER.resolve(request.path)
+        except Exception:
+            pass
+
+        scope.add_event_processor(
+            _make_event_processor(weakref.ref(request), integration)
+        )
+
+
+def _patch_get_response():
+    # type: () -> None
+    """
+    patch get_response, because at that point we have the Django request object
+    """
+    from django.core.handlers.base import BaseHandler
+
+    old_get_response = BaseHandler.get_response
+
+    def sentry_patched_get_response(self, request):
+        # type: (Any, WSGIRequest) -> Union[HttpResponse, BaseException]
+        _before_get_response(request)
+        return old_get_response(self, request)
+
+    BaseHandler.get_response = sentry_patched_get_response
+
+    if hasattr(BaseHandler, "get_response_async"):
+        from sentry_sdk.integrations.django.asgi import patch_get_response_async
+
+        patch_get_response_async(BaseHandler, _before_get_response)
 
 
 def _make_event_processor(weak_request, integration):
