@@ -27,6 +27,15 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.15.0
+
+* **Breaking change:** The ASGI middleware will now raise an exception if contextvars are not available, like it is already the case for other asyncio integrations.
+* Contextvars are now used in more circumstances following a bugfix release of `gevent`. This will fix a few instances of wrong request data being attached to events while using an asyncio-based web framework.
+* APM: Fix a bug in the SQLAlchemy integration where a span was left open if the database transaction had to be rolled back. This could have led to deeply nested span trees under that db query span.
+* Fix a bug in the Pyramid integration where the transaction name could not be overridden at all.
+* Fix a broken type annotation on `capture_exception`.
+* Basic support for Django 3.1. More work is required for async middlewares to be instrumented properly for APM.
+
 ## 0.14.4
 
 * Fix bugs in transport rate limit enforcement for specific data categories.
