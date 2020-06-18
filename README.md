@@ -43,4 +43,4 @@ Please refer to [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 # License
 
-Licensed under the BSD license, see `LICENSE`
+Licensed under the BSD license, see [LICENSE](./LICENSE)
