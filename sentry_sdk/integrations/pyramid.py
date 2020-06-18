@@ -81,7 +81,7 @@ class PyramidIntegration(Integration):
                         elif integration.transaction_style == "route_pattern":
                             scope.transaction = request.matched_route.pattern
                     except Exception:
-                        raise
+                        pass
 
                     scope.add_event_processor(
                         _make_event_processor(weakref.ref(request), integration)
