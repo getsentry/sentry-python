@@ -174,13 +174,10 @@ def test_transaction_method_signature(sentry_init, capture_events):
     with start_transaction(name="a"):
         pass
 
-    with start_transaction("b"):
-        pass
-
     with start_transaction(Transaction(name="c")):
         pass
 
-    assert len(events) == 3
+    assert len(events) == 2
 
 
 def test_nested_spans_in_scope(sentry_init, capture_events):

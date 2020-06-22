@@ -206,8 +206,8 @@ def start_span(
 
 @hubmethod
 def start_transaction(
-    span_or_name=None,  # type: Optional[Union[Span, str]]
+    transaction=None,  # type: Optional[Transaction]
     **kwargs  # type: Any
 ):
     # type: (...) -> Transaction
-    return Hub.current.start_transaction(span_or_name=span_or_name, **kwargs)
+    return Hub.current.start_transaction(transaction, **kwargs)

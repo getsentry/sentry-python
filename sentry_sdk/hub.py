@@ -468,32 +468,44 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def start_transaction(
         self,
-        span_or_name=None,  # type: Optional[Union[Span, str]]
+        transaction=None,  # type: Optional[Transaction]
         **kwargs  # type: Any
     ):
         # type: (...) -> Transaction
         """
-        Create a new transaction detached from the current span. The return
-        value is the `Transaction` object which for the most part works like a
-        span.
+        Start and return a transaction.
+
+        Start an existing transaction if given, otherwise create and start a new
+        transaction with kwargs.
         """
+        # XXX: should we always set transaction.hub = self?
+        # In a multi-hub program, what does it mean to write
+        #     hub1.start_transaction(Transaction(hub=hub2))
+        # ? Should the transaction be on hub1 or hub2?
 
-        kwargs.setdefault("hub", self)
+        # XXX: it is strange that both start_span and start_transaction take
+        # kwargs, but those are ignored if span/transaction are not None.
+        # Code such as:
+        #     hub.start_transaction(Transaction(name="foo"), name="bar")
+        #
+        # is clearly weird, but not so weird if we intentionally want to rename
+        # a transaction we got from somewhere else:
+        #     hub.start_transaction(transaction, name="new_name")
+        #
+        # Would be clearer if Hub was not involved:
+        #     transaction.name = "new_name"
+        #     with transaction:  # __enter__ => start, __exit__ => finish
+        #         with transaction.start_child(...):
+        #             pass
+        #         # alternatively, rely on transaction being in the current scope
+        #         with Span(...):
+        #             pass
 
-        if isinstance(span_or_name, str):
-            if "name" in kwargs:
-                raise ValueError("Cannot specify transaction name twice.")
-            kwargs["name"] = span_or_name
+        if transaction is None:
+            if "name" not in kwargs:
+                raise ValueError("missing name")
+            kwargs.setdefault("hub", self)
             transaction = Transaction(**kwargs)
-
-        elif span_or_name is None and "name" in kwargs:
-            transaction = Transaction(**kwargs)
-
-        elif isinstance(span_or_name, Transaction):
-            transaction = span_or_name
-
-        else:
-            raise ValueError("transaction object or name required.")
 
         client, scope = self._stack[-1]
 
