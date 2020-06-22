@@ -18,8 +18,8 @@ def test_basic(sentry_init, capture_events, sample_rate):
     sentry_init(traces_sample_rate=sample_rate)
     events = capture_events()
 
-    with start_transaction(name="hi") as span:
-        span.set_status("ok")
+    with start_transaction(name="hi") as transaction:
+        transaction.set_status("ok")
         with pytest.raises(ZeroDivisionError):
             with start_span(op="foo", description="foodesc"):
                 1 / 0
@@ -63,15 +63,15 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
     if sampled is None:
         assert header.endswith("-")
 
-    span = Transaction.continue_from_headers(headers, name="WRONG")
-    assert span is not None
-    assert span.sampled == sampled
-    assert span.trace_id == old_span.trace_id
-    assert span.same_process_as_parent is False
-    assert span.parent_span_id == old_span.span_id
-    assert span.span_id != old_span.span_id
+    transaction = Transaction.continue_from_headers(headers, name="WRONG")
+    assert transaction is not None
+    assert transaction.sampled == sampled
+    assert transaction.trace_id == old_span.trace_id
+    assert transaction.same_process_as_parent is False
+    assert transaction.parent_span_id == old_span.span_id
+    assert transaction.span_id != old_span.span_id
 
-    with start_transaction(span):
+    with start_transaction(transaction):
         with configure_scope() as scope:
             scope.transaction = "ho"
         capture_message("hello")
@@ -89,7 +89,7 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
         assert (
             trace1["contexts"]["trace"]["trace_id"]
             == trace2["contexts"]["trace"]["trace_id"]
-            == span.trace_id
+            == transaction.trace_id
             == message["contexts"]["trace"]["trace_id"]
         )
 

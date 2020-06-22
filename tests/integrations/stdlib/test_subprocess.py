@@ -63,7 +63,7 @@ def test_subprocess_basic(
     sentry_init(integrations=[StdlibIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
-    with start_transaction(name="foo") as span:
+    with start_transaction(name="foo") as transaction:
         args = [
             sys.executable,
             "-c",
@@ -114,7 +114,7 @@ def test_subprocess_basic(
 
     assert os.environ == old_environ
 
-    assert span.trace_id in str(output)
+    assert transaction.trace_id in str(output)
 
     capture_message("hi")
 
