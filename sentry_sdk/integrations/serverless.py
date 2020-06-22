@@ -69,7 +69,7 @@ def _capture_and_reraise():
     # type: () -> None
     exc_info = sys.exc_info()
     hub = Hub.current
-    if hub is not None and hub.client is not None:
+    if hub.client is not None:
         event, hint = event_from_exception(
             exc_info,
             client_options=hub.client.options,
@@ -82,6 +82,4 @@ def _capture_and_reraise():
 
 def _flush_client():
     # type: () -> None
-    hub = Hub.current
-    if hub is not None:
-        hub.flush()
+    return Hub.current.flush()
