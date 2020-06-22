@@ -99,11 +99,11 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
 def test_sampling_decided_only_for_transactions(sentry_init, capture_events):
     sentry_init(traces_sample_rate=0.5)
 
-    with start_transaction(name="hi") as trace:
-        assert trace.sampled is not None
+    with start_transaction(name="hi") as transaction:
+        assert transaction.sampled is not None
 
         with start_span() as span:
-            assert span.sampled == trace.sampled
+            assert span.sampled == transaction.sampled
 
     with start_span() as span:
         assert span.sampled is None
