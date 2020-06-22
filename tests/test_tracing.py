@@ -181,3 +181,25 @@ def test_transaction_method_signature(sentry_init, capture_events):
         pass
 
     assert len(events) == 3
+
+
+def test_nested_spans_in_scope(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    # XXX: nesting of spans may not work when async code is involved (data race
+    # accessing scope._span)
+    with start_transaction(name="/status/") as transaction:
+        assert Hub.current.scope._span is transaction
+        with start_span(op="check1", description="desc1") as span1:
+            assert Hub.current.scope._span is span1
+            with start_span(op="check1_1", description="desc1_1") as span1_1:
+                assert Hub.current.scope._span is span1_1
+            assert Hub.current.scope._span is span1
+        with start_span(op="check2", description="desc2") as span2:
+            assert Hub.current.scope._span is span2
+        assert Hub.current.scope._span is transaction
+        transaction.set_status("ok")
+
+    assert len(events) == 1
+    assert len(events[0]["spans"]) == 3
