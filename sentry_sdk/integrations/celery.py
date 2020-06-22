@@ -130,21 +130,21 @@ def _wrap_tracer(task, f):
             scope.clear_breadcrumbs()
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
-            span = Transaction.continue_from_headers(
+            transaction = Transaction.continue_from_headers(
                 args[3].get("headers") or {},
                 op="celery.task",
                 name="unknown celery task",
             )
 
             # Could possibly use a better hook than this one
-            span.set_status("ok")
+            transaction.set_status("ok")
 
             with capture_internal_exceptions():
                 # Celery task objects are not a thing to be trusted. Even
                 # something such as attribute access can fail.
-                span.name = task.name
+                transaction.name = task.name
 
-            with hub.start_transaction(span):
+            with hub.start_transaction(transaction):
                 return f(*args, **kwargs)
 
     return _inner  # type: ignore

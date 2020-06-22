@@ -123,17 +123,17 @@ class SentryAsgiMiddleware:
                 ty = scope["type"]
 
                 if ty in ("http", "websocket"):
-                    span = Transaction.continue_from_headers(
+                    transaction = Transaction.continue_from_headers(
                         dict(scope["headers"]),
                         name=_DEFAULT_TRANSACTION_NAME,
                         op="{}.server".format(ty),
                     )
                 else:
-                    span = Transaction(name=_DEFAULT_TRANSACTION_NAME, op="asgi.server")
+                    transaction = Transaction(name=_DEFAULT_TRANSACTION_NAME, op="asgi.server")
 
-                span.set_tag("asgi.type", ty)
+                transaction.set_tag("asgi.type", ty)
 
-                with hub.start_transaction(span):
+                with hub.start_transaction(transaction):
                     # XXX: Would be cool to have correct span status, but we
                     # would have to wrap send(). That is a bit hard to do with
                     # the current abstraction over ASGI 2/3.
