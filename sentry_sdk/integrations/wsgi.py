@@ -113,15 +113,15 @@ class SentryWsgiMiddleware(object):
                                 _make_wsgi_event_processor(environ)
                             )
 
-                    span = Transaction.continue_from_environ(
+                    transaction = Transaction.continue_from_environ(
                         environ, op="http.server", name="generic WSGI request"
                     )
 
-                    with hub.start_transaction(span) as span:
+                    with hub.start_transaction(transaction) as transaction:
                         try:
                             rv = self.app(
                                 environ,
-                                partial(_sentry_start_response, start_response, span),
+                                partial(_sentry_start_response, start_response, transaction),
                             )
                         except BaseException:
                             reraise(*_capture_exception(hub))
