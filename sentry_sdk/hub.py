@@ -502,8 +502,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         #             pass
 
         if transaction is None:
-            if "name" not in kwargs:
-                raise ValueError("missing name")
             kwargs.setdefault("hub", self)
             transaction = Transaction(**kwargs)
 

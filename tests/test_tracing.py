@@ -168,8 +168,12 @@ def test_transaction_method_signature(sentry_init, capture_events):
     with pytest.raises(TypeError):
         start_span(name="foo")
 
-    with pytest.raises(ValueError):
-        start_transaction()
+    with start_transaction() as transaction:
+        pass
+    assert transaction.name == "<unlabeled transaction>"
+
+    with start_transaction() as transaction:
+        transaction.name = "name-known-after-transaction-started"
 
     with start_transaction(name="a"):
         pass
@@ -177,7 +181,7 @@ def test_transaction_method_signature(sentry_init, capture_events):
     with start_transaction(Transaction(name="c")):
         pass
 
-    assert len(events) == 2
+    assert len(events) == 4
 
 
 def test_nested_spans_in_scope(sentry_init, capture_events):

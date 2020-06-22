@@ -393,7 +393,7 @@ class Transaction(Span):
 
     def __init__(
         self,
-        name,  # type: str
+        name="",  # type: str
         **kwargs  # type: Any
     ):
         # type: (...) -> None
@@ -403,6 +403,12 @@ class Transaction(Span):
 
     def finish(self, hub=None):
         # type: (Optional[sentry_sdk.Hub]) -> Optional[str]
+        if not self.name:
+            logger.warning(
+                "Transaction has no name, falling back to `<unlabeled transaction>`."
+            )
+            self.name = "<unlabeled transaction>"
+
         Span.finish(self, hub)
 
         hub = hub or self.hub or sentry_sdk.Hub.current
