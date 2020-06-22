@@ -492,9 +492,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         elif isinstance(span_or_name, Transaction):
             transaction = span_or_name
 
-        elif span_or_name is None and "span" in kwargs:
-            transaction = kwargs.pop("span")
-
         else:
             raise ValueError("transaction object or name required.")
 
