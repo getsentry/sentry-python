@@ -264,7 +264,4 @@ def start_transaction(
     **kwargs  # type: Any
 ):
     # type: (...) -> Transaction
-
-    # TODO: All other functions in this module check for
-    # `Hub.current is None`. That actually should never happen?
     return Hub.current.start_transaction(span_or_name=span_or_name, **kwargs)
