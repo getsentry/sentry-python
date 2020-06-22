@@ -158,8 +158,7 @@ def test_nested_transaction_sampling_override():
         assert outer_transaction.sampled is True
         with start_transaction(name="inner", sampled=False) as inner_transaction:
             assert inner_transaction.sampled is False
-
-        assert span.sampled is True
+        assert outer_transaction.sampled is True
 
 
 def test_transaction_method_signature(sentry_init, capture_events):
