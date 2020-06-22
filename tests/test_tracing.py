@@ -22,7 +22,8 @@ def test_basic(sentry_init, capture_events, sample_rate):
             pass
 
     if sample_rate:
-        (event,) = events
+        assert len(events) == 1
+        event = events[0]
 
         span1, span2 = event["spans"]
         parent_span = event
