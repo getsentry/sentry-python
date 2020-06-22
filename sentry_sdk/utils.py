@@ -751,6 +751,27 @@ def _is_contextvars_broken():
     return False
 
 
+def _make_threadlocal_contextvars(local):
+    # type: (type) -> type
+    class ContextVar(object):
+        # Super-limited impl of ContextVar
+
+        def __init__(self, name):
+            # type: (str) -> None
+            self._name = name
+            self._local = local()
+
+        def get(self, default):
+            # type: (Any) -> Any
+            return getattr(self._local, "value", default)
+
+        def set(self, value):
+            # type: (Any) -> None
+            self._local.value = value
+
+    return ContextVar
+
+
 def _get_contextvars():
     # type: () -> Tuple[bool, type]
     """
@@ -786,23 +807,7 @@ def _get_contextvars():
 
     from threading import local
 
-    class ContextVar(object):
-        # Super-limited impl of ContextVar
-
-        def __init__(self, name):
-            # type: (str) -> None
-            self._name = name
-            self._local = local()
-
-        def get(self, default):
-            # type: (Any) -> Any
-            return getattr(self._local, "value", default)
-
-        def set(self, value):
-            # type: (Any) -> None
-            self._local.value = value
-
-    return False, ContextVar
+    return False, _make_threadlocal_contextvars(local)
 
 
 HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()

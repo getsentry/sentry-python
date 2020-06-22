@@ -18,8 +18,9 @@ if django.VERSION >= (3, 0):
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
-async def test_basic(sentry_init, capture_events, application):
+async def test_basic(sentry_init, capture_events, application, request):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+
     events = capture_events()
 
     comm = HttpCommunicator(application, "GET", "/view-exc?test=query")

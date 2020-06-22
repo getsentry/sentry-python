@@ -49,11 +49,11 @@ def patch_django_middlewares():
 
     old_load_middleware = base.BaseHandler.load_middleware
 
-    def sentry_patched_load_middleware(self):
-        # type: (base.BaseHandler) -> Any
+    def sentry_patched_load_middleware(*args, **kwargs):
+        # type: (Any, Any) -> Any
         _import_string_should_wrap_middleware.set(True)
         try:
-            return old_load_middleware(self)
+            return old_load_middleware(*args, **kwargs)
         finally:
             _import_string_should_wrap_middleware.set(False)
 
