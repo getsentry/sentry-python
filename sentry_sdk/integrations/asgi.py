@@ -129,7 +129,9 @@ class SentryAsgiMiddleware:
                         op="{}.server".format(ty),
                     )
                 else:
-                    transaction = Transaction(name=_DEFAULT_TRANSACTION_NAME, op="asgi.server")
+                    transaction = Transaction(
+                        name=_DEFAULT_TRANSACTION_NAME, op="asgi.server"
+                    )
 
                 transaction.set_tag("asgi.type", ty)
 
