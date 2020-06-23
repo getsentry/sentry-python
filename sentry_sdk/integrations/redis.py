@@ -9,6 +9,11 @@ from sentry_sdk._types import MYPY
 if MYPY:
     from typing import Any
 
+SINGLE_KEY_COMMANDS = frozenset(
+    ["decr", "decrby", "get", "incr", "incrby", "pttl", "set", "setex", "setnx", "ttl"]
+)
+MULTI_KEY_COMMANDS = frozenset(["del", "touch", "unlink"])
+
 
 class RedisIntegration(Integration):
     identifier = "redis"
@@ -62,8 +67,12 @@ def patch_redis_client(cls):
             if name:
                 span.set_tag("redis.command", name)
 
-            if name and args and name.lower() in ("get", "set", "setex", "setnx"):
-                span.set_tag("redis.key", args[0])
+            if name and args:
+                name_low = name.lower()
+                if (name_low in SINGLE_KEY_COMMANDS) or (
+                    name_low in MULTI_KEY_COMMANDS and len(args) == 1
+                ):
+                    span.set_tag("redis.key", args[0])
 
             return old_execute_command(self, name, *args, **kwargs)
 
