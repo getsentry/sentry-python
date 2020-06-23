@@ -97,7 +97,7 @@ def test_filename():
 def test_parse_dsn_paths(given, expected):
     dsn = Dsn(given)
     auth = dsn.to_auth()
-    assert auth.store_api_url == expected
+    assert auth.get_api_url() == expected
 
 
 @pytest.mark.parametrize(

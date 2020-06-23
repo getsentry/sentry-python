@@ -197,15 +197,15 @@ class Auth(object):
         self.version = version
         self.client = client
 
-    @property
-    def store_api_url(self):
+    def get_api_url(self, type='store'):
         # type: () -> str
         """Returns the API url for storing events."""
-        return "%s://%s%sapi/%s/store/" % (
+        return "%s://%s%sapi/%s/%s/" % (
             self.scheme,
             self.host,
             self.path,
             self.project_id,
+            type,
         )
 
     def to_header(self, timestamp=None):

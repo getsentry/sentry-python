@@ -163,6 +163,7 @@ class HttpTransport(Transport):
         self,
         body,  # type: bytes
         headers,  # type: Dict[str, str]
+        endpoint_type="store",
     ):
         # type: (...) -> None
         headers.update(
@@ -172,7 +173,7 @@ class HttpTransport(Transport):
             }
         )
         response = self._pool.request(
-            "POST", str(self._auth.store_api_url), body=body, headers=headers
+            "POST", str(self._auth.get_api_url(endpoint_type)), body=body, headers=headers
         )
 
         try:
@@ -258,6 +259,7 @@ class HttpTransport(Transport):
                 "Content-Type": "application/x-sentry-envelope",
                 "Content-Encoding": "gzip",
             },
+            endpoint_type="envelope",
         )
         return None
 
