@@ -237,6 +237,10 @@ class _Client(object):
         scope=None,  # type: Optional[Scope]
     ):
         # type: (...) -> bool
+        if event.get("type") == "transaction":
+            # Transactions are sampled independent of error events.
+            return True
+
         if scope is not None and not scope._should_capture:
             return False
 

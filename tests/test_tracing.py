@@ -155,3 +155,15 @@ def test_nested_span_sampling_override():
         assert span.sampled is True
         with Hub.current.start_span(transaction="inner", sampled=False) as span:
             assert span.sampled is False
+
+
+def test_no_double_sampling(sentry_init, capture_events):
+    # Transactions should not be subject to the global/error sample rate.
+    # Only the traces_sample_rate should apply.
+    sentry_init(traces_sample_rate=1.0, sample_rate=0.0)
+    events = capture_events()
+
+    with Hub.current.start_span(transaction="/"):
+        pass
+
+    assert len(events) == 1
