@@ -27,7 +27,7 @@ if MYPY:
     from urllib3.poolmanager import PoolManager  # type: ignore
     from urllib3.poolmanager import ProxyManager
 
-    from sentry_sdk._types import Event
+    from sentry_sdk._types import Event, EndpointType
 
     DataCategory = Optional[str]
 
@@ -163,7 +163,7 @@ class HttpTransport(Transport):
         self,
         body,  # type: bytes
         headers,  # type: Dict[str, str]
-        endpoint_type="store",
+        endpoint_type="store",  # type: EndpointType
     ):
         # type: (...) -> None
         headers.update(
@@ -173,7 +173,10 @@ class HttpTransport(Transport):
             }
         )
         response = self._pool.request(
-            "POST", str(self._auth.get_api_url(endpoint_type)), body=body, headers=headers
+            "POST",
+            str(self._auth.get_api_url(endpoint_type)),
+            body=body,
+            headers=headers,
         )
 
         try:

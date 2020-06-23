@@ -25,7 +25,7 @@ if MYPY:
     from typing import Union
     from typing import Type
 
-    from sentry_sdk._types import ExcInfo
+    from sentry_sdk._types import ExcInfo, EndpointType
 
 epoch = datetime(1970, 1, 1)
 
@@ -197,8 +197,10 @@ class Auth(object):
         self.version = version
         self.client = client
 
-    def get_api_url(self, type='store'):
-        # type: () -> str
+    def get_api_url(
+        self, type="store"  # type: EndpointType
+    ):
+        # type: (...) -> str
         """Returns the API url for storing events."""
         return "%s://%s%sapi/%s/%s/" % (
             self.scheme,

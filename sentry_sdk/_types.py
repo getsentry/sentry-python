@@ -35,3 +35,4 @@ if MYPY:
         "default", "error", "crash", "transaction", "security", "attachment", "session"
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
+    EndpointType = Literal["store", "envelope"]
