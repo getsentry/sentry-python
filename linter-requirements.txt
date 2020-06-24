@@ -1,6 +1,6 @@
 black==19.10b0
 flake8
 flake8-import-order
-mypy==0.781
+mypy==0.782
 flake8-bugbear>=19.8.0
 pep8-naming
