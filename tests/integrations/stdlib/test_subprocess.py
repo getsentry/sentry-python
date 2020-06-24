@@ -140,13 +140,15 @@ def test_subprocess_basic(
 
     (
         subprocess_init_span,
-        subprocess_wait_span,
         subprocess_communicate_span,
+        subprocess_wait_span,
     ) = transaction_event["spans"]
 
-    assert subprocess_init_span["op"] == "subprocess"
-    assert subprocess_communicate_span["op"] == "subprocess.communicate"
-    assert subprocess_wait_span["op"] == "subprocess.wait"
+    assert (
+        subprocess_init_span["op"],
+        subprocess_communicate_span["op"],
+        subprocess_wait_span["op"],
+    ) == ("subprocess", "subprocess.communicate", "subprocess.wait")
 
     # span hierarchy
     assert (
