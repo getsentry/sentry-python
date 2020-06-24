@@ -9,10 +9,10 @@ from sentry_sdk._types import MYPY
 if MYPY:
     from typing import Any
 
-SINGLE_KEY_COMMANDS = frozenset(
+_SINGLE_KEY_COMMANDS = frozenset(
     ["decr", "decrby", "get", "incr", "incrby", "pttl", "set", "setex", "setnx", "ttl"]
 )
-MULTI_KEY_COMMANDS = frozenset(["del", "touch", "unlink"])
+_MULTI_KEY_COMMANDS = frozenset(["del", "touch", "unlink"])
 
 
 class RedisIntegration(Integration):
@@ -69,8 +69,8 @@ def patch_redis_client(cls):
 
             if name and args:
                 name_low = name.lower()
-                if (name_low in SINGLE_KEY_COMMANDS) or (
-                    name_low in MULTI_KEY_COMMANDS and len(args) == 1
+                if (name_low in _SINGLE_KEY_COMMANDS) or (
+                    name_low in _MULTI_KEY_COMMANDS and len(args) == 1
                 ):
                     span.set_tag("redis.key", args[0])
 
