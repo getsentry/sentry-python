@@ -447,18 +447,6 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
     return rv
 
 
-def stacktrace_from_traceback(tb=None, with_locals=True):
-    # type: (Optional[TracebackType], bool) -> Dict[str, List[Dict[str, Any]]]
-    return {
-        "frames": [
-            serialize_frame(
-                tb.tb_frame, tb_lineno=tb.tb_lineno, with_locals=with_locals
-            )
-            for tb in iter_stacks(tb)
-        ]
-    }
-
-
 def current_stacktrace(with_locals=True):
     # type: (bool) -> Any
     __tracebackhide__ = True
@@ -504,12 +492,21 @@ def single_exception_from_error_tuple(
     else:
         with_locals = client_options["with_locals"]
 
+    stacktrace = {
+        "frames": [
+            serialize_frame(
+                tb.tb_frame, tb_lineno=tb.tb_lineno, with_locals=with_locals
+            )
+            for tb in iter_stacks(tb)
+        ]
+    }
+
     return {
         "module": get_type_module(exc_type),
         "type": get_type_name(exc_type),
         "value": safe_str(exc_value),
         "mechanism": mechanism,
-        "stacktrace": stacktrace_from_traceback(tb, with_locals),
+        "stacktrace": stacktrace if stacktrace['frames'] else None
     }
 
 
