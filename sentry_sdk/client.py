@@ -199,7 +199,7 @@ class _Client(object):
             event = serialize(event)
 
         before_send = self.options["before_send"]
-        if before_send is not None:
+        if before_send is not None and event.get("type") != "transaction":
             new_event = None
             with capture_internal_exceptions():
                 new_event = before_send(event, hint or {})
