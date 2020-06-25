@@ -67,28 +67,26 @@ class EnvironHeaders(Mapping):  # type: ignore
 
 
 class _SpanRecorder(object):
-    __slots__ = ("maxlen", "finished_spans", "open_span_count")
+    """Limits the number of spans recorded in a transaction."""
+
+    __slots__ = ("maxlen", "spans")
 
     def __init__(self, maxlen):
         # type: (int) -> None
-        self.maxlen = maxlen
-        self.open_span_count = 0  # type: int
-        self.finished_spans = []  # type: List[Span]
+        # FIXME: this is `maxlen - 1` only to preserve historical behavior
+        # enforced by tests.
+        # Either this should be changed to `maxlen` or the JS SDK implementation
+        # should be changed to match a consistent interpretation of what maxlen
+        # limits: either transaction+spans or only child spans.
+        self.maxlen = maxlen - 1
+        self.spans = []  # type: List[Span]
 
-    def start_span(self, span):
+    def add(self, span):
         # type: (Span) -> None
-
-        # This is just so that we don't run out of memory while recording a lot
-        # of spans. At some point we just stop and flush out the start of the
-        # trace tree (i.e. the first n spans with the smallest
-        # start_timestamp).
-        self.open_span_count += 1
-        if self.open_span_count > self.maxlen:
+        if len(self.spans) > self.maxlen:
             span._span_recorder = None
-
-    def finish_span(self, span):
-        # type: (Span) -> None
-        self.finished_spans.append(span)
+        else:
+            self.spans.append(span)
 
 
 class Span(object):
@@ -157,7 +155,7 @@ class Span(object):
         # type: (int) -> None
         if self._span_recorder is None:
             self._span_recorder = _SpanRecorder(maxlen)
-        self._span_recorder.start_span(self)
+        self._span_recorder.add(self)
 
     def __repr__(self):
         # type: () -> str
@@ -330,8 +328,6 @@ class Span(object):
         if self._span_recorder is None:
             return None
 
-        self._span_recorder.finish_span(self)
-
         if self.transaction is None:
             # If this has no transaction set we assume there's a parent
             # transaction for this span that would be flushed out eventually.
@@ -354,6 +350,12 @@ class Span(object):
 
             return None
 
+        finished_spans = [
+            span.to_json(client)
+            for span in self._span_recorder.spans
+            if span is not self and span.timestamp is not None
+        ]
+
         return hub.capture_event(
             {
                 "type": "transaction",
@@ -362,11 +364,7 @@ class Span(object):
                 "tags": self._tags,
                 "timestamp": self.timestamp,
                 "start_timestamp": self.start_timestamp,
-                "spans": [
-                    s.to_json(client)
-                    for s in self._span_recorder.finished_spans
-                    if s is not self
-                ],
+                "spans": finished_spans,
             }
         )
 
