@@ -199,7 +199,7 @@ class _Client(object):
             event = serialize(event)
 
         before_send = self.options["before_send"]
-        if before_send is not None:
+        if before_send is not None and event.get("type") != "transaction":
             new_event = None
             with capture_internal_exceptions():
                 new_event = before_send(event, hint or {})
@@ -237,6 +237,10 @@ class _Client(object):
         scope=None,  # type: Optional[Scope]
     ):
         # type: (...) -> bool
+        if event.get("type") == "transaction":
+            # Transactions are sampled independent of error events.
+            return True
+
         if scope is not None and not scope._should_capture:
             return False
 

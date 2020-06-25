@@ -155,3 +155,28 @@ def test_nested_span_sampling_override():
         assert span.sampled is True
         with Hub.current.start_span(transaction="inner", sampled=False) as span:
             assert span.sampled is False
+
+
+def test_no_double_sampling(sentry_init, capture_events):
+    # Transactions should not be subject to the global/error sample rate.
+    # Only the traces_sample_rate should apply.
+    sentry_init(traces_sample_rate=1.0, sample_rate=0.0)
+    events = capture_events()
+
+    with Hub.current.start_span(transaction="/"):
+        pass
+
+    assert len(events) == 1
+
+
+def test_transactions_do_not_go_through_before_send(sentry_init, capture_events):
+    def before_send(event, hint):
+        raise RuntimeError("should not be called")
+
+    sentry_init(traces_sample_rate=1.0, before_send=before_send)
+    events = capture_events()
+
+    with Hub.current.start_span(transaction="/"):
+        pass
+
+    assert len(events) == 1
