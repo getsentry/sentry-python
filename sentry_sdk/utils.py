@@ -197,6 +197,15 @@ class Auth(object):
         self.version = version
         self.client = client
 
+    @property
+    def store_api_url(self):
+        # type: () -> str
+        """Returns the API url for storing events.
+
+        Deprecated: use get_api_url instead.
+        """
+        return self.get_api_url(type="store")
+
     def get_api_url(
         self, type="store"  # type: EndpointType
     ):
