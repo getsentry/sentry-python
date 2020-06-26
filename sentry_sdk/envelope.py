@@ -6,6 +6,7 @@ import mimetypes
 from sentry_sdk._compat import text_type
 from sentry_sdk._types import MYPY
 from sentry_sdk.sessions import Session
+from sentry_sdk.utils import json_dumps
 
 if MYPY:
     from typing import Any
@@ -86,7 +87,7 @@ class Envelope(object):
         self, f  # type: Any
     ):
         # type: (...) -> None
-        f.write(json.dumps(self.headers, allow_nan=False).encode("utf-8"))
+        f.write(json_dumps(self.headers))
         f.write(b"\n")
         for item in self.items:
             item.serialize_into(f)
@@ -142,7 +143,7 @@ class PayloadRef(object):
                 with open(self.path, "rb") as f:
                     self.bytes = f.read()
             elif self.json is not None:
-                self.bytes = json.dumps(self.json, allow_nan=False).encode("utf-8")
+                self.bytes = json_dumps(self.json)
             else:
                 self.bytes = b""
         return self.bytes
@@ -256,7 +257,7 @@ class Item(object):
         headers = dict(self.headers)
         length, writer = self.payload._prepare_serialize()
         headers["length"] = length
-        f.write(json.dumps(headers, allow_nan=False).encode("utf-8"))
+        f.write(json_dumps(headers))
         f.write(b"\n")
         writer(f)
         f.write(b"\n")

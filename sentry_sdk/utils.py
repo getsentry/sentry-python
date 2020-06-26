@@ -1,7 +1,8 @@
-import os
-import sys
+import json
 import linecache
 import logging
+import os
+import sys
 
 from datetime import datetime
 
@@ -35,6 +36,12 @@ logger = logging.getLogger("sentry_sdk.errors")
 
 MAX_STRING_LENGTH = 512
 MAX_FORMAT_PARAM_LENGTH = 128
+
+
+def json_dumps(data):
+    # type: (Any) -> bytes
+    """Serialize data into a compact JSON representation encoded as UTF-8."""
+    return json.dumps(data, allow_nan=False, separators=(",", ":")).encode("utf-8")
 
 
 def _get_debug_hub():
