@@ -6,8 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
-import sentry_sdk
-from sentry_sdk import capture_message
+from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 
@@ -101,7 +100,7 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
     Session = sessionmaker(bind=engine)  # noqa: N806
     session = Session()
 
-    with sentry_sdk.start_span(transaction="test_transaction", sampled=True):
+    with start_transaction(name="test_transaction", sampled=True):
         with session.begin_nested():
             session.query(Person).first()
 
