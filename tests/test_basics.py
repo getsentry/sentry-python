@@ -172,13 +172,13 @@ def test_push_scope_callback(sentry_init, null_client, capture_events):
     if null_client:
         Hub.current.bind_client(None)
 
-    outer_scope = Hub.current._stack[-1][1]
+    outer_scope = Hub.current.scope
 
     calls = []
 
     @push_scope
     def _(scope):
-        assert scope is Hub.current._stack[-1][1]
+        assert scope is Hub.current.scope
         assert scope is not outer_scope
         calls.append(1)
 
@@ -188,7 +188,7 @@ def test_push_scope_callback(sentry_init, null_client, capture_events):
     assert calls == [1]
 
     # Assert scope gets popped correctly
-    assert Hub.current._stack[-1][1] is outer_scope
+    assert Hub.current.scope is outer_scope
 
 
 def test_breadcrumbs(sentry_init, capture_events):

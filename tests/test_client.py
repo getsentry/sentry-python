@@ -316,7 +316,7 @@ def test_configure_scope_available(sentry_init, request, monkeypatch):
     sentry_init()
 
     with configure_scope() as scope:
-        assert scope is Hub.current._stack[-1][1]
+        assert scope is Hub.current.scope
         scope.set_tag("foo", "bar")
 
     calls = []
@@ -327,7 +327,7 @@ def test_configure_scope_available(sentry_init, request, monkeypatch):
 
     assert configure_scope(callback) is None
     assert len(calls) == 1
-    assert calls[0] is Hub.current._stack[-1][1]
+    assert calls[0] is Hub.current.scope
 
 
 @pytest.mark.tests_internal_exceptions

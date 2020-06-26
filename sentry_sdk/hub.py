@@ -276,7 +276,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         else:
             raise ValueError("Integration has no name")
 
-        client = self._stack[-1][0]
+        client = self.client
         if client is not None:
             rv = client.integrations.get(integration_name)
             if rv is not None:
@@ -587,7 +587,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             session.close()
             if client is not None:
                 client.capture_session(session)
-        self._stack[-1][1]._session = None
+        self.scope._session = None
 
     def stop_auto_session_tracking(self):
         # type: (...) -> None
