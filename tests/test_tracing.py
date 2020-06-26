@@ -3,7 +3,7 @@ import gc
 
 import pytest
 
-from sentry_sdk import Hub, capture_message
+from sentry_sdk import Hub, capture_message, start_span
 from sentry_sdk.tracing import Span
 
 
@@ -179,5 +179,19 @@ def test_transactions_do_not_go_through_before_send(sentry_init, capture_events)
 
     with Hub.current.start_span(transaction="/"):
         pass
+
+    assert len(events) == 1
+
+
+def test_get_transaction_from_scope(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with start_span(transaction="/"):
+        with start_span(op="child-span"):
+            with start_span(op="child-child-span"):
+                scope = Hub.current.scope
+                assert scope.span.op == "child-child-span"
+                assert scope.transaction.transaction == "/"
 
     assert len(events) == 1

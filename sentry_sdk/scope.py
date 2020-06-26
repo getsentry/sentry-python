@@ -134,10 +134,33 @@ class Scope(object):
         """When set this overrides the default fingerprint."""
         self._fingerprint = value
 
-    @_attr_setter
+    @property
+    def transaction(self):
+        # type: () -> Any
+        # would be type: () -> Optional[Span], see https://github.com/python/mypy/issues/3004
+        # XXX: update return type to Optional[Transaction]
+        """Return the transaction (root span) in the scope."""
+        if self._span is None or self._span._span_recorder is None:
+            return None
+        try:
+            return self._span._span_recorder.spans[0]
+        except (AttributeError, IndexError):
+            return None
+
+    @transaction.setter
     def transaction(self, value):
-        # type: (Optional[str]) -> None
+        # type: (Any) -> None
+        # would be type: (Optional[str]) -> None, see https://github.com/python/mypy/issues/3004
         """When set this forces a specific transaction name to be set."""
+        # XXX: the docstring above is misleading. The implementation of
+        # apply_to_event prefers an existing value of event.transaction over
+        # anything set in the scope.
+        # XXX: note that with the introduction of the Scope.transaction getter,
+        # there is a semantic and type mismatch between getter and setter. The
+        # getter returns a transaction, the setter sets a transaction name.
+        # Without breaking version compatibility, we could make the setter set a
+        # transaction name or transaction (self._span) depending on the type of
+        # the value argument.
         self._transaction = value
         span = self._span
         if span:
