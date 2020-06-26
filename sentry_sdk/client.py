@@ -7,11 +7,12 @@ import socket
 
 from sentry_sdk._compat import string_types, text_type, iteritems
 from sentry_sdk.utils import (
-    handle_in_app,
-    get_type_name,
     capture_internal_exceptions,
     current_stacktrace,
     disable_capture_event,
+    format_timestamp,
+    get_type_name,
+    handle_in_app,
     logger,
 )
 from sentry_sdk.serializer import serialize
@@ -20,7 +21,7 @@ from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO, ClientConstructor
 from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
-from sentry_sdk.envelope import Envelope
+from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
 from sentry_sdk._types import MYPY
 
@@ -334,7 +335,22 @@ class _Client(object):
         if session:
             self._update_session_from_event(session, event)
 
-        self.transport.capture_event(event_opt)
+        if event_opt.get("type") == "transaction":
+            # Transactions should go to the /envelope/ endpoint.
+            self.transport.capture_envelope(
+                Envelope(
+                    headers={
+                        "event_id": event_opt["event_id"],
+                        "sent_at": format_timestamp(datetime.utcnow()),
+                    },
+                    items=[
+                        Item(payload=PayloadRef(json=event_opt), type="transaction"),
+                    ],
+                )
+            )
+        else:
+            # All other events go to the /store/ endpoint.
+            self.transport.capture_event(event_opt)
         return event_id
 
     def capture_session(
