@@ -25,7 +25,7 @@ from sentry_sdk.transport import HttpTransport
 class TestTransport(HttpTransport):
     def _send_event(self, event):
         # Delay event output like this to test proper shutdown
-        # Note that AWS Lambda trunchates the log output to 4kb, so you better
+        # Note that AWS Lambda truncates the log output to 4kb, so you better
         # pray that your events are smaller than that or else tests start
         # failing.
         time.sleep(1)
