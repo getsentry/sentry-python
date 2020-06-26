@@ -31,7 +31,7 @@ To learn more about how to use the SDK:
 
 Are you coming from raven-python?
 
-- [Cheatsheet: Migrating to the new SDK from Raven](https://forum.sentry.io/t/switching-to-sentry-python/4733)
+- [Cheatsheet: Migrating to the new SDK from Raven](https://docs.sentry.io/platforms/python/migration/)
 
 To learn about internals:
 
