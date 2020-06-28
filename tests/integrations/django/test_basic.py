@@ -438,9 +438,9 @@ def test_template_exception(sentry_init, client, capture_events):
         (f.get("function"), f.get("module")) for f in exception["stacktrace"]["frames"]
     ]
     assert filenames[-3:] == [
-        (u"parse", u"django.template.base"),
+        (u"Parser.parse", u"django.template.base"),
         (None, None),
-        (u"invalid_block_tag", u"django.template.base"),
+        (u"Parser.invalid_block_tag", u"django.template.base"),
     ]
 
 

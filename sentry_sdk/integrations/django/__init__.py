@@ -157,7 +157,7 @@ class DjangoIntegration(Integration):
                     for i in reversed(range(len(frames))):
                         f = frames[i]
                         if (
-                            f.get("function") in ("parse", "render")
+                            f.get("function") in ("Parser.parse", "render")
                             and f.get("module") == "django.template.base"
                         ):
                             i += 1
