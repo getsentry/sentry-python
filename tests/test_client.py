@@ -180,8 +180,13 @@ def test_ignore_errors():
 def test_with_locals_enabled():
     events = []
     hub = Hub(Client(with_locals=True, transport=events.append))
+
+    def foo():
+        foo.d = {1: 2}
+        print(foo.d[1] / 0)
+
     try:
-        1 / 0
+        foo()
     except Exception:
         hub.capture_exception()
 
@@ -191,6 +196,11 @@ def test_with_locals_enabled():
         frame["vars"]
         for frame in event["exception"]["values"][0]["stacktrace"]["frames"]
     )
+
+    frame_vars = event["exception"]["values"][0]["stacktrace"]["frames"][-1]["vars"]
+    assert sorted(frame_vars.keys()) == ["foo", "foo.d", "foo.d[1]"]
+    assert frame_vars["foo.d"] == {"1": "2"}
+    assert frame_vars["foo.d[1]"] == "2"
 
 
 def test_with_locals_disabled():

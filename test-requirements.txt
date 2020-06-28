@@ -7,3 +7,6 @@ pytest-cov==2.8.1
 gevent
 eventlet
 newrelic
+executing
+pure_eval
+asttokens

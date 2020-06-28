@@ -1,3 +1,4 @@
+import ast
 import os
 import sys
 import linecache
@@ -27,8 +28,22 @@ if MYPY:
 
     from sentry_sdk._types import ExcInfo, EndpointType
 
-epoch = datetime(1970, 1, 1)
+try:
+    import executing
+except ImportError:
+    executing = None
 
+try:
+    import asttokens
+except ImportError:
+    asttokens = None
+
+try:
+    import pure_eval
+except ImportError:
+    pure_eval = None
+
+epoch = datetime(1970, 1, 1)
 
 # The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
@@ -453,9 +468,40 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
         "post_context": post_context,
     }  # type: Dict[str, Any]
     if with_locals:
-        rv["vars"] = frame.f_locals
+        rv["vars"] = pure_eval_frame(frame)
+        rv["vars"].update(frame.f_locals)
 
     return rv
+
+
+def pure_eval_frame(frame):
+    if not (executing and pure_eval and asttokens):
+        return {}
+
+    source = executing.Source.for_frame(frame)
+    if not source.tree:
+        return {}
+
+    statements = source.statements_at_line(frame.f_lineno)
+    if not statements:
+        return {}
+
+    stmt = list(statements)[0]
+    while True:
+        # Get the parent first in case the original statement is already
+        # a function definition, e.g. if we're calling a decorator
+        # In that case we still want the surrounding scope, not that function
+        stmt = stmt.parent
+        if isinstance(stmt, (ast.FunctionDef, ast.ClassDef, ast.Module)):
+            break
+
+    evaluator = pure_eval.Evaluator.from_frame(frame)
+    expressions = evaluator.interesting_expressions_grouped(stmt)
+    atok = source.asttokens()
+    return {
+        atok.get_text(nodes[0]): value
+        for nodes, value in expressions
+    }
 
 
 def stacktrace_from_traceback(tb=None, with_locals=True):
