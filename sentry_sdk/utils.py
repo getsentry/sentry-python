@@ -498,10 +498,7 @@ def pure_eval_frame(frame):
     evaluator = pure_eval.Evaluator.from_frame(frame)
     expressions = evaluator.interesting_expressions_grouped(stmt)
     atok = source.asttokens()
-    return {
-        atok.get_text(nodes[0]): value
-        for nodes, value in expressions
-    }
+    return {atok.get_text(nodes[0]): value for nodes, value in expressions}
 
 
 def stacktrace_from_traceback(tb=None, with_locals=True):
