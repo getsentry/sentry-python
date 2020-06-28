@@ -224,7 +224,10 @@ def test_attach_stacktrace_enabled():
     (event,) = events
     (thread,) = event["threads"]["values"]
     functions = [x["function"] for x in thread["stacktrace"]["frames"]]
-    assert functions[-2:] == ["foo", "bar"]
+    assert functions[-2:] == [
+        "test_attach_stacktrace_enabled.<locals>.foo",
+        "test_attach_stacktrace_enabled.<locals>.bar",
+    ]
 
 
 def test_attach_stacktrace_enabled_no_locals():
