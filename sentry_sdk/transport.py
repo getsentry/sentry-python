@@ -1,6 +1,5 @@
 from __future__ import print_function
 
-import json
 import io
 import urllib3  # type: ignore
 import certifi
@@ -8,7 +7,7 @@ import gzip
 
 from datetime import datetime, timedelta
 
-from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
+from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions, json_dumps
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, get_event_data_category
 
@@ -214,7 +213,7 @@ class HttpTransport(Transport):
 
         body = io.BytesIO()
         with gzip.GzipFile(fileobj=body, mode="w") as f:
-            f.write(json.dumps(event, allow_nan=False).encode("utf-8"))
+            f.write(json_dumps(event))
 
         assert self.parsed_dsn is not None
         logger.debug(
