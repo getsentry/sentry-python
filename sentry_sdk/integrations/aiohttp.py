@@ -9,7 +9,7 @@ from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
 )
-from sentry_sdk.tracing import Span
+from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -87,27 +87,29 @@ class AioHttpIntegration(Integration):
                     scope.clear_breadcrumbs()
                     scope.add_event_processor(_make_request_processor(weak_request))
 
-                span = Span.continue_from_headers(request.headers)
-                span.op = "http.server"
-                # If this transaction name makes it to the UI, AIOHTTP's
-                # URL resolver did not find a route or died trying.
-                span.transaction = "generic AIOHTTP request"
+                transaction = Transaction.continue_from_headers(
+                    request.headers,
+                    op="http.server",
+                    # If this transaction name makes it to the UI, AIOHTTP's
+                    # URL resolver did not find a route or died trying.
+                    name="generic AIOHTTP request",
+                )
 
-                with hub.start_span(span):
+                with hub.start_transaction(transaction):
                     try:
                         response = await old_handle(self, request)
                     except HTTPException as e:
-                        span.set_http_status(e.status_code)
+                        transaction.set_http_status(e.status_code)
                         raise
                     except asyncio.CancelledError:
-                        span.set_status("cancelled")
+                        transaction.set_status("cancelled")
                         raise
                     except Exception:
                         # This will probably map to a 500 but seems like we
                         # have no way to tell. Do not set span status.
                         reraise(*_capture_exception(hub))
 
-                    span.set_http_status(response.status)
+                    transaction.set_http_status(response.status)
                     return response
 
         Application._handle = sentry_app_handle

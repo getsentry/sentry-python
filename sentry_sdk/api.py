@@ -16,7 +16,7 @@ if MYPY:
     from typing import Union
 
     from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint, ExcInfo
-    from sentry_sdk.tracing import Span
+    from sentry_sdk.tracing import Span, Transaction
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
@@ -37,6 +37,7 @@ __all__ = [
     "flush",
     "last_event_id",
     "start_span",
+    "start_transaction",
     "set_tag",
     "set_context",
     "set_extra",
@@ -201,3 +202,12 @@ def start_span(
 ):
     # type: (...) -> Span
     return Hub.current.start_span(span=span, **kwargs)
+
+
+@hubmethod
+def start_transaction(
+    transaction=None,  # type: Optional[Transaction]
+    **kwargs  # type: Any
+):
+    # type: (...) -> Transaction
+    return Hub.current.start_transaction(transaction, **kwargs)

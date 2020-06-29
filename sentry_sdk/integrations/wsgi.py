@@ -8,7 +8,7 @@ from sentry_sdk.utils import (
     event_from_exception,
 )
 from sentry_sdk._compat import PY2, reraise, iteritems
-from sentry_sdk.tracing import Span
+from sentry_sdk.tracing import Transaction
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
@@ -113,15 +113,17 @@ class SentryWsgiMiddleware(object):
                                 _make_wsgi_event_processor(environ)
                             )
 
-                    span = Span.continue_from_environ(environ)
-                    span.op = "http.server"
-                    span.transaction = "generic WSGI request"
+                    transaction = Transaction.continue_from_environ(
+                        environ, op="http.server", name="generic WSGI request"
+                    )
 
-                    with hub.start_span(span) as span:
+                    with hub.start_transaction(transaction):
                         try:
                             rv = self.app(
                                 environ,
-                                partial(_sentry_start_response, start_response, span),
+                                partial(
+                                    _sentry_start_response, start_response, transaction
+                                ),
                             )
                         except BaseException:
                             reraise(*_capture_exception(hub))
@@ -133,7 +135,7 @@ class SentryWsgiMiddleware(object):
 
 def _sentry_start_response(
     old_start_response,  # type: StartResponse
-    span,  # type: Span
+    transaction,  # type: Transaction
     status,  # type: str
     response_headers,  # type: WsgiResponseHeaders
     exc_info=None,  # type: Optional[WsgiExcInfo]
@@ -141,7 +143,7 @@ def _sentry_start_response(
     # type: (...) -> WsgiResponseIter
     with capture_internal_exceptions():
         status_int = int(status.split(" ", 1)[0])
-        span.set_http_status(status_int)
+        transaction.set_http_status(status_int)
 
     if exc_info is None:
         # The Django Rest Framework WSGI test client, and likely other

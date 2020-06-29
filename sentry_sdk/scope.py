@@ -5,6 +5,7 @@ from itertools import chain
 from sentry_sdk._functools import wraps
 from sentry_sdk._types import MYPY
 from sentry_sdk.utils import logger, capture_internal_exceptions
+from sentry_sdk.tracing import Transaction
 
 if MYPY:
     from typing import Any
@@ -137,8 +138,7 @@ class Scope(object):
     @property
     def transaction(self):
         # type: () -> Any
-        # would be type: () -> Optional[Span], see https://github.com/python/mypy/issues/3004
-        # XXX: update return type to Optional[Transaction]
+        # would be type: () -> Optional[Transaction], see https://github.com/python/mypy/issues/3004
         """Return the transaction (root span) in the scope."""
         if self._span is None or self._span._span_recorder is None:
             return None
@@ -163,8 +163,8 @@ class Scope(object):
         # the value argument.
         self._transaction = value
         span = self._span
-        if span:
-            span.transaction = value
+        if span and isinstance(span, Transaction):
+            span.name = value
 
     @_attr_setter
     def user(self, value):
@@ -182,17 +182,19 @@ class Scope(object):
     @property
     def span(self):
         # type: () -> Optional[Span]
-        """Get/set current tracing span."""
+        """Get/set current tracing span or transaction."""
         return self._span
 
     @span.setter
     def span(self, span):
         # type: (Optional[Span]) -> None
         self._span = span
-        if span is not None:
-            span_transaction = span.transaction
-            if span_transaction:
-                self._transaction = span_transaction
+        # XXX: this differs from the implementation in JS, there Scope.setSpan
+        # does not set Scope._transactionName.
+        if isinstance(span, Transaction):
+            transaction = span
+            if transaction.name:
+                self._transaction = transaction.name
 
     def set_tag(
         self,

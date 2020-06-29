@@ -4,7 +4,7 @@ import sys
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
-from sentry_sdk.tracing import Span
+from sentry_sdk.tracing import Transaction
 from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
@@ -130,19 +130,21 @@ def _wrap_tracer(task, f):
             scope.clear_breadcrumbs()
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
-            span = Span.continue_from_headers(args[3].get("headers") or {})
-            span.op = "celery.task"
-            span.transaction = "unknown celery task"
+            transaction = Transaction.continue_from_headers(
+                args[3].get("headers") or {},
+                op="celery.task",
+                name="unknown celery task",
+            )
 
             # Could possibly use a better hook than this one
-            span.set_status("ok")
+            transaction.set_status("ok")
 
             with capture_internal_exceptions():
                 # Celery task objects are not a thing to be trusted. Even
                 # something such as attribute access can fail.
-                span.transaction = task.name
+                transaction.name = task.name
 
-            with hub.start_span(span):
+            with hub.start_transaction(transaction):
                 return f(*args, **kwargs)
 
     return _inner  # type: ignore

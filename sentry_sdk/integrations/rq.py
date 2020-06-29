@@ -4,7 +4,7 @@ import weakref
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.tracing import Span
+from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
 
@@ -61,15 +61,16 @@ class RqIntegration(Integration):
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
 
-                span = Span.continue_from_headers(
-                    job.meta.get("_sentry_trace_headers") or {}
+                transaction = Transaction.continue_from_headers(
+                    job.meta.get("_sentry_trace_headers") or {},
+                    op="rq.task",
+                    name="unknown RQ task",
                 )
-                span.op = "rq.task"
 
                 with capture_internal_exceptions():
-                    span.transaction = job.func_name
+                    transaction.name = job.func_name
 
-                with hub.start_span(span):
+                with hub.start_transaction(transaction):
                     rv = old_perform_job(self, job, *args, **kwargs)
 
             if self.is_horse:

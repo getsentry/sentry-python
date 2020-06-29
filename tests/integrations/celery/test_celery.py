@@ -4,7 +4,7 @@ import pytest
 
 pytest.importorskip("celery")
 
-from sentry_sdk import Hub, configure_scope
+from sentry_sdk import Hub, configure_scope, start_transaction
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk._compat import text_type
 
@@ -74,14 +74,14 @@ def test_simple(capture_events, celery, celery_invocation):
         foo = 42  # noqa
         return x / y
 
-    with Hub.current.start_span() as span:
+    with start_transaction() as transaction:
         celery_invocation(dummy_task, 1, 2)
         _, expected_context = celery_invocation(dummy_task, 1, 0)
 
     (event,) = events
 
-    assert event["contexts"]["trace"]["trace_id"] == span.trace_id
-    assert event["contexts"]["trace"]["span_id"] != span.span_id
+    assert event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+    assert event["contexts"]["trace"]["span_id"] != transaction.span_id
     assert event["transaction"] == "dummy_task"
     assert "celery_task_id" in event["tags"]
     assert event["extra"]["celery-job"] == dict(
@@ -107,12 +107,12 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
 
     events = capture_events()
 
-    with Hub.current.start_span(transaction="submission") as span:
+    with start_transaction(name="submission") as transaction:
         celery_invocation(dummy_task, 1, 0 if task_fails else 1)
 
     if task_fails:
         error_event = events.pop(0)
-        assert error_event["contexts"]["trace"]["trace_id"] == span.trace_id
+        assert error_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
         assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
 
     execution_event, submission_event = events
@@ -121,8 +121,8 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     assert submission_event["transaction"] == "submission"
 
     assert execution_event["type"] == submission_event["type"] == "transaction"
-    assert execution_event["contexts"]["trace"]["trace_id"] == span.trace_id
-    assert submission_event["contexts"]["trace"]["trace_id"] == span.trace_id
+    assert execution_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+    assert submission_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
 
     if task_fails:
         assert execution_event["contexts"]["trace"]["status"] == "internal_error"
@@ -139,7 +139,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
             u"span_id": submission_event["spans"][0]["span_id"],
             u"start_timestamp": submission_event["spans"][0]["start_timestamp"],
             u"timestamp": submission_event["spans"][0]["timestamp"],
-            u"trace_id": text_type(span.trace_id),
+            u"trace_id": text_type(transaction.trace_id),
         }
     ]
 
@@ -177,11 +177,11 @@ def test_simple_no_propagation(capture_events, init_celery):
     def dummy_task():
         1 / 0
 
-    with Hub.current.start_span() as span:
+    with start_transaction() as transaction:
         dummy_task.delay()
 
     (event,) = events
-    assert event["contexts"]["trace"]["trace_id"] != span.trace_id
+    assert event["contexts"]["trace"]["trace_id"] != transaction.trace_id
     assert event["transaction"] == "dummy_task"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"

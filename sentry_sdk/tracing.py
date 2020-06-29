@@ -96,7 +96,6 @@ class Span(object):
         "parent_span_id",
         "same_process_as_parent",
         "sampled",
-        "transaction",
         "op",
         "description",
         "start_timestamp",
@@ -110,6 +109,15 @@ class Span(object):
         "_context_manager_state",
     )
 
+    def __new__(cls, **kwargs):
+        # type: (**Any) -> Any
+        # TODO: consider removing this in a future release.
+        # This is for backwards compatibility with releases before Transaction
+        # existed, to allow for a smoother transition.
+        if "transaction" in kwargs:
+            return object.__new__(Transaction)
+        return object.__new__(cls)
+
     def __init__(
         self,
         trace_id=None,  # type: Optional[str]
@@ -117,11 +125,11 @@ class Span(object):
         parent_span_id=None,  # type: Optional[str]
         same_process_as_parent=True,  # type: bool
         sampled=None,  # type: Optional[bool]
-        transaction=None,  # type: Optional[str]
         op=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
         hub=None,  # type: Optional[sentry_sdk.Hub]
         status=None,  # type: Optional[str]
+        transaction=None,  # type: Optional[str] # deprecated
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -129,7 +137,6 @@ class Span(object):
         self.parent_span_id = parent_span_id
         self.same_process_as_parent = same_process_as_parent
         self.sampled = sampled
-        self.transaction = transaction
         self.op = op
         self.description = description
         self.status = status
@@ -151,7 +158,7 @@ class Span(object):
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
 
-    def init_finished_spans(self, maxlen):
+    def init_span_recorder(self, maxlen):
         # type: (int) -> None
         if self._span_recorder is None:
             self._span_recorder = _SpanRecorder(maxlen)
@@ -159,16 +166,12 @@ class Span(object):
 
     def __repr__(self):
         # type: () -> str
-        return (
-            "<%s(transaction=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>"
-            % (
-                self.__class__.__name__,
-                self.transaction,
-                self.trace_id,
-                self.span_id,
-                self.parent_span_id,
-                self.sampled,
-            )
+        return "<%s(trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>" % (
+            self.__class__.__name__,
+            self.trace_id,
+            self.span_id,
+            self.parent_span_id,
+            self.sampled,
         )
 
     def __enter__(self):
@@ -192,27 +195,60 @@ class Span(object):
         self.finish(hub)
         scope.span = old_span
 
-    def new_span(self, **kwargs):
+    def start_child(self, **kwargs):
         # type: (**Any) -> Span
+        """
+        Start a sub-span from the current span or transaction.
+
+        Takes the same arguments as the initializer of :py:class:`Span`. No
+        attributes other than the sample rate are inherited.
+        """
         kwargs.setdefault("sampled", self.sampled)
-        rv = type(self)(
+
+        rv = Span(
             trace_id=self.trace_id, span_id=None, parent_span_id=self.span_id, **kwargs
         )
 
-        rv._span_recorder = self._span_recorder
+        rv._span_recorder = recorder = self._span_recorder
+        if recorder:
+            recorder.add(rv)
         return rv
 
-    @classmethod
-    def continue_from_environ(cls, environ):
-        # type: (typing.Mapping[str, str]) -> Span
-        return cls.continue_from_headers(EnvironHeaders(environ))
+    def new_span(self, **kwargs):
+        # type: (**Any) -> Span
+        """Deprecated: use start_child instead."""
+        logger.warning("Deprecated: use Span.start_child instead of Span.new_span.")
+        return self.start_child(**kwargs)
 
     @classmethod
-    def continue_from_headers(cls, headers):
-        # type: (typing.Mapping[str, str]) -> Span
-        parent = cls.from_traceparent(headers.get("sentry-trace"))
+    def continue_from_environ(
+        cls,
+        environ,  # type: typing.Mapping[str, str]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Transaction
+        if cls is Span:
+            logger.warning(
+                "Deprecated: use Transaction.continue_from_environ "
+                "instead of Span.continue_from_environ."
+            )
+        return Transaction.continue_from_headers(EnvironHeaders(environ), **kwargs)
+
+    @classmethod
+    def continue_from_headers(
+        cls,
+        headers,  # type: typing.Mapping[str, str]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Transaction
+        if cls is Span:
+            logger.warning(
+                "Deprecated: use Transaction.continue_from_headers "
+                "instead of Span.continue_from_headers."
+            )
+        parent = Transaction.from_traceparent(headers.get("sentry-trace"), **kwargs)
         if parent is None:
-            return cls()
+            parent = Transaction(**kwargs)
         parent.same_process_as_parent = False
         return parent
 
@@ -221,8 +257,18 @@ class Span(object):
         yield "sentry-trace", self.to_traceparent()
 
     @classmethod
-    def from_traceparent(cls, traceparent):
-        # type: (Optional[str]) -> Optional[Span]
+    def from_traceparent(
+        cls,
+        traceparent,  # type: Optional[str]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Optional[Transaction]
+        if cls is Span:
+            logger.warning(
+                "Deprecated: use Transaction.from_traceparent "
+                "instead of Span.from_traceparent."
+            )
+
         if not traceparent:
             return None
 
@@ -245,7 +291,9 @@ class Span(object):
         else:
             sampled = None
 
-        return cls(trace_id=trace_id, parent_span_id=span_id, sampled=sampled)
+        return Transaction(
+            trace_id=trace_id, parent_span_id=span_id, sampled=sampled, **kwargs
+        )
 
     def to_traceparent(self):
         # type: () -> str
@@ -311,11 +359,13 @@ class Span(object):
 
     def finish(self, hub=None):
         # type: (Optional[sentry_sdk.Hub]) -> Optional[str]
-        hub = hub or self.hub or sentry_sdk.Hub.current
-
+        # XXX: would be type: (Optional[sentry_sdk.Hub]) -> None, but that leads
+        # to incompatible return types for Span.finish and Transaction.finish.
         if self.timestamp is not None:
-            # This transaction is already finished, so we should not flush it again.
+            # This span is already finished, ignore.
             return None
+
+        hub = hub or self.hub or sentry_sdk.Hub.current
 
         try:
             duration_seconds = time.perf_counter() - self._start_timestamp_monotonic
@@ -324,49 +374,7 @@ class Span(object):
             self.timestamp = datetime.utcnow()
 
         _maybe_create_breadcrumbs_from_span(hub, self)
-
-        if self._span_recorder is None:
-            return None
-
-        if self.transaction is None:
-            # If this has no transaction set we assume there's a parent
-            # transaction for this span that would be flushed out eventually.
-            return None
-
-        client = hub.client
-
-        if client is None:
-            # We have no client and therefore nowhere to send this transaction
-            # event.
-            return None
-
-        if not self.sampled:
-            # At this point a `sampled = None` should have already been
-            # resolved to a concrete decision. If `sampled` is `None`, it's
-            # likely that somebody used `with sentry_sdk.Hub.start_span(..)` on a
-            # non-transaction span and later decided to make it a transaction.
-            if self.sampled is None:
-                logger.warning("Discarding transaction Span without sampling decision")
-
-            return None
-
-        finished_spans = [
-            span.to_json(client)
-            for span in self._span_recorder.spans
-            if span is not self and span.timestamp is not None
-        ]
-
-        return hub.capture_event(
-            {
-                "type": "transaction",
-                "transaction": self.transaction,
-                "contexts": {"trace": self.get_trace_context()},
-                "tags": self._tags,
-                "timestamp": self.timestamp,
-                "start_timestamp": self.start_timestamp,
-                "spans": finished_spans,
-            }
-        )
+        return None
 
     def to_json(self, client):
         # type: (Optional[sentry_sdk.Client]) -> Dict[str, Any]
@@ -380,10 +388,6 @@ class Span(object):
             "start_timestamp": self.start_timestamp,
             "timestamp": self.timestamp,
         }  # type: Dict[str, Any]
-
-        transaction = self.transaction
-        if transaction:
-            rv["transaction"] = transaction
 
         if self.status:
             self._tags["status"] = self.status
@@ -411,6 +415,91 @@ class Span(object):
             rv["status"] = self.status
 
         return rv
+
+
+class Transaction(Span):
+    __slots__ = ("name",)
+
+    def __init__(
+        self,
+        name="",  # type: str
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> None
+        # TODO: consider removing this in a future release.
+        # This is for backwards compatibility with releases before Transaction
+        # existed, to allow for a smoother transition.
+        if not name and "transaction" in kwargs:
+            logger.warning(
+                "Deprecated: use Transaction(name=...) to create transactions "
+                "instead of Span(transaction=...)."
+            )
+            name = kwargs.pop("transaction")
+        Span.__init__(self, **kwargs)
+        self.name = name
+
+    def __repr__(self):
+        # type: () -> str
+        return (
+            "<%s(name=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>"
+            % (
+                self.__class__.__name__,
+                self.name,
+                self.trace_id,
+                self.span_id,
+                self.parent_span_id,
+                self.sampled,
+            )
+        )
+
+    def finish(self, hub=None):
+        # type: (Optional[sentry_sdk.Hub]) -> Optional[str]
+        if self.timestamp is not None:
+            # This transaction is already finished, ignore.
+            return None
+
+        if self._span_recorder is None:
+            return None
+
+        hub = hub or self.hub or sentry_sdk.Hub.current
+        client = hub.client
+
+        if client is None:
+            # We have no client and therefore nowhere to send this transaction.
+            return None
+
+        if not self.name:
+            logger.warning(
+                "Transaction has no name, falling back to `<unlabeled transaction>`."
+            )
+            self.name = "<unlabeled transaction>"
+
+        Span.finish(self, hub)
+
+        if not self.sampled:
+            # At this point a `sampled = None` should have already been resolved
+            # to a concrete decision.
+            if self.sampled is None:
+                logger.warning("Discarding transaction without sampling decision.")
+            return None
+
+        finished_spans = [
+            span.to_json(client)
+            for span in self._span_recorder.spans
+            if span is not self and span.timestamp is not None
+        ]
+
+        return hub.capture_event(
+            {
+                "type": "transaction",
+                "transaction": self.name,
+                "contexts": {"trace": self.get_trace_context()},
+                "tags": self._tags,
+                "timestamp": self.timestamp,
+                "start_timestamp": self.start_timestamp,
+                "spans": finished_spans,
+            }
+        )
 
 
 def _format_sql(cursor, sql):
