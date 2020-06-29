@@ -492,22 +492,22 @@ def single_exception_from_error_tuple(
     else:
         with_locals = client_options["with_locals"]
 
-    stacktrace = {
-        "frames": [
-            serialize_frame(
-                tb.tb_frame, tb_lineno=tb.tb_lineno, with_locals=with_locals
-            )
-            for tb in iter_stacks(tb)
-        ]
-    }
+    frames = [
+        serialize_frame(tb.tb_frame, tb_lineno=tb.tb_lineno, with_locals=with_locals)
+        for tb in iter_stacks(tb)
+    ]
 
-    return {
+    rv = {
         "module": get_type_module(exc_type),
         "type": get_type_name(exc_type),
         "value": safe_str(exc_value),
         "mechanism": mechanism,
-        "stacktrace": stacktrace if stacktrace['frames'] else None
     }
+
+    if frames:
+        rv["stacktrace"] = {"frames": frames}
+
+    return rv
 
 
 HAS_CHAINED_EXCEPTIONS = hasattr(Exception, "__suppress_context__")
