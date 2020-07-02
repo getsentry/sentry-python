@@ -27,9 +27,13 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
-## [Unreleased]
+## 0.16.0
 
 * Redis integration: add tags for more commands
+* Redis integration: Patch rediscluster package if installed.
+* Session tracking: A session is no longer considered crashed if there has been a fatal log message (only unhandled exceptions count).
+* **Breaking change**: Revamping of the tracing API.
+* **Breaking change**: `before_send` is no longer called for transactions.
 
 ## 0.15.1
 
