@@ -267,20 +267,14 @@ class _Client(object):
         errored = False
         user_agent = None
 
-        # Figure out if this counts as an error and if we should mark the
-        # session as crashed.
-        level = event.get("level")
-        if level == "fatal":
-            crashed = True
-        if not crashed:
-            exceptions = (event.get("exception") or {}).get("values")
-            if exceptions:
-                errored = True
-                for error in exceptions:
-                    mechanism = error.get("mechanism")
-                    if mechanism and mechanism.get("handled") is False:
-                        crashed = True
-                        break
+        exceptions = (event.get("exception") or {}).get("values")
+        if exceptions:
+            errored = True
+            for error in exceptions:
+                mechanism = error.get("mechanism")
+                if mechanism and mechanism.get("handled") is False:
+                    crashed = True
+                    break
 
         user = event.get("user")
 
