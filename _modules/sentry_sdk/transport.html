@@ -4,7 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.transport &#8212; sentry-python 0.15.1 documentation</title>
+    <title>sentry_sdk.transport &#8212; sentry-python 0.16.0 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -33,7 +33,6 @@
   <h1>Source code for sentry_sdk.transport</h1><div class="highlight"><pre>
 <span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">print_function</span>
 
-<span class="kn">import</span> <span class="nn">json</span>
 <span class="kn">import</span> <span class="nn">io</span>
 <span class="kn">import</span> <span class="nn">urllib3</span>  <span class="c1"># type: ignore</span>
 <span class="kn">import</span> <span class="nn">certifi</span>
@@ -41,7 +40,7 @@
 
 <span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span>
 
-<span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">Dsn</span><span class="p">,</span> <span class="n">logger</span><span class="p">,</span> <span class="n">capture_internal_exceptions</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">Dsn</span><span class="p">,</span> <span class="n">logger</span><span class="p">,</span> <span class="n">capture_internal_exceptions</span><span class="p">,</span> <span class="n">json_dumps</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.worker</span> <span class="kn">import</span> <span class="n">BackgroundWorker</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.envelope</span> <span class="kn">import</span> <span class="n">Envelope</span><span class="p">,</span> <span class="n">get_event_data_category</span>
 
@@ -60,7 +59,7 @@
     <span class="kn">from</span> <span class="nn">urllib3.poolmanager</span> <span class="kn">import</span> <span class="n">PoolManager</span>  <span class="c1"># type: ignore</span>
     <span class="kn">from</span> <span class="nn">urllib3.poolmanager</span> <span class="kn">import</span> <span class="n">ProxyManager</span>
 
-    <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">Event</span>
+    <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">EndpointType</span>
 
     <span class="n">DataCategory</span> <span class="o">=</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
 
@@ -196,6 +195,7 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">body</span><span class="p">,</span>  <span class="c1"># type: bytes</span>
         <span class="n">headers</span><span class="p">,</span>  <span class="c1"># type: Dict[str, str]</span>
+        <span class="n">endpoint_type</span><span class="o">=</span><span class="s2">&quot;store&quot;</span><span class="p">,</span>  <span class="c1"># type: EndpointType</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
         <span class="n">headers</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
@@ -205,7 +205,10 @@
             <span class="p">}</span>
         <span class="p">)</span>
         <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span><span class="o">.</span><span class="n">request</span><span class="p">(</span>
-            <span class="s2">&quot;POST&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="o">.</span><span class="n">store_api_url</span><span class="p">),</span> <span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span>
+            <span class="s2">&quot;POST&quot;</span><span class="p">,</span>
+            <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="o">.</span><span class="n">get_api_url</span><span class="p">(</span><span class="n">endpoint_type</span><span class="p">)),</span>
+            <span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">,</span>
+            <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span>
         <span class="p">)</span>
 
         <span class="k">try</span><span class="p">:</span>
@@ -243,7 +246,7 @@
 
         <span class="n">body</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
         <span class="k">with</span> <span class="n">gzip</span><span class="o">.</span><span class="n">GzipFile</span><span class="p">(</span><span class="n">fileobj</span><span class="o">=</span><span class="n">body</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">allow_nan</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json_dumps</span><span class="p">(</span><span class="n">event</span><span class="p">))</span>
 
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
@@ -291,6 +294,7 @@
                 <span class="s2">&quot;Content-Type&quot;</span><span class="p">:</span> <span class="s2">&quot;application/x-sentry-envelope&quot;</span><span class="p">,</span>
                 <span class="s2">&quot;Content-Encoding&quot;</span><span class="p">:</span> <span class="s2">&quot;gzip&quot;</span><span class="p">,</span>
             <span class="p">},</span>
+            <span class="n">endpoint_type</span><span class="o">=</span><span class="s2">&quot;envelope&quot;</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
 

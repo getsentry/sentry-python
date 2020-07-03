@@ -4,7 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.client &#8212; sentry-python 0.15.1 documentation</title>
+    <title>sentry_sdk.client &#8212; sentry-python 0.16.0 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -40,11 +40,12 @@
 
 <span class="kn">from</span> <span class="nn">sentry_sdk._compat</span> <span class="kn">import</span> <span class="n">string_types</span><span class="p">,</span> <span class="n">text_type</span><span class="p">,</span> <span class="n">iteritems</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="p">(</span>
-    <span class="n">handle_in_app</span><span class="p">,</span>
-    <span class="n">get_type_name</span><span class="p">,</span>
     <span class="n">capture_internal_exceptions</span><span class="p">,</span>
     <span class="n">current_stacktrace</span><span class="p">,</span>
     <span class="n">disable_capture_event</span><span class="p">,</span>
+    <span class="n">format_timestamp</span><span class="p">,</span>
+    <span class="n">get_type_name</span><span class="p">,</span>
+    <span class="n">handle_in_app</span><span class="p">,</span>
     <span class="n">logger</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.serializer</span> <span class="kn">import</span> <span class="n">serialize</span>
@@ -53,7 +54,7 @@
 <span class="kn">from</span> <span class="nn">sentry_sdk.integrations</span> <span class="kn">import</span> <span class="n">setup_integrations</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">ContextVar</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.sessions</span> <span class="kn">import</span> <span class="n">SessionFlusher</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.envelope</span> <span class="kn">import</span> <span class="n">Envelope</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.envelope</span> <span class="kn">import</span> <span class="n">Envelope</span><span class="p">,</span> <span class="n">Item</span><span class="p">,</span> <span class="n">PayloadRef</span>
 
 <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">MYPY</span>
 
@@ -232,7 +233,7 @@
             <span class="n">event</span> <span class="o">=</span> <span class="n">serialize</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
 
         <span class="n">before_send</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;before_send&quot;</span><span class="p">]</span>
-        <span class="k">if</span> <span class="n">before_send</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">before_send</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">&quot;transaction&quot;</span><span class="p">:</span>
             <span class="n">new_event</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
                 <span class="n">new_event</span> <span class="o">=</span> <span class="n">before_send</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="ow">or</span> <span class="p">{})</span>
@@ -270,6 +271,10 @@
         <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Scope]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; bool</span>
+        <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;transaction&quot;</span><span class="p">:</span>
+            <span class="c1"># Transactions are sampled independent of error events.</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
         <span class="k">if</span> <span class="n">scope</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">scope</span><span class="o">.</span><span class="n">_should_capture</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">False</span>
 
@@ -295,20 +300,14 @@
         <span class="n">errored</span> <span class="o">=</span> <span class="kc">False</span>
         <span class="n">user_agent</span> <span class="o">=</span> <span class="kc">None</span>
 
-        <span class="c1"># Figure out if this counts as an error and if we should mark the</span>
-        <span class="c1"># session as crashed.</span>
-        <span class="n">level</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;level&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">level</span> <span class="o">==</span> <span class="s2">&quot;fatal&quot;</span><span class="p">:</span>
-            <span class="n">crashed</span> <span class="o">=</span> <span class="kc">True</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">crashed</span><span class="p">:</span>
-            <span class="n">exceptions</span> <span class="o">=</span> <span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exception&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;values&quot;</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">exceptions</span><span class="p">:</span>
-                <span class="n">errored</span> <span class="o">=</span> <span class="kc">True</span>
-                <span class="k">for</span> <span class="n">error</span> <span class="ow">in</span> <span class="n">exceptions</span><span class="p">:</span>
-                    <span class="n">mechanism</span> <span class="o">=</span> <span class="n">error</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;mechanism&quot;</span><span class="p">)</span>
-                    <span class="k">if</span> <span class="n">mechanism</span> <span class="ow">and</span> <span class="n">mechanism</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;handled&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
-                        <span class="n">crashed</span> <span class="o">=</span> <span class="kc">True</span>
-                        <span class="k">break</span>
+        <span class="n">exceptions</span> <span class="o">=</span> <span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exception&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;values&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">exceptions</span><span class="p">:</span>
+            <span class="n">errored</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">for</span> <span class="n">error</span> <span class="ow">in</span> <span class="n">exceptions</span><span class="p">:</span>
+                <span class="n">mechanism</span> <span class="o">=</span> <span class="n">error</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;mechanism&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">mechanism</span> <span class="ow">and</span> <span class="n">mechanism</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;handled&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+                    <span class="n">crashed</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="k">break</span>
 
         <span class="n">user</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;user&quot;</span><span class="p">)</span>
 
@@ -363,7 +362,22 @@
         <span class="k">if</span> <span class="n">session</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_update_session_from_event</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">event</span><span class="p">)</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event_opt</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">event_opt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;transaction&quot;</span><span class="p">:</span>
+            <span class="c1"># Transactions should go to the /envelope/ endpoint.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">capture_envelope</span><span class="p">(</span>
+                <span class="n">Envelope</span><span class="p">(</span>
+                    <span class="n">headers</span><span class="o">=</span><span class="p">{</span>
+                        <span class="s2">&quot;event_id&quot;</span><span class="p">:</span> <span class="n">event_opt</span><span class="p">[</span><span class="s2">&quot;event_id&quot;</span><span class="p">],</span>
+                        <span class="s2">&quot;sent_at&quot;</span><span class="p">:</span> <span class="n">format_timestamp</span><span class="p">(</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()),</span>
+                    <span class="p">},</span>
+                    <span class="n">items</span><span class="o">=</span><span class="p">[</span>
+                        <span class="n">Item</span><span class="p">(</span><span class="n">payload</span><span class="o">=</span><span class="n">PayloadRef</span><span class="p">(</span><span class="n">json</span><span class="o">=</span><span class="n">event_opt</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;transaction&quot;</span><span class="p">),</span>
+                    <span class="p">],</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># All other events go to the /store/ endpoint.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event_opt</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">event_id</span>
 
     <span class="k">def</span> <span class="nf">capture_session</span><span class="p">(</span>

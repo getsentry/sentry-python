@@ -4,7 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.hub &#8212; sentry-python 0.15.1 documentation</title>
+    <title>sentry_sdk.hub &#8212; sentry-python 0.16.0 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -41,7 +41,7 @@
 <span class="kn">from</span> <span class="nn">sentry_sdk._compat</span> <span class="kn">import</span> <span class="n">with_metaclass</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.scope</span> <span class="kn">import</span> <span class="n">Scope</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.client</span> <span class="kn">import</span> <span class="n">Client</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.tracing</span> <span class="kn">import</span> <span class="n">Span</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.tracing</span> <span class="kn">import</span> <span class="n">Span</span><span class="p">,</span> <span class="n">Transaction</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.sessions</span> <span class="kn">import</span> <span class="n">Session</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">exc_info_from_error</span><span class="p">,</span>
@@ -309,7 +309,7 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Integration has no name&quot;</span><span class="p">)</span>
 
-        <span class="n">client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span>
         <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">rv</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">integration_name</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -474,38 +474,88 @@
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Span</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Create a new span whose parent span is the currently active</span>
-<span class="sd">        span, if any. The return value is the span object that can</span>
-<span class="sd">        be used as a context manager to start and stop timing.</span>
+<span class="sd">        Create and start timing a new span whose parent is the currently active</span>
+<span class="sd">        span or transaction, if any. The return value is a span instance,</span>
+<span class="sd">        typically used as a context manager to start and stop timing in a `with`</span>
+<span class="sd">        block.</span>
 
-<span class="sd">        Note that you will not see any span that is not contained</span>
-<span class="sd">        within a transaction. Create a transaction with</span>
-<span class="sd">        ``start_span(transaction=&quot;my transaction&quot;)`` if an</span>
-<span class="sd">        integration doesn&#39;t already do this for you.</span>
+<span class="sd">        Only spans contained in a transaction are sent to Sentry. Most</span>
+<span class="sd">        integrations start a transaction at the appropriate time, for example</span>
+<span class="sd">        for every incoming HTTP request. Use `start_transaction` to start a new</span>
+<span class="sd">        transaction when one is not already in progress.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># TODO: consider removing this in a future release.</span>
+        <span class="c1"># This is for backwards compatibility with releases before</span>
+        <span class="c1"># start_transaction existed, to allow for a smoother transition.</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">span</span><span class="p">,</span> <span class="n">Transaction</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;transaction&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="n">deprecation_msg</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">&quot;Deprecated: use start_transaction to start transactions and &quot;</span>
+                <span class="s2">&quot;Transaction.start_child to start spans.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">span</span><span class="p">,</span> <span class="n">Transaction</span><span class="p">):</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">deprecation_msg</span><span class="p">)</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_transaction</span><span class="p">(</span><span class="n">span</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s2">&quot;transaction&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">deprecation_msg</span><span class="p">)</span>
+                <span class="n">name</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;transaction&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_transaction</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">span</span>
 
         <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;hub&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">span</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">span</span>
-            <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="n">span</span> <span class="o">=</span> <span class="n">span</span><span class="o">.</span><span class="n">new_span</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">span</span> <span class="o">=</span> <span class="n">Span</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">span</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">span</span>
+        <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">span</span><span class="o">.</span><span class="n">start_child</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">span</span><span class="o">.</span><span class="n">sampled</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">span</span><span class="o">.</span><span class="n">transaction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Span</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Hub.start_transaction"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.start_transaction">[docs]</a>    <span class="k">def</span> <span class="nf">start_transaction</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">transaction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Transaction]</span>
+        <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
+    <span class="p">):</span>
+        <span class="c1"># type: (...) -&gt; Transaction</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Start and return a transaction.</span>
+
+<span class="sd">        Start an existing transaction if given, otherwise create and start a new</span>
+<span class="sd">        transaction with kwargs.</span>
+
+<span class="sd">        This is the entry point to manual tracing instrumentation.</span>
+
+<span class="sd">        A tree structure can be built by adding child spans to the transaction,</span>
+<span class="sd">        and child spans to other spans. To start a new child span within the</span>
+<span class="sd">        transaction or any span, call the respective `.start_child()` method.</span>
+
+<span class="sd">        Every child span must be finished before the transaction is finished,</span>
+<span class="sd">        otherwise the unfinished spans are discarded.</span>
+
+<span class="sd">        When used as context managers, spans and transactions are automatically</span>
+<span class="sd">        finished at the end of the `with` block. If not using context managers,</span>
+<span class="sd">        call the `.finish()` method.</span>
+
+<span class="sd">        When the transaction is finished, it will be sent to Sentry with all its</span>
+<span class="sd">        finished child spans.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">transaction</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;hub&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+            <span class="n">transaction</span> <span class="o">=</span> <span class="n">Transaction</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">transaction</span><span class="o">.</span><span class="n">sampled</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">sample_rate</span> <span class="o">=</span> <span class="n">client</span> <span class="ow">and</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;traces_sample_rate&quot;</span><span class="p">]</span> <span class="ow">or</span> <span class="mi">0</span>
-            <span class="n">span</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">sample_rate</span>
+            <span class="n">transaction</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">sample_rate</span>
 
-        <span class="k">if</span> <span class="n">span</span><span class="o">.</span><span class="n">sampled</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">transaction</span><span class="o">.</span><span class="n">sampled</span><span class="p">:</span>
             <span class="n">max_spans</span> <span class="o">=</span> <span class="p">(</span>
                 <span class="n">client</span> <span class="ow">and</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;_experiments&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_spans&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">1000</span>
             <span class="p">)</span>
-            <span class="n">span</span><span class="o">.</span><span class="n">init_finished_spans</span><span class="p">(</span><span class="n">maxlen</span><span class="o">=</span><span class="n">max_spans</span><span class="p">)</span>
+            <span class="n">transaction</span><span class="o">.</span><span class="n">init_span_recorder</span><span class="p">(</span><span class="n">maxlen</span><span class="o">=</span><span class="n">max_spans</span><span class="p">)</span>
 
-        <span class="k">return</span> <span class="n">span</span></div>
+        <span class="k">return</span> <span class="n">transaction</span></div>
 
     <span class="nd">@overload</span>  <span class="c1"># noqa</span>
     <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>
@@ -620,7 +670,7 @@
             <span class="n">session</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
             <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">client</span><span class="o">.</span><span class="n">capture_session</span><span class="p">(</span><span class="n">session</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="kc">None</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="kc">None</span></div>
 
 <div class="viewcode-block" id="Hub.stop_auto_session_tracking"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.stop_auto_session_tracking">[docs]</a>    <span class="k">def</span> <span class="nf">stop_auto_session_tracking</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>

@@ -4,7 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.scope &#8212; sentry-python 0.15.1 documentation</title>
+    <title>sentry_sdk.scope &#8212; sentry-python 0.16.0 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -38,6 +38,7 @@
 <span class="kn">from</span> <span class="nn">sentry_sdk._functools</span> <span class="kn">import</span> <span class="n">wraps</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">MYPY</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">logger</span><span class="p">,</span> <span class="n">capture_internal_exceptions</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.tracing</span> <span class="kn">import</span> <span class="n">Transaction</span>
 
 <span class="k">if</span> <span class="n">MYPY</span><span class="p">:</span>
     <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
@@ -167,14 +168,36 @@
         <span class="sd">&quot;&quot;&quot;When set this overrides the default fingerprint.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="n">value</span>
 
-    <span class="nd">@_attr_setter</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type: () -&gt; Any</span>
+        <span class="c1"># would be type: () -&gt; Optional[Transaction], see https://github.com/python/mypy/issues/3004</span>
+        <span class="sd">&quot;&quot;&quot;Return the transaction (root span) in the scope.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span><span class="o">.</span><span class="n">_span_recorder</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span><span class="o">.</span><span class="n">_span_recorder</span><span class="o">.</span><span class="n">spans</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">IndexError</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="nd">@transaction</span><span class="o">.</span><span class="n">setter</span>
     <span class="k">def</span> <span class="nf">transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-        <span class="c1"># type: (Optional[str]) -&gt; None</span>
+        <span class="c1"># type: (Any) -&gt; None</span>
+        <span class="c1"># would be type: (Optional[str]) -&gt; None, see https://github.com/python/mypy/issues/3004</span>
         <span class="sd">&quot;&quot;&quot;When set this forces a specific transaction name to be set.&quot;&quot;&quot;</span>
+        <span class="c1"># XXX: the docstring above is misleading. The implementation of</span>
+        <span class="c1"># apply_to_event prefers an existing value of event.transaction over</span>
+        <span class="c1"># anything set in the scope.</span>
+        <span class="c1"># XXX: note that with the introduction of the Scope.transaction getter,</span>
+        <span class="c1"># there is a semantic and type mismatch between getter and setter. The</span>
+        <span class="c1"># getter returns a transaction, the setter sets a transaction name.</span>
+        <span class="c1"># Without breaking version compatibility, we could make the setter set a</span>
+        <span class="c1"># transaction name or transaction (self._span) depending on the type of</span>
+        <span class="c1"># the value argument.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="n">value</span>
         <span class="n">span</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span>
-        <span class="k">if</span> <span class="n">span</span><span class="p">:</span>
-            <span class="n">span</span><span class="o">.</span><span class="n">transaction</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="k">if</span> <span class="n">span</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">span</span><span class="p">,</span> <span class="n">Transaction</span><span class="p">):</span>
+            <span class="n">span</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">value</span>
 
     <span class="nd">@_attr_setter</span>
     <span class="k">def</span> <span class="nf">user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
@@ -192,17 +215,19 @@
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">span</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; Optional[Span]</span>
-        <span class="sd">&quot;&quot;&quot;Get/set current tracing span.&quot;&quot;&quot;</span>
+        <span class="sd">&quot;&quot;&quot;Get/set current tracing span or transaction.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span>
 
     <span class="nd">@span</span><span class="o">.</span><span class="n">setter</span>
     <span class="k">def</span> <span class="nf">span</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="p">):</span>
         <span class="c1"># type: (Optional[Span]) -&gt; None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_span</span> <span class="o">=</span> <span class="n">span</span>
-        <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">span_transaction</span> <span class="o">=</span> <span class="n">span</span><span class="o">.</span><span class="n">transaction</span>
-            <span class="k">if</span> <span class="n">span_transaction</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="n">span_transaction</span>
+        <span class="c1"># XXX: this differs from the implementation in JS, there Scope.setSpan</span>
+        <span class="c1"># does not set Scope._transactionName.</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">span</span><span class="p">,</span> <span class="n">Transaction</span><span class="p">):</span>
+            <span class="n">transaction</span> <span class="o">=</span> <span class="n">span</span>
+            <span class="k">if</span> <span class="n">transaction</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="n">transaction</span><span class="o">.</span><span class="n">name</span>
 
 <div class="viewcode-block" id="Scope.set_tag"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_tag">[docs]</a>    <span class="k">def</span> <span class="nf">set_tag</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
