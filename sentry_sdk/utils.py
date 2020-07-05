@@ -437,6 +437,7 @@ def filename_for_module(module, abs_path):
 
 
 def function_name(frame):
+    # type: (FrameType) -> str
     if executing:
         return executing.Source.for_frame(frame).code_qualname(frame.f_code)
     else:
