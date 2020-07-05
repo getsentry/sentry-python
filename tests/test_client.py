@@ -10,7 +10,7 @@ from textwrap import dedent
 from sentry_sdk import Hub, Client, configure_scope, capture_message, capture_exception
 from sentry_sdk.transport import Transport
 from sentry_sdk._compat import reraise, text_type, PY2
-from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
+from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS, executing
 
 if PY2:
     # Importing ABCs from collections is deprecated, and will stop working in 3.8
@@ -224,10 +224,14 @@ def test_attach_stacktrace_enabled():
     (event,) = events
     (thread,) = event["threads"]["values"]
     functions = [x["function"] for x in thread["stacktrace"]["frames"]]
-    assert functions[-2:] == [
-        "test_attach_stacktrace_enabled.<locals>.foo",
-        "test_attach_stacktrace_enabled.<locals>.bar",
-    ]
+
+    if executing:
+        assert functions[-2:] == [
+            "test_attach_stacktrace_enabled.<locals>.foo",
+            "test_attach_stacktrace_enabled.<locals>.bar",
+        ]
+    else:
+        assert functions[-2:] == ["foo", "bar"]
 
 
 def test_attach_stacktrace_enabled_no_locals():

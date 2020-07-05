@@ -17,6 +17,7 @@ except ImportError:
 
 from sentry_sdk import capture_message, capture_exception
 from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.utils import executing
 
 from tests.integrations.django.myapp.wsgi import application
 
@@ -437,11 +438,19 @@ def test_template_exception(sentry_init, client, capture_events):
     filenames = [
         (f.get("function"), f.get("module")) for f in exception["stacktrace"]["frames"]
     ]
-    assert filenames[-3:] == [
-        (u"Parser.parse", u"django.template.base"),
-        (None, None),
-        (u"Parser.invalid_block_tag", u"django.template.base"),
-    ]
+
+    if executing:
+        assert filenames[-3:] == [
+            (u"Parser.parse", u"django.template.base"),
+            (None, None),
+            (u"Parser.invalid_block_tag", u"django.template.base"),
+        ]
+    else:
+        assert filenames[-3:] == [
+            (u"parse", u"django.template.base"),
+            (None, None),
+            (u"invalid_block_tag", u"django.template.base"),
+        ]
 
 
 @pytest.mark.parametrize(
