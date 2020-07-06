@@ -14,9 +14,9 @@ setup(
     name="sentry-sdk",
     version="0.16.0",
     author="Sentry Team and Contributors",
-    author_email="hello@getsentry.com",
+    author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
-    description="Python client for Sentry (https://getsentry.com)",
+    description="Python client for Sentry (https://sentry.io)",
     long_description=__doc__,
     packages=find_packages(exclude=("tests", "tests.*")),
     # PEP 561
