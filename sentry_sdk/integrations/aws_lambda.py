@@ -37,13 +37,13 @@ def _wrap_init_error(init_error):
     def sentry_init_error(*args, **kwargs):
         # type: (*Any, **Any) -> Any
 
-        # Fetch Initialization error details from arguments
-        error = json.loads(args[1])
-
         hub = Hub.current
         integration = hub.get_integration(AwsLambdaIntegration)
         if integration is None:
             return init_error(*args, **kwargs)
+
+        # Fetch Initialization error details from arguments
+        error = json.loads(args[1])
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
@@ -51,13 +51,9 @@ def _wrap_init_error(init_error):
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
-            try:
-                # Checking if there is any error/exception which is raised in the runtime
-                # environment from arguments and, re-raising it to capture it as an event.
-                if error.get("errorType"):
-                    exc_info = sys.exc_info()
-                    reraise(*exc_info)
-            except Exception:
+            # Checking if there is any error/exception which is raised in the runtime
+            # environment from arguments and, re-raising it to capture it as an event.
+            if error.get("errorType"):
                 exc_info = sys.exc_info()
                 event, hint = event_from_exception(
                     exc_info,
