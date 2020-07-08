@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from os import environ
 import sys
+import json
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk._compat import reraise
@@ -9,6 +10,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     logger,
+    TimeoutThread,
 )
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
@@ -25,6 +27,49 @@ if MYPY:
 
     F = TypeVar("F", bound=Callable[..., Any])
 
+# Constants
+TIMEOUT_THRESHOLD_MILLIS = 1500  # Minimum time required to capture TimeoutError
+SECONDS_CONVERSION_FACTOR = 1000.0
+
+
+def _wrap_init_error(init_error):
+    # type: (F) -> F
+    def sentry_init_error(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
+
+        # Fetch Initialization error details from arguments
+        error = json.loads(args[1])
+
+        hub = Hub.current
+        integration = hub.get_integration(AwsLambdaIntegration)
+        if integration is None:
+            return init_error(*args, **kwargs)
+
+        # If an integration is there, a client has to be there.
+        client = hub.client  # type: Any
+
+        with hub.push_scope() as scope:
+            with capture_internal_exceptions():
+                scope.clear_breadcrumbs()
+            try:
+                # Checking if there is any error/exception which is raised in the runtime
+                # environment from arguments and, re-raising it to capture it as an event.
+                if error.get("errorType"):
+                    exc_info = sys.exc_info()
+                    reraise(*exc_info)
+            except Exception:
+                exc_info = sys.exc_info()
+                event, hint = event_from_exception(
+                    exc_info,
+                    client_options=client.options,
+                    mechanism={"type": "aws_lambda", "handled": False},
+                )
+                hub.capture_event(event, hint=hint)
+
+        return init_error(*args, **kwargs)
+
+    return sentry_init_error  # type: ignore
+
 
 def _wrap_handler(handler):
     # type: (F) -> F
@@ -37,14 +82,31 @@ def _wrap_handler(handler):
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
+        configured_time_in_millis = context.get_remaining_time_in_millis()
 
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
                 scope.transaction = context.function_name
-                scope.add_event_processor(_make_request_event_processor(event, context))
+                scope.add_event_processor(_make_request_event_processor(event, context, configured_time_in_millis))
 
             try:
+                # Checking if parameter to check timeout is set True
+                if integration.get_check_timeout_error():
+                    # Starting the Timeout thread only if the configured time is greater than Timeout threshold value
+                    if configured_time_in_millis > TIMEOUT_THRESHOLD_MILLIS:
+                        remaining_time_in_sec = (configured_time_in_millis - TIMEOUT_THRESHOLD_MILLIS)/SECONDS_CONVERSION_FACTOR
+
+                        configured_time_in_sec = configured_time_in_millis / SECONDS_CONVERSION_FACTOR
+                        configured_time = int(configured_time_in_sec)
+
+                        # Setting up the exact integer value of configured time(in seconds)
+                        if configured_time < configured_time_in_sec:
+                            configured_time = configured_time + 1
+
+                        # Starting the thread to raise timeout warning exception
+                        timeout_thread = TimeoutThread(remaining_time_in_sec, configured_time)
+                        timeout_thread.start()
                 return handler(event, context, *args, **kwargs)
             except Exception:
                 exc_info = sys.exc_info()
@@ -72,6 +134,14 @@ def _drain_queue():
 
 class AwsLambdaIntegration(Integration):
     identifier = "aws_lambda"
+
+    def __init__(self, check_timeout_error=False):
+        # type: (bool) -> None
+        self.check_timeout_error = check_timeout_error
+
+    def get_check_timeout_error(self):
+        # type: () -> bool
+        return self.check_timeout_error
 
     @staticmethod
     def setup_once():
@@ -126,6 +196,10 @@ class AwsLambdaIntegration(Integration):
 
             lambda_bootstrap.to_json = sentry_to_json
         else:
+            lambda_bootstrap.LambdaRuntimeClient.post_init_error = _wrap_init_error(
+                lambda_bootstrap.LambdaRuntimeClient.post_init_error
+            )
+
             old_handle_event_request = lambda_bootstrap.handle_event_request
 
             def sentry_handle_event_request(  # type: ignore
@@ -158,19 +232,22 @@ class AwsLambdaIntegration(Integration):
             )
 
 
-def _make_request_event_processor(aws_event, aws_context):
-    # type: (Any, Any) -> EventProcessor
+def _make_request_event_processor(aws_event, aws_context, configured_timeout):
+    # type: (Any, Any, Any) -> EventProcessor
     start_time = datetime.now()
 
     def event_processor(event, hint, start_time=start_time):
         # type: (Event, Hint, datetime) -> Optional[Event]
         extra = event.setdefault("extra", {})
+        remaining_time_in_milis = aws_context.get_remaining_time_in_millis()
+        exec_duration = configured_timeout - remaining_time_in_milis
         extra["lambda"] = {
             "function_name": aws_context.function_name,
             "function_version": aws_context.function_version,
             "invoked_function_arn": aws_context.invoked_function_arn,
-            "remaining_time_in_millis": aws_context.get_remaining_time_in_millis(),
+            "remaining_time_in_millis": remaining_time_in_milis,
             "aws_request_id": aws_context.aws_request_id,
+            "execution_duration": exec_duration,
         }
 
         extra["cloudwatch logs"] = {

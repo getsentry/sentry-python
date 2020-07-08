@@ -3,6 +3,8 @@ import linecache
 import logging
 import os
 import sys
+import time
+import threading
 
 from datetime import datetime
 
@@ -870,3 +872,30 @@ def transaction_from_function(func):
 
 
 disable_capture_event = ContextVar("disable_capture_event")
+
+
+class TimeoutThread(threading.Thread):
+    """Creates a Thread."""
+
+    def __init__(self, timeout_duration, configured_timeout):
+        # type: (float, int) -> None
+        threading.Thread.__init__(self)
+        self.timeout_duration = timeout_duration
+        self.configured_timeout = configured_timeout
+
+    def get_timeout_duration(self):
+        # type: () -> float
+        return self.timeout_duration
+
+    def get_configured_timeout(self):
+        # type: () -> int
+        return self.configured_timeout
+
+    def run(self):
+        # type: () -> None
+        time.sleep(self.get_timeout_duration())
+        # Raising Exception after timeout duration is reached
+        raise Exception(
+            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds".format(
+                self.get_configured_timeout())
+        )
