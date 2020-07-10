@@ -37,8 +37,6 @@ try:
         __version__ as FLASK_VERSION,
     )
     from flask.signals import (
-        appcontext_pushed,
-        appcontext_tearing_down,
         got_request_exception,
         request_started,
     )
