@@ -37,8 +37,6 @@ try:
         __version__ as FLASK_VERSION,
     )
     from flask.signals import (
-        appcontext_pushed,
-        appcontext_tearing_down,
         got_request_exception,
         request_started,
     )
@@ -74,8 +72,6 @@ class FlaskIntegration(Integration):
         if version < (0, 11):
             raise DidNotEnable("Flask 0.11 or newer is required.")
 
-        appcontext_pushed.connect(_push_appctx)
-        appcontext_tearing_down.connect(_pop_appctx)
         request_started.connect(_request_started)
         got_request_exception.connect(_capture_exception)
 
@@ -91,26 +87,6 @@ class FlaskIntegration(Integration):
             )
 
         Flask.__call__ = sentry_patched_wsgi_app  # type: ignore
-
-
-def _push_appctx(*args, **kwargs):
-    # type: (*Flask, **Any) -> None
-    hub = Hub.current
-    if hub.get_integration(FlaskIntegration) is not None:
-        # always want to push scope regardless of whether WSGI app might already
-        # have (not the case for CLI for example)
-        scope_manager = hub.push_scope()
-        scope_manager.__enter__()
-        _app_ctx_stack.top.sentry_sdk_scope_manager = scope_manager
-        with hub.configure_scope() as scope:
-            scope._name = "flask"
-
-
-def _pop_appctx(*args, **kwargs):
-    # type: (*Flask, **Any) -> None
-    scope_manager = getattr(_app_ctx_stack.top, "sentry_sdk_scope_manager", None)
-    if scope_manager is not None:
-        scope_manager.__exit__(None, None, None)
 
 
 def _request_started(sender, **kwargs):
