@@ -182,11 +182,11 @@ def relay_normalize(tmpdir):
 
 @pytest.fixture
 def sentry_init(monkeypatch_test_transport, request):
-    def inner(*a, transport=None, **kw):
+    def inner(*a, **kw):
         hub = sentry_sdk.Hub.current
-        client = sentry_sdk.Client(*a, transport=transport, **kw)
+        client = sentry_sdk.Client(*a, **kw)
         hub.bind_client(client)
-        if transport is None:
+        if "transport" not in kw:
             monkeypatch_test_transport(sentry_sdk.Hub.current.client)
 
     if request.node.get_closest_marker("forked"):
