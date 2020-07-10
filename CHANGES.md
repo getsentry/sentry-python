@@ -27,6 +27,10 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.16.1
+
+* Flask integration: Fix a bug that prevented custom tags from being attached to transactions.
+
 ## 0.16.0
 
 * Redis integration: add tags for more commands
