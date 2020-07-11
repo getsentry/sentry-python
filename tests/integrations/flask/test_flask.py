@@ -12,6 +12,7 @@ from flask.views import View
 from flask_login import LoginManager, login_user
 
 from sentry_sdk import (
+    set_tag,
     configure_scope,
     capture_message,
     capture_exception,
@@ -630,20 +631,34 @@ def test_errorhandler_for_exception_swallows_exception(
 def test_tracing_success(sentry_init, capture_events, app):
     sentry_init(traces_sample_rate=1.0, integrations=[flask_sentry.FlaskIntegration()])
 
+    @app.before_request
+    def _():
+        set_tag("before_request", "yes")
+
+    @app.route("/message_tx")
+    def hi_tx():
+        set_tag("view", "yes")
+        capture_message("hi")
+        return "ok"
+
     events = capture_events()
 
     with app.test_client() as client:
-        response = client.get("/message")
+        response = client.get("/message_tx")
         assert response.status_code == 200
 
     message_event, transaction_event = events
 
     assert transaction_event["type"] == "transaction"
-    assert transaction_event["transaction"] == "hi"
+    assert transaction_event["transaction"] == "hi_tx"
     assert transaction_event["contexts"]["trace"]["status"] == "ok"
+    assert transaction_event["tags"]["view"] == "yes"
+    assert transaction_event["tags"]["before_request"] == "yes"
 
     assert message_event["message"] == "hi"
-    assert message_event["transaction"] == "hi"
+    assert message_event["transaction"] == "hi_tx"
+    assert message_event["tags"]["view"] == "yes"
+    assert message_event["tags"]["before_request"] == "yes"
 
 
 def test_tracing_error(sentry_init, capture_events, app):
