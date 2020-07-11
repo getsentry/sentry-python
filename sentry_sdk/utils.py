@@ -28,11 +28,6 @@ if MYPY:
 
     from sentry_sdk._types import ExcInfo, EndpointType
 
-try:
-    import executing
-except ImportError:
-    executing = None
-
 
 epoch = datetime(1970, 1, 1)
 
@@ -436,14 +431,6 @@ def filename_for_module(module, abs_path):
         return abs_path
 
 
-def function_name(frame):
-    # type: (FrameType) -> str
-    if executing:
-        return executing.Source.for_frame(frame).code_qualname(frame.f_code)
-    else:
-        return frame.f_code.co_name
-
-
 def serialize_frame(frame, tb_lineno=None, with_locals=True):
     # type: (FrameType, Optional[int], bool) -> Dict[str, Any]
     f_code = getattr(frame, "f_code", None)
@@ -452,7 +439,7 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
         function = None
     else:
         abs_path = frame.f_code.co_filename
-        function = function_name(frame)
+        function = frame.f_code.co_name
     try:
         module = frame.f_globals["__name__"]
     except Exception:
