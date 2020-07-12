@@ -22,6 +22,8 @@ class ExecutingIntegration(Integration):
 
     @staticmethod
     def setup_once():
+        # type: () -> None
+
         @add_global_event_processor
         def add_executing_info(event, hint):
             # type: (Event, Optional[Hint]) -> Optional[Event]
