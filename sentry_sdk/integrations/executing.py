@@ -49,7 +49,11 @@ class ExecutingIntegration(Integration):
             for exception, (_exc_type, _exc_value, exc_tb) in zip(
                 reversed(values), walk_exception_chain(exc_info)
             ):
-                sentry_frames = exception.get("stacktrace", {}).get("frames", [])
+                sentry_frames = [
+                    frame
+                    for frame in exception.get("stacktrace", {}).get("frames", [])
+                    if frame.get("function")
+                ]
                 tbs = list(iter_stacks(exc_tb))
                 if len(sentry_frames) != len(tbs):
                     continue
