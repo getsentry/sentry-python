@@ -15,6 +15,7 @@ from sentry_sdk import (
     capture_exception,
     capture_event,
 )
+from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
 from sentry_sdk._compat import reraise, text_type, PY2
 from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
@@ -216,6 +217,35 @@ def test_with_locals_disabled(sentry_init, capture_events):
     )
 
 
+@pytest.mark.parametrize("integrations", [[], [ExecutingIntegration()]])
+def test_function_names(sentry_init, capture_events, integrations):
+    sentry_init(integrations=integrations)
+    events = capture_events()
+
+    def foo():
+        try:
+            bar()
+        except Exception:
+            capture_exception()
+
+    def bar():
+        1 / 0
+
+    foo()
+
+    (event,) = events
+    (thread,) = event["exception"]["values"]
+    functions = [x["function"] for x in thread["stacktrace"]["frames"]]
+
+    if integrations:
+        assert functions == [
+            "test_function_names.<locals>.foo",
+            "test_function_names.<locals>.bar",
+        ]
+    else:
+        assert functions == ["foo", "bar"]
+
+
 def test_attach_stacktrace_enabled(sentry_init, capture_events):
     sentry_init(attach_stacktrace=True)
     events = capture_events()
@@ -231,6 +261,7 @@ def test_attach_stacktrace_enabled(sentry_init, capture_events):
     (event,) = events
     (thread,) = event["threads"]["values"]
     functions = [x["function"] for x in thread["stacktrace"]["frames"]]
+
     assert functions[-2:] == ["foo", "bar"]
 
 

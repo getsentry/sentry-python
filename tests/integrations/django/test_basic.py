@@ -9,6 +9,7 @@ from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError, ProgrammingError, DataError
 
+from sentry_sdk.integrations.executing import ExecutingIntegration
 
 try:
     from django.urls import reverse
@@ -408,8 +409,11 @@ def test_read_request(sentry_init, client, capture_events):
     assert "data" not in event["request"]
 
 
-def test_template_exception(sentry_init, client, capture_events):
-    sentry_init(integrations=[DjangoIntegration()])
+@pytest.mark.parametrize("with_executing_integration", [[], [ExecutingIntegration()]])
+def test_template_exception(
+    sentry_init, client, capture_events, with_executing_integration
+):
+    sentry_init(integrations=[DjangoIntegration()] + with_executing_integration)
     events = capture_events()
 
     content, status, headers = client.get(reverse("template_exc"))
@@ -437,11 +441,19 @@ def test_template_exception(sentry_init, client, capture_events):
     filenames = [
         (f.get("function"), f.get("module")) for f in exception["stacktrace"]["frames"]
     ]
-    assert filenames[-3:] == [
-        (u"parse", u"django.template.base"),
-        (None, None),
-        (u"invalid_block_tag", u"django.template.base"),
-    ]
+
+    if with_executing_integration:
+        assert filenames[-3:] == [
+            (u"Parser.parse", u"django.template.base"),
+            (None, None),
+            (u"Parser.invalid_block_tag", u"django.template.base"),
+        ]
+    else:
+        assert filenames[-3:] == [
+            (u"parse", u"django.template.base"),
+            (None, None),
+            (u"invalid_block_tag", u"django.template.base"),
+        ]
 
 
 @pytest.mark.parametrize(
