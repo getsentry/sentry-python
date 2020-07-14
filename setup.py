@@ -37,6 +37,7 @@ setup(
         "tornado": ["tornado>=5"],
         "sqlalchemy": ["sqlalchemy>=1.2"],
         "pyspark": ["pyspark>=2.4.4"],
+        "executing": ["executing", "asttokens"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",

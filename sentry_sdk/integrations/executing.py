@@ -7,7 +7,7 @@ from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import walk_exception_chain, iter_stacks
 
 if MYPY:
-    from typing import Optional
+    from typing import Optional, Dict
 
     from sentry_sdk._types import Event, Hint
 
@@ -15,6 +15,12 @@ try:
     import executing
 except ImportError:
     raise DidNotEnable("executing is not installed")
+
+try:
+    # Used implicitly, just testing it's available
+    import asttokens  # noqa
+except ImportError:
+    raise DidNotEnable("asttokens is not installed")
 
 
 class ExecutingIntegration(Integration):
@@ -61,8 +67,16 @@ class ExecutingIntegration(Integration):
                     continue
 
                 for sentry_frame, tb in zip(sentry_frames, tbs):
-                    frame = tb.tb_frame
-                    source = executing.Source.for_frame(frame)
-                    sentry_frame["function"] = source.code_qualname(frame.f_code)
-
+                    ex = executing.Source.executing(tb)
+                    ex.source.asttokens()
+                    sentry_frame["function"] = ex.code_qualname()
+                    sentry_frame["executing_node"] = {
+                        "start": line_and_column(*ex.node.first_token.start),
+                        "end": line_and_column(*ex.node.last_token.end),
+                    }
             return event
+
+
+def line_and_column(line, column):
+    # type: (int, int) -> Dict[str, int]
+    return locals()
