@@ -62,7 +62,7 @@ class PureEvalIntegration(Integration):
                 return event
 
             for exception, (_exc_type, _exc_value, exc_tb) in zip(
-                    reversed(values), walk_exception_chain(exc_info)
+                reversed(values), walk_exception_chain(exc_info)
             ):
                 sentry_frames = [
                     frame
