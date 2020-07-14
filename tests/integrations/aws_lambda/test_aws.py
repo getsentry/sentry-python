@@ -67,7 +67,11 @@ def run_lambda_function(tmpdir, lambda_client, request, relay_normalize):
         # Check file for valid syntax first, and that the integration does not
         # crash when not running in Lambda (but rather a local deployment tool
         # such as chalice's)
-        subprocess.check_call([sys.executable, str(tmp.join("test_lambda.py"))])
+        try:
+            subprocess.check_call([sys.executable, str(tmp.join("test_lambda.py"))])
+        except Exception as e:
+            # Exception caught in case of Initialization error
+            pass
 
         tmp.join("setup.cfg").write("[install]\nprefix=")
         subprocess.check_call([sys.executable, "setup.py", "sdist", "-d", str(tmpdir)])
@@ -85,6 +89,7 @@ def run_lambda_function(tmpdir, lambda_client, request, relay_normalize):
             Handler="test_lambda.test_handler",
             Code={"ZipFile": tmpdir.join("ball.zip").read(mode="rb")},
             Description="Created as part of testsuite for getsentry/sentry-python",
+            Timeout=4,
         )
 
         @request.addfinalizer
@@ -234,3 +239,50 @@ def test_request_data(run_lambda_function):
         "query_string": {"bonkers": "true"},
         "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
     }
+
+
+def test_init_error(run_lambda_function):
+    events, response = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk()
+        func()
+        def test_handler(event, context):
+            return 0
+        """
+        ),
+        b'{"foo": "bar"}',
+    )
+    log_result = (base64.b64decode(response["LogResult"])).decode("utf-8")
+    expected_text = "name 'func' is not defined"
+    assert expected_text in log_result
+
+
+def test_timeout_error(run_lambda_function):
+    # Modifying LAMBDA_PRELUDE since capturing timeout error is kept optional.
+    modified_prelude = LAMBDA_PRELUDE.replace("[AwsLambdaIntegration()]", "[AwsLambdaIntegration(True)]")
+    events, response = run_lambda_function(
+        modified_prelude
+        + dedent(
+            """
+        init_sdk()
+        def test_handler(event, context):
+            time.sleep(10)
+            return 0
+        """
+        ),
+        b'{"foo": "bar"}',
+    )
+    expected_text = "WARNING : Function is expected to get timed out. Configured timeout duration = 4 seconds"
+    if not events:
+        # In case of Python 2.7 runtime environment
+        log_result = (base64.b64decode(response["LogResult"])).decode("utf-8")
+        assert expected_text in log_result
+    else:
+        # In case of Python 3.6, 3.7 & 3.8 runtime environments
+        (event,) = events
+        assert event["level"] == "error"
+        (exception,) = event["exception"]["values"]
+        assert exception["type"] == "Exception"
+        assert exception["value"] == expected_text
