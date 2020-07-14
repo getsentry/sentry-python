@@ -70,10 +70,11 @@ class ExecutingIntegration(Integration):
                     ex = executing.Source.executing(tb)
                     ex.source.asttokens()
                     sentry_frame["function"] = ex.code_qualname()
-                    sentry_frame["executing_node"] = {
-                        "start": line_and_column(*ex.node.first_token.start),
-                        "end": line_and_column(*ex.node.last_token.end),
-                    }
+                    if ex.node:
+                        sentry_frame["executing_node"] = {
+                            "start": line_and_column(*ex.node.first_token.start),
+                            "end": line_and_column(*ex.node.last_token.end),
+                        }
             return event
 
 
