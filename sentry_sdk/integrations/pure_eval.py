@@ -25,7 +25,8 @@ except ImportError:
     raise DidNotEnable("pure_eval is not installed")
 
 try:
-    import asttokens
+    # Used implicitly, just testing it's available
+    import asttokens  # noqa
 except ImportError:
     raise DidNotEnable("asttokens is not installed")
 
