@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from os import environ
 import sys
 import json
+import os
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk._compat import reraise
@@ -28,8 +29,8 @@ if MYPY:
     F = TypeVar("F", bound=Callable[..., Any])
 
 # Constants
-TIMEOUT_THRESHOLD_MILLIS = 1500  # Minimum time required to capture TimeoutError
-SECONDS_CONVERSION_FACTOR = 1000.0
+TIMEOUT_WARNING_BUFFER = 1500  # Buffer time required to send timeout warning to Sentry
+MILLIS_TO_SECONDS = 1000.0
 
 
 def _wrap_init_error(init_error):
@@ -78,31 +79,33 @@ def _wrap_handler(handler):
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
-        configured_time_in_millis = context.get_remaining_time_in_millis()
+        configured_time = context.get_remaining_time_in_millis()
 
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
                 scope.transaction = context.function_name
-                scope.add_event_processor(_make_request_event_processor(event, context, configured_time_in_millis))
+                scope.add_event_processor(
+                    _make_request_event_processor(event, context, configured_time)
+                )
+                # Starting the Timeout thread only if the configured time is greater than Timeout warning
+                # buffer and timeout_warning parameter is set True.
+                if (
+                    integration.timeout_warning
+                    and configured_time > TIMEOUT_WARNING_BUFFER
+                ):
+                    waiting_time = (
+                        configured_time - TIMEOUT_WARNING_BUFFER
+                    ) / MILLIS_TO_SECONDS
+
+                    timeout_thread = TimeoutThread(
+                        waiting_time, configured_time / MILLIS_TO_SECONDS
+                    )
+
+                    # Starting the thread to raise timeout warning exception
+                    timeout_thread.start()
 
             try:
-                # Checking if parameter to check timeout is set True
-                if integration.get_check_timeout_error():
-                    # Starting the Timeout thread only if the configured time is greater than Timeout threshold value
-                    if configured_time_in_millis > TIMEOUT_THRESHOLD_MILLIS:
-                        remaining_time_in_sec = (configured_time_in_millis - TIMEOUT_THRESHOLD_MILLIS)/SECONDS_CONVERSION_FACTOR
-
-                        configured_time_in_sec = configured_time_in_millis / SECONDS_CONVERSION_FACTOR
-                        configured_time = int(configured_time_in_sec)
-
-                        # Setting up the exact integer value of configured time(in seconds)
-                        if configured_time < configured_time_in_sec:
-                            configured_time = configured_time + 1
-
-                        # Starting the thread to raise timeout warning exception
-                        timeout_thread = TimeoutThread(remaining_time_in_sec, configured_time)
-                        timeout_thread.start()
                 return handler(event, context, *args, **kwargs)
             except Exception:
                 exc_info = sys.exc_info()
@@ -131,13 +134,9 @@ def _drain_queue():
 class AwsLambdaIntegration(Integration):
     identifier = "aws_lambda"
 
-    def __init__(self, check_timeout_error=False):
+    def __init__(self, timeout_warning=False):
         # type: (bool) -> None
-        self.check_timeout_error = check_timeout_error
-
-    def get_check_timeout_error(self):
-        # type: () -> bool
-        return self.check_timeout_error
+        self.timeout_warning = timeout_warning
 
     @staticmethod
     def setup_once():
@@ -234,16 +233,29 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
 
     def event_processor(event, hint, start_time=start_time):
         # type: (Event, Hint, datetime) -> Optional[Event]
-        extra = event.setdefault("extra", {})
+        total_memory, used_memory, free_memory = map(
+            int, os.popen("free -t -m").readlines()[-1].split()[1:]
+        )
         remaining_time_in_milis = aws_context.get_remaining_time_in_millis()
         exec_duration = configured_timeout - remaining_time_in_milis
+
+        contexts = event.setdefault("contexts", {})
+        if (
+            isinstance(contexts, dict)
+            and "memory usage and execution duration" not in contexts
+        ):
+            contexts["memory usage and execution time"] = {
+                "Execution duration in millis": exec_duration,
+                "Memory usage in MB": used_memory,
+                "Remaining time in millis": remaining_time_in_milis,
+            }
+
+        extra = event.setdefault("extra", {})
         extra["lambda"] = {
             "function_name": aws_context.function_name,
             "function_version": aws_context.function_version,
             "invoked_function_arn": aws_context.invoked_function_arn,
-            "remaining_time_in_millis": remaining_time_in_milis,
             "aws_request_id": aws_context.aws_request_id,
-            "execution_duration": exec_duration,
         }
 
         extra["cloudwatch logs"] = {

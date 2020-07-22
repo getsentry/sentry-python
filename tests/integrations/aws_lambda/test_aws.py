@@ -31,11 +31,11 @@ class TestTransport(HttpTransport):
         time.sleep(1)
         print("\\nEVENT:", json.dumps(event))
 
-def init_sdk(**extra_init_args):
+def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
         dsn="https://123abc@example.com/123",
         transport=TestTransport,
-        integrations=[AwsLambdaIntegration()],
+        integrations=[AwsLambdaIntegration(timeout_warning=timeout_warning)],
         shutdown_timeout=10,
         **extra_init_args
     )
@@ -57,7 +57,7 @@ def lambda_client():
 
 @pytest.fixture(params=["python3.6", "python3.7", "python3.8", "python2.7"])
 def run_lambda_function(tmpdir, lambda_client, request, relay_normalize):
-    def inner(code, payload):
+    def inner(code, payload, syntax_check=True):
         runtime = request.param
         tmpdir.ensure_dir("lambda_tmp").remove()
         tmp = tmpdir.ensure_dir("lambda_tmp")
@@ -67,11 +67,8 @@ def run_lambda_function(tmpdir, lambda_client, request, relay_normalize):
         # Check file for valid syntax first, and that the integration does not
         # crash when not running in Lambda (but rather a local deployment tool
         # such as chalice's)
-        try:
+        if syntax_check:
             subprocess.check_call([sys.executable, str(tmp.join("test_lambda.py"))])
-        except Exception as e:
-            # Exception caught in case of Initialization error
-            pass
 
         tmp.join("setup.cfg").write("[install]\nprefix=")
         subprocess.check_call([sys.executable, "setup.py", "sdist", "-d", str(tmpdir)])
@@ -126,6 +123,8 @@ def test_basic(run_lambda_function):
         + dedent(
             """
         init_sdk()
+
+
         def test_handler(event, context):
             raise Exception("something went wrong")
         """
@@ -248,11 +247,13 @@ def test_init_error(run_lambda_function):
             """
         init_sdk()
         func()
+
         def test_handler(event, context):
             return 0
         """
         ),
         b'{"foo": "bar"}',
+        syntax_check=False,
     )
     log_result = (base64.b64decode(response["LogResult"])).decode("utf-8")
     expected_text = "name 'func' is not defined"
@@ -260,13 +261,13 @@ def test_init_error(run_lambda_function):
 
 
 def test_timeout_error(run_lambda_function):
-    # Modifying LAMBDA_PRELUDE since capturing timeout error is kept optional.
-    modified_prelude = LAMBDA_PRELUDE.replace("[AwsLambdaIntegration()]", "[AwsLambdaIntegration(True)]")
     events, response = run_lambda_function(
-        modified_prelude
+        LAMBDA_PRELUDE
         + dedent(
             """
-        init_sdk()
+        init_sdk(timeout_warning=True)
+
+
         def test_handler(event, context):
             time.sleep(10)
             return 0
@@ -275,14 +276,5 @@ def test_timeout_error(run_lambda_function):
         b'{"foo": "bar"}',
     )
     expected_text = "WARNING : Function is expected to get timed out. Configured timeout duration = 4 seconds"
-    if not events:
-        # In case of Python 2.7 runtime environment
-        log_result = (base64.b64decode(response["LogResult"])).decode("utf-8")
-        assert expected_text in log_result
-    else:
-        # In case of Python 3.6, 3.7 & 3.8 runtime environments
-        (event,) = events
-        assert event["level"] == "error"
-        (exception,) = event["exception"]["values"]
-        assert exception["type"] == "Exception"
-        assert exception["value"] == expected_text
+    log_result = (base64.b64decode(response["LogResult"])).decode("utf-8")
+    assert expected_text in log_result

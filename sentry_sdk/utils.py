@@ -874,28 +874,37 @@ def transaction_from_function(func):
 disable_capture_event = ContextVar("disable_capture_event")
 
 
-class TimeoutThread(threading.Thread):
-    """Creates a Thread."""
+class ServerlessTimeoutWarning(Exception):
+    """Raised when a serverless method is about to reach its timeout."""
 
-    def __init__(self, timeout_duration, configured_timeout):
+    pass
+
+
+class TimeoutThread(threading.Thread):
+    """Creates a Thread which runs (sleeps) for a time duration equal to
+       waiting_time and raises a custom ServerlessTimeout exception.
+    """
+
+    def __init__(self, waiting_time, configured_timeout):
         # type: (float, int) -> None
         threading.Thread.__init__(self)
-        self.timeout_duration = timeout_duration
+        self.waiting_time = waiting_time
         self.configured_timeout = configured_timeout
-
-    def get_timeout_duration(self):
-        # type: () -> float
-        return self.timeout_duration
-
-    def get_configured_timeout(self):
-        # type: () -> int
-        return self.configured_timeout
 
     def run(self):
         # type: () -> None
-        time.sleep(self.get_timeout_duration())
+
+        time.sleep(self.waiting_time)
+
+        integer_configured_timeout = int(self.configured_timeout)
+
+        # Setting up the exact integer value of configured time(in seconds)
+        if integer_configured_timeout < self.configured_timeout:
+            integer_configured_timeout = integer_configured_timeout + 1
+
         # Raising Exception after timeout duration is reached
-        raise Exception(
-            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds".format(
-                self.get_configured_timeout())
+        raise ServerlessTimeoutWarning(
+            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
+                integer_configured_timeout
+            )
         )
