@@ -57,9 +57,6 @@ def lambda_client():
 
 @pytest.fixture(params=["python3.6", "python3.7", "python3.8", "python2.7"])
 def run_lambda_function(tmpdir, lambda_client, request, relay_normalize):
-    if request.param == "python3.8":
-        pytest.xfail("Python 3.8 is currently broken")
-
     def inner(code, payload):
         runtime = request.param
         tmpdir.ensure_dir("lambda_tmp").remove()
