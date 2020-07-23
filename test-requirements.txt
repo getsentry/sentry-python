@@ -8,7 +8,7 @@ pytest-cov==2.8.1
 gevent
 eventlet
 # https://github.com/eventlet/eventlet/issues/619
-dnspython<2.0
+dnspython<3.0
 
 newrelic
 executing
