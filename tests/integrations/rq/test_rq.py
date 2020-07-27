@@ -1,7 +1,27 @@
 from sentry_sdk.integrations.rq import RqIntegration
 
+import pytest
+
 from fakeredis import FakeStrictRedis
 import rq
+
+
+@pytest.fixture(autouse=True)
+def _patch_rq_get_server_version(monkeypatch):
+    """
+    Patch up RQ 1.5 to work with fakeredis.
+
+    https://github.com/jamesls/fakeredis/issues/273
+    """
+
+    from distutils.version import StrictVersion
+
+    if tuple(map(int, rq.VERSION.split("."))) >= (1, 5):
+        for k in (
+            "rq.job.Job.get_redis_server_version",
+            "rq.worker.Worker.get_redis_server_version",
+        ):
+            monkeypatch.setattr(k, lambda _: StrictVersion("4.0.0"))
 
 
 def crashing_job(foo):
