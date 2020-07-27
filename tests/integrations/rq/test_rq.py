@@ -17,7 +17,10 @@ def _patch_rq_get_server_version(monkeypatch):
     from distutils.version import StrictVersion
 
     if tuple(map(int, rq.VERSION.split("."))) >= (1, 5):
-        for k in "rq.job.Job.get_redis_server_version", "rq.worker.Worker.get_redis_server_version":
+        for k in (
+            "rq.job.Job.get_redis_server_version",
+            "rq.worker.Worker.get_redis_server_version",
+        ):
             monkeypatch.setattr(k, lambda _: StrictVersion("4.0.0"))
 
 
