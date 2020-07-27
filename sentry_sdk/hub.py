@@ -524,15 +524,15 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return transaction
 
-    @overload  # noqa
-    def push_scope(
+    @overload
+    def push_scope(  # noqa: F811
         self, callback=None  # type: Optional[None]
     ):
         # type: (...) -> ContextManager[Scope]
         pass
 
-    @overload  # noqa
-    def push_scope(
+    @overload
+    def push_scope(  # noqa: F811
         self, callback  # type: Callable[[Scope], None]
     ):
         # type: (...) -> None
@@ -573,15 +573,15 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         assert self._stack, "stack must have at least one layer"
         return rv
 
-    @overload  # noqa
-    def configure_scope(
+    @overload
+    def configure_scope(  # noqa: F811
         self, callback=None  # type: Optional[None]
     ):
         # type: (...) -> ContextManager[Scope]
         pass
 
-    @overload  # noqa
-    def configure_scope(
+    @overload
+    def configure_scope(  # noqa: F811
         self, callback  # type: Callable[[Scope], None]
     ):
         # type: (...) -> None

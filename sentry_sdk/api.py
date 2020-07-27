@@ -106,44 +106,44 @@ def add_breadcrumb(
     return Hub.current.add_breadcrumb(crumb, hint, **kwargs)
 
 
-@overload  # noqa
-def configure_scope():
+@overload
+def configure_scope():  # noqa: F811
     # type: () -> ContextManager[Scope]
     pass
 
 
-@overload  # noqa
-def configure_scope(
+@overload
+def configure_scope(  # noqa: F811
     callback,  # type: Callable[[Scope], None]
 ):
     # type: (...) -> None
     pass
 
 
-@hubmethod  # noqa
-def configure_scope(
+@hubmethod
+def configure_scope(  # noqa: F811
     callback=None,  # type: Optional[Callable[[Scope], None]]
 ):
     # type: (...) -> Optional[ContextManager[Scope]]
     return Hub.current.configure_scope(callback)
 
 
-@overload  # noqa
-def push_scope():
+@overload
+def push_scope():  # noqa: F811
     # type: () -> ContextManager[Scope]
     pass
 
 
-@overload  # noqa
-def push_scope(
+@overload
+def push_scope(  # noqa: F811
     callback,  # type: Callable[[Scope], None]
 ):
     # type: (...) -> None
     pass
 
 
-@hubmethod  # noqa
-def push_scope(
+@hubmethod
+def push_scope(  # noqa: F811
     callback=None,  # type: Optional[Callable[[Scope], None]]
 ):
     # type: (...) -> Optional[ContextManager[Scope]]
