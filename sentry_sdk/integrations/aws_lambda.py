@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 from os import environ
 import sys
 import json
-import os
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk._compat import reraise
@@ -233,22 +232,8 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
 
     def event_processor(event, hint, start_time=start_time):
         # type: (Event, Hint, datetime) -> Optional[Event]
-        total_memory, used_memory, free_memory = map(
-            int, os.popen("free -t -m").readlines()[-1].split()[1:]
-        )
         remaining_time_in_milis = aws_context.get_remaining_time_in_millis()
         exec_duration = configured_timeout - remaining_time_in_milis
-
-        contexts = event.setdefault("contexts", {})
-        if (
-            isinstance(contexts, dict)
-            and "memory usage and execution duration" not in contexts
-        ):
-            contexts["memory usage and execution time"] = {
-                "Execution duration in millis": exec_duration,
-                "Memory usage in MB": used_memory,
-                "Remaining time in millis": remaining_time_in_milis,
-            }
 
         extra = event.setdefault("extra", {})
         extra["lambda"] = {
@@ -256,6 +241,8 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
             "function_version": aws_context.function_version,
             "invoked_function_arn": aws_context.invoked_function_arn,
             "aws_request_id": aws_context.aws_request_id,
+            "execution_duration_in_millis": exec_duration,
+            "remaining_time_in_millis": remaining_time_in_milis,
         }
 
         extra["cloudwatch logs"] = {

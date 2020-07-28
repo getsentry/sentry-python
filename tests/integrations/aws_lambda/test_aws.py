@@ -22,13 +22,16 @@ import sentry_sdk
 import json
 from sentry_sdk.transport import HttpTransport
 
+FLUSH_EVENT = True
+
 class TestTransport(HttpTransport):
     def _send_event(self, event):
         # Delay event output like this to test proper shutdown
         # Note that AWS Lambda truncates the log output to 4kb, so you better
         # pray that your events are smaller than that or else tests start
         # failing.
-        time.sleep(1)
+        if FLUSH_EVENT:
+            time.sleep(1)
         print("\\nEVENT:", json.dumps(event))
 
 def init_sdk(timeout_warning=False, **extra_init_args):
@@ -255,6 +258,7 @@ def test_init_error(run_lambda_function):
         b'{"foo": "bar"}',
         syntax_check=False,
     )
+
     log_result = (base64.b64decode(response["LogResult"])).decode("utf-8")
     expected_text = "name 'func' is not defined"
     assert expected_text in log_result
@@ -266,6 +270,7 @@ def test_timeout_error(run_lambda_function):
         + dedent(
             """
         init_sdk(timeout_warning=True)
+        FLUSH_EVENT=False
 
 
         def test_handler(event, context):
@@ -275,6 +280,28 @@ def test_timeout_error(run_lambda_function):
         ),
         b'{"foo": "bar"}',
     )
-    expected_text = "WARNING : Function is expected to get timed out. Configured timeout duration = 4 seconds"
-    log_result = (base64.b64decode(response["LogResult"])).decode("utf-8")
-    assert expected_text in log_result
+
+    (event,) = events
+    assert event["level"] == "error"
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "ServerlessTimeoutWarning"
+    assert (
+        exception["value"]
+        == "WARNING : Function is expected to get timed out. Configured timeout duration = 4 seconds."
+    )
+
+    assert exception["mechanism"] == {"type": "threading", "handled": False}
+
+    assert event["extra"]["lambda"]["function_name"].startswith("test_function_")
+
+    logs_url = event["extra"]["cloudwatch logs"]["url"]
+    assert logs_url.startswith("https://console.aws.amazon.com/cloudwatch/home?region=")
+    assert not re.search("(=;|=$)", logs_url)
+    assert event["extra"]["cloudwatch logs"]["log_group"].startswith(
+        "/aws/lambda/test_function_"
+    )
+
+    log_stream_re = "^[0-9]{4}/[0-9]{2}/[0-9]{2}/\\[[^\\]]+][a-f0-9]+$"
+    log_stream = event["extra"]["cloudwatch logs"]["log_stream"]
+
+    assert re.match(log_stream_re, log_stream)
