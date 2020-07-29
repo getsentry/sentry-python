@@ -30,6 +30,7 @@ if MYPY:
 
     from sentry_sdk._types import ExcInfo, EndpointType
 
+
 epoch = datetime(1970, 1, 1)
 
 

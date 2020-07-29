@@ -7,7 +7,15 @@ import sys
 import time
 
 from textwrap import dedent
-from sentry_sdk import Hub, Client, configure_scope, capture_message, capture_exception
+from sentry_sdk import (
+    Hub,
+    Client,
+    configure_scope,
+    capture_message,
+    capture_exception,
+    capture_event,
+)
+from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
 from sentry_sdk._compat import reraise, text_type, PY2
 from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
@@ -149,41 +157,41 @@ def test_proxy_httpsselect_bothenv_http(monkeypatch):
     assert client.transport._pool.proxy.scheme == "http"
 
 
-def test_simple_transport():
+def test_simple_transport(sentry_init):
     events = []
-    with Hub(Client(transport=events.append)):
-        capture_message("Hello World!")
+    sentry_init(transport=events.append)
+    capture_message("Hello World!")
     assert events[0]["message"] == "Hello World!"
 
 
-def test_ignore_errors():
+def test_ignore_errors(sentry_init, capture_events):
     class MyDivisionError(ZeroDivisionError):
         pass
 
     def raise_it(exc_info):
         reraise(*exc_info)
 
-    hub = Hub(Client(ignore_errors=[ZeroDivisionError], transport=_TestTransport()))
-    hub._capture_internal_exception = raise_it
+    sentry_init(ignore_errors=[ZeroDivisionError], transport=_TestTransport())
+    Hub.current._capture_internal_exception = raise_it
 
     def e(exc):
         try:
             raise exc
         except Exception:
-            hub.capture_exception()
+            capture_exception()
 
     e(ZeroDivisionError())
     e(MyDivisionError())
     pytest.raises(EventCaptured, lambda: e(ValueError()))
 
 
-def test_with_locals_enabled():
-    events = []
-    hub = Hub(Client(with_locals=True, transport=events.append))
+def test_with_locals_enabled(sentry_init, capture_events):
+    sentry_init(with_locals=True)
+    events = capture_events()
     try:
         1 / 0
     except Exception:
-        hub.capture_exception()
+        capture_exception()
 
     (event,) = events
 
@@ -193,13 +201,13 @@ def test_with_locals_enabled():
     )
 
 
-def test_with_locals_disabled():
-    events = []
-    hub = Hub(Client(with_locals=False, transport=events.append))
+def test_with_locals_disabled(sentry_init, capture_events):
+    sentry_init(with_locals=False)
+    events = capture_events()
     try:
         1 / 0
     except Exception:
-        hub.capture_exception()
+        capture_exception()
 
     (event,) = events
 
@@ -209,35 +217,63 @@ def test_with_locals_disabled():
     )
 
 
-def test_attach_stacktrace_enabled():
-    events = []
-    hub = Hub(Client(attach_stacktrace=True, transport=events.append))
+@pytest.mark.parametrize("integrations", [[], [ExecutingIntegration()]])
+def test_function_names(sentry_init, capture_events, integrations):
+    sentry_init(integrations=integrations)
+    events = capture_events()
+
+    def foo():
+        try:
+            bar()
+        except Exception:
+            capture_exception()
+
+    def bar():
+        1 / 0
+
+    foo()
+
+    (event,) = events
+    (thread,) = event["exception"]["values"]
+    functions = [x["function"] for x in thread["stacktrace"]["frames"]]
+
+    if integrations:
+        assert functions == [
+            "test_function_names.<locals>.foo",
+            "test_function_names.<locals>.bar",
+        ]
+    else:
+        assert functions == ["foo", "bar"]
+
+
+def test_attach_stacktrace_enabled(sentry_init, capture_events):
+    sentry_init(attach_stacktrace=True)
+    events = capture_events()
 
     def foo():
         bar()
 
     def bar():
-        hub.capture_message("HI")
+        capture_message("HI")
 
     foo()
 
     (event,) = events
     (thread,) = event["threads"]["values"]
     functions = [x["function"] for x in thread["stacktrace"]["frames"]]
+
     assert functions[-2:] == ["foo", "bar"]
 
 
-def test_attach_stacktrace_enabled_no_locals():
-    events = []
-    hub = Hub(
-        Client(attach_stacktrace=True, with_locals=False, transport=events.append)
-    )
+def test_attach_stacktrace_enabled_no_locals(sentry_init, capture_events):
+    sentry_init(attach_stacktrace=True, with_locals=False)
+    events = capture_events()
 
     def foo():
         bar()
 
     def bar():
-        hub.capture_message("HI")
+        capture_message("HI")
 
     foo()
 
@@ -262,19 +298,19 @@ def test_attach_stacktrace_in_app(sentry_init, capture_events):
     assert any(f["in_app"] for f in frames)
 
 
-def test_attach_stacktrace_disabled():
-    events = []
-    hub = Hub(Client(attach_stacktrace=False, transport=events.append))
-    hub.capture_message("HI")
+def test_attach_stacktrace_disabled(sentry_init, capture_events):
+    sentry_init(attach_stacktrace=False)
+    events = capture_events()
+    capture_message("HI")
 
     (event,) = events
     assert "threads" not in event
 
 
-def test_capture_event_works():
-    c = Client(transport=_TestTransport())
-    pytest.raises(EventCaptured, lambda: c.capture_event({}))
-    pytest.raises(EventCaptured, lambda: c.capture_event({}))
+def test_capture_event_works(sentry_init):
+    sentry_init(transport=_TestTransport())
+    pytest.raises(EventCaptured, lambda: capture_event({}))
+    pytest.raises(EventCaptured, lambda: capture_event({}))
 
 
 @pytest.mark.parametrize("num_messages", [10, 20])

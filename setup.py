@@ -12,7 +12,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="sentry-sdk",
-    version="0.16.0",
+    version="0.16.2",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -37,6 +37,7 @@ setup(
         "tornado": ["tornado>=5"],
         "sqlalchemy": ["sqlalchemy>=1.2"],
         "pyspark": ["pyspark>=2.4.4"],
+        "pure_eval": ["pure_eval", "executing", "asttokens"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
