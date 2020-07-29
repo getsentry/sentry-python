@@ -63,7 +63,7 @@ def run_lambda_function(tmpdir, lambda_client, request, relay_normalize):
     if request.param == "python3.8":
         pytest.xfail("Python 3.8 is currently broken")
 
-    def inner(code, payload):
+    def inner(code, payload, syntax_check=True):
         runtime = request.param
         tmpdir.ensure_dir("lambda_tmp").remove()
         tmp = tmpdir.ensure_dir("lambda_tmp")
