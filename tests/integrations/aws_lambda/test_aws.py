@@ -22,20 +22,23 @@ import sentry_sdk
 import json
 from sentry_sdk.transport import HttpTransport
 
+FLUSH_EVENT = True
+
 class TestTransport(HttpTransport):
     def _send_event(self, event):
         # Delay event output like this to test proper shutdown
         # Note that AWS Lambda truncates the log output to 4kb, so you better
         # pray that your events are smaller than that or else tests start
         # failing.
-        time.sleep(1)
+        if FLUSH_EVENT:
+            time.sleep(1)
         print("\\nEVENT:", json.dumps(event))
 
-def init_sdk(**extra_init_args):
+def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
         dsn="https://123abc@example.com/123",
         transport=TestTransport,
-        integrations=[AwsLambdaIntegration()],
+        integrations=[AwsLambdaIntegration(timeout_warning=timeout_warning)],
         shutdown_timeout=10,
         **extra_init_args
     )
@@ -60,7 +63,7 @@ def run_lambda_function(tmpdir, lambda_client, request, relay_normalize):
     if request.param == "python3.8":
         pytest.xfail("Python 3.8 is currently broken")
 
-    def inner(code, payload):
+    def inner(code, payload, syntax_check=True):
         runtime = request.param
         tmpdir.ensure_dir("lambda_tmp").remove()
         tmp = tmpdir.ensure_dir("lambda_tmp")
@@ -70,7 +73,8 @@ def run_lambda_function(tmpdir, lambda_client, request, relay_normalize):
         # Check file for valid syntax first, and that the integration does not
         # crash when not running in Lambda (but rather a local deployment tool
         # such as chalice's)
-        subprocess.check_call([sys.executable, str(tmp.join("test_lambda.py"))])
+        if syntax_check:
+            subprocess.check_call([sys.executable, str(tmp.join("test_lambda.py"))])
 
         tmp.join("setup.cfg").write("[install]\nprefix=")
         subprocess.check_call([sys.executable, "setup.py", "sdist", "-d", str(tmpdir)])
@@ -88,6 +92,7 @@ def run_lambda_function(tmpdir, lambda_client, request, relay_normalize):
             Handler="test_lambda.test_handler",
             Code={"ZipFile": tmpdir.join("ball.zip").read(mode="rb")},
             Description="Created as part of testsuite for getsentry/sentry-python",
+            Timeout=4,
         )
 
         @request.addfinalizer
@@ -124,6 +129,8 @@ def test_basic(run_lambda_function):
         + dedent(
             """
         init_sdk()
+
+
         def test_handler(event, context):
             raise Exception("something went wrong")
         """
@@ -237,3 +244,67 @@ def test_request_data(run_lambda_function):
         "query_string": {"bonkers": "true"},
         "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
     }
+
+
+def test_init_error(run_lambda_function):
+    events, response = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk()
+        func()
+
+        def test_handler(event, context):
+            return 0
+        """
+        ),
+        b'{"foo": "bar"}',
+        syntax_check=False,
+    )
+
+    log_result = (base64.b64decode(response["LogResult"])).decode("utf-8")
+    expected_text = "name 'func' is not defined"
+    assert expected_text in log_result
+
+
+def test_timeout_error(run_lambda_function):
+    events, response = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk(timeout_warning=True)
+        FLUSH_EVENT=False
+
+
+        def test_handler(event, context):
+            time.sleep(10)
+            return 0
+        """
+        ),
+        b'{"foo": "bar"}',
+    )
+
+    (event,) = events
+    assert event["level"] == "error"
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "ServerlessTimeoutWarning"
+    assert (
+        exception["value"]
+        == "WARNING : Function is expected to get timed out. Configured timeout duration = 4 seconds."
+    )
+
+    assert exception["mechanism"] == {"type": "threading", "handled": False}
+
+    assert event["extra"]["lambda"]["function_name"].startswith("test_function_")
+
+    logs_url = event["extra"]["cloudwatch logs"]["url"]
+    assert logs_url.startswith("https://console.aws.amazon.com/cloudwatch/home?region=")
+    assert not re.search("(=;|=$)", logs_url)
+    assert event["extra"]["cloudwatch logs"]["log_group"].startswith(
+        "/aws/lambda/test_function_"
+    )
+
+    log_stream_re = "^[0-9]{4}/[0-9]{2}/[0-9]{2}/\\[[^\\]]+][a-f0-9]+$"
+    log_stream = event["extra"]["cloudwatch logs"]["log_stream"]
+
+    assert re.match(log_stream_re, log_stream)

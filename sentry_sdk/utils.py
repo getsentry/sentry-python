@@ -3,6 +3,8 @@ import linecache
 import logging
 import os
 import sys
+import time
+import threading
 
 from datetime import datetime
 
@@ -871,3 +873,39 @@ def transaction_from_function(func):
 
 
 disable_capture_event = ContextVar("disable_capture_event")
+
+
+class ServerlessTimeoutWarning(Exception):
+    """Raised when a serverless method is about to reach its timeout."""
+
+    pass
+
+
+class TimeoutThread(threading.Thread):
+    """Creates a Thread which runs (sleeps) for a time duration equal to
+       waiting_time and raises a custom ServerlessTimeout exception.
+    """
+
+    def __init__(self, waiting_time, configured_timeout):
+        # type: (float, int) -> None
+        threading.Thread.__init__(self)
+        self.waiting_time = waiting_time
+        self.configured_timeout = configured_timeout
+
+    def run(self):
+        # type: () -> None
+
+        time.sleep(self.waiting_time)
+
+        integer_configured_timeout = int(self.configured_timeout)
+
+        # Setting up the exact integer value of configured time(in seconds)
+        if integer_configured_timeout < self.configured_timeout:
+            integer_configured_timeout = integer_configured_timeout + 1
+
+        # Raising Exception after timeout duration is reached
+        raise ServerlessTimeoutWarning(
+            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
+                integer_configured_timeout
+            )
+        )
