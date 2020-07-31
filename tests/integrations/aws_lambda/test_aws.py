@@ -1,11 +1,21 @@
+"""
+# AWS Lambda system tests
+
+This testsuite uses boto3 to upload actual lambda functions to AWS, execute them and assert some things about the externally observed behavior. What that means for you is that those tests won't run without AWS access keys:
+
+    export SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID=..
+    export SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY=...
+    export SENTRY_PYTHON_TEST_AWS_IAM_ROLE="arn:aws:iam::920901907255:role/service-role/lambda"
+
+If you need to debug a new runtime, use this REPL to figure things out:
+
+    pip3 install click
+    python3 tests/integrations/aws_lambda/client.py --runtime=python4.0
+"""
 import base64
 import json
 import os
 import re
-import shutil
-import subprocess
-import sys
-import uuid
 from textwrap import dedent
 
 import pytest
@@ -47,58 +57,20 @@ def lambda_client():
     if "SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID" not in os.environ:
         pytest.skip("AWS environ vars not set")
 
-    return boto3.client(
-        "lambda",
-        aws_access_key_id=os.environ["SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID"],
-        aws_secret_access_key=os.environ["SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY"],
-        region_name="us-east-1",
-    )
+    from tests.integrations.aws_lambda.client import get_boto_client
+
+    return get_boto_client()
 
 
 @pytest.fixture(params=["python3.6", "python3.7", "python3.8", "python2.7"])
 def run_lambda_function(tmpdir, lambda_client, request, relay_normalize):
     def inner(code, payload):
+        from tests.integrations.aws_lambda.client import run_lambda_function
+
         runtime = request.param
-        tmpdir.ensure_dir("lambda_tmp").remove()
-        tmp = tmpdir.ensure_dir("lambda_tmp")
-
-        tmp.join("test_lambda.py").write(code)
-
-        # Check file for valid syntax first, and that the integration does not
-        # crash when not running in Lambda (but rather a local deployment tool
-        # such as chalice's)
-        subprocess.check_call([sys.executable, str(tmp.join("test_lambda.py"))])
-
-        tmp.join("setup.cfg").write("[install]\nprefix=")
-        subprocess.check_call([sys.executable, "setup.py", "sdist", "-d", str(tmpdir)])
-
-        # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
-        subprocess.check_call("pip install ../*.tar.gz -t .", cwd=str(tmp), shell=True)
-        shutil.make_archive(tmpdir.join("ball"), "zip", str(tmp))
-
-        fn_name = "test_function_{}".format(uuid.uuid4())
-
-        lambda_client.create_function(
-            FunctionName=fn_name,
-            Runtime=runtime,
-            Role=os.environ["SENTRY_PYTHON_TEST_AWS_IAM_ROLE"],
-            Handler="test_lambda.test_handler",
-            Code={"ZipFile": tmpdir.join("ball.zip").read(mode="rb")},
-            Description="Created as part of testsuite for getsentry/sentry-python",
+        response = run_lambda_function(
+            lambda_client, runtime, code, payload, request.addfinalizer
         )
-
-        @request.addfinalizer
-        def delete_function():
-            lambda_client.delete_function(FunctionName=fn_name)
-
-        response = lambda_client.invoke(
-            FunctionName=fn_name,
-            InvocationType="RequestResponse",
-            LogType="Tail",
-            Payload=payload,
-        )
-
-        assert 200 <= response["StatusCode"] < 300, response
 
         events = []
 

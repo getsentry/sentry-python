@@ -76,24 +76,38 @@ class AwsLambdaIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        import __main__ as lambda_bootstrap  # type: ignore
 
-        pre_37 = True  # Python 3.6 or 2.7
-
-        if not hasattr(lambda_bootstrap, "handle_http_request"):
-            try:
-                import bootstrap as lambda_bootstrap  # type: ignore
-
-                pre_37 = False  # Python 3.7
-            except ImportError:
-                pass
+        # Python 2.7: Everything is in `__main__`.
+        #
+        # Python 3.7: If the bootstrap module is *already imported*, it is the
+        # one we actually want to use (no idea what's in __main__)
+        #
+        # On Python 3.8 bootstrap is also importable, but will be the same file
+        # as __main__ imported under a different name:
+        #
+        #     sys.modules['__main__'].__file__ == sys.modules['bootstrap'].__file__
+        #     sys.modules['__main__'] is not sys.modules['bootstrap']
+        #
+        # Such a setup would then make all monkeypatches useless.
+        if "bootstrap" in sys.modules:
+            lambda_bootstrap = sys.modules["bootstrap"]  # type: ignore
+        elif "__main__" in sys.modules:
+            lambda_bootstrap = sys.modules["__main__"]  # type: ignore
+        else:
+            logger.warning(
+                "Not running in AWS Lambda environment, "
+                "AwsLambdaIntegration disabled (could not find bootstrap module)"
+            )
+            return
 
         if not hasattr(lambda_bootstrap, "handle_event_request"):
             logger.warning(
                 "Not running in AWS Lambda environment, "
-                "AwsLambdaIntegration disabled"
+                "AwsLambdaIntegration disabled (could not find handle_event_request)"
             )
             return
+
+        pre_37 = hasattr(lambda_bootstrap, "handle_http_request")  # Python 3.6 or 2.7
 
         if pre_37:
             old_handle_event_request = lambda_bootstrap.handle_event_request
