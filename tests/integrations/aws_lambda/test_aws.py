@@ -1,7 +1,9 @@
 """
 # AWS Lambda system tests
 
-This testsuite uses boto3 to upload actual lambda functions to AWS, execute them and assert some things about the externally observed behavior. What that means for you is that those tests won't run without AWS access keys:
+This testsuite uses boto3 to upload actual lambda functions to AWS, execute
+them and assert some things about the externally observed behavior. What that
+means for you is that those tests won't run without AWS access keys:
 
     export SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID=..
     export SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY=...
@@ -25,24 +27,27 @@ boto3 = pytest.importorskip("boto3")
 LAMBDA_PRELUDE = """
 from __future__ import print_function
 
-import time
-
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 import sentry_sdk
 import json
+import time
+
 from sentry_sdk.transport import HttpTransport
 
-FLUSH_EVENT = True
+def event_processor(event):
+    # AWS Lambda truncates the log output to 4kb. If you only need a
+    # subsection of the event, override this function in your test
+    # to print less to logs.
+    return event
 
 class TestTransport(HttpTransport):
     def _send_event(self, event):
-        # Delay event output like this to test proper shutdown
-        # Note that AWS Lambda truncates the log output to 4kb, so you better
-        # pray that your events are smaller than that or else tests start
-        # failing.
-        if FLUSH_EVENT:
-            time.sleep(1)
-        print("\\nEVENT:", json.dumps(event))
+        event = event_processor(event)
+        # Writing a single string to stdout holds the GIL (seems like) and
+        # therefore cannot be interleaved with other threads. This is why we
+        # explicitly add a newline at the end even though `print` would provide
+        # us one.
+        print("\\nEVENT: {}\\n".format(json.dumps(event)))
 
 def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
@@ -66,17 +71,23 @@ def lambda_client():
 
 
 @pytest.fixture(params=["python3.6", "python3.7", "python3.8", "python2.7"])
-def run_lambda_function(tmpdir, lambda_client, request, relay_normalize):
-    def inner(code, payload, syntax_check=True):
+def lambda_runtime(request):
+    return request.param
+
+
+@pytest.fixture
+def run_lambda_function(request, lambda_client, lambda_runtime):
+    def inner(code, payload, timeout=30, syntax_check=True):
         from tests.integrations.aws_lambda.client import run_lambda_function
 
-        runtime = request.param
         response = run_lambda_function(
             client=lambda_client,
-            runtime=runtime, code=code,
+            runtime=lambda_runtime,
+            code=code,
             payload=payload,
             add_finalizer=request.addfinalizer,
-            syntax_check=syntax_check
+            timeout=timeout,
+            syntax_check=syntax_check,
         )
 
         events = []
@@ -87,7 +98,6 @@ def run_lambda_function(tmpdir, lambda_client, request, relay_normalize):
                 continue
             line = line[len(b"EVENT: ") :]
             events.append(json.loads(line.decode("utf-8")))
-            relay_normalize(events[-1])
 
         return events, response
 
@@ -101,6 +111,10 @@ def test_basic(run_lambda_function):
             """
         init_sdk()
 
+        def event_processor(event):
+            # Delay event output like this to test proper shutdown
+            time.sleep(1)
+            return event
 
         def test_handler(event, context):
             raise Exception("something went wrong")
@@ -217,25 +231,23 @@ def test_request_data(run_lambda_function):
     }
 
 
-def test_init_error(run_lambda_function):
-    events, response = run_lambda_function(
-        LAMBDA_PRELUDE
-        + dedent(
-            """
-        init_sdk()
-        func()
+def test_init_error(run_lambda_function, lambda_runtime):
+    if lambda_runtime == "python2.7":
+        pytest.skip("initialization error not supported on Python 2.7")
 
-        def test_handler(event, context):
-            return 0
-        """
+    events, response = run_lambda_function(
+        LAMBDA_PRELUDE + (
+            'def event_processor(event):\n'
+            '    return event["exception"]["values"][0]["value"]\n'
+            'init_sdk()\n'
+            'func()'
         ),
         b'{"foo": "bar"}',
         syntax_check=False,
     )
 
-    log_result = (base64.b64decode(response["LogResult"])).decode("utf-8")
-    expected_text = "name 'func' is not defined"
-    assert expected_text in log_result
+    event, = events
+    assert "name 'func' is not defined" in event
 
 
 def test_timeout_error(run_lambda_function):
@@ -244,8 +256,6 @@ def test_timeout_error(run_lambda_function):
         + dedent(
             """
         init_sdk(timeout_warning=True)
-        FLUSH_EVENT=False
-
 
         def test_handler(event, context):
             time.sleep(10)
@@ -253,15 +263,16 @@ def test_timeout_error(run_lambda_function):
         """
         ),
         b'{"foo": "bar"}',
+        timeout=3
     )
 
     (event,) = events
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ServerlessTimeoutWarning"
-    assert (
-        exception["value"]
-        == "WARNING : Function is expected to get timed out. Configured timeout duration = 4 seconds."
+    assert exception["value"] in (
+        "WARNING : Function is expected to get timed out. Configured timeout duration = 4 seconds.",
+        "WARNING : Function is expected to get timed out. Configured timeout duration = 3 seconds.",
     )
 
     assert exception["mechanism"] == {"type": "threading", "handled": False}

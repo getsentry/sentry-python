@@ -42,19 +42,15 @@ def _wrap_init_error(init_error):
         if integration is None:
             return init_error(*args, **kwargs)
 
-        # Fetch Initialization error details from arguments
-        error = json.loads(args[1])
-
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
 
-        with hub.push_scope() as scope:
-            with capture_internal_exceptions():
+        with capture_internal_exceptions():
+            with hub.configure_scope() as scope:
                 scope.clear_breadcrumbs()
-            # Checking if there is any error/exception which is raised in the runtime
-            # environment from arguments and, re-raising it to capture it as an event.
-            if error.get("errorType"):
-                exc_info = sys.exc_info()
+
+            exc_info = sys.exc_info()
+            if exc_info and all(exc_info):
                 event, hint = event_from_exception(
                     exc_info,
                     client_options=client.options,
@@ -154,9 +150,9 @@ class AwsLambdaIntegration(Integration):
         #
         # Such a setup would then make all monkeypatches useless.
         if "bootstrap" in sys.modules:
-            lambda_bootstrap = sys.modules["bootstrap"]  # type: ignore
+            lambda_bootstrap = sys.modules["bootstrap"]  # type: Any
         elif "__main__" in sys.modules:
-            lambda_bootstrap = sys.modules["__main__"]  # type: ignore
+            lambda_bootstrap = sys.modules["__main__"]  # type: Any
         else:
             logger.warning(
                 "Not running in AWS Lambda environment, "

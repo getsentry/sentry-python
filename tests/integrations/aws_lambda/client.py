@@ -18,7 +18,14 @@ def get_boto_client():
 
 
 def run_lambda_function(
-    client, runtime, code, payload, add_finalizer, syntax_check=True, subprocess_kwargs=()
+    client,
+    runtime,
+    code,
+    payload,
+    add_finalizer,
+    syntax_check=True,
+    timeout=30,
+    subprocess_kwargs=(),
 ):
     subprocess_kwargs = dict(subprocess_kwargs)
 
@@ -27,10 +34,11 @@ def run_lambda_function(
         with open(test_lambda_py, "w") as f:
             f.write(code)
 
-        # Check file for valid syntax first, and that the integration does not
-        # crash when not running in Lambda (but rather a local deployment tool
-        # such as chalice's)
-        subprocess.check_call([sys.executable, test_lambda_py])
+        if syntax_check:
+            # Check file for valid syntax first, and that the integration does not
+            # crash when not running in Lambda (but rather a local deployment tool
+            # such as chalice's)
+            subprocess.check_call([sys.executable, test_lambda_py])
 
         setup_cfg = os.path.join(tmpdir, "setup.cfg")
         with open(setup_cfg, "w") as f:
@@ -53,6 +61,7 @@ def run_lambda_function(
             client.create_function(
                 FunctionName=fn_name,
                 Runtime=runtime,
+                Timeout=timeout,
                 Role=os.environ["SENTRY_PYTHON_TEST_AWS_IAM_ROLE"],
                 Handler="test_lambda.test_handler",
                 Code={"ZipFile": zip.read()},
