@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from os import environ
 import sys
+import json
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk._compat import reraise
@@ -9,6 +10,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     logger,
+    TimeoutThread,
 )
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
@@ -25,6 +27,45 @@ if MYPY:
 
     F = TypeVar("F", bound=Callable[..., Any])
 
+# Constants
+TIMEOUT_WARNING_BUFFER = 1500  # Buffer time required to send timeout warning to Sentry
+MILLIS_TO_SECONDS = 1000.0
+
+
+def _wrap_init_error(init_error):
+    # type: (F) -> F
+    def sentry_init_error(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
+
+        hub = Hub.current
+        integration = hub.get_integration(AwsLambdaIntegration)
+        if integration is None:
+            return init_error(*args, **kwargs)
+
+        # Fetch Initialization error details from arguments
+        error = json.loads(args[1])
+
+        # If an integration is there, a client has to be there.
+        client = hub.client  # type: Any
+
+        with hub.push_scope() as scope:
+            with capture_internal_exceptions():
+                scope.clear_breadcrumbs()
+            # Checking if there is any error/exception which is raised in the runtime
+            # environment from arguments and, re-raising it to capture it as an event.
+            if error.get("errorType"):
+                exc_info = sys.exc_info()
+                event, hint = event_from_exception(
+                    exc_info,
+                    client_options=client.options,
+                    mechanism={"type": "aws_lambda", "handled": False},
+                )
+                hub.capture_event(event, hint=hint)
+
+        return init_error(*args, **kwargs)
+
+    return sentry_init_error  # type: ignore
+
 
 def _wrap_handler(handler):
     # type: (F) -> F
@@ -37,12 +78,31 @@ def _wrap_handler(handler):
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
+        configured_time = context.get_remaining_time_in_millis()
 
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
                 scope.transaction = context.function_name
-                scope.add_event_processor(_make_request_event_processor(event, context))
+                scope.add_event_processor(
+                    _make_request_event_processor(event, context, configured_time)
+                )
+                # Starting the Timeout thread only if the configured time is greater than Timeout warning
+                # buffer and timeout_warning parameter is set True.
+                if (
+                    integration.timeout_warning
+                    and configured_time > TIMEOUT_WARNING_BUFFER
+                ):
+                    waiting_time = (
+                        configured_time - TIMEOUT_WARNING_BUFFER
+                    ) / MILLIS_TO_SECONDS
+
+                    timeout_thread = TimeoutThread(
+                        waiting_time, configured_time / MILLIS_TO_SECONDS
+                    )
+
+                    # Starting the thread to raise timeout warning exception
+                    timeout_thread.start()
 
             try:
                 return handler(event, context, *args, **kwargs)
@@ -72,6 +132,10 @@ def _drain_queue():
 
 class AwsLambdaIntegration(Integration):
     identifier = "aws_lambda"
+
+    def __init__(self, timeout_warning=False):
+        # type: (bool) -> None
+        self.timeout_warning = timeout_warning
 
     @staticmethod
     def setup_once():
@@ -140,6 +204,10 @@ class AwsLambdaIntegration(Integration):
 
             lambda_bootstrap.to_json = sentry_to_json
         else:
+            lambda_bootstrap.LambdaRuntimeClient.post_init_error = _wrap_init_error(
+                lambda_bootstrap.LambdaRuntimeClient.post_init_error
+            )
+
             old_handle_event_request = lambda_bootstrap.handle_event_request
 
             def sentry_handle_event_request(  # type: ignore
@@ -172,19 +240,23 @@ class AwsLambdaIntegration(Integration):
             )
 
 
-def _make_request_event_processor(aws_event, aws_context):
-    # type: (Any, Any) -> EventProcessor
+def _make_request_event_processor(aws_event, aws_context, configured_timeout):
+    # type: (Any, Any, Any) -> EventProcessor
     start_time = datetime.now()
 
     def event_processor(event, hint, start_time=start_time):
         # type: (Event, Hint, datetime) -> Optional[Event]
+        remaining_time_in_milis = aws_context.get_remaining_time_in_millis()
+        exec_duration = configured_timeout - remaining_time_in_milis
+
         extra = event.setdefault("extra", {})
         extra["lambda"] = {
             "function_name": aws_context.function_name,
             "function_version": aws_context.function_version,
             "invoked_function_arn": aws_context.invoked_function_arn,
-            "remaining_time_in_millis": aws_context.get_remaining_time_in_millis(),
             "aws_request_id": aws_context.aws_request_id,
+            "execution_duration_in_millis": exec_duration,
+            "remaining_time_in_millis": remaining_time_in_milis,
         }
 
         extra["cloudwatch logs"] = {

@@ -18,7 +18,7 @@ def get_boto_client():
 
 
 def run_lambda_function(
-    client, runtime, code, payload, add_finalizer, subprocess_kwargs=()
+    client, runtime, code, payload, add_finalizer, syntax_check=True, subprocess_kwargs=()
 ):
     subprocess_kwargs = dict(subprocess_kwargs)
 

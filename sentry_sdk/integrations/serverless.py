@@ -27,13 +27,13 @@ else:
 
 
 @overload
-def serverless_function(f, flush=True):
+def serverless_function(f, flush=True):  # noqa: F811
     # type: (F, bool) -> F
     pass
 
 
-@overload  # noqa
-def serverless_function(f=None, flush=True):
+@overload
+def serverless_function(f=None, flush=True):  # noqa: F811
     # type: (None, bool) -> Callable[[F], F]
     pass
 
