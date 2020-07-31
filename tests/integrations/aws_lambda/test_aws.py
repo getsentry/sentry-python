@@ -236,17 +236,18 @@ def test_init_error(run_lambda_function, lambda_runtime):
         pytest.skip("initialization error not supported on Python 2.7")
 
     events, response = run_lambda_function(
-        LAMBDA_PRELUDE + (
-            'def event_processor(event):\n'
+        LAMBDA_PRELUDE
+        + (
+            "def event_processor(event):\n"
             '    return event["exception"]["values"][0]["value"]\n'
-            'init_sdk()\n'
-            'func()'
+            "init_sdk()\n"
+            "func()"
         ),
         b'{"foo": "bar"}',
         syntax_check=False,
     )
 
-    event, = events
+    (event,) = events
     assert "name 'func' is not defined" in event
 
 
@@ -263,7 +264,7 @@ def test_timeout_error(run_lambda_function):
         """
         ),
         b'{"foo": "bar"}',
-        timeout=3
+        timeout=3,
     )
 
     (event,) = events

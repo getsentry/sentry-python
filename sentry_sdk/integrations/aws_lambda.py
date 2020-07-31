@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 from os import environ
 import sys
-import json
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk._compat import reraise
@@ -152,7 +151,7 @@ class AwsLambdaIntegration(Integration):
         if "bootstrap" in sys.modules:
             lambda_bootstrap = sys.modules["bootstrap"]  # type: Any
         elif "__main__" in sys.modules:
-            lambda_bootstrap = sys.modules["__main__"]  # type: Any
+            lambda_bootstrap = sys.modules["__main__"]
         else:
             logger.warning(
                 "Not running in AWS Lambda environment, "
