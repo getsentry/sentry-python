@@ -94,7 +94,7 @@ def _wrap_middleware(middleware, middleware_name):
                 sentry_wrapped_method = wraps(old_method)(sentry_wrapped_method)  # type: ignore
 
                 # Necessary for Django 3.1
-                sentry_wrapped_method.__self__ = old_method.__self__
+                sentry_wrapped_method.__self__ = old_method.__self__  # type: ignore
             except Exception:
                 pass
 
