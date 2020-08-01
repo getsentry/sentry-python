@@ -27,6 +27,15 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.16.3
+
+* Fix AWS Lambda support for Python 3.8.
+* The AWS Lambda integration now captures initialization/import errors for Python 3.
+* The AWS Lambda integration now supports an option to warn about functions likely to time out.
+* Testing for RQ 1.5
+* Flip default of `traceparent_v2`. This change should have zero impact. The flag will be removed in 0.17.
+* Fix compatibility bug with Django 3.1.
+
 ## 0.16.2
 
 * New (optional) integrations for richer stacktraces: `pure_eval` for
