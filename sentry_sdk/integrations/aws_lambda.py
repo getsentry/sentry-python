@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 from os import environ
 import sys
-import json
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk._compat import reraise
@@ -42,19 +41,15 @@ def _wrap_init_error(init_error):
         if integration is None:
             return init_error(*args, **kwargs)
 
-        # Fetch Initialization error details from arguments
-        error = json.loads(args[1])
-
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
 
-        with hub.push_scope() as scope:
-            with capture_internal_exceptions():
+        with capture_internal_exceptions():
+            with hub.configure_scope() as scope:
                 scope.clear_breadcrumbs()
-            # Checking if there is any error/exception which is raised in the runtime
-            # environment from arguments and, re-raising it to capture it as an event.
-            if error.get("errorType"):
-                exc_info = sys.exc_info()
+
+            exc_info = sys.exc_info()
+            if exc_info and all(exc_info):
                 event, hint = event_from_exception(
                     exc_info,
                     client_options=client.options,
@@ -140,24 +135,38 @@ class AwsLambdaIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        import __main__ as lambda_bootstrap  # type: ignore
 
-        pre_37 = True  # Python 3.6 or 2.7
-
-        if not hasattr(lambda_bootstrap, "handle_http_request"):
-            try:
-                import bootstrap as lambda_bootstrap  # type: ignore
-
-                pre_37 = False  # Python 3.7
-            except ImportError:
-                pass
+        # Python 2.7: Everything is in `__main__`.
+        #
+        # Python 3.7: If the bootstrap module is *already imported*, it is the
+        # one we actually want to use (no idea what's in __main__)
+        #
+        # On Python 3.8 bootstrap is also importable, but will be the same file
+        # as __main__ imported under a different name:
+        #
+        #     sys.modules['__main__'].__file__ == sys.modules['bootstrap'].__file__
+        #     sys.modules['__main__'] is not sys.modules['bootstrap']
+        #
+        # Such a setup would then make all monkeypatches useless.
+        if "bootstrap" in sys.modules:
+            lambda_bootstrap = sys.modules["bootstrap"]  # type: Any
+        elif "__main__" in sys.modules:
+            lambda_bootstrap = sys.modules["__main__"]
+        else:
+            logger.warning(
+                "Not running in AWS Lambda environment, "
+                "AwsLambdaIntegration disabled (could not find bootstrap module)"
+            )
+            return
 
         if not hasattr(lambda_bootstrap, "handle_event_request"):
             logger.warning(
                 "Not running in AWS Lambda environment, "
-                "AwsLambdaIntegration disabled"
+                "AwsLambdaIntegration disabled (could not find handle_event_request)"
             )
             return
+
+        pre_37 = hasattr(lambda_bootstrap, "handle_http_request")  # Python 3.6 or 2.7
 
         if pre_37:
             old_handle_event_request = lambda_bootstrap.handle_event_request

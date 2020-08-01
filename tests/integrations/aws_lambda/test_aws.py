@@ -1,11 +1,23 @@
+"""
+# AWS Lambda system tests
+
+This testsuite uses boto3 to upload actual lambda functions to AWS, execute
+them and assert some things about the externally observed behavior. What that
+means for you is that those tests won't run without AWS access keys:
+
+    export SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID=..
+    export SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY=...
+    export SENTRY_PYTHON_TEST_AWS_IAM_ROLE="arn:aws:iam::920901907255:role/service-role/lambda"
+
+If you need to debug a new runtime, use this REPL to figure things out:
+
+    pip3 install click
+    python3 tests/integrations/aws_lambda/client.py --runtime=python4.0
+"""
 import base64
 import json
 import os
 import re
-import shutil
-import subprocess
-import sys
-import uuid
 from textwrap import dedent
 
 import pytest
@@ -15,24 +27,27 @@ boto3 = pytest.importorskip("boto3")
 LAMBDA_PRELUDE = """
 from __future__ import print_function
 
-import time
-
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 import sentry_sdk
 import json
+import time
+
 from sentry_sdk.transport import HttpTransport
 
-FLUSH_EVENT = True
+def event_processor(event):
+    # AWS Lambda truncates the log output to 4kb. If you only need a
+    # subsection of the event, override this function in your test
+    # to print less to logs.
+    return event
 
 class TestTransport(HttpTransport):
     def _send_event(self, event):
-        # Delay event output like this to test proper shutdown
-        # Note that AWS Lambda truncates the log output to 4kb, so you better
-        # pray that your events are smaller than that or else tests start
-        # failing.
-        if FLUSH_EVENT:
-            time.sleep(1)
-        print("\\nEVENT:", json.dumps(event))
+        event = event_processor(event)
+        # Writing a single string to stdout holds the GIL (seems like) and
+        # therefore cannot be interleaved with other threads. This is why we
+        # explicitly add a newline at the end even though `print` would provide
+        # us one.
+        print("\\nEVENT: {}\\n".format(json.dumps(event)))
 
 def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
@@ -50,63 +65,30 @@ def lambda_client():
     if "SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID" not in os.environ:
         pytest.skip("AWS environ vars not set")
 
-    return boto3.client(
-        "lambda",
-        aws_access_key_id=os.environ["SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID"],
-        aws_secret_access_key=os.environ["SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY"],
-        region_name="us-east-1",
-    )
+    from tests.integrations.aws_lambda.client import get_boto_client
+
+    return get_boto_client()
 
 
 @pytest.fixture(params=["python3.6", "python3.7", "python3.8", "python2.7"])
-def run_lambda_function(tmpdir, lambda_client, request, relay_normalize):
-    if request.param == "python3.8":
-        pytest.xfail("Python 3.8 is currently broken")
+def lambda_runtime(request):
+    return request.param
 
-    def inner(code, payload, syntax_check=True):
-        runtime = request.param
-        tmpdir.ensure_dir("lambda_tmp").remove()
-        tmp = tmpdir.ensure_dir("lambda_tmp")
 
-        tmp.join("test_lambda.py").write(code)
+@pytest.fixture
+def run_lambda_function(request, lambda_client, lambda_runtime):
+    def inner(code, payload, timeout=30, syntax_check=True):
+        from tests.integrations.aws_lambda.client import run_lambda_function
 
-        # Check file for valid syntax first, and that the integration does not
-        # crash when not running in Lambda (but rather a local deployment tool
-        # such as chalice's)
-        if syntax_check:
-            subprocess.check_call([sys.executable, str(tmp.join("test_lambda.py"))])
-
-        tmp.join("setup.cfg").write("[install]\nprefix=")
-        subprocess.check_call([sys.executable, "setup.py", "sdist", "-d", str(tmpdir)])
-
-        # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
-        subprocess.check_call("pip install ../*.tar.gz -t .", cwd=str(tmp), shell=True)
-        shutil.make_archive(tmpdir.join("ball"), "zip", str(tmp))
-
-        fn_name = "test_function_{}".format(uuid.uuid4())
-
-        lambda_client.create_function(
-            FunctionName=fn_name,
-            Runtime=runtime,
-            Role=os.environ["SENTRY_PYTHON_TEST_AWS_IAM_ROLE"],
-            Handler="test_lambda.test_handler",
-            Code={"ZipFile": tmpdir.join("ball.zip").read(mode="rb")},
-            Description="Created as part of testsuite for getsentry/sentry-python",
-            Timeout=4,
+        response = run_lambda_function(
+            client=lambda_client,
+            runtime=lambda_runtime,
+            code=code,
+            payload=payload,
+            add_finalizer=request.addfinalizer,
+            timeout=timeout,
+            syntax_check=syntax_check,
         )
-
-        @request.addfinalizer
-        def delete_function():
-            lambda_client.delete_function(FunctionName=fn_name)
-
-        response = lambda_client.invoke(
-            FunctionName=fn_name,
-            InvocationType="RequestResponse",
-            LogType="Tail",
-            Payload=payload,
-        )
-
-        assert 200 <= response["StatusCode"] < 300, response
 
         events = []
 
@@ -116,7 +98,6 @@ def run_lambda_function(tmpdir, lambda_client, request, relay_normalize):
                 continue
             line = line[len(b"EVENT: ") :]
             events.append(json.loads(line.decode("utf-8")))
-            relay_normalize(events[-1])
 
         return events, response
 
@@ -130,6 +111,10 @@ def test_basic(run_lambda_function):
             """
         init_sdk()
 
+        def event_processor(event):
+            # Delay event output like this to test proper shutdown
+            time.sleep(1)
+            return event
 
         def test_handler(event, context):
             raise Exception("something went wrong")
@@ -246,25 +231,24 @@ def test_request_data(run_lambda_function):
     }
 
 
-def test_init_error(run_lambda_function):
+def test_init_error(run_lambda_function, lambda_runtime):
+    if lambda_runtime == "python2.7":
+        pytest.skip("initialization error not supported on Python 2.7")
+
     events, response = run_lambda_function(
         LAMBDA_PRELUDE
-        + dedent(
-            """
-        init_sdk()
-        func()
-
-        def test_handler(event, context):
-            return 0
-        """
+        + (
+            "def event_processor(event):\n"
+            '    return event["exception"]["values"][0]["value"]\n'
+            "init_sdk()\n"
+            "func()"
         ),
         b'{"foo": "bar"}',
         syntax_check=False,
     )
 
-    log_result = (base64.b64decode(response["LogResult"])).decode("utf-8")
-    expected_text = "name 'func' is not defined"
-    assert expected_text in log_result
+    (event,) = events
+    assert "name 'func' is not defined" in event
 
 
 def test_timeout_error(run_lambda_function):
@@ -273,8 +257,6 @@ def test_timeout_error(run_lambda_function):
         + dedent(
             """
         init_sdk(timeout_warning=True)
-        FLUSH_EVENT=False
-
 
         def test_handler(event, context):
             time.sleep(10)
@@ -282,15 +264,16 @@ def test_timeout_error(run_lambda_function):
         """
         ),
         b'{"foo": "bar"}',
+        timeout=3,
     )
 
     (event,) = events
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ServerlessTimeoutWarning"
-    assert (
-        exception["value"]
-        == "WARNING : Function is expected to get timed out. Configured timeout duration = 4 seconds."
+    assert exception["value"] in (
+        "WARNING : Function is expected to get timed out. Configured timeout duration = 4 seconds.",
+        "WARNING : Function is expected to get timed out. Configured timeout duration = 3 seconds.",
     )
 
     assert exception["mechanism"] == {"type": "threading", "handled": False}
