@@ -4,7 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.hub &#8212; sentry-python 0.16.2 documentation</title>
+    <title>sentry_sdk.hub &#8212; sentry-python 0.16.3 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -557,15 +557,15 @@
 
         <span class="k">return</span> <span class="n">transaction</span></div>
 
-    <span class="nd">@overload</span>  <span class="c1"># noqa</span>
-    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>
+    <span class="nd">@overload</span>
+    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>  <span class="c1"># noqa: F811</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[None]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; ContextManager[Scope]</span>
         <span class="k">pass</span>
 
-    <span class="nd">@overload</span>  <span class="c1"># noqa</span>
-    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>
+    <span class="nd">@overload</span>
+    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>  <span class="c1"># noqa: F811</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span>  <span class="c1"># type: Callable[[Scope], None]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
@@ -606,15 +606,15 @@
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">,</span> <span class="s2">&quot;stack must have at least one layer&quot;</span>
         <span class="k">return</span> <span class="n">rv</span></div>
 
-    <span class="nd">@overload</span>  <span class="c1"># noqa</span>
-    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>
+    <span class="nd">@overload</span>
+    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>  <span class="c1"># noqa: F811</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[None]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; ContextManager[Scope]</span>
         <span class="k">pass</span>
 
-    <span class="nd">@overload</span>  <span class="c1"># noqa</span>
-    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>
+    <span class="nd">@overload</span>
+    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>  <span class="c1"># noqa: F811</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span>  <span class="c1"># type: Callable[[Scope], None]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
