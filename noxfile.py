@@ -109,7 +109,7 @@ if travis_python:
     @nox.session(python=travis_python)
     def travis_test(session):
         installed_base_deps = False
-        for name, f in globals().items():
+        for name, f in sorted(globals().items()):
             python = "pypy" if travis_python == "pypy" else "py{}".format(travis_python)
             if name.startswith("test-{python}".format(python=python)):
                 f(session, fast=installed_base_deps)
