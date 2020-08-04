@@ -32,7 +32,7 @@ matrix:
       dist: xenial
       install:
         - pip install tox
-      script: tox -e linters
+      script: nox -s linters
 
     - python: "3.8"
       dist: xenial
@@ -54,14 +54,14 @@ services:
   - postgresql
 
 install:
-  - pip install tox
+  - bash scripts/travis-install-nox.sh
   - pip install codecov
   - make install-zeus-cli
   - bash scripts/download-relay.sh
 
 script:
   - coverage erase
-  - ./scripts/runtox.sh '' --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+  - nox -s travis_test -- --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
   - coverage combine .coverage*
   - coverage xml -i
   - codecov --file coverage.xml
