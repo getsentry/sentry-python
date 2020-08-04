@@ -80,7 +80,7 @@ def generate_test_sessions():
         def func(session):
             session.install("-e", ".")
             session.install("-r", "test-requirements.txt", *deps)
-            session.env['COVERAGE_FILE'] = f'.coverage-{job_name}'
+            session.env['COVERAGE_FILE'] = ".coverage-{job_name}".format(job_name=job_name)
             session.run(
                 "pytest",
                 *["tests/integrations/{integration}".format(integration=integration) for integration in integrations],
