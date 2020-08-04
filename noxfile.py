@@ -40,7 +40,6 @@ def parse_tox():
         env_matcher, dependency = line.split(":", 1)
         dependencies.append((env_matcher.strip(), dependency))
 
-    batch_jobs = {}
     single_jobs = []
 
     for env in expand_envlist(config['tox']['envlist']):
@@ -48,20 +47,9 @@ def parse_tox():
             list(env.split("-")) + [None, None]
         )
 
-        python_version_jobs = batch_jobs.setdefault(python_version, [])
-
-        if integration is None:
-            python_version_jobs.append({})
-        else:
-            for job in python_version_jobs:
-                if job and job.setdefault(integration, framework_version) == framework_version:
-                    break
-            else:
-                python_version_jobs.append({integration: framework_version})
-
         single_jobs.append((python_version, integration, framework_version))
 
-    return dependencies, batch_jobs, single_jobs
+    return dependencies, single_jobs
 
 
 def _format_job_name(python_version, integration, framework_version):
@@ -72,9 +60,9 @@ def _format_job_name(python_version, integration, framework_version):
 
 
 def generate_test_sessions():
-    dependencies, batch_jobs, single_jobs = parse_tox()
+    dependencies, single_jobs = parse_tox()
 
-    def add_nox_job(job_name, integrations, python_version, deps):
+    def add_nox_job(job_name, integration, python_version, deps):
         def func(session, fast=False):
             if not fast:
                 session.install("-U", "pip")
@@ -82,20 +70,13 @@ def generate_test_sessions():
                 session.install("-r", "test-requirements.txt")
 
             if deps:
-                session.install(
-                    *deps,
-                    # Necessary to be able to specify double-requirements
-                    "--use-feature=2020-resolver",
-                )
+                session.install(*deps)
 
             session.env['COVERAGE_FILE'] = ".coverage-{job_name}".format(job_name=job_name)
             session.run(
                 "pytest",
-                *[
-                    "tests/integrations/{integration}".format(integration=integration)
-                    if integration else "tests/"
-                    for integration in integrations
-                ],
+                "tests/integrations/{integration}".format(integration=integration)
+                if integration else "tests/",
                 *session.posargs
             )
 
@@ -110,20 +91,7 @@ def generate_test_sessions():
         job_name = _format_job_name(python_version,integration,framework_version)
         deps = list(find_dependencies(dependencies, job_name))
 
-        add_nox_job("test-{job_name}".format(job_name=job_name), [integration], python_version, deps)
-
-    for python_version, batches in batch_jobs.items():
-        for batch_name, integrations in enumerate(batches):
-            job_name = "batchtest-{python_version}-{batch_name}".format(python_version=python_version, batch_name=batch_name)
-            deps = []
-            for integration, framework_version in integrations.items():
-                deps.extend(find_dependencies(
-                    dependencies, 
-                    _format_job_name(python_version, integration, framework_version)
-                ))
-
-            add_nox_job(job_name, integrations, python_version, deps)
-
+        add_nox_job("test-{job_name}".format(job_name=job_name), integration, python_version, deps)
 
 @nox.session(python="3.8")
 def linters(session):
@@ -143,7 +111,7 @@ if travis_python:
         installed_base_deps = False
         for name, f in globals().items():
             python = "pypy" if travis_python == "pypy" else "py{}".format(travis_python)
-            if name.startswith("batchtest-{python}".format(python=python)):
+            if name.startswith("test-{python}".format(python=python)):
                 f(session, fast=installed_base_deps)
                 installed_base_deps = True
 
