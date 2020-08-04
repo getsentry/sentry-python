@@ -21,7 +21,7 @@ def expand_envlist(value):
 
 def find_dependencies(deps, env):
     env_factors = set(env.split("-"))
-    for (matcher, dependency) in deps.items():
+    for (matcher, dependency) in deps:
         for (included, excluded) in _split_factor_expr(matcher):
             if included <= env_factors and not env_factors & excluded:
                 yield dependency
@@ -30,7 +30,7 @@ def parse_tox():
     config = configparser.ConfigParser()
     config.read("tox.ini")
 
-    dependencies = {}
+    dependencies = []
 
     for line in config['testenv']['deps'].splitlines():
         line = line.strip()
@@ -38,7 +38,7 @@ def parse_tox():
             continue
 
         env_matcher, dependency = line.split(":", 1)
-        dependencies[env_matcher.strip()] = dependency
+        dependencies.append((env_matcher.strip(), dependency))
 
     batch_jobs = {}
     single_jobs = []
@@ -75,15 +75,27 @@ def generate_test_sessions():
     dependencies, batch_jobs, single_jobs = parse_tox()
 
     def add_nox_job(job_name, integrations, python_version, deps):
-        job_name = job_name.replace(".", "").replace("-", "_")
+        def func(session, fast=False):
+            if not fast:
+                session.install("-U", "pip")
+                session.install("-e", ".")
+                session.install("-r", "test-requirements.txt")
 
-        def func(session):
-            session.install("-e", ".")
-            session.install("-r", "test-requirements.txt", *deps)
+            if deps:
+                session.install(
+                    *deps,
+                    # Necessary to be able to specify double-requirements
+                    "--use-feature=2020-resolver",
+                )
+
             session.env['COVERAGE_FILE'] = ".coverage-{job_name}".format(job_name=job_name)
             session.run(
                 "pytest",
-                *["tests/integrations/{integration}".format(integration=integration) for integration in integrations],
+                *[
+                    "tests/integrations/{integration}".format(integration=integration)
+                    if integration else "tests/"
+                    for integration in integrations
+                ],
                 *session.posargs
             )
 
@@ -128,9 +140,12 @@ travis_python = os.environ.get("TRAVIS_PYTHON_VERSION")
 if travis_python:
     @nox.session(python=travis_python)
     def travis_test(session):
+        installed_base_deps = False
         for name, f in globals().items():
-            if name.startswith("test-{travis_python}".format(travis_python=travis_python)):
-                f(session)
+            python = "pypy" if travis_python == "pypy" else "py{}".format(travis_python)
+            if name.startswith("batchtest-{python}".format(python=python)):
+                f(session, fast=installed_base_deps)
+                installed_base_deps = True
 
 
 generate_test_sessions()
