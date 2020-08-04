@@ -24,9 +24,9 @@ raise ValueError()  # Will also create an event.
 
 To learn more about how to use the SDK:
 
-- [Getting started with the new SDK](https://docs.sentry.io/quickstart/?platform=python)
+- [Getting started with the new SDK](https://docs.sentry.io/error-reporting/quickstart/?platform=python)
 - [Configuration options](https://docs.sentry.io/error-reporting/configuration/?platform=python)
-- [Setting context (tags, user, extra information)](https://docs.sentry.io/enriching-error-data/context/?platform=python)
+- [Setting context (tags, user, extra information)](https://docs.sentry.io/enriching-error-data/additional-data/?platform=python)
 - [Integrations](https://docs.sentry.io/platforms/python/)
 
 Are you coming from raven-python?
