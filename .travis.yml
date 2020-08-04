@@ -31,7 +31,7 @@ matrix:
       python: "3.8"
       dist: xenial
       install:
-        - pip install tox
+        - bash scripts/travis-install-nox.sh
       script: nox -s linters
 
     - python: "3.8"
