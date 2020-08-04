@@ -66,9 +66,9 @@ def parse_tox():
 
 def _format_job_name(python_version, integration, framework_version):
     if integration is not None:
-        return f"{python_version}-{integration}-{framework_version}"
+        return "{python_version}-{integration}-{framework_version}".format(python_version=python_version, integration=integration, framework_version=framework_version)
     else:
-        return f"{python_version}"
+        return "{python_version}".format(python_version=python_version)
 
 
 def generate_test_sessions():
@@ -83,7 +83,7 @@ def generate_test_sessions():
             session.env['COVERAGE_FILE'] = f'.coverage-{job_name}'
             session.run(
                 "pytest",
-                *[f"tests/integrations/{integration}" for integration in integrations],
+                *["tests/integrations/{integration}".format(integration=integration) for integration in integrations],
                 *session.posargs
             )
 
@@ -98,11 +98,11 @@ def generate_test_sessions():
         job_name = _format_job_name(python_version,integration,framework_version)
         deps = list(find_dependencies(dependencies, job_name))
 
-        add_nox_job(f"test-{job_name}", [integration], python_version, deps)
+        add_nox_job("test-{job_name}".format(job_name=job_name), [integration], python_version, deps)
 
     for python_version, batches in batch_jobs.items():
         for batch_name, integrations in enumerate(batches):
-            job_name = f"batchtest-{python_version}-{batch_name}"
+            job_name = "batchtest-{python_version}-{batch_name}".format(python_version=python_version, batch_name=batch_name)
             deps = []
             for integration, framework_version in integrations.items():
                 deps.extend(find_dependencies(
@@ -129,7 +129,7 @@ if travis_python:
     @nox.session(python=travis_python)
     def travis_test(session):
         for name, f in globals().items():
-            if name.startswith(f"test-{travis_python}"):
+            if name.startswith("test-{travis_python}".format(travis_python=travis_python)):
                 f(session)
 
 
