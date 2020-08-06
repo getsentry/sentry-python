@@ -2,7 +2,7 @@ import pytest
 import sentry_sdk
 from chalice import Chalice
 
-from sentry_chalice import ChaliceIntegration
+import sentry_sdk.integrations.chalice as chalice_sentry
 
 from pytest_chalice.handlers import RequestHandler
 
@@ -11,7 +11,8 @@ SENTRY_DSN = 'https://111@sentry.io/111'
 
 @pytest.fixture
 def app():
-    sentry_sdk.init(dsn=SENTRY_DSN, integrations=[ChaliceIntegration()])
+    sentry_sdk.init(dsn=SENTRY_DSN, integrations=[
+        chalice_sentry.ChaliceIntegration()])
     app = Chalice(app_name='sentry_chalice')
 
     @app.route('/boom')
