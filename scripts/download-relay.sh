@@ -12,7 +12,8 @@ target=relay
 
 output="$(
     curl -s \
-    https://api.github.com/repos/getsentry/relay/releases/latest?access_token=$GITHUB_API_TOKEN
+    -H "Authorization: token $GITHUB_API_TOKEN" \
+    https://api.github.com/repos/getsentry/relay/releases/latest
 )"
 
 echo "$output"
