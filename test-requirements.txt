@@ -14,5 +14,3 @@ dnspython<2.0
 newrelic
 executing
 asttokens
-chalice
-pytest_chalice
