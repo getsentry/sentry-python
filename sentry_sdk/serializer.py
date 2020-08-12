@@ -112,12 +112,12 @@ class Memo(object):
         self._ids.pop(id(self._objs.pop()), None)
 
 
-def serialize(event, **kwargs):
-    # type: (Event, **Any) -> Event
+def serialize(event, smart_transaction_trimming=False, **kwargs):
+    # type: (Event, bool, **Any) -> Event
     memo = Memo()
     path = []  # type: List[Segment]
     meta_stack = []  # type: List[Dict[str, Any]]
-    span_description_bytes = []
+    span_description_bytes = []  # type: List[int]
 
     def _annotate(**meta):
         # type: (**Any) -> None
@@ -350,7 +350,12 @@ def serialize(event, **kwargs):
         # Because arbitrarily large events may be discarded by the server as a
         # protection mechanism, we dynamically limit the description length
         # later in _truncate_span_descriptions.
-        if len(path) == 3 and path[0] == "spans" and path[-1] == "description":
+        if (
+            smart_transaction_trimming
+            and len(path) == 3
+            and path[0] == "spans"
+            and path[-1] == "description"
+        ):
             span_description_bytes.append(len(obj))
             return obj
         return _flatten_annotated(strip_string(obj))
