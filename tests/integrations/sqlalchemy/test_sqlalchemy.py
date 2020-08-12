@@ -118,7 +118,7 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
     assert (
         render_span_tree(event)
         == """\
-- op=None: description=None
+- op=None: description='None'
   - op='db': description='SAVEPOINT sa_savepoint_1'
   - op='db': description='SELECT person.id AS person_id, person.name AS person_name \\nFROM person\\n LIMIT ? OFFSET ?'
   - op='db': description='RELEASE SAVEPOINT sa_savepoint_1'
