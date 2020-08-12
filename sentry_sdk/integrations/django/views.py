@@ -6,33 +6,32 @@ from sentry_sdk._types import MYPY
 if MYPY:
     from typing import Any
 
-    from django.core.handlers.wsgi import WSGIRequest
     from django.urls.resolvers import ResolverMatch
 
 
-def patch_resolve_request():
+def patch_resolver():
     # type: () -> None
-    from django.core.handlers.base import BaseHandler
+    try:
+        from django.urls.resolvers import URLResolver
+    except ImportError:
+        from django.core.urlresolvers import RegexURLResolver as URLResolver
+
     from sentry_sdk.integrations.django import DjangoIntegration
 
-    try:
-        old_resolve_request = BaseHandler.resolve_request
-    except AttributeError:
-        # Django 3+ only
-        return
+    old_resolve = URLResolver.resolve
 
-    def resolve_request(self, request):
-        # type: (BaseHandler, WSGIRequest) -> ResolverMatch
+    def resolve(self, path):
+        # type: (BaseHandler, Any) -> ResolverMatch
         hub = Hub.current
         integration = hub.get_integration(DjangoIntegration)
 
         if integration is None or not integration.middleware_spans:
-            return old_resolve_request(self, request)
+            return old_resolve(self, path)
 
-        with hub.start_span(op="django.view.resolve"):
-            return _wrap_resolver_match(hub, old_resolve_request(self, request))
+        with hub.start_span(op="django.urls.resolve"):
+            return _wrap_resolver_match(hub, old_resolve(self, path))
 
-    BaseHandler.resolve_request = resolve_request
+    URLResolver.resolve = resolve
 
 
 def _wrap_resolver_match(hub, resolver_match):
