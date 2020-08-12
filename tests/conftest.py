@@ -334,8 +334,8 @@ def render_span_tree():
             by_parent.setdefault(span["parent_span_id"], []).append(span)
 
         def render_span(span):
-            yield "- op={!r}: description={!r}".format(
-                span.get("op"), span.get("description")
+            yield "- op='{}': description='{}'".format(
+                span.get("op")), span.get("description")
             )
             for subspan in by_parent.get(span["span_id"]) or ():
                 for line in render_span(subspan):

@@ -542,14 +542,14 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
 
     else:
         assert render_span_tree(transaction) == (
-            "- op=u'http.server': description=None\n"
-            "  - op=u'django.middleware': description=u'django.contrib.sessions.middleware.SessionMiddleware.process_request'\n"
-            "  - op=u'django.middleware': description=u'django.contrib.auth.middleware.AuthenticationMiddleware.process_request'\n"
-            "  - op=u'django.middleware': description=u'tests.integrations.django.myapp.settings.TestMiddleware.process_request'\n"
-            "  - op=u'django.urls.resolve': description=None\n"
-            "  - op=u'django.view': description=u'message'\n"
-            "  - op=u'django.middleware': description=u'tests.integrations.django.myapp.settings.TestMiddleware.process_response'\n"
-            "  - op=u'django.middleware': description=u'django.contrib.sessions.middleware.SessionMiddleware.process_response'"
+            "- op='http.server': description=None\n"
+            "  - op='django.middleware': description='django.contrib.sessions.middleware.SessionMiddleware.process_request'\n"
+            "  - op='django.middleware': description='django.contrib.auth.middleware.AuthenticationMiddleware.process_request'\n"
+            "  - op='django.middleware': description='tests.integrations.django.myapp.settings.TestMiddleware.process_request'\n"
+            "  - op='django.urls.resolve': description=None\n"
+            "  - op='django.view': description='message'\n"
+            "  - op='django.middleware': description='tests.integrations.django.myapp.settings.TestMiddleware.process_response'\n"
+            "  - op='django.middleware': description='django.contrib.sessions.middleware.SessionMiddleware.process_response'"
         )
 
 
