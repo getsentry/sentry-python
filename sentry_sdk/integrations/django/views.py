@@ -21,7 +21,7 @@ def patch_resolver():
     old_resolve = URLResolver.resolve
 
     def resolve(self, path):
-        # type: (BaseHandler, Any) -> ResolverMatch
+        # type: (URLResolver, Any) -> ResolverMatch
         hub = Hub.current
         integration = hub.get_integration(DjangoIntegration)
 
