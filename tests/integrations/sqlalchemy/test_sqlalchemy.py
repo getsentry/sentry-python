@@ -138,7 +138,7 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
 
 
 def test_long_sql_query_preserved(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1, integrations=[SqlalchemyIntegration()])
+    sentry_init(traces_sample_rate=1, integrations=[SqlalchemyIntegration()], _experiments={"smart_transaction_trimming": True})
     events = capture_events()
 
     engine = create_engine("sqlite:///:memory:")
@@ -153,7 +153,7 @@ def test_long_sql_query_preserved(sentry_init, capture_events):
 
 
 def test_too_large_event_truncated(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1, integrations=[SqlalchemyIntegration()])
+    sentry_init(traces_sample_rate=1, integrations=[SqlalchemyIntegration()], _experiments={"smart_transaction_trimming": True})
     events = capture_events()
 
     long_str = "x" * (MAX_STRING_LENGTH + 10)
