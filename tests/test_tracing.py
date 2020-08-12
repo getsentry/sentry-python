@@ -14,24 +14,28 @@ from sentry_sdk.tracing import Span, Transaction
 
 
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
-def test_basic(sentry_init, capture_events, sample_rate):
+@pytest.mark.parametrize("num_spans", [1, 900])
+def test_basic(sentry_init, capture_events, sample_rate, num_spans, benchmark):
     sentry_init(traces_sample_rate=sample_rate)
     events = capture_events()
 
-    with start_transaction(name="hi") as transaction:
-        transaction.set_status("ok")
-        with pytest.raises(ZeroDivisionError):
-            with start_span(op="foo", description="foodesc"):
-                1 / 0
+    @benchmark
+    def run():
+        with start_transaction(name="hi") as transaction:
+            transaction.set_status("ok")
+            with pytest.raises(ZeroDivisionError):
+                with start_span(op="foo", description="foodesc"):
+                    1 / 0
 
-        with start_span(op="bar", description="bardesc"):
-            pass
+            for _ in range(num_spans):
+                with start_span(op="bar", description="bardesc"):
+                    pass
 
     if sample_rate:
-        assert len(events) == 1
         event = events[0]
 
-        span1, span2 = event["spans"]
+        assert len(event['spans']) == num_spans + 1
+        span1, span2 = event["spans"][:2]
         parent_span = event
         assert span1["tags"]["status"] == "internal_error"
         assert span1["op"] == "foo"
