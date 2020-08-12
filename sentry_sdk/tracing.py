@@ -142,7 +142,7 @@ class Span(object):
         self.trace_id = trace_id or uuid.uuid4().hex
 
         if not span_id and _span_id_generator:
-            span_id = next(_span_id_generator)
+            span_id = "{:016x}".format(int(self.trace_id, 16) + next(_span_id_generator))
 
         if not span_id:
             span_id = uuid.uuid4().hex[16:]
@@ -460,7 +460,7 @@ class Transaction(Span):
         # next() on itertools.count() is a way to get-and-increment an integer
         # "atomically" on Python runtimes with a GIL
         if _ITERTOOLS_COUNT_IS_ATOMIC and kwargs.pop("_fast_span_ids", None):
-            kwargs['_span_id_generator'] = ("{:016x}".format(i) for i in itertools.count())
+            kwargs['_span_id_generator'] = itertools.count()
 
         Span.__init__(self, **kwargs)
         self.name = name
