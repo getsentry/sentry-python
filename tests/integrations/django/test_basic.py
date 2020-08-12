@@ -537,9 +537,10 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
             "        - op='django.middleware': "
             "description='tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__'\n"
             "          - op='django.view.resolve': description=None\n"
-            "          - op='django.view': description='message'")
+            "          - op='django.view': description='message'"
+        )
 
-    elif DJANGO_VERSION >= (1,11):
+    elif DJANGO_VERSION >= (1, 11):
         assert render_span_tree(transaction) == (
             "- op='http.server': description=None\n"
             "  - op='django.middleware': "

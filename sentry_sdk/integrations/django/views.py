@@ -31,7 +31,7 @@ def _wrap_resolver_match(hub, resolver_match):
 
     # XXX: The wrapper function is created for every request. Find more
     # efficient way to wrap views (or build a cache?)
-    
+
     old_callback = resolver_match.func
 
     @functools.wraps(old_callback)
@@ -42,4 +42,3 @@ def _wrap_resolver_match(hub, resolver_match):
     resolver_match.func = callback
 
     return resolver_match
-
