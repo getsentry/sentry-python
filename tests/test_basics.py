@@ -106,7 +106,7 @@ def test_option_callback(sentry_init, capture_events):
     normal, no_crumbs = events
 
     assert normal["exception"]["values"][0]["type"] == "ValueError"
-    (crumb,) = normal["breadcrumbs"]
+    (crumb,) = normal["breadcrumbs"]['values']
     assert "timestamp" in crumb
     assert crumb["message"] == "Hello"
     assert crumb["data"] == {"foo": "bar"}
@@ -203,9 +203,9 @@ def test_breadcrumbs(sentry_init, capture_events):
     capture_exception(ValueError())
     (event,) = events
 
-    assert len(event["breadcrumbs"]) == 10
-    assert "user 10" in event["breadcrumbs"][0]["message"]
-    assert "user 19" in event["breadcrumbs"][-1]["message"]
+    assert len(event["breadcrumbs"]['values']) == 10
+    assert "user 10" in event["breadcrumbs"]['values'][0]["message"]
+    assert "user 19" in event["breadcrumbs"]['values'][-1]["message"]
 
     del events[:]
 
@@ -219,7 +219,7 @@ def test_breadcrumbs(sentry_init, capture_events):
 
     capture_exception(ValueError())
     (event,) = events
-    assert len(event["breadcrumbs"]) == 0
+    assert len(event["breadcrumbs"]['values']) == 0
 
 
 def test_integration_scoping(sentry_init, capture_events):

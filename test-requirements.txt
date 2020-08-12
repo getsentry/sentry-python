@@ -4,6 +4,7 @@ tox==3.7.0
 Werkzeug==0.15.5
 pytest-localserver==0.5.0
 pytest-cov==2.8.1
+jsonschema==3.2.0
 
 gevent
 eventlet

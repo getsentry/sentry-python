@@ -312,7 +312,9 @@ class Scope(object):
             event["level"] = self._level
 
         if event.get("type") != "transaction":
-            event.setdefault("breadcrumbs", []).extend(self._breadcrumbs)
+            event.setdefault("breadcrumbs", {}) \
+                .setdefault("values", []) \
+                .extend(self._breadcrumbs)
 
         if event.get("user") is None and self._user is not None:
             event["user"] = self._user

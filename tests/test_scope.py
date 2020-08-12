@@ -22,14 +22,14 @@ def test_merging(sentry_init, capture_events):
     sentry_init()
 
     s = Scope()
-    s.set_user({"id": 42})
+    s.set_user({"id": "42"})
 
     events = capture_events()
 
     capture_exception(NameError(), scope=s)
 
     (event,) = events
-    assert event["user"] == {"id": 42}
+    assert event["user"] == {"id": "42"}
 
 
 def test_common_args():

@@ -10,7 +10,7 @@ def test_basic(sentry_init, capture_envelopes):
 
     try:
         with hub.configure_scope() as scope:
-            scope.set_user({"id": 42})
+            scope.set_user({"id": "42"})
             raise Exception("all is wrong")
     except Exception:
         hub.capture_exception()

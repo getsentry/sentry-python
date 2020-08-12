@@ -18,14 +18,11 @@ else:
         )
     )
     @example(dt=datetime(2001, 1, 1, 0, 0, 0, 999500))
-    def test_datetime_precision(dt, relay_normalize):
+    def test_datetime_precision(dt, validate_event_schema):
         event = serialize({"timestamp": dt})
-        normalized = relay_normalize(event)
+        validate_event_schema(event)
 
-        if normalized is None:
-            pytest.skip("no relay available")
-
-        dt2 = datetime.utcfromtimestamp(normalized["timestamp"])
+        dt2 = datetime.utcfromtimestamp(event["timestamp"])
 
         # Float glitches can happen, and more glitches can happen
         # because we try to work around some float glitches in relay
@@ -43,13 +40,10 @@ else:
 
 
 @pytest.fixture
-def message_normalizer(relay_normalize):
-    if relay_normalize({"test": "test"}) is None:
-        pytest.skip("no relay available")
-
+def message_normalizer(validate_event_schema):
     def inner(message, **kwargs):
         event = serialize({"logentry": {"message": message}}, **kwargs)
-        normalized = relay_normalize(event)
+        validate_event_schema(event)
         return normalized["logentry"]["message"]
 
     return inner
