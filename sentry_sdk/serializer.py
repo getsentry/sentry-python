@@ -291,7 +291,9 @@ def serialize(event, **kwargs):
 
             return rv_dict
 
-        elif not isinstance(obj, serializable_str_types) and isinstance(obj, (Set, Sequence)):
+        elif not isinstance(obj, serializable_str_types) and isinstance(
+            obj, (Set, Sequence)
+        ):
             rv_list = []
 
             for i, v in enumerate(obj):
