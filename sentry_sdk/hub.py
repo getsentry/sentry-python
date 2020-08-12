@@ -511,7 +511,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         if transaction is None:
             kwargs.setdefault("hub", self)
-            kwargs['_fast_span_ids'] = client and client.options['_experiments'].get("fast_span_ids")
+            kwargs["_fast_span_ids"] = client and client.options["_experiments"].get(
+                "fast_span_ids"
+            )
             transaction = Transaction(**kwargs)
 
         if transaction.sampled is None:
