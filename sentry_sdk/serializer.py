@@ -421,7 +421,7 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
             rv["_meta"] = meta_stack[0]
 
         sum_span_description_bytes = sum(span_description_bytes)
-        if sum_span_description_bytes > 0:
+        if smart_transaction_trimming and sum_span_description_bytes > 0:
             span_count = len(event.get("spans") or [])
             # This is an upper bound of how many bytes all descriptions would
             # consume if the usual string truncation in _serialize_node_impl
