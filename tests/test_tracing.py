@@ -15,8 +15,9 @@ from sentry_sdk.tracing import Span, Transaction
 
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
 @pytest.mark.parametrize("num_spans", [1, 900])
-def test_basic(sentry_init, capture_events, sample_rate, num_spans, benchmark):
-    sentry_init(traces_sample_rate=sample_rate)
+@pytest.mark.parametrize("fast_span_ids", [True, False])
+def test_basic(sentry_init, capture_events, sample_rate, num_spans, benchmark, fast_span_ids):
+    sentry_init(traces_sample_rate=sample_rate, _experiments={"fast_span_ids": fast_span_ids})
     events = capture_events()
 
     @benchmark

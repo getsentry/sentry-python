@@ -506,11 +506,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         When the transaction is finished, it will be sent to Sentry with all its
         finished child spans.
         """
-        if transaction is None:
-            kwargs.setdefault("hub", self)
-            transaction = Transaction(**kwargs)
 
         client, scope = self._stack[-1]
+
+        if transaction is None:
+            kwargs.setdefault("hub", self)
+            kwargs['_fast_span_ids'] = client and client.options['_experiments'].get("fast_span_ids")
+            transaction = Transaction(**kwargs)
 
         if transaction.sampled is None:
             sample_rate = client and client.options["traces_sample_rate"] or 0

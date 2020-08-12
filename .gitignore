@@ -19,6 +19,7 @@ venv
 .vscode/tags
 .pytest_cache
 .hypothesis
+.benchmarks
 relay
 pip-wheel-metadata
 .mypy_cache

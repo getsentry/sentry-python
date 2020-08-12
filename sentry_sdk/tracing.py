@@ -2,6 +2,8 @@ import re
 import uuid
 import contextlib
 import time
+import itertools
+import platform
 
 from datetime import datetime, timedelta
 
@@ -25,6 +27,7 @@ if MYPY:
     from typing import Dict
     from typing import List
     from typing import Tuple
+    from typing import Iterator
 
 _traceparent_header_format_re = re.compile(
     "^[ \t]*"  # whitespace
@@ -33,6 +36,8 @@ _traceparent_header_format_re = re.compile(
     "-?([01])?"  # sampled
     "[ \t]*$"  # whitespace
 )
+
+_ITERTOOLS_COUNT_IS_ATOMIC = platform.python_implementation() in ("CPython", "PyPy")
 
 
 class EnvironHeaders(Mapping):  # type: ignore
@@ -107,6 +112,7 @@ class Span(object):
         "_span_recorder",
         "hub",
         "_context_manager_state",
+        "_span_id_generator",
     )
 
     def __new__(cls, **kwargs):
@@ -130,10 +136,20 @@ class Span(object):
         hub=None,  # type: Optional[sentry_sdk.Hub]
         status=None,  # type: Optional[str]
         transaction=None,  # type: Optional[str] # deprecated
+        _span_id_generator=None,  # type: Optional[Iterator[str]]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
-        self.span_id = span_id or uuid.uuid4().hex[16:]
+
+        if not span_id and _span_id_generator:
+            span_id = next(_span_id_generator)
+
+        if not span_id:
+            span_id = uuid.uuid4().hex[16:]
+
+        self.span_id = span_id
+        self._span_id_generator = _span_id_generator
+
         self.parent_span_id = parent_span_id
         self.same_process_as_parent = same_process_as_parent
         self.sampled = sampled
@@ -206,7 +222,9 @@ class Span(object):
         kwargs.setdefault("sampled", self.sampled)
 
         rv = Span(
-            trace_id=self.trace_id, span_id=None, parent_span_id=self.span_id, **kwargs
+            trace_id=self.trace_id, span_id=None, parent_span_id=self.span_id,
+            _span_id_generator=self._span_id_generator,
+            **kwargs
         )
 
         rv._span_recorder = recorder = self._span_recorder
@@ -435,6 +453,15 @@ class Transaction(Span):
                 "instead of Span(transaction=...)."
             )
             name = kwargs.pop("transaction")
+
+        if "_span_id_generator" in kwargs:
+            raise TypeError("Argument _span_id_generator can only be provided to Spans")
+
+        # next() on itertools.count() is a way to get-and-increment an integer
+        # "atomically" on Python runtimes with a GIL
+        if _ITERTOOLS_COUNT_IS_ATOMIC and kwargs.pop("_fast_span_ids", None):
+            kwargs['_span_id_generator'] = ("{:016x}".format(i) for i in itertools.count())
+
         Span.__init__(self, **kwargs)
         self.name = name
 
