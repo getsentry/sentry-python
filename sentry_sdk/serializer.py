@@ -36,14 +36,14 @@ if MYPY:
 if PY2:
     # Importing ABCs from collections is deprecated, and will stop working in 3.8
     # https://github.com/python/cpython/blob/master/Lib/collections/__init__.py#L49
-    from collections import Mapping, Sequence
+    from collections import Mapping, Sequence, Set
 
     serializable_str_types = string_types
 
 else:
     # New in 3.3
     # https://docs.python.org/3/library/collections.abc.html
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Mapping, Sequence, Set
 
     # Bytes are technically not strings in Python 3, but we can serialize them
     serializable_str_types = (str, bytes)
@@ -291,7 +291,9 @@ def serialize(event, **kwargs):
 
             return rv_dict
 
-        elif not isinstance(obj, serializable_str_types) and isinstance(obj, Sequence):
+        elif not isinstance(obj, serializable_str_types) and isinstance(
+            obj, (Set, Sequence)
+        ):
             rv_list = []
 
             for i, v in enumerate(obj):
