@@ -252,7 +252,7 @@ def run_cloud_function(request, authorized_credentials, functions_runtime):
                     and entry_function_name == function_name
                     and "EVENTS: " in entry_text_payload
                 ):
-                    log_flag = True
+                    log_flag = False
                     event = entry_text_payload[len("EVENTS: ") :]
                     events.append(json.loads(event))
 
