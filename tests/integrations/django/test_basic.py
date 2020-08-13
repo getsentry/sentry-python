@@ -525,7 +525,7 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
 
     assert message["message"] == "hi"
 
-    if DJANGO_VERSION >= (1, 11):
+    if DJANGO_VERSION >= (1, 10):
         assert (
             render_span_tree(transaction)
             == """\
