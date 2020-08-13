@@ -535,7 +535,7 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
       - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.__call__"
         - op="django.middleware": description="tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__"
           - op="django.view": description="message"\
-        """
+"""
         )
 
     else:
@@ -549,7 +549,7 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
   - op="django.view": description="message"
   - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.process_response"
   - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.process_response"\
-  """
+"""
         )
 
 
