@@ -28,8 +28,7 @@ def patch_resolver():
         if integration is None or not integration.middleware_spans:
             return old_resolve(self, path)
 
-        with hub.start_span(op="django.urls.resolve"):
-            return _wrap_resolver_match(hub, old_resolve(self, path))
+        return _wrap_resolver_match(hub, old_resolve(self, path))
 
     URLResolver.resolve = resolve
 
