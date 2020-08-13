@@ -118,18 +118,18 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
     assert (
         render_span_tree(event)
         == """\
-- op=None: description='None'
-  - op='db': description='SAVEPOINT sa_savepoint_1'
-  - op='db': description='SELECT person.id AS person_id, person.name AS person_name \\nFROM person\\n LIMIT ? OFFSET ?'
-  - op='db': description='RELEASE SAVEPOINT sa_savepoint_1'
-  - op='db': description='SAVEPOINT sa_savepoint_2'
-  - op='db': description='INSERT INTO person (id, name) VALUES (?, ?)'
-  - op='db': description='ROLLBACK TO SAVEPOINT sa_savepoint_2'
-  - op='db': description='SAVEPOINT sa_savepoint_3'
-  - op='db': description='INSERT INTO person (id, name) VALUES (?, ?)'
-  - op='db': description='ROLLBACK TO SAVEPOINT sa_savepoint_3'
-  - op='db': description='SAVEPOINT sa_savepoint_4'
-  - op='db': description='SELECT person.id AS person_id, person.name AS person_name \\nFROM person\\n LIMIT ? OFFSET ?'
-  - op='db': description='RELEASE SAVEPOINT sa_savepoint_4'\
+- op=null: description=null
+  - op="db": description="SAVEPOINT sa_savepoint_1"
+  - op="db": description="SELECT person.id AS person_id, person.name AS person_name \\nFROM person\\n LIMIT ? OFFSET ?"
+  - op="db": description="RELEASE SAVEPOINT sa_savepoint_1"
+  - op="db": description="SAVEPOINT sa_savepoint_2"
+  - op="db": description="INSERT INTO person (id, name) VALUES (?, ?)"
+  - op="db": description="ROLLBACK TO SAVEPOINT sa_savepoint_2"
+  - op="db": description="SAVEPOINT sa_savepoint_3"
+  - op="db": description="INSERT INTO person (id, name) VALUES (?, ?)"
+  - op="db": description="ROLLBACK TO SAVEPOINT sa_savepoint_3"
+  - op="db": description="SAVEPOINT sa_savepoint_4"
+  - op="db": description="SELECT person.id AS person_id, person.name AS person_name \\nFROM person\\n LIMIT ? OFFSET ?"
+  - op="db": description="RELEASE SAVEPOINT sa_savepoint_4"\
 """
     )
