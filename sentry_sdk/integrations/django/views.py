@@ -14,7 +14,10 @@ def patch_resolver():
     try:
         from django.urls.resolvers import URLResolver
     except ImportError:
-        from django.core.urlresolvers import RegexURLResolver as URLResolver
+        try:
+            from django.urls.resolvers import RegexURLResolver as URLResolver
+        except ImportError:
+            from django.core.urlresolvers import RegexURLResolver as URLResolver
 
     from sentry_sdk.integrations.django import DjangoIntegration
 
