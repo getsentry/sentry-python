@@ -27,6 +27,13 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.16.4
+
+* Add experiment to avoid trunchating span descriptions. Initialize with
+  `init(_experiments={"smart_transaction_trimming": True})`.
+* Add a span around the Django view in transactions to distinguish its
+  operations from middleware operations.
+
 ## 0.16.3
 
 * Fix AWS Lambda support for Python 3.8.
