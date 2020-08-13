@@ -4,7 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.client &#8212; sentry-python 0.16.3 documentation</title>
+    <title>sentry_sdk.client &#8212; sentry-python 0.16.4 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -230,7 +230,12 @@
         <span class="c1"># Postprocess the event here so that annotated types do</span>
         <span class="c1"># generally not surface in before_send</span>
         <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">event</span> <span class="o">=</span> <span class="n">serialize</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+            <span class="n">event</span> <span class="o">=</span> <span class="n">serialize</span><span class="p">(</span>
+                <span class="n">event</span><span class="p">,</span>
+                <span class="n">smart_transaction_trimming</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;_experiments&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="s2">&quot;smart_transaction_trimming&quot;</span>
+                <span class="p">),</span>
+            <span class="p">)</span>
 
         <span class="n">before_send</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;before_send&quot;</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">before_send</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">&quot;transaction&quot;</span><span class="p">:</span>
