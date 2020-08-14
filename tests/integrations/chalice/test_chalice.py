@@ -1,10 +1,13 @@
 import pytest
+
 import sentry_sdk
 from chalice import Chalice
 
 import sentry_sdk.integrations.chalice as chalice_sentry
 
 from pytest_chalice.handlers import RequestHandler
+
+pytest.importorskip("chalice")
 
 SENTRY_DSN = 'https://111@sentry.io/111'
 
