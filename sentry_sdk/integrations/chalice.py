@@ -23,7 +23,6 @@ if MYPY:
 
 
 class EventSourceHandler(ChaliceEventSourceHandler):
-
     def __call__(self, event, context):
         hub = Hub.current
         client = hub.client
@@ -33,11 +32,7 @@ class EventSourceHandler(ChaliceEventSourceHandler):
                 event_obj = self.event_class(event, context)
                 return self.func(event_obj)
             except Exception:
-                scope.add_event_processor(
-                    _make_request_event_processor(
-                        event, context
-                    )
-                )
+                scope.add_event_processor(_make_request_event_processor(event, context))
                 exc_info = sys.exc_info()
                 event, hint = event_from_exception(
                     exc_info,
@@ -62,7 +57,7 @@ def _get_view_function_response(app, view_function, function_args):
             # Any chalice view error should propagate.  These
             # get mapped to various HTTP status codes in API Gateway.
             response = Response(
-                body={'Code': e.__class__.__name__, 'Message': str(e)},
+                body={"Code": e.__class__.__name__, "Message": str(e)},
                 status_code=e.STATUS_CODE,
             )
             hub.flush()
@@ -83,20 +78,18 @@ def _get_view_function_response(app, view_function, function_args):
             hub.capture_event(event, hint=hint)
             hub.flush()
             headers = {}
-            app.log.error(
-                "Caught exception for %s", view_function, exc_info=True
-            )
+            app.log.error("Caught exception for %s", view_function, exc_info=True)
             if app.debug:
                 # If the user has turned on debug mode,
                 # we'll let the original exception propagate so
                 # they get more information about what went wrong.
-                stack_trace = ''.join(traceback.format_exc())
+                stack_trace = "".join(traceback.format_exc())
                 body = stack_trace
-                headers['Content-Type'] = 'text/plain'
+                headers["Content-Type"] = "text/plain"
             else:
                 body = {
-                    'Code': 'InternalServerError',
-                    'Message': 'An internal server error occurred.',
+                    "Code": "InternalServerError",
+                    "Message": "An internal server error occurred.",
                 }
             response = Response(body=body, headers=headers, status_code=500)
     return response
@@ -144,9 +137,7 @@ def _make_request_event_processor(current_request, lambda_context):
         request_info["headers"] = _filter_headers(current_request.headers)
 
         if current_request._body is None:
-            request_info["data"] = AnnotatedValue(
-                "", {"rem": [["!raw", "x", 0, 0]]}
-            )
+            request_info["data"] = AnnotatedValue("", {"rem": [["!raw", "x", 0, 0]]})
 
         if _should_send_default_pii():
             user_info = event.setdefault("user", {})

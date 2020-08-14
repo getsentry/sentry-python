@@ -9,33 +9,32 @@ from pytest_chalice.handlers import RequestHandler
 
 pytest.importorskip("chalice")
 
-SENTRY_DSN = 'https://111@sentry.io/111'
+SENTRY_DSN = "https://111@sentry.io/111"
 
 
 @pytest.fixture
 def app():
-    sentry_sdk.init(dsn=SENTRY_DSN, integrations=[
-        chalice_sentry.ChaliceIntegration()])
-    app = Chalice(app_name='sentry_chalice')
+    sentry_sdk.init(dsn=SENTRY_DSN, integrations=[chalice_sentry.ChaliceIntegration()])
+    app = Chalice(app_name="sentry_chalice")
 
-    @app.route('/boom')
+    @app.route("/boom")
     def boom():
-        raise Exception('boom goes the dynamite!')
+        raise Exception("boom goes the dynamite!")
 
-    @app.route('/context')
+    @app.route("/context")
     def has_request():
-        raise Exception('boom goes the dynamite!')
+        raise Exception("boom goes the dynamite!")
 
     return app
 
 
 def test_exception_boom(app, client: RequestHandler) -> None:
-    response = client.get('/boom')
+    response = client.get("/boom")
     assert response.status_code == 500
     assert response.json == dict(
         [
-            ('Code', 'InternalServerError'),
-            ('Message', 'An internal server error occurred.'),
+            ("Code", "InternalServerError"),
+            ("Message", "An internal server error occurred."),
         ]
     )
 
@@ -43,7 +42,7 @@ def test_exception_boom(app, client: RequestHandler) -> None:
 def test_has_request(app, capture_events, client: RequestHandler):
     events = capture_events()
 
-    response = client.get('/context')
+    response = client.get("/context")
     assert response.status_code == 500
 
     (event,) = events
