@@ -1,5 +1,3 @@
-import functools
-
 from sentry_sdk.hub import Hub
 from sentry_sdk._types import MYPY
 from sentry_sdk._functools import wraps
