@@ -2,6 +2,7 @@ import functools
 
 from sentry_sdk.hub import Hub
 from sentry_sdk._types import MYPY
+from sentry_sdk._functools import wraps
 
 if MYPY:
     from typing import Any
@@ -44,7 +45,7 @@ def _wrap_resolver_match(hub, resolver_match):
 
     old_callback = resolver_match.func
 
-    @functools.wraps(old_callback)
+    @wraps(old_callback)
     def callback(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         with hub.start_span(op="django.view", description=resolver_match.view_name):
