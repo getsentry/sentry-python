@@ -269,12 +269,13 @@ def run_cloud_function(request, authorized_credentials, functions_runtime):
     return inner
 
 
-def test_basic(run_cloud_function):
+def test_handled_exception(run_cloud_function):
     events, response = run_cloud_function(
         FUNCTIONS_PRELUDE
         + dedent(
             """
         init_sdk()
+
 
         def cloud_handler(request):
             raise Exception("something went wrong")
@@ -318,3 +319,66 @@ def test_initialization_order(run_cloud_function):
     assert exception["type"] == "Exception"
     assert exception["value"] == "something went wrong"
     assert exception["mechanism"] == {"type": "gcp", "handled": False}
+
+
+def test_unhandled_exception(run_cloud_function):
+    events, response = run_cloud_function(
+        FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk()
+
+
+        def cloud_handler(request):
+            x = 3/0
+            return "str"
+        """
+        )
+    )
+
+    assert (
+        response["error"]
+        == "Error: function terminated. Recommended action: inspect logs for termination reason. Details:\ndivision by zero"
+    )
+    (event,) = events
+    assert event["level"] == "error"
+    (exception,) = event["exception"]["values"]
+
+    assert exception["type"] == "Exception"
+    assert exception["value"] == "something went wrong"
+    assert exception["mechanism"] == {"type": "gcp", "handled": False}
+
+
+def test_timeout_error(run_cloud_function):
+    events, response = run_cloud_function(
+        FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        def event_processor(event):
+            return event
+
+        init_sdk(timeout_warning=True)
+
+
+        def cloud_handler(request):
+            time.sleep(10)
+            return "str"
+        """,
+            timeout=3,
+        )
+    )
+
+    assert (
+        response["error"]
+        == "Error: function execution attempt timed out. Instance restarted."
+    )
+    (event,) = events
+    assert event["level"] == "error"
+    (exception,) = event["exception"]["values"]
+
+    assert exception["type"] == "ServerlessTimeoutWarning"
+    assert (
+        exception["value"]
+        == "WARNING : Function is expected to get timed out. Configured timeout duration = 3 seconds."
+    )
+    assert exception["mechanism"] == {"type": "threading", "handled": False}
