@@ -532,9 +532,11 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
 - op="http.server": description=null
   - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.__call__"
     - op="django.middleware": description="django.contrib.auth.middleware.AuthenticationMiddleware.__call__"
-      - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.__call__"
-        - op="django.middleware": description="tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__"
-          - op="django.view": description="message"\
+      - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.__call__"
+        - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.__call__"
+          - op="django.middleware": description="tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__"
+            - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
+            - op="django.view": description="message"\
 """
         )
 
@@ -568,13 +570,28 @@ def test_middleware_spans_disabled(sentry_init, client, capture_events):
     assert not transaction["spans"]
 
 
-def test_csrf_exempt(sentry_init, client):
+def test_csrf(sentry_init, client):
     """
     Assert that CSRF view decorator works even with the view wrapped in our own
     callable.
     """
 
     sentry_init(integrations=[DjangoIntegration()])
-    content, status, _headers = client.get(reverse("csrf_hello"))
+
+    content, status, _headers = client.post(reverse("csrf_hello_not_exempt"))
+    assert status.lower() == "403 forbidden"
+
+    content, status, _headers = client.post(reverse("sentryclass_csrf"))
+    assert status.lower() == "403 forbidden"
+
+    content, status, _headers = client.post(reverse("sentryclass"))
+    assert status.lower() == "200 ok"
+    assert b"".join(content) == b"ok"
+
+    content, status, _headers = client.post(reverse("classbased"))
+    assert status.lower() == "200 ok"
+    assert b"".join(content) == b"ok"
+
+    content, status, _headers = client.post(reverse("message"))
     assert status.lower() == "200 ok"
     assert b"".join(content) == b"ok"
