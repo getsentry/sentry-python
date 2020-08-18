@@ -43,9 +43,20 @@ def _wrap_resolver_match(hub, resolver_match):
 
     old_callback = resolver_match.func
 
-    @_functools.wraps(
-        old_callback, assigned=_functools.WRAPPER_ASSIGNMENTS + ("csrf_exempt",)
-    )
+    # Explicitly forward `csrf_exempt` in case it is not an attribute in
+    # callback.__dict__, but rather a class attribute (on a class
+    # implementing __call__) such as this:
+    #
+    #     class Foo(object):
+    #         csrf_exempt = True
+    #
+    #         def __call__(self, request): ...
+    #
+    # We have had this in the Sentry codebase (for no good reason, but
+    # nevertheless we broke user code)
+    assigned = _functools.WRAPPER_ASSIGNMENTS + ("csrf_exempt",)
+
+    @_functools.wraps(old_callback, assigned=assigned)
     def callback(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         with hub.start_span(op="django.view", description=resolver_match.view_name):

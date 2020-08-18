@@ -40,9 +40,10 @@ def view_exc(request):
     1 / 0
 
 
-# This is a "class based view" as found in the sentry codebase
-#
-# See https://github.com/getsentry/getsentry/pull/4348
+# This is a "class based view" as previously found in the sentry codebase. The
+# interesting property of this one is that csrf_exempt, as a class attribute,
+# is not in __dict__, so regular use of functools.wraps will not forward the
+# attribute.
 class SentryClassBasedView(object):
     csrf_exempt = True
 
