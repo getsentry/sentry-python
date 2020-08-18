@@ -4,6 +4,7 @@ from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse, HttpResponseServerError, HttpResponseNotFound
 from django.shortcuts import render
 from django.views.generic import ListView
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
 
 try:
     from rest_framework.decorators import api_view
@@ -82,3 +83,9 @@ def template_exc(request, *args, **kwargs):
 
 def permission_denied_exc(*args, **kwargs):
     raise PermissionDenied("bye")
+
+
+@csrf_protect
+@csrf_exempt
+def csrf_hello(*args, **kwargs):
+    return HttpResponse("ok")

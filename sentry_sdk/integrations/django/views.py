@@ -1,6 +1,6 @@
 from sentry_sdk.hub import Hub
 from sentry_sdk._types import MYPY
-from sentry_sdk._functools import wraps
+from sentry_sdk import _functools
 
 if MYPY:
     from typing import Any
@@ -43,7 +43,9 @@ def _wrap_resolver_match(hub, resolver_match):
 
     old_callback = resolver_match.func
 
-    @wraps(old_callback)
+    @_functools.wraps(
+        old_callback, assigned=_functools.WRAPPER_ASSIGNMENTS + ("csrf_exempt",)
+    )
     def callback(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         with hub.start_span(op="django.view", description=resolver_match.view_name):

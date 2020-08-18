@@ -566,3 +566,15 @@ def test_middleware_spans_disabled(sentry_init, client, capture_events):
     assert message["message"] == "hi"
 
     assert not transaction["spans"]
+
+
+def test_csrf_exempt(sentry_init, client):
+    """
+    Assert that CSRF view decorator works even with the view wrapped in our own
+    callable.
+    """
+
+    sentry_init(integrations=[DjangoIntegration()])
+    content, status, _headers = client.get(reverse("csrf_hello"))
+    assert status.lower() == "200 ok"
+    assert b"".join(content) == b"ok"

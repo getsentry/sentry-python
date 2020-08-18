@@ -40,6 +40,7 @@ urlpatterns = [
         views.permission_denied_exc,
         name="permission_denied_exc",
     ),
+    path("csrf-hello", views.csrf_hello, name="csrf_hello"),
 ]
 
 
