@@ -548,8 +548,10 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
   - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.process_request"
   - op="django.middleware": description="django.contrib.auth.middleware.AuthenticationMiddleware.process_request"
   - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.process_request"
+  - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
   - op="django.view": description="message"
   - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.process_response"
+  - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.process_response"
   - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.process_response"\
 """
         )
