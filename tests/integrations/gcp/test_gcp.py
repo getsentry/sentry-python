@@ -3,7 +3,6 @@
 
 """
 import json
-import os
 import time
 from textwrap import dedent
 import requests
@@ -55,7 +54,7 @@ def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
         dsn="https://123abc@example.com/123",
         transport=TestTransport,
-        integrations=[GcpIntegration()],
+        integrations=[GcpIntegration(timeout_warning=timeout_warning)],
         shutdown_timeout=10,
         **extra_init_args
     )
@@ -363,9 +362,9 @@ def test_timeout_error(run_cloud_function):
         def cloud_handler(request):
             time.sleep(10)
             return "str"
-        """,
-            timeout=3,
-        )
+        """
+        ),
+        timeout=3,
     )
 
     assert (

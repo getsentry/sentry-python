@@ -7,6 +7,7 @@ from sentry_sdk._compat import reraise
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    logger,
     TimeoutThread,
 )
 from sentry_sdk.integrations import Integration
@@ -86,6 +87,12 @@ class GcpIntegration(Integration):
     def setup_once():
         # type: () -> None
         import __main__ as gcp_functions  # type: ignore
+
+        if not hasattr(gcp_functions, "worker_v1"):
+            logger.warning(
+                "GcpIntegration currently supports only Python 3.7 runtime environment."
+            )
+            return
 
         worker1 = gcp_functions.worker_v1
 
