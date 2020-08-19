@@ -14,12 +14,12 @@ import subprocess
 import pytest
 import os.path
 import os
-from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
 
 requests = pytest.importorskip("requests")
 pickle = pytest.importorskip("pickle")
+build = pytest.importorskip("googleapiclient.discovery.build")
+InstalledAppFlow = pytest.importorskip("google_auth_oauthlib.flow.InstalledAppFlow")
+Request = pytest.importorskip("google.auth.transport.requests.Request")
 
 SCOPES = [
     "https://www.googleapis.com/auth/cloud-platform",
