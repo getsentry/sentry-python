@@ -61,7 +61,7 @@ _AUTO_ENABLING_INTEGRATIONS = (
     "sentry_sdk.integrations.rq.RqIntegration",
     "sentry_sdk.integrations.aiohttp.AioHttpIntegration",
     "sentry_sdk.integrations.tornado.TornadoIntegration",
-    "sentry_sdk.integrations.sqlalchemy.SqlalchemyIntegration"
+    "sentry_sdk.integrations.sqlalchemy.SqlalchemyIntegration",
 )
 
 
