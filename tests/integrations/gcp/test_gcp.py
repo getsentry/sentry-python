@@ -5,7 +5,6 @@
 import json
 import time
 from textwrap import dedent
-import requests
 import uuid
 import tempfile
 import shutil
@@ -13,12 +12,14 @@ import sys
 import subprocess
 
 import pytest
-import pickle
 import os.path
 import os
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+
+requests = pytest.importorskip("requests")
+pickle = pytest.importorskip("pickle")
 
 SCOPES = [
     "https://www.googleapis.com/auth/cloud-platform",
