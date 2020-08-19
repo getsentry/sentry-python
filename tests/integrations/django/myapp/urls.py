@@ -18,36 +18,40 @@ from __future__ import absolute_import
 try:
     from django.urls import path
 except ImportError:
-    from django.conf.urls import url as path
+    from django.conf.urls import url
+
+    def path(path, *args, **kwargs):
+        return url("^{}$".format(path), *args, **kwargs)
+
 
 from . import views
 
 urlpatterns = [
-    path("^view-exc", views.view_exc, name="view_exc"),
+    path("view-exc", views.view_exc, name="view_exc"),
     path(
-        "^read-body-and-view-exc$",
+        "read-body-and-view-exc",
         views.read_body_and_view_exc,
         name="read_body_and_view_exc",
     ),
-    path("^middleware-exc$", views.message, name="middleware_exc"),
-    path("^message$", views.message, name="message"),
-    path("^mylogin$", views.mylogin, name="mylogin"),
-    path("^classbased$", views.ClassBasedView.as_view(), name="classbased"),
-    path("^sentryclass$", views.SentryClassBasedView(), name="sentryclass"),
+    path("middleware-exc", views.message, name="middleware_exc"),
+    path("message", views.message, name="message"),
+    path("mylogin", views.mylogin, name="mylogin"),
+    path("classbased", views.ClassBasedView.as_view(), name="classbased"),
+    path("sentryclass", views.SentryClassBasedView(), name="sentryclass"),
     path(
-        "^sentryclass-csrf$",
+        "sentryclass-csrf",
         views.SentryClassBasedViewWithCsrf(),
         name="sentryclass_csrf",
     ),
-    path("^post-echo$", views.post_echo, name="post_echo"),
-    path("^template-exc$", views.template_exc, name="template_exc"),
+    path("post-echo", views.post_echo, name="post_echo"),
+    path("template-exc", views.template_exc, name="template_exc"),
     path(
-        "^permission-denied-exc$",
+        "permission-denied-exc",
         views.permission_denied_exc,
         name="permission_denied_exc",
     ),
     path(
-        "^csrf-hello-not-exempt$",
+        "csrf-hello-not-exempt",
         views.csrf_hello_not_exempt,
         name="csrf_hello_not_exempt",
     ),
@@ -56,13 +60,11 @@ urlpatterns = [
 
 try:
     urlpatterns.append(
-        path(
-            "^rest-framework-exc$", views.rest_framework_exc, name="rest_framework_exc"
-        )
+        path("rest-framework-exc", views.rest_framework_exc, name="rest_framework_exc")
     )
     urlpatterns.append(
         path(
-            "^rest-framework-read-body-and-exc$",
+            "rest-framework-read-body-and-exc",
             views.rest_framework_read_body_and_exc,
             name="rest_framework_read_body_and_exc",
         )
@@ -70,7 +72,7 @@ try:
     urlpatterns.append(path("rest-hello", views.rest_hello, name="rest_hello"))
     urlpatterns.append(
         path(
-            "^rest-permission-denied-exc$",
+            "rest-permission-denied-exc",
             views.rest_permission_denied_exc,
             name="rest_permission_denied_exc",
         )
