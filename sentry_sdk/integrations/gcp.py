@@ -44,7 +44,9 @@ def _wrap_func(func):
 
         configured_time = environ.get("FUNCTION_TIMEOUT_SEC")
         if not configured_time:
-            logger.debug("The configured timeout could not be fetched from Cloud Functions configuration.")
+            logger.debug(
+                "The configured timeout could not be fetched from Cloud Functions configuration."
+            )
             return func(*args, **kwargs)
 
         configured_time = int(configured_time)
