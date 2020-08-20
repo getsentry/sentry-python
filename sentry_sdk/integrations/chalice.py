@@ -1,25 +1,17 @@
 import sys
 import traceback
-from datetime import datetime
 
 import chalice
 from chalice import Chalice, ChaliceViewError, Response
 from chalice.app import EventSourceHandler as ChaliceEventSourceHandler
-from sentry_sdk._types import MYPY
-from sentry_sdk.hub import Hub, _should_send_default_pii
+from sentry_sdk._compat import reraise
+from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
-from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk.integrations.aws_lambda import _get_cloudwatch_logs_url
+from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
 from sentry_sdk.utils import (
-    AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
 )
-
-if MYPY:
-    from typing import Any, Optional
-
-    from sentry_sdk._types import Event, EventProcessor, Hint
 
 
 class EventSourceHandler(ChaliceEventSourceHandler):
@@ -32,7 +24,10 @@ class EventSourceHandler(ChaliceEventSourceHandler):
                 event_obj = self.event_class(event, context)
                 return self.func(event_obj)
             except Exception:
-                scope.add_event_processor(_make_request_event_processor(event, context))
+                configured_time = context.get_remaining_time_in_millis()
+                scope.add_event_processor(
+                    _make_request_event_processor(event, context, configured_time)
+                )
                 exc_info = sys.exc_info()
                 event, hint = event_from_exception(
                     exc_info,
@@ -41,6 +36,7 @@ class EventSourceHandler(ChaliceEventSourceHandler):
                 )
                 hub.capture_event(event, hint=hint)
                 hub.flush()
+                reraise(*exc_info)
 
 
 def _get_view_function_response(app, view_function, function_args):
@@ -63,10 +59,13 @@ def _get_view_function_response(app, view_function, function_args):
             hub.flush()
         except Exception:
             with capture_internal_exceptions():
+                configured_time = app.lambda_context.get_remaining_time_in_millis()
                 scope.transaction = app.lambda_context.function_name
                 scope.add_event_processor(
                     _make_request_event_processor(
-                        app.current_request, app.lambda_context
+                        app.current_request.to_dict(),
+                        app.lambda_context,
+                        configured_time,
                     )
                 )
             exc_info = sys.exc_info()
@@ -104,54 +103,3 @@ class ChaliceIntegration(Integration):
         Chalice._get_view_function_response = _get_view_function_response
         # for everything else (like events)
         chalice.app.EventSourceHandler = EventSourceHandler
-
-
-def _make_request_event_processor(current_request, lambda_context):
-    # type: (Any, Any) -> EventProcessor
-    start_time = datetime.now()
-
-    def event_processor(event, hint, start_time=start_time):
-        # type: (Event, Hint, datetime) -> Optional[Event]
-
-        extra = event.setdefault("extra", {})
-
-        extra["Chalice-lambda"] = {
-            "function_name": lambda_context.function_name,
-            "function_version": lambda_context.function_version,
-            "Lambda ARN": lambda_context.invoked_function_arn,
-            "aws_request_id": lambda_context.aws_request_id,
-        }
-
-        extra["cloudwatch-info"] = {
-            "url": _get_cloudwatch_logs_url(lambda_context, start_time),
-            "log_group": lambda_context.log_group_name,
-            "log_stream": lambda_context.log_stream_name,
-        }
-
-        request_info = event.get("request", {})
-
-        request_info["method"] = current_request.context["httpMethod"]
-
-        request_info["query_string"] = current_request.query_params
-
-        request_info["headers"] = _filter_headers(current_request.headers)
-
-        if current_request._body is None:
-            request_info["data"] = AnnotatedValue("", {"rem": [["!raw", "x", 0, 0]]})
-
-        if _should_send_default_pii():
-            user_info = event.setdefault("user", {})
-
-            id = current_request.context["identity"]["userArn"]
-            if id is not None:
-                user_info.setdefault("id", id)
-
-            ip = current_request.context["identity"]["sourceIp"]
-            if ip is not None:
-                user_info.setdefault("ip_address", ip)
-
-        event["request"] = request_info
-
-        return event
-
-    return event_processor
