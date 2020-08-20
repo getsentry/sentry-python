@@ -10,13 +10,14 @@ import tempfile
 import shutil
 import sys
 import subprocess
+import pickle
 
 import pytest
 import os.path
 import os
 
 requests = pytest.importorskip("requests")
-pickle = pytest.importorskip("pickle")
+google_cloud_sdk = pytest.importorskip("google-cloud-sdk")
 build = pytest.importorskip("googleapiclient.discovery.build")
 InstalledAppFlow = pytest.importorskip("google_auth_oauthlib.flow.InstalledAppFlow")
 Request = pytest.importorskip("google.auth.transport.requests.Request")
