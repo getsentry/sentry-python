@@ -64,10 +64,23 @@ class Envelope(object):
         # type: (...) -> None
         self.items.append(item)
 
+    def get_items(
+        self, type=None  # type: Optional[str]
+    ):
+        return [item for item in self.items if item.get_type() == type]
+
     def get_event(self):
         # type: (...) -> Optional[Event]
         for items in self.items:
             event = items.get_event()
+            if event is not None:
+                return event
+        return None
+
+    def get_transaction_event(self):
+        # type: (...) -> Optional[Event]
+        for items in self.items:
+            event = items.get_transaction_event()
             if event is not None:
                 return event
         return None
@@ -220,6 +233,9 @@ class Item(object):
             self.data_category,
         )
 
+    def get_type(self):
+        return self.headers.get("type")
+
     @property
     def data_category(self):
         # type: (...) -> EventDataCategory
@@ -245,6 +261,12 @@ class Item(object):
         Returns an error event if there is one.
         """
         if self.headers.get("type") == "event" and self.payload.json is not None:
+            return self.payload.json
+        return None
+
+    def get_transaction_event(self):
+        # type: (...) -> Optional[Event]
+        if self.headers.get("type") == "transaction" and self.payload.json is not None:
             return self.payload.json
         return None
 
@@ -277,7 +299,7 @@ class Item(object):
         headers = json.loads(line)
         length = headers["length"]
         payload = f.read(length)
-        if headers.get("type") == "event":
+        if headers.get("type") == "event" or headers.get("type") == "transaction":
             rv = cls(headers=headers, payload=PayloadRef(json=json.loads(payload)))
         else:
             rv = cls(headers=headers, payload=payload)
