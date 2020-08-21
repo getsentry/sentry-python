@@ -67,6 +67,7 @@ class Envelope(object):
     def get_items(
         self, type=None  # type: Optional[str]
     ):
+        # type: (...) -> List[Item]
         return [item for item in self.items if item.get_type() == type]
 
     def get_event(self):
@@ -234,6 +235,7 @@ class Item(object):
         )
 
     def get_type(self):
+        # type: (...) -> Optional[str]
         return self.headers.get("type")
 
     @property
