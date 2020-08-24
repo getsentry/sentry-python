@@ -304,10 +304,6 @@ class Span(object):
             sampled = "0"
         return "%s-%s-%s" % (self.trace_id, self.span_id, sampled)
 
-    def to_legacy_traceparent(self):
-        # type: () -> str
-        return "00-%s-%s-00" % (self.trace_id, self.span_id)
-
     def set_tag(self, key, value):
         # type: (str, Any) -> None
         self._tags[key] = value
