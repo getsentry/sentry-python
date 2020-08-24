@@ -4,7 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.integrations.logging &#8212; sentry-python 0.16.5 documentation</title>
+    <title>sentry_sdk.integrations.logging &#8212; sentry-python 0.17.0 documentation</title>
     <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
@@ -63,7 +63,9 @@
 <span class="c1">#</span>
 <span class="c1"># Note: Ignoring by logger name here is better than mucking with thread-locals.</span>
 <span class="c1"># We do not necessarily know whether thread-locals work 100% correctly in the user&#39;s environment.</span>
-<span class="n">_IGNORED_LOGGERS</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span><span class="s2">&quot;sentry_sdk.errors&quot;</span><span class="p">,</span> <span class="s2">&quot;urllib3.connectionpool&quot;</span><span class="p">])</span>
+<span class="n">_IGNORED_LOGGERS</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span>
+    <span class="p">[</span><span class="s2">&quot;sentry_sdk.errors&quot;</span><span class="p">,</span> <span class="s2">&quot;urllib3.connectionpool&quot;</span><span class="p">,</span> <span class="s2">&quot;urllib3.connection&quot;</span><span class="p">]</span>
+<span class="p">)</span>
 
 
 <div class="viewcode-block" id="ignore_logger"><a class="viewcode-back" href="../../../integrations.html#sentry_sdk.integrations.logging.ignore_logger">[docs]</a><span class="k">def</span> <span class="nf">ignore_logger</span><span class="p">(</span>

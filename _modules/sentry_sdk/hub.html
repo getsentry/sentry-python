@@ -4,7 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.hub &#8212; sentry-python 0.16.5 documentation</title>
+    <title>sentry_sdk.hub &#8212; sentry-python 0.17.0 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -718,12 +718,7 @@
         <span class="k">if</span> <span class="ow">not</span> <span class="n">propagate_traces</span><span class="p">:</span>
             <span class="k">return</span>
 
-        <span class="k">if</span> <span class="n">client</span> <span class="ow">and</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;traceparent_v2&quot;</span><span class="p">]:</span>
-            <span class="n">traceparent</span> <span class="o">=</span> <span class="n">span</span><span class="o">.</span><span class="n">to_traceparent</span><span class="p">()</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">traceparent</span> <span class="o">=</span> <span class="n">span</span><span class="o">.</span><span class="n">to_legacy_traceparent</span><span class="p">()</span>
-
-        <span class="k">yield</span> <span class="s2">&quot;sentry-trace&quot;</span><span class="p">,</span> <span class="n">traceparent</span></div>
+        <span class="k">yield</span> <span class="s2">&quot;sentry-trace&quot;</span><span class="p">,</span> <span class="n">span</span><span class="o">.</span><span class="n">to_traceparent</span><span class="p">()</span></div>
 
 
 <span class="n">GLOBAL_HUB</span> <span class="o">=</span> <span class="n">Hub</span><span class="p">()</span>
