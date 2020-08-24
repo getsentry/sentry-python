@@ -65,7 +65,7 @@ def test_start_span_to_start_transaction(sentry_init, capture_events):
 
 @pytest.mark.parametrize("sampled", [True, False, None])
 def test_continue_from_headers(sentry_init, capture_events, sampled):
-    sentry_init(traces_sample_rate=1.0, traceparent_v2=True)
+    sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
     with start_transaction(name="hi"):

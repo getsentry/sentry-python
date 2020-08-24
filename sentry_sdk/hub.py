@@ -685,12 +685,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if not propagate_traces:
             return
 
-        if client and client.options["traceparent_v2"]:
-            traceparent = span.to_traceparent()
-        else:
-            traceparent = span.to_legacy_traceparent()
-
-        yield "sentry-trace", traceparent
+        yield "sentry-trace", span.to_traceparent()
 
 
 GLOBAL_HUB = Hub()

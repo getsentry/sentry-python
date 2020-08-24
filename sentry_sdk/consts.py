@@ -27,6 +27,7 @@ if MYPY:
             "record_sql_params": Optional[bool],
             "auto_enabling_integrations": Optional[bool],
             "auto_session_tracking": Optional[bool],
+            "smart_transaction_trimming": Optional[bool],
         },
         total=False,
     )
@@ -63,7 +64,6 @@ class ClientConstructor(object):
         ca_certs=None,  # type: Optional[str]
         propagate_traces=True,  # type: bool
         traces_sample_rate=0.0,  # type: float
-        traceparent_v2=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
     ):
         # type: (...) -> None

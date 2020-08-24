@@ -26,7 +26,6 @@ def write_event(event):
 sentry_sdk.init(
     integrations=[FlaskIntegration(), RqIntegration()],
     traces_sample_rate=1.0,
-    traceparent_v2=True,
     debug=True,
     transport=write_event,
 )
