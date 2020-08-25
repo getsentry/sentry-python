@@ -237,7 +237,7 @@ class AwsLambdaIntegration(Integration):
 
 def _make_request_event_processor(aws_event, aws_context, configured_timeout):
     # type: (Any, Any, Any) -> EventProcessor
-    start_time = datetime.now()
+    start_time = datetime.utcnow()
 
     def event_processor(event, hint, start_time=start_time):
         # type: (Event, Hint, datetime) -> Optional[Event]
@@ -318,7 +318,7 @@ def _get_cloudwatch_logs_url(context, start_time):
     Returns:
         str -- AWS Console URL to logs.
     """
-    formatstring = "%Y-%m-%dT%H:%M:%S"
+    formatstring = "%Y-%m-%dT%H:%M:%SZ"
 
     url = (
         "https://console.aws.amazon.com/cloudwatch/home?region={region}"
@@ -329,7 +329,7 @@ def _get_cloudwatch_logs_url(context, start_time):
         log_group=context.log_group_name,
         log_stream=context.log_stream_name,
         start_time=(start_time - timedelta(seconds=1)).strftime(formatstring),
-        end_time=(datetime.now() + timedelta(seconds=2)).strftime(formatstring),
+        end_time=(datetime.utcnow() + timedelta(seconds=2)).strftime(formatstring),
     )
 
     return url
