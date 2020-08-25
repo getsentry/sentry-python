@@ -42,7 +42,6 @@ def test_has_request(app, capture_events, client: RequestHandler):
     assert response.status_code == 500
 
     (event,) = events
-    assert event["transaction"] == "api_handler"
-    assert "data" not in event["request"]
-    assert event["request"]["url"] == "awslambda:///api_handler"
-    assert event["request"]["headers"] == {}
+    assert event["level"] == "error"
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "Exception"
