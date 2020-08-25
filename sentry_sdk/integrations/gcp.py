@@ -91,6 +91,10 @@ def _wrap_func(func):
 class GcpIntegration(Integration):
     identifier = "gcp"
 
+    def __init__(self, timeout_warning=False):
+        # type: (bool) -> None
+        self.timeout_warning = timeout_warning
+
     @staticmethod
     def setup_once():
         # type: () -> None

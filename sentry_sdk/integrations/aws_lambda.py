@@ -318,7 +318,7 @@ def _get_cloudwatch_logs_url(context, start_time):
     Returns:
         str -- AWS Console URL to logs.
     """
-    formatstring = "%Y-%m-%dT%H:%M:%S"
+    formatstring = "%Y-%m-%dT%H:%M:%SZ"
 
     url = (
         "https://console.aws.amazon.com/cloudwatch/home?region={region}"
