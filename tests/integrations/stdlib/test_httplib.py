@@ -52,7 +52,7 @@ def test_crumb_capture_hint(sentry_init, capture_events):
     capture_message("Testing!")
 
     (event,) = events
-    (crumb,) = event["breadcrumbs"]
+    (crumb,) = event["breadcrumbs"]['values']
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
     assert crumb["data"] == {
@@ -96,7 +96,7 @@ def test_httplib_misuse(sentry_init, capture_events):
     capture_message("Testing!")
 
     (event,) = events
-    (crumb,) = event["breadcrumbs"]
+    (crumb,) = event["breadcrumbs"]['values']
 
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"

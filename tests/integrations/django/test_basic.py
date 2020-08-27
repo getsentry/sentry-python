@@ -201,7 +201,7 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
     (event,) = events
 
     if with_integration:
-        crumb = event["breadcrumbs"][-1]
+        crumb = event["breadcrumbs"]['values'][-1]
 
         assert crumb["message"] == "SELECT count(*) FROM people_person WHERE foo = %s"
         assert crumb["data"]["db.params"] == [123]
