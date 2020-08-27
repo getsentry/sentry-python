@@ -80,7 +80,7 @@ def test_view_exceptions(
     assert isinstance(error, ZeroDivisionError)
 
     (event,) = events
-    (breadcrumb,) = event["breadcrumbs"]['values']
+    (breadcrumb,) = event["breadcrumbs"]["values"]
     assert breadcrumb["message"] == "hi2"
     assert event["exception"]["values"][0]["mechanism"]["type"] == "pyramid"
 
