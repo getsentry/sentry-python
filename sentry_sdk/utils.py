@@ -503,7 +503,7 @@ def single_exception_from_error_tuple(
         errno = None
 
     if errno is not None:
-        mechanism = mechanism or {}
+        mechanism = mechanism or {"type": "generic"}
         mechanism.setdefault("meta", {}).setdefault("errno", {}).setdefault(
             "number", errno
         )

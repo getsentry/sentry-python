@@ -18,7 +18,7 @@ from sentry_sdk.utils import capture_internal_exceptions
 from tests import _warning_recorder, _warning_recorder_mgr
 
 
-SENTRY_EVENT_SCHEMA = './checkouts/data-schemas/relay/event.schema.json'
+SENTRY_EVENT_SCHEMA = "./checkouts/data-schemas/relay/event.schema.json"
 
 if not os.path.isfile(SENTRY_EVENT_SCHEMA):
     SENTRY_EVENT_SCHEMA = None

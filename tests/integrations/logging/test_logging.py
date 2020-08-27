@@ -26,7 +26,7 @@ def test_logging_works_with_many_loggers(sentry_init, capture_events, logger):
     assert event["level"] == "fatal"
     assert not event["logentry"]["params"]
     assert event["logentry"]["message"] == "LOL"
-    assert any(crumb["message"] == "bread" for crumb in event["breadcrumbs"])
+    assert any(crumb["message"] == "bread" for crumb in event["breadcrumbs"]["values"])
 
 
 @pytest.mark.parametrize("integrations", [None, [], [LoggingIntegration()]])
@@ -39,8 +39,10 @@ def test_logging_defaults(integrations, sentry_init, capture_events):
     (event,) = events
 
     assert event["level"] == "fatal"
-    assert any(crumb["message"] == "bread" for crumb in event["breadcrumbs"])
-    assert not any(crumb["message"] == "LOL" for crumb in event["breadcrumbs"])
+    assert any(crumb["message"] == "bread" for crumb in event["breadcrumbs"]["values"])
+    assert not any(
+        crumb["message"] == "LOL" for crumb in event["breadcrumbs"]["values"]
+    )
     assert "threads" not in event
 
 
@@ -57,7 +59,7 @@ def test_logging_extra_data(sentry_init, capture_events):
     assert event["extra"] == {"bar": 69}
     assert any(
         crumb["message"] == "bread" and crumb["data"] == {"foo": 42}
-        for crumb in event["breadcrumbs"]
+        for crumb in event["breadcrumbs"]["values"]
     )
 
 
