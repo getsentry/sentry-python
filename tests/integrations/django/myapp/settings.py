@@ -76,6 +76,7 @@ def TestFunctionMiddleware(get_response):  # noqa: N802
 MIDDLEWARE_CLASSES = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
     "tests.integrations.django.myapp.settings.TestMiddleware",
 ]
 

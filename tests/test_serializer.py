@@ -49,6 +49,19 @@ def message_normalizer(validate_event_schema):
     return inner
 
 
+@pytest.fixture
+def extra_normalizer(relay_normalize):
+    if relay_normalize({"test": "test"}) is None:
+        pytest.skip("no relay available")
+
+    def inner(message, **kwargs):
+        event = serialize({"extra": {"foo": message}}, **kwargs)
+        normalized = relay_normalize(event)
+        return normalized["extra"]["foo"]
+
+    return inner
+
+
 def test_bytes_serialization_decode(message_normalizer):
     binary = b"abc123\x80\xf0\x9f\x8d\x95"
     result = message_normalizer(binary, should_repr_strings=False)
@@ -60,3 +73,8 @@ def test_bytes_serialization_repr(message_normalizer):
     binary = b"abc123\x80\xf0\x9f\x8d\x95"
     result = message_normalizer(binary, should_repr_strings=True)
     assert result == r"b'abc123\x80\xf0\x9f\x8d\x95'"
+
+
+def test_serialize_sets(extra_normalizer):
+    result = extra_normalizer({1, 2, 3})
+    assert result == [1, 2, 3]

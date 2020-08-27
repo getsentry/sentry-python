@@ -6,8 +6,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_message, start_transaction, configure_scope
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+from sentry_sdk.utils import json_dumps, MAX_STRING_LENGTH
+from sentry_sdk.serializer import MAX_EVENT_BYTES
 
 
 def test_orm_queries(sentry_init, capture_events):
@@ -118,18 +120,105 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
     assert (
         render_span_tree(event)
         == """\
-- op=None: description=None
-  - op='db': description='SAVEPOINT sa_savepoint_1'
-  - op='db': description='SELECT person.id AS person_id, person.name AS person_name \\nFROM person\\n LIMIT ? OFFSET ?'
-  - op='db': description='RELEASE SAVEPOINT sa_savepoint_1'
-  - op='db': description='SAVEPOINT sa_savepoint_2'
-  - op='db': description='INSERT INTO person (id, name) VALUES (?, ?)'
-  - op='db': description='ROLLBACK TO SAVEPOINT sa_savepoint_2'
-  - op='db': description='SAVEPOINT sa_savepoint_3'
-  - op='db': description='INSERT INTO person (id, name) VALUES (?, ?)'
-  - op='db': description='ROLLBACK TO SAVEPOINT sa_savepoint_3'
-  - op='db': description='SAVEPOINT sa_savepoint_4'
-  - op='db': description='SELECT person.id AS person_id, person.name AS person_name \\nFROM person\\n LIMIT ? OFFSET ?'
-  - op='db': description='RELEASE SAVEPOINT sa_savepoint_4'\
+- op=null: description=null
+  - op="db": description="SAVEPOINT sa_savepoint_1"
+  - op="db": description="SELECT person.id AS person_id, person.name AS person_name \\nFROM person\\n LIMIT ? OFFSET ?"
+  - op="db": description="RELEASE SAVEPOINT sa_savepoint_1"
+  - op="db": description="SAVEPOINT sa_savepoint_2"
+  - op="db": description="INSERT INTO person (id, name) VALUES (?, ?)"
+  - op="db": description="ROLLBACK TO SAVEPOINT sa_savepoint_2"
+  - op="db": description="SAVEPOINT sa_savepoint_3"
+  - op="db": description="INSERT INTO person (id, name) VALUES (?, ?)"
+  - op="db": description="ROLLBACK TO SAVEPOINT sa_savepoint_3"
+  - op="db": description="SAVEPOINT sa_savepoint_4"
+  - op="db": description="SELECT person.id AS person_id, person.name AS person_name \\nFROM person\\n LIMIT ? OFFSET ?"
+  - op="db": description="RELEASE SAVEPOINT sa_savepoint_4"\
 """
     )
+
+
+def test_long_sql_query_preserved(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1,
+        integrations=[SqlalchemyIntegration()],
+        _experiments={"smart_transaction_trimming": True},
+    )
+    events = capture_events()
+
+    engine = create_engine("sqlite:///:memory:")
+    with start_transaction(name="test"):
+        with engine.connect() as con:
+            con.execute(" UNION ".join("SELECT {}".format(i) for i in range(100)))
+
+    (event,) = events
+    description = event["spans"][0]["description"]
+    assert description.startswith("SELECT 0 UNION SELECT 1")
+    assert description.endswith("SELECT 98 UNION SELECT 99")
+
+
+def test_too_large_event_truncated(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1,
+        integrations=[SqlalchemyIntegration()],
+        _experiments={"smart_transaction_trimming": True},
+    )
+    events = capture_events()
+
+    long_str = "x" * (MAX_STRING_LENGTH + 10)
+
+    with configure_scope() as scope:
+
+        @scope.add_event_processor
+        def processor(event, hint):
+            event["message"] = long_str
+            return event
+
+    engine = create_engine("sqlite:///:memory:")
+    with start_transaction(name="test"):
+        with engine.connect() as con:
+            for _ in range(2000):
+                con.execute(" UNION ".join("SELECT {}".format(i) for i in range(100)))
+
+    (event,) = events
+
+    # Because of attached metadata in the "_meta" key, we may send out a little
+    # bit more than MAX_EVENT_BYTES.
+    max_bytes = 1.2 * MAX_EVENT_BYTES
+    assert len(json_dumps(event)) < max_bytes
+
+    # Some spans are discarded.
+    assert len(event["spans"]) == 999
+
+    # Some spans have their descriptions truncated. Because the test always
+    # generates the same amount of descriptions and truncation is deterministic,
+    # the number here should never change across test runs.
+    #
+    # Which exact span descriptions are truncated depends on the span durations
+    # of each SQL query and is non-deterministic.
+    assert len(event["_meta"]["spans"]) == 536
+
+    for i, span in enumerate(event["spans"]):
+        description = span["description"]
+
+        assert description.startswith("SELECT ")
+        if str(i) in event["_meta"]["spans"]:
+            # Description must have been truncated
+            assert len(description) == 10
+            assert description.endswith("...")
+        else:
+            # Description was not truncated, check for original length
+            assert len(description) == 1583
+            assert description.endswith("SELECT 98 UNION SELECT 99")
+
+    # Smoke check the meta info for one of the spans.
+    assert next(iter(event["_meta"]["spans"].values())) == {
+        "description": {"": {"len": 1583, "rem": [["!limit", "x", 7, 10]]}}
+    }
+
+    # Smoke check that truncation of other fields has not changed.
+    assert len(event["message"]) == MAX_STRING_LENGTH
+
+    # The _meta for other truncated fields should be there as well.
+    assert event["_meta"]["message"] == {
+        "": {"len": 522, "rem": [["!limit", "x", 509, 512]]}
+    }

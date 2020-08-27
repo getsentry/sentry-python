@@ -30,7 +30,9 @@ DEFAULT_EVENT_LEVEL = logging.ERROR
 #
 # Note: Ignoring by logger name here is better than mucking with thread-locals.
 # We do not necessarily know whether thread-locals work 100% correctly in the user's environment.
-_IGNORED_LOGGERS = set(["sentry_sdk.errors", "urllib3.connectionpool"])
+_IGNORED_LOGGERS = set(
+    ["sentry_sdk.errors", "urllib3.connectionpool", "urllib3.connection"]
+)
 
 
 def ignore_logger(
