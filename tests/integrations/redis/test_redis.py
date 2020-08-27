@@ -14,7 +14,7 @@ def test_basic(sentry_init, capture_events):
     capture_message("hi")
 
     (event,) = events
-    (crumb,) = event["breadcrumbs"]
+    (crumb,) = event["breadcrumbs"]["values"]
 
     assert crumb == {
         "category": "redis",

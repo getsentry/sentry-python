@@ -235,8 +235,8 @@ def test_spark_worker(monkeypatch, sentry_init, capture_events, capture_exceptio
     assert events[0]["exception"]["values"][0]["type"] == "ZeroDivisionError"
 
     assert events[0]["tags"] == {
-        "stageId": 0,
-        "attemptNumber": 1,
-        "partitionId": 2,
-        "taskAttemptId": 3,
+        "stageId": "0",
+        "attemptNumber": "1",
+        "partitionId": "2",
+        "taskAttemptId": "3",
     }
