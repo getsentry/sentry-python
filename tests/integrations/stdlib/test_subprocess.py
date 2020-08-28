@@ -118,7 +118,10 @@ def test_subprocess_basic(
 
     capture_message("hi")
 
-    transaction_event, message_event, = events
+    (
+        transaction_event,
+        message_event,
+    ) = events
 
     assert message_event["message"] == "hi"
 
