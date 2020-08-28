@@ -2,8 +2,7 @@ name: black
 
 on:
   pull_request:
-    paths:
-      - '**.py'
+    types: [opened, synchronize, reopened, edited]
 
 jobs:
   format:
