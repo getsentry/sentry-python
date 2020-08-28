@@ -1,8 +1,6 @@
 name: black
 
-on:
-  pull_request:
-    types: [opened, synchronize, reopened, edited]
+on: push
 
 jobs:
   format:
