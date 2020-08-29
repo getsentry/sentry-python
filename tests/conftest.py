@@ -1,7 +1,5 @@
 import os
-import subprocess
 import json
-import uuid
 
 import pytest
 import jsonschema
