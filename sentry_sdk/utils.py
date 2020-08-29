@@ -883,7 +883,7 @@ class ServerlessTimeoutWarning(Exception):
 
 class TimeoutThread(threading.Thread):
     """Creates a Thread which runs (sleeps) for a time duration equal to
-       waiting_time and raises a custom ServerlessTimeout exception.
+    waiting_time and raises a custom ServerlessTimeout exception.
     """
 
     def __init__(self, waiting_time, configured_timeout):

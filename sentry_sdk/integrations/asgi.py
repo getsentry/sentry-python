@@ -124,7 +124,8 @@ class SentryAsgiMiddleware:
 
                 if ty in ("http", "websocket"):
                     transaction = Transaction.continue_from_headers(
-                        dict(scope["headers"]), op="{}.server".format(ty),
+                        dict(scope["headers"]),
+                        op="{}.server".format(ty),
                     )
                 else:
                     transaction = Transaction(op="asgi.server")

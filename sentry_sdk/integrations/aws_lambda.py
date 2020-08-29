@@ -227,11 +227,15 @@ class AwsLambdaIntegration(Integration):
 
                 return inner  # type: ignore
 
-            lambda_bootstrap.LambdaRuntimeClient.post_invocation_result = _wrap_post_function(
-                lambda_bootstrap.LambdaRuntimeClient.post_invocation_result
+            lambda_bootstrap.LambdaRuntimeClient.post_invocation_result = (
+                _wrap_post_function(
+                    lambda_bootstrap.LambdaRuntimeClient.post_invocation_result
+                )
             )
-            lambda_bootstrap.LambdaRuntimeClient.post_invocation_error = _wrap_post_function(
-                lambda_bootstrap.LambdaRuntimeClient.post_invocation_error
+            lambda_bootstrap.LambdaRuntimeClient.post_invocation_error = (
+                _wrap_post_function(
+                    lambda_bootstrap.LambdaRuntimeClient.post_invocation_error
+                )
             )
 
 

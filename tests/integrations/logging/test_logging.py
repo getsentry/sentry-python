@@ -82,7 +82,10 @@ def test_logging_stack(sentry_init, capture_events):
     logger.error("first", exc_info=True)
     logger.error("second")
 
-    event_with, event_without, = events
+    (
+        event_with,
+        event_without,
+    ) = events
 
     assert event_with["level"] == "error"
     assert event_with["threads"]["values"][0]["stacktrace"]["frames"]

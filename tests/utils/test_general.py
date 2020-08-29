@@ -128,32 +128,44 @@ def test_parse_invalid_dsn(dsn):
 
 @pytest.mark.parametrize("empty", [None, []])
 def test_in_app(empty):
-    assert handle_in_app_impl(
-        [{"module": "foo"}, {"module": "bar"}],
-        in_app_include=["foo"],
-        in_app_exclude=empty,
-    ) == [{"module": "foo", "in_app": True}, {"module": "bar"}]
+    assert (
+        handle_in_app_impl(
+            [{"module": "foo"}, {"module": "bar"}],
+            in_app_include=["foo"],
+            in_app_exclude=empty,
+        )
+        == [{"module": "foo", "in_app": True}, {"module": "bar"}]
+    )
 
-    assert handle_in_app_impl(
-        [{"module": "foo"}, {"module": "bar"}],
-        in_app_include=["foo"],
-        in_app_exclude=["foo"],
-    ) == [{"module": "foo", "in_app": True}, {"module": "bar"}]
+    assert (
+        handle_in_app_impl(
+            [{"module": "foo"}, {"module": "bar"}],
+            in_app_include=["foo"],
+            in_app_exclude=["foo"],
+        )
+        == [{"module": "foo", "in_app": True}, {"module": "bar"}]
+    )
 
-    assert handle_in_app_impl(
-        [{"module": "foo"}, {"module": "bar"}],
-        in_app_include=empty,
-        in_app_exclude=["foo"],
-    ) == [{"module": "foo", "in_app": False}, {"module": "bar", "in_app": True}]
+    assert (
+        handle_in_app_impl(
+            [{"module": "foo"}, {"module": "bar"}],
+            in_app_include=empty,
+            in_app_exclude=["foo"],
+        )
+        == [{"module": "foo", "in_app": False}, {"module": "bar", "in_app": True}]
+    )
 
 
 def test_iter_stacktraces():
-    assert set(
-        iter_event_stacktraces(
-            {
-                "threads": {"values": [{"stacktrace": 1}]},
-                "stacktrace": 2,
-                "exception": {"values": [{"stacktrace": 3}]},
-            }
+    assert (
+        set(
+            iter_event_stacktraces(
+                {
+                    "threads": {"values": [{"stacktrace": 1}]},
+                    "stacktrace": 2,
+                    "exception": {"values": [{"stacktrace": 3}]},
+                }
+            )
         )
-    ) == {1, 2, 3}
+        == {1, 2, 3}
+    )
