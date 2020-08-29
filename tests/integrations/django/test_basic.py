@@ -270,7 +270,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     capture_message("HI")
 
     (event,) = events
-    crumb = event["breadcrumbs"]['values'][-1]
+    crumb = event["breadcrumbs"]["values"][-1]
     assert crumb["message"] == ('SELECT %(my_param)s FROM "foobar"')
     assert crumb["data"]["db.params"] == {"my_param": 10}
 
