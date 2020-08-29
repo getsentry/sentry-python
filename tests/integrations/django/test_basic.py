@@ -16,7 +16,7 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
-from sentry_sdk import capture_message, capture_exception
+from sentry_sdk import capture_message, capture_exception, configure_scope
 from sentry_sdk.integrations.django import DjangoIntegration
 
 from tests.integrations.django.myapp.wsgi import application
@@ -182,15 +182,12 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
 
     from django.db import connection
 
-    sentry_init(
-        integrations=[DjangoIntegration()],
-        send_default_pii=True,
-        _experiments={"record_sql_params": True},
-    )
-
     events = capture_events()
 
     sql = connection.cursor()
+
+    with configure_scope() as scope:
+        scope.clear_breadcrumbs()
 
     with pytest.raises(OperationalError):
         # table doesn't even exist
