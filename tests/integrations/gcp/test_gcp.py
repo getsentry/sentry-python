@@ -204,8 +204,10 @@ def run_cloud_function(request, authorized_credentials, functions_runtime):
         function_call_response = api_request.execute()
 
         # STEP : Fetch logs of invoked function
-        log_name = "projects/{}/logs/cloudfunctions.googleapis.com%2Fcloud-functions".format(
-            project_id
+        log_name = (
+            "projects/{}/logs/cloudfunctions.googleapis.com%2Fcloud-functions".format(
+                project_id
+            )
         )
         project_name = "projects/{}".format(project_id)
         body = {"resourceNames": [project_name], "filter": log_name}

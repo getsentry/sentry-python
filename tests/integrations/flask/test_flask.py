@@ -247,7 +247,9 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         release="demo-release",
-        _experiments=dict(auto_session_tracking=True,),
+        _experiments=dict(
+            auto_session_tracking=True,
+        ),
     )
 
     @app.route("/")
