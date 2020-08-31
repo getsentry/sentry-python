@@ -37,7 +37,7 @@ def tornado_testcase(request):
 class CrashingHandler(RequestHandler):
     def get(self):
         with configure_scope() as scope:
-            scope.set_tag("foo", 42)
+            scope.set_tag("foo", "42")
         1 / 0
 
 
@@ -72,7 +72,7 @@ def test_basic(tornado_testcase, sentry_init, capture_events):
         "url": "http://{host}/hi".format(host=host),
     }
 
-    assert event["tags"] == {"foo": 42}
+    assert event["tags"] == {"foo": "42"}
     assert (
         event["transaction"]
         == "tests.integrations.tornado.test_tornado.CrashingHandler.get"
