@@ -12,22 +12,6 @@ except ImportError:
     pass
 else:
 
-    @given(
-        dt=st.datetimes(
-            min_value=datetime(2000, 1, 1, 0, 0, 0), timezones=st.just(None)
-        )
-    )
-    @example(dt=datetime(2001, 1, 1, 0, 0, 0, 999500))
-    def test_datetime_precision(dt, validate_event_schema):
-        event = serialize({"timestamp": dt})
-        validate_event_schema(event)
-
-        dt2 = datetime.utcfromtimestamp(event["timestamp"])
-
-        # Float glitches can happen, and more glitches can happen
-        # because we try to work around some float glitches in relay
-        assert (dt - dt2).total_seconds() < 1.0
-
     @given(binary=st.binary(min_size=1))
     def test_bytes_serialization_decode_many(binary, message_normalizer):
         result = message_normalizer(binary, should_repr_strings=False)
