@@ -27,6 +27,11 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.17.1
+
+* Fix timezone bugs in AWS Lambda integration.
+* Fix crash on GCP integration because of missing parameter `timeout_warning`.
+
 ## 0.17.0
 
 * Fix a bug where class-based callables used as Django views (without using

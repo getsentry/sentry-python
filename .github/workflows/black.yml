@@ -1,0 +1,31 @@
+name: black
+
+on: push
+
+jobs:
+  format:
+    runs-on: ubuntu-16.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
+      - name: Install Black
+        run: pip install -r linter-requirements.txt
+
+      - name: Run Black
+        run: black tests examples sentry_sdk
+
+      - name: Commit changes
+        run: |
+          if git diff-files --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+
+          git config --global user.name 'sentry-bot'
+          git config --global user.email 'markus+ghbot@sentry.io'
+
+          git commit -am "fix: Formatting"
+          git push

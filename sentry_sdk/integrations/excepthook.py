@@ -14,7 +14,8 @@ if MYPY:
     from types import TracebackType
 
     Excepthook = Callable[
-        [Type[BaseException], BaseException, TracebackType], Any,
+        [Type[BaseException], BaseException, TracebackType],
+        Any,
     ]
 
 
