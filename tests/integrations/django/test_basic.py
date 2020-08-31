@@ -221,6 +221,9 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     sql = connections["postgres"].cursor()
 
     events = capture_events()
+    with configure_scope() as scope:
+        scope.clear_breadcrumbs()
+
     with pytest.raises(ProgrammingError):
         sql.execute(
             """SELECT count(*) FROM people_person WHERE foo = %(my_foo)s""",
@@ -230,7 +233,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     capture_message("HI")
     (event,) = events
 
-    crumb = event["breadcrumbs"][-1]
+    crumb = event["breadcrumbs"]['values'][-1]
     assert crumb["message"] == (
         "SELECT count(*) FROM people_person WHERE foo = %(my_foo)s"
     )
@@ -263,7 +266,11 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
 
     sql = connections["postgres"].cursor()
 
+    with configure_scope() as scope:
+        scope.clear_breadcrumbs()
+
     events = capture_events()
+
     with pytest.raises(ProgrammingError):
         sql.execute(query(psycopg2.sql), {"my_param": 10})
 
@@ -293,6 +300,9 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     sql = connections["postgres"].cursor()
 
     events = capture_events()
+    with configure_scope() as scope:
+        scope.clear_breadcrumbs()
+
     with pytest.raises(DataError):
         names = ["foo", "bar"]
         identifiers = [psycopg2.sql.Identifier(name) for name in names]
@@ -310,10 +320,10 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     capture_message("HI")
 
     (event,) = events
-    for crumb in event["breadcrumbs"]:
+    for crumb in event["breadcrumbs"]['values']:
         del crumb["timestamp"]
 
-    assert event["breadcrumbs"][-2:] == [
+    assert event["breadcrumbs"]['values'][-2:] == [
         {
             "category": "query",
             "data": {"db.paramstyle": "format"},
