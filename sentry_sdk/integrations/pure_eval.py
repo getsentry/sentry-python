@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import ast
+from collections import OrderedDict
 
 from sentry_sdk import Hub
 from sentry_sdk._types import MYPY
@@ -9,7 +10,7 @@ from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import walk_exception_chain, iter_stacks
 
 if MYPY:
-    from typing import Optional, Dict, Any
+    from typing import Optional, Dict, Any, Tuple, List
     from types import FrameType
 
     from sentry_sdk._types import Event, Hint
@@ -75,7 +76,9 @@ class PureEvalIntegration(Integration):
                     continue
 
                 for sentry_frame, tb in zip(sentry_frames, tbs):
-                    sentry_frame["vars"].update(pure_eval_frame(tb.tb_frame))
+                    sentry_frame["vars"] = (
+                        pure_eval_frame(tb.tb_frame) or sentry_frame["vars"]
+                    )
             return event
 
 
@@ -89,16 +92,39 @@ def pure_eval_frame(frame):
     if not statements:
         return {}
 
-    stmt = list(statements)[0]
+    scope = stmt = list(statements)[0]
     while True:
         # Get the parent first in case the original statement is already
         # a function definition, e.g. if we're calling a decorator
         # In that case we still want the surrounding scope, not that function
-        stmt = stmt.parent
-        if isinstance(stmt, (ast.FunctionDef, ast.ClassDef, ast.Module)):
+        scope = scope.parent
+        if isinstance(scope, (ast.FunctionDef, ast.ClassDef, ast.Module)):
             break
 
     evaluator = pure_eval.Evaluator.from_frame(frame)
-    expressions = evaluator.interesting_expressions_grouped(stmt)
+    expressions = evaluator.interesting_expressions_grouped(scope)
+
+    def closeness(expression):
+        # type: (Tuple[List[Any], Any]) -> int
+        # Prioritise expressions with a node closer to the statement executed
+        # without being after that statement
+        # A higher return value is better - the expression will appear
+        # earlier in the list of values and is less likely to be trimmed
+        nodes, _value = expression
+        nodes_before_stmt = [
+            node for node in nodes if node.first_token.startpos < stmt.last_token.endpos
+        ]
+        if nodes_before_stmt:
+            # The position of the last node before or in the statement
+            return max(node.first_token.startpos for node in nodes_before_stmt)
+        else:
+            # The position of the first node after the statement
+            # Negative means it's always lower priority than nodes that come before
+            # Less negative means closer to the statement and higher priority
+            return -min(node.first_token.startpos for node in nodes)
+
+    # This adds the first_token and last_token attributes to nodes
     atok = source.asttokens()
-    return {atok.get_text(nodes[0]): value for nodes, value in expressions}
+
+    expressions.sort(key=closeness, reverse=True)
+    return OrderedDict((atok.get_text(nodes[0]), value) for nodes, value in expressions)
