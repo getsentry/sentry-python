@@ -233,7 +233,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     capture_message("HI")
     (event,) = events
 
-    crumb = event["breadcrumbs"]['values'][-1]
+    crumb = event["breadcrumbs"]["values"][-1]
     assert crumb["message"] == (
         "SELECT count(*) FROM people_person WHERE foo = %(my_foo)s"
     )
@@ -320,10 +320,10 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     capture_message("HI")
 
     (event,) = events
-    for crumb in event["breadcrumbs"]['values']:
+    for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
 
-    assert event["breadcrumbs"]['values'][-2:] == [
+    assert event["breadcrumbs"]["values"][-2:] == [
         {
             "category": "query",
             "data": {"db.paramstyle": "format"},
