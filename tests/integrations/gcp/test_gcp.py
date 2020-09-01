@@ -12,7 +12,9 @@ import pytest
 import os.path
 import os
 
-pytest.importorskip("tempfile.TemporaryDirectory")
+pytestmark = pytest.mark.skipif(
+    not hasattr(tempfile, "TemporaryDirectory"), reason="need Python 3.2+"
+)
 
 
 FUNCTIONS_PRELUDE = """
