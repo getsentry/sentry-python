@@ -27,6 +27,10 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.17.2
+
+* Fix timezone bugs in GCP integration.
+
 ## 0.17.1
 
 * Fix timezone bugs in AWS Lambda integration.
