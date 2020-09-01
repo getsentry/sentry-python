@@ -160,21 +160,22 @@ def _get_google_cloud_logs_url(final_time):
         str -- Google Cloud Logs Console URL to logs.
     """
     hour_ago = final_time - timedelta(hours=1)
+    formatstring = "%Y-%m-%dT%H:%M:%SZ"
 
     url = (
         "https://console.cloud.google.com/logs/viewer?project={project}&resource=cloud_function"
         "%2Ffunction_name%2F{function_name}%2Fregion%2F{region}&minLogLevel=0&expandAll=false"
-        "&timestamp={initial_time}Z&customFacets=&limitCustomFacetWidth=true"
-        "&dateRangeStart={timestamp_start}Z&dateRangeEnd={timestamp_end}Z"
-        "&interval=PT1H&scrollTimestamp={timestamp_current}Z"
+        "&timestamp={initial_time}&customFacets=&limitCustomFacetWidth=true"
+        "&dateRangeStart={timestamp_start}&dateRangeEnd={timestamp_end}"
+        "&interval=PT1H&scrollTimestamp={timestamp_current}"
     ).format(
         project=environ.get("GCP_PROJECT"),
         function_name=environ.get("FUNCTION_NAME"),
         region=environ.get("FUNCTION_REGION"),
-        initial_time=final_time,
-        timestamp_start=hour_ago,
-        timestamp_end=final_time,
-        timestamp_current=final_time,
+        initial_time=final_time.strftime(formatstring),
+        timestamp_start=hour_ago.strftime(formatstring),
+        timestamp_end=final_time.strftime(formatstring),
+        timestamp_current=final_time.strftime(formatstring),
     )
 
     return url
