@@ -12,7 +12,8 @@ import pytest
 import os.path
 import os
 
-pytest.importorskip("tempfile.TemporaryDirectory")
+if not hasattr(tempfile, "TemporaryDirectory"):
+    pytest.skip("Not running on Python 3.2+")
 
 
 FUNCTIONS_PRELUDE = """
