@@ -165,17 +165,15 @@ def _get_google_cloud_logs_url(final_time):
     url = (
         "https://console.cloud.google.com/logs/viewer?project={project}&resource=cloud_function"
         "%2Ffunction_name%2F{function_name}%2Fregion%2F{region}&minLogLevel=0&expandAll=false"
-        "&timestamp={final_time}&customFacets=&limitCustomFacetWidth=true"
+        "&timestamp={timestamp_end}&customFacets=&limitCustomFacetWidth=true"
         "&dateRangeStart={timestamp_start}&dateRangeEnd={timestamp_end}"
-        "&interval=PT1H&scrollTimestamp={timestamp_current}"
+        "&interval=PT1H&scrollTimestamp={timestamp_end}"
     ).format(
         project=environ.get("GCP_PROJECT"),
         function_name=environ.get("FUNCTION_NAME"),
         region=environ.get("FUNCTION_REGION"),
-        final_time=final_time.strftime(formatstring),
-        timestamp_start=hour_ago.strftime(formatstring),
         timestamp_end=final_time.strftime(formatstring),
-        timestamp_current=final_time.strftime(formatstring),
+        timestamp_start=hour_ago.strftime(formatstring),
     )
 
     return url
