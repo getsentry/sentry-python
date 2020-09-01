@@ -1,9 +1,8 @@
 from __future__ import absolute_import
 
 import ast
-from collections import OrderedDict
 
-from sentry_sdk import Hub
+from sentry_sdk import Hub, serializer
 from sentry_sdk._types import MYPY
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.scope import add_global_event_processor
@@ -127,4 +126,7 @@ def pure_eval_frame(frame):
     atok = source.asttokens()
 
     expressions.sort(key=closeness, reverse=True)
-    return OrderedDict((atok.get_text(nodes[0]), value) for nodes, value in expressions)
+    return {
+        atok.get_text(nodes[0]): value
+        for nodes, value in expressions[: serializer.MAX_DATABAG_BREADTH]
+    }

@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from sentry_sdk import capture_exception
+from sentry_sdk import capture_exception, serializer
 from sentry_sdk.integrations.pure_eval import PureEvalIntegration
 
 
@@ -89,4 +89,4 @@ def test_with_locals_enabled(sentry_init, capture_events, integrations):
             "s",
             "events",
         }
-        assert len(frame_vars) == 10
+        assert len(frame_vars) == serializer.MAX_DATABAG_BREADTH
