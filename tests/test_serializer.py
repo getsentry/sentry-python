@@ -1,4 +1,3 @@
-from datetime import datetime
 import sys
 
 import pytest
@@ -6,7 +5,7 @@ import pytest
 from sentry_sdk.serializer import serialize
 
 try:
-    from hypothesis import given, example
+    from hypothesis import given
     import hypothesis.strategies as st
 except ImportError:
     pass
