@@ -1,36 +1,41 @@
 """
-# GCP Cloud Functions system tests
+# GCP Cloud Functions unit tests
 
 """
 import json
-import time
 from textwrap import dedent
-import uuid
 import tempfile
-import shutil
 import sys
 import subprocess
-import pickle
 
 import pytest
 import os.path
 import os
 
-requests = pytest.importorskip("requests")
-google_cloud_sdk = pytest.importorskip("google-cloud-sdk")
-build = pytest.importorskip("googleapiclient.discovery.build")
-InstalledAppFlow = pytest.importorskip("google_auth_oauthlib.flow.InstalledAppFlow")
-Request = pytest.importorskip("google.auth.transport.requests.Request")
+pytestmark = pytest.mark.skipif(
+    not hasattr(tempfile, "TemporaryDirectory"), reason="need Python 3.2+"
+)
 
-SCOPES = [
-    "https://www.googleapis.com/auth/cloud-platform",
-    "https://www.googleapis.com/auth/cloud-platform.read-only",
-    "https://www.googleapis.com/auth/cloudfunctions",
-    "https://www.googleapis.com/auth/logging.read",
-    "https://www.googleapis.com/auth/logging.admin",
-]
 
 FUNCTIONS_PRELUDE = """
+from unittest.mock import Mock
+import __main__ as gcp_functions
+import os
+
+# Initializing all the necessary environment variables
+os.environ["FUNCTION_TIMEOUT_SEC"] = "3"
+os.environ["FUNCTION_NAME"] = "Google Cloud function"
+os.environ["ENTRY_POINT"] = "cloud_function"
+os.environ["FUNCTION_IDENTITY"] = "func_ID"
+os.environ["FUNCTION_REGION"] = "us-central1"
+os.environ["GCP_PROJECT"] = "serverless_project"
+
+gcp_functions.worker_v1 = Mock()
+gcp_functions.worker_v1.FunctionHandler = Mock()
+gcp_functions.worker_v1.FunctionHandler.invoke_user_function = cloud_function
+function = gcp_functions.worker_v1.FunctionHandler.invoke_user_function
+
+
 import sentry_sdk
 from sentry_sdk.integrations.gcp import GcpIntegration
 import json
@@ -50,7 +55,7 @@ class TestTransport(HttpTransport):
         # therefore cannot be interleaved with other threads. This is why we
         # explicitly add a newline at the end even though `print` would provide
         # us one.
-        print("\\nEVENTS: {}\\n".format(json.dumps(event)))
+        print("EVENTS: {}".format(json.dumps(event)))
 
 def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
@@ -60,63 +65,15 @@ def init_sdk(timeout_warning=False, **extra_init_args):
         shutdown_timeout=10,
         **extra_init_args
     )
+
 """
 
 
 @pytest.fixture
-def authorized_credentials():
-    credentials = None
+def run_cloud_function():
+    def inner(code, subprocess_kwargs=()):
 
-    # Skipping tests if environment variables not set.
-    if "SENTRY_PYTHON_TEST_GCP_CREDENTIALS_JSON" not in os.environ:
-        pytest.skip("GCP environ vars not set")
-
-    # The file token.pickle stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first
-    # time.
-    with open(
-        os.environ.get("SENTRY_PYTHON_TEST_GCP_CREDENTIALS_JSON"), "rb"
-    ) as creds_file:
-        for line in creds_file.readlines():
-            creds_json = json.loads(line)
-    project_id = creds_json.get("installed", {}).get("project_id")
-    if not project_id:
-        pytest.skip("Credentials json file is not valid")
-
-    if os.path.exists("token.pickle"):
-        with open("token.pickle", "rb") as token:
-            credentials = pickle.load(token)
-    # If there are no (valid) credentials available, let the user log in.
-    if not credentials or not credentials.valid:
-        if credentials and credentials.expired and credentials.refresh_token:
-            credentials.refresh(Request())
-        else:
-            credential_json = os.environ.get("SENTRY_PYTHON_TEST_GCP_CREDENTIALS_JSON")
-            flow = InstalledAppFlow.from_client_secrets_file(credential_json, SCOPES)
-            credentials = flow.run_local_server(port=0)
-        # Save the credentials for the next run
-        with open("token.pickle", "wb") as token:
-            pickle.dump(credentials, token)
-    return credentials, project_id
-
-
-@pytest.fixture(params=["python37"])
-def functions_runtime(request):
-    return request.param
-
-
-@pytest.fixture
-def run_cloud_function(request, authorized_credentials, functions_runtime):
-    def inner(code, timeout="10s", subprocess_kwargs=()):
-
-        events = []
-        creds, project_id = authorized_credentials
-        functions_service = build("cloudfunctions", "v1", credentials=creds)
-        location_id = "us-central1"
-        function_name = "test_function_{}".format(uuid.uuid4())
-        name = "projects/{}/locations/{}/functions/{}".format(
-            project_id, location_id, function_name
-        )
+        event = []
 
         # STEP : Create a zip of cloud function
 
@@ -143,179 +100,32 @@ def run_cloud_function(request, authorized_credentials, functions_runtime):
                 shell=True,
                 **subprocess_kwargs
             )
-            shutil.make_archive(os.path.join(tmpdir, "ball"), "zip", tmpdir)
 
-            # STEP : Generate a signed url
-            parent = "projects/{}/locations/{}".format(project_id, location_id)
+            stream = os.popen("python {}/main.py".format(tmpdir))
+            event = stream.read()
+            event = json.loads(event[len("EVENT: ") :])
 
-            api_request = (
-                functions_service.projects()
-                .locations()
-                .functions()
-                .generateUploadUrl(parent=parent)
-            )
-            upload_url_response = api_request.execute()
-
-            upload_url = upload_url_response.get("uploadUrl")
-
-            # STEP : Upload zip file of cloud function to generated signed url
-            with open(os.path.join(tmpdir, "ball.zip"), "rb") as data:
-                requests.put(
-                    upload_url,
-                    data=data,
-                    headers={
-                        "x-goog-content-length-range": "0,104857600",
-                        "content-type": "application/zip",
-                    },
-                )
-
-        # STEP : Create a new cloud function
-        location = "projects/{}/locations/{}".format(project_id, location_id)
-
-        function_url = "https://{}-{}.cloudfunctions.net/{}".format(
-            location_id, project_id, function_name
-        )
-
-        body = {
-            "name": name,
-            "description": "Created as part of testsuite for getsentry/sentry-python",
-            "entryPoint": "cloud_handler",
-            "runtime": functions_runtime,
-            "timeout": timeout,
-            "availableMemoryMb": 128,
-            "sourceUploadUrl": upload_url,
-            "httpsTrigger": {"url": function_url},
-        }
-
-        api_request = (
-            functions_service.projects()
-            .locations()
-            .functions()
-            .create(location=location, body=body)
-        )
-        api_request.execute()
-
-        # STEP : Invoke the cloud function
-        # Adding delay of 60 seconds for new created function to get deployed.
-        time.sleep(60)
-        api_request = (
-            functions_service.projects().locations().functions().call(name=name)
-        )
-        function_call_response = api_request.execute()
-
-        # STEP : Fetch logs of invoked function
-        log_name = (
-            "projects/{}/logs/cloudfunctions.googleapis.com%2Fcloud-functions".format(
-                project_id
-            )
-        )
-        project_name = "projects/{}".format(project_id)
-        body = {"resourceNames": [project_name], "filter": log_name}
-
-        log_service = build("logging", "v2", credentials=creds)
-
-        api_request = log_service.entries().list(body=body)
-        log_response = api_request.execute()
-
-        for entry in log_response.get("entries", []):
-            entry_log_name = entry.get("logName")
-            entry_function_name = (
-                entry.get("resource", {}).get("labels", {}).get("function_name")
-            )
-            entry_text_payload = entry.get("textPayload", "")
-            if (
-                entry_log_name == log_name
-                and entry_function_name == function_name
-                and "EVENTS: " in entry_text_payload
-            ):
-                event = entry_text_payload[len("EVENTS: ") :]
-                events.append(json.loads(event))
-
-        log_flag = True
-
-        # Looping so that appropriate event can be fetched from logs
-        while log_response.get("nextPageToken") and log_flag:
-            body = {
-                "resourceNames": [project_name],
-                "pageToken": log_response["nextPageToken"],
-                "filter": log_name,
-            }
-
-            api_request = log_service.entries().list(body=body)
-            log_response = api_request.execute()
-
-            for entry in log_response.get("entries", []):
-                entry_log_name = entry.get("logName")
-                entry_function_name = (
-                    entry.get("resource", {}).get("labels", {}).get("function_name")
-                )
-                entry_text_payload = entry.get("textPayload", "")
-                if (
-                    entry_log_name == log_name
-                    and entry_function_name == function_name
-                    and "EVENTS: " in entry_text_payload
-                ):
-                    log_flag = False
-                    event = entry_text_payload[len("EVENTS: ") :]
-                    events.append(json.loads(event))
-
-        # STEP : Delete the cloud function
-        @request.addfinalizer
-        def delete_function():
-            api_request = (
-                functions_service.projects().locations().functions().delete(name=name)
-            )
-            api_request.execute()
-
-        return events, function_call_response
+        return event
 
     return inner
 
 
 def test_handled_exception(run_cloud_function):
-    events, response = run_cloud_function(
-        FUNCTIONS_PRELUDE
-        + dedent(
+    event = run_cloud_function(
+        dedent(
             """
-        init_sdk()
-
-
-        def cloud_handler(request):
+        def cloud_function():
             raise Exception("something went wrong")
         """
         )
-    )
-
-    assert (
-        response["error"]
-        == "Error: function terminated. Recommended action: inspect logs for termination reason. Details:\nsomething went wrong"
-    )
-    (event,) = events
-    assert event["level"] == "error"
-    (exception,) = event["exception"]["values"]
-
-    assert exception["type"] == "Exception"
-    assert exception["value"] == "something went wrong"
-    assert exception["mechanism"] == {"type": "gcp", "handled": False}
-
-
-def test_initialization_order(run_cloud_function):
-    events, response = run_cloud_function(
-        FUNCTIONS_PRELUDE
+        + FUNCTIONS_PRELUDE
         + dedent(
             """
-        def cloud_handler(request):
-            init_sdk()
-            raise Exception("something went wrong")
+        init_sdk(timeout_warning=False)
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function()
         """
         )
     )
-
-    assert (
-        response["error"]
-        == "Error: function terminated. Recommended action: inspect logs for termination reason. Details:\nsomething went wrong"
-    )
-    (event,) = events
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
 
@@ -325,57 +135,47 @@ def test_initialization_order(run_cloud_function):
 
 
 def test_unhandled_exception(run_cloud_function):
-    events, response = run_cloud_function(
-        FUNCTIONS_PRELUDE
+    event = run_cloud_function(
+        dedent(
+            """
+        def cloud_function():
+            x = 3/0
+            return "3"
+        """
+        )
+        + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk()
-
-
-        def cloud_handler(request):
-            x = 3/0
-            return "str"
+        init_sdk(timeout_warning=False)
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function()
         """
         )
     )
-
-    assert (
-        response["error"]
-        == "Error: function terminated. Recommended action: inspect logs for termination reason. Details:\ndivision by zero"
-    )
-    (event,) = events
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
 
-    assert exception["type"] == "Exception"
-    assert exception["value"] == "something went wrong"
+    assert exception["type"] == "ZeroDivisionError"
+    assert exception["value"] == "division by zero"
     assert exception["mechanism"] == {"type": "gcp", "handled": False}
 
 
 def test_timeout_error(run_cloud_function):
-    events, response = run_cloud_function(
-        FUNCTIONS_PRELUDE
+    event = run_cloud_function(
+        dedent(
+            """
+        def cloud_function():
+            time.sleep(10)
+            return "3"
+        """
+        )
+        + FUNCTIONS_PRELUDE
         + dedent(
             """
-        def event_processor(event):
-            return event
-
         init_sdk(timeout_warning=True)
-
-
-        def cloud_handler(request):
-            time.sleep(10)
-            return "str"
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function()
         """
-        ),
-        timeout=3,
+        )
     )
-
-    assert (
-        response["error"]
-        == "Error: function execution attempt timed out. Instance restarted."
-    )
-    (event,) = events
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
 

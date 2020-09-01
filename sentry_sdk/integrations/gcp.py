@@ -51,7 +51,7 @@ def _wrap_func(func):
 
         configured_time = int(configured_time)
 
-        initial_time = datetime.now()
+        initial_time = datetime.utcnow()
 
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
@@ -119,7 +119,7 @@ def _make_request_event_processor(configured_timeout, initial_time):
     def event_processor(event, hint):
         # type: (Event, Hint) -> Optional[Event]
 
-        final_time = datetime.now()
+        final_time = datetime.utcnow()
         time_diff = final_time - initial_time
 
         execution_duration_in_millis = time_diff.microseconds / MILLIS_TO_SECONDS
@@ -136,7 +136,7 @@ def _make_request_event_processor(configured_timeout, initial_time):
         }
 
         extra["google cloud logs"] = {
-            "url": _get_google_cloud_logs_url(initial_time),
+            "url": _get_google_cloud_logs_url(final_time),
         }
 
         request = event.get("request", {})
@@ -150,31 +150,30 @@ def _make_request_event_processor(configured_timeout, initial_time):
     return event_processor
 
 
-def _get_google_cloud_logs_url(initial_time):
+def _get_google_cloud_logs_url(final_time):
     # type: (datetime) -> str
     """
     Generates a Google Cloud Logs console URL based on the environment variables
     Arguments:
-        initial_time {datetime} -- Initial time
+        final_time {datetime} -- Final time
     Returns:
         str -- Google Cloud Logs Console URL to logs.
     """
-    hour_ago = initial_time - timedelta(hours=1)
+    hour_ago = final_time - timedelta(hours=1)
+    formatstring = "%Y-%m-%dT%H:%M:%SZ"
 
     url = (
         "https://console.cloud.google.com/logs/viewer?project={project}&resource=cloud_function"
         "%2Ffunction_name%2F{function_name}%2Fregion%2F{region}&minLogLevel=0&expandAll=false"
-        "&timestamp={initial_time}&customFacets=&limitCustomFacetWidth=true"
+        "&timestamp={timestamp_end}&customFacets=&limitCustomFacetWidth=true"
         "&dateRangeStart={timestamp_start}&dateRangeEnd={timestamp_end}"
-        "&interval=PT1H&scrollTimestamp={timestamp_current}"
+        "&interval=PT1H&scrollTimestamp={timestamp_end}"
     ).format(
         project=environ.get("GCP_PROJECT"),
         function_name=environ.get("FUNCTION_NAME"),
         region=environ.get("FUNCTION_REGION"),
-        initial_time=initial_time,
-        timestamp_start=hour_ago,
-        timestamp_end=initial_time,
-        timestamp_current=initial_time,
+        timestamp_end=final_time.strftime(formatstring),
+        timestamp_start=hour_ago.strftime(formatstring),
     )
 
     return url
