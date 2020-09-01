@@ -155,7 +155,7 @@ def _get_google_cloud_logs_url(final_time):
     """
     Generates a Google Cloud Logs console URL based on the environment variables
     Arguments:
-        initial_time {datetime} -- Initial time
+        final_time {datetime} -- Final time
     Returns:
         str -- Google Cloud Logs Console URL to logs.
     """
@@ -165,14 +165,14 @@ def _get_google_cloud_logs_url(final_time):
     url = (
         "https://console.cloud.google.com/logs/viewer?project={project}&resource=cloud_function"
         "%2Ffunction_name%2F{function_name}%2Fregion%2F{region}&minLogLevel=0&expandAll=false"
-        "&timestamp={initial_time}&customFacets=&limitCustomFacetWidth=true"
+        "&timestamp={final_time}&customFacets=&limitCustomFacetWidth=true"
         "&dateRangeStart={timestamp_start}&dateRangeEnd={timestamp_end}"
         "&interval=PT1H&scrollTimestamp={timestamp_current}"
     ).format(
         project=environ.get("GCP_PROJECT"),
         function_name=environ.get("FUNCTION_NAME"),
         region=environ.get("FUNCTION_REGION"),
-        initial_time=final_time.strftime(formatstring),
+        final_time=final_time.strftime(formatstring),
         timestamp_start=hour_ago.strftime(formatstring),
         timestamp_end=final_time.strftime(formatstring),
         timestamp_current=final_time.strftime(formatstring),
