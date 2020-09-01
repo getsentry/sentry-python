@@ -12,6 +12,8 @@ import pytest
 import os.path
 import os
 
+pytest.importorskip("tempfile.TemporaryDirectory")
+
 
 FUNCTIONS_PRELUDE = """
 from unittest.mock import Mock
