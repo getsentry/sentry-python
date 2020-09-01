@@ -4,7 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.hub &#8212; sentry-python 0.17.1 documentation</title>
+    <title>sentry_sdk.hub &#8212; sentry-python 0.17.2 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -348,8 +348,7 @@
         <span class="o">**</span><span class="n">scope_args</span>  <span class="c1"># type: Dict[str, Any]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Optional[str]</span>
-        <span class="sd">&quot;&quot;&quot;Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="sd">&quot;&quot;&quot;Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`.&quot;&quot;&quot;</span>
         <span class="n">client</span><span class="p">,</span> <span class="n">top_scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="n">scope</span> <span class="o">=</span> <span class="n">_update_scope</span><span class="p">(</span><span class="n">top_scope</span><span class="p">,</span> <span class="n">scope</span><span class="p">,</span> <span class="n">scope_args</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
