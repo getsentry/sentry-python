@@ -1,7 +1,8 @@
 import sys
 
+from functools import wraps
 import chalice
-from chalice import Chalice, Response
+from chalice import Chalice, ChaliceViewError
 from chalice.app import EventSourceHandler as ChaliceEventSourceHandler
 from sentry_sdk._compat import reraise
 from sentry_sdk.hub import Hub
@@ -40,53 +41,53 @@ class EventSourceHandler(ChaliceEventSourceHandler):
                 reraise(*exc_info)
 
 
+old_get_view_function_response = Chalice._get_view_function_response
+
+
+def _get_view_function_response(app, view_function, function_args):
+    @wraps(view_function)
+    def wrapped_view_function(**function_args):
+        hub = Hub.current
+        client = hub.client
+        with hub.push_scope() as scope:
+            with capture_internal_exceptions():
+                configured_time = (
+                    app.lambda_context.get_remaining_time_in_millis()
+                )
+                scope.transaction = app.lambda_context.function_name
+                scope.add_event_processor(
+                    _make_request_event_processor(
+                        app.current_request.to_dict(),
+                        app.lambda_context,
+                        configured_time,
+                    )
+                )
+            try:
+                return view_function(**function_args)
+            except Exception as exc:
+                if isinstance(exc, ChaliceViewError):
+                    raise
+                exc_info = sys.exc_info()
+                event, hint = event_from_exception(
+                    exc_info,
+                    client_options=client.options,
+                    mechanism={"type": "chalice", "handled": False},
+                )
+                hub.capture_event(event, hint=hint)
+                hub.flush()
+                raise
+
+    return old_get_view_function_response(
+        app, wrapped_view_function, function_args
+    )
+
+
 class ChaliceIntegration(Integration):
     identifier = "chalice"
 
     @staticmethod
     def setup_once():
-        old_get_view_function_response = Chalice._get_view_function_response
 
-        def sentry_get_view_function_response(
-                app, view_function, function_args):
-            hub = Hub.current
-            client = hub.client
-
-            with hub.push_scope() as scope:
-                with capture_internal_exceptions():
-                    configured_time = (
-                        app.lambda_context.get_remaining_time_in_millis()
-                    )
-                    scope.transaction = app.lambda_context.function_name
-                    scope.add_event_processor(
-                        _make_request_event_processor(
-                            app.current_request,
-                            app.lambda_context,
-                            configured_time,
-                        )
-                    )
-                try:
-                    response = old_get_view_function_response(
-                        app, view_function, function_args)
-                    hub.flush()
-                except Exception:
-                    exc_info = sys.exc_info()
-                    event, hint = event_from_exception(
-                        exc_info,
-                        client_options=client.options,
-                        mechanism={"type": "chalice", "handled": False},
-                    )
-                    hub.capture_event(event, hint=hint)
-                    hub.flush()
-                    headers = {}
-                    body = {
-                        'Code': 'InternalServerError',
-                        'Message': 'An internal server error occurred.',
-                    }
-                    response = Response(body=body, headers=headers,
-                                        status_code=500)
-                return response
-
-        Chalice._get_view_function_response = sentry_get_view_function_response
+        Chalice._get_view_function_response = _get_view_function_response
         # for everything else (like events)
         chalice.app.EventSourceHandler = EventSourceHandler
