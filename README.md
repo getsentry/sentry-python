@@ -22,20 +22,9 @@ capture_message("Hello World")  # Will create an event.
 raise ValueError()  # Will also create an event.
 ```
 
-To learn more about how to use the SDK:
-
-- [Getting started with the new SDK](https://docs.sentry.io/error-reporting/quickstart/?platform=python)
-- [Configuration options](https://docs.sentry.io/error-reporting/configuration/?platform=python)
-- [Setting context (tags, user, extra information)](https://docs.sentry.io/enriching-error-data/additional-data/?platform=python)
-- [Integrations](https://docs.sentry.io/platforms/python/)
-
-Are you coming from raven-python?
-
-- [Cheatsheet: Migrating to the new SDK from Raven](https://docs.sentry.io/platforms/python/migration/)
-
-To learn about internals:
-
-- [API Reference](https://getsentry.github.io/sentry-python/)
+- To learn more about how to use the SDK [refer to our docs](https://docs.sentry.io/platforms/python/)
+- Are you coming from raven-python? [Use this cheatcheet](https://docs.sentry.io/platforms/python/migration/)
+- To learn about internals use the [API Reference](https://getsentry.github.io/sentry-python/)
 
 # Contributing to the SDK
 
