@@ -6,13 +6,11 @@ ignore =
   W503,  // Handled by black (Line break occured before a binary operator)
   E402,  // Sometimes not possible due to execution order (Module level import is not at top of file)
   E731,  // I don't care (Do not assign a lambda expression, use a def)
-  C901,  // I don't care (Function is too complex)
   B950,  // Handled by black (Line too long by flake8-bugbear)
   B011,  // I don't care (Do not call assert False)
   B014,  // does not apply to Python 2 (redundant exception types by flake8-bugbear)
   N812,  // I don't care (Lowercase imported as non-lowercase by pep8-naming)
   N804   // is a worse version of and conflicts with B902 (first argument of a classmethod should be named cls)
 max-line-length = 80
-max-complexity = 18
 select = N,B,C,E,F,W,T4,B9
 exclude=checkouts,lol*,.tox
