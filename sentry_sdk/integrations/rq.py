@@ -39,7 +39,7 @@ class RqIntegration(Integration):
         try:
             version = tuple(map(int, RQ_VERSION.split(".")[:3]))
         except (ValueError, TypeError):
-            raise DidNotEnable("Unparseable RQ version: {}".format(RQ_VERSION))
+            raise DidNotEnable("Unparsable RQ version: {}".format(RQ_VERSION))
 
         if version < (0, 6):
             raise DidNotEnable("RQ 0.6 or newer is required.")

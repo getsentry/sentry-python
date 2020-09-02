@@ -31,7 +31,7 @@ class SqlalchemyIntegration(Integration):
             version = tuple(map(int, SQLALCHEMY_VERSION.split("b")[0].split(".")))
         except (TypeError, ValueError):
             raise DidNotEnable(
-                "Unparseable SQLAlchemy version: {}".format(SQLALCHEMY_VERSION)
+                "Unparsable SQLAlchemy version: {}".format(SQLALCHEMY_VERSION)
             )
 
         if version < (1, 2):

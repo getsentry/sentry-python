@@ -104,7 +104,7 @@ class FalconIntegration(Integration):
         try:
             version = tuple(map(int, FALCON_VERSION.split(".")))
         except (ValueError, TypeError):
-            raise DidNotEnable("Unparseable Falcon version: {}".format(FALCON_VERSION))
+            raise DidNotEnable("Unparsable Falcon version: {}".format(FALCON_VERSION))
 
         if version < (1, 4):
             raise DidNotEnable("Falcon 1.4 or newer required.")

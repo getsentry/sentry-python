@@ -372,7 +372,7 @@ def make_transport(options):
     elif callable(ref_transport):
         return _FunctionTransport(ref_transport)  # type: ignore
 
-    # if a transport class is given only instanciate it if the dsn is not
+    # if a transport class is given only instantiate it if the dsn is not
     # empty or None
     if options["dsn"]:
         return transport_cls(options)

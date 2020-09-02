@@ -46,7 +46,7 @@ class SanicIntegration(Integration):
         try:
             version = tuple(map(int, SANIC_VERSION.split(".")))
         except (TypeError, ValueError):
-            raise DidNotEnable("Unparseable Sanic version: {}".format(SANIC_VERSION))
+            raise DidNotEnable("Unparsable Sanic version: {}".format(SANIC_VERSION))
 
         if version < (0, 8):
             raise DidNotEnable("Sanic 0.8 or newer required.")

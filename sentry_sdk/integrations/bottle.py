@@ -59,7 +59,7 @@ class BottleIntegration(Integration):
         try:
             version = tuple(map(int, BOTTLE_VERSION.split(".")))
         except (TypeError, ValueError):
-            raise DidNotEnable("Unparseable Bottle version: {}".format(version))
+            raise DidNotEnable("Unparsable Bottle version: {}".format(version))
 
         if version < (0, 12):
             raise DidNotEnable("Bottle 0.12 or newer required.")

@@ -202,7 +202,7 @@ A major release `N` implies the previous release `N-1` will no longer receive up
 
 ## 0.11.0
 
-* Fix type hints for the logging integration. Thansk Steven Dignam!
+* Fix type hints for the logging integration. Thanks Steven Dignam!
 * Fix an issue where scope/context data would leak in applications that use `gevent` with its threading monkeypatch. The fix is to avoid usage of contextvars in such environments. Thanks Ran Benita!
 * Fix a reference cycle in the `ThreadingIntegration` that led to exceptions on interpreter shutdown. Thanks Guang Tian Li!
 * Fix a series of bugs in the stdlib integration that broke usage of `subprocess`.

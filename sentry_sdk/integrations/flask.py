@@ -67,7 +67,7 @@ class FlaskIntegration(Integration):
         try:
             version = tuple(map(int, FLASK_VERSION.split(".")[:3]))
         except (ValueError, TypeError):
-            raise DidNotEnable("Unparseable Flask version: {}".format(FLASK_VERSION))
+            raise DidNotEnable("Unparsable Flask version: {}".format(FLASK_VERSION))
 
         if version < (0, 11):
             raise DidNotEnable("Flask 0.11 or newer is required.")
