@@ -49,10 +49,10 @@ def test_orm_queries(sentry_init, capture_events):
 
     (event,) = events
 
-    for crumb in event["breadcrumbs"]:
+    for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
 
-    assert event["breadcrumbs"][-2:] == [
+    assert event["breadcrumbs"]["values"][-2:] == [
         {
             "category": "query",
             "data": {"db.params": ["Bob"], "db.paramstyle": "qmark"},

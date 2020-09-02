@@ -42,7 +42,7 @@ def test_propagates_hub(sentry_init, capture_events, propagate_hub):
 
     def stage1():
         with configure_scope() as scope:
-            scope.set_tag("stage1", True)
+            scope.set_tag("stage1", "true")
 
         t = Thread(target=stage2)
         t.start()
@@ -63,7 +63,7 @@ def test_propagates_hub(sentry_init, capture_events, propagate_hub):
     assert exception["mechanism"] == {"type": "threading", "handled": False}
 
     if propagate_hub:
-        assert event["tags"]["stage1"] is True
+        assert event["tags"]["stage1"] == "true"
     else:
         assert "stage1" not in event.get("tags", {})
 

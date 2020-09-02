@@ -1,9 +1,8 @@
 import os
-import subprocess
 import json
-import uuid
 
 import pytest
+import jsonschema
 
 import gevent
 import eventlet
@@ -16,11 +15,14 @@ from sentry_sdk.utils import capture_internal_exceptions
 
 from tests import _warning_recorder, _warning_recorder_mgr
 
-SENTRY_RELAY = "./relay"
 
-if not os.path.isfile(SENTRY_RELAY):
-    SENTRY_RELAY = None
+SENTRY_EVENT_SCHEMA = "./checkouts/data-schemas/relay/event.schema.json"
 
+if not os.path.isfile(SENTRY_EVENT_SCHEMA):
+    SENTRY_EVENT_SCHEMA = None
+else:
+    with open(SENTRY_EVENT_SCHEMA) as f:
+        SENTRY_EVENT_SCHEMA = json.load(f)
 
 try:
     import pytest_benchmark
@@ -118,7 +120,7 @@ def _capture_internal_warnings():
 
 
 @pytest.fixture
-def monkeypatch_test_transport(monkeypatch, relay_normalize):
+def monkeypatch_test_transport(monkeypatch, validate_event_schema):
     def check_event(event):
         def check_string_keys(map):
             for key, value in iteritems(map):
@@ -128,7 +130,7 @@ def monkeypatch_test_transport(monkeypatch, relay_normalize):
 
         with capture_internal_exceptions():
             check_string_keys(event)
-            relay_normalize(event)
+            validate_event_schema(event)
 
     def inner(client):
         monkeypatch.setattr(client, "transport", TestTransport(check_event))
@@ -136,46 +138,11 @@ def monkeypatch_test_transport(monkeypatch, relay_normalize):
     return inner
 
 
-def _no_errors_in_relay_response(obj):
-    """Assert that relay didn't throw any errors when processing the
-    event."""
-
-    def inner(obj):
-        if not isinstance(obj, dict):
-            return
-
-        assert "err" not in obj
-
-        for value in obj.values():
-            inner(value)
-
-    try:
-        inner(obj.get("_meta"))
-        inner(obj.get(""))
-    except AssertionError:
-        raise AssertionError(obj)
-
-
 @pytest.fixture
-def relay_normalize(tmpdir):
+def validate_event_schema(tmpdir):
     def inner(event):
-        if not SENTRY_RELAY:
-            return
-
-        # Disable subprocess integration
-        with sentry_sdk.Hub(None):
-            # not dealing with the subprocess API right now
-            file = tmpdir.join("event-{}".format(uuid.uuid4().hex))
-            file.write(json.dumps(dict(event)))
-            with file.open() as f:
-                output = json.loads(
-                    subprocess.check_output(
-                        [SENTRY_RELAY, "process-event"], stdin=f
-                    ).decode("utf-8")
-                )
-            _no_errors_in_relay_response(output)
-            output.pop("_meta", None)
-            return output
+        if SENTRY_EVENT_SCHEMA:
+            jsonschema.validate(instance=event, schema=SENTRY_EVENT_SCHEMA)
 
     return inner
 

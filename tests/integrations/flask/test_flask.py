@@ -255,7 +255,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     @app.route("/")
     def index():
         with configure_scope() as scope:
-            scope.set_user({"ip_address": "1.2.3.4", "id": 42})
+            scope.set_user({"ip_address": "1.2.3.4", "id": "42"})
         try:
             raise ValueError("stuff")
         except Exception:

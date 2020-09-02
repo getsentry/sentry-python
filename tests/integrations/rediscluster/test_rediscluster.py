@@ -26,7 +26,7 @@ def test_rediscluster_basic(rediscluster_cls, sentry_init, capture_events):
     capture_message("hi")
 
     (event,) = events
-    (crumb,) = event["breadcrumbs"]
+    (crumb,) = event["breadcrumbs"]["values"]
 
     assert crumb == {
         "category": "redis",
