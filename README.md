@@ -23,7 +23,7 @@ raise ValueError()  # Will also create an event.
 ```
 
 - To learn more about how to use the SDK [refer to our docs](https://docs.sentry.io/platforms/python/)
-- Are you coming from raven-python? [Use this cheatcheet](https://docs.sentry.io/platforms/python/migration/)
+- Are you coming from raven-python? [Use this cheatsheet](https://docs.sentry.io/platforms/python/migration/)
 - To learn about internals use the [API Reference](https://getsentry.github.io/sentry-python/)
 
 # Contributing to the SDK
