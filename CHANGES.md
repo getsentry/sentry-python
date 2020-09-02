@@ -27,6 +27,10 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.17.3
+
+* Fix an issue with the `pure_eval` integration in interaction with trimming where `pure_eval` would create a lot of useless local variables that then drown out the useful ones in trimming.
+
 ## 0.17.2
 
 * Fix timezone bugs in GCP integration.
