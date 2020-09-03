@@ -41,9 +41,6 @@ class EventSourceHandler(ChaliceEventSourceHandler):
                 reraise(*exc_info)
 
 
-old_get_view_function_response = Chalice._get_view_function_response
-
-
 def _get_view_function_response(app, view_function, function_args):
     @wraps(view_function)
     def wrapped_view_function(**function_args):
@@ -77,9 +74,7 @@ def _get_view_function_response(app, view_function, function_args):
                 hub.flush()
                 raise
 
-    return old_get_view_function_response(
-        app, wrapped_view_function, function_args
-    )
+    return wrapped_view_function
 
 
 class ChaliceIntegration(Integration):
@@ -87,7 +82,17 @@ class ChaliceIntegration(Integration):
 
     @staticmethod
     def setup_once():
+        old_get_view_function_response = Chalice._get_view_function_response
 
-        Chalice._get_view_function_response = _get_view_function_response
+        def sentry_event_response(app, view_function, function_args):
+            wrapped_view_function = _get_view_function_response(
+                app, view_function, function_args
+            )
+
+            return old_get_view_function_response(
+                app, wrapped_view_function, function_args
+            )
+
+        Chalice._get_view_function_response = sentry_event_response
         # for everything else (like events)
         chalice.app.EventSourceHandler = EventSourceHandler
