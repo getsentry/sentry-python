@@ -2,7 +2,7 @@
 A fork of Python 3.6's stdlib queue with Lock swapped out for RLock to avoid a
 deadlock while garbage collecting.
 
-See 
+See
 https://codewithoutrules.com/2017/08/16/concurrency-python/
 https://bugs.python.org/issue14976
 https://github.com/sqlalchemy/sqlalchemy/blob/4eb747b61f0c1b1c25bdee3856d7195d10a0c227/lib/sqlalchemy/queue.py#L1
@@ -16,10 +16,9 @@ try:
 except ImportError:
     import dummy_threading as threading
 from collections import deque
-from heapq import heappush, heappop
 from time import monotonic as time
 
-__all__ = ["Empty", "Full", "Queue", "PriorityQueue", "LifoQueue"]
+__all__ = ["Empty", "Full", "Queue"]
 
 
 class Empty(Exception):
