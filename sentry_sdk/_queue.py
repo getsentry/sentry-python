@@ -19,21 +19,24 @@ from collections import deque
 from heapq import heappush, heappop
 from time import monotonic as time
 
-__all__ = ['Empty', 'Full', 'Queue', 'PriorityQueue', 'LifoQueue']
+__all__ = ["Empty", "Full", "Queue", "PriorityQueue", "LifoQueue"]
+
 
 class Empty(Exception):
-    'Exception raised by Queue.get(block=0)/get_nowait().'
+    "Exception raised by Queue.get(block=0)/get_nowait()."
     pass
+
 
 class Full(Exception):
-    'Exception raised by Queue.put(block=0)/put_nowait().'
+    "Exception raised by Queue.put(block=0)/put_nowait()."
     pass
 
+
 class Queue(object):
-    '''Create a queue object with a given maximum size.
+    """Create a queue object with a given maximum size.
 
     If maxsize is <= 0, the queue size is infinite.
-    '''
+    """
 
     def __init__(self, maxsize=0):
         self.maxsize = maxsize
@@ -59,7 +62,7 @@ class Queue(object):
         self.unfinished_tasks = 0
 
     def task_done(self):
-        '''Indicate that a formerly enqueued task is complete.
+        """Indicate that a formerly enqueued task is complete.
 
         Used by Queue consumer threads.  For each get() used to fetch a task,
         a subsequent call to task_done() tells the queue that the processing
@@ -71,35 +74,35 @@ class Queue(object):
 
         Raises a ValueError if called more times than there were items
         placed in the queue.
-        '''
+        """
         with self.all_tasks_done:
             unfinished = self.unfinished_tasks - 1
             if unfinished <= 0:
                 if unfinished < 0:
-                    raise ValueError('task_done() called too many times')
+                    raise ValueError("task_done() called too many times")
                 self.all_tasks_done.notify_all()
             self.unfinished_tasks = unfinished
 
     def join(self):
-        '''Blocks until all items in the Queue have been gotten and processed.
+        """Blocks until all items in the Queue have been gotten and processed.
 
         The count of unfinished tasks goes up whenever an item is added to the
         queue. The count goes down whenever a consumer thread calls task_done()
         to indicate the item was retrieved and all work on it is complete.
 
         When the count of unfinished tasks drops to zero, join() unblocks.
-        '''
+        """
         with self.all_tasks_done:
             while self.unfinished_tasks:
                 self.all_tasks_done.wait()
 
     def qsize(self):
-        '''Return the approximate size of the queue (not reliable!).'''
+        """Return the approximate size of the queue (not reliable!)."""
         with self.mutex:
             return self._qsize()
 
     def empty(self):
-        '''Return True if the queue is empty, False otherwise (not reliable!).
+        """Return True if the queue is empty, False otherwise (not reliable!).
 
         This method is likely to be removed at some point.  Use qsize() == 0
         as a direct substitute, but be aware that either approach risks a race
@@ -108,23 +111,23 @@ class Queue(object):
 
         To create code that needs to wait for all queued tasks to be
         completed, the preferred technique is to use the join() method.
-        '''
+        """
         with self.mutex:
             return not self._qsize()
 
     def full(self):
-        '''Return True if the queue is full, False otherwise (not reliable!).
+        """Return True if the queue is full, False otherwise (not reliable!).
 
         This method is likely to be removed at some point.  Use qsize() >= n
         as a direct substitute, but be aware that either approach risks a race
         condition where a queue can shrink before the result of full() or
         qsize() can be used.
-        '''
+        """
         with self.mutex:
             return 0 < self.maxsize <= self._qsize()
 
     def put(self, item, block=True, timeout=None):
-        '''Put an item into the queue.
+        """Put an item into the queue.
 
         If optional args 'block' is true and 'timeout' is None (the default),
         block if necessary until a free slot is available. If 'timeout' is
@@ -133,7 +136,7 @@ class Queue(object):
         Otherwise ('block' is false), put an item on the queue if a free slot
         is immediately available, else raise the Full exception ('timeout'
         is ignored in that case).
-        '''
+        """
         with self.not_full:
             if self.maxsize > 0:
                 if not block:
@@ -156,7 +159,7 @@ class Queue(object):
             self.not_empty.notify()
 
     def get(self, block=True, timeout=None):
-        '''Remove and return an item from the queue.
+        """Remove and return an item from the queue.
 
         If optional args 'block' is true and 'timeout' is None (the default),
         block if necessary until an item is available. If 'timeout' is
@@ -165,7 +168,7 @@ class Queue(object):
         Otherwise ('block' is false), return an item if one is immediately
         available, else raise the Empty exception ('timeout' is ignored
         in that case).
-        '''
+        """
         with self.not_empty:
             if not block:
                 if not self._qsize():
@@ -187,19 +190,19 @@ class Queue(object):
             return item
 
     def put_nowait(self, item):
-        '''Put an item into the queue without blocking.
+        """Put an item into the queue without blocking.
 
         Only enqueue the item if a free slot is immediately available.
         Otherwise raise the Full exception.
-        '''
+        """
         return self.put(item, block=False)
 
     def get_nowait(self):
-        '''Remove and return an item from the queue without blocking.
+        """Remove and return an item from the queue without blocking.
 
         Only get an item if one is immediately available. Otherwise
         raise the Empty exception.
-        '''
+        """
         return self.get(block=False)
 
     # Override these methods to implement other queue organizations
