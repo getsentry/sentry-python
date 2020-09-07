@@ -11,14 +11,12 @@ from sentry_sdk.transport import _parse_rate_limits
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 
-@pytest.fixture(params=[True, False])
-def make_client(request):
-    def inner(*args, **kwargs):
-        client = Client(*args, **kwargs)
-        if request.param:
-            client = pickle.loads(pickle.dumps(client))
-
-        return client
+@pytest.fixture
+def make_client(request, httpserver):
+    def inner(**kwargs):
+        return Client(
+            "http://foobar{}/132".format(httpserver.url[len("http://") :]), **kwargs
+        )
 
     return inner
 
@@ -26,6 +24,7 @@ def make_client(request):
 @pytest.mark.forked
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("client_flush_method", ["close", "flush"])
+@pytest.mark.parametrize("pickle", (True, False))
 def test_transport_works(
     httpserver,
     request,
@@ -34,15 +33,16 @@ def test_transport_works(
     debug,
     make_client,
     client_flush_method,
+    pickle,
     maybe_monkeypatched_threading,
 ):
     httpserver.serve_content("ok", 200)
-
     caplog.set_level(logging.DEBUG)
+    client = make_client(debug=debug)
 
-    client = make_client(
-        "http://foobar@{}/123".format(httpserver.url[len("http://") :]), debug=debug
-    )
+    if pickle:
+        client = pickle.loads(pickle.dumps(client))
+
     Hub.current.bind_client(client)
     request.addfinalizer(lambda: Hub.current.bind_client(None))
 
@@ -58,11 +58,10 @@ def test_transport_works(
     assert any("Sending event" in record.msg for record in caplog.records) == debug
 
 
-def test_transport_infinite_loop(httpserver, request):
+def test_transport_infinite_loop(httpserver, request, make_client):
     httpserver.serve_content("ok", 200)
 
-    client = Client(
-        "http://foobar@{}/123".format(httpserver.url[len("http://") :]),
+    client = make_client(
         debug=True,
         # Make sure we cannot create events from our own logging
         integrations=[LoggingIntegration(event_level=logging.DEBUG)],
@@ -110,8 +109,8 @@ def test_parse_rate_limits(input, expected):
     assert dict(_parse_rate_limits(input, now=NOW)) == expected
 
 
-def test_simple_rate_limits(httpserver, capsys, caplog):
-    client = Client(dsn="http://foobar@{}/123".format(httpserver.url[len("http://") :]))
+def test_simple_rate_limits(httpserver, capsys, caplog, make_client):
+    client = make_client()
     httpserver.serve_content("no", 429, headers={"Retry-After": "4"})
 
     client.capture_event({"type": "transaction"})
@@ -130,10 +129,8 @@ def test_simple_rate_limits(httpserver, capsys, caplog):
 
 
 @pytest.mark.parametrize("response_code", [200, 429])
-def test_data_category_limits(httpserver, capsys, caplog, response_code):
-    client = Client(
-        dict(dsn="http://foobar@{}/123".format(httpserver.url[len("http://") :]))
-    )
+def test_data_category_limits(httpserver, capsys, caplog, response_code, make_client):
+    client = make_client()
     httpserver.serve_content(
         "hm",
         response_code,
@@ -162,15 +159,11 @@ def test_data_category_limits(httpserver, capsys, caplog, response_code):
 
 @pytest.mark.parametrize("response_code", [200, 429])
 def test_complex_limits_without_data_category(
-    httpserver, capsys, caplog, response_code
+    httpserver, capsys, caplog, response_code, make_client
 ):
-    client = Client(
-        dict(dsn="http://foobar@{}/123".format(httpserver.url[len("http://") :]))
-    )
+    client = make_client()
     httpserver.serve_content(
-        "hm",
-        response_code,
-        headers={"X-Sentry-Rate-Limits": "4711::organization"},
+        "hm", response_code, headers={"X-Sentry-Rate-Limits": "4711::organization"},
     )
 
     client.capture_event({"type": "transaction"})
