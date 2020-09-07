@@ -21,7 +21,7 @@ class BackgroundWorker(object):
     def __init__(self, queue_size=30):
         # type: (int) -> None
         check_thread_support()
-        self._queue = Queue(queue_size)  # type: Queue[Any]
+        self._queue = Queue(queue_size)  # type: Queue
         self._lock = threading.Lock()
         self._thread = None  # type: Optional[threading.Thread]
         self._thread_for_pid = None  # type: Optional[int]

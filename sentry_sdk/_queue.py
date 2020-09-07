@@ -11,12 +11,15 @@ We also vendor the code to evade eventlet's broken monkeypatching, see
 https://github.com/getsentry/sentry-python/pull/484
 """
 
-try:
-    import threading
-except ImportError:
-    import dummy_threading as threading
+import threading
+
 from collections import deque
 from time import monotonic as time
+
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from typing import Any
 
 __all__ = ["Empty", "Full", "Queue"]
 
@@ -210,7 +213,7 @@ class Queue(object):
 
     # Initialize the queue representation
     def _init(self, maxsize):
-        self.queue = deque()
+        self.queue = deque()  # type: Any
 
     def _qsize(self):
         return len(self.queue)
