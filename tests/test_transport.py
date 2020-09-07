@@ -15,7 +15,7 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 def make_client(request, httpserver):
     def inner(**kwargs):
         return Client(
-            "http://foobar{}/132".format(httpserver.url[len("http://") :]), **kwargs
+            "http://foobar@{}/132".format(httpserver.url[len("http://") :]), **kwargs
         )
 
     return inner
