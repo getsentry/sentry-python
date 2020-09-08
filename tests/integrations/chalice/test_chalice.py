@@ -97,8 +97,8 @@ def test_scheduled_event(app, lambda_context_args):
     assert str(exc_info.value) == 'only chalice event!'
 
 
-def test_bad_reques(client: RequestHandler) -> None:
-    response = client.http.get('/badrequest')
+def test_bad_reques(app, client: RequestHandler) -> None:
+    response = client.get('/badrequest')
 
     assert response.status_code == 400
     assert response.json_body == dict(
