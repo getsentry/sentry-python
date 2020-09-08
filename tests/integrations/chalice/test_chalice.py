@@ -1,6 +1,6 @@
 import pytest
 import time
-from chalice import Chalice
+from chalice import Chalice, BadRequestError
 from chalice.local import LambdaContext, LocalGateway
 
 from sentry_sdk.integrations.chalice import ChaliceIntegration
@@ -37,6 +37,10 @@ def app(sentry_init):
     def has_request():
         raise Exception("boom goes the dynamite!")
 
+    @app.route('/badrequest')
+    def badrequest():
+        raise BadRequestError('bad-request')
+
     LocalGateway._generate_lambda_context = _generate_lambda_context
 
     return app
@@ -44,7 +48,7 @@ def app(sentry_init):
 
 @pytest.fixture
 def lambda_context_args():
-    return ['lambda_name', 256]
+    return ["lambda_name", 256]
 
 
 def test_exception_boom(app, client: RequestHandler) -> None:
@@ -71,9 +75,9 @@ def test_has_request(app, capture_events, client: RequestHandler):
 
 
 def test_scheduled_event(app, lambda_context_args):
-    @app.schedule('rate(1 minutes)')
+    @app.schedule("rate(1 minutes)")
     def every_hour(event):
-        raise Exception('only chalice event!')
+        raise Exception("schedule event!")
 
     context = LambdaContext(
         *lambda_context_args, max_runtime_ms=10000, time_source=time
@@ -88,22 +92,17 @@ def test_scheduled_event(app, lambda_context_args):
         "source": "aws.events",
         "time": "1970-01-01T00:00:00Z",
         "id": "event-id",
-        "resources": [
-            "arn:aws:events:us-west-1:120987654312:rule/my-schedule"
-        ],
+        "resources": ["arn:aws:events:us-west-1:120987654312:rule/my-schedule"],
     }
     with pytest.raises(Exception) as exc_info:
         every_hour(lambda_event, context=context)
-    assert str(exc_info.value) == 'only chalice event!'
+    assert str(exc_info.value) == "schedule event!"
 
 
-def test_bad_reques(app, client: RequestHandler) -> None:
-    response = client.get('/badrequest')
+def test_bad_reques(client: RequestHandler) -> None:
+    response = client.get("/badrequest")
 
     assert response.status_code == 400
-    assert response.json_body == dict(
-        [
-            ('Code', 'BadRequestError'),
-            ('Message', 'BadRequestError: bad-request'),
-        ]
+    assert response.json == dict(
+        [("Code", "BadRequestError"), ("Message", "BadRequestError: bad-request"),]
     )
