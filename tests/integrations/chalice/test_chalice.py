@@ -1,5 +1,5 @@
 import pytest
-
+import time
 from chalice import Chalice
 from chalice.local import LambdaContext, LocalGateway
 
@@ -42,6 +42,11 @@ def app(sentry_init):
     return app
 
 
+@pytest.fixture
+def lambda_context_args():
+    return ['lambda_name', 256]
+
+
 def test_exception_boom(app, client: RequestHandler) -> None:
     response = client.get("/boom")
     assert response.status_code == 500
@@ -63,3 +68,42 @@ def test_has_request(app, capture_events, client: RequestHandler):
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "Exception"
+
+
+def test_scheduled_event(app, lambda_context_args):
+    @app.schedule('rate(1 minutes)')
+    def every_hour(event):
+        raise Exception('only chalice event!')
+
+    context = LambdaContext(
+        *lambda_context_args, max_runtime_ms=10000, time_source=time
+    )
+
+    lambda_event = {
+        "version": "0",
+        "account": "120987654312",
+        "region": "us-west-1",
+        "detail": {},
+        "detail-type": "Scheduled Event",
+        "source": "aws.events",
+        "time": "1970-01-01T00:00:00Z",
+        "id": "event-id",
+        "resources": [
+            "arn:aws:events:us-west-1:120987654312:rule/my-schedule"
+        ],
+    }
+    with pytest.raises(Exception) as exc_info:
+        every_hour(lambda_event, context=context)
+    assert str(exc_info.value) == 'only chalice event!'
+
+
+def test_bad_reques(client: RequestHandler) -> None:
+    response = client.http.get('/badrequest')
+
+    assert response.status_code == 400
+    assert response.json_body == dict(
+        [
+            ('Code', 'BadRequestError'),
+            ('Message', 'BadRequestError: bad-request'),
+        ]
+    )
