@@ -23,8 +23,7 @@ class EventSourceHandler(ChaliceEventSourceHandler):
             with capture_internal_exceptions():
                 configured_time = context.get_remaining_time_in_millis()
                 scope.add_event_processor(
-                    _make_request_event_processor(event, context,
-                                                  configured_time)
+                    _make_request_event_processor(event, context, configured_time)
                 )
             try:
                 event_obj = self.event_class(event, context)
@@ -48,9 +47,7 @@ def _get_view_function_response(app, view_function, function_args):
         client = hub.client
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
-                configured_time = (
-                    app.lambda_context.get_remaining_time_in_millis()
-                )
+                configured_time = app.lambda_context.get_remaining_time_in_millis()
                 scope.transaction = app.lambda_context.function_name
                 scope.add_event_processor(
                     _make_request_event_processor(

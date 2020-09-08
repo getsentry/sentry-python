@@ -20,7 +20,7 @@ def _generate_lambda_context(self):
     return LambdaContext(
         function_name=self._config.function_name,
         memory_size=self._config.lambda_memory_size,
-        max_runtime_ms=timeout
+        max_runtime_ms=timeout,
     )
 
 
