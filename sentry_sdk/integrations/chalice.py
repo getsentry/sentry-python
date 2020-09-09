@@ -1,9 +1,5 @@
 import sys
 
-from functools import wraps
-import chalice
-from chalice import Chalice, ChaliceViewError
-from chalice.app import EventSourceHandler as ChaliceEventSourceHandler
 from sentry_sdk._compat import reraise
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
@@ -13,6 +9,11 @@ from sentry_sdk.utils import (
     event_from_exception,
 )
 from sentry_sdk._types import MYPY
+from sentry_sdk._functools import wraps
+
+import chalice  # type: ignore
+from chalice import Chalice, ChaliceViewError
+from chalice.app import EventSourceHandler as ChaliceEventSourceHandler  # type: ignore
 
 if MYPY:
     from typing import Any
@@ -22,7 +23,7 @@ if MYPY:
     F = TypeVar("F", bound=Callable[..., Any])
 
 
-class EventSourceHandler(ChaliceEventSourceHandler):
+class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
     def __call__(self, event, context):
         # type: (Any, Any) -> Any
         hub = Hub.current
