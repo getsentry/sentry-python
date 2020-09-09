@@ -12,12 +12,21 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
 )
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from typing import Any
+    from typing import TypeVar
+    from typing import Callable
+
+    F = TypeVar("F", bound=Callable[..., Any])
 
 
 class EventSourceHandler(ChaliceEventSourceHandler):
     def __call__(self, event, context):
+        # type: (Any, Any) -> Any
         hub = Hub.current
-        client = hub.client
+        client = hub.client  # type: Any
 
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
@@ -41,10 +50,12 @@ class EventSourceHandler(ChaliceEventSourceHandler):
 
 
 def _get_view_function_response(app, view_function, function_args):
+    # type: (Any, F, Any) -> F
     @wraps(view_function)
     def wrapped_view_function(**function_args):
+        # type: (**Any) -> Any
         hub = Hub.current
-        client = hub.client
+        client = hub.client  # type: Any
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
                 configured_time = app.lambda_context.get_remaining_time_in_millis()
@@ -71,7 +82,7 @@ def _get_view_function_response(app, view_function, function_args):
                 hub.flush()
                 raise
 
-    return wrapped_view_function
+    return wrapped_view_function  # type: ignore
 
 
 class ChaliceIntegration(Integration):
@@ -79,9 +90,11 @@ class ChaliceIntegration(Integration):
 
     @staticmethod
     def setup_once():
+        # type: () -> None
         old_get_view_function_response = Chalice._get_view_function_response
 
         def sentry_event_response(app, view_function, function_args):
+            # type: (Any, F, **Any) -> Any
             wrapped_view_function = _get_view_function_response(
                 app, view_function, function_args
             )
