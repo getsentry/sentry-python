@@ -107,8 +107,14 @@ class SentryAsgiMiddleware:
 
     async def _run_app(self, scope, callback):
         # type: (Any, Any) -> Any
-        if _asgi_middleware_applied.get(False):
-            return await callback()
+        is_recursive_asgi_middleware = _asgi_middleware_applied.get(False)
+
+        if is_recursive_asgi_middleware:
+            try:
+                return await callback()
+            except Exception as exc:
+                _capture_exception(Hub.current, exc)
+                raise exc from None
 
         _asgi_middleware_applied.set(True)
         try:
