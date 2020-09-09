@@ -24,7 +24,7 @@ def make_client(request, httpserver):
 @pytest.mark.forked
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("client_flush_method", ["close", "flush"])
-@pytest.mark.parametrize("pickle", (True, False))
+@pytest.mark.parametrize("use_pickle", (True, False))
 def test_transport_works(
     httpserver,
     request,
@@ -33,14 +33,14 @@ def test_transport_works(
     debug,
     make_client,
     client_flush_method,
-    pickle,
+    use_pickle,
     maybe_monkeypatched_threading,
 ):
     httpserver.serve_content("ok", 200)
     caplog.set_level(logging.DEBUG)
     client = make_client(debug=debug)
 
-    if pickle:
+    if use_pickle:
         client = pickle.loads(pickle.dumps(client))
 
     Hub.current.bind_client(client)
