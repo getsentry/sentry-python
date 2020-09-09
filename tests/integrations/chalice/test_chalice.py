@@ -37,9 +37,9 @@ def app(sentry_init):
     def has_request():
         raise Exception("boom goes the dynamite!")
 
-    @app.route('/badrequest')
+    @app.route("/badrequest")
     def badrequest():
-        raise BadRequestError('bad-request')
+        raise BadRequestError("bad-request")
 
     LocalGateway._generate_lambda_context = _generate_lambda_context
 
@@ -104,5 +104,8 @@ def test_bad_reques(client: RequestHandler) -> None:
 
     assert response.status_code == 400
     assert response.json == dict(
-        [("Code", "BadRequestError"), ("Message", "BadRequestError: bad-request"),]
+        [
+            ("Code", "BadRequestError"),
+            ("Message", "BadRequestError: bad-request"),
+        ]
     )
