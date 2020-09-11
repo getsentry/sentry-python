@@ -14,7 +14,7 @@ https://github.com/getsentry/sentry-python/pull/484
 import threading
 
 from collections import deque
-from time import monotonic as time
+from time import time
 
 from sentry_sdk._types import MYPY
 
