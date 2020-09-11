@@ -68,6 +68,8 @@ class Envelope(object):
         self, type=None  # type: Optional[str]
     ):
         # type: (...) -> List[Item]
+        if type is None:
+            return self.items
         return [item for item in self.items if item.get_type() == type]
 
     def get_event(self):
