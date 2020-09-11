@@ -45,9 +45,7 @@ class BackgroundWorker(object):
         if self.is_alive:
             return
 
-        self._thread = Thread(
-            target=self._target, name="raven-sentry.BackgroundWorker"
-        )
+        self._thread = Thread(target=self._target, name="raven-sentry.BackgroundWorker")
         self._thread.setDaemon(True)
         self._thread.start()
         self._thread_for_pid = os.getpid()
