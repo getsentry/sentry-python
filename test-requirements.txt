@@ -5,7 +5,7 @@ Werkzeug==0.15.5
 pytest-localserver==0.5.0
 pytest-cov==2.8.1
 jsonschema==3.2.0
-pyrsistent==0.16.0 # TODO(py3): 0.17.0 requires python3, see https://github.com/tobgu/pyrsistent/issues/205
+pyrsistent==0.17.3 # TODO(py3): 0.17.0 requires python3, see https://github.com/tobgu/pyrsistent/issues/205
 
 gevent
 eventlet
