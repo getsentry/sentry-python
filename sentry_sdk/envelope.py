@@ -82,8 +82,8 @@ class Envelope(object):
 
     def get_transaction_event(self):
         # type: (...) -> Optional[Event]
-        for items in self.items:
-            event = items.get_transaction_event()
+        for item in self.items:
+            event = item.get_transaction_event()
             if event is not None:
                 return event
         return None
