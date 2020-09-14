@@ -228,9 +228,14 @@ class Item(object):
             self.data_category,
         )
 
-    def get_type(self):
+    @property
+    def type(self):
         # type: (...) -> Optional[str]
         return self.headers.get("type")
+
+    @type.setter
+    def type(self, value):
+        self.headers["type"] = type
 
     @property
     def data_category(self):
@@ -262,7 +267,7 @@ class Item(object):
 
     def get_transaction_event(self):
         # type: (...) -> Optional[Event]
-        if self.headers.get("type") == "transaction" and self.payload.json is not None:
+        if self.type == "transaction" and self.payload.json is not None:
             return self.payload.json
         return None
 
