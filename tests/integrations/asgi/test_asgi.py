@@ -9,7 +9,6 @@ from starlette.testclient import TestClient
 from starlette.websockets import WebSocket
 
 
-
 @pytest.fixture
 def app():
     app = Starlette()
@@ -198,8 +197,8 @@ def test_starlette_last_event_id(app, sentry_init, capture_events, request):
     response = client.get("/handlederror")
     assert response.status_code == 500
 
-    event, = events
-    assert response.content.strip().decode('ascii') == event['event_id']
+    (event,) = events
+    assert response.content.strip().decode("ascii") == event["event_id"]
     (exception,) = event["exception"]["values"]
-    assert exception['type'] == 'ValueError'
-    assert exception['value'] == 'oh no'
+    assert exception["type"] == "ValueError"
+    assert exception["value"] == "oh no"
