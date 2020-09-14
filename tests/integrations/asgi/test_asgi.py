@@ -1,7 +1,7 @@
 import sys
 
 import pytest
-from sentry_sdk import Hub, capture_message
+from sentry_sdk import Hub, capture_message, last_event_id
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
@@ -179,3 +179,26 @@ def test_websocket(sentry_init, capture_events, request):
             "url": "ws://testserver/",
         }
     )
+
+
+def test_starlette_last_event_id(app, sentry_init, capture_events, request):
+    sentry_init(send_default_pii=True)
+    events = capture_events()
+
+    @app.route("/handlederror")
+    def handlederror(request):
+        raise ValueError("oh no")
+
+    @app.exception_handler(500)
+    def handler(*args, **kwargs):
+        return PlainTextResponse(last_event_id(), status_code=500)
+
+    client = TestClient(SentryAsgiMiddleware(app), raise_server_exceptions=False)
+    response = client.get("/handlederror")
+    assert response.status_code == 500
+
+    (event,) = events
+    assert response.content.strip().decode("ascii") == event["event_id"]
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "ValueError"
+    assert exception["value"] == "oh no"
