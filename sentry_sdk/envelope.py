@@ -233,10 +233,6 @@ class Item(object):
         # type: (...) -> Optional[str]
         return self.headers.get("type")
 
-    @type.setter
-    def type(self, value):
-        self.headers["type"] = type
-
     @property
     def data_category(self):
         # type: (...) -> EventDataCategory
