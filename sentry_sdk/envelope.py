@@ -64,14 +64,6 @@ class Envelope(object):
         # type: (...) -> None
         self.items.append(item)
 
-    def get_items(
-        self, type=None  # type: Optional[str]
-    ):
-        # type: (...) -> List[Item]
-        if type is None:
-            return self.items
-        return [item for item in self.items if item.get_type() == type]
-
     def get_event(self):
         # type: (...) -> Optional[Event]
         for items in self.items:
