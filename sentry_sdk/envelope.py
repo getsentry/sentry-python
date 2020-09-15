@@ -50,6 +50,12 @@ class Envelope(object):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=event), type="event"))
 
+    def add_transaction(
+        self, transaction  # type: Transaction
+    ):
+        # type: (...) -> None
+        self.add_item(Item(payload=PayloadRef(json=transaction), type="transaction"))
+
     def add_session(
         self, session  # type: Union[Session, Any]
     ):
