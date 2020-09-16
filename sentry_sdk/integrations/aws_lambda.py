@@ -3,6 +3,7 @@ from os import environ
 import sys
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
+from sentry_sdk.tracing import Transaction
 from sentry_sdk._compat import reraise
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -100,7 +101,9 @@ def _wrap_handler(handler):
                     timeout_thread.start()
 
             try:
-                return handler(event, context, *args, **kwargs)
+                transaction = Transaction(op="aws_lambda", name=context.function_name)
+                with hub.start_transaction(transaction):
+                    return handler(event, context, *args, **kwargs)
             except Exception:
                 exc_info = sys.exc_info()
                 event, hint = event_from_exception(
