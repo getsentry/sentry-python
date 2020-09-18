@@ -248,7 +248,10 @@ class Item(object):
         Returns a regular event if there is one. Transaction events are exempt
         from this.
         """
-        if self.headers.get("type") in ("event", "transaction") and self.payload.json is not None:
+        if (
+            self.headers.get("type") in ("event", "transaction")
+            and self.payload.json is not None
+        ):
             return self.payload.json
         return None
 
