@@ -93,15 +93,23 @@ def _wrap_apply_async(task, f):
         hub = Hub.current
         integration = hub.get_integration(CeleryIntegration)
         if integration is not None and integration.propagate_traces:
-            headers = None
-            for key, value in hub.iter_trace_propagation_headers():
-                if headers is None:
-                    headers = dict(kwargs.get("headers") or {})
-                headers[key] = value
-            if headers is not None:
-                kwargs["headers"] = headers
-
             with hub.start_span(op="celery.submit", description=task.name):
+                with capture_internal_exceptions():
+                    headers = dict(hub.iter_trace_propagation_headers())
+                    if headers:
+                        kwarg_headers = kwargs.setdefault("headers", {})
+                        kwarg_headers.update(headers)
+
+                        # https://github.com/celery/celery/issues/4875
+                        #
+                        # Need to setdefault the inner headers too since other
+                        # tracing tools (dd-trace-py) also employ this exact
+                        # workaround and we don't want to break them.
+                        #
+                        # This is not reproducible outside of AMQP, therefore no
+                        # tests!
+                        kwarg_headers.setdefault("headers", {}).update(headers)
+
                 return f(*args, **kwargs)
         else:
             return f(*args, **kwargs)
@@ -130,19 +138,22 @@ def _wrap_tracer(task, f):
             scope.clear_breadcrumbs()
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
-            transaction = Transaction.continue_from_headers(
-                args[3].get("headers") or {},
-                op="celery.task",
-                name="unknown celery task",
-            )
+            transaction = None
 
-            # Could possibly use a better hook than this one
-            transaction.set_status("ok")
-
+            # Celery task objects are not a thing to be trusted. Even
+            # something such as attribute access can fail.
             with capture_internal_exceptions():
-                # Celery task objects are not a thing to be trusted. Even
-                # something such as attribute access can fail.
+                transaction = Transaction.continue_from_headers(
+                    args[3].get("headers") or {},
+                    op="celery.task",
+                    name="unknown celery task",
+                )
+
                 transaction.name = task.name
+                transaction.set_status("ok")
+
+            if transaction is None:
+                return f(*args, **kwargs)
 
             with hub.start_transaction(transaction):
                 return f(*args, **kwargs)
