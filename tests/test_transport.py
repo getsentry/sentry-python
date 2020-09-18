@@ -116,7 +116,7 @@ def test_simple_rate_limits(httpserver, capsys, caplog, make_client):
     client.capture_event({"type": "transaction"})
     client.flush()
 
-    assert len(httpserver.requests) == 1
+    assert list(r.url[-18:] for r in httpserver.requests) == ['/api/132/envelope/']
     del httpserver.requests[:]
 
     assert set(client.transport._disabled_until) == set([None])
@@ -140,13 +140,13 @@ def test_data_category_limits(httpserver, capsys, caplog, response_code, make_cl
     client.capture_event({"type": "transaction"})
     client.flush()
 
-    assert len(httpserver.requests) == 1
+    assert list(r.url[-18:] for r in httpserver.requests) == ['/api/132/envelope/']
     del httpserver.requests[:]
 
     assert set(client.transport._disabled_until) == set(["transaction"])
 
-    client.transport.capture_event({"type": "transaction"})
-    client.transport.capture_event({"type": "transaction"})
+    client.capture_event({"type": "transaction"})
+    client.capture_event({"type": "transaction"})
     client.flush()
 
     assert not httpserver.requests
@@ -171,13 +171,13 @@ def test_complex_limits_without_data_category(
     client.capture_event({"type": "transaction"})
     client.flush()
 
-    assert len(httpserver.requests) == 1
+    assert list(r.url[-18:] for r in httpserver.requests) == ['/api/132/envelope/']
     del httpserver.requests[:]
 
     assert set(client.transport._disabled_until) == set([None])
 
-    client.transport.capture_event({"type": "transaction"})
-    client.transport.capture_event({"type": "transaction"})
+    client.capture_event({"type": "transaction"})
+    client.capture_event({"type": "transaction"})
     client.capture_event({"type": "event"})
     client.flush()
 

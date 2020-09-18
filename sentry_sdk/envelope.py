@@ -230,15 +230,13 @@ class Item(object):
     @property
     def data_category(self):
         # type: (...) -> EventDataCategory
-        rv = "default"  # type: Any
-        event = self.get_event()
-        if event is not None:
-            rv = get_event_data_category(event)
+        ty = self.headers.get("type")
+        if ty in ("session", "attachment", "transaction"):
+            return ty
+        elif ty == "event":
+            return "error"
         else:
-            ty = self.headers.get("type")
-            if ty in ("session", "attachment"):
-                rv = ty
-        return rv
+            return "default"
 
     def get_bytes(self):
         # type: (...) -> bytes
@@ -246,7 +244,7 @@ class Item(object):
 
     def get_event(self):
         # type: (...) -> Optional[Event]
-        if self.headers.get("type") == "event" and self.payload.json is not None:
+        if self.headers.get("type") in ("event", "transaction") and self.payload.json is not None:
             return self.payload.json
         return None
 
