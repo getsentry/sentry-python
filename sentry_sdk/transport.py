@@ -211,7 +211,7 @@ class HttpTransport(Transport):
         self, event  # type: Event
     ):
         # type: (...) -> None
-        assert event['type'] != 'transaction'
+        assert event["type"] != "transaction"
 
         if self._check_disabled(get_event_data_category(event)):
             return None
