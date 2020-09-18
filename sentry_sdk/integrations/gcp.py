@@ -3,6 +3,7 @@ from os import environ
 import sys
 
 from sentry_sdk.hub import Hub
+from sentry_sdk.tracing import Transaction
 from sentry_sdk._compat import reraise
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -43,6 +44,7 @@ def _wrap_func(func):
         client = hub.client  # type: Any
 
         configured_time = environ.get("FUNCTION_TIMEOUT_SEC")
+        function_name = environ.get("FUNCTION_NAME")
         if not configured_time:
             logger.debug(
                 "The configured timeout could not be fetched from Cloud Functions configuration."
@@ -56,7 +58,7 @@ def _wrap_func(func):
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
-                scope.transaction = environ.get("FUNCTION_NAME")
+                scope.transaction = function_name
                 scope.add_event_processor(
                     _make_request_event_processor(configured_time, initial_time)
                 )
@@ -71,7 +73,9 @@ def _wrap_func(func):
 
                     # Starting the thread to raise timeout warning exception
                     timeout_thread.start()
-                return func(*args, **kwargs)
+                transaction = Transaction(op="gcp", name=function_name)
+                with hub.start_transaction(transaction):
+                    return func(*args, **kwargs)
             except Exception:
                 exc_info = sys.exc_info()
                 event, hint = event_from_exception(
