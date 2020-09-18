@@ -70,6 +70,9 @@ class Transport(object):
         """This gets invoked with an envelope when an event should
         be sent to sentry.  The default implementation invokes `capture_event`
         if the envelope contains an event and ignores all other envelopes.
+
+        Note that this excludes transaction events as they should be sent to
+        the envelopes endpoint always.
         """
         event = envelope.get_event()
         if event is not None:
