@@ -34,7 +34,6 @@ os.environ["GCP_PROJECT"] = "serverless_project"
 gcp_functions.worker_v1 = Mock()
 gcp_functions.worker_v1.FunctionHandler = Mock()
 gcp_functions.worker_v1.FunctionHandler.invoke_user_function = cloud_function
-function = gcp_functions.worker_v1.FunctionHandler.invoke_user_function
 
 
 import sentry_sdk
