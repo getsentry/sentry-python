@@ -137,7 +137,9 @@ def monkeypatch_test_transport(monkeypatch, validate_event_schema):
         pass
 
     def inner(client):
-        monkeypatch.setattr(client, "transport", TestTransport(check_event, check_envelope))
+        monkeypatch.setattr(
+            client, "transport", TestTransport(check_event, check_envelope)
+        )
 
     return inner
 

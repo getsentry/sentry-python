@@ -729,7 +729,6 @@ def test_init_string_types(dsn, sentry_init):
     )
 
 
-
 def test_envelope_types():
     envelopes = []
     events = []
@@ -747,17 +746,17 @@ def test_envelope_types():
         assert not envelopes
         event = events.pop()
 
-        assert event['event_id'] == event_id
-        assert 'type' not in event
+        assert event["event_id"] == event_id
+        assert "type" not in event
 
-        with start_transaction(name='foo'):
+        with start_transaction(name="foo"):
             pass
 
         assert not events
         envelope = envelopes.pop()
 
-        item, = envelope.items
-        assert item.data_category == 'transaction'
+        (item,) = envelope.items
+        assert item.data_category == "transaction"
         assert item.headers.get("type") == "transaction"
 
     assert not envelopes
