@@ -305,7 +305,8 @@ def test_redis_backend(init_celery, capture_events_forksafe, tmpdir):
         runs.append(1)
         1 / 0
 
-    res = dummy_task.delay()
+    # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
+    res = dummy_task.apply_async()
 
     with pytest.raises(Exception):
         # Celery 4.1 raises a gibberish exception
