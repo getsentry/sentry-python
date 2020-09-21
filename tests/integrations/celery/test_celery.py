@@ -22,17 +22,41 @@ def connect_signal(request):
 
 
 @pytest.fixture
-def init_celery(sentry_init):
-    def inner(propagate_traces=True, **kwargs):
+def init_celery(sentry_init, request):
+    def inner(propagate_traces=True, backend="always_eager", **kwargs):
         sentry_init(
             integrations=[CeleryIntegration(propagate_traces=propagate_traces)],
             **kwargs
         )
         celery = Celery(__name__)
-        if VERSION < (4,):
-            celery.conf.CELERY_ALWAYS_EAGER = True
+
+        if backend == "always_eager":
+            if VERSION < (4,):
+                celery.conf.CELERY_ALWAYS_EAGER = True
+            else:
+                celery.conf.task_always_eager = True
+        elif backend == "redis":
+            # broken on celery 3
+            if VERSION < (4,):
+                pytest.skip("Redis backend broken for some reason")
+
+            # this backend requires capture_events_forksafe
+            celery.conf.worker_max_tasks_per_child = 1
+            celery.conf.broker_url = "redis://127.0.0.1:6379"
+            celery.conf.result_backend = "redis://127.0.0.1:6379"
+            celery.conf.task_always_eager = False
+
+            Hub.main.bind_client(Hub.current.client)
+            request.addfinalizer(lambda: Hub.main.bind_client(None))
+
+            # Once we drop celery 3 we can use the celery_worker fixture
+            w = worker.worker(app=celery)
+            t = threading.Thread(target=w.run)
+            t.daemon = True
+            t.start()
         else:
-            celery.conf.task_always_eager = True
+            raise ValueError(backend)
+
         return celery
 
     return inner
@@ -273,15 +297,10 @@ def test_retry(celery, capture_events):
 
 
 @pytest.mark.forked
-@pytest.mark.skipif(VERSION < (4,), reason="in-memory backend broken")
-def test_transport_shutdown(request, celery, capture_events_forksafe, tmpdir):
-    events = capture_events_forksafe()
+def test_redis_backend(init_celery, capture_events_forksafe, tmpdir):
+    celery = init_celery(traces_sample_rate=1.0, backend="redis", debug=True)
 
-    celery.conf.worker_max_tasks_per_child = 1
-    celery.conf.broker_url = "memory://localhost/"
-    celery.conf.broker_backend = "memory"
-    celery.conf.result_backend = "file://{}".format(tmpdir.mkdir("celery-results"))
-    celery.conf.task_always_eager = False
+    events = capture_events_forksafe()
 
     runs = []
 
@@ -290,20 +309,25 @@ def test_transport_shutdown(request, celery, capture_events_forksafe, tmpdir):
         runs.append(1)
         1 / 0
 
-    res = dummy_task.delay()
-
-    w = worker.worker(app=celery)
-    t = threading.Thread(target=w.run)
-    t.daemon = True
-    t.start()
+    # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
+    res = dummy_task.apply_async()
 
     with pytest.raises(Exception):
         # Celery 4.1 raises a gibberish exception
         res.wait()
 
+    # if this is nonempty, the worker never really forked
+    assert not runs
+
     event = events.read_event()
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
+
+    transaction = events.read_event()
+    assert (
+        transaction["contexts"]["trace"]["trace_id"]
+        == event["contexts"]["trace"]["trace_id"]
+    )
 
     events.read_flush()
 

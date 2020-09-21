@@ -4,6 +4,7 @@ dist: xenial
 
 services:
   - postgresql
+  - redis-server
 
 language: python
 

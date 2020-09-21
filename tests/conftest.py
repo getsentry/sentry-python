@@ -197,7 +197,7 @@ def capture_events(monkeypatch):
         def append_envelope(envelope):
             for item in envelope:
                 if item.headers.get("type") in ("event", "transaction"):
-                    events.append(item.payload.json)
+                    test_client.transport.capture_event(item.payload.json)
             return old_capture_envelope(envelope)
 
         monkeypatch.setattr(test_client.transport, "capture_event", append_event)
@@ -233,8 +233,14 @@ def capture_envelopes(monkeypatch):
 
 
 @pytest.fixture
-def capture_events_forksafe(monkeypatch):
+def capture_events_forksafe(monkeypatch, capture_events, request):
     def inner():
+        in_process_events = capture_events()
+
+        @request.addfinalizer
+        def _():
+            assert not in_process_events
+
         events_r, events_w = os.pipe()
         events_r = os.fdopen(events_r, "rb", 0)
         events_w = os.fdopen(events_w, "wb", 0)
