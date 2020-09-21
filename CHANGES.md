@@ -30,7 +30,7 @@ A major release `N` implies the previous release `N-1` will no longer receive up
 
 ## 0.17.6
 
-* Support for Flask 0.10 (only relaxing verson check)
+* Support for Flask 0.10 (only relaxing version check)
 
 ## 0.17.5
 
