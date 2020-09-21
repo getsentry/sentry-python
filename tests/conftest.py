@@ -133,8 +133,10 @@ def monkeypatch_test_transport(monkeypatch, validate_event_schema):
             validate_event_schema(event)
 
     def check_envelope(envelope):
-        # Perhaps one day
-        pass
+        with capture_internal_exceptions():
+            # Assert error events are sent without envelope to server, for compat.
+            assert not any(item.data_category == "error" for item in envelope.items)
+            assert not any(item.get_event() is not None for item in envelope.items)
 
     def inner(client):
         monkeypatch.setattr(

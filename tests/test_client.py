@@ -730,6 +730,11 @@ def test_init_string_types(dsn, sentry_init):
 
 
 def test_envelope_types():
+    """
+    Tests for calling the right transport method (capture_event vs
+    capture_envelope) from the SDK client for different data types.
+    """
+
     envelopes = []
     events = []
 
@@ -743,6 +748,7 @@ def test_envelope_types():
     with Hub(Client(traces_sample_rate=1.0, transport=CustomTransport())):
         event_id = capture_message("hello")
 
+        # Assert error events get passed in via capture_event
         assert not envelopes
         event = events.pop()
 
@@ -752,6 +758,7 @@ def test_envelope_types():
         with start_transaction(name="foo"):
             pass
 
+        # Assert transactions get passed in via capture_envelope
         assert not events
         envelope = envelopes.pop()
 

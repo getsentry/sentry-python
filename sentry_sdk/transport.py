@@ -58,7 +58,8 @@ class Transport(object):
         self, event  # type: Event
     ):
         # type: (...) -> None
-        """This gets invoked with the event dictionary when an event should
+        """
+        This gets invoked with the event dictionary when an event should
         be sent to sentry.
         """
         raise NotImplementedError()
@@ -67,8 +68,13 @@ class Transport(object):
         self, envelope  # type: Envelope
     ):
         # type: (...) -> None
-        """This gets invoked with an envelope when a transaction or session should
-        be sent to sentry.
+        """
+        Send an envelope to Sentry.
+
+        Envelopes are a data container format that can hold any type of data
+        submitted to Sentry. We use it for transactions and sessions, but
+        regular "error" events should go through `capture_event` for backwards
+        compat.
         """
         raise NotImplementedError()
 
@@ -204,7 +210,6 @@ class HttpTransport(Transport):
         self, event  # type: Event
     ):
         # type: (...) -> None
-        assert event.get("type") != "transaction"
 
         if self._check_disabled("error"):
             return None
