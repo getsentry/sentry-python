@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions, json_dumps
 from sentry_sdk.worker import BackgroundWorker
-from sentry_sdk.envelope import Envelope, get_event_data_category
+from sentry_sdk.envelope import Envelope
 
 from sentry_sdk._types import MYPY
 
@@ -58,7 +58,8 @@ class Transport(object):
         self, event  # type: Event
     ):
         # type: (...) -> None
-        """This gets invoked with the event dictionary when an event should
+        """
+        This gets invoked with the event dictionary when an event should
         be sent to sentry.
         """
         raise NotImplementedError()
@@ -67,14 +68,15 @@ class Transport(object):
         self, envelope  # type: Envelope
     ):
         # type: (...) -> None
-        """This gets invoked with an envelope when an event should
-        be sent to sentry.  The default implementation invokes `capture_event`
-        if the envelope contains an event and ignores all other envelopes.
         """
-        event = envelope.get_event()
-        if event is not None:
-            self.capture_event(event)
-        return None
+        Send an envelope to Sentry.
+
+        Envelopes are a data container format that can hold any type of data
+        submitted to Sentry. We use it for transactions and sessions, but
+        regular "error" events should go through `capture_event` for backwards
+        compat.
+        """
+        raise NotImplementedError()
 
     def flush(
         self,
@@ -208,7 +210,8 @@ class HttpTransport(Transport):
         self, event  # type: Event
     ):
         # type: (...) -> None
-        if self._check_disabled(get_event_data_category(event)):
+
+        if self._check_disabled("error"):
             return None
 
         body = io.BytesIO()

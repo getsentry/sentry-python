@@ -132,8 +132,16 @@ def monkeypatch_test_transport(monkeypatch, validate_event_schema):
             check_string_keys(event)
             validate_event_schema(event)
 
+    def check_envelope(envelope):
+        with capture_internal_exceptions():
+            # Assert error events are sent without envelope to server, for compat.
+            assert not any(item.data_category == "error" for item in envelope.items)
+            assert not any(item.get_event() is not None for item in envelope.items)
+
     def inner(client):
-        monkeypatch.setattr(client, "transport", TestTransport(check_event))
+        monkeypatch.setattr(
+            client, "transport", TestTransport(check_event, check_envelope)
+        )
 
     return inner
 
@@ -167,9 +175,10 @@ def sentry_init(monkeypatch_test_transport, request):
 
 
 class TestTransport(Transport):
-    def __init__(self, capture_event_callback):
+    def __init__(self, capture_event_callback, capture_envelope_callback):
         Transport.__init__(self)
         self.capture_event = capture_event_callback
+        self.capture_envelope = capture_envelope_callback
         self._queue = None
 
 
