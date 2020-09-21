@@ -224,8 +224,12 @@ class Item(object):
     def data_category(self):
         # type: (...) -> EventDataCategory
         ty = self.headers.get("type")
-        if ty in ("session", "attachment", "transaction"):
-            return ty
+        if ty == "session":
+            return "session"
+        elif ty == "attachment":
+            return "attachment"
+        elif ty == "transaction":
+            return "transaction"
         elif ty == "event":
             return "error"
         else:
