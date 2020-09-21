@@ -20,13 +20,6 @@ if MYPY:
     from sentry_sdk._types import Event, EventDataCategory
 
 
-def get_event_data_category(event):
-    # type: (Event) -> EventDataCategory
-    if event.get("type") == "transaction":
-        return "transaction"
-    return "error"
-
-
 class Envelope(object):
     def __init__(
         self,
@@ -245,8 +238,7 @@ class Item(object):
     def get_event(self):
         # type: (...) -> Optional[Event]
         """
-        Returns a regular event if there is one. Transaction events are exempt
-        from this.
+        Returns a regular event if there is one.
         """
         if (
             self.headers.get("type") in ("event", "transaction")

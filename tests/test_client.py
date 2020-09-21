@@ -14,6 +14,7 @@ from sentry_sdk import (
     capture_message,
     capture_exception,
     capture_event,
+    start_transaction,
 )
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
@@ -726,3 +727,38 @@ def test_init_string_types(dsn, sentry_init):
         Hub.current.client.dsn
         == "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2"
     )
+
+
+
+def test_envelope_types():
+    envelopes = []
+    events = []
+
+    class CustomTransport(Transport):
+        def capture_envelope(self, envelope):
+            envelopes.append(envelope)
+
+        def capture_event(self, event):
+            events.append(event)
+
+    with Hub(Client(traces_sample_rate=1.0, transport=CustomTransport())):
+        event_id = capture_message("hello")
+
+        assert not envelopes
+        event = events.pop()
+
+        assert event['event_id'] == event_id
+        assert 'type' not in event
+
+        with start_transaction(name='foo'):
+            pass
+
+        assert not events
+        envelope = envelopes.pop()
+
+        item, = envelope.items
+        assert item.data_category == 'transaction'
+        assert item.headers.get("type") == "transaction"
+
+    assert not envelopes
+    assert not events
