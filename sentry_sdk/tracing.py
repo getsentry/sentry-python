@@ -318,7 +318,7 @@ class Span(object):
 
     def set_http_status(self, http_status):
         # type: (int) -> None
-        self.set_tag("http.status_code", http_status)
+        self.set_tag("http.status_code", str(http_status))
 
         if http_status < 400:
             self.set_status("ok")
