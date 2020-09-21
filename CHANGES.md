@@ -27,6 +27,10 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.17.7
+
+* Internal: Change data category for transaction envelopes.
+* Fix a bug under Celery 4.2+ that may have caused disjoint traces or missing transactions.
 
 ## 0.17.6
 
