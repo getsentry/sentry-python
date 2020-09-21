@@ -23,19 +23,19 @@ def connect_signal(request):
 
 @pytest.fixture
 def init_celery(sentry_init, request):
-    def inner(propagate_traces=True, backend='always_eager', **kwargs):
+    def inner(propagate_traces=True, backend="always_eager", **kwargs):
         sentry_init(
             integrations=[CeleryIntegration(propagate_traces=propagate_traces)],
             **kwargs
         )
         celery = Celery(__name__)
 
-        if backend == 'always_eager':
+        if backend == "always_eager":
             if VERSION < (4,):
                 celery.conf.CELERY_ALWAYS_EAGER = True
             else:
                 celery.conf.task_always_eager = True
-        elif backend == 'redis':
+        elif backend == "redis":
             # requires capture_events_forksafe
             celery.conf.worker_max_tasks_per_child = 1
             celery.conf.broker_url = "redis://127.0.0.1:6379"
@@ -294,7 +294,7 @@ def test_retry(celery, capture_events):
 
 @pytest.mark.forked
 def test_redis_backend(init_celery, capture_events_forksafe, tmpdir):
-    celery = init_celery(traces_sample_rate=1.0, backend='redis', debug=True)
+    celery = init_celery(traces_sample_rate=1.0, backend="redis", debug=True)
 
     events = capture_events_forksafe()
 
@@ -320,7 +320,10 @@ def test_redis_backend(init_celery, capture_events_forksafe, tmpdir):
     assert exception["type"] == "ZeroDivisionError"
 
     transaction = events.read_event()
-    assert transaction['contexts']['trace']['trace_id'] == event['contexts']['trace']['trace_id']
+    assert (
+        transaction["contexts"]["trace"]["trace_id"]
+        == event["contexts"]["trace"]["trace_id"]
+    )
 
     events.read_flush()
 
