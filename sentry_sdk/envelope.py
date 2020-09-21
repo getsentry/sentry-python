@@ -242,7 +242,7 @@ class Item(object):
     def get_event(self):
         # type: (...) -> Optional[Event]
         """
-        Returns a regular (non-transaction) event if there is one.
+        Returns an error event if there is one.
         """
         if self.headers.get("type") == "event" and self.payload.json is not None:
             return self.payload.json
