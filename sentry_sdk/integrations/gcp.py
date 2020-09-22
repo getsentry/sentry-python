@@ -44,7 +44,7 @@ def _wrap_func(func):
         client = hub.client  # type: Any
 
         configured_time = environ.get("FUNCTION_TIMEOUT_SEC")
-        function_name = environ.get("FUNCTION_NAME")
+        function_name = environ.get("FUNCTION_NAME", "")
         if not configured_time:
             logger.debug(
                 "The configured timeout could not be fetched from Cloud Functions configuration."
