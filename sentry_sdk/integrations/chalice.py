@@ -2,7 +2,7 @@ import sys
 
 from sentry_sdk._compat import reraise
 from sentry_sdk.hub import Hub
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -22,6 +22,11 @@ if MYPY:
 
     F = TypeVar("F", bound=Callable[..., Any])
 
+try:
+    from chalice import __version__ as CHALICE_VERSION
+except ImportError:
+    raise DidNotEnable("Chalice is not installed")
+
 
 class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
     def __call__(self, event, context):
@@ -36,8 +41,7 @@ class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
                     _make_request_event_processor(event, context, configured_time)
                 )
             try:
-                event_obj = self.event_class(event, context)
-                return self.func(event_obj)
+                return super.__init__(self, event, context)
             except Exception:
                 exc_info = sys.exc_info()
                 event, hint = event_from_exception(
@@ -92,7 +96,22 @@ class ChaliceIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        old_get_view_function_response = Chalice._get_view_function_response
+        try:
+            version = tuple(map(int, CHALICE_VERSION.split(".")[:3]))
+        except (ValueError, TypeError):
+            raise DidNotEnable(
+                "Unparsable Chalice version: {}".format(CHALICE_VERSION)
+            )
+        if version < (1, 20):
+            old_get_view_function_response = (
+                Chalice._get_view_function_response
+            )
+        else:
+            from chalice.app import RestAPIEventHandler
+
+            old_get_view_function_response = (
+                RestAPIEventHandler._get_view_function_response
+            )
 
         def sentry_event_response(app, view_function, function_args):
             # type: (Any, F, **Any) -> Any
@@ -104,6 +123,11 @@ class ChaliceIntegration(Integration):
                 app, wrapped_view_function, function_args
             )
 
-        Chalice._get_view_function_response = sentry_event_response
+        if version < (1, 20):
+            Chalice._get_view_function_response = sentry_event_response
+        else:
+            RestAPIEventHandler._get_view_function_response = (
+                sentry_event_response
+            )
         # for everything else (like events)
         chalice.app.EventSourceHandler = EventSourceHandler
