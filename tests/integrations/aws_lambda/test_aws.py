@@ -351,6 +351,12 @@ def test_performance_error(run_lambda_function):
         b'{"foo": "bar"}',
     )
 
+    (event,) = events
+    assert event["level"] == "error"
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "Exception"
+    assert exception["value"] == "something went wrong"
+
     (envelope,) = envelopes
 
     assert envelope["type"] == "transaction"
