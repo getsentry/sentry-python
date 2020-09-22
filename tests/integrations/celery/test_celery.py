@@ -310,8 +310,7 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe, t
         runs.append(1)
         1 / 0
 
-
-    with start_transaction(name='submit_celery'):
+    with start_transaction(name="submit_celery"):
         # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
         res = dummy_task.apply_async()
 
@@ -323,11 +322,11 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe, t
     assert not runs
 
     submit_transaction = events.read_event()
-    assert submit_transaction['type'] == 'transaction'
-    assert submit_transaction['transaction'] == 'submit_celery'
-    span, = submit_transaction['spans']
-    assert span['op'] == 'celery.submit'
-    assert span['description'] == 'dummy_task'
+    assert submit_transaction["type"] == "transaction"
+    assert submit_transaction["transaction"] == "submit_celery"
+    (span,) = submit_transaction["spans"]
+    assert span["op"] == "celery.submit"
+    assert span["description"] == "dummy_task"
 
     event = events.read_event()
     (exception,) = event["exception"]["values"]

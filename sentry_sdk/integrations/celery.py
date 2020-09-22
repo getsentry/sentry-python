@@ -112,7 +112,7 @@ def _wrap_apply_async(f):
                         # tracing tools (dd-trace-py) also employ this exact
                         # workaround and we don't want to break them.
                         kwarg_headers.setdefault("headers", {}).update(headers)
-                        kwargs['headers'] = kwarg_headers
+                        kwargs["headers"] = kwarg_headers
 
                 return f(*args, **kwargs)
         else:
