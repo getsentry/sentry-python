@@ -99,13 +99,9 @@ class ChaliceIntegration(Integration):
         try:
             version = tuple(map(int, CHALICE_VERSION.split(".")[:3]))
         except (ValueError, TypeError):
-            raise DidNotEnable(
-                "Unparsable Chalice version: {}".format(CHALICE_VERSION)
-            )
+            raise DidNotEnable("Unparsable Chalice version: {}".format(CHALICE_VERSION))
         if version < (1, 20):
-            old_get_view_function_response = (
-                Chalice._get_view_function_response
-            )
+            old_get_view_function_response = Chalice._get_view_function_response
         else:
             from chalice.app import RestAPIEventHandler
 
@@ -126,8 +122,6 @@ class ChaliceIntegration(Integration):
         if version < (1, 20):
             Chalice._get_view_function_response = sentry_event_response
         else:
-            RestAPIEventHandler._get_view_function_response = (
-                sentry_event_response
-            )
+            RestAPIEventHandler._get_view_function_response = sentry_event_response
         # for everything else (like events)
         chalice.app.EventSourceHandler = EventSourceHandler
