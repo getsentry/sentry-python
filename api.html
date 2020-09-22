@@ -4,7 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Main API &#8212; sentry-python 0.17.6 documentation</title>
+    <title>Main API &#8212; sentry-python 0.17.7 documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
@@ -827,9 +827,11 @@ semantics as <a class="reference internal" href="#sentry_sdk.Client.flush" title
 <dl class="py method">
 <dt id="sentry_sdk.Transport.capture_envelope">
 <code class="sig-name descname">capture_envelope</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">envelope</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#Transport.capture_envelope"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Transport.capture_envelope" title="Permalink to this definition">¶</a></dt>
-<dd><p>This gets invoked with an envelope when an event should
-be sent to sentry.  The default implementation invokes <cite>capture_event</cite>
-if the envelope contains an event and ignores all other envelopes.</p>
+<dd><p>Send an envelope to Sentry.</p>
+<p>Envelopes are a data container format that can hold any type of data
+submitted to Sentry. We use it for transactions and sessions, but
+regular “error” events should go through <cite>capture_event</cite> for backwards
+compat.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
 <dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p>
@@ -880,9 +882,11 @@ be sent to sentry.</p>
 <dl class="py method">
 <dt id="sentry_sdk.HttpTransport.capture_envelope">
 <code class="sig-name descname">capture_envelope</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">envelope</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#HttpTransport.capture_envelope"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.HttpTransport.capture_envelope" title="Permalink to this definition">¶</a></dt>
-<dd><p>This gets invoked with an envelope when an event should
-be sent to sentry.  The default implementation invokes <cite>capture_event</cite>
-if the envelope contains an event and ignores all other envelopes.</p>
+<dd><p>Send an envelope to Sentry.</p>
+<p>Envelopes are a data container format that can hold any type of data
+submitted to Sentry. We use it for transactions and sessions, but
+regular “error” events should go through <cite>capture_event</cite> for backwards
+compat.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
 <dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p>

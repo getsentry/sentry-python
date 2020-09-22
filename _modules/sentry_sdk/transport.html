@@ -4,7 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.transport &#8212; sentry-python 0.17.6 documentation</title>
+    <title>sentry_sdk.transport &#8212; sentry-python 0.17.7 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -42,7 +42,7 @@
 
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">Dsn</span><span class="p">,</span> <span class="n">logger</span><span class="p">,</span> <span class="n">capture_internal_exceptions</span><span class="p">,</span> <span class="n">json_dumps</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.worker</span> <span class="kn">import</span> <span class="n">BackgroundWorker</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.envelope</span> <span class="kn">import</span> <span class="n">Envelope</span><span class="p">,</span> <span class="n">get_event_data_category</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.envelope</span> <span class="kn">import</span> <span class="n">Envelope</span>
 
 <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">MYPY</span>
 
@@ -91,7 +91,8 @@
         <span class="bp">self</span><span class="p">,</span> <span class="n">event</span>  <span class="c1"># type: Event</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
-        <span class="sd">&quot;&quot;&quot;This gets invoked with the event dictionary when an event should</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This gets invoked with the event dictionary when an event should</span>
 <span class="sd">        be sent to sentry.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
@@ -100,14 +101,15 @@
         <span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span>  <span class="c1"># type: Envelope</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
-        <span class="sd">&quot;&quot;&quot;This gets invoked with an envelope when an event should</span>
-<span class="sd">        be sent to sentry.  The default implementation invokes `capture_event`</span>
-<span class="sd">        if the envelope contains an event and ignores all other envelopes.</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Send an envelope to Sentry.</span>
+
+<span class="sd">        Envelopes are a data container format that can hold any type of data</span>
+<span class="sd">        submitted to Sentry. We use it for transactions and sessions, but</span>
+<span class="sd">        regular &quot;error&quot; events should go through `capture_event` for backwards</span>
+<span class="sd">        compat.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">event</span> <span class="o">=</span> <span class="n">envelope</span><span class="o">.</span><span class="n">get_event</span><span class="p">()</span>
-        <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-        <span class="k">return</span> <span class="kc">None</span></div>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="Transport.flush"><a class="viewcode-back" href="../../api.html#sentry_sdk.Transport.flush">[docs]</a>    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -241,7 +243,8 @@
         <span class="bp">self</span><span class="p">,</span> <span class="n">event</span>  <span class="c1"># type: Event</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_disabled</span><span class="p">(</span><span class="n">get_event_data_category</span><span class="p">(</span><span class="n">event</span><span class="p">)):</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_disabled</span><span class="p">(</span><span class="s2">&quot;error&quot;</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">None</span>
 
         <span class="n">body</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
