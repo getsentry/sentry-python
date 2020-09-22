@@ -41,7 +41,7 @@ class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
                     _make_request_event_processor(event, context, configured_time)
                 )
             try:
-                return super.__init__(self, event, context)
+                return ChaliceEventSourceHandler.__call__(self, event, context)
             except Exception:
                 exc_info = sys.exc_info()
                 event, hint = event_from_exception(
