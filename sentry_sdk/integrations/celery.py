@@ -96,7 +96,7 @@ def _wrap_apply_async(f):
         hub = Hub.current
         integration = hub.get_integration(CeleryIntegration)
         if integration is not None and integration.propagate_traces:
-            with hub.start_span(op="celery.submit", description=args[0].name) as span:
+            with hub.start_span(op="celery.submit", description=args[0].name):
                 with capture_internal_exceptions():
                     headers = dict(hub.iter_trace_propagation_headers())
 
