@@ -27,6 +27,12 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+
+## 0.17.8
+
+* Fix yet another bug with disjoint traces in Celery.
+* Added support for Chalice 1.20. Thanks again to the folks at Cuenca MX!
+
 ## 0.17.7
 
 * Internal: Change data category for transaction envelopes.
