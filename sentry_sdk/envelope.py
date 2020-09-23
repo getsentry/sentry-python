@@ -263,7 +263,7 @@ class Item(object):
         """
         Returns an error event if there is one.
         """
-        if self.headers.get("type") == "event" and self.payload.json is not None:
+        if self.type == "event" and self.payload.json is not None:
             return self.payload.json
         return None
 
