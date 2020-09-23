@@ -42,6 +42,7 @@ def init_celery(sentry_init, request):
 
             # this backend requires capture_events_forksafe
             celery.conf.worker_max_tasks_per_child = 1
+            celery.conf.worker_concurrency = 1
             celery.conf.broker_url = "redis://127.0.0.1:6379"
             celery.conf.result_backend = "redis://127.0.0.1:6379"
             celery.conf.task_always_eager = False
@@ -297,7 +298,7 @@ def test_retry(celery, capture_events):
 
 
 @pytest.mark.forked
-def test_redis_backend(init_celery, capture_events_forksafe, tmpdir):
+def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe, tmpdir):
     celery = init_celery(traces_sample_rate=1.0, backend="redis", debug=True)
 
     events = capture_events_forksafe()
@@ -309,8 +310,9 @@ def test_redis_backend(init_celery, capture_events_forksafe, tmpdir):
         runs.append(1)
         1 / 0
 
-    # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
-    res = dummy_task.apply_async()
+    with start_transaction(name="submit_celery"):
+        # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
+        res = dummy_task.apply_async()
 
     with pytest.raises(Exception):
         # Celery 4.1 raises a gibberish exception
@@ -318,6 +320,13 @@ def test_redis_backend(init_celery, capture_events_forksafe, tmpdir):
 
     # if this is nonempty, the worker never really forked
     assert not runs
+
+    submit_transaction = events.read_event()
+    assert submit_transaction["type"] == "transaction"
+    assert submit_transaction["transaction"] == "submit_celery"
+    (span,) = submit_transaction["spans"]
+    assert span["op"] == "celery.submit"
+    assert span["description"] == "dummy_task"
 
     event = events.read_event()
     (exception,) = event["exception"]["values"]
@@ -327,6 +336,7 @@ def test_redis_backend(init_celery, capture_events_forksafe, tmpdir):
     assert (
         transaction["contexts"]["trace"]["trace_id"]
         == event["contexts"]["trace"]["trace_id"]
+        == submit_transaction["contexts"]["trace"]["trace_id"]
     )
 
     events.read_flush()

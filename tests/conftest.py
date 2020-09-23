@@ -235,11 +235,7 @@ def capture_envelopes(monkeypatch):
 @pytest.fixture
 def capture_events_forksafe(monkeypatch, capture_events, request):
     def inner():
-        in_process_events = capture_events()
-
-        @request.addfinalizer
-        def _():
-            assert not in_process_events
+        capture_events()
 
         events_r, events_w = os.pipe()
         events_r = os.fdopen(events_r, "rb", 0)

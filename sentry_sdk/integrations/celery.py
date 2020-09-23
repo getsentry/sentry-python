@@ -61,7 +61,6 @@ class CeleryIntegration(Integration):
                 # short-circuits to task.run if it thinks it's safe.
                 task.__call__ = _wrap_task_call(task, task.__call__)
                 task.run = _wrap_task_call(task, task.run)
-                task.apply_async = _wrap_apply_async(task, task.apply_async)
 
                 # `build_tracer` is apparently called for every task
                 # invocation. Can't wrap every celery task for every invocation
@@ -71,6 +70,10 @@ class CeleryIntegration(Integration):
             return _wrap_tracer(task, old_build_tracer(name, task, *args, **kwargs))
 
         trace.build_tracer = sentry_build_tracer
+
+        from celery.app.task import Task  # type: ignore
+
+        Task.apply_async = _wrap_apply_async(Task.apply_async)
 
         _patch_worker_exit()
 
@@ -85,19 +88,22 @@ class CeleryIntegration(Integration):
         ignore_logger("celery.redirected")
 
 
-def _wrap_apply_async(task, f):
-    # type: (Any, F) -> F
+def _wrap_apply_async(f):
+    # type: (F) -> F
     @wraps(f)
     def apply_async(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         hub = Hub.current
         integration = hub.get_integration(CeleryIntegration)
         if integration is not None and integration.propagate_traces:
-            with hub.start_span(op="celery.submit", description=task.name):
+            with hub.start_span(op="celery.submit", description=args[0].name):
                 with capture_internal_exceptions():
                     headers = dict(hub.iter_trace_propagation_headers())
+
                     if headers:
-                        kwarg_headers = kwargs.setdefault("headers", {})
+                        # Note: kwargs can contain headers=None, so no setdefault!
+                        # Unsure which backend though.
+                        kwarg_headers = kwargs.get("headers") or {}
                         kwarg_headers.update(headers)
 
                         # https://github.com/celery/celery/issues/4875
@@ -105,10 +111,8 @@ def _wrap_apply_async(task, f):
                         # Need to setdefault the inner headers too since other
                         # tracing tools (dd-trace-py) also employ this exact
                         # workaround and we don't want to break them.
-                        #
-                        # This is not reproducible outside of AMQP, therefore no
-                        # tests!
                         kwarg_headers.setdefault("headers", {}).update(headers)
+                        kwargs["headers"] = kwarg_headers
 
                 return f(*args, **kwargs)
         else:
