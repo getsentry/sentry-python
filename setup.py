@@ -8,8 +8,17 @@ Sentry-Python - Sentry SDK for Python
 <https://github.com/getsentry/sentry-python>`_ to find out more.
 """
 
+import os
 from setuptools import setup, find_packages
 
+here = os.path.abspath(os.path.dirname(__file__))
+
+
+def get_file_text(file_name):
+    with open(os.path.join(here, file_name)) as in_file:
+        return in_file.read()
+
+    
 setup(
     name="sentry-sdk",
     version="0.17.8",
@@ -17,7 +26,8 @@ setup(
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
     description="Python client for Sentry (https://sentry.io)",
-    long_description=__doc__,
+    long_description="\n".join((get_file_text("README.md"), get_file_text("CHANGES.md")))
+    long_description_content_type='text/markdown',
     packages=find_packages(exclude=("tests", "tests.*")),
     # PEP 561
     package_data={"sentry_sdk": ["py.typed"]},
