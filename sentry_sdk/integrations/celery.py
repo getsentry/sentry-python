@@ -71,7 +71,7 @@ class CeleryIntegration(Integration):
 
         trace.build_tracer = sentry_build_tracer
 
-        from celery.app.task import Task
+        from celery.app.task import Task  # type: ignore
 
         Task.apply_async = _wrap_apply_async(Task.apply_async)
 
