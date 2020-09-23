@@ -26,7 +26,7 @@ setup(
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
     description="Python client for Sentry (https://sentry.io)",
-    long_description="\n".join((get_file_text("README.md"), get_file_text("CHANGES.md")))
+    long_description="\n".join((get_file_text("README.md"), get_file_text("CHANGES.md"))),
     long_description_content_type='text/markdown',
     packages=find_packages(exclude=("tests", "tests.*")),
     # PEP 561
