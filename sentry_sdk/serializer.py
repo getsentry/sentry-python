@@ -1,4 +1,5 @@
 import sys
+import math
 
 from datetime import datetime
 
@@ -273,7 +274,12 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
                     return _flatten_annotated(result)
 
         if obj is None or isinstance(obj, (bool, number_types)):
-            return obj if not should_repr_strings else safe_repr(obj)
+            if should_repr_strings or (
+                isinstance(obj, float) and (math.isinf(obj) or math.isnan(obj))
+            ):
+                return safe_repr(obj)
+            else:
+                return obj
 
         elif isinstance(obj, datetime):
             return (
