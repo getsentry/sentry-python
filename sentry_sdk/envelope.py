@@ -6,6 +6,7 @@ import mimetypes
 from sentry_sdk._compat import text_type
 from sentry_sdk._types import MYPY
 from sentry_sdk.sessions import Session
+from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import json_dumps
 
 if MYPY:
@@ -50,6 +51,12 @@ class Envelope(object):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=event), type="event"))
 
+    def add_transaction(
+        self, transaction  # type: Transaction
+    ):
+        # type: (...) -> None
+        self.add_item(Item(payload=PayloadRef(json=transaction), type="transaction"))
+
     def add_session(
         self, session  # type: Union[Session, Any]
     ):
@@ -68,6 +75,14 @@ class Envelope(object):
         # type: (...) -> Optional[Event]
         for items in self.items:
             event = items.get_event()
+            if event is not None:
+                return event
+        return None
+
+    def get_transaction_event(self):
+        # type: (...) -> Optional[Event]
+        for item in self.items:
+            event = item.get_transaction_event()
             if event is not None:
                 return event
         return None
@@ -221,6 +236,11 @@ class Item(object):
         )
 
     @property
+    def type(self):
+        # type: (...) -> Optional[str]
+        return self.headers.get("type")
+
+    @property
     def data_category(self):
         # type: (...) -> EventDataCategory
         ty = self.headers.get("type")
@@ -244,7 +264,13 @@ class Item(object):
         """
         Returns an error event if there is one.
         """
-        if self.headers.get("type") == "event" and self.payload.json is not None:
+        if self.type == "event" and self.payload.json is not None:
+            return self.payload.json
+        return None
+
+    def get_transaction_event(self):
+        # type: (...) -> Optional[Event]
+        if self.type == "transaction" and self.payload.json is not None:
             return self.payload.json
         return None
 
@@ -277,7 +303,7 @@ class Item(object):
         headers = json.loads(line)
         length = headers["length"]
         payload = f.read(length)
-        if headers.get("type") == "event":
+        if headers.get("type") in ("event", "transaction"):
             rv = cls(headers=headers, payload=PayloadRef(json=json.loads(payload)))
         else:
             rv = cls(headers=headers, payload=payload)
