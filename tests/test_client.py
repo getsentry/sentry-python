@@ -59,33 +59,104 @@ def test_transport_option(monkeypatch):
     "dsn,env_http_proxy,env_https_proxy,arg_http_proxy,arg_https_proxy,expected_proxy_scheme",
     [
         ("http://foo@sentry.io/123", None, None, "http://localhost/123", None, "http"),
-        ("https://foo@sentry.io/123", None, None, "https://localhost/123", None, "https"),
-        ("http://foo@sentry.io/123", None, None, "http://localhost/123", "https://localhost/123", "http"),
-        ("https://foo@sentry.io/123", None, None, "http://localhost/123", "https://localhost/123", "https"),
+        (
+            "https://foo@sentry.io/123",
+            None,
+            None,
+            "https://localhost/123",
+            None,
+            "https",
+        ),
+        (
+            "http://foo@sentry.io/123",
+            None,
+            None,
+            "http://localhost/123",
+            "https://localhost/123",
+            "http",
+        ),
+        (
+            "https://foo@sentry.io/123",
+            None,
+            None,
+            "http://localhost/123",
+            "https://localhost/123",
+            "https",
+        ),
         ("https://foo@sentry.io/123", None, None, "http://localhost/123", None, "http"),
         ("http://foo@sentry.io/123", None, None, None, None, None),
         ("http://foo@sentry.io/123", "http://localhost/123", None, None, None, "http"),
-        ("https://foo@sentry.io/123", None, "https://localhost/123", None, None, "https"),
+        (
+            "https://foo@sentry.io/123",
+            None,
+            "https://localhost/123",
+            None,
+            None,
+            "https",
+        ),
         ("https://foo@sentry.io/123", "http://localhost/123", None, None, None, "http"),
-        ("https://foo@sentry.io/123", "http://localhost/123", "https://localhost/123", "", "", None),
-        ("https://foo@sentry.io/123", "http://localhost/123", "https://localhost/123", None, None, "https"),
+        (
+            "https://foo@sentry.io/123",
+            "http://localhost/123",
+            "https://localhost/123",
+            "",
+            "",
+            None,
+        ),
+        (
+            "https://foo@sentry.io/123",
+            "http://localhost/123",
+            "https://localhost/123",
+            None,
+            None,
+            "https",
+        ),
         ("https://foo@sentry.io/123", "http://localhost/123", None, None, None, "http"),
-        ("https://foo@sentry.io/123", "http://localhost/123", "https://localhost/123", None, "", "http"),
-        ("https://foo@sentry.io/123", "http://localhost/123", "https://localhost/123", "", None, "https"),
+        (
+            "https://foo@sentry.io/123",
+            "http://localhost/123",
+            "https://localhost/123",
+            None,
+            "",
+            "http",
+        ),
+        (
+            "https://foo@sentry.io/123",
+            "http://localhost/123",
+            "https://localhost/123",
+            "",
+            None,
+            "https",
+        ),
         ("https://foo@sentry.io/123", None, "https://localhost/123", None, "", None),
-        ("http://foo@sentry.io/123", "http://localhost/123", "https://localhost/123", None, None, "http"),
-    ]
+        (
+            "http://foo@sentry.io/123",
+            "http://localhost/123",
+            "https://localhost/123",
+            None,
+            None,
+            "http",
+        ),
+    ],
 )
-def test_proxy(monkeypatch, dsn, env_http_proxy, env_https_proxy, arg_http_proxy, arg_https_proxy, expected_proxy_scheme):
+def test_proxy(
+    monkeypatch,
+    dsn,
+    env_http_proxy,
+    env_https_proxy,
+    arg_http_proxy,
+    arg_https_proxy,
+    expected_proxy_scheme,
+):
     if env_http_proxy is not None:
         monkeypatch.setenv("HTTP_PROXY", env_http_proxy)
     if env_https_proxy is not None:
         monkeypatch.setenv("HTTPS_PROXY", env_https_proxy)
     kwargs = {}
     if arg_http_proxy is not None:
-        kwargs['http_proxy'] = arg_http_proxy
+        kwargs["http_proxy"] = arg_http_proxy
     if arg_https_proxy is not None:
-        kwargs['https_proxy'] = arg_https_proxy
+        kwargs["https_proxy"] = arg_https_proxy
     client = Client(dsn, **kwargs)
     if expected_proxy_scheme is None:
         assert client.transport._pool.proxy is None
