@@ -274,7 +274,9 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
                     return _flatten_annotated(result)
 
         if obj is None or isinstance(obj, (bool, number_types)):
-            if should_repr_strings or (isinstance(obj, float) and (math.isinf(obj) or math.isnan(obj))):
+            if should_repr_strings or (
+                isinstance(obj, float) and (math.isinf(obj) or math.isnan(obj))
+            ):
                 return safe_repr(obj)
             else:
                 return obj

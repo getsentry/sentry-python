@@ -15,7 +15,7 @@ from sentry_sdk import (
     capture_exception,
     capture_event,
     start_transaction,
-    set_tag
+    set_tag,
 )
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
@@ -430,7 +430,7 @@ def test_nan(sentry_init, capture_events):
     frames = event["exception"]["values"][0]["stacktrace"]["frames"]
     (frame,) = frames
     assert frame["vars"]["nan"] == "nan"
-    assert event['tags']['mynan'] == 'nan'
+    assert event["tags"]["mynan"] == "nan"
 
 
 def test_cyclic_frame_vars(sentry_init, capture_events):
