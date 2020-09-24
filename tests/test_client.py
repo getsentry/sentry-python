@@ -187,6 +187,43 @@ def test_transport_option(monkeypatch):
             "arg_https_proxy": None,
             "expected_proxy_scheme": "http",
         },
+        # NO_PROXY testcases
+        {
+            "dsn": "http://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": None,
+            "env_no_proxy": "sentry.io,example.com",
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": None,
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": "https://localhost/123",
+            "env_no_proxy": "example.com,sentry.io",
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": None,
+        },
+        {
+            "dsn": "http://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": None,
+            "env_no_proxy": "sentry.io,example.com",
+            "arg_http_proxy": "http://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "http",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": None,
+            "env_no_proxy": "sentry.io,example.com",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "https://localhost/123",
+            "expected_proxy_scheme": "https",
+        },
     ],
 )
 def test_proxy(monkeypatch, testcase):
@@ -194,6 +231,8 @@ def test_proxy(monkeypatch, testcase):
         monkeypatch.setenv("HTTP_PROXY", testcase["env_http_proxy"])
     if testcase["env_https_proxy"] is not None:
         monkeypatch.setenv("HTTPS_PROXY", testcase["env_https_proxy"])
+    if testcase.get("env_no_proxy") is not None:
+        monkeypatch.setenv("NO_PROXY", testcase["env_no_proxy"])
     kwargs = {}
     if testcase["arg_http_proxy"] is not None:
         kwargs["http_proxy"] = testcase["arg_http_proxy"]
