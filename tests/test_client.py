@@ -56,112 +56,153 @@ def test_transport_option(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "dsn,env_http_proxy,env_https_proxy,arg_http_proxy,arg_https_proxy,expected_proxy_scheme",
+    "testcase",
     [
-        ("http://foo@sentry.io/123", None, None, "http://localhost/123", None, "http"),
-        (
-            "https://foo@sentry.io/123",
-            None,
-            None,
-            "https://localhost/123",
-            None,
-            "https",
-        ),
-        (
-            "http://foo@sentry.io/123",
-            None,
-            None,
-            "http://localhost/123",
-            "https://localhost/123",
-            "http",
-        ),
-        (
-            "https://foo@sentry.io/123",
-            None,
-            None,
-            "http://localhost/123",
-            "https://localhost/123",
-            "https",
-        ),
-        ("https://foo@sentry.io/123", None, None, "http://localhost/123", None, "http"),
-        ("http://foo@sentry.io/123", None, None, None, None, None),
-        ("http://foo@sentry.io/123", "http://localhost/123", None, None, None, "http"),
-        (
-            "https://foo@sentry.io/123",
-            None,
-            "https://localhost/123",
-            None,
-            None,
-            "https",
-        ),
-        ("https://foo@sentry.io/123", "http://localhost/123", None, None, None, "http"),
-        (
-            "https://foo@sentry.io/123",
-            "http://localhost/123",
-            "https://localhost/123",
-            "",
-            "",
-            None,
-        ),
-        (
-            "https://foo@sentry.io/123",
-            "http://localhost/123",
-            "https://localhost/123",
-            None,
-            None,
-            "https",
-        ),
-        ("https://foo@sentry.io/123", "http://localhost/123", None, None, None, "http"),
-        (
-            "https://foo@sentry.io/123",
-            "http://localhost/123",
-            "https://localhost/123",
-            None,
-            "",
-            "http",
-        ),
-        (
-            "https://foo@sentry.io/123",
-            "http://localhost/123",
-            "https://localhost/123",
-            "",
-            None,
-            "https",
-        ),
-        ("https://foo@sentry.io/123", None, "https://localhost/123", None, "", None),
-        (
-            "http://foo@sentry.io/123",
-            "http://localhost/123",
-            "https://localhost/123",
-            None,
-            None,
-            "http",
-        ),
+        {
+            "dsn": "http://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": None,
+            "arg_http_proxy": "http://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "http",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": None,
+            "arg_http_proxy": "https://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "https",
+        },
+        {
+            "dsn": "http://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": None,
+            "arg_http_proxy": "http://localhost/123",
+            "arg_https_proxy": "https://localhost/123",
+            "expected_proxy_scheme": "http",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": None,
+            "arg_http_proxy": "http://localhost/123",
+            "arg_https_proxy": "https://localhost/123",
+            "expected_proxy_scheme": "https",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": None,
+            "arg_http_proxy": "http://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "http",
+        },
+        {
+            "dsn": "http://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": None,
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": None,
+        },
+        {
+            "dsn": "http://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": None,
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "http",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": "https://localhost/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "https",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": None,
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "http",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": "https://localhost/123",
+            "arg_http_proxy": "",
+            "arg_https_proxy": "",
+            "expected_proxy_scheme": None,
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": "https://localhost/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "https",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": None,
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "http",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": "https://localhost/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "",
+            "expected_proxy_scheme": "http",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": "https://localhost/123",
+            "arg_http_proxy": "",
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "https",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": "https://localhost/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "",
+            "expected_proxy_scheme": None,
+        },
+        {
+            "dsn": "http://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": "https://localhost/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "http",
+        },
     ],
 )
-def test_proxy(
-    monkeypatch,
-    dsn,
-    env_http_proxy,
-    env_https_proxy,
-    arg_http_proxy,
-    arg_https_proxy,
-    expected_proxy_scheme,
-):
-    if env_http_proxy is not None:
-        monkeypatch.setenv("HTTP_PROXY", env_http_proxy)
-    if env_https_proxy is not None:
-        monkeypatch.setenv("HTTPS_PROXY", env_https_proxy)
+def test_proxy(monkeypatch, testcase):
+    if testcase["env_http_proxy"] is not None:
+        monkeypatch.setenv("HTTP_PROXY", testcase["env_http_proxy"])
+    if testcase["env_https_proxy"] is not None:
+        monkeypatch.setenv("HTTPS_PROXY", testcase["env_https_proxy"])
     kwargs = {}
-    if arg_http_proxy is not None:
-        kwargs["http_proxy"] = arg_http_proxy
-    if arg_https_proxy is not None:
-        kwargs["https_proxy"] = arg_https_proxy
-    client = Client(dsn, **kwargs)
-    if expected_proxy_scheme is None:
+    if testcase["arg_http_proxy"] is not None:
+        kwargs["http_proxy"] = testcase["arg_http_proxy"]
+    if testcase["arg_https_proxy"] is not None:
+        kwargs["https_proxy"] = testcase["arg_https_proxy"]
+    client = Client(testcase["dsn"], **kwargs)
+    if testcase["expected_proxy_scheme"] is None:
         assert client.transport._pool.proxy is None
     else:
-        assert client.transport._pool.proxy.scheme == expected_proxy_scheme
+        assert client.transport._pool.proxy.scheme == testcase["expected_proxy_scheme"]
 
 
 def test_simple_transport(sentry_init):
