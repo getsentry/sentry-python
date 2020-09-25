@@ -55,7 +55,11 @@ def init_celery(sentry_init, request):
                 worker_fn = worker.worker(app=celery).run
             else:
                 from celery.bin.base import CLIContext
-                worker_fn = lambda: worker.worker(obj=CLIContext(app=celery, no_color=True, workdir='.', quiet=False), args=[])
+
+                worker_fn = lambda: worker.worker(
+                    obj=CLIContext(app=celery, no_color=True, workdir=".", quiet=False),
+                    args=[],
+                )
 
             worker_thread = threading.Thread(target=worker_fn)
             worker_thread.daemon = True
