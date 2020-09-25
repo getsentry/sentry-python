@@ -51,10 +51,15 @@ def init_celery(sentry_init, request):
             request.addfinalizer(lambda: Hub.main.bind_client(None))
 
             # Once we drop celery 3 we can use the celery_worker fixture
-            w = worker.worker(app=celery)
-            t = threading.Thread(target=w.run)
-            t.daemon = True
-            t.start()
+            if VERSION < (5,):
+                worker_fn = worker.worker(app=celery).run
+            else:
+                from celery.bin.base import CLIContext
+                worker_fn = lambda: worker.worker(obj=CLIContext(app=celery, no_color=True, workdir='.', quiet=False), args=[])
+
+            worker_thread = threading.Thread(target=worker_fn)
+            worker_thread.daemon = True
+            worker_thread.start()
         else:
             raise ValueError(backend)
 
