@@ -66,13 +66,12 @@ class TestTransport(HttpTransport):
         envelope = envelope_processor(envelope)
         print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
 
-def init_sdk(timeout_warning=False, traces_sample_rate=0, **extra_init_args):
+def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
         dsn="https://123abc@example.com/123",
         transport=TestTransport,
         integrations=[AwsLambdaIntegration(timeout_warning=timeout_warning)],
         shutdown_timeout=10,
-        traces_sample_rate=traces_sample_rate,
         **extra_init_args
     )
 """
@@ -113,16 +112,14 @@ def run_lambda_function(request, lambda_client, lambda_runtime):
 
         for line in base64.b64decode(response["LogResult"]).splitlines():
             print("AWS:", line)
-            if not line.startswith(b"EVENT: "):
+            if line.startswith(b"EVENT: "):
+                line = line[len(b"EVENT: ") :]
+                events.append(json.loads(line.decode("utf-8")))
+            elif line.startswith(b"ENVELOPE: "):
+                line = line[len(b"ENVELOPE: ") :]
+                envelopes.append(json.loads(line.decode("utf-8")))
+            else:
                 continue
-            line = line[len(b"EVENT: ") :]
-            events.append(json.loads(line.decode("utf-8")))
-
-        for line in base64.b64decode(response["LogResult"]).splitlines():
-            if not line.startswith(b"ENVELOPE: "):
-                continue
-            line = line[len(b"ENVELOPE: ") :]
-            envelopes.append(json.loads(line.decode("utf-8")))
 
         return envelopes, events, response
 
@@ -147,6 +144,8 @@ def test_basic(run_lambda_function):
         ),
         b'{"foo": "bar"}',
     )
+
+    assert response["FunctionError"] == "Unhandled"
 
     (event,) = events
     assert event["level"] == "error"
@@ -332,7 +331,7 @@ def test_performance_no_error(run_lambda_function):
 
     (envelope,) = envelopes
     assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == "aws_lambda"
+    assert envelope["contexts"]["trace"]["op"] == "serverless.function"
     assert envelope["transaction"].startswith("test_function_")
     assert envelope["transaction"] in envelope["request"]["url"]
 
@@ -360,6 +359,6 @@ def test_performance_error(run_lambda_function):
     (envelope,) = envelopes
 
     assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == "aws_lambda"
+    assert envelope["contexts"]["trace"]["op"] == "serverless.function"
     assert envelope["transaction"].startswith("test_function_")
     assert envelope["transaction"] in envelope["request"]["url"]

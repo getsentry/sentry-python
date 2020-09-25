@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from os import environ
 import sys
+import json
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.tracing import Transaction
@@ -12,6 +13,7 @@ from sentry_sdk.utils import (
     TimeoutThread,
 )
 from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations._wsgi_common import _filter_headers
 
 from sentry_sdk._types import MYPY
 
@@ -32,8 +34,8 @@ if MYPY:
 
 def _wrap_func(func):
     # type: (F) -> F
-    def sentry_func(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def sentry_func(functionhandler, event, *args, **kwargs):
+        # type: (Any, Any, *Any, **Any) -> Any
 
         hub = Hub.current
         integration = hub.get_integration(GcpIntegration)
@@ -44,7 +46,6 @@ def _wrap_func(func):
         client = hub.client  # type: Any
 
         configured_time = environ.get("FUNCTION_TIMEOUT_SEC")
-        function_name = environ.get("FUNCTION_NAME", "")
         if not configured_time:
             logger.debug(
                 "The configured timeout could not be fetched from Cloud Functions configuration."
@@ -58,11 +59,9 @@ def _wrap_func(func):
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
-                scope.transaction = function_name
                 scope.add_event_processor(
-                    _make_request_event_processor(configured_time, initial_time)
+                    _make_request_event_processor(event, configured_time, initial_time)
                 )
-            try:
                 if (
                     integration.timeout_warning
                     and configured_time > TIMEOUT_WARNING_BUFFER
@@ -73,21 +72,28 @@ def _wrap_func(func):
 
                     # Starting the thread to raise timeout warning exception
                     timeout_thread.start()
-                transaction = Transaction(op="gcp", name=function_name)
-                with hub.start_transaction(transaction):
+
+            headers = {}
+            if hasattr(event, "headers"):
+                headers = _filter_headers(event.headers)
+            transaction = Transaction.continue_from_headers(
+                headers, op="serverless.function", name=environ.get("FUNCTION_NAME", "")
+            )
+            with hub.start_transaction(transaction):
+                try:
                     return func(*args, **kwargs)
-            except Exception:
-                exc_info = sys.exc_info()
-                event, hint = event_from_exception(
-                    exc_info,
-                    client_options=client.options,
-                    mechanism={"type": "gcp", "handled": False},
-                )
-                hub.capture_event(event, hint=hint)
-                reraise(*exc_info)
-            finally:
-                # Flush out the event queue
-                hub.flush()
+                except Exception:
+                    exc_info = sys.exc_info()
+                    event, hint = event_from_exception(
+                        exc_info,
+                        client_options=client.options,
+                        mechanism={"type": "gcp", "handled": False},
+                    )
+                    hub.capture_event(event, hint=hint)
+                    reraise(*exc_info)
+                finally:
+                    # Flush out the event queue
+                    hub.flush()
 
     return sentry_func  # type: ignore
 
@@ -117,7 +123,7 @@ class GcpIntegration(Integration):
         )
 
 
-def _make_request_event_processor(configured_timeout, initial_time):
+def _make_request_event_processor(gcp_event, configured_timeout, initial_time):
     # type: (Any, Any) -> EventProcessor
 
     def event_processor(event, hint):
@@ -146,6 +152,18 @@ def _make_request_event_processor(configured_timeout, initial_time):
         request = event.get("request", {})
 
         request["url"] = "gcp:///{}".format(environ.get("FUNCTION_NAME"))
+
+        if hasattr(gcp_event, "method"):
+            request["method"] = gcp_event.method
+
+        if hasattr(gcp_event, "query_string"):
+            request["query_string"] = str(gcp_event.query_string)
+
+        if hasattr(gcp_event, "headers"):
+            request["headers"] = _filter_headers(gcp_event.headers)
+
+        if hasattr(gcp_event, "data"):
+            request["data"] = json.loads(gcp_event.data)
 
         event["request"] = request
 
