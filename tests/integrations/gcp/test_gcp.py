@@ -72,8 +72,6 @@ def init_sdk(timeout_warning=False, **extra_init_args):
         shutdown_timeout=10,
         **extra_init_args
     )
-functionhandler = None
-event = {}
 
 """
 
@@ -134,7 +132,9 @@ def test_handled_exception(run_cloud_function):
     envelope, event = run_cloud_function(
         dedent(
             """
-        def cloud_function():
+        functionhandler = None
+        event = {}
+        def cloud_function(functionhandler, event):
             raise Exception("something went wrong")
         """
         )
@@ -158,7 +158,9 @@ def test_unhandled_exception(run_cloud_function):
     envelope, event = run_cloud_function(
         dedent(
             """
-        def cloud_function():
+        functionhandler = None
+        event = {}
+        def cloud_function(functionhandler, event):
             x = 3/0
             return "3"
         """
@@ -183,7 +185,9 @@ def test_timeout_error(run_cloud_function):
     envelope, event = run_cloud_function(
         dedent(
             """
-        def cloud_function():
+        functionhandler = None
+        event = {}
+        def cloud_function(functionhandler, event):
             time.sleep(10)
             return "3"
         """
@@ -211,7 +215,9 @@ def test_performance_no_error(run_cloud_function):
     envelope, event = run_cloud_function(
         dedent(
             """
-        def cloud_function():
+        functionhandler = None
+        event = {}
+        def cloud_function(functionhandler, event):
             return "test_string"
         """
         )
@@ -234,7 +240,9 @@ def test_performance_error(run_cloud_function):
     envelope, event = run_cloud_function(
         dedent(
             """
-        def cloud_function():
+        functionhandler = None
+        event = {}
+        def cloud_function(functionhandler, event):
             raise Exception("something went wrong")
         """
         )

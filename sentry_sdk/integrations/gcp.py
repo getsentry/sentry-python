@@ -40,7 +40,7 @@ def _wrap_func(func):
         hub = Hub.current
         integration = hub.get_integration(GcpIntegration)
         if integration is None:
-            return func(*args, **kwargs)
+            return func(functionhandler, event, *args, **kwargs)
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
@@ -50,7 +50,7 @@ def _wrap_func(func):
             logger.debug(
                 "The configured timeout could not be fetched from Cloud Functions configuration."
             )
-            return func(*args, **kwargs)
+            return func(functionhandler, event, *args, **kwargs)
 
         configured_time = int(configured_time)
 
@@ -81,7 +81,7 @@ def _wrap_func(func):
             )
             with hub.start_transaction(transaction):
                 try:
-                    return func(*args, **kwargs)
+                    return func(functionhandler, event, *args, **kwargs)
                 except Exception:
                     exc_info = sys.exc_info()
                     event, hint = event_from_exception(
@@ -124,7 +124,7 @@ class GcpIntegration(Integration):
 
 
 def _make_request_event_processor(gcp_event, configured_timeout, initial_time):
-    # type: (Any, Any) -> EventProcessor
+    # type: (Any, Any, Any) -> EventProcessor
 
     def event_processor(event, hint):
         # type: (Event, Hint) -> Optional[Event]
@@ -157,7 +157,7 @@ def _make_request_event_processor(gcp_event, configured_timeout, initial_time):
             request["method"] = gcp_event.method
 
         if hasattr(gcp_event, "query_string"):
-            request["query_string"] = str(gcp_event.query_string)
+            request["query_string"] = gcp_event.query_string.decode("utf-8")
 
         if hasattr(gcp_event, "headers"):
             request["headers"] = _filter_headers(gcp_event.headers)
