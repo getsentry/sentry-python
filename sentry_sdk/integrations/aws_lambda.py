@@ -81,6 +81,7 @@ def _wrap_handler(handler):
                 scope.add_event_processor(
                     _make_request_event_processor(event, context, configured_time)
                 )
+                scope.set_tag("region", context.invoked_function_arn.split(":")[3])
                 # Starting the Timeout thread only if the configured time is greater than Timeout warning
                 # buffer and timeout_warning parameter is set True.
                 if (
