@@ -1,12 +1,12 @@
 from datetime import datetime, timedelta
 from os import environ
 import sys
-import json
 
-from sentry_sdk.hub import Hub
+from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.tracing import Transaction
 from sentry_sdk._compat import reraise
 from sentry_sdk.utils import (
+    AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
     logger,
@@ -163,8 +163,14 @@ def _make_request_event_processor(gcp_event, configured_timeout, initial_time):
         if hasattr(gcp_event, "headers"):
             request["headers"] = _filter_headers(gcp_event.headers)
 
-        if hasattr(gcp_event, "data"):
-            request["data"] = json.loads(gcp_event.data)
+        if _should_send_default_pii():
+            if hasattr(gcp_event, "data"):
+                request["data"] = gcp_event.data
+        else:
+            if hasattr(gcp_event, "data"):
+                # Unfortunately couldn't find a way to get structured body from GCP
+                # event. Meaning every body is unstructured to us.
+                request["data"] = AnnotatedValue("", {"rem": [["!raw", "x", 0, 0]]})
 
         event["request"] = request
 

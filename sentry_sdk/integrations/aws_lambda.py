@@ -6,6 +6,7 @@ from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.tracing import Transaction
 from sentry_sdk._compat import reraise
 from sentry_sdk.utils import (
+    AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
     logger,
@@ -282,9 +283,6 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
         if "headers" in aws_event:
             request["headers"] = _filter_headers(aws_event["headers"])
 
-        if "body" in aws_event:
-            request["data"] = aws_event.get("body", "")
-
         if _should_send_default_pii():
             user_info = event.setdefault("user", {})
 
@@ -295,6 +293,14 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
             ip = aws_event.get("identity", {}).get("sourceIp")
             if ip is not None:
                 user_info.setdefault("ip_address", ip)
+
+            if "body" in aws_event:
+                request["data"] = aws_event.get("body", "")
+        else:
+            if aws_event.get("body", None):
+                # Unfortunately couldn't find a way to get structured body from AWS
+                # event. Meaning every body is unstructured to us.
+                request["data"] = AnnotatedValue("", {"rem": [["!raw", "x", 0, 0]]})
 
         event["request"] = request
 
