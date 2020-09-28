@@ -62,7 +62,7 @@ def _wrap_func(func):
                 scope.add_event_processor(
                     _make_request_event_processor(event, configured_time, initial_time)
                 )
-                scope.set_tag("region", environ.get("FUNCTION_REGION"))
+                scope.set_tag("gcp_region", environ.get("FUNCTION_REGION"))
                 if (
                     integration.timeout_warning
                     and configured_time > TIMEOUT_WARNING_BUFFER
