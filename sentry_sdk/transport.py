@@ -276,6 +276,17 @@ class HttpTransport(Transport):
             "ca_certs": ca_certs or certifi.where(),
         }
 
+    def _in_no_proxy(self, parsed_dsn):
+        # type: (Dsn) -> bool
+        no_proxy = getproxies().get("no")
+        if not no_proxy:
+            return False
+        for host in no_proxy.split(","):
+            host = host.strip()
+            if parsed_dsn.host.endswith(host) or parsed_dsn.netloc.endswith(host):
+                return True
+        return False
+
     def _make_pool(
         self,
         parsed_dsn,  # type: Dsn
@@ -285,14 +296,15 @@ class HttpTransport(Transport):
     ):
         # type: (...) -> Union[PoolManager, ProxyManager]
         proxy = None
+        no_proxy = self._in_no_proxy(parsed_dsn)
 
         # try HTTPS first
         if parsed_dsn.scheme == "https" and (https_proxy != ""):
-            proxy = https_proxy or getproxies().get("https")
+            proxy = https_proxy or (not no_proxy and getproxies().get("https"))
 
         # maybe fallback to HTTP proxy
         if not proxy and (http_proxy != ""):
-            proxy = http_proxy or getproxies().get("http")
+            proxy = http_proxy or (not no_proxy and getproxies().get("http"))
 
         opts = self._get_pool_options(ca_certs)
 
