@@ -8,60 +8,33 @@ if MYPY:
     from django.urls.resolvers import ResolverMatch
 
 
-def patch_resolver():
+def patch_views():
     # type: () -> None
-    try:
-        from django.urls.resolvers import URLResolver
-    except ImportError:
-        try:
-            from django.urls.resolvers import RegexURLResolver as URLResolver
-        except ImportError:
-            from django.core.urlresolvers import RegexURLResolver as URLResolver
 
+    from django.core.handlers.base import BaseHandler
     from sentry_sdk.integrations.django import DjangoIntegration
 
-    old_resolve = URLResolver.resolve
+    old_make_view_atomic = BaseHandler.make_view_atomic
 
-    def resolve(self, path):
-        # type: (URLResolver, Any) -> ResolverMatch
+    @_functools.wraps(old_make_view_atomic)
+    def sentry_patched_make_view_atomic(self, *args, **kwargs):
+        callback = old_make_view_atomic(self, *args, **kwargs)
+
+        # XXX: The wrapper function is created for every request. Find more
+        # efficient way to wrap views (or build a cache?)
+
         hub = Hub.current
         integration = hub.get_integration(DjangoIntegration)
 
-        if integration is None or not integration.middleware_spans:
-            return old_resolve(self, path)
+        if integration is not None and integration.middleware_spans:
+            @_functools.wraps(callback)
+            def sentry_wrapped_callback(request, *args, **kwargs):
+                with hub.start_span(op="django.view", description=request.resolver_match.view_name):
+                    return callback(request, *args, **kwargs)
 
-        return _wrap_resolver_match(hub, old_resolve(self, path))
+        else:
+            sentry_wrapped_callback = callback
 
-    URLResolver.resolve = resolve
+        return sentry_wrapped_callback
 
-
-def _wrap_resolver_match(hub, resolver_match):
-    # type: (Hub, ResolverMatch) -> ResolverMatch
-
-    # XXX: The wrapper function is created for every request. Find more
-    # efficient way to wrap views (or build a cache?)
-
-    old_callback = resolver_match.func
-
-    # Explicitly forward `csrf_exempt` in case it is not an attribute in
-    # callback.__dict__, but rather a class attribute (on a class
-    # implementing __call__) such as this:
-    #
-    #     class Foo(object):
-    #         csrf_exempt = True
-    #
-    #         def __call__(self, request): ...
-    #
-    # We have had this in the Sentry codebase (for no good reason, but
-    # nevertheless we broke user code)
-    assigned = _functools.WRAPPER_ASSIGNMENTS + ("csrf_exempt",)
-
-    @_functools.wraps(old_callback, assigned=assigned)
-    def callback(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
-        with hub.start_span(op="django.view", description=resolver_match.view_name):
-            return old_callback(*args, **kwargs)
-
-    resolver_match.func = callback
-
-    return resolver_match
+    BaseHandler.make_view_atomic = sentry_patched_make_view_atomic

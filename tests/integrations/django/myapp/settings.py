@@ -59,6 +59,11 @@ INSTALLED_APPS = [
 
 class TestMiddleware(MiddlewareMixin):
     def process_request(self, request):
+        # https://github.com/getsentry/sentry-python/issues/837 -- We should
+        # not touch the resolver_match because apparently people rely on it.
+        if request.resolver_match:
+            assert not getattr(request.resolver_match.callback, "__wrapped__", None)
+
         if "middleware-exc" in request.path:
             1 / 0
 
