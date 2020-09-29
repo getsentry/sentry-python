@@ -27,6 +27,11 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.18.0
+
+* **Breaking change**: The `no_proxy` environment variable is now honored when inferring proxy settings from the system. Thanks Xavier Fernandez!
+* Added Performance/Tracing support for AWS and GCP functions.
+* Fix an issue with Django instrumentation where the SDK modified `resolver_match.callback` and broke user code.
 
 ## 0.17.8
 
