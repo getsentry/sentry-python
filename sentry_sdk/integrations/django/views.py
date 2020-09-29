@@ -5,8 +5,6 @@ from sentry_sdk import _functools
 if MYPY:
     from typing import Any
 
-    from django.urls.resolvers import ResolverMatch
-
 
 def patch_views():
     # type: () -> None
@@ -18,6 +16,7 @@ def patch_views():
 
     @_functools.wraps(old_make_view_atomic)
     def sentry_patched_make_view_atomic(self, *args, **kwargs):
+        # type: (Any, *Any, **Any) -> Any
         callback = old_make_view_atomic(self, *args, **kwargs)
 
         # XXX: The wrapper function is created for every request. Find more
@@ -30,6 +29,7 @@ def patch_views():
 
             @_functools.wraps(callback)
             def sentry_wrapped_callback(request, *args, **kwargs):
+                # type: (Any, *Any, **Any) -> Any
                 with hub.start_span(
                     op="django.view", description=request.resolver_match.view_name
                 ):
