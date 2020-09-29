@@ -34,13 +34,13 @@ if MYPY:
 
 def _wrap_func(func):
     # type: (F) -> F
-    def sentry_func(functionhandler, event, *args, **kwargs):
-        # type: (Any, Any, *Any, **Any) -> Any
+    def sentry_func(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
 
         hub = Hub.current
         integration = hub.get_integration(GcpIntegration)
         if integration is None:
-            return func(functionhandler, event, *args, **kwargs)
+            return func(*args, **kwargs)
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
@@ -50,7 +50,7 @@ def _wrap_func(func):
             logger.debug(
                 "The configured timeout could not be fetched from Cloud Functions configuration."
             )
-            return func(functionhandler, event, *args, **kwargs)
+            return func(*args, **kwargs)
 
         configured_time = int(configured_time)
 
@@ -76,7 +76,7 @@ def _wrap_func(func):
 
             headers = {}
             if hasattr(event, "headers"):
-                headers = _filter_headers(event.headers)
+                headers = event.headers
             transaction = Transaction.continue_from_headers(
                 headers, op="serverless.function", name=environ.get("FUNCTION_NAME", "")
             )

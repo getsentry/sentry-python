@@ -100,7 +100,7 @@ def _wrap_handler(handler):
                     # Starting the thread to raise timeout warning exception
                     timeout_thread.start()
 
-            headers = _filter_headers(event.get("headers", {}))
+            headers = event.get("headers", {})
             transaction = Transaction.continue_from_headers(
                 headers, op="serverless.function", name=context.function_name
             )
