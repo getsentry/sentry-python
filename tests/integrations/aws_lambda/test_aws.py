@@ -40,6 +40,19 @@ def event_processor(event):
     # to print less to logs.
     return event
 
+def envelope_processor(envelope):
+    (item,) = envelope.items
+    envelope_json = json.loads(item.get_bytes())
+
+    envelope_data = {}
+    envelope_data[\"contexts\"] = {}
+    envelope_data[\"type\"] = envelope_json[\"type\"]
+    envelope_data[\"transaction\"] = envelope_json[\"transaction\"]
+    envelope_data[\"contexts\"][\"trace\"] = envelope_json[\"contexts\"][\"trace\"]
+    envelope_data[\"request\"] = envelope_json[\"request\"]
+
+    return envelope_data
+
 class TestTransport(HttpTransport):
     def _send_event(self, event):
         event = event_processor(event)
@@ -48,6 +61,10 @@ class TestTransport(HttpTransport):
         # explicitly add a newline at the end even though `print` would provide
         # us one.
         print("\\nEVENT: {}\\n".format(json.dumps(event)))
+
+    def _send_envelope(self, envelope):
+        envelope = envelope_processor(envelope)
+        print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
 
 def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
@@ -91,21 +108,26 @@ def run_lambda_function(request, lambda_client, lambda_runtime):
         )
 
         events = []
+        envelopes = []
 
         for line in base64.b64decode(response["LogResult"]).splitlines():
             print("AWS:", line)
-            if not line.startswith(b"EVENT: "):
+            if line.startswith(b"EVENT: "):
+                line = line[len(b"EVENT: ") :]
+                events.append(json.loads(line.decode("utf-8")))
+            elif line.startswith(b"ENVELOPE: "):
+                line = line[len(b"ENVELOPE: ") :]
+                envelopes.append(json.loads(line.decode("utf-8")))
+            else:
                 continue
-            line = line[len(b"EVENT: ") :]
-            events.append(json.loads(line.decode("utf-8")))
 
-        return events, response
+        return envelopes, events, response
 
     return inner
 
 
 def test_basic(run_lambda_function):
-    events, response = run_lambda_function(
+    envelopes, events, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -160,7 +182,7 @@ def test_initialization_order(run_lambda_function):
     as seen by AWS already runs. At this point at least draining the queue
     should work."""
 
-    events, _response = run_lambda_function(
+    envelopes, events, _response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -180,7 +202,7 @@ def test_initialization_order(run_lambda_function):
 
 
 def test_request_data(run_lambda_function):
-    events, _response = run_lambda_function(
+    envelopes, events, _response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -235,7 +257,7 @@ def test_init_error(run_lambda_function, lambda_runtime):
     if lambda_runtime == "python2.7":
         pytest.skip("initialization error not supported on Python 2.7")
 
-    events, response = run_lambda_function(
+    envelopes, events, response = run_lambda_function(
         LAMBDA_PRELUDE
         + (
             "def event_processor(event):\n"
@@ -252,7 +274,7 @@ def test_init_error(run_lambda_function, lambda_runtime):
 
 
 def test_timeout_error(run_lambda_function):
-    events, response = run_lambda_function(
+    envelopes, events, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -291,3 +313,52 @@ def test_timeout_error(run_lambda_function):
     log_stream = event["extra"]["cloudwatch logs"]["log_stream"]
 
     assert re.match(log_stream_re, log_stream)
+
+
+def test_performance_no_error(run_lambda_function):
+    envelopes, events, response = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0)
+
+        def test_handler(event, context):
+            return "test_string"
+        """
+        ),
+        b'{"foo": "bar"}',
+    )
+
+    (envelope,) = envelopes
+    assert envelope["type"] == "transaction"
+    assert envelope["contexts"]["trace"]["op"] == "serverless.function"
+    assert envelope["transaction"].startswith("test_function_")
+    assert envelope["transaction"] in envelope["request"]["url"]
+
+
+def test_performance_error(run_lambda_function):
+    envelopes, events, response = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0)
+
+        def test_handler(event, context):
+            raise Exception("something went wrong")
+        """
+        ),
+        b'{"foo": "bar"}',
+    )
+
+    (event,) = events
+    assert event["level"] == "error"
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "Exception"
+    assert exception["value"] == "something went wrong"
+
+    (envelope,) = envelopes
+
+    assert envelope["type"] == "transaction"
+    assert envelope["contexts"]["trace"]["op"] == "serverless.function"
+    assert envelope["transaction"].startswith("test_function_")
+    assert envelope["transaction"] in envelope["request"]["url"]

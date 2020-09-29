@@ -2,15 +2,18 @@ from datetime import datetime, timedelta
 from os import environ
 import sys
 
-from sentry_sdk.hub import Hub
+from sentry_sdk.hub import Hub, _should_send_default_pii
+from sentry_sdk.tracing import Transaction
 from sentry_sdk._compat import reraise
 from sentry_sdk.utils import (
+    AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
     logger,
     TimeoutThread,
 )
 from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations._wsgi_common import _filter_headers
 
 from sentry_sdk._types import MYPY
 
@@ -31,13 +34,13 @@ if MYPY:
 
 def _wrap_func(func):
     # type: (F) -> F
-    def sentry_func(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def sentry_func(functionhandler, event, *args, **kwargs):
+        # type: (Any, Any, *Any, **Any) -> Any
 
         hub = Hub.current
         integration = hub.get_integration(GcpIntegration)
         if integration is None:
-            return func(*args, **kwargs)
+            return func(functionhandler, event, *args, **kwargs)
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
@@ -47,7 +50,7 @@ def _wrap_func(func):
             logger.debug(
                 "The configured timeout could not be fetched from Cloud Functions configuration."
             )
-            return func(*args, **kwargs)
+            return func(functionhandler, event, *args, **kwargs)
 
         configured_time = int(configured_time)
 
@@ -56,11 +59,10 @@ def _wrap_func(func):
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
-                scope.transaction = environ.get("FUNCTION_NAME")
                 scope.add_event_processor(
-                    _make_request_event_processor(configured_time, initial_time)
+                    _make_request_event_processor(event, configured_time, initial_time)
                 )
-            try:
+                scope.set_tag("gcp_region", environ.get("FUNCTION_REGION"))
                 if (
                     integration.timeout_warning
                     and configured_time > TIMEOUT_WARNING_BUFFER
@@ -71,19 +73,28 @@ def _wrap_func(func):
 
                     # Starting the thread to raise timeout warning exception
                     timeout_thread.start()
-                return func(*args, **kwargs)
-            except Exception:
-                exc_info = sys.exc_info()
-                event, hint = event_from_exception(
-                    exc_info,
-                    client_options=client.options,
-                    mechanism={"type": "gcp", "handled": False},
-                )
-                hub.capture_event(event, hint=hint)
-                reraise(*exc_info)
-            finally:
-                # Flush out the event queue
-                hub.flush()
+
+            headers = {}
+            if hasattr(event, "headers"):
+                headers = event.headers
+            transaction = Transaction.continue_from_headers(
+                headers, op="serverless.function", name=environ.get("FUNCTION_NAME", "")
+            )
+            with hub.start_transaction(transaction):
+                try:
+                    return func(functionhandler, event, *args, **kwargs)
+                except Exception:
+                    exc_info = sys.exc_info()
+                    event, hint = event_from_exception(
+                        exc_info,
+                        client_options=client.options,
+                        mechanism={"type": "gcp", "handled": False},
+                    )
+                    hub.capture_event(event, hint=hint)
+                    reraise(*exc_info)
+                finally:
+                    # Flush out the event queue
+                    hub.flush()
 
     return sentry_func  # type: ignore
 
@@ -113,8 +124,8 @@ class GcpIntegration(Integration):
         )
 
 
-def _make_request_event_processor(configured_timeout, initial_time):
-    # type: (Any, Any) -> EventProcessor
+def _make_request_event_processor(gcp_event, configured_timeout, initial_time):
+    # type: (Any, Any, Any) -> EventProcessor
 
     def event_processor(event, hint):
         # type: (Event, Hint) -> Optional[Event]
@@ -142,6 +153,24 @@ def _make_request_event_processor(configured_timeout, initial_time):
         request = event.get("request", {})
 
         request["url"] = "gcp:///{}".format(environ.get("FUNCTION_NAME"))
+
+        if hasattr(gcp_event, "method"):
+            request["method"] = gcp_event.method
+
+        if hasattr(gcp_event, "query_string"):
+            request["query_string"] = gcp_event.query_string.decode("utf-8")
+
+        if hasattr(gcp_event, "headers"):
+            request["headers"] = _filter_headers(gcp_event.headers)
+
+        if _should_send_default_pii():
+            if hasattr(gcp_event, "data"):
+                request["data"] = gcp_event.data
+        else:
+            if hasattr(gcp_event, "data"):
+                # Unfortunately couldn't find a way to get structured body from GCP
+                # event. Meaning every body is unstructured to us.
+                request["data"] = AnnotatedValue("", {"rem": [["!raw", "x", 0, 0]]})
 
         event["request"] = request
 

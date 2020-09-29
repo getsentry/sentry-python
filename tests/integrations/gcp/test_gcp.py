@@ -33,7 +33,6 @@ os.environ["GCP_PROJECT"] = "serverless_project"
 gcp_functions.worker_v1 = Mock()
 gcp_functions.worker_v1.FunctionHandler = Mock()
 gcp_functions.worker_v1.FunctionHandler.invoke_user_function = cloud_function
-function = gcp_functions.worker_v1.FunctionHandler.invoke_user_function
 
 
 import sentry_sdk
@@ -48,6 +47,10 @@ def event_processor(event):
     time.sleep(1)
     return event
 
+def envelope_processor(envelope):
+    (item,) = envelope.items
+    return item.get_bytes()
+
 class TestTransport(HttpTransport):
     def _send_event(self, event):
         event = event_processor(event)
@@ -55,7 +58,11 @@ class TestTransport(HttpTransport):
         # therefore cannot be interleaved with other threads. This is why we
         # explicitly add a newline at the end even though `print` would provide
         # us one.
-        print("EVENTS: {}".format(json.dumps(event)))
+        print("\\nEVENT: {}\\n".format(json.dumps(event)))
+
+    def _send_envelope(self, envelope):
+        envelope = envelope_processor(envelope)
+        print("\\nENVELOPE: {}\\n".format(envelope.decode(\"utf-8\")))
 
 def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
@@ -74,6 +81,7 @@ def run_cloud_function():
     def inner(code, subprocess_kwargs=()):
 
         event = []
+        envelope = []
 
         # STEP : Create a zip of cloud function
 
@@ -102,19 +110,31 @@ def run_cloud_function():
             )
 
             stream = os.popen("python {}/main.py".format(tmpdir))
-            event = stream.read()
-            event = json.loads(event[len("EVENT: ") :])
+            stream_data = stream.read()
 
-        return event
+            for line in stream_data.splitlines():
+                print("GCP:", line)
+                if line.startswith("EVENT: "):
+                    line = line[len("EVENT: ") :]
+                    event = json.loads(line)
+                elif line.startswith("ENVELOPE: "):
+                    line = line[len("ENVELOPE: ") :]
+                    envelope = json.loads(line)
+                else:
+                    continue
+
+        return envelope, event
 
     return inner
 
 
 def test_handled_exception(run_cloud_function):
-    event = run_cloud_function(
+    envelope, event = run_cloud_function(
         dedent(
             """
-        def cloud_function():
+        functionhandler = None
+        event = {}
+        def cloud_function(functionhandler, event):
             raise Exception("something went wrong")
         """
         )
@@ -122,7 +142,7 @@ def test_handled_exception(run_cloud_function):
         + dedent(
             """
         init_sdk(timeout_warning=False)
-        gcp_functions.worker_v1.FunctionHandler.invoke_user_function()
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
     )
@@ -135,10 +155,12 @@ def test_handled_exception(run_cloud_function):
 
 
 def test_unhandled_exception(run_cloud_function):
-    event = run_cloud_function(
+    envelope, event = run_cloud_function(
         dedent(
             """
-        def cloud_function():
+        functionhandler = None
+        event = {}
+        def cloud_function(functionhandler, event):
             x = 3/0
             return "3"
         """
@@ -147,7 +169,7 @@ def test_unhandled_exception(run_cloud_function):
         + dedent(
             """
         init_sdk(timeout_warning=False)
-        gcp_functions.worker_v1.FunctionHandler.invoke_user_function()
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
     )
@@ -160,10 +182,12 @@ def test_unhandled_exception(run_cloud_function):
 
 
 def test_timeout_error(run_cloud_function):
-    event = run_cloud_function(
+    envelope, event = run_cloud_function(
         dedent(
             """
-        def cloud_function():
+        functionhandler = None
+        event = {}
+        def cloud_function(functionhandler, event):
             time.sleep(10)
             return "3"
         """
@@ -172,7 +196,7 @@ def test_timeout_error(run_cloud_function):
         + dedent(
             """
         init_sdk(timeout_warning=True)
-        gcp_functions.worker_v1.FunctionHandler.invoke_user_function()
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
     )
@@ -185,3 +209,59 @@ def test_timeout_error(run_cloud_function):
         == "WARNING : Function is expected to get timed out. Configured timeout duration = 3 seconds."
     )
     assert exception["mechanism"] == {"type": "threading", "handled": False}
+
+
+def test_performance_no_error(run_cloud_function):
+    envelope, event = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+        event = {}
+        def cloud_function(functionhandler, event):
+            return "test_string"
+        """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0)
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+        )
+    )
+
+    assert envelope["type"] == "transaction"
+    assert envelope["contexts"]["trace"]["op"] == "serverless.function"
+    assert envelope["transaction"].startswith("Google Cloud function")
+    assert envelope["transaction"] in envelope["request"]["url"]
+
+
+def test_performance_error(run_cloud_function):
+    envelope, event = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+        event = {}
+        def cloud_function(functionhandler, event):
+            raise Exception("something went wrong")
+        """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0)
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+        )
+    )
+
+    assert envelope["type"] == "transaction"
+    assert envelope["contexts"]["trace"]["op"] == "serverless.function"
+    assert envelope["transaction"].startswith("Google Cloud function")
+    assert envelope["transaction"] in envelope["request"]["url"]
+    assert event["level"] == "error"
+    (exception,) = event["exception"]["values"]
+
+    assert exception["type"] == "Exception"
+    assert exception["value"] == "something went wrong"
+    assert exception["mechanism"] == {"type": "gcp", "handled": False}

@@ -3,6 +3,7 @@ from os import environ
 import sys
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
+from sentry_sdk.tracing import Transaction
 from sentry_sdk._compat import reraise
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -78,10 +79,10 @@ def _wrap_handler(handler):
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
-                scope.transaction = context.function_name
                 scope.add_event_processor(
                     _make_request_event_processor(event, context, configured_time)
                 )
+                scope.set_tag("aws_region", context.invoked_function_arn.split(":")[3])
                 # Starting the Timeout thread only if the configured time is greater than Timeout warning
                 # buffer and timeout_warning parameter is set True.
                 if (
@@ -99,17 +100,22 @@ def _wrap_handler(handler):
                     # Starting the thread to raise timeout warning exception
                     timeout_thread.start()
 
-            try:
-                return handler(event, context, *args, **kwargs)
-            except Exception:
-                exc_info = sys.exc_info()
-                event, hint = event_from_exception(
-                    exc_info,
-                    client_options=client.options,
-                    mechanism={"type": "aws_lambda", "handled": False},
-                )
-                hub.capture_event(event, hint=hint)
-                reraise(*exc_info)
+            headers = event.get("headers", {})
+            transaction = Transaction.continue_from_headers(
+                headers, op="serverless.function", name=context.function_name
+            )
+            with hub.start_transaction(transaction):
+                try:
+                    return handler(event, context, *args, **kwargs)
+                except Exception:
+                    exc_info = sys.exc_info()
+                    event, hint = event_from_exception(
+                        exc_info,
+                        client_options=client.options,
+                        mechanism={"type": "aws_lambda", "handled": False},
+                    )
+                    hub.capture_event(event, hint=hint)
+                    reraise(*exc_info)
 
     return sentry_handler  # type: ignore
 
@@ -277,11 +283,6 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
         if "headers" in aws_event:
             request["headers"] = _filter_headers(aws_event["headers"])
 
-        if aws_event.get("body", None):
-            # Unfortunately couldn't find a way to get structured body from AWS
-            # event. Meaning every body is unstructured to us.
-            request["data"] = AnnotatedValue("", {"rem": [["!raw", "x", 0, 0]]})
-
         if _should_send_default_pii():
             user_info = event.setdefault("user", {})
 
@@ -292,6 +293,14 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
             ip = aws_event.get("identity", {}).get("sourceIp")
             if ip is not None:
                 user_info.setdefault("ip_address", ip)
+
+            if "body" in aws_event:
+                request["data"] = aws_event.get("body", "")
+        else:
+            if aws_event.get("body", None):
+                # Unfortunately couldn't find a way to get structured body from AWS
+                # event. Meaning every body is unstructured to us.
+                request["data"] = AnnotatedValue("", {"rem": [["!raw", "x", 0, 0]]})
 
         event["request"] = request
 
