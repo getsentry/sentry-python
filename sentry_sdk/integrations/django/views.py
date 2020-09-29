@@ -27,9 +27,12 @@ def patch_views():
         integration = hub.get_integration(DjangoIntegration)
 
         if integration is not None and integration.middleware_spans:
+
             @_functools.wraps(callback)
             def sentry_wrapped_callback(request, *args, **kwargs):
-                with hub.start_span(op="django.view", description=request.resolver_match.view_name):
+                with hub.start_span(
+                    op="django.view", description=request.resolver_match.view_name
+                ):
                     return callback(request, *args, **kwargs)
 
         else:
