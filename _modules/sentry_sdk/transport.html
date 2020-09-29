@@ -4,7 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.transport &#8212; sentry-python 0.17.8 documentation</title>
+    <title>sentry_sdk.transport &#8212; sentry-python 0.18.0 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -309,6 +309,17 @@
             <span class="s2">&quot;ca_certs&quot;</span><span class="p">:</span> <span class="n">ca_certs</span> <span class="ow">or</span> <span class="n">certifi</span><span class="o">.</span><span class="n">where</span><span class="p">(),</span>
         <span class="p">}</span>
 
+    <span class="k">def</span> <span class="nf">_in_no_proxy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parsed_dsn</span><span class="p">):</span>
+        <span class="c1"># type: (Dsn) -&gt; bool</span>
+        <span class="n">no_proxy</span> <span class="o">=</span> <span class="n">getproxies</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;no&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">no_proxy</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">for</span> <span class="n">host</span> <span class="ow">in</span> <span class="n">no_proxy</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">):</span>
+            <span class="n">host</span> <span class="o">=</span> <span class="n">host</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">parsed_dsn</span><span class="o">.</span><span class="n">host</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="n">host</span><span class="p">)</span> <span class="ow">or</span> <span class="n">parsed_dsn</span><span class="o">.</span><span class="n">netloc</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="n">host</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
     <span class="k">def</span> <span class="nf">_make_pool</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">parsed_dsn</span><span class="p">,</span>  <span class="c1"># type: Dsn</span>
@@ -318,14 +329,15 @@
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Union[PoolManager, ProxyManager]</span>
         <span class="n">proxy</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">no_proxy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_in_no_proxy</span><span class="p">(</span><span class="n">parsed_dsn</span><span class="p">)</span>
 
         <span class="c1"># try HTTPS first</span>
         <span class="k">if</span> <span class="n">parsed_dsn</span><span class="o">.</span><span class="n">scheme</span> <span class="o">==</span> <span class="s2">&quot;https&quot;</span> <span class="ow">and</span> <span class="p">(</span><span class="n">https_proxy</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>
-            <span class="n">proxy</span> <span class="o">=</span> <span class="n">https_proxy</span> <span class="ow">or</span> <span class="n">getproxies</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;https&quot;</span><span class="p">)</span>
+            <span class="n">proxy</span> <span class="o">=</span> <span class="n">https_proxy</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">no_proxy</span> <span class="ow">and</span> <span class="n">getproxies</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;https&quot;</span><span class="p">))</span>
 
         <span class="c1"># maybe fallback to HTTP proxy</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">proxy</span> <span class="ow">and</span> <span class="p">(</span><span class="n">http_proxy</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>
-            <span class="n">proxy</span> <span class="o">=</span> <span class="n">http_proxy</span> <span class="ow">or</span> <span class="n">getproxies</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;http&quot;</span><span class="p">)</span>
+            <span class="n">proxy</span> <span class="o">=</span> <span class="n">http_proxy</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">no_proxy</span> <span class="ow">and</span> <span class="n">getproxies</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;http&quot;</span><span class="p">))</span>
 
         <span class="n">opts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_pool_options</span><span class="p">(</span><span class="n">ca_certs</span><span class="p">)</span>
 
