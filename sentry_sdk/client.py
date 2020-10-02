@@ -128,7 +128,7 @@ class _Client(object):
             self.integrations = setup_integrations(
                 self.options["integrations"],
                 with_defaults=self.options["default_integrations"],
-                with_auto_enabling_integrations=self.options["_experiments"].get(
+                with_auto_enabling_integrations=self.options["auto_enabling_integrations"] or self.options["_experiments"].get(
                     "auto_enabling_integrations", False
                 ),
             )

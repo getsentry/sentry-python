@@ -64,6 +64,7 @@ class ClientConstructor(object):
         ca_certs=None,  # type: Optional[str]
         propagate_traces=True,  # type: bool
         traces_sample_rate=0.0,  # type: float
+        auto_enabling_integrations=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
     ):
         # type: (...) -> None
