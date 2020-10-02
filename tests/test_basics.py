@@ -43,7 +43,7 @@ def test_processors(sentry_init, capture_events):
 def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
     caplog.set_level(logging.DEBUG)
 
-    sentry_init(_experiments={"auto_enabling_integrations": True}, debug=True)
+    sentry_init(auto_enabling_integrations=True, debug=True)
 
     for import_string in _AUTO_ENABLING_INTEGRATIONS:
         assert any(
