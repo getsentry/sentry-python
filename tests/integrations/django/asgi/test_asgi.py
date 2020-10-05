@@ -55,7 +55,7 @@ async def test_async_views(sentry_init, capture_events, application):
     response = await comm.get_response()
     assert response["status"] == 200
 
-    event, = events
+    (event,) = events
 
     assert event["transaction"] == "/async_message"
     assert event["request"] == {

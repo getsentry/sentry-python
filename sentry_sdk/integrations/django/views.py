@@ -39,10 +39,20 @@ def patch_views():
 
         if integration is not None and integration.middleware_spans:
 
-            if iscoroutinefunction is not None and wrap_async_view is not None and iscoroutinefunction(callback):
+            if (
+                iscoroutinefunction is not None
+                and wrap_async_view is not None
+                and iscoroutinefunction(callback)
+            ):
                 sentry_wrapped_callback = wrap_async_view(hub, callback)
             else:
-                print((iscoroutinefunction, wrap_async_view, iscoroutinefunction(callback)))
+                print(
+                    (
+                        iscoroutinefunction,
+                        wrap_async_view,
+                        iscoroutinefunction(callback),
+                    )
+                )
                 sentry_wrapped_callback = _wrap_sync_view(hub, callback)
 
         else:
