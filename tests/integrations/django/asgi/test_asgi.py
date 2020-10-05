@@ -43,6 +43,7 @@ async def test_basic(sentry_init, capture_events, application):
     event = events[-1]
     assert "request" not in event
 
+
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
 async def test_async_views(sentry_init, capture_events, application):
