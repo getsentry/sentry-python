@@ -122,6 +122,5 @@ def csrf_hello_not_exempt(*args, **kwargs):
     return HttpResponse("ok")
 
 
-@csrf_exempt
 async def async_ok(request):
     return HttpResponse("ok")

@@ -14,7 +14,7 @@ if django.VERSION >= (3, 0):
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
-async def test_basic(sentry_init, capture_events, application, request):
+async def test_basic(sentry_init, capture_events, application):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
 
     events = capture_events()
@@ -43,7 +43,13 @@ async def test_basic(sentry_init, capture_events, application, request):
     event = events[-1]
     assert "request" not in event
 
-    # Test that async views work properly
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.asyncio
+async def test_async_views(sentry_init, capture_events, application):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+
+    events = capture_events()
+
     comm = HttpCommunicator(application, "GET", "/async_ok")
     response = await comm.get_response()
     assert response["status"] == 200
