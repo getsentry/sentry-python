@@ -1,12 +1,8 @@
-import pytest
-
 import django
-
+import pytest
 from channels.testing import HttpCommunicator
-
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.django import DjangoIntegration
-
 from tests.integrations.django.myapp.asgi import channels_application
 
 APPS = [channels_application]
@@ -46,3 +42,8 @@ async def test_basic(sentry_init, capture_events, application, request):
     capture_message("hi")
     event = events[-1]
     assert "request" not in event
+
+    # Test that async views work properly
+    comm = HttpCommunicator(application, "GET", "/async_ok")
+    response = await comm.get_response()
+    assert response["status"] == 200

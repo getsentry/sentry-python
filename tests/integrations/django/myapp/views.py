@@ -1,11 +1,11 @@
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
-from django.http import HttpResponse, HttpResponseServerError, HttpResponseNotFound
+from django.http import HttpResponse, HttpResponseNotFound, HttpResponseServerError
 from django.shortcuts import render
-from django.views.generic import ListView
-from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from django.views.generic import ListView
 
 try:
     from rest_framework.decorators import api_view
@@ -119,4 +119,9 @@ def permission_denied_exc(*args, **kwargs):
 
 
 def csrf_hello_not_exempt(*args, **kwargs):
+    return HttpResponse("ok")
+
+
+@csrf_exempt
+async def async_ok(request):
     return HttpResponse("ok")
