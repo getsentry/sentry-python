@@ -63,8 +63,8 @@ def test_basic(tornado_testcase, sentry_init, capture_events):
         "headers": {
             "Accept-Encoding": "gzip",
             "Connection": "close",
-            "Host": host,
             "Cookie": "name=value; name2=value2; name3=value3",
+            **request["headers"],
         },
         "cookies": {"name": "value", "name2": "value2", "name3": "value3"},
         "method": "GET",
