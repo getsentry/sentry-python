@@ -55,7 +55,7 @@ urlpatterns = [
         views.csrf_hello_not_exempt,
         name="csrf_hello_not_exempt",
     ),
-    path("async_ok", views.async_ok, name="async_ok"),
+    path("async_message", views.async_message, name="async_message"),
 ]
 
 

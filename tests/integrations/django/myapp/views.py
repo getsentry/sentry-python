@@ -122,5 +122,10 @@ def csrf_hello_not_exempt(*args, **kwargs):
     return HttpResponse("ok")
 
 
-async def async_ok(request):
-    return HttpResponse("ok")
+try:
+    exec("""async def async_message(request):
+    sentry_sdk.capture_message("hi")
+    return HttpResponse("ok")""")
+
+except SyntaxError:
+    async_message = None

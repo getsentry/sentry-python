@@ -51,6 +51,17 @@ async def test_async_views(sentry_init, capture_events, application):
 
     events = capture_events()
 
-    comm = HttpCommunicator(application, "GET", "/async_ok")
+    comm = HttpCommunicator(application, "GET", "/async_message")
     response = await comm.get_response()
     assert response["status"] == 200
+
+    event, = events
+
+    assert event["transaction"] == "/async_message"
+    assert event["request"] == {
+        "cookies": {},
+        "headers": {},
+        "method": "GET",
+        "query_string": None,
+        "url": "/async_message",
+    }
