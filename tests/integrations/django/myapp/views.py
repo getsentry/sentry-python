@@ -122,7 +122,8 @@ def permission_denied_exc(*args, **kwargs):
 def csrf_hello_not_exempt(*args, **kwargs):
     return HttpResponse("ok")
 
-if VERSION >= (3,1):
+
+if VERSION >= (3, 1):
     # Use exec to produce valid Python 2
     exec(
         """async def async_message(request):

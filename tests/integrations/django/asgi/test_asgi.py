@@ -46,7 +46,9 @@ async def test_basic(sentry_init, capture_events, application):
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
-@pytest.mark.skipif(django.VERSION < (3,1), reason="async views have been introduced in Django 3.1")
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
 async def test_async_views(sentry_init, capture_events, application):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
 
