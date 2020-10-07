@@ -46,13 +46,6 @@ def patch_views():
             ):
                 sentry_wrapped_callback = wrap_async_view(hub, callback)
             else:
-                print(
-                    (
-                        iscoroutinefunction,
-                        wrap_async_view,
-                        iscoroutinefunction(callback),
-                    )
-                )
                 sentry_wrapped_callback = _wrap_sync_view(hub, callback)
 
         else:
