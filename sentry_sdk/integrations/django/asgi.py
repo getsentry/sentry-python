@@ -72,6 +72,7 @@ def patch_channels_asgi_handler_impl(cls):
 
 
 def wrap_async_view(hub, callback):
+    # type: (Hub, Any) -> Any
     @_functools.wraps(callback)
     async def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any

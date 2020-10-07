@@ -9,13 +9,13 @@ if MYPY:
 try:
     from asyncio import iscoroutinefunction
 except ImportError:
-    iscoroutinefunction = None
+    iscoroutinefunction = None  # type: ignore
 
 
 try:
     from sentry_sdk.integrations.django.asgi import wrap_async_view
 except (ImportError, SyntaxError):
-    wrap_async_view = None
+    wrap_async_view = None  # type: ignore
 
 
 def patch_views():
@@ -57,6 +57,7 @@ def patch_views():
 
 
 def _wrap_sync_view(hub, callback):
+    # type: (Hub, Any) -> Any
     @_functools.wraps(callback)
     def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
