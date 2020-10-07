@@ -1,3 +1,4 @@
+from django import VERSION
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -121,13 +122,12 @@ def permission_denied_exc(*args, **kwargs):
 def csrf_hello_not_exempt(*args, **kwargs):
     return HttpResponse("ok")
 
-
-try:
+if VERSION >= (3,1):
+    # Use exec to produce valid Python 2
     exec(
         """async def async_message(request):
     sentry_sdk.capture_message("hi")
     return HttpResponse("ok")"""
     )
-
-except SyntaxError:
+else:
     async_message = None
