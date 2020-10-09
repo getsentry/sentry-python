@@ -123,6 +123,8 @@ def run_cloud_function():
                 else:
                     continue
 
+            stream.close()
+
         return envelope, event
 
     return inner

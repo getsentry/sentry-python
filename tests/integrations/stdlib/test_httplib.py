@@ -106,3 +106,5 @@ def test_httplib_misuse(sentry_init, capture_events):
         "status_code": 200,
         "reason": "OK",
     }
+
+    conn.close()
