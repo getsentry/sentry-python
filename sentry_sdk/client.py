@@ -338,7 +338,7 @@ class _Client(object):
         needs_envelopes = event_opt.get("type") == "transaction" or attachments
 
         if needs_envelopes:
-            # Transactions or envelopes with attachments should go to the
+            # Transactions or events with attachments should go to the
             # /envelope/ endpoint.
             envelope = Envelope(
                 headers={
