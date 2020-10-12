@@ -411,6 +411,8 @@ class Scope(object):
             self._breadcrumbs.extend(scope._breadcrumbs)
         if scope._span:
             self._span = scope._span
+        if scope._attachments:
+            self._attachments.extend(scope._attachments)
 
     def update_from_kwargs(
         self,
@@ -457,6 +459,7 @@ class Scope(object):
         rv._span = self._span
         rv._session = self._session
         rv._force_auto_session_tracking = self._force_auto_session_tracking
+        rv._attachments = list(self._attachments)
 
         return rv
 
