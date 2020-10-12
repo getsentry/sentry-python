@@ -334,19 +334,24 @@ class _Client(object):
         if session:
             self._update_session_from_event(session, event)
 
-        if event_opt.get("type") == "transaction":
-            # Transactions should go to the /envelope/ endpoint.
-            self.transport.capture_envelope(
-                Envelope(
-                    headers={
-                        "event_id": event_opt["event_id"],
-                        "sent_at": format_timestamp(datetime.utcnow()),
-                    },
-                    items=[
-                        Item(payload=PayloadRef(json=event_opt), type="transaction"),
-                    ],
-                )
+        attachments = hint.get("attachments")
+        needs_envelopes = event_opt.get("type") == "transaction" or attachments
+
+        if needs_envelopes:
+            # Transactions or envelopes with attachments should go to the
+            # /envelope/ endpoint.
+            envelope = Envelope(
+                headers={
+                    "event_id": event_opt["event_id"],
+                    "sent_at": format_timestamp(datetime.utcnow()),
+                },
+                items=[
+                    Item(payload=PayloadRef(json=event_opt), type="transaction"),
+                ],
             )
+            for attachment in attachments or ():
+                envelope.add_item(attachment.to_envelope_item())
+            self.transport.capture_envelope(envelope)
         else:
             # All other events go to the /store/ endpoint.
             self.transport.capture_event(event_opt)

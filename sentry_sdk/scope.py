@@ -6,6 +6,7 @@ from sentry_sdk._functools import wraps
 from sentry_sdk._types import MYPY
 from sentry_sdk.utils import logger, capture_internal_exceptions
 from sentry_sdk.tracing import Transaction
+from sentry_sdk.attachments import Attachment
 
 if MYPY:
     from typing import Any
@@ -88,6 +89,7 @@ class Scope(object):
         "_should_capture",
         "_span",
         "_session",
+        "_attachments",
         "_force_auto_session_tracking",
     )
 
@@ -110,6 +112,7 @@ class Scope(object):
         self._tags = {}  # type: Dict[str, Any]
         self._contexts = {}  # type: Dict[str, Dict[str, Any]]
         self._extras = {}  # type: Dict[str, Any]
+        self._attachments = []  # type: List[Attachment]
 
         self.clear_breadcrumbs()
         self._should_capture = True
@@ -249,6 +252,26 @@ class Scope(object):
         """Clears breadcrumb buffer."""
         self._breadcrumbs = deque()  # type: Deque[Breadcrumb]
 
+    def add_attachment(
+        self,
+        bytes=None,  # type: Optional[bytes]
+        filename=None,  # type: Optional[str]
+        path=None,  # type: Optional[str]
+        content_type=None,  # type: Optional[str]
+        add_to_transactions=False,  # type: bool
+    ):
+        # type: (...) -> None
+        """Adds an attachment to the next error event sent."""
+        self._attachments.append(
+            Attachment(
+                bytes=bytes,
+                path=path,
+                filename=filename,
+                content_type=content_type,
+                add_to_transactions=add_to_transactions,
+            )
+        )
+
     def add_event_processor(
         self, func  # type: EventProcessor
     ):
@@ -308,10 +331,21 @@ class Scope(object):
             logger.info("%s (%s) dropped event (%s)", ty, cause, event)
             return None
 
+        is_transaction = event.get("type") == "transaction"
+
+        # put all attachments into the hint.  This lets callbacks play around
+        # with attachments.  We also later pull this out of the hint when we
+        # create the envelope.
+        attachments_to_send = hint.get("attachments") or []
+        for attachment in self._attachments:
+            if not is_transaction or attachment.add_to_transactions:
+                attachments_to_send.append(attachment)
+        hint["attachments"] = attachments_to_send
+
         if self._level is not None:
             event["level"] = self._level
 
-        if event.get("type") != "transaction":
+        if not is_transaction:
             event.setdefault("breadcrumbs", {}).setdefault("values", []).extend(
                 self._breadcrumbs
             )
