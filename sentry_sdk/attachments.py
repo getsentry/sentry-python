@@ -3,6 +3,7 @@ import mimetypes
 
 from sentry_sdk._types import MYPY
 from sentry_sdk.envelope import Item
+from sentry_sdk.utils import capture_internal_exceptions
 
 if MYPY:
     from typing import Optional
@@ -37,8 +38,9 @@ class Attachment(object):
         """Returns an envelope item for this attachment."""
         payload = self.bytes
         if payload is None:
-            with open(self.path, "rb") as f:
-                payload = f.read()
+            with capture_internal_exceptions():
+                with open(self.path, "rb") as f:
+                    payload = f.read()
         return Item(
             payload=payload,
             type="attachment",

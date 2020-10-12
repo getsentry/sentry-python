@@ -6,7 +6,7 @@ import mimetypes
 from sentry_sdk._compat import text_type
 from sentry_sdk._types import MYPY
 from sentry_sdk.sessions import Session
-from sentry_sdk.utils import json_dumps
+from sentry_sdk.utils import json_dumps, capture_internal_exceptions
 
 if MYPY:
     from typing import Any
@@ -147,8 +147,9 @@ class PayloadRef(object):
         # type: (...) -> bytes
         if self.bytes is None:
             if self.path is not None:
-                with open(self.path, "rb") as f:
-                    self.bytes = f.read()
+                with capture_internal_exceptions():
+                    with open(self.path, "rb") as f:
+                        self.bytes = f.read()
             elif self.json is not None:
                 self.bytes = json_dumps(self.json)
             else:
