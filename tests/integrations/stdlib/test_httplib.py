@@ -83,7 +83,7 @@ def test_httplib_misuse(sentry_init, capture_events, request):
     conn = HTTPSConnection("httpbin.org", 443)
 
     # make sure we release the resource, even if the test fails
-    request.addfinalizer(lambda: conn.close())
+    request.addfinalizer(conn.close)
 
     conn.request("GET", "/anything/foo")
 
