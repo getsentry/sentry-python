@@ -891,21 +891,32 @@ class TimeoutThread(threading.Thread):
         threading.Thread.__init__(self)
         self.waiting_time = waiting_time
         self.configured_timeout = configured_timeout
+        self.stop_thread = False
 
     def run(self):
         # type: () -> None
 
-        time.sleep(self.waiting_time)
+        raise_exception = True
+        threading_is_running = True
+        while threading_is_running and self.waiting_time > 1:
+            time.sleep(1)
+            self.waiting_time = self.waiting_time - 1
+            if self.stop_thread:
+                raise_exception = False
+                threading_is_running = False
 
-        integer_configured_timeout = int(self.configured_timeout)
+        if raise_exception:
+            time.sleep(self.waiting_time)
 
-        # Setting up the exact integer value of configured time(in seconds)
-        if integer_configured_timeout < self.configured_timeout:
-            integer_configured_timeout = integer_configured_timeout + 1
+            integer_configured_timeout = int(self.configured_timeout)
 
-        # Raising Exception after timeout duration is reached
-        raise ServerlessTimeoutWarning(
-            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
-                integer_configured_timeout
+            # Setting up the exact integer value of configured time(in seconds)
+            if integer_configured_timeout < self.configured_timeout:
+                integer_configured_timeout = integer_configured_timeout + 1
+
+            # Raising Exception after timeout duration is reached
+            raise ServerlessTimeoutWarning(
+                "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
+                    integer_configured_timeout
+                )
             )
-        )

@@ -116,6 +116,13 @@ def _wrap_handler(handler):
                     )
                     hub.capture_event(event, hint=hint)
                     reraise(*exc_info)
+                finally:
+                    if (
+                        integration.timeout_warning
+                        and configured_time > TIMEOUT_WARNING_BUFFER
+                    ):
+                        timeout_thread.stop_thread = True
+                        timeout_thread.join()
 
     return sentry_handler  # type: ignore
 
