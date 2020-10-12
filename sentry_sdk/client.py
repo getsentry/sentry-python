@@ -144,15 +144,13 @@ class _Client(object):
     def _prepare_event(
         self,
         event,  # type: Event
-        hint,  # type: Optional[Hint]
+        hint,  # type: Hint
         scope,  # type: Optional[Scope]
     ):
         # type: (...) -> Optional[Event]
 
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.utcnow()
-
-        hint = dict(hint or ())  # type: Hint
 
         if scope is not None:
             event_ = scope.apply_to_event(event, hint)
@@ -320,10 +318,13 @@ class _Client(object):
         if hint is None:
             hint = {}
         event_id = event.get("event_id")
+        hint = dict(hint or ())  # type: Hint
+
         if event_id is None:
             event["event_id"] = event_id = uuid.uuid4().hex
         if not self._should_capture(event, hint, scope):
             return None
+
         event_opt = self._prepare_event(event, hint, scope)
         if event_opt is None:
             return None
