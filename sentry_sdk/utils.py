@@ -898,11 +898,15 @@ class TimeoutThread(threading.Thread):
 
         raise_exception = True
         threading_is_running = True
-        while threading_is_running and self.waiting_time > 1:
-            time.sleep(1)
-            self.waiting_time = self.waiting_time - 1
+        start_time = time.time()
+
+        while threading_is_running:
             if self.stop_thread:
                 raise_exception = False
+                threading_is_running = False
+            current_time = time.time()
+            elapsed_time = current_time - start_time
+            if elapsed_time >= self.waiting_time:
                 threading_is_running = False
 
         if raise_exception:
