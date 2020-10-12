@@ -37,7 +37,7 @@ class Attachment(object):
         """Returns an envelope item for this attachment."""
         payload = self.bytes
         if payload is None:
-            with open(self.filename, "rb") as f:
+            with open(self.path, "rb") as f:
                 payload = f.read()
         return Item(
             payload=payload,
