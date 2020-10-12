@@ -252,7 +252,7 @@ def test_attachments(sentry_init, capture_envelopes):
     assert pyfile.headers["type"] == "attachment"
     assert pyfile.headers["content_type"].startswith("text/")
     with open(this_file, "rb") as f:
-        assert pyfile.payload.bytes == f.read()
+        assert pyfile.payload.get_bytes() == f.read()
 
 
 def test_integration_scoping(sentry_init, capture_events):
