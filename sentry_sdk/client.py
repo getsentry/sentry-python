@@ -21,7 +21,7 @@ from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO, ClientConstructor
 from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
-from sentry_sdk.envelope import Envelope, Item, PayloadRef
+from sentry_sdk.envelope import Envelope
 
 from sentry_sdk._types import MYPY
 
@@ -335,20 +335,23 @@ class _Client(object):
             self._update_session_from_event(session, event)
 
         attachments = hint.get("attachments")
-        needs_envelopes = event_opt.get("type") == "transaction" or attachments
+        is_transaction = event_opt.get("type") == "transaction"
 
-        if needs_envelopes:
+        if is_transaction or attachments:
             # Transactions or events with attachments should go to the
             # /envelope/ endpoint.
             envelope = Envelope(
                 headers={
                     "event_id": event_opt["event_id"],
                     "sent_at": format_timestamp(datetime.utcnow()),
-                },
-                items=[
-                    Item(payload=PayloadRef(json=event_opt), type="transaction"),
-                ],
+                }
             )
+
+            if is_transaction:
+                envelope.add_transaction(event_opt)
+            else:
+                envelope.add_event(event_opt)
+
             for attachment in attachments or ():
                 envelope.add_item(attachment.to_envelope_item())
             self.transport.capture_envelope(envelope)

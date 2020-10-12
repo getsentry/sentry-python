@@ -6,7 +6,6 @@ import mimetypes
 from sentry_sdk._compat import text_type
 from sentry_sdk._types import MYPY
 from sentry_sdk.sessions import Session
-from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import json_dumps
 
 if MYPY:
@@ -52,7 +51,7 @@ class Envelope(object):
         self.add_item(Item(payload=PayloadRef(json=event), type="event"))
 
     def add_transaction(
-        self, transaction  # type: Transaction
+        self, transaction  # type: Event
     ):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=transaction), type="transaction"))
