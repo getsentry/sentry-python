@@ -227,10 +227,7 @@ def test_attachments(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     with configure_scope() as scope:
-        scope.add_attachment(
-            bytes=b"Hello World!",
-            filename="message.txt"
-        )
+        scope.add_attachment(bytes=b"Hello World!", filename="message.txt")
 
     capture_exception(ValueError())
 
