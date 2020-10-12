@@ -261,7 +261,7 @@ class Scope(object):
         add_to_transactions=False,  # type: bool
     ):
         # type: (...) -> None
-        """Adds an attachment to the next error event sent."""
+        """Adds an attachment to future events sent."""
         self._attachments.append(
             Attachment(
                 bytes=bytes,
