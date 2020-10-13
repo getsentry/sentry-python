@@ -1,6 +1,5 @@
 import io
 import json
-import shutil
 import mimetypes
 
 from sentry_sdk._compat import text_type
@@ -10,7 +9,6 @@ from sentry_sdk.utils import json_dumps, capture_internal_exceptions
 
 if MYPY:
     from typing import Any
-    from typing import Tuple
     from typing import Optional
     from typing import Union
     from typing import Dict

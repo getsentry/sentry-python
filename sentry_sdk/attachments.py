@@ -3,7 +3,6 @@ import mimetypes
 
 from sentry_sdk._types import MYPY
 from sentry_sdk.envelope import Item, PayloadRef
-from sentry_sdk.utils import capture_internal_exceptions
 
 if MYPY:
     from typing import Optional
