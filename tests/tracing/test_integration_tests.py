@@ -1,5 +1,6 @@
 import weakref
 import gc
+
 import pytest
 
 from sentry_sdk import (
@@ -47,7 +48,6 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
 @pytest.mark.parametrize("sampled", [True, False, None])
 def test_continue_from_headers(sentry_init, capture_events, sampled):
-    """"""
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
