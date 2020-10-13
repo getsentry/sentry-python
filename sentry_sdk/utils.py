@@ -891,27 +891,22 @@ class TimeoutThread(threading.Thread):
         threading.Thread.__init__(self)
         self.waiting_time = waiting_time
         self.configured_timeout = configured_timeout
-        self.stop_thread = False
+        self._stop_event = threading.Event()
+
+    def stop(self):
+        # type: () -> None
+        self._stop_event.set()
+
+    def stopped(self):
+        # type: () -> Any
+        return self._stop_event.is_set()
 
     def run(self):
         # type: () -> None
 
-        raise_exception = True
-        threading_is_running = True
-        start_time = time.time()
+        time.sleep(self.waiting_time)
 
-        while threading_is_running:
-            if self.stop_thread:
-                raise_exception = False
-                threading_is_running = False
-            current_time = time.time()
-            elapsed_time = current_time - start_time
-            if elapsed_time >= self.waiting_time:
-                threading_is_running = False
-
-        if raise_exception:
-            time.sleep(self.waiting_time)
-
+        if not self.stopped():
             integer_configured_timeout = int(self.configured_timeout)
 
             # Setting up the exact integer value of configured time(in seconds)
