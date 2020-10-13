@@ -16,6 +16,10 @@ setup(
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
+    project_urls={
+        "Documentation": "https://docs.sentry.io/platforms/python/",
+        "Changelog": "https://github.com/getsentry/sentry-python/blob/master/CHANGES.md",
+    },
     description="Python client for Sentry (https://sentry.io)",
     long_description=__doc__,
     packages=find_packages(exclude=("tests", "tests.*")),
