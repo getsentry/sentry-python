@@ -246,11 +246,12 @@ def test_attachments(sentry_init, capture_envelopes):
     assert message.headers["filename"] == "message.txt"
     assert message.headers["type"] == "attachment"
     assert message.headers["content_type"] == "text/plain"
-    assert message.payload.bytes == b"Hello World!"
+    assert message.payload.bytes == message.payload.get_bytes() == b"Hello World!"
 
     assert pyfile.headers["filename"] == os.path.basename(this_file)
     assert pyfile.headers["type"] == "attachment"
     assert pyfile.headers["content_type"].startswith("text/")
+    assert pyfile.payload.bytes is None
     with open(this_file, "rb") as f:
         assert pyfile.payload.get_bytes() == f.read()
 
