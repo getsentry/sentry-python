@@ -903,7 +903,7 @@ class TimeoutThread(threading.Thread):
 
         if self._stop_event.is_set():
             return
-        
+
         integer_configured_timeout = int(self.configured_timeout)
 
         # Setting up the exact integer value of configured time(in seconds)
