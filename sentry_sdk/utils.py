@@ -901,16 +901,18 @@ class TimeoutThread(threading.Thread):
 
         self._stop_event.wait(self.waiting_time)
 
-        if not self._stop_event.is_set():
-            integer_configured_timeout = int(self.configured_timeout)
+        if self._stop_event.is_set():
+            return
+        
+        integer_configured_timeout = int(self.configured_timeout)
 
-            # Setting up the exact integer value of configured time(in seconds)
-            if integer_configured_timeout < self.configured_timeout:
-                integer_configured_timeout = integer_configured_timeout + 1
+        # Setting up the exact integer value of configured time(in seconds)
+        if integer_configured_timeout < self.configured_timeout:
+            integer_configured_timeout = integer_configured_timeout + 1
 
-            # Raising Exception after timeout duration is reached
-            raise ServerlessTimeoutWarning(
-                "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
-                    integer_configured_timeout
-                )
+        # Raising Exception after timeout duration is reached
+        raise ServerlessTimeoutWarning(
+            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
+                integer_configured_timeout
             )
+        )
