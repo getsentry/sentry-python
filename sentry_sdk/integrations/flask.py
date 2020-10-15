@@ -44,7 +44,7 @@ except ImportError:
     raise DidNotEnable("Flask is not installed")
 
 try:
-    import blinker  # type: ignore
+    import blinker  # noqa
 except ImportError:
     raise DidNotEnable("blinker is not installed")
 
