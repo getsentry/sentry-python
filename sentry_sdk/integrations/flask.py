@@ -43,6 +43,10 @@ try:
 except ImportError:
     raise DidNotEnable("Flask is not installed")
 
+try:
+    import blinker  # type: ignore
+except ImportError:
+    raise DidNotEnable("blinker is not installed")
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
