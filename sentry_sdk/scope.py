@@ -77,6 +77,8 @@ class Scope(object):
         "_level",
         "_name",
         "_fingerprint",
+        # note that for legacy reasons, _transaction is the transaction *name*,
+        # not a Transaction object (the object is stored in _span)
         "_transaction",
         "_user",
         "_tags",

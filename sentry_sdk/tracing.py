@@ -200,8 +200,9 @@ class Span(object):
         """
         Start a sub-span from the current span or transaction.
 
-        Takes the same arguments as the initializer of :py:class:`Span`. No
-        attributes other than the sample rate are inherited.
+        Takes the same arguments as the initializer of :py:class:`Span`. The
+        trace id, sampling decision, and span recorder are inherited from the
+        current span/transaction.
         """
         kwargs.setdefault("sampled", self.sampled)
 
@@ -226,6 +227,14 @@ class Span(object):
         environ,  # type: typing.Mapping[str, str]
         **kwargs  # type: Any
     ):
+        """
+        Create a Transaction with the given params, then add in data pulled from
+        the 'sentry-trace' header in the environ (if any) before returning the
+        Transaction.
+
+        If the 'sentry-trace' header is malformed or missing, just create and
+        return a Transaction instance with the given params.
+        """
         # type: (...) -> Transaction
         if cls is Span:
             logger.warning(
@@ -240,6 +249,13 @@ class Span(object):
         headers,  # type: typing.Mapping[str, str]
         **kwargs  # type: Any
     ):
+        """
+        Create a Transaction with the given params, then add in data pulled from
+        the 'sentry-trace' header (if any) before returning the Transaction.
+
+        If the 'sentry-trace' header is malformed or missing, just create and
+        return a Transaction instance with the given params.
+        """
         # type: (...) -> Transaction
         if cls is Span:
             logger.warning(
@@ -262,6 +278,13 @@ class Span(object):
         traceparent,  # type: Optional[str]
         **kwargs  # type: Any
     ):
+        """
+        Create a Transaction with the given params, then add in data pulled from
+        the given 'sentry-trace' header value before returning the Transaction.
+
+        If the header value is malformed or missing, just create and return a
+        Transaction instance with the given params.
+        """
         # type: (...) -> Optional[Transaction]
         if cls is Span:
             logger.warning(
@@ -454,7 +477,9 @@ class Transaction(Span):
             # This transaction is already finished, ignore.
             return None
 
+        # This is a de facto proxy for checking if sampled = False
         if self._span_recorder is None:
+            logger.debug("Discarding transaction because sampled = False")
             return None
 
         hub = hub or self.hub or sentry_sdk.Hub.current
