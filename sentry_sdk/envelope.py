@@ -21,7 +21,7 @@ if MYPY:
 class Envelope(object):
     def __init__(
         self,
-        headers=None,  # type: Optional[Dict[str, str]]
+        headers=None,  # type: Optional[Dict[str, Any]]
         items=None,  # type: Optional[List[Item]]
     ):
         # type: (...) -> None
@@ -177,7 +177,7 @@ class Item(object):
     def __init__(
         self,
         payload,  # type: Union[bytes, text_type, PayloadRef]
-        headers=None,  # type: Optional[Dict[str, str]]
+        headers=None,  # type: Optional[Dict[str, Any]]
         type=None,  # type: Optional[str]
         content_type=None,  # type: Optional[str]
         filename=None,  # type: Optional[str]

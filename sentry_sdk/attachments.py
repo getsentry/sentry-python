@@ -35,6 +35,7 @@ class Attachment(object):
     def to_envelope_item(self):
         # type: () -> Item
         """Returns an envelope item for this attachment."""
+        payload = None  # type: Union[None, PayloadRef, bytes]
         if self.bytes is not None:
             if callable(self.bytes):
                 payload = self.bytes()
