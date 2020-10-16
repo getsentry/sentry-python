@@ -1,5 +1,4 @@
 import copy
-import random
 import sys
 
 from datetime import datetime
@@ -505,20 +504,23 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         When the transaction is finished, it will be sent to Sentry with all its
         finished child spans.
         """
+        # if we haven't been given a transaction, make one
         if transaction is None:
             kwargs.setdefault("hub", self)
             transaction = Transaction(**kwargs)
 
-        client, scope = self._stack[-1]
+        # use traces_sample_rate, traces_sampler, and/or inheritance to make a
+        # sampling decision
+        transaction._set_initial_sampling_decision(
+            sampling_context=transaction.to_json()
+        )
 
-        if transaction.sampled is None:
-            sample_rate = client and client.options["traces_sample_rate"] or 0
-            transaction.sampled = random.random() < sample_rate
-
+        # we don't bother to keep spans if we already know we're not going to
+        # send the transaction
         if transaction.sampled:
             max_spans = (
-                client and client.options["_experiments"].get("max_spans") or 1000
-            )
+                self.client and self.client.options["_experiments"].get("max_spans")
+            ) or 1000
             transaction.init_span_recorder(maxlen=max_spans)
 
         return transaction
