@@ -4,13 +4,17 @@ import sys
 import pytest
 
 try:
+    # py3
     from urllib.request import urlopen
 except ImportError:
+    # py2
     from urllib import urlopen
 
 try:
+    # py2
     from httplib import HTTPSConnection
 except ImportError:
+    # py3
     from http.client import HTTPSConnection
 
 from sentry_sdk import capture_message
