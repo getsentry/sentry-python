@@ -536,6 +536,16 @@ class Transaction(Span):
             }
         )
 
+    def to_json(self):
+        # type: () -> Dict[str, Any]
+        rv = super(Transaction, self).to_json()
+
+        rv["name"] = self.name
+        rv["sampled"] = self.sampled
+        rv["parent_sampled"] = self.parent_sampled
+
+        return rv
+
 
 def _is_valid_sample_rate(rate):
     # type: (Any) -> bool
