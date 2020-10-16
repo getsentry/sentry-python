@@ -111,6 +111,11 @@ class Span(object):
 
     def __new__(cls, **kwargs):
         # type: (**Any) -> Any
+        """
+        Backwards-compatible implementation of Span and Transaction
+        creation.
+        """
+
         # TODO: consider removing this in a future release.
         # This is for backwards compatibility with releases before Transaction
         # existed, to allow for a smoother transition.
@@ -166,8 +171,10 @@ class Span(object):
 
     def __repr__(self):
         # type: () -> str
-        return "<%s(trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>" % (
+        return "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>" % (
             self.__class__.__name__,
+            self.op,
+            self.description,
             self.trace_id,
             self.span_id,
             self.parent_span_id,
@@ -200,8 +207,9 @@ class Span(object):
         """
         Start a sub-span from the current span or transaction.
 
-        Takes the same arguments as the initializer of :py:class:`Span`. No
-        attributes other than the sample rate are inherited.
+        Takes the same arguments as the initializer of :py:class:`Span`. The
+        trace id, sampling decision, and span recorder are inherited from the
+        current span/transaction.
         """
         kwargs.setdefault("sampled", self.sampled)
 
@@ -227,6 +235,14 @@ class Span(object):
         **kwargs  # type: Any
     ):
         # type: (...) -> Transaction
+        """
+        Create a Transaction with the given params, then add in data pulled from
+        the 'sentry-trace' header in the environ (if any) before returning the
+        Transaction.
+
+        If the 'sentry-trace' header is malformed or missing, just create and
+        return a Transaction instance with the given params.
+        """
         if cls is Span:
             logger.warning(
                 "Deprecated: use Transaction.continue_from_environ "
@@ -241,16 +257,25 @@ class Span(object):
         **kwargs  # type: Any
     ):
         # type: (...) -> Transaction
+        """
+        Create a Transaction with the given params, then add in data pulled from
+        the 'sentry-trace' header (if any) before returning the Transaction.
+
+        If the 'sentry-trace' header is malformed or missing, just create and
+        return a Transaction instance with the given params.
+        """
         if cls is Span:
             logger.warning(
                 "Deprecated: use Transaction.continue_from_headers "
                 "instead of Span.continue_from_headers."
             )
-        parent = Transaction.from_traceparent(headers.get("sentry-trace"), **kwargs)
-        if parent is None:
-            parent = Transaction(**kwargs)
-        parent.same_process_as_parent = False
-        return parent
+        transaction = Transaction.from_traceparent(
+            headers.get("sentry-trace"), **kwargs
+        )
+        if transaction is None:
+            transaction = Transaction(**kwargs)
+        transaction.same_process_as_parent = False
+        return transaction
 
     def iter_headers(self):
         # type: () -> Generator[Tuple[str, str], None, None]
@@ -263,6 +288,13 @@ class Span(object):
         **kwargs  # type: Any
     ):
         # type: (...) -> Optional[Transaction]
+        """
+        Create a Transaction with the given params, then add in data pulled from
+        the given 'sentry-trace' header value before returning the Transaction.
+
+        If the header value is malformed or missing, just create and return a
+        Transaction instance with the given params.
+        """
         if cls is Span:
             logger.warning(
                 "Deprecated: use Transaction.from_traceparent "
@@ -279,20 +311,23 @@ class Span(object):
         if match is None:
             return None
 
-        trace_id, span_id, sampled_str = match.groups()
+        trace_id, parent_span_id, sampled_str = match.groups()
 
         if trace_id is not None:
             trace_id = "{:032x}".format(int(trace_id, 16))
-        if span_id is not None:
-            span_id = "{:016x}".format(int(span_id, 16))
+        if parent_span_id is not None:
+            parent_span_id = "{:016x}".format(int(parent_span_id, 16))
 
         if sampled_str:
-            sampled = sampled_str != "0"  # type: Optional[bool]
+            parent_sampled = sampled_str != "0"  # type: Optional[bool]
         else:
-            sampled = None
+            parent_sampled = None
 
         return Transaction(
-            trace_id=trace_id, parent_span_id=span_id, sampled=sampled, **kwargs
+            trace_id=trace_id,
+            parent_span_id=parent_span_id,
+            sampled=parent_sampled,
+            **kwargs
         )
 
     def to_traceparent(self):
@@ -436,16 +471,14 @@ class Transaction(Span):
 
     def __repr__(self):
         # type: () -> str
-        return (
-            "<%s(name=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>"
-            % (
-                self.__class__.__name__,
-                self.name,
-                self.trace_id,
-                self.span_id,
-                self.parent_span_id,
-                self.sampled,
-            )
+        return "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>" % (
+            self.__class__.__name__,
+            self.name,
+            self.op,
+            self.trace_id,
+            self.span_id,
+            self.parent_span_id,
+            self.sampled,
         )
 
     def finish(self, hub=None):
@@ -454,7 +487,9 @@ class Transaction(Span):
             # This transaction is already finished, ignore.
             return None
 
+        # This is a de facto proxy for checking if sampled = False
         if self._span_recorder is None:
+            logger.debug("Discarding transaction because sampled = False")
             return None
 
         hub = hub or self.hub or sentry_sdk.Hub.current

@@ -51,11 +51,13 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
+    # make a parent transaction (normally this would be in a different service)
     with start_transaction(name="hi"):
         with start_span() as old_span:
             old_span.sampled = sampled
             headers = dict(Hub.current.iter_trace_propagation_headers())
 
+    # test that the sampling decision is getting encoded in the header correctly
     header = headers["sentry-trace"]
     if sampled is True:
         assert header.endswith("-1")
@@ -64,6 +66,8 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
     if sampled is None:
         assert header.endswith("-")
 
+    # child transaction, to prove that we can read 'sentry-trace' header data
+    # correctly
     transaction = Transaction.continue_from_headers(headers, name="WRONG")
     assert transaction is not None
     assert transaction.sampled == sampled
@@ -72,6 +76,9 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
     assert transaction.parent_span_id == old_span.span_id
     assert transaction.span_id != old_span.span_id
 
+    # add child transaction to the scope, to show that the captured message will
+    # be tagged with the trace id (since it happens while the transaction is
+    # open)
     with start_transaction(transaction):
         with configure_scope() as scope:
             scope.transaction = "ho"
