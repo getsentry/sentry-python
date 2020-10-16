@@ -78,7 +78,13 @@ def get_default_release():
         if release:
             return release
 
-    for var in ("HEROKU_SLUG_COMMIT", "GAE_DEPLOYMENT_ID"):
+    for var in (
+        "HEROKU_SLUG_COMMIT",
+        "SOURCE_VERSION",
+        "CODEBUILD_RESOLVED_SOURCE_VERSION",
+        "CIRCLE_SHA1",
+        "GAE_DEPLOYMENT_ID",
+    ):
         release = os.environ.get(var)
         if release:
             return release
