@@ -264,11 +264,13 @@ class Span(object):
                 "Deprecated: use Transaction.continue_from_headers "
                 "instead of Span.continue_from_headers."
             )
-        parent = Transaction.from_traceparent(headers.get("sentry-trace"), **kwargs)
-        if parent is None:
-            parent = Transaction(**kwargs)
-        parent.same_process_as_parent = False
-        return parent
+        transaction = Transaction.from_traceparent(
+            headers.get("sentry-trace"), **kwargs
+        )
+        if transaction is None:
+            transaction = Transaction(**kwargs)
+        transaction.same_process_as_parent = False
+        return transaction
 
     def iter_headers(self):
         # type: () -> Generator[Tuple[str, str], None, None]
@@ -304,20 +306,23 @@ class Span(object):
         if match is None:
             return None
 
-        trace_id, span_id, sampled_str = match.groups()
+        trace_id, parent_span_id, sampled_str = match.groups()
 
         if trace_id is not None:
             trace_id = "{:032x}".format(int(trace_id, 16))
-        if span_id is not None:
-            span_id = "{:016x}".format(int(span_id, 16))
+        if parent_span_id is not None:
+            parent_span_id = "{:016x}".format(int(parent_span_id, 16))
 
         if sampled_str:
-            sampled = sampled_str != "0"  # type: Optional[bool]
+            parent_sampled = sampled_str != "0"  # type: Optional[bool]
         else:
-            sampled = None
+            parent_sampled = None
 
         return Transaction(
-            trace_id=trace_id, parent_span_id=span_id, sampled=sampled, **kwargs
+            trace_id=trace_id,
+            parent_span_id=parent_span_id,
+            sampled=parent_sampled,
+            **kwargs
         )
 
     def to_traceparent(self):
