@@ -12,6 +12,8 @@ from sentry_sdk.utils import (
     disable_capture_event,
     format_timestamp,
     get_type_name,
+    get_default_release,
+    get_default_environment,
     handle_in_app,
     logger,
 )
@@ -62,10 +64,10 @@ def _get_options(*args, **kwargs):
         rv["dsn"] = os.environ.get("SENTRY_DSN")
 
     if rv["release"] is None:
-        rv["release"] = os.environ.get("SENTRY_RELEASE")
+        rv["release"] = get_default_release()
 
     if rv["environment"] is None:
-        rv["environment"] = os.environ.get("SENTRY_ENVIRONMENT")
+        rv["environment"] = get_default_environment(rv["release"])
 
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
