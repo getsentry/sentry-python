@@ -144,13 +144,25 @@ class Scope(object):
     def transaction(self):
         # type: () -> Any
         # would be type: () -> Optional[Transaction], see https://github.com/python/mypy/issues/3004
-        """Return the transaction (root span) in the scope."""
-        if self._span is None or self._span._span_recorder is None:
+        """Return the transaction (root span) in the scope, if any."""
+
+        # there is no span/transaction on the scope
+        if self._span is None:
             return None
-        try:
-            return self._span._span_recorder.spans[0]
-        except (AttributeError, IndexError):
-            return None
+
+        # the span on the scope is itself a transaction
+        if isinstance(self._span, Transaction):
+            return self._span
+
+        # the span on the scope isn't a transaction but belongs to one
+        if self._span._containing_transaction:
+            return self._span._containing_transaction
+
+        # there's a span (not a transaction) on the scope, but it was started on
+        # its own, not as the descendant of a transaction (this is deprecated
+        # behavior, but as long as the start_span function exists, it can still
+        # happen)
+        return None
 
     @transaction.setter
     def transaction(self, value):
