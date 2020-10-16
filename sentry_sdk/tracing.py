@@ -166,8 +166,10 @@ class Span(object):
 
     def __repr__(self):
         # type: () -> str
-        return "<%s(trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>" % (
+        return "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>" % (
             self.__class__.__name__,
+            self.op,
+            self.description,
             self.trace_id,
             self.span_id,
             self.parent_span_id,
@@ -459,16 +461,14 @@ class Transaction(Span):
 
     def __repr__(self):
         # type: () -> str
-        return (
-            "<%s(name=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>"
-            % (
-                self.__class__.__name__,
-                self.name,
-                self.trace_id,
-                self.span_id,
-                self.parent_span_id,
-                self.sampled,
-            )
+        return "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>" % (
+            self.__class__.__name__,
+            self.name,
+            self.op,
+            self.trace_id,
+            self.span_id,
+            self.parent_span_id,
+            self.sampled,
         )
 
     def finish(self, hub=None):
