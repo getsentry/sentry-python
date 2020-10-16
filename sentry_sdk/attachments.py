@@ -5,13 +5,13 @@ from sentry_sdk._types import MYPY
 from sentry_sdk.envelope import Item, PayloadRef
 
 if MYPY:
-    from typing import Optional
+    from typing import Optional, Union, Callable
 
 
 class Attachment(object):
     def __init__(
         self,
-        bytes=None,  # type: Optional[bytes]
+        bytes=None,  # type: Union[None, bytes, Callable[[], bytes]]
         filename=None,  # type: Optional[str]
         path=None,  # type: Optional[str]
         content_type=None,  # type: Optional[str]
@@ -36,7 +36,10 @@ class Attachment(object):
         # type: () -> Item
         """Returns an envelope item for this attachment."""
         if self.bytes is not None:
-            payload = self.bytes
+            if callable(self.bytes):
+                payload = self.bytes()
+            else:
+                payload = self.bytes
         else:
             payload = PayloadRef(path=self.path)
         return Item(
