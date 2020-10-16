@@ -63,6 +63,7 @@ def _wrap_func(func):
                     _make_request_event_processor(event, configured_time, initial_time)
                 )
                 scope.set_tag("gcp_region", environ.get("FUNCTION_REGION"))
+                timeout_thread = None
                 if (
                     integration.timeout_warning
                     and configured_time > TIMEOUT_WARNING_BUFFER
@@ -93,6 +94,8 @@ def _wrap_func(func):
                     hub.capture_event(event, hint=hint)
                     reraise(*exc_info)
                 finally:
+                    if timeout_thread:
+                        timeout_thread.stop()
                     # Flush out the event queue
                     hub.flush()
 

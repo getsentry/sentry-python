@@ -3,7 +3,6 @@ import linecache
 import logging
 import os
 import sys
-import time
 import threading
 
 from datetime import datetime
@@ -891,11 +890,19 @@ class TimeoutThread(threading.Thread):
         threading.Thread.__init__(self)
         self.waiting_time = waiting_time
         self.configured_timeout = configured_timeout
+        self._stop_event = threading.Event()
+
+    def stop(self):
+        # type: () -> None
+        self._stop_event.set()
 
     def run(self):
         # type: () -> None
 
-        time.sleep(self.waiting_time)
+        self._stop_event.wait(self.waiting_time)
+
+        if self._stop_event.is_set():
+            return
 
         integer_configured_timeout = int(self.configured_timeout)
 
