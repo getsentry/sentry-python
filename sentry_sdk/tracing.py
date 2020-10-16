@@ -337,7 +337,7 @@ class Span(object):
         return Transaction(
             trace_id=trace_id,
             parent_span_id=parent_span_id,
-            sampled=parent_sampled,
+            parent_sampled=parent_sampled,
             **kwargs
         )
 
