@@ -449,11 +449,12 @@ class Span(object):
 
 
 class Transaction(Span):
-    __slots__ = ("name",)
+    __slots__ = ("name", "parent_sampled")
 
     def __init__(
         self,
         name="",  # type: str
+        parent_sampled=None,  # type: Optional[bool]
         **kwargs  # type: Any
     ):
         # type: (...) -> None
@@ -468,6 +469,7 @@ class Transaction(Span):
             name = kwargs.pop("transaction")
         Span.__init__(self, **kwargs)
         self.name = name
+        self.parent_sampled = parent_sampled
 
     def __repr__(self):
         # type: () -> str
