@@ -111,6 +111,11 @@ class Span(object):
 
     def __new__(cls, **kwargs):
         # type: (**Any) -> Any
+        """
+        Backwards-compatible implementation of Span and Transaction
+        creation.
+        """
+
         # TODO: consider removing this in a future release.
         # This is for backwards compatibility with releases before Transaction
         # existed, to allow for a smoother transition.
@@ -229,6 +234,7 @@ class Span(object):
         environ,  # type: typing.Mapping[str, str]
         **kwargs  # type: Any
     ):
+        # type: (...) -> Transaction
         """
         Create a Transaction with the given params, then add in data pulled from
         the 'sentry-trace' header in the environ (if any) before returning the
@@ -237,7 +243,6 @@ class Span(object):
         If the 'sentry-trace' header is malformed or missing, just create and
         return a Transaction instance with the given params.
         """
-        # type: (...) -> Transaction
         if cls is Span:
             logger.warning(
                 "Deprecated: use Transaction.continue_from_environ "
@@ -251,6 +256,7 @@ class Span(object):
         headers,  # type: typing.Mapping[str, str]
         **kwargs  # type: Any
     ):
+        # type: (...) -> Transaction
         """
         Create a Transaction with the given params, then add in data pulled from
         the 'sentry-trace' header (if any) before returning the Transaction.
@@ -258,7 +264,6 @@ class Span(object):
         If the 'sentry-trace' header is malformed or missing, just create and
         return a Transaction instance with the given params.
         """
-        # type: (...) -> Transaction
         if cls is Span:
             logger.warning(
                 "Deprecated: use Transaction.continue_from_headers "
@@ -282,6 +287,7 @@ class Span(object):
         traceparent,  # type: Optional[str]
         **kwargs  # type: Any
     ):
+        # type: (...) -> Optional[Transaction]
         """
         Create a Transaction with the given params, then add in data pulled from
         the given 'sentry-trace' header value before returning the Transaction.
@@ -289,7 +295,6 @@ class Span(object):
         If the header value is malformed or missing, just create and return a
         Transaction instance with the given params.
         """
-        # type: (...) -> Optional[Transaction]
         if cls is Span:
             logger.warning(
                 "Deprecated: use Transaction.from_traceparent "
