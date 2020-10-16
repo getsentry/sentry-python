@@ -71,6 +71,7 @@ def get_default_release():
                 )
                 .communicate()[0]
                 .strip()
+                .decode("utf-8")
             )
         except (OSError, IOError):
             pass
@@ -94,7 +95,7 @@ def get_default_release():
 def get_default_environment(
     release=None,  # type: Optional[str]
 ):
-    # type: () -> Optional[str]
+    # type: (...) -> Optional[str]
     rv = os.environ.get("SENTRY_ENVIRONMENT")
     if rv:
         return rv
