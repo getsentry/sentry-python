@@ -2,6 +2,7 @@ import asyncio
 import json
 from contextlib import suppress
 
+import pytest
 from aiohttp import web
 from aiohttp.client import ServerDisconnectedError
 
@@ -186,3 +187,33 @@ async def test_tracing(sentry_init, aiohttp_client, loop, capture_events):
         event["transaction"]
         == "tests.integrations.aiohttp.test_aiohttp.test_tracing.<locals>.hello"
     )
+
+
+@pytest.mark.parametrize(
+    "transaction_style,expected_transaction",
+    [
+        ("handler_name", "tests.integrations.aiohttp.test_aiohttp.test_transaction_style.<locals>.hello"),
+        ("method_and_path", "GET /")
+    ],
+)
+async def test_transaction_style(
+    sentry_init, aiohttp_client, capture_events, transaction_style, expected_transaction
+):
+    sentry_init(integrations=[AioHttpIntegration(transaction_style=transaction_style)], traces_sample_rate=1.0)
+
+    async def hello(request):
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/")
+    assert resp.status == 200
+
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == expected_transaction
