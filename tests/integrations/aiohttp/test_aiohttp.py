@@ -192,14 +192,20 @@ async def test_tracing(sentry_init, aiohttp_client, loop, capture_events):
 @pytest.mark.parametrize(
     "transaction_style,expected_transaction",
     [
-        ("handler_name", "tests.integrations.aiohttp.test_aiohttp.test_transaction_style.<locals>.hello"),
-        ("method_and_path", "GET /")
+        (
+            "handler_name",
+            "tests.integrations.aiohttp.test_aiohttp.test_transaction_style.<locals>.hello",
+        ),
+        ("method_and_path", "GET /"),
     ],
 )
 async def test_transaction_style(
     sentry_init, aiohttp_client, capture_events, transaction_style, expected_transaction
 ):
-    sentry_init(integrations=[AioHttpIntegration(transaction_style=transaction_style)], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[AioHttpIntegration(transaction_style=transaction_style)],
+        traces_sample_rate=1.0,
+    )
 
     async def hello(request):
         return web.Response(text="hello")
