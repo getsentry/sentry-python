@@ -142,8 +142,8 @@ class AioHttpIntegration(Integration):
                     name = transaction_from_function(rv.handler)
                 elif integration.transaction_style == "method_and_path_pattern":
                     route_info = rv.get_info()
-                    route_pattern = route_info.get("path") or route_info.get("formatter")
-                    name = "{} {}".format(request.method, route_pattern)
+                    pattern = route_info.get("path") or route_info.get("formatter")
+                    name = "{} {}".format(request.method, pattern)
             except Exception:
                 pass
 
