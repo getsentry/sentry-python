@@ -156,7 +156,6 @@ class AioHttpIntegration(Integration):
         UrlDispatcher.resolve = sentry_urldispatcher_resolve
 
 
-import logging
 def _make_request_processor(weak_request):
     # type: (Callable[[], Request]) -> EventProcessor
     def aiohttp_processor(
