@@ -196,7 +196,7 @@ async def test_tracing(sentry_init, aiohttp_client, loop, capture_events):
             "handler_name",
             "tests.integrations.aiohttp.test_aiohttp.test_transaction_style.<locals>.hello",
         ),
-        ("method_and_path", "GET /"),
+        ("method_and_path_pattern", "GET /{var}"),
     ],
 )
 async def test_transaction_style(
@@ -211,12 +211,12 @@ async def test_transaction_style(
         return web.Response(text="hello")
 
     app = web.Application()
-    app.router.add_get("/", hello)
+    app.router.add_get(r"/{var}", hello)
 
     events = capture_events()
 
     client = await aiohttp_client(app)
-    resp = await client.get("/")
+    resp = await client.get("/1")
     assert resp.status == 200
 
     (event,) = events

@@ -43,7 +43,7 @@ if MYPY:
     from sentry_sdk._types import EventProcessor
 
 
-TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path")
+TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
 
 
 class AioHttpIntegration(Integration):
@@ -140,8 +140,10 @@ class AioHttpIntegration(Integration):
             try:
                 if integration.transaction_style == "handler_name":
                     name = transaction_from_function(rv.handler)
-                elif integration.transaction_style == "method_and_path":
-                    name = "{} {}".format(request.method, request.path)
+                elif integration.transaction_style == "method_and_path_pattern":
+                    route_info = rv.get_info()
+                    route_pattern = route_info.get("path") or route_info.get("formatter")
+                    name = "{} {}".format(request.method, route_pattern)
             except Exception:
                 pass
 
@@ -154,6 +156,7 @@ class AioHttpIntegration(Integration):
         UrlDispatcher.resolve = sentry_urldispatcher_resolve
 
 
+import logging
 def _make_request_processor(weak_request):
     # type: (Callable[[], Request]) -> EventProcessor
     def aiohttp_processor(
