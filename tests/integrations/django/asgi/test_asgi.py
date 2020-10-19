@@ -1,12 +1,8 @@
-import pytest
-
 import django
-
+import pytest
 from channels.testing import HttpCommunicator
-
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.django import DjangoIntegration
-
 from tests.integrations.django.myapp.asgi import channels_application
 
 APPS = [channels_application]
@@ -18,7 +14,7 @@ if django.VERSION >= (3, 0):
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
-async def test_basic(sentry_init, capture_events, application, request):
+async def test_basic(sentry_init, capture_events, application):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
 
     events = capture_events()
@@ -46,3 +42,29 @@ async def test_basic(sentry_init, capture_events, application, request):
     capture_message("hi")
     event = events[-1]
     assert "request" not in event
+
+
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
+async def test_async_views(sentry_init, capture_events, application):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+
+    events = capture_events()
+
+    comm = HttpCommunicator(application, "GET", "/async_message")
+    response = await comm.get_response()
+    assert response["status"] == 200
+
+    (event,) = events
+
+    assert event["transaction"] == "/async_message"
+    assert event["request"] == {
+        "cookies": {},
+        "headers": {},
+        "method": "GET",
+        "query_string": None,
+        "url": "/async_message",
+    }

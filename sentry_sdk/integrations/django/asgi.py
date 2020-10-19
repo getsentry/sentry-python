@@ -6,10 +6,9 @@ Since this file contains `async def` it is conditionally imported in
 `django.core.handlers.asgi`.
 """
 
-from sentry_sdk import Hub
+from sentry_sdk import Hub, _functools
 from sentry_sdk._types import MYPY
 
-from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
 if MYPY:
@@ -21,6 +20,9 @@ if MYPY:
 
 def patch_django_asgi_handler_impl(cls):
     # type: (Any) -> None
+
+    from sentry_sdk.integrations.django import DjangoIntegration
+
     old_app = cls.__call__
 
     async def sentry_patched_asgi_handler(self, scope, receive, send):
@@ -50,6 +52,9 @@ def patch_get_response_async(cls, _before_get_response):
 
 def patch_channels_asgi_handler_impl(cls):
     # type: (Any) -> None
+
+    from sentry_sdk.integrations.django import DjangoIntegration
+
     old_app = cls.__call__
 
     async def sentry_patched_asgi_handler(self, receive, send):
@@ -64,3 +69,17 @@ def patch_channels_asgi_handler_impl(cls):
         return await middleware(self.scope)(receive, send)
 
     cls.__call__ = sentry_patched_asgi_handler
+
+
+def wrap_async_view(hub, callback):
+    # type: (Hub, Any) -> Any
+    @_functools.wraps(callback)
+    async def sentry_wrapped_callback(request, *args, **kwargs):
+        # type: (Any, *Any, **Any) -> Any
+
+        with hub.start_span(
+            op="django.view", description=request.resolver_match.view_name
+        ):
+            return await callback(request, *args, **kwargs)
+
+    return sentry_wrapped_callback

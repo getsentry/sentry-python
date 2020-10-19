@@ -57,7 +57,11 @@ urlpatterns = [
     ),
 ]
 
+# async views
+if views.async_message is not None:
+    urlpatterns.append(path("async_message", views.async_message, name="async_message"))
 
+# rest framework
 try:
     urlpatterns.append(
         path("rest-framework-exc", views.rest_framework_exc, name="rest_framework_exc")
