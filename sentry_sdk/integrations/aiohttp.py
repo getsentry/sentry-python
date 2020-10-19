@@ -43,8 +43,20 @@ if MYPY:
     from sentry_sdk._types import EventProcessor
 
 
+TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
+
+
 class AioHttpIntegration(Integration):
     identifier = "aiohttp"
+
+    def __init__(self, transaction_style="handler_name"):
+        # type: (str) -> None
+        if transaction_style not in TRANSACTION_STYLE_VALUES:
+            raise ValueError(
+                "Invalid value for transaction_style: %s (must be in %s)"
+                % (transaction_style, TRANSACTION_STYLE_VALUES)
+            )
+        self.transaction_style = transaction_style
 
     @staticmethod
     def setup_once():
@@ -120,10 +132,18 @@ class AioHttpIntegration(Integration):
             # type: (UrlDispatcher, Request) -> AbstractMatchInfo
             rv = await old_urldispatcher_resolve(self, request)
 
+            hub = Hub.current
+            integration = hub.get_integration(AioHttpIntegration)
+
             name = None
 
             try:
-                name = transaction_from_function(rv.handler)
+                if integration.transaction_style == "handler_name":
+                    name = transaction_from_function(rv.handler)
+                elif integration.transaction_style == "method_and_path_pattern":
+                    route_info = rv.get_info()
+                    pattern = route_info.get("path") or route_info.get("formatter")
+                    name = "{} {}".format(request.method, pattern)
             except Exception:
                 pass
 
