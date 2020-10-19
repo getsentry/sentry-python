@@ -479,6 +479,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def start_transaction(
         self,
         transaction=None,  # type: Optional[Transaction]
+        custom_sampling_context=None,  # type: Optional[Dict[str, Any]]
         **kwargs  # type: Any
     ):
         # type: (...) -> Transaction
@@ -511,9 +512,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         # use traces_sample_rate, traces_sampler, and/or inheritance to make a
         # sampling decision
-        transaction._set_initial_sampling_decision(
-            sampling_context=transaction.to_json()
-        )
+        sampling_context = {
+            "transaction_context": transaction.to_json(),
+            "parent_sampled": transaction.parent_sampled,
+        }
+        sampling_context.update(custom_sampling_context or {})
+        transaction._set_initial_sampling_decision(sampling_context=sampling_context)
 
         # we don't bother to keep spans if we already know we're not going to
         # send the transaction
