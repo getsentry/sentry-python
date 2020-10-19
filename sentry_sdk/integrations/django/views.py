@@ -6,6 +6,18 @@ if MYPY:
     from typing import Any
 
 
+try:
+    from asyncio import iscoroutinefunction
+except ImportError:
+    iscoroutinefunction = None  # type: ignore
+
+
+try:
+    from sentry_sdk.integrations.django.asgi import wrap_async_view
+except (ImportError, SyntaxError):
+    wrap_async_view = None  # type: ignore
+
+
 def patch_views():
     # type: () -> None
 
@@ -27,13 +39,14 @@ def patch_views():
 
         if integration is not None and integration.middleware_spans:
 
-            @_functools.wraps(callback)
-            def sentry_wrapped_callback(request, *args, **kwargs):
-                # type: (Any, *Any, **Any) -> Any
-                with hub.start_span(
-                    op="django.view", description=request.resolver_match.view_name
-                ):
-                    return callback(request, *args, **kwargs)
+            if (
+                iscoroutinefunction is not None
+                and wrap_async_view is not None
+                and iscoroutinefunction(callback)
+            ):
+                sentry_wrapped_callback = wrap_async_view(hub, callback)
+            else:
+                sentry_wrapped_callback = _wrap_sync_view(hub, callback)
 
         else:
             sentry_wrapped_callback = callback
@@ -41,3 +54,16 @@ def patch_views():
         return sentry_wrapped_callback
 
     BaseHandler.make_view_atomic = sentry_patched_make_view_atomic
+
+
+def _wrap_sync_view(hub, callback):
+    # type: (Hub, Any) -> Any
+    @_functools.wraps(callback)
+    def sentry_wrapped_callback(request, *args, **kwargs):
+        # type: (Any, *Any, **Any) -> Any
+        with hub.start_span(
+            op="django.view", description=request.resolver_match.view_name
+        ):
+            return callback(request, *args, **kwargs)
+
+    return sentry_wrapped_callback

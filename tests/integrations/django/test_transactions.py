@@ -19,6 +19,7 @@ else:
 
 example_url_conf = (
     url(r"^api/(?P<project_id>[\w_-]+)/store/$", lambda x: ""),
+    url(r"^api/(?P<version>(v1|v2))/author/$", lambda x: ""),
     url(r"^report/", lambda x: ""),
     url(r"^example/", include(included_url_conf)),
 )
@@ -34,6 +35,14 @@ def test_legacy_resolver_complex_match():
     resolver = RavenResolver()
     result = resolver.resolve("/api/1234/store/", example_url_conf)
     assert result == "/api/{project_id}/store/"
+
+
+def test_legacy_resolver_complex_either_match():
+    resolver = RavenResolver()
+    result = resolver.resolve("/api/v1/author/", example_url_conf)
+    assert result == "/api/{version}/author/"
+    result = resolver.resolve("/api/v2/author/", example_url_conf)
+    assert result == "/api/{version}/author/"
 
 
 def test_legacy_resolver_included_match():
