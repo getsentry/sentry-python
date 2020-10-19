@@ -1,5 +1,6 @@
 import os
 import json
+from types import FunctionType
 
 import pytest
 import jsonschema
@@ -35,6 +36,11 @@ except ImportError:
 
 else:
     del pytest_benchmark
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 
 @pytest.fixture(autouse=True)
@@ -327,3 +333,83 @@ def render_span_tree():
         return "\n".join(render_span(root_span))
 
     return inner
+
+
+@pytest.fixture(name="StringContaining")
+def string_containing_matcher():
+    """
+    An object which matches any string containing the substring passed to the
+    object at instantiation time.
+
+    Useful for assert_called_with, assert_any_call, etc.
+
+    Used like this:
+
+    >>> f = mock.Mock(return_value=None)
+    >>> f("dogs are great")
+    >>> f.assert_any_call("dogs") # will raise AssertionError
+    Traceback (most recent call last):
+        ...
+    AssertionError: mock('dogs') call not found
+    >>> f.assert_any_call(StringContaining("dogs")) # no AssertionError
+
+    """
+
+    class StringContaining(object):
+        def __init__(self, substring):
+            self.substring = substring
+
+        def __eq__(self, test_string):
+            if not isinstance(test_string, str):
+                return False
+
+            return self.substring in test_string
+
+    return StringContaining
+
+
+@pytest.fixture(name="DictionaryContaining")
+def dictionary_containing_matcher():
+    """
+    An object which matches any dictionary containing all key-value pairs from
+    the dictionary passed to the object at instantiation time.
+
+    Useful for assert_called_with, assert_any_call, etc.
+
+    Used like this:
+
+    >>> f = mock.Mock(return_value=None)
+    >>> f({"dogs": "yes", "cats": "maybe"})
+    >>> f.assert_any_call({"dogs": "yes"}) # will raise AssertionError
+    Traceback (most recent call last):
+        ...
+    AssertionError: mock({'dogs': 'yes'}) call not found
+    >>> f.assert_any_call(DictionaryContaining({"dogs": "yes"})) # no AssertionError
+    """
+
+    class DictionaryContaining(object):
+        def __init__(self, subdict):
+            self.subdict = subdict
+
+        def __eq__(self, test_dict):
+            if not isinstance(test_dict, dict):
+                return False
+
+            return all(test_dict.get(key) == self.subdict[key] for key in self.subdict)
+
+    return DictionaryContaining
+
+
+@pytest.fixture(name="FunctionMock")
+def function_mock():
+    """
+    Just like a mock.Mock object, but one which always passes an isfunction
+    test.
+    """
+
+    class FunctionMock(mock.Mock):
+        def __init__(self, *args, **kwargs):
+            super(FunctionMock, self).__init__(*args, **kwargs)
+            self.__class__ = FunctionType
+
+    return FunctionMock
