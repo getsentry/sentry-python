@@ -1,3 +1,4 @@
+import os
 import logging
 
 import pytest
@@ -220,6 +221,39 @@ def test_breadcrumbs(sentry_init, capture_events):
     capture_exception(ValueError())
     (event,) = events
     assert len(event["breadcrumbs"]["values"]) == 0
+
+
+def test_attachments(sentry_init, capture_envelopes):
+    sentry_init()
+    envelopes = capture_envelopes()
+
+    this_file = os.path.abspath(__file__.rstrip("c"))
+
+    with configure_scope() as scope:
+        scope.add_attachment(bytes=b"Hello World!", filename="message.txt")
+        scope.add_attachment(path=this_file)
+
+    capture_exception(ValueError())
+
+    (envelope,) = envelopes
+
+    assert len(envelope.items) == 3
+    assert envelope.get_event()["exception"] is not None
+
+    attachments = [x for x in envelope.items if x.type == "attachment"]
+    (message, pyfile) = attachments
+
+    assert message.headers["filename"] == "message.txt"
+    assert message.headers["type"] == "attachment"
+    assert message.headers["content_type"] == "text/plain"
+    assert message.payload.bytes == message.payload.get_bytes() == b"Hello World!"
+
+    assert pyfile.headers["filename"] == os.path.basename(this_file)
+    assert pyfile.headers["type"] == "attachment"
+    assert pyfile.headers["content_type"].startswith("text/")
+    assert pyfile.payload.bytes is None
+    with open(this_file, "rb") as f:
+        assert pyfile.payload.get_bytes() == f.read()
 
 
 def test_integration_scoping(sentry_init, capture_events):

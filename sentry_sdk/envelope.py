@@ -1,17 +1,14 @@
 import io
 import json
-import shutil
 import mimetypes
 
 from sentry_sdk._compat import text_type
 from sentry_sdk._types import MYPY
 from sentry_sdk.sessions import Session
-from sentry_sdk.tracing import Transaction
-from sentry_sdk.utils import json_dumps
+from sentry_sdk.utils import json_dumps, capture_internal_exceptions
 
 if MYPY:
     from typing import Any
-    from typing import Tuple
     from typing import Optional
     from typing import Union
     from typing import Dict
@@ -24,7 +21,7 @@ if MYPY:
 class Envelope(object):
     def __init__(
         self,
-        headers=None,  # type: Optional[Dict[str, str]]
+        headers=None,  # type: Optional[Dict[str, Any]]
         items=None,  # type: Optional[List[Item]]
     ):
         # type: (...) -> None
@@ -52,7 +49,7 @@ class Envelope(object):
         self.add_item(Item(payload=PayloadRef(json=event), type="event"))
 
     def add_transaction(
-        self, transaction  # type: Transaction
+        self, transaction  # type: Event
     ):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=transaction), type="transaction"))
@@ -148,33 +145,14 @@ class PayloadRef(object):
         # type: (...) -> bytes
         if self.bytes is None:
             if self.path is not None:
-                with open(self.path, "rb") as f:
-                    self.bytes = f.read()
+                with capture_internal_exceptions():
+                    with open(self.path, "rb") as f:
+                        self.bytes = f.read()
             elif self.json is not None:
                 self.bytes = json_dumps(self.json)
             else:
                 self.bytes = b""
         return self.bytes
-
-    def _prepare_serialize(self):
-        # type: (...) -> Tuple[Any, Any]
-        if self.path is not None and self.bytes is None:
-            f = open(self.path, "rb")
-            f.seek(0, 2)
-            length = f.tell()
-            f.seek(0, 0)
-
-            def writer(out):
-                # type: (Any) -> None
-                try:
-                    shutil.copyfileobj(f, out)
-                finally:
-                    f.close()
-
-            return length, writer
-
-        bytes = self.get_bytes()
-        return len(bytes), lambda f: f.write(bytes)
 
     @property
     def inferred_content_type(self):
@@ -199,7 +177,7 @@ class Item(object):
     def __init__(
         self,
         payload,  # type: Union[bytes, text_type, PayloadRef]
-        headers=None,  # type: Optional[Dict[str, str]]
+        headers=None,  # type: Optional[Dict[str, Any]]
         type=None,  # type: Optional[str]
         content_type=None,  # type: Optional[str]
         filename=None,  # type: Optional[str]
@@ -279,11 +257,11 @@ class Item(object):
     ):
         # type: (...) -> None
         headers = dict(self.headers)
-        length, writer = self.payload._prepare_serialize()
-        headers["length"] = length
+        bytes = self.get_bytes()
+        headers["length"] = len(bytes)
         f.write(json_dumps(headers))
         f.write(b"\n")
-        writer(f)
+        f.write(bytes)
         f.write(b"\n")
 
     def serialize(self):
