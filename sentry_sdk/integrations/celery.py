@@ -61,6 +61,7 @@ class CeleryIntegration(Integration):
                 # short-circuits to task.run if it thinks it's safe.
                 task.__call__ = _wrap_task_call(task, task.__call__)
                 task.run = _wrap_task_call(task, task.run)
+                task.apply_async = _wrap_apply_async(task, task.apply_async)
 
                 # `build_tracer` is apparently called for every task
                 # invocation. Can't wrap every celery task for every invocation
@@ -70,10 +71,6 @@ class CeleryIntegration(Integration):
             return _wrap_tracer(task, old_build_tracer(name, task, *args, **kwargs))
 
         trace.build_tracer = sentry_build_tracer
-
-        from celery.app.task import Task  # type: ignore
-
-        Task.apply_async = _wrap_apply_async(Task.apply_async)
 
         _patch_worker_exit()
 
@@ -88,15 +85,15 @@ class CeleryIntegration(Integration):
         ignore_logger("celery.redirected")
 
 
-def _wrap_apply_async(f):
-    # type: (F) -> F
+def _wrap_apply_async(task, f):
+    # type: (Any, F) -> F
     @wraps(f)
     def apply_async(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         hub = Hub.current
         integration = hub.get_integration(CeleryIntegration)
         if integration is not None and integration.propagate_traces:
-            with hub.start_span(op="celery.submit", description=args[0].name):
+            with hub.start_span(op="celery.submit", description=task.name):
                 with capture_internal_exceptions():
                     headers = dict(hub.iter_trace_propagation_headers())
 
