@@ -99,10 +99,12 @@ def celery_invocation(request):
     """
     return request.param
 
+
 @pytest.mark.parametrize("custom_celery_task_cls", (True, False))
 def test_simple(capture_events, celery, celery_invocation, custom_celery_task_cls):
 
     if custom_celery_task_cls:
+
         class CustomTask(celery.Task):
             def __call__(self, *args, **kwargs):
                 return self.run(*args, **kwargs)
