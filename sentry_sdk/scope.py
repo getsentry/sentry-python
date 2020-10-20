@@ -336,7 +336,7 @@ class Scope(object):
         is_transaction = event.get("type") == "transaction"
 
         # put all attachments into the hint.  This lets callbacks play around
-        # with attachments.  We also later pull this out of the hint when we
+        # with attachments. We also later pull this out of the hint when we
         # create the envelope.
         attachments_to_send = hint.get("attachments") or []
         for attachment in self._attachments:
