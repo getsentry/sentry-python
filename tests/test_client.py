@@ -10,6 +10,7 @@ from textwrap import dedent
 from sentry_sdk import (
     Hub,
     Client,
+    add_breadcrumb,
     configure_scope,
     capture_message,
     capture_exception,
@@ -21,6 +22,8 @@ from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
 from sentry_sdk._compat import reraise, text_type, PY2
 from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
+from sentry_sdk.serializer import MAX_DATABAG_BREADTH
+from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS
 
 if PY2:
     # Importing ABCs from collections is deprecated, and will stop working in 3.8
@@ -611,6 +614,10 @@ def test_databag_breadth_stripping(sentry_init, capture_events, benchmark):
 
         (event,) = events
 
+        assert (
+            len(event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"])
+            == MAX_DATABAG_BREADTH
+        )
         assert len(json.dumps(event)) < 10000
 
 
@@ -860,3 +867,21 @@ def test_envelope_types():
 
     assert not envelopes
     assert not events
+
+
+@pytest.mark.parametrize(
+    "sdk_options, expected_breadcrumbs",
+    [({}, DEFAULT_MAX_BREADCRUMBS), ({"max_breadcrumbs": 50}, 50)],
+)
+def test_max_breadcrumbs_option(
+    sentry_init, capture_events, sdk_options, expected_breadcrumbs
+):
+    sentry_init(sdk_options)
+    events = capture_events()
+
+    for _ in range(1231):
+        add_breadcrumb({"type": "sourdough"})
+
+    capture_message("dogs are great")
+
+    assert len(events[0]["breadcrumbs"]["values"]) == expected_breadcrumbs

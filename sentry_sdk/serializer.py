@@ -188,8 +188,8 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
             if p0 == "request" and path[1] == "data":
                 return True
 
-            if p0 == "breadcrumbs":
-                path[1]
+            if p0 == "breadcrumbs" and path[1] == "values":
+                path[2]
                 return True
 
             if p0 == "extra":

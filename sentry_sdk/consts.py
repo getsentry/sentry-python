@@ -31,6 +31,8 @@ if MYPY:
         total=False,
     )
 
+DEFAULT_MAX_BREADCRUMBS = 100
+
 
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
 # take these arguments (even though they take opaque **kwargs)
@@ -39,7 +41,7 @@ class ClientConstructor(object):
         self,
         dsn=None,  # type: Optional[str]
         with_locals=True,  # type: bool
-        max_breadcrumbs=100,  # type: int
+        max_breadcrumbs=DEFAULT_MAX_BREADCRUMBS,  # type: int
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
         server_name=None,  # type: Optional[str]
