@@ -104,7 +104,7 @@ def _can_record(record):
 def _breadcrumb_from_record(record):
     # type: (LogRecord) -> Dict[str, Any]
     return {
-        "ty": "log",
+        "type": "log",
         "level": _logging_to_event_level(record.levelname),
         "category": record.name,
         "message": record.message,
