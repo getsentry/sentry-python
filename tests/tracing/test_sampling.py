@@ -1,6 +1,6 @@
 import pytest
 
-from sentry_sdk import start_span, start_transaction
+from sentry_sdk import Hub, start_span, start_transaction
 from sentry_sdk.tracing import _is_valid_sample_rate
 from sentry_sdk.utils import logger
 
@@ -73,3 +73,17 @@ def test_warns_on_invalid_sample_rate(rate, StringContaining):  # noqa: N803
         result = _is_valid_sample_rate(rate)
         logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))
         assert result is False
+
+
+@pytest.mark.parametrize("sampling_decision", [True, False])
+def test_get_transaction_and_span_from_scope_regardless_of_sampling_decision(
+    sentry_init, sampling_decision
+):
+    sentry_init(traces_sample_rate=1.0)
+
+    with start_transaction(name="/", sampled=sampling_decision):
+        with start_span(op="child-span"):
+            with start_span(op="child-child-span"):
+                scope = Hub.current.scope
+                assert scope.span.op == "child-child-span"
+                assert scope.transaction.name == "/"
