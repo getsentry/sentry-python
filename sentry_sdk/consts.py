@@ -14,7 +14,12 @@ if MYPY:
     from sentry_sdk.transport import Transport
     from sentry_sdk.integrations import Integration
 
-    from sentry_sdk._types import Event, EventProcessor, BreadcrumbProcessor
+    from sentry_sdk._types import (
+        BreadcrumbProcessor,
+        Event,
+        EventProcessor,
+        TracesSampler,
+    )
 
     # Experiments are feature flags to enable and disable certain unstable SDK
     # functionality. Changing them from the defaults (`None`) in production
@@ -65,6 +70,7 @@ class ClientConstructor(object):
         ca_certs=None,  # type: Optional[str]
         propagate_traces=True,  # type: bool
         traces_sample_rate=0.0,  # type: float
+        traces_sampler=None,  # type: Optional[TracesSampler]
         auto_enabling_integrations=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
     ):
