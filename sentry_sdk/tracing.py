@@ -13,7 +13,6 @@ import sentry_sdk
 
 from sentry_sdk.utils import (
     capture_internal_exceptions,
-    has_tracing_enabled,
     logger,
     to_string,
 )
@@ -663,6 +662,16 @@ class Transaction(Span):
                     sample_rate=float(sample_rate),
                 )
             )
+
+
+def has_tracing_enabled(options):
+    # type: (Dict[str, Any]) -> bool
+    """
+    Returns True if either traces_sample_rate or traces_sampler is
+    non-zero/defined, False otherwise.
+    """
+
+    return bool(options.get("traces_sample_rate") or options.get("traces_sampler"))
 
 
 def _is_valid_sample_rate(rate):
