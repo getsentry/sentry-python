@@ -631,7 +631,7 @@ class Transaction(Span):
         # 0, it's a sign the transaction should be dropped
         if not sample_rate:
             logger.debug(
-                "[Tracing] Discarding {transaction_description} because ${reason}".format(
+                "[Tracing] Discarding {transaction_description} because {reason}".format(
                     transaction_description=transaction_description,
                     reason=(
                         "traces_sampler returned 0 or False"

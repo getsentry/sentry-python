@@ -180,7 +180,8 @@ def test_ignores_inherited_sample_decision_when_traces_sampler_defined(
 ):
     # make traces_sampler pick the opposite of the inherited decision, to prove
     # that traces_sampler takes precedence
-    sentry_init(traces_sampler=lambda _: not parent_sampling_decision)
+    traces_sampler = mock.Mock(return_value=not parent_sampling_decision)
+    sentry_init(traces_sampler=traces_sampler)
 
     transaction = start_transaction(
         name="dogpark", parent_sampled=parent_sampling_decision
@@ -194,7 +195,8 @@ def test_traces_sampler_doesnt_overwrite_explicitly_passed_sampling_decision(
 ):
     # make traces_sampler pick the opposite of the explicit decision, to prove
     # that the explicit decision takes precedence
-    sentry_init(traces_sampler=lambda _: not explicit_decision)
+    traces_sampler = mock.Mock(return_value=not explicit_decision)
+    sentry_init(traces_sampler=traces_sampler)
 
     transaction = start_transaction(name="dogpark", sampled=explicit_decision)
     assert transaction.sampled is explicit_decision
