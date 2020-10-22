@@ -106,8 +106,9 @@ class AioHttpIntegration(Integration):
                     # URL resolver did not find a route or died trying.
                     name="generic AIOHTTP request",
                 )
-
-                with hub.start_transaction(transaction):
+                with hub.start_transaction(
+                    transaction, custom_sampling_context={"aiohttp_request": request}
+                ):
                     try:
                         response = await old_handle(self, request)
                     except HTTPException as e:
