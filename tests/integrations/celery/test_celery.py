@@ -23,12 +23,12 @@ def connect_signal(request):
 
 @pytest.fixture
 def init_celery(sentry_init, request):
-    def inner(propagate_traces=True, backend="always_eager", **kwargs):
+    def inner(propagate_traces=True, backend="always_eager", celery_kwargs=None, **kwargs):
         sentry_init(
             integrations=[CeleryIntegration(propagate_traces=propagate_traces)],
             **kwargs
         )
-        celery = Celery(__name__)
+        celery = Celery(__name__, **(celery_kwargs or {}))
 
         if backend == "always_eager":
             if VERSION < (4,):
@@ -100,20 +100,7 @@ def celery_invocation(request):
     return request.param
 
 
-@pytest.mark.parametrize("custom_celery_task_cls", (True, False))
-def test_simple(capture_events, celery, celery_invocation, custom_celery_task_cls):
-
-    if custom_celery_task_cls:
-
-        custom_calls = []
-
-        class CustomTask(celery.Task):
-            def __call__(self, *args, **kwargs):
-                custom_calls.append(1)
-                return self.run(*args, **kwargs)
-
-        celery.Task = CustomTask
-
+def test_simple(capture_events, celery, celery_invocation):
     events = capture_events()
 
     @celery.task(name="dummy_task")
@@ -124,8 +111,6 @@ def test_simple(capture_events, celery, celery_invocation, custom_celery_task_cl
     with start_transaction() as transaction:
         celery_invocation(dummy_task, 1, 2)
         _, expected_context = celery_invocation(dummy_task, 1, 0)
-
-    assert not custom_celery_task_cls or custom_calls
 
     (event,) = events
 
@@ -322,8 +307,21 @@ def test_retry(celery, capture_events):
 
 
 @pytest.mark.forked
-def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe, tmpdir):
+@pytest.mark.parametrize("custom_celery_task_cls", (True, False))
+def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe, tmpdir, custom_celery_task_cls):
     celery = init_celery(traces_sample_rate=1.0, backend="redis", debug=True)
+
+    custom_calls = []
+
+    if custom_celery_task_cls:
+        import celery as celery_mod
+
+        class CustomTask(celery_mod.Task):
+            def __call__(self, *args, **kwargs):
+                custom_calls.append(1)
+                return self.run(*args, **kwargs)
+
+        celery.Task = CustomTask
 
     events = capture_events_forksafe()
 
@@ -367,6 +365,8 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe, t
 
     # if this is nonempty, the worker never really forked
     assert not runs
+
+    assert not custom_celery_task_cls or custom_calls
 
 
 @pytest.mark.forked
