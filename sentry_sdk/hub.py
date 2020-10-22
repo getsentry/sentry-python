@@ -479,7 +479,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def start_transaction(
         self,
         transaction=None,  # type: Optional[Transaction]
-        custom_sampling_context=None,  # type: Optional[Dict[str, Any]]
         **kwargs  # type: Any
     ):
         # type: (...) -> Transaction
@@ -505,6 +504,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         When the transaction is finished, it will be sent to Sentry with all its
         finished child spans.
         """
+        custom_sampling_context = kwargs.pop("custom_sampling_context", {})
+
         # if we haven't been given a transaction, make one
         if transaction is None:
             kwargs.setdefault("hub", self)
@@ -516,7 +517,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             "transaction_context": transaction.to_json(),
             "parent_sampled": transaction.parent_sampled,
         }
-        sampling_context.update(custom_sampling_context or {})
+        sampling_context.update(custom_sampling_context)
         transaction._set_initial_sampling_decision(sampling_context=sampling_context)
 
         # we don't bother to keep spans if we already know we're not going to

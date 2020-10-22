@@ -207,8 +207,7 @@ def start_span(
 @hubmethod
 def start_transaction(
     transaction=None,  # type: Optional[Transaction]
-    custom_sampling_context=None,  # type: Optional[Dict[str, Any]]
     **kwargs  # type: Any
 ):
     # type: (...) -> Transaction
-    return Hub.current.start_transaction(transaction, custom_sampling_context, **kwargs)
+    return Hub.current.start_transaction(transaction, **kwargs)
