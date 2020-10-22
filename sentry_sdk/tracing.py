@@ -34,7 +34,6 @@ if MYPY:
     from typing import Dict
     from typing import List
     from typing import Tuple
-    from typing import Union
 
     from sentry_sdk._types import SamplingContext
 
@@ -587,15 +586,6 @@ class Transaction(Span):
         decision, `traces_sample_rate` will be used.
         """
 
-        def _inherit_or_use_static_rate(parent_sampled, traces_sample_rate):
-            # type: (bool, float) -> Union[bool, float]
-            """
-            Implements the default inheritance behavior, to be used when
-            traces_sampler is not defined.
-            """
-
-            return parent_sampled if parent_sampled is not None else traces_sample_rate
-
         hub = self.hub or sentry_sdk.Hub.current
         client = hub.client
         options = (client and client.options) or {}
@@ -618,9 +608,12 @@ class Transaction(Span):
         # the hook if so
         sample_rate = (
             options["traces_sampler"](sampling_context)
-            if isfunction(options.get("traces_sampler"))
-            else _inherit_or_use_static_rate(
-                sampling_context["parent_sampled"], options["traces_sample_rate"]
+            if callable(options.get("traces_sampler"))
+            else (
+                # default inheritance behavior
+                sampling_context["parent_sampled"]
+                if sampling_context["parent_sampled"] is not None
+                else options["traces_sample_rate"]
             )
         )
 
