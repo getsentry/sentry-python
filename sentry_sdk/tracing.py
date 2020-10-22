@@ -6,7 +6,6 @@ import random
 import time
 
 from datetime import datetime, timedelta
-from inspect import isfunction
 from numbers import Real
 
 import sentry_sdk
@@ -636,7 +635,7 @@ class Transaction(Span):
                     transaction_description=transaction_description,
                     reason=(
                         "traces_sampler returned 0 or False"
-                        if isfunction(options.get("traces_sampler"))
+                        if callable(options.get("traces_sampler"))
                         else "traces_sample_rate is set to 0"
                     ),
                 )

@@ -1,6 +1,5 @@
 import os
 import json
-from types import FunctionType
 
 import pytest
 import jsonschema
@@ -36,11 +35,6 @@ except ImportError:
 
 else:
     del pytest_benchmark
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 @pytest.fixture(autouse=True)
@@ -400,18 +394,3 @@ def dictionary_containing_matcher():
             return all(test_dict.get(key) == self.subdict[key] for key in self.subdict)
 
     return DictionaryContaining
-
-
-@pytest.fixture(name="FunctionMock")
-def function_mock():
-    """
-    Just like a mock.Mock object, but one which always passes an isfunction
-    test.
-    """
-
-    class FunctionMock(mock.Mock):
-        def __init__(self, *args, **kwargs):
-            super(FunctionMock, self).__init__(*args, **kwargs)
-            self.__class__ = FunctionType
-
-    return FunctionMock

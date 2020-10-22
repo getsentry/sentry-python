@@ -119,11 +119,10 @@ def test_uses_traces_sample_rate_correctly(
 )
 def test_uses_traces_sampler_return_value_correctly(
     sentry_init,
-    FunctionMock,  # noqa: N803
     traces_sampler_return_value,
     expected_decision,
 ):
-    sentry_init(traces_sampler=FunctionMock(return_value=traces_sampler_return_value))
+    sentry_init(traces_sampler=mock.Mock(return_value=traces_sampler_return_value))
 
     with mock.patch.object(random, "random", return_value=0.5):
 
@@ -133,9 +132,9 @@ def test_uses_traces_sampler_return_value_correctly(
 
 @pytest.mark.parametrize("traces_sampler_return_value", [True, False])
 def test_tolerates_traces_sampler_returning_a_boolean(
-    sentry_init, FunctionMock, traces_sampler_return_value  # noqa: N803
+    sentry_init, traces_sampler_return_value
 ):
-    sentry_init(traces_sampler=FunctionMock(return_value=traces_sampler_return_value))
+    sentry_init(traces_sampler=mock.Mock(return_value=traces_sampler_return_value))
 
     transaction = start_transaction(name="dogpark")
     assert transaction.sampled is traces_sampler_return_value
@@ -143,9 +142,9 @@ def test_tolerates_traces_sampler_returning_a_boolean(
 
 @pytest.mark.parametrize("sampling_decision", [True, False])
 def test_only_captures_transaction_when_sampled_is_true(
-    sentry_init, FunctionMock, sampling_decision, capture_events  # noqa: N803
+    sentry_init, sampling_decision, capture_events
 ):
-    sentry_init(traces_sampler=FunctionMock(return_value=sampling_decision))
+    sentry_init(traces_sampler=mock.Mock(return_value=sampling_decision))
     events = capture_events()
 
     transaction = start_transaction(name="dogpark")
@@ -159,13 +158,12 @@ def test_only_captures_transaction_when_sampled_is_true(
 )
 def test_prefers_traces_sampler_to_traces_sample_rate(
     sentry_init,
-    FunctionMock,  # noqa: N803
     traces_sample_rate,
     traces_sampler_return_value,
 ):
     # make traces_sample_rate imply the opposite of traces_sampler, to prove
     # that traces_sampler takes precedence
-    traces_sampler = FunctionMock(return_value=traces_sampler_return_value)
+    traces_sampler = mock.Mock(return_value=traces_sampler_return_value)
     sentry_init(
         traces_sample_rate=traces_sample_rate,
         traces_sampler=traces_sampler,
@@ -246,9 +244,9 @@ def test_passes_parent_sampling_decision_in_sampling_context(
 
 
 def test_passes_custom_samling_context_from_start_transaction_to_traces_sampler(
-    FunctionMock, sentry_init, DictionaryContaining  # noqa: N803
+    sentry_init, DictionaryContaining  # noqa: N803
 ):
-    traces_sampler = FunctionMock()
+    traces_sampler = mock.Mock()
     sentry_init(traces_sampler=traces_sampler)
 
     start_transaction(custom_sampling_context={"dogs": "yes", "cats": "maybe"})
