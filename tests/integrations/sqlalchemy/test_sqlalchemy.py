@@ -76,7 +76,9 @@ def test_orm_queries(sentry_init, capture_events):
 def test_transactions(sentry_init, capture_events, render_span_tree):
 
     sentry_init(
-        integrations=[SqlalchemyIntegration()], _experiments={"record_sql_params": True}
+        integrations=[SqlalchemyIntegration()],
+        _experiments={"record_sql_params": True},
+        traces_sample_rate=1.0,
     )
     events = capture_events()
 

@@ -2,6 +2,7 @@ import re
 import uuid
 import contextlib
 import math
+import random
 import time
 
 from datetime import datetime, timedelta
@@ -9,7 +10,11 @@ from numbers import Real
 
 import sentry_sdk
 
-from sentry_sdk.utils import capture_internal_exceptions, logger, to_string
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    logger,
+    to_string,
+)
 from sentry_sdk._compat import PY2
 from sentry_sdk._types import MYPY
 
@@ -27,6 +32,8 @@ if MYPY:
     from typing import Dict
     from typing import List
     from typing import Tuple
+
+    from sentry_sdk._types import SamplingContext
 
 _traceparent_header_format_re = re.compile(
     "^[ \t]*"  # whitespace
@@ -337,7 +344,7 @@ class Span(object):
         return Transaction(
             trace_id=trace_id,
             parent_span_id=parent_span_id,
-            sampled=parent_sampled,
+            parent_sampled=parent_sampled,
             **kwargs
         )
 
@@ -554,6 +561,116 @@ class Transaction(Span):
         rv["parent_sampled"] = self.parent_sampled
 
         return rv
+
+    def _set_initial_sampling_decision(self, sampling_context):
+        # type: (SamplingContext) -> None
+        """
+        Sets the transaction's sampling decision, according to the following
+        precedence rules:
+
+        1. If a sampling decision is passed to `start_transaction`
+        (`start_transaction(name: "my transaction", sampled: True)`), that
+        decision will be used, regardlesss of anything else
+
+        2. If `traces_sampler` is defined, its decision will be used. It can
+        choose to keep or ignore any parent sampling decision, or use the
+        sampling context data to make its own decision or to choose a sample
+        rate for the transaction.
+
+        3. If `traces_sampler` is not defined, but there's a parent sampling
+        decision, the parent sampling decision will be used.
+
+        4. If `traces_sampler` is not defined and there's no parent sampling
+        decision, `traces_sample_rate` will be used.
+        """
+
+        hub = self.hub or sentry_sdk.Hub.current
+        client = hub.client
+        options = (client and client.options) or {}
+        transaction_description = "{op}transaction <{name}>".format(
+            op=("<" + self.op + "> " if self.op else ""), name=self.name
+        )
+
+        # nothing to do if there's no client or if tracing is disabled
+        if not client or not has_tracing_enabled(options):
+            self.sampled = False
+            return
+
+        # if the user has forced a sampling decision by passing a `sampled`
+        # value when starting the transaction, go with that
+        if self.sampled is not None:
+            return
+
+        # we would have bailed already if neither `traces_sampler` nor
+        # `traces_sample_rate` were defined, so one of these should work; prefer
+        # the hook if so
+        sample_rate = (
+            options["traces_sampler"](sampling_context)
+            if callable(options.get("traces_sampler"))
+            else (
+                # default inheritance behavior
+                sampling_context["parent_sampled"]
+                if sampling_context["parent_sampled"] is not None
+                else options["traces_sample_rate"]
+            )
+        )
+
+        # Since this is coming from the user (or from a function provided by the
+        # user), who knows what we might get. (The only valid values are
+        # booleans or numbers between 0 and 1.)
+        if not _is_valid_sample_rate(sample_rate):
+            logger.warning(
+                "[Tracing] Discarding {transaction_description} because of invalid sample rate.".format(
+                    transaction_description=transaction_description,
+                )
+            )
+            self.sampled = False
+            return
+
+        # if the function returned 0 (or false), or if `traces_sample_rate` is
+        # 0, it's a sign the transaction should be dropped
+        if not sample_rate:
+            logger.debug(
+                "[Tracing] Discarding {transaction_description} because {reason}".format(
+                    transaction_description=transaction_description,
+                    reason=(
+                        "traces_sampler returned 0 or False"
+                        if callable(options.get("traces_sampler"))
+                        else "traces_sample_rate is set to 0"
+                    ),
+                )
+            )
+            self.sampled = False
+            return
+
+        # Now we roll the dice. random.random is inclusive of 0, but not of 1,
+        # so strict < is safe here. In case sample_rate is a boolean, cast it
+        # to a float (True becomes 1.0 and False becomes 0.0)
+        self.sampled = random.random() < float(sample_rate)
+
+        if self.sampled:
+            logger.debug(
+                "[Tracing] Starting {transaction_description}".format(
+                    transaction_description=transaction_description,
+                )
+            )
+        else:
+            logger.debug(
+                "[Tracing] Discarding {transaction_description} because it's not included in the random sample (sampling rate = {sample_rate})".format(
+                    transaction_description=transaction_description,
+                    sample_rate=float(sample_rate),
+                )
+            )
+
+
+def has_tracing_enabled(options):
+    # type: (Dict[str, Any]) -> bool
+    """
+    Returns True if either traces_sample_rate or traces_sampler is
+    non-zero/defined, False otherwise.
+    """
+
+    return bool(options.get("traces_sample_rate") or options.get("traces_sampler"))
 
 
 def _is_valid_sample_rate(rate):

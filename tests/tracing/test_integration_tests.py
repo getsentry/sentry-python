@@ -70,7 +70,7 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
     # correctly
     transaction = Transaction.continue_from_headers(headers, name="WRONG")
     assert transaction is not None
-    assert transaction.sampled == sampled
+    assert transaction.parent_sampled == sampled
     assert transaction.trace_id == old_span.trace_id
     assert transaction.same_process_as_parent is False
     assert transaction.parent_span_id == old_span.span_id
