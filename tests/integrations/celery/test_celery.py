@@ -23,7 +23,9 @@ def connect_signal(request):
 
 @pytest.fixture
 def init_celery(sentry_init, request):
-    def inner(propagate_traces=True, backend="always_eager", celery_kwargs=None, **kwargs):
+    def inner(
+        propagate_traces=True, backend="always_eager", celery_kwargs=None, **kwargs
+    ):
         sentry_init(
             integrations=[CeleryIntegration(propagate_traces=propagate_traces)],
             **kwargs
@@ -308,7 +310,9 @@ def test_retry(celery, capture_events):
 
 @pytest.mark.forked
 @pytest.mark.parametrize("custom_celery_task_cls", (True, False))
-def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe, tmpdir, custom_celery_task_cls):
+def test_redis_backend_trace_propagation(
+    init_celery, capture_events_forksafe, tmpdir, custom_celery_task_cls
+):
     celery = init_celery(traces_sample_rate=1.0, backend="redis", debug=True)
 
     custom_calls = []
