@@ -105,8 +105,11 @@ def test_simple(capture_events, celery, celery_invocation, custom_celery_task_cl
 
     if custom_celery_task_cls:
 
+        custom_calls = []
+
         class CustomTask(celery.Task):
             def __call__(self, *args, **kwargs):
+                custom_calls.append(1)
                 return self.run(*args, **kwargs)
 
         celery.Task = CustomTask
@@ -121,6 +124,8 @@ def test_simple(capture_events, celery, celery_invocation, custom_celery_task_cl
     with start_transaction() as transaction:
         celery_invocation(dummy_task, 1, 2)
         _, expected_context = celery_invocation(dummy_task, 1, 0)
+
+    assert not custom_celery_task_cls or custom_calls
 
     (event,) = events
 
