@@ -8,6 +8,11 @@ from starlette.responses import PlainTextResponse
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocket
 
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
+
 
 @pytest.fixture
 def app():
@@ -202,3 +207,47 @@ def test_starlette_last_event_id(app, sentry_init, capture_events, request):
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ValueError"
     assert exception["value"] == "oh no"
+
+
+def test_transaction(app, sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    @app.route("/tricks/kangaroo")
+    def kangaroo_handler(request):
+        return PlainTextResponse("dogs are great")
+
+    client = TestClient(app)
+    client.get("/tricks/kangaroo")
+
+    event = events[0]
+    assert event["type"] == "transaction"
+    assert (
+        event["transaction"]
+        == "tests.integrations.asgi.test_asgi.test_transaction.<locals>.kangaroo_handler"
+    )
+
+
+def test_traces_sampler_gets_scope_in_sampling_context(
+    app, sentry_init, DictionaryContaining  # noqa: N803
+):
+    traces_sampler = mock.Mock()
+    sentry_init(traces_sampler=traces_sampler)
+
+    @app.route("/tricks/kangaroo")
+    def kangaroo_handler(request):
+        return PlainTextResponse("dogs are great")
+
+    client = TestClient(app)
+    client.get("/tricks/kangaroo")
+
+    traces_sampler.assert_any_call(
+        DictionaryContaining(
+            {
+                # starlette just uses a dictionary to hold the scope
+                "asgi_scope": DictionaryContaining(
+                    {"method": "GET", "path": "/tricks/kangaroo"}
+                )
+            }
+        )
+    )
