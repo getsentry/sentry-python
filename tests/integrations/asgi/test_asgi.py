@@ -8,6 +8,10 @@ from starlette.responses import PlainTextResponse
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocket
 
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 @pytest.fixture
 def app():
@@ -202,3 +206,42 @@ def test_starlette_last_event_id(app, sentry_init, capture_events, request):
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ValueError"
     assert exception["value"] == "oh no"
+
+async def test_traces_sampler_gets_scope_object_in_sampling_context(
+        sentry_init,
+        app,
+        capture_events,
+        DictionaryContaining,
+        ObjectDescribedBy
+):
+    test_url = "/sync-message"
+
+    traces_sampler = mock.Mock()
+    sentry_init(
+        send_default_pii=True,
+        traces_sampler=traces_sampler
+    )
+
+    events = capture_events()
+
+    client = TestClient(app)
+    response = client.get(test_url)
+
+    assert response.status_code == 200
+
+    traces_sampler.assert_any_call(
+        DictionaryContaining(
+           {
+              "scope": ObjectDescribedBy(
+                 type=dict, attrs={
+                    'type': 'http',
+                    'http_version': '1.1',
+                    'method': 'GET',
+                    'path': test_url,
+                    'root_path': '',
+                    'scheme': 'http'
+                 }
+              )
+           }
+        )
+    )
