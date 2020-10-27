@@ -139,7 +139,10 @@ class SentryAsgiMiddleware:
                 transaction.name = _DEFAULT_TRANSACTION_NAME
                 transaction.set_tag("asgi.type", ty)
 
-                with hub.start_transaction(transaction):
+                with hub.start_transaction(
+                    transaction,
+                    custom_sampling_context={"scope": scope}
+                ):
                     # XXX: Would be cool to have correct span status, but we
                     # would have to wrap send(). That is a bit hard to do with
                     # the current abstraction over ASGI 2/3.
