@@ -159,7 +159,18 @@ def _wrap_tracer(task, f):
             if transaction is None:
                 return f(*args, **kwargs)
 
-            with hub.start_transaction(transaction):
+            with hub.start_transaction(
+                transaction,
+                custom_sampling_context={
+                    "celery_job": {
+                        "task": task.name,
+                        # for some reason, args[1] is a list if non-empty but a
+                        # tuple if empty
+                        "args": list(args[1]),
+                        "kwargs": args[2],
+                    }
+                },
+            ):
                 return f(*args, **kwargs)
 
     return _inner  # type: ignore
