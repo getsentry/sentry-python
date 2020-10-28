@@ -26,7 +26,7 @@ def test_with_locals_enabled(sentry_init, capture_events, integrations):
         p = 10
         a = 11
         s = 12
-        str((f"{q}", w, e, r, t, y, u, i, o, p, a, s))  # use variables for linter
+        str((q, w, e, r, t, y, u, i, o, p, a, s))  # use variables for linter
         namespace.d = {1: 2}
         print(namespace.d[1] / 0)
 
