@@ -110,20 +110,22 @@ def pure_eval_frame(frame):
         # A higher return value is better - the expression will appear
         # earlier in the list of values and is less likely to be trimmed
         nodes, _value = expression
-        for node in nodes:
-            node._start = (node.lineno, node.col_offset)
+
+        def start(n):
+            # type: (ast.expr) -> Tuple[int, int]
+            return (n.lineno, n.col_offset)
 
         nodes_before_stmt = [
-            node for node in nodes if node._start < stmt.last_token.end
+            node for node in nodes if start(node) < stmt.last_token.end
         ]
         if nodes_before_stmt:
             # The position of the last node before or in the statement
-            return max(node._start for node in nodes_before_stmt)
+            return max(start(node) for node in nodes_before_stmt)
         else:
             # The position of the first node after the statement
             # Negative means it's always lower priority than nodes that come before
             # Less negative means closer to the statement and higher priority
-            lineno, col_offset = min(node._start for node in nodes)
+            lineno, col_offset = min(start(node) for node in nodes)
             return (-lineno, -col_offset)
 
     # This adds the first_token and last_token attributes to nodes
