@@ -413,8 +413,10 @@ def object_described_by_matcher():
     """
     An object which matches any other object with the given properties.
 
-    Available properties currently are "type" (a type object) and "attrs" (a
-    dictionary).
+    Available properties currently are "type" (a type object), "type_name" (a
+    string), and "attrs" (a dictionary). Note that while "type" allows for
+    subclasses to match, "type_name" must be an exact match to the object being
+    tested.
 
     Useful for assert_called_with, assert_any_call, etc.
 
@@ -429,17 +431,23 @@ def object_described_by_matcher():
     >>> f = mock.Mock()
     >>> f(maisey)
     >>> f.assert_any_call(ObjectDescribedBy(type=Dog)) # no AssertionError
+    >>> f.assert_any_call(ObjectDescribedBy(type_name="Dog")) # no AssertionError
     >>> f.assert_any_call(ObjectDescribedBy(attrs={"name": "Maisey"})) # no AssertionError
     """
 
     class ObjectDescribedBy(object):
-        def __init__(self, type=None, attrs=None):
+        def __init__(self, type=None, type_name=None, attrs=None):
             self.type = type
+            self.type_name = type_name
             self.attrs = attrs
 
         def __eq__(self, test_obj):
             if self.type:
                 if not isinstance(test_obj, self.type):
+                    return False
+
+            if self.type_name:
+                if self.type_name != type(test_obj).__name__:
                     return False
 
             # all checks here done with getattr rather than comparing to

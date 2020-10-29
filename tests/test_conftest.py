@@ -71,24 +71,24 @@ class Cat(Animal):
 
 
 @pytest.mark.parametrize(
-    "test_obj, type_and_attrs_result, type_only_result, attrs_only_result",
+    "test_obj, type_and_attrs_result, type_only_result, attrs_only_result, type_name_only_result",
     [
         # type matches
-        (Dog("Maisey", 7, "silly"), True, True, True),  # full attr containment
-        (Dog("Maisey", 7), True, True, True),  # type and attr equality
-        (Dog(), False, True, False),  # reverse attr containment
-        (Dog("Maisey"), False, True, False),  # reverse attr containment
-        (Dog("Charlie", 7, "goofy"), False, True, False),  # partial attr overlap
-        (Dog("Bodhi", 6, "floppy"), False, True, False),  # no attr overlap
+        (Dog("Maisey", 7, "silly"), True, True, True, True),  # full attr containment
+        (Dog("Maisey", 7), True, True, True, True),  # type and attr equality
+        (Dog(), False, True, False, True),  # reverse attr containment
+        (Dog("Maisey"), False, True, False, True),  # reverse attr containment
+        (Dog("Charlie", 7, "goofy"), False, True, False, True),  # partial attr overlap
+        (Dog("Bodhi", 6, "floppy"), False, True, False, True),  # no attr overlap
         # type mismatches
-        (Cat("Maisey", 7), False, False, True),  # attr equality
-        (Cat("Piper", 1, "doglike"), False, False, False),
-        ("Good girl, Maisey", False, False, False),
-        ({"name": "Maisey", "age": 7}, False, False, False),
-        (1231, False, False, False),
-        (11.21, False, False, False),
-        ([], False, False, False),
-        (True, False, False, False),
+        (Cat("Maisey", 7), False, False, True, False),  # attr equality
+        (Cat("Piper", 1, "doglike"), False, False, False, False),
+        ("Good girl, Maisey", False, False, False, False),
+        ({"name": "Maisey", "age": 7}, False, False, False, False),
+        (1231, False, False, False, False),
+        (11.21, False, False, False, False),
+        ([], False, False, False, False),
+        (True, False, False, False, False),
     ],
 )
 def test_object_described_by(
@@ -96,6 +96,7 @@ def test_object_described_by(
     type_and_attrs_result,
     type_only_result,
     attrs_only_result,
+    type_name_only_result,
     ObjectDescribedBy,  # noqa: N803
 ):
 
@@ -108,3 +109,5 @@ def test_object_described_by(
     assert (
         test_obj == ObjectDescribedBy(attrs={"name": "Maisey", "age": 7})
     ) is attrs_only_result
+
+    assert (test_obj == ObjectDescribedBy(type_name="Dog")) is type_name_only_result
