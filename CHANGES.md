@@ -29,7 +29,15 @@ A major release `N` implies the previous release `N-1` will no longer receive up
 
 ## 0.19.2
 
-* Added support for automatic release and environment configuration for some common situations.
+* Add `traces_sampler` option.
+* The SDK now attempts to infer a default release from various environment
+  variables and the current git repo.
+* Fix a crash with async views in Django 3.1.
+* Fix a bug where complex URL patterns in Django would create malformed transaction names.
+* Add options for transaction styling in AIOHTTP.
+* Add basic attachment support (documentation tbd).
+* fix a crash in the `pure_eval` integration.
+* Integration for creating spans from `boto3`.
 
 ## 0.19.1
 
