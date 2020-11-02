@@ -183,7 +183,12 @@ class EventHandler(logging.Handler, object):
         client_options = hub.client.options
 
         # exc_info might be None or (None, None, None)
-        if record.exc_info is not None and record.exc_info[0] is not None:
+        #
+        # exc_info may also be any falsy value due to Python stdlib being
+        # liberal with what it receives and Celery's billiard being "liberal"
+        # with what it sends. See
+        # https://github.com/getsentry/sentry-python/issues/904
+        if record.exc_info and record.exc_info[0] is not None:
             event, hint = event_from_exception(
                 record.exc_info,
                 client_options=client_options,
