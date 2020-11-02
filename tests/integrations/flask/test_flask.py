@@ -45,7 +45,7 @@ def app():
 @pytest.fixture(params=("auto", "manual"))
 def integration_enabled_params(request):
     if request.param == "auto":
-        return {"_experiments": {"auto_enabling_integrations": True}}
+        return {"auto_enabling_integrations": True}
     elif request.param == "manual":
         return {"integrations": [flask_sentry.FlaskIntegration()]}
     else:

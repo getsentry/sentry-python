@@ -1,13 +1,20 @@
 import re
 import uuid
 import contextlib
+import math
+import random
 import time
 
 from datetime import datetime, timedelta
+from numbers import Real
 
 import sentry_sdk
 
-from sentry_sdk.utils import capture_internal_exceptions, logger, to_string
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    logger,
+    to_string,
+)
 from sentry_sdk._compat import PY2
 from sentry_sdk._types import MYPY
 
@@ -25,6 +32,8 @@ if MYPY:
     from typing import Dict
     from typing import List
     from typing import Tuple
+
+    from sentry_sdk._types import SamplingContext
 
 _traceparent_header_format_re = re.compile(
     "^[ \t]*"  # whitespace
@@ -107,10 +116,18 @@ class Span(object):
         "_span_recorder",
         "hub",
         "_context_manager_state",
+        # TODO: rename this "transaction" once we fully and truly deprecate the
+        # old "transaction" attribute (which was actually the transaction name)?
+        "_containing_transaction",
     )
 
     def __new__(cls, **kwargs):
         # type: (**Any) -> Any
+        """
+        Backwards-compatible implementation of Span and Transaction
+        creation.
+        """
+
         # TODO: consider removing this in a future release.
         # This is for backwards compatibility with releases before Transaction
         # existed, to allow for a smoother transition.
@@ -157,6 +174,7 @@ class Span(object):
         self.timestamp = None  # type: Optional[datetime]
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
+        self._containing_transaction = None  # type: Optional[Transaction]
 
     def init_span_recorder(self, maxlen):
         # type: (int) -> None
@@ -166,8 +184,10 @@ class Span(object):
 
     def __repr__(self):
         # type: () -> str
-        return "<%s(trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>" % (
+        return "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>" % (
             self.__class__.__name__,
+            self.op,
+            self.description,
             self.trace_id,
             self.span_id,
             self.parent_span_id,
@@ -200,14 +220,20 @@ class Span(object):
         """
         Start a sub-span from the current span or transaction.
 
-        Takes the same arguments as the initializer of :py:class:`Span`. No
-        attributes other than the sample rate are inherited.
+        Takes the same arguments as the initializer of :py:class:`Span`. The
+        trace id, sampling decision, transaction pointer, and span recorder are
+        inherited from the current span/transaction.
         """
         kwargs.setdefault("sampled", self.sampled)
 
         rv = Span(
             trace_id=self.trace_id, span_id=None, parent_span_id=self.span_id, **kwargs
         )
+
+        if isinstance(self, Transaction):
+            rv._containing_transaction = self
+        else:
+            rv._containing_transaction = self._containing_transaction
 
         rv._span_recorder = recorder = self._span_recorder
         if recorder:
@@ -227,6 +253,14 @@ class Span(object):
         **kwargs  # type: Any
     ):
         # type: (...) -> Transaction
+        """
+        Create a Transaction with the given params, then add in data pulled from
+        the 'sentry-trace' header in the environ (if any) before returning the
+        Transaction.
+
+        If the 'sentry-trace' header is malformed or missing, just create and
+        return a Transaction instance with the given params.
+        """
         if cls is Span:
             logger.warning(
                 "Deprecated: use Transaction.continue_from_environ "
@@ -241,16 +275,25 @@ class Span(object):
         **kwargs  # type: Any
     ):
         # type: (...) -> Transaction
+        """
+        Create a Transaction with the given params, then add in data pulled from
+        the 'sentry-trace' header (if any) before returning the Transaction.
+
+        If the 'sentry-trace' header is malformed or missing, just create and
+        return a Transaction instance with the given params.
+        """
         if cls is Span:
             logger.warning(
                 "Deprecated: use Transaction.continue_from_headers "
                 "instead of Span.continue_from_headers."
             )
-        parent = Transaction.from_traceparent(headers.get("sentry-trace"), **kwargs)
-        if parent is None:
-            parent = Transaction(**kwargs)
-        parent.same_process_as_parent = False
-        return parent
+        transaction = Transaction.from_traceparent(
+            headers.get("sentry-trace"), **kwargs
+        )
+        if transaction is None:
+            transaction = Transaction(**kwargs)
+        transaction.same_process_as_parent = False
+        return transaction
 
     def iter_headers(self):
         # type: () -> Generator[Tuple[str, str], None, None]
@@ -263,6 +306,13 @@ class Span(object):
         **kwargs  # type: Any
     ):
         # type: (...) -> Optional[Transaction]
+        """
+        Create a Transaction with the given params, then add in data pulled from
+        the given 'sentry-trace' header value before returning the Transaction.
+
+        If the header value is malformed or missing, just create and return a
+        Transaction instance with the given params.
+        """
         if cls is Span:
             logger.warning(
                 "Deprecated: use Transaction.from_traceparent "
@@ -279,20 +329,23 @@ class Span(object):
         if match is None:
             return None
 
-        trace_id, span_id, sampled_str = match.groups()
+        trace_id, parent_span_id, sampled_str = match.groups()
 
         if trace_id is not None:
             trace_id = "{:032x}".format(int(trace_id, 16))
-        if span_id is not None:
-            span_id = "{:016x}".format(int(span_id, 16))
+        if parent_span_id is not None:
+            parent_span_id = "{:016x}".format(int(parent_span_id, 16))
 
         if sampled_str:
-            sampled = sampled_str != "0"  # type: Optional[bool]
+            parent_sampled = sampled_str != "0"  # type: Optional[bool]
         else:
-            sampled = None
+            parent_sampled = None
 
         return Transaction(
-            trace_id=trace_id, parent_span_id=span_id, sampled=sampled, **kwargs
+            trace_id=trace_id,
+            parent_span_id=parent_span_id,
+            parent_sampled=parent_sampled,
+            **kwargs
         )
 
     def to_traceparent(self):
@@ -372,8 +425,8 @@ class Span(object):
         _maybe_create_breadcrumbs_from_span(hub, self)
         return None
 
-    def to_json(self, client):
-        # type: (Optional[sentry_sdk.Client]) -> Dict[str, Any]
+    def to_json(self):
+        # type: () -> Dict[str, Any]
         rv = {
             "trace_id": self.trace_id,
             "span_id": self.span_id,
@@ -414,11 +467,12 @@ class Span(object):
 
 
 class Transaction(Span):
-    __slots__ = ("name",)
+    __slots__ = ("name", "parent_sampled")
 
     def __init__(
         self,
         name="",  # type: str
+        parent_sampled=None,  # type: Optional[bool]
         **kwargs  # type: Any
     ):
         # type: (...) -> None
@@ -433,19 +487,18 @@ class Transaction(Span):
             name = kwargs.pop("transaction")
         Span.__init__(self, **kwargs)
         self.name = name
+        self.parent_sampled = parent_sampled
 
     def __repr__(self):
         # type: () -> str
-        return (
-            "<%s(name=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>"
-            % (
-                self.__class__.__name__,
-                self.name,
-                self.trace_id,
-                self.span_id,
-                self.parent_span_id,
-                self.sampled,
-            )
+        return "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>" % (
+            self.__class__.__name__,
+            self.name,
+            self.op,
+            self.trace_id,
+            self.span_id,
+            self.parent_span_id,
+            self.sampled,
         )
 
     def finish(self, hub=None):
@@ -454,7 +507,9 @@ class Transaction(Span):
             # This transaction is already finished, ignore.
             return None
 
+        # This is a de facto proxy for checking if sampled = False
         if self._span_recorder is None:
+            logger.debug("Discarding transaction because sampled = False")
             return None
 
         hub = hub or self.hub or sentry_sdk.Hub.current
@@ -480,7 +535,7 @@ class Transaction(Span):
             return None
 
         finished_spans = [
-            span.to_json(client)
+            span.to_json()
             for span in self._span_recorder.spans
             if span is not self and span.timestamp is not None
         ]
@@ -496,6 +551,157 @@ class Transaction(Span):
                 "spans": finished_spans,
             }
         )
+
+    def to_json(self):
+        # type: () -> Dict[str, Any]
+        rv = super(Transaction, self).to_json()
+
+        rv["name"] = self.name
+        rv["sampled"] = self.sampled
+        rv["parent_sampled"] = self.parent_sampled
+
+        return rv
+
+    def _set_initial_sampling_decision(self, sampling_context):
+        # type: (SamplingContext) -> None
+        """
+        Sets the transaction's sampling decision, according to the following
+        precedence rules:
+
+        1. If a sampling decision is passed to `start_transaction`
+        (`start_transaction(name: "my transaction", sampled: True)`), that
+        decision will be used, regardlesss of anything else
+
+        2. If `traces_sampler` is defined, its decision will be used. It can
+        choose to keep or ignore any parent sampling decision, or use the
+        sampling context data to make its own decision or to choose a sample
+        rate for the transaction.
+
+        3. If `traces_sampler` is not defined, but there's a parent sampling
+        decision, the parent sampling decision will be used.
+
+        4. If `traces_sampler` is not defined and there's no parent sampling
+        decision, `traces_sample_rate` will be used.
+        """
+
+        hub = self.hub or sentry_sdk.Hub.current
+        client = hub.client
+        options = (client and client.options) or {}
+        transaction_description = "{op}transaction <{name}>".format(
+            op=("<" + self.op + "> " if self.op else ""), name=self.name
+        )
+
+        # nothing to do if there's no client or if tracing is disabled
+        if not client or not has_tracing_enabled(options):
+            self.sampled = False
+            return
+
+        # if the user has forced a sampling decision by passing a `sampled`
+        # value when starting the transaction, go with that
+        if self.sampled is not None:
+            return
+
+        # we would have bailed already if neither `traces_sampler` nor
+        # `traces_sample_rate` were defined, so one of these should work; prefer
+        # the hook if so
+        sample_rate = (
+            options["traces_sampler"](sampling_context)
+            if callable(options.get("traces_sampler"))
+            else (
+                # default inheritance behavior
+                sampling_context["parent_sampled"]
+                if sampling_context["parent_sampled"] is not None
+                else options["traces_sample_rate"]
+            )
+        )
+
+        # Since this is coming from the user (or from a function provided by the
+        # user), who knows what we might get. (The only valid values are
+        # booleans or numbers between 0 and 1.)
+        if not _is_valid_sample_rate(sample_rate):
+            logger.warning(
+                "[Tracing] Discarding {transaction_description} because of invalid sample rate.".format(
+                    transaction_description=transaction_description,
+                )
+            )
+            self.sampled = False
+            return
+
+        # if the function returned 0 (or false), or if `traces_sample_rate` is
+        # 0, it's a sign the transaction should be dropped
+        if not sample_rate:
+            logger.debug(
+                "[Tracing] Discarding {transaction_description} because {reason}".format(
+                    transaction_description=transaction_description,
+                    reason=(
+                        "traces_sampler returned 0 or False"
+                        if callable(options.get("traces_sampler"))
+                        else "traces_sample_rate is set to 0"
+                    ),
+                )
+            )
+            self.sampled = False
+            return
+
+        # Now we roll the dice. random.random is inclusive of 0, but not of 1,
+        # so strict < is safe here. In case sample_rate is a boolean, cast it
+        # to a float (True becomes 1.0 and False becomes 0.0)
+        self.sampled = random.random() < float(sample_rate)
+
+        if self.sampled:
+            logger.debug(
+                "[Tracing] Starting {transaction_description}".format(
+                    transaction_description=transaction_description,
+                )
+            )
+        else:
+            logger.debug(
+                "[Tracing] Discarding {transaction_description} because it's not included in the random sample (sampling rate = {sample_rate})".format(
+                    transaction_description=transaction_description,
+                    sample_rate=float(sample_rate),
+                )
+            )
+
+
+def has_tracing_enabled(options):
+    # type: (Dict[str, Any]) -> bool
+    """
+    Returns True if either traces_sample_rate or traces_sampler is
+    non-zero/defined, False otherwise.
+    """
+
+    return bool(options.get("traces_sample_rate") or options.get("traces_sampler"))
+
+
+def _is_valid_sample_rate(rate):
+    # type: (Any) -> bool
+    """
+    Checks the given sample rate to make sure it is valid type and value (a
+    boolean or a number between 0 and 1, inclusive).
+    """
+
+    # both booleans and NaN are instances of Real, so a) checking for Real
+    # checks for the possibility of a boolean also, and b) we have to check
+    # separately for NaN
+    if not isinstance(rate, Real) or math.isnan(rate):
+        logger.warning(
+            "[Tracing] Given sample rate is invalid. Sample rate must be a boolean or a number between 0 and 1. Got {rate} of type {type}.".format(
+                rate=rate, type=type(rate)
+            )
+        )
+        return False
+
+    # in case rate is a boolean, it will get cast to 1 if it's True and 0 if it's False
+    rate = float(rate)
+    if rate < 0 or rate > 1:
+        logger.warning(
+            "[Tracing] Given sample rate is invalid. Sample rate must be between 0 and 1. Got {rate}.".format(
+                rate=rate
+            )
+        )
+        return False
+
+    return True
 
 
 def _format_sql(cursor, sql):

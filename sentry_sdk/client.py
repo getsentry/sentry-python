@@ -12,6 +12,8 @@ from sentry_sdk.utils import (
     disable_capture_event,
     format_timestamp,
     get_type_name,
+    get_default_release,
+    get_default_environment,
     handle_in_app,
     logger,
 )
@@ -21,7 +23,7 @@ from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO, ClientConstructor
 from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
-from sentry_sdk.envelope import Envelope, Item, PayloadRef
+from sentry_sdk.envelope import Envelope
 
 from sentry_sdk._types import MYPY
 
@@ -62,10 +64,10 @@ def _get_options(*args, **kwargs):
         rv["dsn"] = os.environ.get("SENTRY_DSN")
 
     if rv["release"] is None:
-        rv["release"] = os.environ.get("SENTRY_RELEASE")
+        rv["release"] = get_default_release()
 
     if rv["environment"] is None:
-        rv["environment"] = os.environ.get("SENTRY_ENVIRONMENT")
+        rv["environment"] = get_default_environment(rv["release"])
 
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
@@ -128,9 +130,9 @@ class _Client(object):
             self.integrations = setup_integrations(
                 self.options["integrations"],
                 with_defaults=self.options["default_integrations"],
-                with_auto_enabling_integrations=self.options["_experiments"].get(
-                    "auto_enabling_integrations", False
-                ),
+                with_auto_enabling_integrations=self.options[
+                    "auto_enabling_integrations"
+                ],
             )
         finally:
             _client_init_debug.set(old_debug)
@@ -144,15 +146,13 @@ class _Client(object):
     def _prepare_event(
         self,
         event,  # type: Event
-        hint,  # type: Optional[Hint]
+        hint,  # type: Hint
         scope,  # type: Optional[Scope]
     ):
         # type: (...) -> Optional[Event]
 
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.utcnow()
-
-        hint = dict(hint or ())  # type: Hint
 
         if scope is not None:
             event_ = scope.apply_to_event(event, hint)
@@ -320,10 +320,13 @@ class _Client(object):
         if hint is None:
             hint = {}
         event_id = event.get("event_id")
+        hint = dict(hint or ())  # type: Hint
+
         if event_id is None:
             event["event_id"] = event_id = uuid.uuid4().hex
         if not self._should_capture(event, hint, scope):
             return None
+
         event_opt = self._prepare_event(event, hint, scope)
         if event_opt is None:
             return None
@@ -334,19 +337,27 @@ class _Client(object):
         if session:
             self._update_session_from_event(session, event)
 
-        if event_opt.get("type") == "transaction":
-            # Transactions should go to the /envelope/ endpoint.
-            self.transport.capture_envelope(
-                Envelope(
-                    headers={
-                        "event_id": event_opt["event_id"],
-                        "sent_at": format_timestamp(datetime.utcnow()),
-                    },
-                    items=[
-                        Item(payload=PayloadRef(json=event_opt), type="transaction"),
-                    ],
-                )
+        attachments = hint.get("attachments")
+        is_transaction = event_opt.get("type") == "transaction"
+
+        if is_transaction or attachments:
+            # Transactions or events with attachments should go to the
+            # /envelope/ endpoint.
+            envelope = Envelope(
+                headers={
+                    "event_id": event_opt["event_id"],
+                    "sent_at": format_timestamp(datetime.utcnow()),
+                }
             )
+
+            if is_transaction:
+                envelope.add_transaction(event_opt)
+            else:
+                envelope.add_event(event_opt)
+
+            for attachment in attachments or ():
+                envelope.add_item(attachment.to_envelope_item())
+            self.transport.capture_envelope(envelope)
         else:
             # All other events go to the /store/ endpoint.
             self.transport.capture_event(event_opt)

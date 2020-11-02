@@ -27,6 +27,19 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.19.2
+
+* Added support for automatic release and environment configuration for some common situations.
+
+## 0.19.1
+
+* Fix dependency check for `blinker` fixes #858
+* Fix incorrect timeout warnings in AWS Lambda and GCP integrations #854
+
+## 0.19.0
+
+* Removed `_experiments.auto_enabling_integrations` in favor of just `auto_enabling_integrations` which is now enabled by default.
+
 ## 0.18.0
 
 * **Breaking change**: The `no_proxy` environment variable is now honored when inferring proxy settings from the system. Thanks Xavier Fernandez!

@@ -5,6 +5,7 @@ except ImportError:
 
 
 if MYPY:
+    from numbers import Real
     from types import TracebackType
     from typing import Any
     from typing import Callable
@@ -12,6 +13,7 @@ if MYPY:
     from typing import Optional
     from typing import Tuple
     from typing import Type
+    from typing import Union
     from typing_extensions import Literal
 
     ExcInfo = Tuple[
@@ -24,9 +26,13 @@ if MYPY:
     Breadcrumb = Dict[str, Any]
     BreadcrumbHint = Dict[str, Any]
 
+    SamplingContext = Dict[str, Any]
+
     EventProcessor = Callable[[Event, Hint], Optional[Event]]
     ErrorProcessor = Callable[[Event, ExcInfo], Optional[Event]]
     BreadcrumbProcessor = Callable[[Breadcrumb, BreadcrumbHint], Optional[Breadcrumb]]
+
+    TracesSampler = Callable[[SamplingContext], Union[Real, bool]]
 
     # https://github.com/python/mypy/issues/5710
     NotImplementedType = Any

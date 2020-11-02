@@ -43,6 +43,10 @@ try:
 except ImportError:
     raise DidNotEnable("Flask is not installed")
 
+try:
+    import blinker  # noqa
+except ImportError:
+    raise DidNotEnable("blinker is not installed")
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
@@ -100,7 +104,8 @@ def _request_started(sender, **kwargs):
     with hub.configure_scope() as scope:
         request = _request_ctx_stack.top.request
 
-        # Rely on WSGI middleware to start a trace
+        # Set the transaction name here, but rely on WSGI middleware to actually
+        # start the transaction
         try:
             if integration.transaction_style == "endpoint":
                 scope.transaction = request.url_rule.endpoint

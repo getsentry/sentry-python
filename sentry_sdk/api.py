@@ -27,6 +27,7 @@ else:
         return x
 
 
+# When changing this, update __all__ in __init__.py too
 __all__ = [
     "capture_event",
     "capture_message",

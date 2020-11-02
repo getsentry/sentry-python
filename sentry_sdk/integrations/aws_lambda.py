@@ -83,6 +83,8 @@ def _wrap_handler(handler):
                     _make_request_event_processor(event, context, configured_time)
                 )
                 scope.set_tag("aws_region", context.invoked_function_arn.split(":")[3])
+
+                timeout_thread = None
                 # Starting the Timeout thread only if the configured time is greater than Timeout warning
                 # buffer and timeout_warning parameter is set True.
                 if (
@@ -94,7 +96,8 @@ def _wrap_handler(handler):
                     ) / MILLIS_TO_SECONDS
 
                     timeout_thread = TimeoutThread(
-                        waiting_time, configured_time / MILLIS_TO_SECONDS
+                        waiting_time,
+                        configured_time / MILLIS_TO_SECONDS,
                     )
 
                     # Starting the thread to raise timeout warning exception
@@ -116,6 +119,9 @@ def _wrap_handler(handler):
                     )
                     hub.capture_event(event, hint=hint)
                     reraise(*exc_info)
+                finally:
+                    if timeout_thread:
+                        timeout_thread.stop()
 
     return sentry_handler  # type: ignore
 

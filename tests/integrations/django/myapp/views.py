@@ -1,11 +1,12 @@
+from django import VERSION
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
-from django.http import HttpResponse, HttpResponseServerError, HttpResponseNotFound
+from django.http import HttpResponse, HttpResponseNotFound, HttpResponseServerError
 from django.shortcuts import render
-from django.views.generic import ListView
-from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from django.views.generic import ListView
 
 try:
     from rest_framework.decorators import api_view
@@ -120,3 +121,14 @@ def permission_denied_exc(*args, **kwargs):
 
 def csrf_hello_not_exempt(*args, **kwargs):
     return HttpResponse("ok")
+
+
+if VERSION >= (3, 1):
+    # Use exec to produce valid Python 2
+    exec(
+        """async def async_message(request):
+    sentry_sdk.capture_message("hi")
+    return HttpResponse("ok")"""
+    )
+else:
+    async_message = None

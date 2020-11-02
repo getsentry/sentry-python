@@ -3,8 +3,8 @@ import linecache
 import logging
 import os
 import sys
-import time
 import threading
+import subprocess
 
 from datetime import datetime
 
@@ -51,6 +51,57 @@ def _get_debug_hub():
     # type: () -> Optional[sentry_sdk.Hub]
     # This function is replaced by debug.py
     pass
+
+
+def get_default_release():
+    # type: () -> Optional[str]
+    """Try to guess a default release."""
+    release = os.environ.get("SENTRY_RELEASE")
+    if release:
+        return release
+
+    with open(os.path.devnull, "w+") as null:
+        try:
+            release = (
+                subprocess.Popen(
+                    ["git", "rev-parse", "--short", "HEAD"],
+                    stdout=subprocess.PIPE,
+                    stderr=null,
+                    stdin=null,
+                )
+                .communicate()[0]
+                .strip()
+                .decode("utf-8")
+            )
+        except (OSError, IOError):
+            pass
+
+        if release:
+            return release
+
+    for var in (
+        "HEROKU_SLUG_COMMIT",
+        "SOURCE_VERSION",
+        "CODEBUILD_RESOLVED_SOURCE_VERSION",
+        "CIRCLE_SHA1",
+        "GAE_DEPLOYMENT_ID",
+    ):
+        release = os.environ.get(var)
+        if release:
+            return release
+    return None
+
+
+def get_default_environment(
+    release=None,  # type: Optional[str]
+):
+    # type: (...) -> Optional[str]
+    rv = os.environ.get("SENTRY_ENVIRONMENT")
+    if rv:
+        return rv
+    if release is not None:
+        return "production"
+    return None
 
 
 class CaptureInternalException(object):
@@ -891,11 +942,19 @@ class TimeoutThread(threading.Thread):
         threading.Thread.__init__(self)
         self.waiting_time = waiting_time
         self.configured_timeout = configured_timeout
+        self._stop_event = threading.Event()
+
+    def stop(self):
+        # type: () -> None
+        self._stop_event.set()
 
     def run(self):
         # type: () -> None
 
-        time.sleep(self.waiting_time)
+        self._stop_event.wait(self.waiting_time)
+
+        if self._stop_event.is_set():
+            return
 
         integer_configured_timeout = int(self.configured_timeout)
 

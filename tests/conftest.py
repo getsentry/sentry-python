@@ -48,6 +48,8 @@ def internal_exceptions(request, monkeypatch):
 
     @request.addfinalizer
     def _():
+        # rerasise the errors so that this just acts as a pass-through (that
+        # happens to keep track of the errors which pass through it)
         for e in errors:
             reraise(*e)
 
@@ -135,8 +137,10 @@ def monkeypatch_test_transport(monkeypatch, validate_event_schema):
     def check_envelope(envelope):
         with capture_internal_exceptions():
             # Assert error events are sent without envelope to server, for compat.
-            assert not any(item.data_category == "error" for item in envelope.items)
-            assert not any(item.get_event() is not None for item in envelope.items)
+            # This does not apply if any item in the envelope is an attachment.
+            if not any(x.type == "attachment" for x in envelope.items):
+                assert not any(item.data_category == "error" for item in envelope.items)
+                assert not any(item.get_event() is not None for item in envelope.items)
 
     def inner(client):
         monkeypatch.setattr(
@@ -325,3 +329,132 @@ def render_span_tree():
         return "\n".join(render_span(root_span))
 
     return inner
+
+
+@pytest.fixture(name="StringContaining")
+def string_containing_matcher():
+    """
+    An object which matches any string containing the substring passed to the
+    object at instantiation time.
+
+    Useful for assert_called_with, assert_any_call, etc.
+
+    Used like this:
+
+    >>> f = mock.Mock()
+    >>> f("dogs are great")
+    >>> f.assert_any_call("dogs") # will raise AssertionError
+    Traceback (most recent call last):
+        ...
+    AssertionError: mock('dogs') call not found
+    >>> f.assert_any_call(StringContaining("dogs")) # no AssertionError
+
+    """
+
+    class StringContaining(object):
+        def __init__(self, substring):
+            self.substring = substring
+
+        def __eq__(self, test_string):
+            if not isinstance(test_string, str):
+                return False
+
+            if len(self.substring) > len(test_string):
+                return False
+
+            return self.substring in test_string
+
+    return StringContaining
+
+
+@pytest.fixture(name="DictionaryContaining")
+def dictionary_containing_matcher():
+    """
+    An object which matches any dictionary containing all key-value pairs from
+    the dictionary passed to the object at instantiation time.
+
+    Useful for assert_called_with, assert_any_call, etc.
+
+    Used like this:
+
+    >>> f = mock.Mock()
+    >>> f({"dogs": "yes", "cats": "maybe"})
+    >>> f.assert_any_call({"dogs": "yes"}) # will raise AssertionError
+    Traceback (most recent call last):
+        ...
+    AssertionError: mock({'dogs': 'yes'}) call not found
+    >>> f.assert_any_call(DictionaryContaining({"dogs": "yes"})) # no AssertionError
+    """
+
+    class DictionaryContaining(object):
+        def __init__(self, subdict):
+            self.subdict = subdict
+
+        def __eq__(self, test_dict):
+            if not isinstance(test_dict, dict):
+                return False
+
+            if len(self.subdict) > len(test_dict):
+                return False
+
+            # Have to test self == other (rather than vice-versa) in case
+            # any of the values in self.subdict is another matcher with a custom
+            # __eq__ method (in LHS == RHS, LHS's __eq__ is tried before RHS's).
+            # In other words, this order is important so that examples like
+            # {"dogs": "are great"} == DictionaryContaining({"dogs": StringContaining("great")})
+            # evaluate to True
+            return all(self.subdict[key] == test_dict.get(key) for key in self.subdict)
+
+    return DictionaryContaining
+
+
+@pytest.fixture(name="ObjectDescribedBy")
+def object_described_by_matcher():
+    """
+    An object which matches any other object with the given properties.
+
+    Available properties currently are "type" (a type object) and "attrs" (a
+    dictionary).
+
+    Useful for assert_called_with, assert_any_call, etc.
+
+    Used like this:
+
+    >>> class Dog(object):
+    ...     pass
+    ...
+    >>> maisey = Dog()
+    >>> maisey.name = "Maisey"
+    >>> maisey.age = 7
+    >>> f = mock.Mock()
+    >>> f(maisey)
+    >>> f.assert_any_call(ObjectDescribedBy(type=Dog)) # no AssertionError
+    >>> f.assert_any_call(ObjectDescribedBy(attrs={"name": "Maisey"})) # no AssertionError
+    """
+
+    class ObjectDescribedBy(object):
+        def __init__(self, type=None, attrs=None):
+            self.type = type
+            self.attrs = attrs
+
+        def __eq__(self, test_obj):
+            if self.type:
+                if not isinstance(test_obj, self.type):
+                    return False
+
+            # all checks here done with getattr rather than comparing to
+            # __dict__ because __dict__ isn't guaranteed to exist
+            if self.attrs:
+                # attributes must exist AND values must match
+                try:
+                    if any(
+                        getattr(test_obj, attr_name) != attr_value
+                        for attr_name, attr_value in self.attrs.items()
+                    ):
+                        return False  # wrong attribute value
+                except AttributeError:  # missing attribute
+                    return False
+
+            return True
+
+    return ObjectDescribedBy

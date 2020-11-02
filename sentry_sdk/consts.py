@@ -14,7 +14,12 @@ if MYPY:
     from sentry_sdk.transport import Transport
     from sentry_sdk.integrations import Integration
 
-    from sentry_sdk._types import Event, EventProcessor, BreadcrumbProcessor
+    from sentry_sdk._types import (
+        BreadcrumbProcessor,
+        Event,
+        EventProcessor,
+        TracesSampler,
+    )
 
     # Experiments are feature flags to enable and disable certain unstable SDK
     # functionality. Changing them from the defaults (`None`) in production
@@ -25,12 +30,13 @@ if MYPY:
         {
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
-            "auto_enabling_integrations": Optional[bool],
             "auto_session_tracking": Optional[bool],
             "smart_transaction_trimming": Optional[bool],
         },
         total=False,
     )
+
+DEFAULT_MAX_BREADCRUMBS = 100
 
 
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
@@ -40,7 +46,7 @@ class ClientConstructor(object):
         self,
         dsn=None,  # type: Optional[str]
         with_locals=True,  # type: bool
-        max_breadcrumbs=100,  # type: int
+        max_breadcrumbs=DEFAULT_MAX_BREADCRUMBS,  # type: int
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
         server_name=None,  # type: Optional[str]
@@ -63,7 +69,9 @@ class ClientConstructor(object):
         attach_stacktrace=False,  # type: bool
         ca_certs=None,  # type: Optional[str]
         propagate_traces=True,  # type: bool
-        traces_sample_rate=0.0,  # type: float
+        traces_sample_rate=None,  # type: Optional[float]
+        traces_sampler=None,  # type: Optional[TracesSampler]
+        auto_enabling_integrations=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
     ):
         # type: (...) -> None
@@ -88,7 +96,7 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "0.18.0"
+VERSION = "0.19.1"
 SDK_INFO = {
     "name": "sentry.python",
     "version": VERSION,
