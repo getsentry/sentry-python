@@ -38,7 +38,7 @@ def test_logging_defaults(integrations, sentry_init, capture_events, kwargs):
     events = capture_events()
 
     logger.info("bread")
-    logger.critical("LOL", kwargs)
+    logger.critical("LOL", **kwargs)
     (event,) = events
 
     assert event["level"] == "fatal"
