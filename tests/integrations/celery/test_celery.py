@@ -11,6 +11,11 @@ from sentry_sdk._compat import text_type
 from celery import Celery, VERSION
 from celery.bin import worker
 
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
+
 
 @pytest.fixture
 def connect_signal(request):
@@ -379,3 +384,26 @@ def test_newrelic_interference(init_celery, newrelic_order, celery_invocation):
 
     assert dummy_task.apply(kwargs={"x": 1, "y": 1}).wait() == 1
     assert celery_invocation(dummy_task, 1, 1)[0].wait() == 1
+
+
+def test_traces_sampler_gets_task_info_in_sampling_context(
+    init_celery, celery_invocation, DictionaryContaining  # noqa:N803
+):
+    traces_sampler = mock.Mock()
+    celery = init_celery(traces_sampler=traces_sampler)
+
+    @celery.task(name="dog_walk")
+    def walk_dogs(x, y):
+        dogs, route = x
+        num_loops = y
+        return dogs, route, num_loops
+
+    _, args_kwargs = celery_invocation(
+        walk_dogs, [["Maisey", "Charlie", "Bodhi", "Cory"], "Dog park round trip"], 1
+    )
+
+    traces_sampler.assert_any_call(
+        # depending on the iteration of celery_invocation, the data might be
+        # passed as args or as kwargs, so make this generic
+        DictionaryContaining({"celery_job": dict(task="dog_walk", **args_kwargs)})
+    )
