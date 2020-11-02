@@ -405,5 +405,5 @@ def test_traces_sampler_gets_task_info_in_sampling_context(
     traces_sampler.assert_any_call(
         # depending on the iteration of celery_invocation, the data might be
         # passed as args or as kwargs, so make this generic
-        DictionaryContaining({"celery_job": {"task": "dog_walk", **args_kwargs}})
+        DictionaryContaining({"celery_job": dict(task="dog_walk", **args_kwargs)})
     )
