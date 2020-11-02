@@ -70,7 +70,9 @@ class RqIntegration(Integration):
                 with capture_internal_exceptions():
                     transaction.name = job.func_name
 
-                with hub.start_transaction(transaction):
+                with hub.start_transaction(
+                    transaction, custom_sampling_context={"rq_job": job}
+                ):
                     rv = old_perform_job(self, job, *args, **kwargs)
 
             if self.is_horse:
