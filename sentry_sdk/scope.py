@@ -232,7 +232,7 @@ class Scope(object):
     def set_context(
         self,
         key,  # type: str
-        value,  # type: dict
+        value,  # type: Dict[str, Any]
     ):
         # type: (...) -> None
         """Binds a context at a certain key to a specific value."""

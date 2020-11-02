@@ -159,7 +159,7 @@ def set_tag(key, value):
 
 @scopemethod  # noqa
 def set_context(key, value):
-    # type: (str, dict) -> None
+    # type: (str, Dict[str, Any]) -> None
     return Hub.current.scope.set_context(key, value)
 
 
