@@ -13,6 +13,7 @@ try:
 except ImportError:
     import mock  # python < 3.3
 
+
 @pytest.fixture
 def app():
     app = Starlette()
@@ -207,20 +208,18 @@ def test_starlette_last_event_id(app, sentry_init, capture_events, request):
     assert exception["type"] == "ValueError"
     assert exception["value"] == "oh no"
 
+
 async def test_traces_sampler_gets_scope_object_in_sampling_context(
-        sentry_init,
-        app,
-        capture_events,
-        DictionaryContaining,
-        ObjectDescribedBy
+    sentry_init,
+    app,
+    capture_events,
+    DictionaryContaining,  # noqa:N803
+    ObjectDescribedBy,  # noqa:N803
 ):
     test_url = "/sync-message"
 
     traces_sampler = mock.Mock()
-    sentry_init(
-        send_default_pii=True,
-        traces_sampler=traces_sampler
-    )
+    sentry_init(send_default_pii=True, traces_sampler=traces_sampler)
 
     events = capture_events()
 
@@ -231,17 +230,18 @@ async def test_traces_sampler_gets_scope_object_in_sampling_context(
 
     traces_sampler.assert_any_call(
         DictionaryContaining(
-           {
-              "scope": ObjectDescribedBy(
-                 type=dict, attrs={
-                    'type': 'http',
-                    'http_version': '1.1',
-                    'method': 'GET',
-                    'path': test_url,
-                    'root_path': '',
-                    'scheme': 'http'
-                 }
-              )
-           }
+            {
+                "scope": ObjectDescribedBy(
+                    type=dict,
+                    attrs={
+                        "type": "http",
+                        "http_version": "1.1",
+                        "method": "GET",
+                        "path": test_url,
+                        "root_path": "",
+                        "scheme": "http",
+                    },
+                )
+            }
         )
     )
