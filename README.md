@@ -28,8 +28,8 @@ raise ValueError()  # Will also create an event.
 
 # Contributing to the SDK
 
-Please refer to [CONTRIBUTING.md](./CONTRIBUTING.md).
+Please refer to [CONTRIBUTING.md](https://github.com/getsentry/sentry-python/blob/master/CONTRIBUTING.md).
 
 # License
 
-Licensed under the BSD license, see [`LICENSE`](./LICENSE)
+Licensed under the BSD license, see [`LICENSE`](https://github.com/getsentry/sentry-python/blob/master/LICENSE)
