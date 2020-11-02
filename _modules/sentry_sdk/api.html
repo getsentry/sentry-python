@@ -4,7 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.api &#8212; sentry-python 0.19.1 documentation</title>
+    <title>sentry_sdk.api &#8212; sentry-python 0.19.2 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -60,6 +60,7 @@
         <span class="k">return</span> <span class="n">x</span>
 
 
+<span class="c1"># When changing this, update __all__ in __init__.py too</span>
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
     <span class="s2">&quot;capture_event&quot;</span><span class="p">,</span>
     <span class="s2">&quot;capture_message&quot;</span><span class="p">,</span>
@@ -191,7 +192,7 @@
 
 <div class="viewcode-block" id="set_context"><a class="viewcode-back" href="../../api.html#sentry_sdk.set_context">[docs]</a><span class="nd">@scopemethod</span>  <span class="c1"># noqa</span>
 <span class="k">def</span> <span class="nf">set_context</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-    <span class="c1"># type: (str, Any) -&gt; None</span>
+    <span class="c1"># type: (str, Dict[str, Any]) -&gt; None</span>
     <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">set_context</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
 
 

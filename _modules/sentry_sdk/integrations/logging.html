@@ -4,7 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.integrations.logging &#8212; sentry-python 0.19.1 documentation</title>
+    <title>sentry_sdk.integrations.logging &#8212; sentry-python 0.19.2 documentation</title>
     <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
@@ -216,7 +216,12 @@
         <span class="n">client_options</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span>
 
         <span class="c1"># exc_info might be None or (None, None, None)</span>
-        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1">#</span>
+        <span class="c1"># exc_info may also be any falsy value due to Python stdlib being</span>
+        <span class="c1"># liberal with what it receives and Celery&#39;s billiard being &quot;liberal&quot;</span>
+        <span class="c1"># with what it sends. See</span>
+        <span class="c1"># https://github.com/getsentry/sentry-python/issues/904</span>
+        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
                 <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">,</span>
                 <span class="n">client_options</span><span class="o">=</span><span class="n">client_options</span><span class="p">,</span>

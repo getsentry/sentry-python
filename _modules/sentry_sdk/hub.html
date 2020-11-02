@@ -4,7 +4,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>sentry_sdk.hub &#8212; sentry-python 0.19.1 documentation</title>
+    <title>sentry_sdk.hub &#8212; sentry-python 0.19.2 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -32,7 +32,6 @@
             
   <h1>Source code for sentry_sdk.hub</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span> <span class="nn">copy</span>
-<span class="kn">import</span> <span class="nn">random</span>
 <span class="kn">import</span> <span class="nn">sys</span>
 
 <span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
@@ -538,20 +537,28 @@
 <span class="sd">        When the transaction is finished, it will be sent to Sentry with all its</span>
 <span class="sd">        finished child spans.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">custom_sampling_context</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;custom_sampling_context&quot;</span><span class="p">,</span> <span class="p">{})</span>
+
+        <span class="c1"># if we haven&#39;t been given a transaction, make one</span>
         <span class="k">if</span> <span class="n">transaction</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;hub&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
             <span class="n">transaction</span> <span class="o">=</span> <span class="n">Transaction</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="c1"># use traces_sample_rate, traces_sampler, and/or inheritance to make a</span>
+        <span class="c1"># sampling decision</span>
+        <span class="n">sampling_context</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;transaction_context&quot;</span><span class="p">:</span> <span class="n">transaction</span><span class="o">.</span><span class="n">to_json</span><span class="p">(),</span>
+            <span class="s2">&quot;parent_sampled&quot;</span><span class="p">:</span> <span class="n">transaction</span><span class="o">.</span><span class="n">parent_sampled</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">sampling_context</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">custom_sampling_context</span><span class="p">)</span>
+        <span class="n">transaction</span><span class="o">.</span><span class="n">_set_initial_sampling_decision</span><span class="p">(</span><span class="n">sampling_context</span><span class="o">=</span><span class="n">sampling_context</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">transaction</span><span class="o">.</span><span class="n">sampled</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">sample_rate</span> <span class="o">=</span> <span class="n">client</span> <span class="ow">and</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;traces_sample_rate&quot;</span><span class="p">]</span> <span class="ow">or</span> <span class="mi">0</span>
-            <span class="n">transaction</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">sample_rate</span>
-
+        <span class="c1"># we don&#39;t bother to keep spans if we already know we&#39;re not going to</span>
+        <span class="c1"># send the transaction</span>
         <span class="k">if</span> <span class="n">transaction</span><span class="o">.</span><span class="n">sampled</span><span class="p">:</span>
             <span class="n">max_spans</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="n">client</span> <span class="ow">and</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;_experiments&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_spans&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">1000</span>
-            <span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;_experiments&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_spans&quot;</span><span class="p">)</span>
+            <span class="p">)</span> <span class="ow">or</span> <span class="mi">1000</span>
             <span class="n">transaction</span><span class="o">.</span><span class="n">init_span_recorder</span><span class="p">(</span><span class="n">maxlen</span><span class="o">=</span><span class="n">max_spans</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">transaction</span></div>
