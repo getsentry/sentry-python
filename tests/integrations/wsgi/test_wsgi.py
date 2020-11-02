@@ -3,6 +3,11 @@ import pytest
 
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
+
 
 @pytest.fixture
 def crashing_app():
@@ -109,3 +114,90 @@ def test_keyboard_interrupt_is_captured(sentry_init, capture_events):
     assert exc["type"] == "KeyboardInterrupt"
     assert exc["value"] == ""
     assert event["level"] == "error"
+
+
+def test_transaction_with_error(
+    sentry_init, crashing_app, capture_events, DictionaryContaining  # noqa:N803
+):
+    def dogpark(environ, start_response):
+        raise Exception("Fetch aborted. The ball was not returned.")
+
+    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(Exception):
+        client.get("http://dogs.are.great/sit/stay/rollover/")
+
+    error_event, envelope = events
+
+    assert error_event["transaction"] == "generic WSGI request"
+    assert error_event["contexts"]["trace"]["op"] == "http.server"
+    assert error_event["exception"]["values"][0]["type"] == "Exception"
+    assert (
+        error_event["exception"]["values"][0]["value"]
+        == "Fetch aborted. The ball was not returned."
+    )
+
+    assert envelope["type"] == "transaction"
+
+    # event trace context is a subset of envelope trace context
+    assert envelope["contexts"]["trace"] == DictionaryContaining(
+        error_event["contexts"]["trace"]
+    )
+    assert envelope["contexts"]["trace"]["status"] == "internal_error"
+    assert envelope["transaction"] == error_event["transaction"]
+    assert envelope["request"] == error_event["request"]
+
+
+def test_transaction_no_error(
+    sentry_init, capture_events, DictionaryContaining  # noqa:N803
+):
+    def dogpark(environ, start_response):
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+    events = capture_events()
+
+    client.get("/dogs/are/great/")
+
+    envelope = events[0]
+
+    assert envelope["type"] == "transaction"
+    assert envelope["transaction"] == "generic WSGI request"
+    assert envelope["contexts"]["trace"]["op"] == "http.server"
+    assert envelope["request"] == DictionaryContaining(
+        {"method": "GET", "url": "http://localhost/dogs/are/great/"}
+    )
+
+
+def test_traces_sampler_gets_correct_values_in_sampling_context(
+    sentry_init, DictionaryContaining, ObjectDescribedBy  # noqa:N803
+):
+    def app(environ, start_response):
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    traces_sampler = mock.Mock(return_value=True)
+    sentry_init(send_default_pii=True, traces_sampler=traces_sampler)
+    app = SentryWsgiMiddleware(app)
+    client = Client(app)
+
+    client.get("/dogs/are/great/")
+
+    traces_sampler.assert_any_call(
+        DictionaryContaining(
+            {
+                "wsgi_environ": DictionaryContaining(
+                    {
+                        "PATH_INFO": "/dogs/are/great/",
+                        "REQUEST_METHOD": "GET",
+                    },
+                ),
+            }
+        )
+    )

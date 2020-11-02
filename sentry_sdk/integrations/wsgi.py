@@ -117,7 +117,9 @@ class SentryWsgiMiddleware(object):
                         environ, op="http.server", name="generic WSGI request"
                     )
 
-                    with hub.start_transaction(transaction):
+                    with hub.start_transaction(
+                        transaction, custom_sampling_context={"wsgi_environ": environ}
+                    ):
                         try:
                             rv = self.app(
                                 environ,
