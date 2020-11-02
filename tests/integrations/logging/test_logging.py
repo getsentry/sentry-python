@@ -30,7 +30,9 @@ def test_logging_works_with_many_loggers(sentry_init, capture_events, logger):
 
 
 @pytest.mark.parametrize("integrations", [None, [], [LoggingIntegration()]])
-@pytest.mark.parametrize("kwargs", [{"exc_info": None}, {}, {"exc_info": 0}, {"exc_info": False}])
+@pytest.mark.parametrize(
+    "kwargs", [{"exc_info": None}, {}, {"exc_info": 0}, {"exc_info": False}]
+)
 def test_logging_defaults(integrations, sentry_init, capture_events, kwargs):
     sentry_init(integrations=integrations)
     events = capture_events()
