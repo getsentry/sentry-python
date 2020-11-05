@@ -177,23 +177,8 @@ class AwsLambdaIntegration(Integration):
     def setup_once():
         # type: () -> None
 
-        # Python 2.7: Everything is in `__main__`.
-        #
-        # Python 3.7: If the bootstrap module is *already imported*, it is the
-        # one we actually want to use (no idea what's in __main__)
-        #
-        # On Python 3.8 bootstrap is also importable, but will be the same file
-        # as __main__ imported under a different name:
-        #
-        #     sys.modules['__main__'].__file__ == sys.modules['bootstrap'].__file__
-        #     sys.modules['__main__'] is not sys.modules['bootstrap']
-        #
-        # Such a setup would then make all monkeypatches useless.
-        if "bootstrap" in sys.modules:
-            lambda_bootstrap = sys.modules["bootstrap"]  # type: Any
-        elif "__main__" in sys.modules:
-            lambda_bootstrap = sys.modules["__main__"]
-        else:
+        lambda_bootstrap = get_lambda_bootstrap()
+        if not lambda_bootstrap:
             logger.warning(
                 "Not running in AWS Lambda environment, "
                 "AwsLambdaIntegration disabled (could not find bootstrap module)"
@@ -278,6 +263,29 @@ class AwsLambdaIntegration(Integration):
                     lambda_bootstrap.LambdaRuntimeClient.post_invocation_error
                 )
             )
+
+
+def get_lambda_bootstrap():
+    # type: () -> Optional[Any]
+
+    # Python 2.7: Everything is in `__main__`.
+    #
+    # Python 3.7: If the bootstrap module is *already imported*, it is the
+    # one we actually want to use (no idea what's in __main__)
+    #
+    # On Python 3.8 bootstrap is also importable, but will be the same file
+    # as __main__ imported under a different name:
+    #
+    #     sys.modules['__main__'].__file__ == sys.modules['bootstrap'].__file__
+    #     sys.modules['__main__'] is not sys.modules['bootstrap']
+    #
+    # Such a setup would then make all monkeypatches useless.
+    if "bootstrap" in sys.modules:
+        return sys.modules["bootstrap"]
+    elif "__main__" in sys.modules:
+        return sys.modules["__main__"]
+    else:
+        return None
 
 
 def _make_request_event_processor(aws_event, aws_context, configured_timeout):
