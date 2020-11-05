@@ -49,6 +49,13 @@ def run_lambda_function(
             **subprocess_kwargs
         )
 
+        subprocess.check_call(
+            "pip install mock==3.0.0 funcsigs -t .",
+            cwd=tmpdir,
+            shell=True,
+            **subprocess_kwargs
+        )
+
         # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
         subprocess.check_call(
             "pip install ../*.tar.gz -t .", cwd=tmpdir, shell=True, **subprocess_kwargs
