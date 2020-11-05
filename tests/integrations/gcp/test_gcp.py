@@ -112,6 +112,8 @@ def run_cloud_function():
             stream = os.popen("python {}/main.py".format(tmpdir))
             stream_data = stream.read()
 
+            stream.close()
+
             for line in stream_data.splitlines():
                 print("GCP:", line)
                 if line.startswith("EVENT: "):
