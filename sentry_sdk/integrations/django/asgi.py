@@ -56,7 +56,7 @@ def patch_channels_asgi_handler_impl(cls):
     import channels
     from sentry_sdk.integrations.django import DjangoIntegration
 
-    if channels.__version__ < '3.0.0':
+    if channels.__version__ < "3.0.0":
 
         old_app = cls.__call__
 
@@ -66,8 +66,7 @@ def patch_channels_asgi_handler_impl(cls):
                 return await old_app(self, receive, send)
 
             middleware = SentryAsgiMiddleware(
-                lambda _scope: old_app.__get__(self, cls),
-                unsafe_context_data=True
+                lambda _scope: old_app.__get__(self, cls), unsafe_context_data=True
             )
 
             return await middleware(self.scope)(receive, send)
