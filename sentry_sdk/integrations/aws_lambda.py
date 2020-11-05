@@ -65,7 +65,7 @@ def _wrap_init_error(init_error):
 
 def _wrap_handler(handler):
     # type: (F) -> F
-    def sentry_handler(aws_event, context, *args, **kwargs):
+    def sentry_handler(aws_event, aws_context, *args, **kwargs):
         # type: (Any, Any, *Any, **Any) -> Any
 
         # Per https://docs.aws.amazon.com/lambda/latest/dg/python-handler.html,
@@ -94,21 +94,23 @@ def _wrap_handler(handler):
         hub = Hub.current
         integration = hub.get_integration(AwsLambdaIntegration)
         if integration is None:
-            return handler(aws_event, context, *args, **kwargs)
+            return handler(aws_event, aws_context, *args, **kwargs)
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
-        configured_time = context.get_remaining_time_in_millis()
+        configured_time = aws_context.get_remaining_time_in_millis()
 
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(
                     _make_request_event_processor(
-                        request_data, context, configured_time
+                        request_data, aws_context, configured_time
                     )
                 )
-                scope.set_tag("aws_region", context.invoked_function_arn.split(":")[3])
+                scope.set_tag(
+                    "aws_region", aws_context.invoked_function_arn.split(":")[3]
+                )
                 if batch_size > 1:
                     scope.set_tag("batch_request", True)
                     scope.set_tag("batch_size", batch_size)
@@ -134,11 +136,17 @@ def _wrap_handler(handler):
 
             headers = request_data.get("headers", {})
             transaction = Transaction.continue_from_headers(
-                headers, op="serverless.function", name=context.function_name
+                headers, op="serverless.function", name=aws_context.function_name
             )
-            with hub.start_transaction(transaction):
+            with hub.start_transaction(
+                transaction,
+                custom_sampling_context={
+                    "aws_event": aws_event,
+                    "aws_context": aws_context,
+                },
+            ):
                 try:
-                    return handler(aws_event, context, *args, **kwargs)
+                    return handler(aws_event, aws_context, *args, **kwargs)
                 except Exception:
                     exc_info = sys.exc_info()
                     sentry_event, hint = event_from_exception(

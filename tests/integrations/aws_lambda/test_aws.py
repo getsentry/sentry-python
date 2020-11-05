@@ -27,7 +27,7 @@ boto3 = pytest.importorskip("boto3")
 LAMBDA_PRELUDE = """
 from __future__ import print_function
 
-from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
+from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration, get_lambda_bootstrap
 import sentry_sdk
 import json
 import time
@@ -69,6 +69,7 @@ def envelope_processor(envelope):
 
     return envelope_data
 
+
 class TestTransport(HttpTransport):
     def _send_event(self, event):
         event = event_processor(event)
@@ -81,6 +82,7 @@ class TestTransport(HttpTransport):
     def _send_envelope(self, envelope):
         envelope = envelope_processor(envelope)
         print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
+
 
 def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
@@ -508,3 +510,79 @@ def test_non_dict_event(
         assert error_event["tags"]["batch_request"] is True
         assert envelope["tags"]["batch_size"] == batch_size
         assert envelope["tags"]["batch_request"] is True
+
+
+def test_traces_sampler_gets_correct_values_in_sampling_context(
+    run_lambda_function,
+    DictionaryContaining,  # noqa:N803
+    ObjectDescribedBy,  # noqa:N803
+    StringContaining,  # noqa:N803
+):
+    import inspect
+
+    envelopes, events, response = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(inspect.getsource(StringContaining))
+        + dedent(inspect.getsource(DictionaryContaining))
+        + dedent(inspect.getsource(ObjectDescribedBy))
+        + dedent(
+            """
+            try:
+                from unittest import mock  # python 3.3 and above
+            except ImportError:
+                import mock  # python < 3.3
+
+            def _safe_is_equal(x, y):
+                # copied from conftest.py - see docstring and comments there
+                try:
+                    is_equal = x.__eq__(y)
+                except AttributeError:
+                    is_equal = NotImplemented
+
+                if is_equal == NotImplemented:
+                    # using == smoothes out weird variations exposed by raw __eq__
+                    return x == y
+
+                return is_equal
+
+            def test_handler(event, context):
+                # this runs after the transaction has started, which means we
+                # can make assertions about traces_sampler
+                try:
+                    traces_sampler.assert_any_call(
+                        DictionaryContaining(
+                            {
+                                "aws_event": DictionaryContaining({
+                                    "httpMethod": "GET",
+                                    "path": "/sit/stay/rollover",
+                                    "headers": {"Host": "dogs.are.great", "X-Forwarded-Proto": "http"},
+                                }),
+                                "aws_context": ObjectDescribedBy(
+                                    type=get_lambda_bootstrap().LambdaContext,
+                                    attrs={
+                                        'function_name': StringContaining("test_function"),
+                                        'function_version': '$LATEST',
+                                    }
+                                )
+                            }
+                        )
+                    )
+                except AssertionError as e:
+                    # catch the error and print it because the error itself will
+                    # get swallowed by the SDK as an "internal exception"
+                    print("\\nERROR: AssertionError: traces_sampler not called with the specified argument.")
+
+                return "dogs are great"
+
+
+            traces_sampler = mock.Mock(return_value=True)
+
+            init_sdk(
+                traces_sampler=traces_sampler,
+            )
+        """
+        ),
+        b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "headers": {"Host": "dogs.are.great", "X-Forwarded-Proto": "http"}}',
+    )
+
+    assert "AssertionError" not in str(response["LogResult"])
