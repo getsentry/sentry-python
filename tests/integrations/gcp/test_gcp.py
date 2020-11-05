@@ -64,6 +64,7 @@ class TestTransport(HttpTransport):
         envelope = envelope_processor(envelope)
         print("\\nENVELOPE: {}\\n".format(envelope.decode(\"utf-8\")))
 
+
 def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
         dsn="https://123abc@example.com/123",
@@ -125,13 +126,13 @@ def run_cloud_function():
                 else:
                     continue
 
-        return envelope, event
+        return envelope, event, stream_data
 
     return inner
 
 
 def test_handled_exception(run_cloud_function):
-    envelope, event = run_cloud_function(
+    envelope, event, stream_data = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -157,7 +158,7 @@ def test_handled_exception(run_cloud_function):
 
 
 def test_unhandled_exception(run_cloud_function):
-    envelope, event = run_cloud_function(
+    envelope, event, stream_data = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -184,7 +185,7 @@ def test_unhandled_exception(run_cloud_function):
 
 
 def test_timeout_error(run_cloud_function):
-    envelope, event = run_cloud_function(
+    envelope, event, stream_data = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -214,7 +215,7 @@ def test_timeout_error(run_cloud_function):
 
 
 def test_performance_no_error(run_cloud_function):
-    envelope, event = run_cloud_function(
+    envelope, event, stream_data = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -239,7 +240,7 @@ def test_performance_no_error(run_cloud_function):
 
 
 def test_performance_error(run_cloud_function):
-    envelope, event = run_cloud_function(
+    envelope, event, stream_data = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -267,3 +268,79 @@ def test_performance_error(run_cloud_function):
     assert exception["type"] == "Exception"
     assert exception["value"] == "something went wrong"
     assert exception["mechanism"] == {"type": "gcp", "handled": False}
+
+
+def test_traces_sampler_gets_correct_values_in_sampling_context(
+    run_cloud_function, DictionaryContaining  # noqa:N803
+):
+    import inspect
+
+    envelope, event, stream_data = run_cloud_function(
+        dedent(
+            """
+            functionhandler = None
+            event = {
+                "type": "chase",
+                "chasers": ["Maisey", "Charlie"],
+                "num_squirrels": 2,
+            }
+            def cloud_function(functionhandler, event):
+                # this runs after the transaction has started, which means we
+                # can make assertions about traces_sampler
+                try:
+                    traces_sampler.assert_any_call(
+                        DictionaryContaining({
+                            "gcp_env": DictionaryContaining({
+                                "function_name": "chase_into_tree",
+                                "function_region": "dogpark",
+                                "function_project": "SquirrelChasing",
+                            }),
+                            "gcp_event": {
+                                "type": "chase",
+                                "chasers": ["Maisey", "Charlie"],
+                                "num_squirrels": 2,
+                            },
+                        })
+                    )
+                except AssertionError as e:
+                    # catch the error and print it because the error itself will
+                    # get swallowed by the SDK as an "internal exception"
+                    print("\\nAssertionError: {}\\n".format(e))
+
+                return "dogs are great"
+            """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(inspect.getsource(DictionaryContaining))
+        + dedent(
+            """
+            os.environ["FUNCTION_NAME"] = "chase_into_tree"
+            os.environ["FUNCTION_REGION"] = "dogpark"
+            os.environ["GCP_PROJECT"] = "SquirrelChasing"
+
+            def _safe_is_equal(x, y):
+                # copied from conftest.py - see docstring and comments there
+                try:
+                    is_equal = x.__eq__(y)
+                except AttributeError:
+                    is_equal = NotImplemented
+
+                if is_equal == NotImplemented:
+                    # using == smoothes out weird variations exposed by raw __eq__
+                    return x == y
+
+                return is_equal
+
+            traces_sampler = Mock(return_value=True)
+
+            init_sdk(
+                traces_sampler=traces_sampler,
+                debug=True
+            )
+
+            gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+            """
+        )
+    )
+
+    assert "AssertionError" not in str(stream_data)
