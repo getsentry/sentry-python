@@ -392,10 +392,6 @@ def test_performance_error(run_lambda_function):
         (b"11.21", False, 1),
         (b'"Good dog!"', False, 1),
         (b"true", False, 1),
-        (b"[12, 31, 2012]", False, 3),
-        (b"[11.21, 20.12]", False, 2),
-        (b'["good", "dog"]', False, 2),
-        (b"[true, false]", False, 2),
         (
             b"""
             [
