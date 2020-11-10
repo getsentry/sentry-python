@@ -30,9 +30,19 @@ os.environ["FUNCTION_IDENTITY"] = "func_ID"
 os.environ["FUNCTION_REGION"] = "us-central1"
 os.environ["GCP_PROJECT"] = "serverless_project"
 
+def log_return_value(func):
+    def inner(*args, **kwargs):
+        rv = func(*args, **kwargs)
+
+        print("\\nRETURN VALUE: {}\\n".format(json.dumps(rv)))
+
+        return rv
+
+    return inner
+
 gcp_functions.worker_v1 = Mock()
 gcp_functions.worker_v1.FunctionHandler = Mock()
-gcp_functions.worker_v1.FunctionHandler.invoke_user_function = cloud_function
+gcp_functions.worker_v1.FunctionHandler.invoke_user_function = log_return_value(cloud_function)
 
 
 import sentry_sdk
@@ -83,6 +93,7 @@ def run_cloud_function():
 
         event = []
         envelope = []
+        return_value = None
 
         # STEP : Create a zip of cloud function
 
@@ -123,16 +134,19 @@ def run_cloud_function():
                 elif line.startswith("ENVELOPE: "):
                     line = line[len("ENVELOPE: ") :]
                     envelope = json.loads(line)
+                elif line.startswith("RETURN VALUE: "):
+                    line = line[len("RETURN VALUE: ") :]
+                    return_value = json.loads(line)
                 else:
                     continue
 
-        return envelope, event, stream_data
+        return envelope, event, return_value
 
     return inner
 
 
 def test_handled_exception(run_cloud_function):
-    envelope, event, stream_data = run_cloud_function(
+    envelope, event, return_value = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -158,7 +172,7 @@ def test_handled_exception(run_cloud_function):
 
 
 def test_unhandled_exception(run_cloud_function):
-    envelope, event, stream_data = run_cloud_function(
+    envelope, event, return_value = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -185,7 +199,7 @@ def test_unhandled_exception(run_cloud_function):
 
 
 def test_timeout_error(run_cloud_function):
-    envelope, event, stream_data = run_cloud_function(
+    envelope, event, return_value = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -215,7 +229,7 @@ def test_timeout_error(run_cloud_function):
 
 
 def test_performance_no_error(run_cloud_function):
-    envelope, event, stream_data = run_cloud_function(
+    envelope, event, return_value = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -240,7 +254,7 @@ def test_performance_no_error(run_cloud_function):
 
 
 def test_performance_error(run_cloud_function):
-    envelope, event, stream_data = run_cloud_function(
+    envelope, event, return_value = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -275,7 +289,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 ):
     import inspect
 
-    envelope, event, stream_data = run_cloud_function(
+    envelopes, events, return_value = run_cloud_function(
         dedent(
             """
             functionhandler = None
@@ -302,12 +316,12 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                             },
                         })
                     )
-                except AssertionError as e:
-                    # catch the error and print it because the error itself will
+                except AssertionError:
+                    # catch the error and return it because the error itself will
                     # get swallowed by the SDK as an "internal exception"
-                    print("\\nAssertionError: {}\\n".format(e))
+                    return {"AssertionError raised": True,}
 
-                return "dogs are great"
+                return {"AssertionError raised": False,}
             """
         )
         + FUNCTIONS_PRELUDE
@@ -326,7 +340,6 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                     is_equal = NotImplemented
 
                 if is_equal == NotImplemented:
-                    # using == smoothes out weird variations exposed by raw __eq__
                     return x == y
 
                 return is_equal
@@ -335,7 +348,6 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
             init_sdk(
                 traces_sampler=traces_sampler,
-                debug=True
             )
 
             gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
@@ -343,4 +355,4 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
         )
     )
 
-    assert "AssertionError" not in str(stream_data)
+    assert return_value["AssertionError raised"] is False

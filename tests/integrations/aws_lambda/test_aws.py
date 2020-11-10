@@ -127,7 +127,7 @@ def run_lambda_function(request, lambda_client, lambda_runtime):
 
         # for better debugging
         response["LogResult"] = base64.b64decode(response["LogResult"]).splitlines()
-        response["Payload"] = response["Payload"].read()
+        response["Payload"] = json.loads(response["Payload"].read().decode("utf-8"))
         del response["ResponseMetadata"]
 
         events = []
@@ -567,12 +567,12 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                             }
                         )
                     )
-                except AssertionError as e:
-                    # catch the error and print it because the error itself will
+                except AssertionError:
+                    # catch the error and return it because the error itself will
                     # get swallowed by the SDK as an "internal exception"
-                    print("\\nERROR: AssertionError: traces_sampler not called with the specified argument.")
+                    return {"AssertionError raised": True,}
 
-                return "dogs are great"
+                return {"AssertionError raised": False,}
 
 
             traces_sampler = mock.Mock(return_value=True)
@@ -585,4 +585,4 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
         b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "headers": {"Host": "dogs.are.great", "X-Forwarded-Proto": "http"}}',
     )
 
-    assert "AssertionError" not in str(response["LogResult"])
+    assert response["Payload"]["AssertionError raised"] is False
