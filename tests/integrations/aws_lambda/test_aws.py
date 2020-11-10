@@ -35,21 +35,37 @@ import time
 from sentry_sdk.transport import HttpTransport
 
 def event_processor(event):
-    # AWS Lambda truncates the log output to 4kb. If you only need a
-    # subsection of the event, override this function in your test
-    # to print less to logs.
-    return event
+    # AWS Lambda truncates the log output to 4kb, which is small enough to miss
+    # parts of even a single error-event/transaction-envelope pair if considered
+    # in full, so only grab the data we need.
+
+    event_data = {}
+    event_data["contexts"] = {}
+    event_data["contexts"]["trace"] = event.get("contexts", {}).get("trace")
+    event_data["exception"] = event.get("exception")
+    event_data["extra"] = event.get("extra")
+    event_data["level"] = event.get("level")
+    event_data["request"] = event.get("request")
+    event_data["tags"] = event.get("tags")
+    event_data["transaction"] = event.get("transaction")
+
+    return event_data
 
 def envelope_processor(envelope):
+    # AWS Lambda truncates the log output to 4kb, which is small enough to miss
+    # parts of even a single error-event/transaction-envelope pair if considered
+    # in full, so only grab the data we need.
+
     (item,) = envelope.items
     envelope_json = json.loads(item.get_bytes())
 
     envelope_data = {}
-    envelope_data[\"contexts\"] = {}
-    envelope_data[\"type\"] = envelope_json[\"type\"]
-    envelope_data[\"transaction\"] = envelope_json[\"transaction\"]
-    envelope_data[\"contexts\"][\"trace\"] = envelope_json[\"contexts\"][\"trace\"]
-    envelope_data[\"request\"] = envelope_json[\"request\"]
+    envelope_data["contexts"] = {}
+    envelope_data["type"] = envelope_json["type"]
+    envelope_data["transaction"] = envelope_json["transaction"]
+    envelope_data["contexts"]["trace"] = envelope_json["contexts"]["trace"]
+    envelope_data["request"] = envelope_json["request"]
+    envelope_data["tags"] = envelope_json["tags"]
 
     return envelope_data
 
@@ -107,10 +123,15 @@ def run_lambda_function(request, lambda_client, lambda_runtime):
             syntax_check=syntax_check,
         )
 
+        # for better debugging
+        response["LogResult"] = base64.b64decode(response["LogResult"]).splitlines()
+        response["Payload"] = response["Payload"].read()
+        del response["ResponseMetadata"]
+
         events = []
         envelopes = []
 
-        for line in base64.b64decode(response["LogResult"]).splitlines():
+        for line in response["LogResult"]:
             print("AWS:", line)
             if line.startswith(b"EVENT: "):
                 line = line[len(b"EVENT: ") :]
@@ -362,3 +383,128 @@ def test_performance_error(run_lambda_function):
     assert envelope["contexts"]["trace"]["op"] == "serverless.function"
     assert envelope["transaction"].startswith("test_function_")
     assert envelope["transaction"] in envelope["request"]["url"]
+
+
+@pytest.mark.parametrize(
+    "aws_event, has_request_data, batch_size",
+    [
+        (b"1231", False, 1),
+        (b"11.21", False, 1),
+        (b'"Good dog!"', False, 1),
+        (b"true", False, 1),
+        (
+            b"""
+            [
+                {"good dog": "Maisey"},
+                {"good dog": "Charlie"},
+                {"good dog": "Cory"},
+                {"good dog": "Bodhi"}
+            ]
+            """,
+            False,
+            4,
+        ),
+        (
+            b"""
+            [
+                {
+                    "headers": {
+                        "Host": "dogs.are.great",
+                        "X-Forwarded-Proto": "http"
+                    },
+                    "httpMethod": "GET",
+                    "path": "/tricks/kangaroo",
+                    "queryStringParameters": {
+                        "completed_successfully": "true",
+                        "treat_provided": "true",
+                        "treat_type": "cheese"
+                    },
+                    "dog": "Maisey"
+                },
+                {
+                    "headers": {
+                        "Host": "dogs.are.great",
+                        "X-Forwarded-Proto": "http"
+                    },
+                    "httpMethod": "GET",
+                    "path": "/tricks/kangaroo",
+                    "queryStringParameters": {
+                        "completed_successfully": "true",
+                        "treat_provided": "true",
+                        "treat_type": "cheese"
+                    },
+                    "dog": "Charlie"
+                }
+            ]
+            """,
+            True,
+            2,
+        ),
+    ],
+)
+def test_non_dict_event(
+    run_lambda_function,
+    aws_event,
+    has_request_data,
+    batch_size,
+    DictionaryContaining,  # noqa:N803
+):
+    envelopes, events, response = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0)
+
+        def test_handler(event, context):
+            raise Exception("More treats, please!")
+        """
+        ),
+        aws_event,
+    )
+
+    assert response["FunctionError"] == "Unhandled"
+
+    error_event = events[0]
+    assert error_event["level"] == "error"
+    assert error_event["contexts"]["trace"]["op"] == "serverless.function"
+
+    function_name = error_event["extra"]["lambda"]["function_name"]
+    assert function_name.startswith("test_function_")
+    assert error_event["transaction"] == function_name
+
+    exception = error_event["exception"]["values"][0]
+    assert exception["type"] == "Exception"
+    assert exception["value"] == "More treats, please!"
+    assert exception["mechanism"]["type"] == "aws_lambda"
+
+    envelope = envelopes[0]
+    assert envelope["type"] == "transaction"
+    assert envelope["contexts"]["trace"] == DictionaryContaining(
+        error_event["contexts"]["trace"]
+    )
+    assert envelope["contexts"]["trace"]["status"] == "internal_error"
+    assert envelope["transaction"] == error_event["transaction"]
+    assert envelope["request"]["url"] == error_event["request"]["url"]
+
+    if has_request_data:
+        request_data = {
+            "headers": {"Host": "dogs.are.great", "X-Forwarded-Proto": "http"},
+            "method": "GET",
+            "url": "http://dogs.are.great/tricks/kangaroo",
+            "query_string": {
+                "completed_successfully": "true",
+                "treat_provided": "true",
+                "treat_type": "cheese",
+            },
+        }
+    else:
+        request_data = {"url": "awslambda:///{}".format(function_name)}
+
+    assert error_event["request"] == request_data
+    assert envelope["request"] == request_data
+
+    if batch_size > 1:
+        assert error_event["tags"]["batch_size"] == batch_size
+        assert error_event["tags"]["batch_request"] is True
+        assert envelope["tags"]["batch_size"] == batch_size
+        assert envelope["tags"]["batch_request"] is True

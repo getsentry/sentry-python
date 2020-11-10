@@ -51,12 +51,12 @@ def _wrap_init_error(init_error):
 
             exc_info = sys.exc_info()
             if exc_info and all(exc_info):
-                event, hint = event_from_exception(
+                sentry_event, hint = event_from_exception(
                     exc_info,
                     client_options=client.options,
                     mechanism={"type": "aws_lambda", "handled": False},
                 )
-                hub.capture_event(event, hint=hint)
+                hub.capture_event(sentry_event, hint=hint)
 
         return init_error(*args, **kwargs)
 
@@ -65,12 +65,36 @@ def _wrap_init_error(init_error):
 
 def _wrap_handler(handler):
     # type: (F) -> F
-    def sentry_handler(event, context, *args, **kwargs):
+    def sentry_handler(aws_event, context, *args, **kwargs):
         # type: (Any, Any, *Any, **Any) -> Any
+
+        # Per https://docs.aws.amazon.com/lambda/latest/dg/python-handler.html,
+        # `event` here is *likely* a dictionary, but also might be a number of
+        # other types (str, int, float, None).
+        #
+        # In some cases, it is a list (if the user is batch-invoking their
+        # function, for example), in which case we'll use the first entry as a
+        # representative from which to try pulling request data. (Presumably it
+        # will be the same for all events in the list, since they're all hitting
+        # the lambda in the same request.)
+
+        if isinstance(aws_event, list):
+            request_data = aws_event[0]
+            batch_size = len(aws_event)
+        else:
+            request_data = aws_event
+            batch_size = 1
+
+        if not isinstance(request_data, dict):
+            # If we're not dealing with a dictionary, we won't be able to get
+            # headers, path, http method, etc in any case, so it's fine that
+            # this is empty
+            request_data = {}
+
         hub = Hub.current
         integration = hub.get_integration(AwsLambdaIntegration)
         if integration is None:
-            return handler(event, context, *args, **kwargs)
+            return handler(aws_event, context, *args, **kwargs)
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
@@ -80,9 +104,14 @@ def _wrap_handler(handler):
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(
-                    _make_request_event_processor(event, context, configured_time)
+                    _make_request_event_processor(
+                        request_data, context, configured_time
+                    )
                 )
                 scope.set_tag("aws_region", context.invoked_function_arn.split(":")[3])
+                if batch_size > 1:
+                    scope.set_tag("batch_request", True)
+                    scope.set_tag("batch_size", batch_size)
 
                 timeout_thread = None
                 # Starting the Timeout thread only if the configured time is greater than Timeout warning
@@ -103,21 +132,21 @@ def _wrap_handler(handler):
                     # Starting the thread to raise timeout warning exception
                     timeout_thread.start()
 
-            headers = event.get("headers", {})
+            headers = request_data.get("headers", {})
             transaction = Transaction.continue_from_headers(
                 headers, op="serverless.function", name=context.function_name
             )
             with hub.start_transaction(transaction):
                 try:
-                    return handler(event, context, *args, **kwargs)
+                    return handler(aws_event, context, *args, **kwargs)
                 except Exception:
                     exc_info = sys.exc_info()
-                    event, hint = event_from_exception(
+                    sentry_event, hint = event_from_exception(
                         exc_info,
                         client_options=client.options,
                         mechanism={"type": "aws_lambda", "handled": False},
                     )
-                    hub.capture_event(event, hint=hint)
+                    hub.capture_event(sentry_event, hint=hint)
                     reraise(*exc_info)
                 finally:
                     if timeout_thread:
@@ -255,12 +284,12 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
     # type: (Any, Any, Any) -> EventProcessor
     start_time = datetime.utcnow()
 
-    def event_processor(event, hint, start_time=start_time):
+    def event_processor(sentry_event, hint, start_time=start_time):
         # type: (Event, Hint, datetime) -> Optional[Event]
         remaining_time_in_milis = aws_context.get_remaining_time_in_millis()
         exec_duration = configured_timeout - remaining_time_in_milis
 
-        extra = event.setdefault("extra", {})
+        extra = sentry_event.setdefault("extra", {})
         extra["lambda"] = {
             "function_name": aws_context.function_name,
             "function_version": aws_context.function_version,
@@ -276,7 +305,7 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
             "log_stream": aws_context.log_stream_name,
         }
 
-        request = event.get("request", {})
+        request = sentry_event.get("request", {})
 
         if "httpMethod" in aws_event:
             request["method"] = aws_event["httpMethod"]
@@ -290,7 +319,7 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
             request["headers"] = _filter_headers(aws_event["headers"])
 
         if _should_send_default_pii():
-            user_info = event.setdefault("user", {})
+            user_info = sentry_event.setdefault("user", {})
 
             id = aws_event.get("identity", {}).get("userArn")
             if id is not None:
@@ -308,31 +337,31 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
                 # event. Meaning every body is unstructured to us.
                 request["data"] = AnnotatedValue("", {"rem": [["!raw", "x", 0, 0]]})
 
-        event["request"] = request
+        sentry_event["request"] = request
 
-        return event
+        return sentry_event
 
     return event_processor
 
 
-def _get_url(event, context):
+def _get_url(aws_event, aws_context):
     # type: (Any, Any) -> str
-    path = event.get("path", None)
-    headers = event.get("headers", {})
+    path = aws_event.get("path", None)
+    headers = aws_event.get("headers", {})
     host = headers.get("Host", None)
     proto = headers.get("X-Forwarded-Proto", None)
     if proto and host and path:
         return "{}://{}{}".format(proto, host, path)
-    return "awslambda:///{}".format(context.function_name)
+    return "awslambda:///{}".format(aws_context.function_name)
 
 
-def _get_cloudwatch_logs_url(context, start_time):
+def _get_cloudwatch_logs_url(aws_context, start_time):
     # type: (Any, datetime) -> str
     """
     Generates a CloudWatchLogs console URL based on the context object
 
     Arguments:
-        context {Any} -- context from lambda handler
+        aws_context {Any} -- context from lambda handler
 
     Returns:
         str -- AWS Console URL to logs.
@@ -345,8 +374,8 @@ def _get_cloudwatch_logs_url(context, start_time):
         ";start={start_time};end={end_time}"
     ).format(
         region=environ.get("AWS_REGION"),
-        log_group=context.log_group_name,
-        log_stream=context.log_stream_name,
+        log_group=aws_context.log_group_name,
+        log_stream=aws_context.log_stream_name,
         start_time=(start_time - timedelta(seconds=1)).strftime(formatstring),
         end_time=(datetime.utcnow() + timedelta(seconds=2)).strftime(formatstring),
     )
