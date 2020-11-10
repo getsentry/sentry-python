@@ -65,7 +65,7 @@ def _wrap_init_error(init_error):
 
 def _wrap_handler(handler):
     # type: (F) -> F
-    def sentry_handler(aws_event, context, *args, **kwargs):
+    def sentry_handler(aws_event, aws_context, *args, **kwargs):
         # type: (Any, Any, *Any, **Any) -> Any
 
         # Per https://docs.aws.amazon.com/lambda/latest/dg/python-handler.html,
@@ -94,21 +94,23 @@ def _wrap_handler(handler):
         hub = Hub.current
         integration = hub.get_integration(AwsLambdaIntegration)
         if integration is None:
-            return handler(aws_event, context, *args, **kwargs)
+            return handler(aws_event, aws_context, *args, **kwargs)
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
-        configured_time = context.get_remaining_time_in_millis()
+        configured_time = aws_context.get_remaining_time_in_millis()
 
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(
                     _make_request_event_processor(
-                        request_data, context, configured_time
+                        request_data, aws_context, configured_time
                     )
                 )
-                scope.set_tag("aws_region", context.invoked_function_arn.split(":")[3])
+                scope.set_tag(
+                    "aws_region", aws_context.invoked_function_arn.split(":")[3]
+                )
                 if batch_size > 1:
                     scope.set_tag("batch_request", True)
                     scope.set_tag("batch_size", batch_size)
@@ -134,11 +136,17 @@ def _wrap_handler(handler):
 
             headers = request_data.get("headers", {})
             transaction = Transaction.continue_from_headers(
-                headers, op="serverless.function", name=context.function_name
+                headers, op="serverless.function", name=aws_context.function_name
             )
-            with hub.start_transaction(transaction):
+            with hub.start_transaction(
+                transaction,
+                custom_sampling_context={
+                    "aws_event": aws_event,
+                    "aws_context": aws_context,
+                },
+            ):
                 try:
-                    return handler(aws_event, context, *args, **kwargs)
+                    return handler(aws_event, aws_context, *args, **kwargs)
                 except Exception:
                     exc_info = sys.exc_info()
                     sentry_event, hint = event_from_exception(
@@ -177,23 +185,8 @@ class AwsLambdaIntegration(Integration):
     def setup_once():
         # type: () -> None
 
-        # Python 2.7: Everything is in `__main__`.
-        #
-        # Python 3.7: If the bootstrap module is *already imported*, it is the
-        # one we actually want to use (no idea what's in __main__)
-        #
-        # On Python 3.8 bootstrap is also importable, but will be the same file
-        # as __main__ imported under a different name:
-        #
-        #     sys.modules['__main__'].__file__ == sys.modules['bootstrap'].__file__
-        #     sys.modules['__main__'] is not sys.modules['bootstrap']
-        #
-        # Such a setup would then make all monkeypatches useless.
-        if "bootstrap" in sys.modules:
-            lambda_bootstrap = sys.modules["bootstrap"]  # type: Any
-        elif "__main__" in sys.modules:
-            lambda_bootstrap = sys.modules["__main__"]
-        else:
+        lambda_bootstrap = get_lambda_bootstrap()
+        if not lambda_bootstrap:
             logger.warning(
                 "Not running in AWS Lambda environment, "
                 "AwsLambdaIntegration disabled (could not find bootstrap module)"
@@ -278,6 +271,29 @@ class AwsLambdaIntegration(Integration):
                     lambda_bootstrap.LambdaRuntimeClient.post_invocation_error
                 )
             )
+
+
+def get_lambda_bootstrap():
+    # type: () -> Optional[Any]
+
+    # Python 2.7: Everything is in `__main__`.
+    #
+    # Python 3.7: If the bootstrap module is *already imported*, it is the
+    # one we actually want to use (no idea what's in __main__)
+    #
+    # On Python 3.8 bootstrap is also importable, but will be the same file
+    # as __main__ imported under a different name:
+    #
+    #     sys.modules['__main__'].__file__ == sys.modules['bootstrap'].__file__
+    #     sys.modules['__main__'] is not sys.modules['bootstrap']
+    #
+    # Such a setup would then make all monkeypatches useless.
+    if "bootstrap" in sys.modules:
+        return sys.modules["bootstrap"]
+    elif "__main__" in sys.modules:
+        return sys.modules["__main__"]
+    else:
+        return None
 
 
 def _make_request_event_processor(aws_event, aws_context, configured_timeout):

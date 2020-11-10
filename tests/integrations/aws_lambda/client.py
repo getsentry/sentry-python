@@ -49,6 +49,13 @@ def run_lambda_function(
             **subprocess_kwargs
         )
 
+        subprocess.check_call(
+            "pip install mock==3.0.0 funcsigs -t .",
+            cwd=tmpdir,
+            shell=True,
+            **subprocess_kwargs
+        )
+
         # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
         subprocess.check_call(
             "pip install ../*.tar.gz -t .", cwd=tmpdir, shell=True, **subprocess_kwargs
@@ -69,8 +76,18 @@ def run_lambda_function(
             )
 
         @add_finalizer
-        def delete_function():
+        def clean_up():
             client.delete_function(FunctionName=fn_name)
+
+            # this closes the web socket so we don't get a
+            #   ResourceWarning: unclosed <ssl.SSLSocket ... >
+            # warning on every test
+            # based on https://github.com/boto/botocore/pull/1810
+            # (if that's ever merged, this can just become client.close())
+            session = client._endpoint.http_session
+            managers = [session._manager] + list(session._proxy_managers.values())
+            for manager in managers:
+                manager.clear()
 
         response = client.invoke(
             FunctionName=fn_name,

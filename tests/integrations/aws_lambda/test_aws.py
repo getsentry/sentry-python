@@ -27,7 +27,7 @@ boto3 = pytest.importorskip("boto3")
 LAMBDA_PRELUDE = """
 from __future__ import print_function
 
-from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
+from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration, get_lambda_bootstrap
 import sentry_sdk
 import json
 import time
@@ -69,6 +69,7 @@ def envelope_processor(envelope):
 
     return envelope_data
 
+
 class TestTransport(HttpTransport):
     def _send_event(self, event):
         event = event_processor(event)
@@ -81,6 +82,7 @@ class TestTransport(HttpTransport):
     def _send_envelope(self, envelope):
         envelope = envelope_processor(envelope)
         print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
+
 
 def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
@@ -125,7 +127,7 @@ def run_lambda_function(request, lambda_client, lambda_runtime):
 
         # for better debugging
         response["LogResult"] = base64.b64decode(response["LogResult"]).splitlines()
-        response["Payload"] = response["Payload"].read()
+        response["Payload"] = json.loads(response["Payload"].read().decode("utf-8"))
         del response["ResponseMetadata"]
 
         events = []
@@ -508,3 +510,105 @@ def test_non_dict_event(
         assert error_event["tags"]["batch_request"] is True
         assert envelope["tags"]["batch_size"] == batch_size
         assert envelope["tags"]["batch_request"] is True
+
+
+def test_traces_sampler_gets_correct_values_in_sampling_context(
+    run_lambda_function,
+    DictionaryContaining,  # noqa:N803
+    ObjectDescribedBy,  # noqa:N803
+    StringContaining,  # noqa:N803
+):
+    # TODO: This whole thing is a little hacky, specifically around the need to
+    # get `conftest.py` code into the AWS runtime, which is why there's both
+    # `inspect.getsource` and a copy of `_safe_is_equal` included directly in
+    # the code below. Ideas which have been discussed to fix this:
+
+    # - Include the test suite as a module installed in the package which is
+    #   shot up to AWS
+    # - In client.py, copy `conftest.py` (or wherever the necessary code lives)
+    #   from the test suite into the main SDK directory so it gets included as
+    #   "part of the SDK"
+
+    # It's also worth noting why it's necessary to run the assertions in the AWS
+    # runtime rather than asserting on side effects the way we do with events
+    # and envelopes. The reasons are two-fold:
+
+    # - We're testing against the `LambdaContext` class, which only exists in
+    #   the AWS runtime
+    # - If we were to transmit call args data they way we transmit event and
+    #   envelope data (through JSON), we'd quickly run into the problem that all
+    #   sorts of stuff isn't serializable by `json.dumps` out of the box, up to
+    #   and including `datetime` objects (so anything with a timestamp is
+    #   automatically out)
+
+    # Perhaps these challenges can be solved in a cleaner and more systematic
+    # way if we ever decide to refactor the entire AWS testing apparatus.
+
+    import inspect
+
+    envelopes, events, response = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(inspect.getsource(StringContaining))
+        + dedent(inspect.getsource(DictionaryContaining))
+        + dedent(inspect.getsource(ObjectDescribedBy))
+        + dedent(
+            """
+            try:
+                from unittest import mock  # python 3.3 and above
+            except ImportError:
+                import mock  # python < 3.3
+
+            def _safe_is_equal(x, y):
+                # copied from conftest.py - see docstring and comments there
+                try:
+                    is_equal = x.__eq__(y)
+                except AttributeError:
+                    is_equal = NotImplemented
+
+                if is_equal == NotImplemented:
+                    # using == smoothes out weird variations exposed by raw __eq__
+                    return x == y
+
+                return is_equal
+
+            def test_handler(event, context):
+                # this runs after the transaction has started, which means we
+                # can make assertions about traces_sampler
+                try:
+                    traces_sampler.assert_any_call(
+                        DictionaryContaining(
+                            {
+                                "aws_event": DictionaryContaining({
+                                    "httpMethod": "GET",
+                                    "path": "/sit/stay/rollover",
+                                    "headers": {"Host": "dogs.are.great", "X-Forwarded-Proto": "http"},
+                                }),
+                                "aws_context": ObjectDescribedBy(
+                                    type=get_lambda_bootstrap().LambdaContext,
+                                    attrs={
+                                        'function_name': StringContaining("test_function"),
+                                        'function_version': '$LATEST',
+                                    }
+                                )
+                            }
+                        )
+                    )
+                except AssertionError:
+                    # catch the error and return it because the error itself will
+                    # get swallowed by the SDK as an "internal exception"
+                    return {"AssertionError raised": True,}
+
+                return {"AssertionError raised": False,}
+
+
+            traces_sampler = mock.Mock(return_value=True)
+
+            init_sdk(
+                traces_sampler=traces_sampler,
+            )
+        """
+        ),
+        b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "headers": {"Host": "dogs.are.great", "X-Forwarded-Proto": "http"}}',
+    )
+
+    assert response["Payload"]["AssertionError raised"] is False

@@ -34,13 +34,13 @@ if MYPY:
 
 def _wrap_func(func):
     # type: (F) -> F
-    def sentry_func(functionhandler, event, *args, **kwargs):
+    def sentry_func(functionhandler, gcp_event, *args, **kwargs):
         # type: (Any, Any, *Any, **Any) -> Any
 
         hub = Hub.current
         integration = hub.get_integration(GcpIntegration)
         if integration is None:
-            return func(functionhandler, event, *args, **kwargs)
+            return func(functionhandler, gcp_event, *args, **kwargs)
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
@@ -50,7 +50,7 @@ def _wrap_func(func):
             logger.debug(
                 "The configured timeout could not be fetched from Cloud Functions configuration."
             )
-            return func(functionhandler, event, *args, **kwargs)
+            return func(functionhandler, gcp_event, *args, **kwargs)
 
         configured_time = int(configured_time)
 
@@ -60,7 +60,9 @@ def _wrap_func(func):
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(
-                    _make_request_event_processor(event, configured_time, initial_time)
+                    _make_request_event_processor(
+                        gcp_event, configured_time, initial_time
+                    )
                 )
                 scope.set_tag("gcp_region", environ.get("FUNCTION_REGION"))
                 timeout_thread = None
@@ -76,22 +78,34 @@ def _wrap_func(func):
                     timeout_thread.start()
 
             headers = {}
-            if hasattr(event, "headers"):
-                headers = event.headers
+            if hasattr(gcp_event, "headers"):
+                headers = gcp_event.headers
             transaction = Transaction.continue_from_headers(
                 headers, op="serverless.function", name=environ.get("FUNCTION_NAME", "")
             )
-            with hub.start_transaction(transaction):
+            sampling_context = {
+                "gcp_env": {
+                    "function_name": environ.get("FUNCTION_NAME"),
+                    "function_entry_point": environ.get("ENTRY_POINT"),
+                    "function_identity": environ.get("FUNCTION_IDENTITY"),
+                    "function_region": environ.get("FUNCTION_REGION"),
+                    "function_project": environ.get("GCP_PROJECT"),
+                },
+                "gcp_event": gcp_event,
+            }
+            with hub.start_transaction(
+                transaction, custom_sampling_context=sampling_context
+            ):
                 try:
-                    return func(functionhandler, event, *args, **kwargs)
+                    return func(functionhandler, gcp_event, *args, **kwargs)
                 except Exception:
                     exc_info = sys.exc_info()
-                    event, hint = event_from_exception(
+                    sentry_event, hint = event_from_exception(
                         exc_info,
                         client_options=client.options,
                         mechanism={"type": "gcp", "handled": False},
                     )
-                    hub.capture_event(event, hint=hint)
+                    hub.capture_event(sentry_event, hint=hint)
                     reraise(*exc_info)
                 finally:
                     if timeout_thread:

@@ -30,9 +30,19 @@ os.environ["FUNCTION_IDENTITY"] = "func_ID"
 os.environ["FUNCTION_REGION"] = "us-central1"
 os.environ["GCP_PROJECT"] = "serverless_project"
 
+def log_return_value(func):
+    def inner(*args, **kwargs):
+        rv = func(*args, **kwargs)
+
+        print("\\nRETURN VALUE: {}\\n".format(json.dumps(rv)))
+
+        return rv
+
+    return inner
+
 gcp_functions.worker_v1 = Mock()
 gcp_functions.worker_v1.FunctionHandler = Mock()
-gcp_functions.worker_v1.FunctionHandler.invoke_user_function = cloud_function
+gcp_functions.worker_v1.FunctionHandler.invoke_user_function = log_return_value(cloud_function)
 
 
 import sentry_sdk
@@ -64,6 +74,7 @@ class TestTransport(HttpTransport):
         envelope = envelope_processor(envelope)
         print("\\nENVELOPE: {}\\n".format(envelope.decode(\"utf-8\")))
 
+
 def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
         dsn="https://123abc@example.com/123",
@@ -82,6 +93,7 @@ def run_cloud_function():
 
         event = []
         envelope = []
+        return_value = None
 
         # STEP : Create a zip of cloud function
 
@@ -112,6 +124,8 @@ def run_cloud_function():
             stream = os.popen("python {}/main.py".format(tmpdir))
             stream_data = stream.read()
 
+            stream.close()
+
             for line in stream_data.splitlines():
                 print("GCP:", line)
                 if line.startswith("EVENT: "):
@@ -120,16 +134,19 @@ def run_cloud_function():
                 elif line.startswith("ENVELOPE: "):
                     line = line[len("ENVELOPE: ") :]
                     envelope = json.loads(line)
+                elif line.startswith("RETURN VALUE: "):
+                    line = line[len("RETURN VALUE: ") :]
+                    return_value = json.loads(line)
                 else:
                     continue
 
-        return envelope, event
+        return envelope, event, return_value
 
     return inner
 
 
 def test_handled_exception(run_cloud_function):
-    envelope, event = run_cloud_function(
+    envelope, event, return_value = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -155,7 +172,7 @@ def test_handled_exception(run_cloud_function):
 
 
 def test_unhandled_exception(run_cloud_function):
-    envelope, event = run_cloud_function(
+    envelope, event, return_value = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -182,7 +199,7 @@ def test_unhandled_exception(run_cloud_function):
 
 
 def test_timeout_error(run_cloud_function):
-    envelope, event = run_cloud_function(
+    envelope, event, return_value = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -212,7 +229,7 @@ def test_timeout_error(run_cloud_function):
 
 
 def test_performance_no_error(run_cloud_function):
-    envelope, event = run_cloud_function(
+    envelope, event, return_value = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -237,7 +254,7 @@ def test_performance_no_error(run_cloud_function):
 
 
 def test_performance_error(run_cloud_function):
-    envelope, event = run_cloud_function(
+    envelope, event, return_value = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -265,3 +282,82 @@ def test_performance_error(run_cloud_function):
     assert exception["type"] == "Exception"
     assert exception["value"] == "something went wrong"
     assert exception["mechanism"] == {"type": "gcp", "handled": False}
+
+
+def test_traces_sampler_gets_correct_values_in_sampling_context(
+    run_cloud_function, DictionaryContaining  # noqa:N803
+):
+    # TODO: There are some decent sized hacks below. For more context, see the
+    # long comment in the test of the same name in the AWS integration. The
+    # situations there and here aren't identical, but they're similar enough
+    # that solving one would probably solve both.
+
+    import inspect
+
+    envelopes, events, return_value = run_cloud_function(
+        dedent(
+            """
+            functionhandler = None
+            event = {
+                "type": "chase",
+                "chasers": ["Maisey", "Charlie"],
+                "num_squirrels": 2,
+            }
+            def cloud_function(functionhandler, event):
+                # this runs after the transaction has started, which means we
+                # can make assertions about traces_sampler
+                try:
+                    traces_sampler.assert_any_call(
+                        DictionaryContaining({
+                            "gcp_env": DictionaryContaining({
+                                "function_name": "chase_into_tree",
+                                "function_region": "dogpark",
+                                "function_project": "SquirrelChasing",
+                            }),
+                            "gcp_event": {
+                                "type": "chase",
+                                "chasers": ["Maisey", "Charlie"],
+                                "num_squirrels": 2,
+                            },
+                        })
+                    )
+                except AssertionError:
+                    # catch the error and return it because the error itself will
+                    # get swallowed by the SDK as an "internal exception"
+                    return {"AssertionError raised": True,}
+
+                return {"AssertionError raised": False,}
+            """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(inspect.getsource(DictionaryContaining))
+        + dedent(
+            """
+            os.environ["FUNCTION_NAME"] = "chase_into_tree"
+            os.environ["FUNCTION_REGION"] = "dogpark"
+            os.environ["GCP_PROJECT"] = "SquirrelChasing"
+
+            def _safe_is_equal(x, y):
+                # copied from conftest.py - see docstring and comments there
+                try:
+                    is_equal = x.__eq__(y)
+                except AttributeError:
+                    is_equal = NotImplemented
+
+                if is_equal == NotImplemented:
+                    return x == y
+
+                return is_equal
+
+            traces_sampler = Mock(return_value=True)
+
+            init_sdk(
+                traces_sampler=traces_sampler,
+            )
+
+            gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+            """
+        )
+    )
+
+    assert return_value["AssertionError raised"] is False
