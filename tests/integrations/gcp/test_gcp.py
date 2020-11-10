@@ -287,6 +287,11 @@ def test_performance_error(run_cloud_function):
 def test_traces_sampler_gets_correct_values_in_sampling_context(
     run_cloud_function, DictionaryContaining  # noqa:N803
 ):
+    # TODO: There are some decent sized hacks below. For more context, see the
+    # long comment in the test of the same name in the AWS integration. The
+    # situations there and here aren't identical, but they're similar enough
+    # that solving one would probably solve both.
+
     import inspect
 
     envelopes, events, return_value = run_cloud_function(

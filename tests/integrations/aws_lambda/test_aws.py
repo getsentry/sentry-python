@@ -518,6 +518,32 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     ObjectDescribedBy,  # noqa:N803
     StringContaining,  # noqa:N803
 ):
+    # TODO: This whole thing is a little hacky, specifically around the need to
+    # get `conftest.py` code into the AWS runtime, which is why there's both
+    # `inspect.getsource` and a copy of `_safe_is_equal` included directly in
+    # the code below. Ideas which have been discussed to fix this:
+
+    # - Include the test suite as a module installed in the package which is
+    #   shot up to AWS
+    # - In client.py, copy `conftest.py` (or wherever the necessary code lives)
+    #   from the test suite into the main SDK directory so it gets included as
+    #   "part of the SDK"
+
+    # It's also worth noting why it's necessary to run the assertions in the AWS
+    # runtime rather than asserting on side effects the way we do with events
+    # and envelopes. The reasons are two-fold:
+
+    # - We're testing against the `LambdaContext` class, which only exists in
+    #   the AWS runtime
+    # - If we were to transmit call args data they way we transmit event and
+    #   envelope data (through JSON), we'd quickly run into the problem that all
+    #   sorts of stuff isn't serializable by `json.dumps` out of the box, up to
+    #   and including `datetime` objects (so anything with a timestamp is
+    #   automatically out)
+
+    # Perhaps these challenges can be solved in a cleaner and more systematic
+    # way if we ever decide to refactor the entire AWS testing apparatus.
+
     import inspect
 
     envelopes, events, response = run_lambda_function(
