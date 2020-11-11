@@ -558,7 +558,6 @@ class Transaction(Span):
 
         rv["name"] = self.name
         rv["sampled"] = self.sampled
-        rv["parent_sampled"] = self.parent_sampled
 
         return rv
 
@@ -609,8 +608,8 @@ class Transaction(Span):
             if callable(options.get("traces_sampler"))
             else (
                 # default inheritance behavior
-                sampling_context["parent_sampled"]
-                if sampling_context["parent_sampled"] is not None
+                sampling_context["transaction_context"]["parent_sampled"]
+                if sampling_context["transaction_context"]["parent_sampled"] is not None
                 else options["traces_sample_rate"]
             )
         )
