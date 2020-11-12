@@ -22,7 +22,7 @@ A major release `N` implies the previous release `N-1` will no longer receive up
 
 ## 0.19.3
 
-- Automatically pass integration-relevant data to `traces_sampler` for AWS, AIOHTTP, ASGI, Bottle, Celery, Django, Falcon, GCP, Pyrammid, Tryton, RQ, and WSGI integrations
+- Automatically pass integration-relevant data to `traces_sampler` for AWS, AIOHTTP, ASGI, Bottle, Celery, Django, Falcon, Flask, GCP, Pyramid, Tryton, RQ, and WSGI integrations
 - Fix a bug where the AWS integration would crash if event was anything besides a dictionary
 - Fix the Django integrations's ASGI handler for Channels 3.0. Thanks Luke Pomfrey!
 
