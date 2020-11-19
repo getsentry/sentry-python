@@ -20,6 +20,10 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.19.4
+
+- Fix a bug that would make applications crash if an old version of `boto3` was installed.
+
 ## 0.19.3
 
 - Automatically pass integration-relevant data to `traces_sampler` for AWS, AIOHTTP, ASGI, Bottle, Celery, Django, Falcon, Flask, GCP, Pyramid, Tryton, RQ, and WSGI integrations
