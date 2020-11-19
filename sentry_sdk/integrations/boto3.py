@@ -14,7 +14,7 @@ if MYPY:
     from typing import Type
 
 try:
-    from botocore import __version__ as BOTOCORE_VERSION
+    from botocore import __version__ as BOTOCORE_VERSION  # type: ignore
     from botocore.client import BaseClient  # type: ignore
     from botocore.response import StreamingBody  # type: ignore
     from botocore.awsrequest import AWSRequest  # type: ignore
