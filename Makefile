@@ -73,3 +73,49 @@ travis-upload-dist: dist install-zeus-cli
 	zeus upload -t "application/zip+wheel" dist/* \
 		|| [[ ! "$(TRAVIS_BRANCH)" =~ ^release/ ]]
 .PHONY: travis-upload-dist
+
+awslambda-layer-build-pre: dist
+	@$(VENV_PATH)/bin/pip install .
+.PHONY: awslambda-layer-build-pre
+
+awslambda-layer-build-py27: awslambda-layer-build-pre
+	$(VENV_PATH)/bin/python scripts/build-awslambda-layer.py --python 2.7
+.PHONY: awslambda-layer-build-py27
+
+awslambda-layer-build-py36: awslambda-layer-build-pre
+	$(VENV_PATH)/bin/python scripts/build-awslambda-layer.py --python 3.6
+.PHONY: awslambda-layer-build-py36
+
+awslambda-layer-build-py37: awslambda-layer-build-pre
+	$(VENV_PATH)/bin/python scripts/build-awslambda-layer.py --python 3.7
+.PHONY: awslambda-layer-build-py37
+
+awslambda-layer-build-py38: awslambda-layer-build-pre
+	$(VENV_PATH)/bin/python scripts/build-awslambda-layer.py --python 3.8
+.PHONY: awslambda-layer-build-py38
+
+awslambda-layer-build: awslambda-layer-build-py27 awslambda-layer-build-py36 awslambda-layer-build-py37 awslambda-layer-build-py38
+.PHONY: awslambda-layer-build
+
+awslambda-layer-publish-pre:
+	@$(VENV_PATH)/bin/pip install boto3
+.PHONY: awslambda-layer-pre
+
+awslambda-layer-publish-py27: awslambda-layer-build-py27 awslambda-layer-publish-pre
+	$(VENV_PATH)/bin/python scripts/publish-awslambda-layer.py --python 2.7
+.PHONY: awslambda-layer-publish-py27
+
+awslambda-layer-publish-py36: awslambda-layer-build-py36 awslambda-layer-publish-pre
+	$(VENV_PATH)/bin/python scripts/publish-awslambda-layer.py --python 3.6
+.PHONY: awslambda-layer-publish-py36
+
+awslambda-layer-publish-py37: awslambda-layer-build-py37 awslambda-layer-publish-pre
+	$(VENV_PATH)/bin/python scripts/publish-awslambda-layer.py --python 3.7
+.PHONY: awslambda-layer-publish-py37
+
+awslambda-layer-publish-py38: awslambda-layer-build-py38 awslambda-layer-publish-pre
+	$(VENV_PATH)/bin/python scripts/publish-awslambda-layer.py --python 3.8
+.PHONY: awslambda-layer-publish-py38
+
+awslambda-layer-publish: awslambda-layer-publish-py27 awslambda-layer-publish-py36 awslambda-layer-publish-py37 awslambda-layer-publish-py38
+.PHONY: awslambda-layer-publish
