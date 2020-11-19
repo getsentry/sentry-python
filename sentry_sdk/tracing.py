@@ -558,7 +558,6 @@ class Transaction(Span):
 
         rv["name"] = self.name
         rv["sampled"] = self.sampled
-        rv["parent_sampled"] = self.parent_sampled
 
         return rv
 
