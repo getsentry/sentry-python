@@ -4,6 +4,8 @@ Create spans from Django middleware invocations
 
 from django import VERSION as DJANGO_VERSION
 
+import asyncio
+
 from sentry_sdk import Hub
 from sentry_sdk._functools import wraps
 from sentry_sdk._types import MYPY
@@ -103,6 +105,10 @@ def _wrap_middleware(middleware, middleware_name):
         return old_method
 
     class SentryWrappingMiddleware(object):
+        # To keep the async capability of the middleware (Needed for Django 3.1)
+        async_capable = middleware.async_capable
+        _is_coroutine = asyncio.coroutines._is_coroutine if middleware.async_capable else None
+
         def __init__(self, *args, **kwargs):
             # type: (*Any, **Any) -> None
             self._inner = middleware(*args, **kwargs)
@@ -128,10 +134,26 @@ def _wrap_middleware(middleware, middleware_name):
 
         def __call__(self, *args, **kwargs):
             # type: (*Any, **Any) -> Any
+            if self.async_capable:
+                return self.__acall__(*args, **kwargs)
+
             f = self._call_method
             if f is None:
                 self._call_method = f = _get_wrapped_method(self._inner.__call__)
             return f(*args, **kwargs)
+
+        async def __acall__(self, *args, **kwargs):
+            """
+            Async version of __call__ that is swapped in when an async request
+            is running.
+
+            NOTE: Using the pattern from django's MiddlewareMixin
+            used for migrating non-async middlewares (django.utils.deprecation:Middlewaremixin)
+            """
+            f = self._call_method
+            if f is None:
+                self._call_method = f = _get_wrapped_method(self._inner.__call__)
+            return await f(*args, **kwargs)
 
     if hasattr(middleware, "__name__"):
         SentryWrappingMiddleware.__name__ = middleware.__name__
