@@ -199,12 +199,26 @@ class DjangoIntegration(Integration):
             )
 
         _patch_channels()
-        patch_django_middlewares()
+        _patch_django_middlewares()
         patch_views()
 
 
 _DRF_PATCHED = False
 _DRF_PATCH_LOCK = threading.Lock()
+
+
+def _patch_django_middlewares():
+    """
+    If Django version is >= 3.1 allow supporting async middlewares
+    to not block the async views.
+    """
+    sentry_wrapping_middleware_base_handler = lambda **_: object
+
+    if DJANGO_VERSION > (3, 1):
+        from sentry_sdk.integrations.django.asgi import get_async_sentry_wrapping_middleware_base_cls
+        sentry_wrapping_middleware_base_handler = get_async_sentry_wrapping_middleware_base_cls
+
+    patch_django_middlewares(sentry_wrapping_middleware_base_handler)
 
 
 def _patch_drf():
