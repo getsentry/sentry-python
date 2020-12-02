@@ -96,14 +96,15 @@ def wrap_async_view(hub, callback):
 def get_async_sentry_wrapping_middleware_base_cls(middleware):
     # Use local import to avoid conflict with python 2
     import asyncio
+    is_async_capable = getattr(middleware, 'async_capable', False)
 
     class AsyncSentryWrappingMiddlewareBase(object):
         """
         Adds async functionality to existing sentry_sdk/integrations/django/middleware:SentryWrappingMiddleware
         to avoid blocking Django 3.1's async views by making the middlewares synchronous
         """
-        async_capable = middleware.async_capable
-        _is_coroutine = asyncio.coroutines._is_coroutine if middleware.async_capable else None
+        async_capable = is_async_capable
+        _is_coroutine = asyncio.coroutines._is_coroutine if is_async_capable else None
 
         async def handle_async(self, f, *args, **kwargs):
             return await f(*args, **kwargs)

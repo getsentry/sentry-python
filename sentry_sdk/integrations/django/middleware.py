@@ -132,7 +132,7 @@ def _wrap_middleware(middleware, middleware_name, sentry_wrapping_middleware_bas
             if f is None:
                 self._call_method = f = _get_wrapped_method(self._inner.__call__)
 
-            if hasattr(self, 'handle_async'):
+            if hasattr(self, 'handle_async') and getattr(self, 'async_capable', False):
                 return self.handle_async(f, *args, **kwargs)
 
             return f(*args, **kwargs)
