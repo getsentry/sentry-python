@@ -103,10 +103,12 @@ def _wrap_middleware(middleware, middleware_name, sentry_wrapping_middleware_bas
         return old_method
 
     class SentryWrappingMiddleware(sentry_wrapping_middleware_base_handler(middleware=middleware)):
-        def __init__(self, *args, **kwargs):
+        def __init__(self, get_response, *args, **kwargs):
             # type: (*Any, **Any) -> None
-            self._inner = middleware(*args, **kwargs)
+            self._inner = middleware(get_response, *args, **kwargs)
             self._call_method = None
+            # Used to determine wether the http handler is asgi or wsgi based
+            self.get_response = get_response
 
         # We need correct behavior for `hasattr()`, which we can only determine
         # when we have an instance of the middleware we're wrapping.
@@ -133,7 +135,7 @@ def _wrap_middleware(middleware, middleware_name, sentry_wrapping_middleware_bas
                 self._call_method = f = _get_wrapped_method(self._inner.__call__)
 
             if hasattr(self, 'handle_async') and getattr(self, 'async_capable', False):
-                return self.handle_async(f, *args, **kwargs)
+                return self.handle_async(self.get_response, f, *args, **kwargs)
 
             return f(*args, **kwargs)
 

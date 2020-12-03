@@ -96,6 +96,7 @@ def wrap_async_view(hub, callback):
 def get_async_sentry_wrapping_middleware_base_cls(middleware):
     # Use local import to avoid conflict with python 2
     import asyncio
+
     is_async_capable = getattr(middleware, 'async_capable', False)
 
     class AsyncSentryWrappingMiddlewareBase(object):
@@ -106,7 +107,15 @@ def get_async_sentry_wrapping_middleware_base_cls(middleware):
         async_capable = is_async_capable
         _is_coroutine = asyncio.coroutines._is_coroutine if is_async_capable else None
 
-        async def handle_async(self, f, *args, **kwargs):
-            return await f(*args, **kwargs)
+        async def handle_async(self, middleware_get_response, f, *args, **kwargs):
+            """
+            The check here is inspired from django.utils.deprecation::MiddlewareMixin.__acall__.
+            We need to check if get_resposen is actually a coroutine to handle wsgi http request handler.
+            """
+            if asyncio.iscoroutinefunction(middleware_get_response):
+                return await f(*args, **kwargs)
+
+            return f(*args, **kwargs)
+
 
     return AsyncSentryWrappingMiddlewareBase
