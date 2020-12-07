@@ -126,7 +126,7 @@ class HttpTransport(Transport):
 
         Transport.__init__(self, options)
         assert self.parsed_dsn is not None
-        self._worker = BackgroundWorker()
+        self._worker = BackgroundWorker(queue_size=self.options["transport_queue_size"])
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
         self._disabled_until = {}  # type: Dict[DataCategory, datetime]
         self._retry = urllib3.util.Retry()

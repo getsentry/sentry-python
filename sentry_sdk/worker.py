@@ -110,7 +110,10 @@ class BackgroundWorker(object):
         try:
             self._queue.put_nowait(callback)
         except Full:
-            logger.debug("background worker queue full, dropping event")
+            self.on_full_queue(callback)
+
+    def on_full_queue(self, callback):
+        logger.debug("background worker queue full, dropping event")
 
     def _target(self):
         # type: () -> None
