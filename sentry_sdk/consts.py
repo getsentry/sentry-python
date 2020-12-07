@@ -1,6 +1,8 @@
 from sentry_sdk._types import MYPY
 
 if MYPY:
+    import sentry_sdk
+
     from typing import Optional
     from typing import Callable
     from typing import Union
@@ -11,7 +13,6 @@ if MYPY:
     from typing import Sequence
     from typing_extensions import TypedDict
 
-    from sentry_sdk.transport import Transport
     from sentry_sdk.integrations import Integration
 
     from sentry_sdk._types import (
@@ -57,7 +58,7 @@ class ClientConstructor(object):
         in_app_exclude=[],  # type: List[str]  # noqa: B006
         default_integrations=True,  # type: bool
         dist=None,  # type: Optional[str]
-        transport=None,  # type: Optional[Union[Transport, Type[Transport], Callable[[Event], None]]]
+        transport=None,  # type: Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]
         transport_queue_size=DEFAULT_QUEUE_SIZE,  # type: int
         sample_rate=1.0,  # type: float
         send_default_pii=False,  # type: bool
