@@ -114,6 +114,7 @@ class BackgroundWorker(object):
             self.on_full_queue(callback)
 
     def on_full_queue(self, callback):
+        # type: (Optional[Any]) -> None
         logger.debug("background worker queue full, dropping event")
 
     def _target(self):
