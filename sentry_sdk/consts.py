@@ -36,6 +36,7 @@ if MYPY:
         total=False,
     )
 
+DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
 
 
@@ -57,7 +58,7 @@ class ClientConstructor(object):
         default_integrations=True,  # type: bool
         dist=None,  # type: Optional[str]
         transport=None,  # type: Optional[Union[Transport, Type[Transport], Callable[[Event], None]]]
-        transport_queue_size=30,  # type: int
+        transport_queue_size=DEFAULT_QUEUE_SIZE,  # type: int
         sample_rate=1.0,  # type: float
         send_default_pii=False,  # type: bool
         http_proxy=None,  # type: Optional[str]
