@@ -9,15 +9,51 @@ from sentry_sdk.utils import logger
 from sentry_sdk._types import MYPY
 
 if MYPY:
-    from typing import Any
     from typing import Optional
     from typing import Callable
+    from typing import Dict
+    from typing import Any
+
+    from sentry_sdk._types import FlushCallback
 
 
 _TERMINATOR = object()
 
 
-class BackgroundWorker(object):
+class Worker(object):
+    """
+    Base interface for task queue based worker.
+    """
+
+    @property
+    def is_alive(self):
+        # type: () -> bool
+        return False
+
+    def start(self):
+        # type: () -> None
+        """Start task queue processing."""
+        raise NotImplementedError()
+
+    def kill(self):
+        # type: () -> None
+        """
+        Stop task queue processing. Returns immediately. Not useful
+        for waiting on shutdown for events, use `flush` for that.
+        """
+
+    def flush(self, timeout, callback=None):
+        # type: (float, Optional[FlushCallback]) -> None
+        """Wait `timeout` seconds for the current tasks to be finished."""
+        pass
+
+    def submit(self, callback):
+        # type: (Callable[[], None]) -> None
+        """Submit new task to the queue"""
+        raise NotImplementedError()
+
+
+class BackgroundWorker(Worker):
     def __init__(self, queue_size=30):
         # type: (int) -> None
         check_thread_support()
@@ -63,7 +99,7 @@ class BackgroundWorker(object):
         with self._lock:
             if not self.is_alive:
                 self._thread = threading.Thread(
-                    target=self._target, name="raven-sentry.BackgroundWorker"
+                    target=self._target, name="sentry_sdk.BackgroundWorker"
                 )
                 self._thread.setDaemon(True)
                 self._thread.start()
@@ -71,6 +107,8 @@ class BackgroundWorker(object):
 
     def kill(self):
         # type: () -> None
+        # FIXME: This doesn't actually do what it claims. Putting the terminator
+        #        on the queue means it will execute all the other tasks first.
         """
         Kill worker thread. Returns immediately. Not useful for
         waiting on shutdown for events, use `flush` for that.
@@ -87,7 +125,7 @@ class BackgroundWorker(object):
                 self._thread_for_pid = None
 
     def flush(self, timeout, callback=None):
-        # type: (float, Optional[Any]) -> None
+        # type: (float, Optional[FlushCallback]) -> None
         logger.debug("background worker got flush request")
         with self._lock:
             if self.is_alive and timeout > 0.0:
@@ -95,7 +133,7 @@ class BackgroundWorker(object):
         logger.debug("background worker flushed")
 
     def _wait_flush(self, timeout, callback):
-        # type: (float, Optional[Any]) -> None
+        # type: (float, Optional[FlushCallback]) -> None
         initial_timeout = min(0.1, timeout)
         if not self._timed_queue_join(initial_timeout):
             pending = self._queue.qsize()
@@ -126,3 +164,18 @@ class BackgroundWorker(object):
             finally:
                 self._queue.task_done()
             sleep(0)
+
+
+def make_worker(options):
+    # type: (Dict[str, Any]) -> Optional[Worker]
+    ref_worker = options["worker"]
+
+    # If no worker is given, we use the background worker class
+    if ref_worker is None:
+        return BackgroundWorker()
+    elif isinstance(ref_worker, Worker):
+        return ref_worker
+    elif isinstance(ref_worker, type) and issubclass(ref_worker, Worker):
+        return ref_worker()
+    else:
+        return None

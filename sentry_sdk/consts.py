@@ -12,6 +12,7 @@ if MYPY:
     from typing_extensions import TypedDict
 
     from sentry_sdk.transport import Transport
+    from sentry_sdk.worker import Worker
     from sentry_sdk.integrations import Integration
 
     from sentry_sdk._types import (
@@ -57,6 +58,7 @@ class ClientConstructor(object):
         default_integrations=True,  # type: bool
         dist=None,  # type: Optional[str]
         transport=None,  # type: Optional[Union[Transport, Type[Transport], Callable[[Event], None]]]
+        worker=None,  # type: Optional[Type[Worker]]
         sample_rate=1.0,  # type: float
         send_default_pii=False,  # type: bool
         http_proxy=None,  # type: Optional[str]

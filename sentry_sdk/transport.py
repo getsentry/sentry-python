@@ -8,7 +8,7 @@ import gzip
 from datetime import datetime, timedelta
 
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions, json_dumps
-from sentry_sdk.worker import BackgroundWorker
+from sentry_sdk.worker import make_worker
 from sentry_sdk.envelope import Envelope
 
 from sentry_sdk._types import MYPY
@@ -126,7 +126,11 @@ class HttpTransport(Transport):
 
         Transport.__init__(self, options)
         assert self.parsed_dsn is not None
-        self._worker = BackgroundWorker()
+
+        worker = make_worker(options)
+        assert worker is not None
+
+        self._worker = worker
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
         self._disabled_until = {}  # type: Dict[DataCategory, datetime]
         self._retry = urllib3.util.Retry()

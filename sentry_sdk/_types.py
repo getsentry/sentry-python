@@ -42,3 +42,5 @@ if MYPY:
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
     EndpointType = Literal["store", "envelope"]
+
+    FlushCallback = Callable[[int, float], None]

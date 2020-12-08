@@ -9,6 +9,7 @@ import pytest
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message
 from sentry_sdk.transport import _parse_rate_limits
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.worker.gevent_worker import GeventWorker
 
 
 @pytest.fixture
@@ -25,6 +26,7 @@ def make_client(request, httpserver):
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("client_flush_method", ["close", "flush"])
 @pytest.mark.parametrize("use_pickle", (True, False))
+@pytest.mark.parametrize("worker", (None, GeventWorker))
 def test_transport_works(
     httpserver,
     request,
@@ -34,11 +36,16 @@ def test_transport_works(
     make_client,
     client_flush_method,
     use_pickle,
+    worker,
     maybe_monkeypatched_threading,
 ):
+    if worker == GeventWorker:
+        if maybe_monkeypatched_threading != "gevent":
+            pytest.skip("GeventWorker requires gevent.monkey")
+
     httpserver.serve_content("ok", 200)
     caplog.set_level(logging.DEBUG)
-    client = make_client(debug=debug)
+    client = make_client(debug=debug, worker=worker)
 
     if use_pickle:
         client = pickle.loads(pickle.dumps(client))

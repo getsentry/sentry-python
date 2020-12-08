@@ -18,7 +18,7 @@ def get_file_text(file_name):
     with open(os.path.join(here, file_name)) as in_file:
         return in_file.read()
 
-    
+
 setup(
     name="sentry-sdk",
     version="0.19.4",
@@ -53,6 +53,7 @@ setup(
         "pyspark": ["pyspark>=2.4.4"],
         "pure_eval": ["pure_eval", "executing", "asttokens"],
         "chalice": ["chalice>=1.16.0"],
+        "gevent": ["gevent>=1.4.0"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
