@@ -135,7 +135,7 @@ def _wrap_handler(handler):
                     timeout_thread.start()
 
             headers = request_data.get("headers", None)
-            # AWS Service may set an explicit `{header: None}`, we can't rely on `.get()`'s default.
+            # AWS Service may set an explicit `{headers: None}`, we can't rely on `.get()`'s default.
             if headers is None:
                 headers = {}
             transaction = Transaction.continue_from_headers(
