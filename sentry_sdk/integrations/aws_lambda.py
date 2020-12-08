@@ -137,7 +137,7 @@ def _wrap_handler(handler):
             headers = request_data.get("headers", None)
             # AWS Service may set an explicit `{header: None}`, we can't rely on `.get()`'s default.
             if headers is None:
-                header = {}
+                headers = {}
             transaction = Transaction.continue_from_headers(
                 headers, op="serverless.function", name=aws_context.function_name
             )
