@@ -134,7 +134,7 @@ def _wrap_handler(handler):
                     # Starting the thread to raise timeout warning exception
                     timeout_thread.start()
 
-            headers = request_data.get("headers", None)
+            headers = request_data.get("headers")
             # AWS Service may set an explicit `{headers: None}`, we can't rely on `.get()`'s default.
             if headers is None:
                 headers = {}
