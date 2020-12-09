@@ -1,6 +1,17 @@
 <p align="center">
+    <style>
+    @media (prefers-color-scheme: dark) {
+      #sentry-white { display: none; }
+    }
+
+    @media (prefers-color-scheme: bright) {
+      #sentry-black { display: none; }
+    }
+    </style>
+
     <a href="https://sentry.io" target="_blank" align="center">
-        <img src="https://sentry-brand.storage.googleapis.com/sentry-logo-black.png" width="280">
+        <img src="https://sentry-brand.storage.googleapis.com/sentry-logo-black.png" id="sentry-black" width="280">
+        <img src="https://sentry-brand.storage.googleapis.com/sentry-logo-white.png" id="sentry-white" width="280">
     </a>
 </p>
 
