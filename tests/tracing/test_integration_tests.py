@@ -87,7 +87,7 @@ def test_continue_from_headers(sentry_init, capture_events, sampled, sample_rate
             scope.transaction = "ho"
         capture_message("hello")
 
-    if sampled is False:
+    if sampled is False or (sample_rate == 0 and sampled is None):
         trace1, message = events
 
         assert trace1["transaction"] == "hi"
