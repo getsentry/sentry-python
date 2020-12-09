@@ -9,11 +9,10 @@
 </style>
 
 <p align="center">
-
-    <a href="https://sentry.io" target="_blank" align="center">
-        <img src="https://sentry-brand.storage.googleapis.com/sentry-logo-black.png" id="sentry-black" width="280">
-        <img src="https://sentry-brand.storage.googleapis.com/sentry-logo-white.png" id="sentry-white" width="280">
-    </a>
+<a href="https://sentry.io" target="_blank" align="center">
+<img src="https://sentry-brand.storage.googleapis.com/sentry-logo-black.png" id="sentry-black" width="280">
+<img src="https://sentry-brand.storage.googleapis.com/sentry-logo-white.png" id="sentry-white" width="280">
+</a>
 </p>
 
 # sentry-python - Sentry SDK for Python
