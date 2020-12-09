@@ -5,6 +5,7 @@ from time import sleep, time
 from sentry_sdk._compat import check_thread_support
 from sentry_sdk._queue import Queue, Full
 from sentry_sdk.utils import logger
+from sentry_sdk.consts import DEFAULT_QUEUE_SIZE
 
 from sentry_sdk._types import MYPY
 
@@ -18,7 +19,7 @@ _TERMINATOR = object()
 
 
 class BackgroundWorker(object):
-    def __init__(self, queue_size=30):
+    def __init__(self, queue_size=DEFAULT_QUEUE_SIZE):
         # type: (int) -> None
         check_thread_support()
         self._queue = Queue(queue_size)  # type: Queue
@@ -110,7 +111,11 @@ class BackgroundWorker(object):
         try:
             self._queue.put_nowait(callback)
         except Full:
-            logger.debug("background worker queue full, dropping event")
+            self.on_full_queue(callback)
+
+    def on_full_queue(self, callback):
+        # type: (Optional[Any]) -> None
+        logger.debug("background worker queue full, dropping event")
 
     def _target(self):
         # type: () -> None
