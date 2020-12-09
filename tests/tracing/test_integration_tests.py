@@ -47,12 +47,15 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
 
 @pytest.mark.parametrize("sampled", [True, False, None])
-def test_continue_from_headers(sentry_init, capture_events, sampled):
-    sentry_init(traces_sample_rate=1.0)
+@pytest.mark.parametrize(
+    "sample_rate", [0.0, 1.0]
+)  # ensure sampling decision is actually passed along via headers
+def test_continue_from_headers(sentry_init, capture_events, sampled, sample_rate):
+    sentry_init(traces_sample_rate=sample_rate)
     events = capture_events()
 
     # make a parent transaction (normally this would be in a different service)
-    with start_transaction(name="hi"):
+    with start_transaction(name="hi", sampled=True):
         with start_span() as old_span:
             old_span.sampled = sampled
             headers = dict(Hub.current.iter_trace_propagation_headers())

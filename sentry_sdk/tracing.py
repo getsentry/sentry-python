@@ -583,22 +583,23 @@ class Transaction(Span):
         decision, `traces_sample_rate` will be used.
         """
 
+        # if the user has forced a sampling decision by passing a `sampled`
+        # value when starting the transaction, go with that
+        if self.sampled is not None:
+            return
+
         hub = self.hub or sentry_sdk.Hub.current
         client = hub.client
-        options = (client and client.options) or {}
         transaction_description = "{op}transaction <{name}>".format(
             op=("<" + self.op + "> " if self.op else ""), name=self.name
         )
 
         # nothing to do if there's no client or if tracing is disabled
-        if not client or not has_tracing_enabled(options):
+        if not client or not has_tracing_enabled(client.options):
             self.sampled = False
             return
 
-        # if the user has forced a sampling decision by passing a `sampled`
-        # value when starting the transaction, go with that
-        if self.sampled is not None:
-            return
+        options = client.options
 
         # we would have bailed already if neither `traces_sampler` nor
         # `traces_sample_rate` were defined, so one of these should work; prefer
