@@ -594,8 +594,8 @@ class Transaction(Span):
             op=("<" + self.op + "> " if self.op else ""), name=self.name
         )
 
-        # nothing to do if there's no client or if tracing is disabled
-        if not client or not has_tracing_enabled(client.options):
+        # nothing to do if there's no client
+        if not client:
             self.sampled = False
             return
 
@@ -661,16 +661,6 @@ class Transaction(Span):
                     sample_rate=float(sample_rate),
                 )
             )
-
-
-def has_tracing_enabled(options):
-    # type: (Dict[str, Any]) -> bool
-    """
-    Returns True if either traces_sample_rate or traces_sampler is
-    non-zero/defined, False otherwise.
-    """
-
-    return bool(options.get("traces_sample_rate") or options.get("traces_sampler"))
 
 
 def _is_valid_sample_rate(rate):
