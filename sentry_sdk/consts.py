@@ -72,7 +72,7 @@ class ClientConstructor(object):
         attach_stacktrace=False,  # type: bool
         ca_certs=None,  # type: Optional[str]
         propagate_traces=True,  # type: bool
-        traces_sample_rate=None,  # type: Optional[float]
+        traces_sample_rate=0.0,  # type: float
         traces_sampler=None,  # type: Optional[TracesSampler]
         auto_enabling_integrations=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
