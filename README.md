@@ -1,13 +1,14 @@
-<p align="center">
-    <style>
-    @media (prefers-color-scheme: dark) {
-      #sentry-white { display: none; }
-    }
+<style>
+@media (prefers-color-scheme: dark) {
+  #sentry-white { display: none; }
+}
 
-    @media (prefers-color-scheme: bright) {
-      #sentry-black { display: none; }
-    }
-    </style>
+@media (prefers-color-scheme: bright) {
+  #sentry-black { display: none; }
+}
+</style>
+
+<p align="center">
 
     <a href="https://sentry.io" target="_blank" align="center">
         <img src="https://sentry-brand.storage.googleapis.com/sentry-logo-black.png" id="sentry-black" width="280">
