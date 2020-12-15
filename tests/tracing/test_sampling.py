@@ -3,7 +3,8 @@ import random
 import pytest
 
 from sentry_sdk import Hub, start_span, start_transaction
-from sentry_sdk.tracing import Transaction, _is_valid_sample_rate
+from sentry_sdk.tracing import Transaction
+from sentry_sdk.tracing_utils import is_valid_sample_rate
 from sentry_sdk.utils import logger
 
 try:
@@ -56,7 +57,7 @@ def test_no_double_sampling(sentry_init, capture_events):
 )
 def test_accepts_valid_sample_rate(rate):
     with mock.patch.object(logger, "warning", mock.Mock()):
-        result = _is_valid_sample_rate(rate)
+        result = is_valid_sample_rate(rate)
         assert logger.warning.called is False
         assert result is True
 
@@ -77,7 +78,7 @@ def test_accepts_valid_sample_rate(rate):
 )
 def test_warns_on_invalid_sample_rate(rate, StringContaining):  # noqa: N803
     with mock.patch.object(logger, "warning", mock.Mock()):
-        result = _is_valid_sample_rate(rate)
+        result = is_valid_sample_rate(rate)
         logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))
         assert result is False
 

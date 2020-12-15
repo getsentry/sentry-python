@@ -9,7 +9,7 @@ from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
-from sentry_sdk.tracing import record_sql_queries
+from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
