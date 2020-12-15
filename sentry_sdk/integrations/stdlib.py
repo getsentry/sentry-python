@@ -6,7 +6,7 @@ import platform
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.tracing import EnvironHeaders
+from sentry_sdk.tracing_utils import EnvironHeaders
 from sentry_sdk.utils import capture_internal_exceptions, safe_repr
 
 from sentry_sdk._types import MYPY
