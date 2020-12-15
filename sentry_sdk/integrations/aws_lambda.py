@@ -339,11 +339,11 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
 
         if _should_send_default_pii():
             user_info = sentry_event.setdefault("user", {})
-            
+
             identity = aws_event.get("identity")
             if identity is None:
                 identity = {}
-            
+
             id = identity.get("userArn")
             if id is not None:
                 user_info.setdefault("id", id)
@@ -370,11 +370,11 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
 def _get_url(aws_event, aws_context):
     # type: (Any, Any) -> str
     path = aws_event.get("path", None)
-    
+
     headers = aws_event.get("headers")
     if headers is None:
         headers = {}
-        
+
     host = headers.get("Host", None)
     proto = headers.get("X-Forwarded-Proto", None)
     if proto and host and path:
