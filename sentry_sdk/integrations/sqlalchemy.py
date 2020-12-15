@@ -3,7 +3,7 @@ from __future__ import absolute_import
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.tracing import record_sql_queries
+from sentry_sdk.tracing_utils import record_sql_queries
 
 try:
     from sqlalchemy.engine import Engine  # type: ignore
