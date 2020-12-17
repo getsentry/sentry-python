@@ -276,6 +276,54 @@ def test_ignore_errors(sentry_init, capture_events):
     pytest.raises(EventCaptured, lambda: e(ValueError()))
 
 
+def test_with_source_context_enabled(sentry_init, capture_events):
+    sentry_init(with_source_context=True)
+    events = capture_events()
+    try:
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+
+    assert all(
+        frame["pre_context"]
+        for frame in event["exception"]["values"][0]["stacktrace"]["frames"]
+    )
+    assert all(
+        frame["context_line"]
+        for frame in event["exception"]["values"][0]["stacktrace"]["frames"]
+    )
+    assert all(
+        frame["post_context"]
+        for frame in event["exception"]["values"][0]["stacktrace"]["frames"]
+    )
+
+
+def test_with_source_context_disabled(sentry_init, capture_events):
+    sentry_init(with_source_context=False)
+    events = capture_events()
+    try:
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+
+    assert not any(
+        frame["pre_context"]
+        for frame in event["exception"]["values"][0]["stacktrace"]["frames"]
+    )
+    assert not any(
+        frame["context_line"]
+        for frame in event["exception"]["values"][0]["stacktrace"]["frames"]
+    )
+    assert not any(
+        frame["post_context"]
+        for frame in event["exception"]["values"][0]["stacktrace"]["frames"]
+    )
+
+
 def test_with_locals_enabled(sentry_init, capture_events):
     sentry_init(with_locals=True)
     events = capture_events()

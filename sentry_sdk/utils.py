@@ -484,8 +484,8 @@ def filename_for_module(module, abs_path):
         return abs_path
 
 
-def serialize_frame(frame, tb_lineno=None, with_locals=True):
-    # type: (FrameType, Optional[int], bool) -> Dict[str, Any]
+def serialize_frame(frame, tb_lineno=None, with_locals=True, with_source_context=True):
+    # type: (FrameType, Optional[int], bool, bool) -> Dict[str, Any]
     f_code = getattr(frame, "f_code", None)
     if not f_code:
         abs_path = None
@@ -501,7 +501,10 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
     if tb_lineno is None:
         tb_lineno = frame.f_lineno
 
-    pre_context, context_line, post_context = get_source_context(frame, tb_lineno)
+    if with_source_context:
+        pre_context, context_line, post_context = get_source_context(frame, tb_lineno)
+    else:
+        pre_context, context_line, post_context = [[], "", []]
 
     rv = {
         "filename": filename_for_module(module, abs_path) or None,
@@ -519,15 +522,19 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
     return rv
 
 
-def current_stacktrace(with_locals=True):
-    # type: (bool) -> Any
+def current_stacktrace(with_locals=True, with_source_context=True):
+    # type: (bool, bool) -> Any
     __tracebackhide__ = True
     frames = []
 
     f = sys._getframe()  # type: Optional[FrameType]
     while f is not None:
         if not should_hide_frame(f):
-            frames.append(serialize_frame(f, with_locals=with_locals))
+            frames.append(
+                serialize_frame(
+                    f, with_locals=with_locals, with_source_context=with_source_context
+                )
+            )
         f = f.f_back
 
     frames.reverse()
@@ -561,11 +568,18 @@ def single_exception_from_error_tuple(
 
     if client_options is None:
         with_locals = True
+        with_source_context = True
     else:
         with_locals = client_options["with_locals"]
+        with_source_context = client_options["with_source_context"]
 
     frames = [
-        serialize_frame(tb.tb_frame, tb_lineno=tb.tb_lineno, with_locals=with_locals)
+        serialize_frame(
+            tb.tb_frame,
+            tb_lineno=tb.tb_lineno,
+            with_locals=with_locals,
+            with_source_context=with_source_context,
+        )
         for tb in iter_stacks(tb)
     ]
 

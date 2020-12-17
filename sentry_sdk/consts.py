@@ -48,6 +48,7 @@ class ClientConstructor(object):
         self,
         dsn=None,  # type: Optional[str]
         with_locals=True,  # type: bool
+        with_source_context=True,  # type: bool
         max_breadcrumbs=DEFAULT_MAX_BREADCRUMBS,  # type: int
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]

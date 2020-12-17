@@ -171,7 +171,8 @@ class _Client(object):
                     "values": [
                         {
                             "stacktrace": current_stacktrace(
-                                self.options["with_locals"]
+                                self.options["with_locals"],
+                                self.options["with_source_context"],
                             ),
                             "crashed": False,
                             "current": True,
