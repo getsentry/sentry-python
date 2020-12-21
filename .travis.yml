@@ -48,13 +48,6 @@ jobs:
       install: []
       script: make travis-upload-docs
 
-    - name: Linting
-      arch: ppc64le
-      python: "3.9"
-      install:
-        - pip install tox
-      script: tox -e linters
-
     - python: "3.9"
       arch: ppc64le
       dist: bionic
