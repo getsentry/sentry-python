@@ -57,18 +57,6 @@ jobs:
 
     - python: "3.9"
       arch: ppc64le
-      name: Distribution packages
-      install: []
-      script: make travis-upload-dist
-
-    - python: "3.9"
-      arch: ppc64le
-      name: Build documentation
-      install: []
-      script: make travis-upload-docs
-      
-    - python: "3.8"
-      arch: ppc64le
       dist: bionic
 
 before_install:
