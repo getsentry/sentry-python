@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import pytest
 import json
+import warnings
 
 from werkzeug.test import Client
 from django import VERSION as DJANGO_VERSION
@@ -516,6 +517,42 @@ def test_does_not_capture_403(sentry_init, client, capture_events, endpoint):
     assert status.lower() == "403 forbidden"
 
     assert not events
+
+
+def test_render_spans(sentry_init, client, capture_events, render_span_tree):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+    _content, status, _headers = client.get(reverse("template_test"))
+    transaction = events[0]
+    assert(render_span_tree(transaction) == """\
+- op="http.server": description=null
+  - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.__call__"
+    - op="django.middleware": description="django.contrib.auth.middleware.AuthenticationMiddleware.__call__"
+      - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.__call__"
+        - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.__call__"
+          - op="django.middleware": description="tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__"
+            - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
+            - op="django.view": description="template_test"
+              - op="django.render": description="user_name.html"\
+""")
+    events = capture_events()
+    _content, status, _headers = client.get(reverse("template_test2"))
+    transaction = events[0]
+    assert(render_span_tree(transaction) == """\
+- op="http.server": description=null
+  - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.__call__"
+    - op="django.middleware": description="django.contrib.auth.middleware.AuthenticationMiddleware.__call__"
+      - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.__call__"
+        - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.__call__"
+          - op="django.middleware": description="tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__"
+            - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
+            - op="django.view": description="template_test2"
+            - op="django.render": description="user_name.html"\
+""")
 
 
 def test_middleware_spans(sentry_init, client, capture_events, render_span_tree):

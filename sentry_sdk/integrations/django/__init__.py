@@ -373,7 +373,7 @@ def patch_templates():
         if hub.get_integration(DjangoIntegration) is None:
             return real_render(request, template_name, context, *args, **kwargs)
 
-        with hub.start_span(op="render", description=template_name) as span:
+        with hub.start_span(op="django.render", description=template_name) as span:
             span.set_data("context", context)
             return real_render(
                 request,
@@ -389,7 +389,7 @@ def patch_templates():
         if hub.get_integration(DjangoIntegration) is None:
             return real_rendered_content.fget(self)
 
-        with hub.start_span(op="render", description=self.template_name) as span:
+        with hub.start_span(op="django.render", description=self.template_name) as span:
             span.set_data("context", self.context_data)
             return real_rendered_content.fget(self)
 

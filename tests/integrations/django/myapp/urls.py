@@ -45,6 +45,8 @@ urlpatterns = [
     ),
     path("post-echo", views.post_echo, name="post_echo"),
     path("template-exc", views.template_exc, name="template_exc"),
+    path("template-test", views.template_test, name="template_test"),
+    path("template-test2", views.template_test2, name="template_test2"),
     path(
         "permission-denied-exc",
         views.permission_denied_exc,

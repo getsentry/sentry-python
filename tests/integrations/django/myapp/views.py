@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse, HttpResponseNotFound, HttpResponseServerError
 from django.shortcuts import render
+from django.template.response import TemplateResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import ListView
@@ -112,6 +113,16 @@ def handler404(*args, **kwargs):
 @csrf_exempt
 def template_exc(request, *args, **kwargs):
     return render(request, "error.html")
+
+
+@csrf_exempt
+def template_test(request, *args, **kwargs):
+    return render(request, "user_name.html", {"user_age": 20})
+
+
+@csrf_exempt
+def template_test2(request, *args, **kwargs):
+    return TemplateResponse(request, "user_name.html", {"user_age": 25})
 
 
 @csrf_exempt
