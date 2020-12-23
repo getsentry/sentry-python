@@ -2,7 +2,6 @@ from __future__ import absolute_import
 
 import pytest
 import json
-import warnings
 
 from werkzeug.test import Client
 from django import VERSION as DJANGO_VERSION
