@@ -524,34 +524,14 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
         traces_sample_rate=1.0,
     )
 
-    events = capture_events()
-    _content, status, _headers = client.get(reverse("template_test"))
-    transaction = events[0]
-    assert(render_span_tree(transaction) == """\
-- op="http.server": description=null
-  - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.__call__"
-    - op="django.middleware": description="django.contrib.auth.middleware.AuthenticationMiddleware.__call__"
-      - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.__call__"
-        - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.__call__"
-          - op="django.middleware": description="tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__"
-            - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
-            - op="django.view": description="template_test"
-              - op="django.render": description="user_name.html"\
-""")
-    events = capture_events()
-    _content, status, _headers = client.get(reverse("template_test2"))
-    transaction = events[0]
-    assert(render_span_tree(transaction) == """\
-- op="http.server": description=null
-  - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.__call__"
-    - op="django.middleware": description="django.contrib.auth.middleware.AuthenticationMiddleware.__call__"
-      - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.__call__"
-        - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.__call__"
-          - op="django.middleware": description="tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__"
-            - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
-            - op="django.view": description="template_test2"
-            - op="django.render": description="user_name.html"\
-""")
+    for url in (reverse("template_test"), reverse("template_test2")):
+        events = capture_events()
+        _content, status, _headers = client.get(url)
+        transaction = events[0]
+        assert(
+            '- op="django.render": description="user_name.html"'
+            in render_span_tree(transaction)
+        )
 
 
 def test_middleware_spans(sentry_init, client, capture_events, render_span_tree):
