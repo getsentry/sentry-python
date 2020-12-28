@@ -375,13 +375,7 @@ def patch_templates():
 
         with hub.start_span(op="django.render", description=template_name) as span:
             span.set_data("context", context)
-            return real_render(
-                request,
-                template_name,
-                context=None,
-                *args,
-                **kwargs
-            )
+            return real_render(request, template_name, context, *args, **kwargs)
 
     @property
     def rendered_content(self):
