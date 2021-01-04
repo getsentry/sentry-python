@@ -134,7 +134,10 @@ def _wrap_handler(handler):
                     # Starting the thread to raise timeout warning exception
                     timeout_thread.start()
 
-            headers = request_data.get("headers", {})
+            headers = request_data.get("headers")
+            # AWS Service may set an explicit `{headers: None}`, we can't rely on `.get()`'s default.
+            if headers is None:
+                headers = {}
             transaction = Transaction.continue_from_headers(
                 headers, op="serverless.function", name=aws_context.function_name
             )
@@ -337,11 +340,15 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
         if _should_send_default_pii():
             user_info = sentry_event.setdefault("user", {})
 
-            id = aws_event.get("identity", {}).get("userArn")
+            identity = aws_event.get("identity")
+            if identity is None:
+                identity = {}
+
+            id = identity.get("userArn")
             if id is not None:
                 user_info.setdefault("id", id)
 
-            ip = aws_event.get("identity", {}).get("sourceIp")
+            ip = identity.get("sourceIp")
             if ip is not None:
                 user_info.setdefault("ip_address", ip)
 
@@ -363,7 +370,11 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
 def _get_url(aws_event, aws_context):
     # type: (Any, Any) -> str
     path = aws_event.get("path", None)
-    headers = aws_event.get("headers", {})
+
+    headers = aws_event.get("headers")
+    if headers is None:
+        headers = {}
+
     host = headers.get("Host", None)
     proto = headers.get("X-Forwarded-Proto", None)
     if proto and host and path:
