@@ -64,7 +64,7 @@ def get_default_release():
         try:
             release = (
                 subprocess.Popen(
-                    ["git", "rev-parse", "--short", "HEAD"],
+                    ["git", "rev-parse", "HEAD"],
                     stdout=subprocess.PIPE,
                     stderr=null,
                     stdin=null,
