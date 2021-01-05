@@ -19,4 +19,6 @@ jobs:
         with:
           python-version: 3.9
 
-      - run: make ci-upload-dist
+      - run: |
+          pip install virtualenv
+          make ci-upload-dist

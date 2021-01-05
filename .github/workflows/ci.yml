@@ -25,9 +25,9 @@ jobs:
           POSTGRES_PASSWORD: sentry
 
     env:
-      - SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
-      - SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      - SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
+      SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
+      SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
 
     steps:
       - uses: actions/checkout@v2
