@@ -19,6 +19,9 @@ jobs:
         with:
           python-version: 3.9
 
-      - run: |
+      - name: Upload
+        env:
+          ZEUS_API_TOKEN: ${{ secrets.ZEUS_API_TOKEN }}
+        run: |
           pip install virtualenv
           make ci-upload-docs
