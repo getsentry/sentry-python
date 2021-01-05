@@ -48,6 +48,8 @@ jobs:
           make install-zeus-cli
 
       - name: run tests
+        env:
+          ZEUS_API_TOKEN: ${{ secrets.ZEUS_API_TOKEN }}
         run: |
           coverage erase
           ./scripts/runtox.sh '' --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
