@@ -21,8 +21,8 @@ jobs:
 
       postgresql:
         image: postgres
-        options:
-          - POSTGRES_PASSWORD: sentry
+        env:
+          POSTGRES_PASSWORD: sentry
 
     env:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
