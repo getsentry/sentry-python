@@ -49,7 +49,7 @@ jobs:
 
       - name: setup
         env:
-          POSTGRES_HOST: postgres
+          PGHOST: postgres
           PGPASSWORD: sentry
         run: |
           psql -c 'create database travis_ci_test;' -U postgres
