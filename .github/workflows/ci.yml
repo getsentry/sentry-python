@@ -19,7 +19,7 @@ jobs:
       redis-server:
         image: redis
 
-      postgresql:
+      postgres:
         image: postgres
         env:
           POSTGRES_PASSWORD: sentry
@@ -29,6 +29,9 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+        # Maps tcp port 5432 on service container to the host
+        ports:
+          - 5432:5432
 
     env:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
@@ -46,6 +49,7 @@ jobs:
 
       - name: setup
         env:
+          POSTGRES_HOST: postgres
           PGPASSWORD: sentry
         run: |
           psql -c 'create database travis_ci_test;' -U postgres
