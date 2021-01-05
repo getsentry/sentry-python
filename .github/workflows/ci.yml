@@ -59,6 +59,7 @@ jobs:
 
       - name: run tests
         env:
+          CI_PYTHON_VERSION: ${{ matrix.python-version }}
           ZEUS_API_TOKEN: ${{ secrets.ZEUS_API_TOKEN }}
         run: |
           coverage erase
