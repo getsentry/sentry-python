@@ -8,7 +8,61 @@ on:
   pull_request:
 
 jobs:
+  dist:
+    name: distribution packages
+    timeout-minutes: 10
+    runs-on: ubuntu-16.04
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Upload
+        env:
+          ZEUS_API_TOKEN: ${{ secrets.ZEUS_API_TOKEN }}
+        run: |
+          pip install virtualenv
+          make ci-upload-dist
+
+  docs:
+    timeout-minutes: 10
+    name: build documentation
+    runs-on: ubuntu-16.04
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Upload
+        env:
+          ZEUS_API_TOKEN: ${{ secrets.ZEUS_API_TOKEN }}
+        run: |
+          pip install virtualenv
+          make ci-upload-docs
+
+  lint:
+    timeout-minutes: 10
+    runs-on: ubuntu-16.04
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - run: pip install tox
+
+      - run: tox -e linters
+
   test:
+    continue-on-error: true
+    timeout-minutes: 30
     runs-on: ubuntu-18.04
     strategy:
       matrix:
