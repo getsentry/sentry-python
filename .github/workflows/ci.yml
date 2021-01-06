@@ -21,6 +21,10 @@ jobs:
         with:
           python-version: 3.9
 
+      - run: |
+          pip install virtualenv
+          make dist
+
       - uses: actions/upload-artifact@v2
         with:
           name: ${{ github.sha }}
@@ -37,6 +41,11 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           python-version: 3.9
+
+      - run: |
+          pip install virtualenv
+          make apidocs
+          cd docs/_build && zip -r gh-pages ./
 
       - uses: actions/upload-artifact@v2
         with:
