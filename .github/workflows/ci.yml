@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - release/**
+
   pull_request:
 
 jobs:
@@ -20,12 +21,10 @@ jobs:
         with:
           python-version: 3.9
 
-      - name: Upload
-        env:
-          ZEUS_API_TOKEN: ${{ secrets.ZEUS_API_TOKEN }}
-        run: |
-          pip install virtualenv
-          make ci-upload-dist
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ github.sha }}
+          path: dist/*
 
   docs:
     timeout-minutes: 10
@@ -39,12 +38,10 @@ jobs:
         with:
           python-version: 3.9
 
-      - name: Upload
-        env:
-          ZEUS_API_TOKEN: ${{ secrets.ZEUS_API_TOKEN }}
-        run: |
-          pip install virtualenv
-          make ci-upload-docs
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ github.sha }}
+          path: docs/_build/gh-pages.zip
 
   lint:
     timeout-minutes: 10
@@ -56,9 +53,9 @@ jobs:
         with:
           python-version: 3.9
 
-      - run: pip install tox
-
-      - run: tox -e linters
+      - run: |
+          pip install tox
+          tox -e linters
 
   test:
     continue-on-error: true
@@ -66,7 +63,8 @@ jobs:
     runs-on: ubuntu-18.04
     strategy:
       matrix:
-        python-version: ['2.7', 'pypy-2.7', '3.4', '3.5', '3.6', '3.7', '3.8', '3.9']
+        python-version:
+          ["2.7", "pypy-2.7", "3.4", "3.5", "3.6", "3.7", "3.8", "3.9"]
 
     services:
       # Label used to access the service container
@@ -104,9 +102,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-
       - uses: actions/setup-node@v1
-
       - uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
@@ -119,17 +115,13 @@ jobs:
           psql -c 'create database travis_ci_test;' -U postgres
           psql -c 'create database test_travis_ci_test;' -U postgres
           pip install codecov tox
-          make install-zeus-cli
 
       - name: run tests
         env:
           CI_PYTHON_VERSION: ${{ matrix.python-version }}
-          ZEUS_API_TOKEN: ${{ secrets.ZEUS_API_TOKEN }}
         run: |
           coverage erase
           ./scripts/runtox.sh '' --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
           codecov --file coverage.xml
-          [[ -z "$ZEUS_API_TOKEN" ]] || zeus upload -t "application/x-cobertura+xml" coverage.xml
-

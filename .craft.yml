@@ -1,9 +1,10 @@
 ---
-minVersion: '0.5.1'
+minVersion: "0.14.0"
 github:
   owner: getsentry
   repo: sentry-python
-targets: 
+
+targets:
   - name: pypi
   - name: github
   - name: gh-pages
@@ -14,3 +15,8 @@ targets:
 
 changelog: CHANGES.md
 changelogPolicy: simple
+
+statusProvider:
+  name: github
+artifactProvider:
+  name: github
