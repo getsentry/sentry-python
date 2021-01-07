@@ -4,8 +4,15 @@ import json
 import pytest
 import jsonschema
 
-import gevent
-import eventlet
+try:
+    import gevent
+except ImportError:
+    gevent = None
+
+try:
+    import eventlet
+except ImportError:
+    eventlet = None
 
 import sentry_sdk
 from sentry_sdk._compat import reraise, string_types, iteritems
@@ -284,6 +291,9 @@ class EventStreamReader(object):
 )
 def maybe_monkeypatched_threading(request):
     if request.param == "eventlet":
+        if eventlet is None:
+            pytest.skip("no eventlet installed")
+
         try:
             eventlet.monkey_patch()
         except AttributeError as e:
@@ -293,6 +303,8 @@ def maybe_monkeypatched_threading(request):
             else:
                 raise
     elif request.param == "gevent":
+        if gevent is None:
+            pytest.skip("no gevent installed")
         try:
             gevent.monkey.patch_all()
         except Exception as e:
