@@ -14,7 +14,6 @@ if MYPY:
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from typing import Any
     from typing import Dict
-    from werkzeug.datastructures import ImmutableTypeConversionDict
     from werkzeug.datastructures import ImmutableMultiDict
     from werkzeug.datastructures import FileStorage
     from typing import Union
@@ -127,7 +126,7 @@ class FlaskRequestExtractor(RequestExtractor):
         return self.request.environ
 
     def cookies(self):
-        # type: () -> ImmutableTypeConversionDict[Any, Any]
+        # type: () -> Dict[Any, Any]
         return {
             k: v[0] if isinstance(v, list) and len(v) == 1 else v
             for k, v in self.request.cookies.items()
