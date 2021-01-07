@@ -1,0 +1,140 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - master
+      - release/**
+
+  pull_request:
+
+jobs:
+  dist:
+    name: distribution packages
+    timeout-minutes: 10
+    runs-on: ubuntu-16.04
+
+    if: "startsWith(github.ref, 'refs/heads/release/')"
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - run: |
+          pip install virtualenv
+          make dist
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ github.sha }}
+          path: dist/*
+
+  docs:
+    timeout-minutes: 10
+    name: build documentation
+    runs-on: ubuntu-16.04
+
+    if: "startsWith(github.ref, 'refs/heads/release/')"
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - run: |
+          pip install virtualenv
+          make apidocs
+          cd docs/_build && zip -r gh-pages ./
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ github.sha }}
+          path: docs/_build/gh-pages.zip
+
+  lint:
+    timeout-minutes: 10
+    runs-on: ubuntu-16.04
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - run: |
+          pip install tox
+          tox -e linters
+
+  test:
+    continue-on-error: true
+    timeout-minutes: 35
+    runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        python-version:
+          ["2.7", "pypy-2.7", "3.4", "3.5", "3.6", "3.7", "3.8", "3.9"]
+
+    services:
+      # Label used to access the service container
+      redis:
+        # Docker Hub image
+        image: redis
+        # Set health checks to wait until redis has started
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          # Maps port 6379 on service container to the host
+          - 6379:6379
+
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: sentry
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        # Maps tcp port 5432 on service container to the host
+        ports:
+          - 5432:5432
+
+    env:
+      SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
+      SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: setup
+        env:
+          PGHOST: localhost
+          PGPASSWORD: sentry
+        run: |
+          psql -c 'create database travis_ci_test;' -U postgres
+          psql -c 'create database test_travis_ci_test;' -U postgres
+          pip install codecov tox
+
+      - name: run tests
+        env:
+          CI_PYTHON_VERSION: ${{ matrix.python-version }}
+        run: |
+          coverage erase
+          ./scripts/runtox.sh '' --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          coverage combine .coverage*
+          coverage xml -i
+          codecov --file coverage.xml
