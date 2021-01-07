@@ -128,7 +128,7 @@ class FlaskRequestExtractor(RequestExtractor):
 
     def cookies(self):
         # type: () -> ImmutableTypeConversionDict[Any, Any]
-        return self.request.cookies
+        return {k: v[0] if isinstance(v, list) and len(v) == 1 else v for k, v in self.request.cookies.items()}
 
     def raw_data(self):
         # type: () -> bytes
