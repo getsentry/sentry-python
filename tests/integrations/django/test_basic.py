@@ -520,10 +520,14 @@ def test_does_not_capture_403(sentry_init, client, capture_events, endpoint):
 
 def test_render_spans(sentry_init, client, capture_events, render_span_tree):
     sentry_init(
-        integrations=[DjangoIntegration()], traces_sample_rate=1.0,
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
     )
+    views_urls = [reverse("template_test2")]
+    if DJANGO_VERSION >= (1, 7):
+        views_urls.append(reverse("template_test"))
 
-    for url in (reverse("template_test"), reverse("template_test2")):
+    for url in views_urls:
         events = capture_events()
         _content, status, _headers = client.get(url)
         transaction = events[0]
