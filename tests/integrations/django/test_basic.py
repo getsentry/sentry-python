@@ -520,16 +520,15 @@ def test_does_not_capture_403(sentry_init, client, capture_events, endpoint):
 
 def test_render_spans(sentry_init, client, capture_events, render_span_tree):
     sentry_init(
-        integrations=[DjangoIntegration()],
-        traces_sample_rate=1.0,
+        integrations=[DjangoIntegration()], traces_sample_rate=1.0,
     )
 
     for url in (reverse("template_test"), reverse("template_test2")):
         events = capture_events()
         _content, status, _headers = client.get(url)
         transaction = events[0]
-        assert(
-            '- op="django.render": description="user_name.html"'
+        assert (
+            '- op="django.template.render": description="user_name.html"'
             in render_span_tree(transaction)
         )
 

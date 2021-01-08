@@ -1,5 +1,6 @@
 from django.template import TemplateSyntaxError
 
+from sentry_sdk import _functools, Hub
 from sentry_sdk._types import MYPY
 
 if MYPY:
@@ -38,6 +39,43 @@ def get_template_frame_from_exception(exc_value):
             return _get_template_frame_from_source(source)  # type: ignore
 
     return None
+
+
+def patch_templates():
+    # type: () -> None
+    import django.shortcuts
+    from django.template.response import SimpleTemplateResponse
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    real_render = django.shortcuts.render
+    real_rendered_content = SimpleTemplateResponse.rendered_content
+
+    @_functools.wraps(real_render)
+    def render(request, template_name, context=None, *args, **kwargs):
+        hub = Hub.current
+        if hub.get_integration(DjangoIntegration) is None:
+            return real_render(request, template_name, context, *args, **kwargs)
+
+        with hub.start_span(
+            op="django.template.render", description=template_name
+        ) as span:
+            span.set_data("context", context)
+            return real_render(request, template_name, context, *args, **kwargs)
+
+    @property
+    def rendered_content(self):
+        hub = Hub.current
+        if hub.get_integration(DjangoIntegration) is None:
+            return real_rendered_content.fget(self)
+
+        with hub.start_span(
+            op="django.template.render", description=self.template_name
+        ) as span:
+            span.set_data("context", self.context_data)
+            return real_rendered_content.fget(self)
+
+    django.shortcuts.render = render
+    SimpleTemplateResponse.rendered_content = rendered_content
 
 
 def _get_template_frame_from_debug(debug):

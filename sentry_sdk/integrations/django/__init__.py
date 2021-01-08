@@ -5,7 +5,6 @@ import sys
 import threading
 import weakref
 
-from sentry_sdk import _functools
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
@@ -38,7 +37,10 @@ except ImportError:
 
 
 from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
-from sentry_sdk.integrations.django.templates import get_template_frame_from_exception
+from sentry_sdk.integrations.django.templates import (
+    get_template_frame_from_exception,
+    patch_templates,
+)
 from sentry_sdk.integrations.django.middleware import patch_django_middlewares
 from sentry_sdk.integrations.django.views import patch_views
 
@@ -357,38 +359,6 @@ def _patch_get_response():
         from sentry_sdk.integrations.django.asgi import patch_get_response_async
 
         patch_get_response_async(BaseHandler, _before_get_response)
-
-
-def patch_templates():
-    # type: () -> None
-    import django.shortcuts
-    from django.template.response import SimpleTemplateResponse
-
-    real_render = django.shortcuts.render
-    real_rendered_content = SimpleTemplateResponse.rendered_content
-
-    @_functools.wraps(real_render)
-    def render(request, template_name, context=None, *args, **kwargs):
-        hub = Hub.current
-        if hub.get_integration(DjangoIntegration) is None:
-            return real_render(request, template_name, context, *args, **kwargs)
-
-        with hub.start_span(op="django.render", description=template_name) as span:
-            span.set_data("context", context)
-            return real_render(request, template_name, context, *args, **kwargs)
-
-    @property
-    def rendered_content(self):
-        hub = Hub.current
-        if hub.get_integration(DjangoIntegration) is None:
-            return real_rendered_content.fget(self)
-
-        with hub.start_span(op="django.render", description=self.template_name) as span:
-            span.set_data("context", self.context_data)
-            return real_rendered_content.fget(self)
-
-    django.shortcuts.render = render
-    SimpleTemplateResponse.rendered_content = rendered_content
 
 
 def _make_event_processor(weak_request, integration):
