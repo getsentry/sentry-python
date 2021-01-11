@@ -311,7 +311,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         event,  # type: Event
         hint=None,  # type: Optional[Hint]
         scope=None,  # type: Optional[Any]
-        **scope_args  # type: Dict[str, Any]
+        **scope_args  # type: Any
     ):
         # type: (...) -> Optional[str]
         """Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`."""
@@ -329,7 +329,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         message,  # type: str
         level=None,  # type: Optional[str]
         scope=None,  # type: Optional[Any]
-        **scope_args  # type: Dict[str, Any]
+        **scope_args  # type: Any
     ):
         # type: (...) -> Optional[str]
         """Captures a message.  The message is just a string.  If no level
@@ -349,7 +349,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self,
         error=None,  # type: Optional[Union[BaseException, ExcInfo]]
         scope=None,  # type: Optional[Any]
-        **scope_args  # type: Dict[str, Any]
+        **scope_args  # type: Any
     ):
         # type: (...) -> Optional[str]
         """Captures an exception.
