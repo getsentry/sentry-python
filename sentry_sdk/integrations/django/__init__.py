@@ -37,7 +37,10 @@ except ImportError:
 
 
 from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
-from sentry_sdk.integrations.django.templates import get_template_frame_from_exception
+from sentry_sdk.integrations.django.templates import (
+    get_template_frame_from_exception,
+    patch_templates,
+)
 from sentry_sdk.integrations.django.middleware import patch_django_middlewares
 from sentry_sdk.integrations.django.views import patch_views
 
@@ -201,6 +204,7 @@ class DjangoIntegration(Integration):
         _patch_channels()
         patch_django_middlewares()
         patch_views()
+        patch_templates()
 
 
 _DRF_PATCHED = False
