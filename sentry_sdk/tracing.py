@@ -11,6 +11,8 @@ from sentry_sdk.tracing_utils import (
     SENTRY_TRACE_REGEX,
     EnvironHeaders,
     compute_new_tracestate,
+    extract_sentrytrace_data,
+    extract_tracestate_data,
     has_tracing_enabled,
     is_valid_sample_rate,
     maybe_create_breadcrumbs_from_span,
@@ -241,12 +243,13 @@ class Span(object):
                 "Deprecated: use Transaction.continue_from_headers "
                 "instead of Span.continue_from_headers."
             )
-        transaction = Transaction.from_traceparent(
-            headers.get("sentry-trace"), **kwargs
-        )
-        if transaction is None:
-            transaction = Transaction(**kwargs)
+
+        kwargs.update(extract_sentrytrace_data(headers.get("sentry-trace")))
+        kwargs.update(extract_tracestate_data(headers.get("tracestate")))
+
+        transaction = Transaction(**kwargs)
         transaction.same_process_as_parent = False
+
         return transaction
 
     def iter_headers(self):
