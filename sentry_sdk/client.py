@@ -3,6 +3,7 @@ import uuid
 import random
 from datetime import datetime
 import socket
+import json
 
 from sentry_sdk._compat import string_types, text_type, iteritems
 from sentry_sdk.utils import (
@@ -10,6 +11,7 @@ from sentry_sdk.utils import (
     current_stacktrace,
     disable_capture_event,
     format_timestamp,
+    from_base64,
     get_type_name,
     get_default_release,
     handle_in_app,
@@ -328,16 +330,36 @@ class _Client(object):
 
         attachments = hint.get("attachments")
         is_transaction = event_opt.get("type") == "transaction"
+        raw_tracestate = (
+            event_opt.get("contexts", {}).get("trace", {}).pop("tracestate", None)
+        )
 
         if is_transaction or attachments:
             # Transactions or events with attachments should go to the
             # /envelope/ endpoint.
-            envelope = Envelope(
-                headers={
-                    "event_id": event_opt["event_id"],
-                    "sent_at": format_timestamp(datetime.utcnow()),
-                }
-            )
+            headers = {
+                "event_id": event_opt["event_id"],
+                "sent_at": format_timestamp(datetime.utcnow()),
+            }
+
+            if raw_tracestate:
+                # Base64-encoded strings always come out with a length which is a multiple
+                # of 4. In order to achieve this, the end is padded with one or more `=`
+                # signs. Because the tracestate standard calls for using `=` signs between
+                # vendor name and value (`sentry=xxx,dogsaregreat=yyy`), to avoid confusion
+                # we strip the `=` when the data is initially encoded. Python's decoding
+                # function requires they be put back.
+
+                # The final mod 4 is necessary because 4 is represented as 4
+                # rather than 0.
+                missing_equals = (4 - (len(raw_tracestate) % 4)) % 4
+                base64_tracestate = raw_tracestate + "=" * missing_equals
+
+                tracestate_json = from_base64(base64_tracestate)
+
+                headers["trace"] = json.loads(tracestate_json)
+
+            envelope = Envelope(headers=headers)
 
             if is_transaction:
                 envelope.add_transaction(event_opt)
