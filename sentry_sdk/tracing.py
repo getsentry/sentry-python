@@ -211,11 +211,12 @@ class Span(object):
         # type: (...) -> Transaction
         """
         Create a Transaction with the given params, then add in data pulled from
-        the 'sentry-trace' header in the environ (if any) before returning the
-        Transaction.
+        the 'sentry-trace' and 'tracestate' headers from the environ (if any)
+        before returning the Transaction.
 
-        If the 'sentry-trace' header is malformed or missing, just create and
-        return a Transaction instance with the given params.
+        This is different from `continue_from_headers` in that it assumes header
+        names in the form "HTTP_HEADER_NAME" - such as you would get from a wsgi
+        environ - rather than the form "header-name".
         """
         if cls is Span:
             logger.warning(
@@ -232,11 +233,8 @@ class Span(object):
     ):
         # type: (...) -> Transaction
         """
-        Create a Transaction with the given params, then add in data pulled from
-        the 'sentry-trace' header (if any) before returning the Transaction.
-
-        If the 'sentry-trace' header is malformed or missing, just create and
-        return a Transaction instance with the given params.
+        Create a transaction with the given params (including any data pulled from
+        the 'sentry-trace' and 'tracestate' headers).
         """
         if cls is Span:
             logger.warning(
