@@ -419,6 +419,9 @@ class Span(object):
         if self.status:
             rv["status"] = self.status
 
+        if self._containing_transaction:
+            rv["tracestate"] = self._containing_transaction._sentry_tracestate_value
+
         return rv
 
 
