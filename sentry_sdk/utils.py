@@ -1,3 +1,4 @@
+import base64
 import json
 import linecache
 import logging
@@ -956,3 +957,26 @@ class TimeoutThread(threading.Thread):
                 integer_configured_timeout
             )
         )
+
+
+def to_base64(original):
+    # type: (str) -> str
+    """
+    Convert a string to base64, via UTF-8.
+    """
+    utf8_bytes = original.encode("UTF-8")
+    base64_bytes = base64.b64encode(utf8_bytes)
+    base64_string = base64_bytes.decode("UTF-8")
+
+    return base64_string
+
+
+def from_base64(base64_string):
+    # type: (str) -> str
+    """
+    Convert a string from base64, via UTF-8.
+    """
+    base64_bytes = base64_string.encode("UTF-8")
+    utf8_bytes = base64.b64decode(base64_bytes)
+    utf8_string = utf8_bytes.decode("UTF-8")
+    return utf8_string
