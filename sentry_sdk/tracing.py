@@ -10,6 +10,7 @@ from sentry_sdk.utils import logger
 from sentry_sdk.tracing_utils import (
     SENTRY_TRACE_REGEX,
     EnvironHeaders,
+    compute_new_tracestate,
     has_tracing_enabled,
     is_valid_sample_rate,
     maybe_create_breadcrumbs_from_span,
@@ -422,12 +423,22 @@ class Span(object):
 
 
 class Transaction(Span):
-    __slots__ = ("name", "parent_sampled")
+    __slots__ = (
+        "name",
+        "parent_sampled",
+        # base64-encoded json of trace correlation context, missing trailing =
+        # (note: does NOT include the `sentry=`)
+        "_sentry_tracestate_value",
+        # tracestate data from other vendors, of the form `dogs=yes,cats=maybe`
+        "_third_party_tracestate",
+    )
 
     def __init__(
         self,
         name="",  # type: str
         parent_sampled=None,  # type: Optional[bool]
+        sentry_tracestate=None,  # type: Optional[str]
+        third_party_tracestate=None,  # type: Optional[str]
         **kwargs  # type: Any
     ):
         # type: (...) -> None
@@ -443,6 +454,10 @@ class Transaction(Span):
         Span.__init__(self, **kwargs)
         self.name = name
         self.parent_sampled = parent_sampled
+        self._sentry_tracestate_value = sentry_tracestate or compute_new_tracestate(
+            self
+        )
+        self._third_party_tracestate = third_party_tracestate
 
     def __repr__(self):
         # type: () -> str
