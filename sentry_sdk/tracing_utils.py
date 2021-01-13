@@ -9,7 +9,9 @@ import sentry_sdk
 
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    Dsn,
     logger,
+    to_base64,
     to_string,
 )
 from sentry_sdk._compat import PY2
@@ -27,8 +29,9 @@ if MYPY:
     from typing import Optional
     from typing import Any
     from typing import Dict
+    from typing import Union
 
-    from sentry_sdk.tracing import Span
+    from sentry_sdk.tracing import Span, Transaction
 
 
 SENTRY_TRACE_REGEX = re.compile(
@@ -37,6 +40,33 @@ SENTRY_TRACE_REGEX = re.compile(
     "-?([0-9a-f]{16})?"  # span_id
     "-?([01])?"  # sampled
     "[ \t]*$"  # whitespace
+)
+
+# This is a normal base64 regex, modified to reflect that fact that we strip the
+# trailing = or == off
+b64 = base64_stripped = (
+    # any of the characters in the base64 "alphabet", in multiples of 4
+    "([a-zA-Z0-9+/]{4})*"
+    # either nothing or 2 or 3 base64-alphabet characters (see
+    # https://en.wikipedia.org/wiki/Base64#Decoding_Base64_without_padding for
+    # why there's never only 1 extra character)
+    "([a-zA-Z0-9+/]{2,3})?"
+)
+ov = outside_vendor_entry = r"\w+=\w+"
+
+TRACESTATE_HEADER_REGEX = re.compile(
+    # zero or more other vendors' entries, each followed by a comma,
+    # captured together as one group
+    "^((?:{ov},)*)"
+    # sentry's entry, with only the value captured
+    "(?:sentry=({b64}))?"
+    # zero or more other vendors' entries, each preceded by a comma,
+    # captured together as one group
+    "((?:,{ov})*)$".format(ov=ov, b64=b64)
+)
+
+TRACESTATE_SENTRY_VALUE_REGEX = re.compile(
+    "sentry=({b64})^[a-zA-Z0-9+/]?".format(b64=b64)
 )
 
 
@@ -173,6 +203,67 @@ def maybe_create_breadcrumbs_from_span(hub, span):
             message=span.description,
             data=span._data,
         )
+
+
+def extract_sentrytrace_data(header):
+    # type: (Optional[str]) -> typing.Mapping[str, Union[Optional[str], Optional[bool]]]
+
+    """
+    Given a `sentry-trace` header string, return a dictionary of data.
+    """
+    trace_id = parent_span_id = parent_sampled = None
+
+    if header:
+        if header.startswith("00-") and header.endswith("-00"):
+            header = header[3:-3]
+
+        match = SENTRY_TRACE_REGEX.match(header)
+
+        if match:
+            trace_id, parent_span_id, sampled_str = match.groups()
+
+            if trace_id:
+                trace_id = "{:032x}".format(int(trace_id, 16))
+            if parent_span_id:
+                parent_span_id = "{:016x}".format(int(parent_span_id, 16))
+            if sampled_str:
+                parent_sampled = sampled_str != "0"
+
+    return {
+        "trace_id": trace_id,
+        "parent_span_id": parent_span_id,
+        "parent_sampled": parent_sampled,
+    }
+
+
+def extract_tracestate_data(header):
+    # type: (Optional[str]) -> typing.Mapping[str, Optional[str]]
+    """
+    Extracts the sentry tracestate value and any third-party data from the given
+    tracestate header, returning a dictionary of data.
+    """
+    sentry_value = third_party = None
+
+    if header:
+
+        match = TRACESTATE_HEADER_REGEX.match(header)
+
+        if match:
+            before, sentry_value, after = match.groups()
+            if before or after:
+                # filter out empty strings, and make sure there aren't too many
+                # commas between them
+                third_party = ",".join(
+                    [value.strip(",") for value in [before, after] if value != ""]
+                )
+
+        else:
+            # if the header is malformed, at least try to grab sentry's part, if any
+            sentry_value_match = TRACESTATE_SENTRY_VALUE_REGEX.search(header)
+            if sentry_value_match:
+                sentry_value = sentry_value_match.group(1)
+
+    return {"sentry_tracestate": sentry_value, "third_party_tracestate": third_party}
 
 
 def compute_new_tracestate(transaction):
