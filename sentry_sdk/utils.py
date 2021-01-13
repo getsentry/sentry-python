@@ -92,18 +92,6 @@ def get_default_release():
     return None
 
 
-def get_default_environment(
-    release=None,  # type: Optional[str]
-):
-    # type: (...) -> Optional[str]
-    rv = os.environ.get("SENTRY_ENVIRONMENT")
-    if rv:
-        return rv
-    if release is not None:
-        return "production"
-    return None
-
-
 class CaptureInternalException(object):
     __slots__ = ()
 
