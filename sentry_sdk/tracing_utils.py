@@ -1,5 +1,6 @@
 import re
 import contextlib
+import json
 import math
 
 from numbers import Real
@@ -172,6 +173,36 @@ def maybe_create_breadcrumbs_from_span(hub, span):
             message=span.description,
             data=span._data,
         )
+
+
+def compute_new_tracestate(transaction):
+    # type: (Transaction) -> str
+    """
+    Computes a new tracestate value for the transaction.
+    """
+    data = {}
+
+    client = (transaction.hub or sentry_sdk.Hub.current).client
+
+    # if there's no client and/or no DSN, we're not sending anything anywhere,
+    # so it's fine to not have any tracestate data
+    if client and client.options.get("dsn"):
+        options = client.options
+        data = {
+            "trace_id": transaction.trace_id,
+            "environment": options["environment"],
+            "release": options.get("release"),
+            "public_key": Dsn(options["dsn"]).public_key,
+        }
+
+    tracestate_json = json.dumps(data)
+
+    # Base64-encoded strings always come out with a length which is a multiple
+    # of 4. In order to achieve this, the end is padded with one or more `=`
+    # signs. Because the tracestate standard calls for using `=` signs between
+    # vendor name and value (`sentry=xxx,dogsaregreat=yyy`), to avoid confusion
+    # we strip the `=`
+    return to_base64(tracestate_json).rstrip("=")
 
 
 def _format_sql(cursor, sql):
