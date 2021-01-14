@@ -294,6 +294,9 @@ def get_lambda_bootstrap():
     if "bootstrap" in sys.modules:
         return sys.modules["bootstrap"]
     elif "__main__" in sys.modules:
+        if hasattr(sys.modules["__main__"], "bootstrap"):
+            return sys.modules["__main__"].bootstrap
+
         return sys.modules["__main__"]
     else:
         return None
