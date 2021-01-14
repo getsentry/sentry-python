@@ -290,11 +290,15 @@ def get_lambda_bootstrap():
     #     sys.modules['__main__'].__file__ == sys.modules['bootstrap'].__file__
     #     sys.modules['__main__'] is not sys.modules['bootstrap']
     #
+    # On container builds using the `aws-lambda-python-runtime-interface-client`
+    # (awslamdaric) module, bootstrap is located in sys.modules['__main__'].bootstrap
+    #
     # Such a setup would then make all monkeypatches useless.
     if "bootstrap" in sys.modules:
         return sys.modules["bootstrap"]
     elif "__main__" in sys.modules:
         if hasattr(sys.modules["__main__"], "bootstrap"):
+            # awslambdaric python module in container builds
             return sys.modules["__main__"].bootstrap  # type: ignore
         return sys.modules["__main__"]
     else:
