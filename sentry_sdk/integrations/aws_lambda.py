@@ -101,6 +101,8 @@ def _wrap_handler(handler):
         configured_time = aws_context.get_remaining_time_in_millis()
 
         with hub.push_scope() as scope:
+            timeout_thread = None
+
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(
@@ -115,7 +117,6 @@ def _wrap_handler(handler):
                     scope.set_tag("batch_request", True)
                     scope.set_tag("batch_size", batch_size)
 
-                timeout_thread = None
                 # Starting the Timeout thread only if the configured time is greater than Timeout warning
                 # buffer and timeout_warning parameter is set True.
                 if (
@@ -295,7 +296,7 @@ def get_lambda_bootstrap():
         return sys.modules["bootstrap"]
     elif "__main__" in sys.modules:
         if hasattr(sys.modules["__main__"], "bootstrap"):
-            return sys.modules["__main__"].bootstrap
+            return getattr(sys.modules["__main__"], "bootstrap")
 
         return sys.modules["__main__"]
     else:
