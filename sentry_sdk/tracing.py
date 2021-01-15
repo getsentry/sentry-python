@@ -8,7 +8,6 @@ import sentry_sdk
 
 from sentry_sdk.utils import logger
 from sentry_sdk.tracing_utils import (
-    SENTRY_TRACE_REGEX,
     EnvironHeaders,
     compute_new_tracestate,
     extract_sentrytrace_data,
@@ -267,46 +266,21 @@ class Span(object):
     ):
         # type: (...) -> Optional[Transaction]
         """
+        DEPRECATED: Use Transaction.continue_from_headers(headers, **kwargs)
+
         Create a Transaction with the given params, then add in data pulled from
         the given 'sentry-trace' header value before returning the Transaction.
 
-        If the header value is malformed or missing, just create and return a
-        Transaction instance with the given params.
         """
-        if cls is Span:
-            logger.warning(
-                "Deprecated: use Transaction.from_traceparent "
-                "instead of Span.from_traceparent."
-            )
+        logger.warning(
+            "Deprecated: Use Transaction.continue_from_headers(headers, **kwargs) "
+            "instead of from_traceparent(traceparent, **kwargs)"
+        )
 
         if not traceparent:
             return None
 
-        if traceparent.startswith("00-") and traceparent.endswith("-00"):
-            traceparent = traceparent[3:-3]
-
-        match = SENTRY_TRACE_REGEX.match(str(traceparent))
-        if match is None:
-            return None
-
-        trace_id, parent_span_id, sampled_str = match.groups()
-
-        if trace_id is not None:
-            trace_id = "{:032x}".format(int(trace_id, 16))
-        if parent_span_id is not None:
-            parent_span_id = "{:016x}".format(int(parent_span_id, 16))
-
-        if sampled_str:
-            parent_sampled = sampled_str != "0"  # type: Optional[bool]
-        else:
-            parent_sampled = None
-
-        return Transaction(
-            trace_id=trace_id,
-            parent_span_id=parent_span_id,
-            parent_sampled=parent_sampled,
-            **kwargs
-        )
+        return cls.continue_from_headers({"sentry-trace": traceparent}, **kwargs)
 
     def to_traceparent(self):
         # type: () -> str
