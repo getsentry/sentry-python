@@ -255,6 +255,9 @@ class Span(object):
     def iter_headers(self):
         # type: () -> Generator[Tuple[str, str], None, None]
         yield "sentry-trace", self.to_traceparent()
+        tracestate = self.to_tracestate()
+        if tracestate:
+            yield "tracestate", tracestate
 
     @classmethod
     def from_traceparent(
@@ -313,6 +316,22 @@ class Span(object):
         if self.sampled is False:
             sampled = "0"
         return "%s-%s-%s" % (self.trace_id, self.span_id, sampled)
+
+    def to_tracestate(self):
+        # type: () -> Optional[str]
+        transaction = self._containing_transaction
+
+        if not transaction:
+            return None
+
+        # it should never happen that thre's no tracestate value, so this "or"
+        # is just insurance
+        header_value = transaction._sentry_tracestate_value or "{}"
+
+        if transaction._third_party_tracestate:
+            header_value = ",".join([header_value, transaction._third_party_tracestate])
+
+        return header_value
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
@@ -420,8 +439,13 @@ class Span(object):
         if self.status:
             rv["status"] = self.status
 
-        if self._containing_transaction:
-            rv["tracestate"] = self._containing_transaction._sentry_tracestate_value
+        if isinstance(self, Transaction):
+            transaction = self  # type: Optional[Transaction]
+        else:
+            transaction = self._containing_transaction
+
+        if transaction:
+            rv["tracestate"] = transaction._sentry_tracestate_value
 
         return rv
 

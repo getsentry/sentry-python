@@ -697,6 +697,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         yield "sentry-trace", span.to_traceparent()
 
+        tracestate = span.to_tracestate()
+        if tracestate:
+            yield "tracestate", tracestate
+
 
 GLOBAL_HUB = Hub()
 _local.set(GLOBAL_HUB)
