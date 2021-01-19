@@ -293,7 +293,7 @@ def compute_new_tracestate(transaction):
     # signs. Because the tracestate standard calls for using `=` signs between
     # vendor name and value (`sentry=xxx,dogsaregreat=yyy`), to avoid confusion
     # we strip the `=`
-    return to_base64(tracestate_json).rstrip("=")
+    return (to_base64(tracestate_json) or "").rstrip("=")
 
 
 def _format_sql(cursor, sql):

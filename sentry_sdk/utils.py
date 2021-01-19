@@ -960,23 +960,36 @@ class TimeoutThread(threading.Thread):
 
 
 def to_base64(original):
-    # type: (str) -> str
+    # type: (str) -> Optional[str]
     """
-    Convert a string to base64, via UTF-8.
+    Convert a string to base64, via UTF-8. Returns None on invalid input.
     """
-    utf8_bytes = original.encode("UTF-8")
-    base64_bytes = base64.b64encode(utf8_bytes)
-    base64_string = base64_bytes.decode("UTF-8")
+    base64_string = None
+
+    try:
+        utf8_bytes = original.encode("UTF-8")
+        base64_bytes = base64.b64encode(utf8_bytes)
+        base64_string = base64_bytes.decode("UTF-8")
+    except Exception as err:
+        logger.warning("Unable to encode {orig} to base64:".format(orig=original), err)
 
     return base64_string
 
 
 def from_base64(base64_string):
-    # type: (str) -> str
+    # type: (str) -> Optional[str]
     """
-    Convert a string from base64, via UTF-8.
+    Convert a string from base64, via UTF-8. Returns None on invalid input.
     """
-    base64_bytes = base64_string.encode("UTF-8")
-    utf8_bytes = base64.b64decode(base64_bytes)
-    utf8_string = utf8_bytes.decode("UTF-8")
+    utf8_string = None
+
+    try:
+        base64_bytes = base64_string.encode("UTF-8")
+        utf8_bytes = base64.b64decode(base64_bytes, validate=True)
+        utf8_string = utf8_bytes.decode("UTF-8")
+    except Exception as err:
+        logger.warning(
+            "Unable to decode {b64} from base64:".format(b64=base64_string), err
+        )
+
     return utf8_string
