@@ -16,8 +16,13 @@ if MYPY:
     from typing import Any
     from typing import Dict
     from typing import Generator
+    from typing import Tuple
 
     from sentry_sdk._types import SessionStatus
+
+
+def minute_trunc(ts):
+    return ts.replace(second=0, microsecond=0)
 
 
 def is_auto_session_tracking_enabled(hub=None):
@@ -60,6 +65,13 @@ def _make_uuid(
 TERMINAL_SESSION_STATES = ("exited", "abnormal", "crashed")
 
 
+def make_aggregate_envelope(aggregate_states, attrs):
+    rv = {"attrs": attrs, "aggregates": []}
+    for state in aggregate_states.values():
+        rv["aggregates"].append(state)
+    return rv
+
+
 class SessionFlusher(object):
     def __init__(
         self,
@@ -69,17 +81,31 @@ class SessionFlusher(object):
         # type: (...) -> None
         self.flush_func = flush_func
         self.flush_interval = flush_interval
-        self.pending = {}  # type: Dict[str, Any]
+        self.pending_sessions = {}  # type: Dict[str, Any]
+        self.pending_aggregates = {}  # type: Dict[Any, Any]
         self._thread = None  # type: Optional[Thread]
         self._thread_lock = Lock()
+        self._aggregate_lock = Lock()
         self._thread_for_pid = None  # type: Optional[int]
         self._running = True
 
     def flush(self):
         # type: (...) -> None
-        pending = self.pending
-        self.pending = {}
-        self.flush_func(list(pending.values()))
+        pending_sessions = self.pending_sessions
+        self.pending_sessions = {}
+
+        with self._aggregate_lock:
+            pending_aggregates = self.pending_aggregates
+            self.pending_aggregates = {}
+
+        if pending_sessions or pending_aggregates:
+            self.flush_func(
+                list(pending_sessions.values()),
+                [
+                    make_aggregate_envelope(states, attrs)
+                    for (attrs, states) in pending_aggregates.items()
+                ],
+            )
 
     def _ensure_running(self):
         # type: (...) -> None
@@ -93,7 +119,7 @@ class SessionFlusher(object):
                 # type: (...) -> None
                 while self._running:
                     time.sleep(self.flush_interval)
-                    if self.pending and self._running:
+                    if self._running:
                         self.flush()
 
             thread = Thread(target=_thread)
@@ -103,11 +129,35 @@ class SessionFlusher(object):
             self._thread_for_pid = os.getpid()
         return None
 
+    def try_aggregate_session(
+        self, session  # type: Session
+    ):
+        # cannot aggregate sessions with dids or durations
+        if session.did is not None or session.duration is not None:
+            return False
+
+        # For this part we can get away with using the global interpreter lock
+        with self._aggregate_lock:
+            attrs = session.get_json_attrs(with_user_info=False)
+            primary_key = tuple(sorted(attrs.items()))
+            secondary_key = session.rounded_started
+            states = self.pending_aggregates.setdefault(primary_key, {})
+            state = states.setdefault(secondary_key, {})
+
+            if "started" not in state:
+                state["started"] = format_timestamp(session.rounded_started)
+            if session.errors > 0:
+                state["errored"] = state.get("errored", 0) + 1
+            for status in ("exited", "crashed", "abnormal"):
+                if session.status == status:
+                    state[status] = state.get(status, 0) + 1
+
     def add_session(
         self, session  # type: Session
     ):
         # type: (...) -> None
-        self.pending[session.sid.hex] = session.to_json()
+        if not self.try_aggregate_session(session):
+            self.pending_sessions[session.sid.hex] = session.to_json()
         self._ensure_running()
 
     def kill(self):
@@ -164,6 +214,10 @@ class Session(object):
             errors=errors,
             user=user,
         )
+
+    @property
+    def truncated_started(self):
+        return minute_trunc(self.started)
 
     def update(
         self,
@@ -222,6 +276,20 @@ class Session(object):
         if status is not None:
             self.update(status=status)
 
+    def get_json_attrs(self, with_user_info=True):
+        # type: (...) -> Any
+        attrs = {}
+        if self.release is not None:
+            attrs["release"] = self.release
+        if self.environment is not None:
+            attrs["environment"] = self.environment
+        if with_user_info:
+            if self.ip_address is not None:
+                attrs["ip_address"] = self.ip_address
+            if self.user_agent is not None:
+                attrs["user_agent"] = self.user_agent
+        return attrs
+
     def to_json(self):
         # type: (...) -> Any
         rv = {
@@ -237,16 +305,7 @@ class Session(object):
             rv["did"] = self.did
         if self.duration is not None:
             rv["duration"] = self.duration
-
-        attrs = {}
-        if self.release is not None:
-            attrs["release"] = self.release
-        if self.environment is not None:
-            attrs["environment"] = self.environment
-        if self.ip_address is not None:
-            attrs["ip_address"] = self.ip_address
-        if self.user_agent is not None:
-            attrs["user_agent"] = self.user_agent
+        attrs = self.get_json_attrs()
         if attrs:
             rv["attrs"] = attrs
         return rv
