@@ -357,7 +357,15 @@ class _Client(object):
 
                 tracestate_json = from_base64(base64_tracestate)
 
-                headers["trace"] = json.loads(tracestate_json)
+                try:
+                    assert tracestate_json is not None
+                    headers["trace"] = json.loads(tracestate_json)
+                except Exception as err:
+                    logger.warning(
+                        "Unable to attach tracestate data to envelope header: {err}\nTracestate value is {base64_tracestate}".format(
+                            err=err, base64_tracestate=base64_tracestate
+                        ),
+                    )
 
             envelope = Envelope(headers=headers)
 
