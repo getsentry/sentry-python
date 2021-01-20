@@ -5,6 +5,7 @@ from datetime import datetime
 from threading import Thread, Lock
 from contextlib import contextmanager
 
+import sentry_sdk
 from sentry_sdk._types import MYPY
 from sentry_sdk.utils import format_timestamp
 
@@ -15,6 +16,7 @@ if MYPY:
     from typing import Union
     from typing import Any
     from typing import Dict
+    from typing import List
     from typing import Generator
     from typing import Tuple
 
@@ -63,10 +65,11 @@ def _make_uuid(
 
 
 TERMINAL_SESSION_STATES = ("exited", "abnormal", "crashed")
+MAX_ENVELOPE_ITEMS = 100
 
 
 def make_aggregate_envelope(aggregate_states, attrs):
-    rv = {"attrs": attrs, "aggregates": []}
+    rv = {"attrs": dict(attrs), "aggregates": []}
     for state in aggregate_states.values():
         rv["aggregates"].append(state)
     return rv
@@ -75,13 +78,13 @@ def make_aggregate_envelope(aggregate_states, attrs):
 class SessionFlusher(object):
     def __init__(
         self,
-        flush_func,  # type: Any
-        flush_interval=10,  # type: int
+        capture_func,  # type: (Envelope) -> None
+        flush_interval=60,  # type: int
     ):
         # type: (...) -> None
-        self.flush_func = flush_func
+        self.capture_func = capture_func
         self.flush_interval = flush_interval
-        self.pending_sessions = {}  # type: Dict[str, Any]
+        self.pending_sessions = []  # type: List[Any]
         self.pending_aggregates = {}  # type: Dict[Any, Any]
         self._thread = None  # type: Optional[Thread]
         self._thread_lock = Lock()
@@ -92,20 +95,32 @@ class SessionFlusher(object):
     def flush(self):
         # type: (...) -> None
         pending_sessions = self.pending_sessions
-        self.pending_sessions = {}
+        self.pending_sessions = []
 
         with self._aggregate_lock:
             pending_aggregates = self.pending_aggregates
             self.pending_aggregates = {}
 
-        if pending_sessions or pending_aggregates:
-            self.flush_func(
-                list(pending_sessions.values()),
-                [
-                    make_aggregate_envelope(states, attrs)
-                    for (attrs, states) in pending_aggregates.items()
-                ],
-            )
+        # NOTE: use absolute import here to avoid circular imports
+        Envelope = sentry_sdk.envelope.Envelope
+
+        envelope = Envelope()
+        for session in pending_sessions:
+            if len(envelope.items) == MAX_ENVELOPE_ITEMS:
+                self.capture_func(envelope)
+                envelope = Envelope()
+
+            envelope.add_session(session)
+
+        for (attrs, states) in pending_aggregates.items():
+            if len(envelope.items) == MAX_ENVELOPE_ITEMS:
+                self.capture_func(envelope)
+                envelope = Envelope()
+
+            envelope.add_sessions(make_aggregate_envelope(states, attrs))
+
+        if len(envelope.items) > 0:
+            self.capture_func(envelope)
 
     def _ensure_running(self):
         # type: (...) -> None
@@ -132,32 +147,35 @@ class SessionFlusher(object):
     def try_aggregate_session(
         self, session  # type: Session
     ):
-        # cannot aggregate sessions with dids or durations
-        if session.did is not None or session.duration is not None:
+        # cannot aggregate sessions with durations
+        if session.duration is not None:
             return False
 
         # For this part we can get away with using the global interpreter lock
         with self._aggregate_lock:
             attrs = session.get_json_attrs(with_user_info=False)
             primary_key = tuple(sorted(attrs.items()))
-            secondary_key = session.rounded_started
+            secondary_key = (session.truncated_started, session.did)
             states = self.pending_aggregates.setdefault(primary_key, {})
             state = states.setdefault(secondary_key, {})
 
             if "started" not in state:
-                state["started"] = format_timestamp(session.rounded_started)
+                state["started"] = format_timestamp(session.truncated_started)
+            if session.did is not None:
+                state["did"] = session.did
             if session.errors > 0:
                 state["errored"] = state.get("errored", 0) + 1
             for status in ("exited", "crashed", "abnormal"):
                 if session.status == status:
                     state[status] = state.get(status, 0) + 1
+        return True
 
     def add_session(
         self, session  # type: Session
     ):
         # type: (...) -> None
         if not self.try_aggregate_session(session):
-            self.pending_sessions[session.sid.hex] = session.to_json()
+            self.pending_sessions.append(session.to_json())
         self._ensure_running()
 
     def kill(self):

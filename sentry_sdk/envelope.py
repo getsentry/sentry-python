@@ -62,6 +62,12 @@ class Envelope(object):
             session = session.to_json()
         self.add_item(Item(payload=PayloadRef(json=session), type="session"))
 
+    def add_sessions(
+        self, sessions  # type: Any
+    ):
+        # type: (...) -> None
+        self.add_item(Item(payload=PayloadRef(json=sessions), type="sessions"))
+
     def add_item(
         self, item  # type: Item
     ):

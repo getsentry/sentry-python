@@ -100,24 +100,14 @@ class _Client(object):
         # type: () -> None
         old_debug = _client_init_debug.get(False)
 
-        def _send_sessions(sessions):
-            # type: (List[Any]) -> None
-            transport = self.transport
-            if not transport or not sessions:
-                return
-            sessions_iter = iter(sessions)
-            while True:
-                envelope = Envelope()
-                for session in islice(sessions_iter, 100):
-                    envelope.add_session(session)
-                if not envelope.items:
-                    break
-                transport.capture_envelope(envelope)
+        def _capture_envelope(envelope):
+            if self.transport is not None:
+                self.transport.capture_envelope(envelope)
 
         try:
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
-            self.session_flusher = SessionFlusher(flush_func=_send_sessions)
+            self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
             request_bodies = ("always", "never", "small", "medium")
             if self.options["request_bodies"] not in request_bodies:
