@@ -44,7 +44,7 @@ SENTRY_TRACE_REGEX = re.compile(
 
 # This is a normal base64 regex, modified to reflect that fact that we strip the
 # trailing = or == off
-b64 = base64_stripped = (
+base64_stripped = (
     # any of the characters in the base64 "alphabet", in multiples of 4
     "([a-zA-Z0-9+/]{4})*"
     # either nothing or 2 or 3 base64-alphabet characters (see
@@ -52,21 +52,26 @@ b64 = base64_stripped = (
     # why there's never only 1 extra character)
     "([a-zA-Z0-9+/]{2,3})?"
 )
-ov = outside_vendor_entry = r"\w+=\w+"
 
-TRACESTATE_HEADER_REGEX = re.compile(
-    # zero or more other vendors' entries, each followed by a comma,
-    # captured together as one group
-    "^((?:{ov},)*)"
-    # sentry's entry, with only the value captured
-    "(?:sentry=({b64}))?"
-    # zero or more other vendors' entries, each preceded by a comma,
-    # captured together as one group
-    "((?:,{ov})*)$".format(ov=ov, b64=b64)
+# comma-delimited list of entries of the form `xxx=yyy`
+tracestate_entry = "[^=]+=[^=]+"
+TRACESTATE_ENTRIES_REGEX = re.compile(
+    # one or more xxxxx=yyyy entries
+    "^({te})+"
+    # each entry except the last must be followed by a comma
+    "(,|$)".format(te=tracestate_entry)
 )
 
-TRACESTATE_SENTRY_VALUE_REGEX = re.compile(
-    "sentry=({b64})^[a-zA-Z0-9+/]?".format(b64=b64)
+# this doesn't check that the value is valid, just that there's something there
+# of the form `sentry=xxxx`
+SENTRY_TRACESTATE_ENTRY_REGEX = re.compile(
+    # either sentry is the first entry or there's stuff immediately before it,
+    # ending in a commma (this prevents matching something like `coolsentry=xxx`)
+    "(?:^|.+,)"
+    # sentry's part
+    "(sentry=[^,]*)"
+    # either there's another vendor's entry or we end
+    "(?:,|$)"
 )
 
 
@@ -243,25 +248,31 @@ def extract_tracestate_data(header):
     tracestate header, returning a dictionary of data.
     """
     sentry_value = third_party = None
+    before = after = ""
 
     if header:
+        # find sentry's entry, if any
+        sentry_match = SENTRY_TRACESTATE_ENTRY_REGEX.search(header)
 
-        match = TRACESTATE_HEADER_REGEX.match(header)
+        if sentry_match:
+            sentry_entry = sentry_match.group(1)
 
-        if match:
-            before, sentry_value, after = match.groups()
-            if before or after:
-                # filter out empty strings, and make sure there aren't too many
-                # commas between them
-                third_party = ",".join(
-                    [value.strip(",") for value in [before, after] if value != ""]
-                )
+            # we have to strip them after the split so we don't end up with
+            # `xxx=yyy,,zzz=qqq` (double commas) when we put them back together
+            before, after = map(lambda s: s.strip(","), header.split(sentry_entry))
 
+            # extract sentry's value from its entry and test to make sure it's
+            # valid; if it isn't, discard it so that a new one will be created
+            sentry_value = sentry_entry.replace("sentry=", "")
+            if not re.search("^{b64}$".format(b64=base64_stripped), sentry_value):
+                sentry_value = None
         else:
-            # if the header is malformed, at least try to grab sentry's part, if any
-            sentry_value_match = TRACESTATE_SENTRY_VALUE_REGEX.search(header)
-            if sentry_value_match:
-                sentry_value = sentry_value_match.group(1)
+            after = header
+
+        # if either part is invalid or empty, remove it before gluing them together
+        third_party = (
+            ",".join(filter(TRACESTATE_ENTRIES_REGEX.search, [before, after])) or None
+        )
 
     return {"sentry_tracestate": sentry_value, "third_party_tracestate": third_party}
 
