@@ -293,14 +293,18 @@ class Span(object):
 
     def to_tracestate(self):
         # type: () -> Optional[str]
-        transaction = self._containing_transaction
+        if isinstance(self, Transaction):
+            transaction = self
+        else:
+            transaction = self._containing_transaction
 
         if not transaction:
             return None
 
         # it should never happen that thre's no tracestate value, so this "or"
-        # is just insurance
-        header_value = transaction._sentry_tracestate_value or "{}"
+        # is just insurance ("e30" is the base64-encoded version of "{}", a
+        # jsonified empty dictionary)
+        header_value = "sentry=" + (transaction._sentry_tracestate_value or "e30")
 
         if transaction._third_party_tracestate:
             header_value = ",".join([header_value, transaction._third_party_tracestate])
