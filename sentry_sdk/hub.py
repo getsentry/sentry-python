@@ -640,7 +640,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         client, scope = self._stack[-1]
         session = scope._session
         self.scope._session = None
-        
+
         if session is not None:
             session.close()
             if client is not None:

@@ -3,10 +3,12 @@ import sentry_sdk
 from sentry_sdk import Hub
 from sentry_sdk.sessions import auto_session_tracking
 
+
 def sorted_aggregates(item):
     aggregates = item["aggregates"]
     aggregates.sort(key=lambda item: (item["started"], item.get("did", "")))
     return aggregates
+
 
 def test_basic(sentry_init, capture_envelopes):
     sentry_init(release="fun-release", environment="not-fun-env")
@@ -44,10 +46,13 @@ def test_basic(sentry_init, capture_envelopes):
 
 
 def test_aggregates(sentry_init, capture_envelopes):
-    sentry_init(release="fun-release", environment="not-fun-env",
+    sentry_init(
+        release="fun-release",
+        environment="not-fun-env",
         _experiments=dict(
             auto_session_tracking=True,
-        ),)
+        ),
+    )
     envelopes = capture_envelopes()
 
     hub = Hub.current
@@ -60,10 +65,10 @@ def test_aggregates(sentry_init, capture_envelopes):
                     raise Exception("all is wrong")
             except Exception:
                 sentry_sdk.capture_exception()
-    
+
     with auto_session_tracking():
         pass
-    
+
     hub.start_session()
     hub.end_session()
 
