@@ -31,7 +31,7 @@ if MYPY:
     from typing import Dict
     from typing import Union
 
-    from sentry_sdk.tracing import Span, Transaction
+    from sentry_sdk.tracing import Span
 
 
 SENTRY_TRACE_REGEX = re.compile(
@@ -277,25 +277,11 @@ def extract_tracestate_data(header):
     return {"sentry_tracestate": sentry_value, "third_party_tracestate": third_party}
 
 
-def compute_new_tracestate(transaction):
-    # type: (Transaction) -> str
+def compute_tracestate_from_data(data):
+    # type: (typing.Mapping[str, str]) -> str
     """
-    Computes a new tracestate value for the transaction.
+    Computes a new tracestate value using the given data.
     """
-    data = {}
-
-    client = (transaction.hub or sentry_sdk.Hub.current).client
-
-    # if there's no client and/or no DSN, we're not sending anything anywhere,
-    # so it's fine to not have any tracestate data
-    if client and client.options.get("dsn"):
-        options = client.options
-        data = {
-            "trace_id": transaction.trace_id,
-            "environment": options["environment"],
-            "release": options.get("release"),
-            "public_key": Dsn(options["dsn"]).public_key,
-        }
 
     tracestate_json = json.dumps(data)
 
@@ -305,6 +291,30 @@ def compute_new_tracestate(transaction):
     # vendor name and value (`sentry=xxx,dogsaregreat=yyy`), to avoid confusion
     # we strip the `=`
     return (to_base64(tracestate_json) or "").rstrip("=")
+
+
+def compute_tracestate(span):
+    # type: (Span) -> str
+    """
+    Computes a new tracestate value for the span.
+    """
+    data = {}
+
+    client = (span.hub or sentry_sdk.Hub.current).client
+
+    # if there's no client and/or no DSN, we're not sending anything anywhere,
+    # so it's fine to not have any tracestate data
+    if client and client.options.get("dsn"):
+        options = client.options
+        data = {
+            "trace_id": span.trace_id,
+            "environment": options["environment"],
+            "release": options.get("release"),
+            "public_key": Dsn(options["dsn"]).public_key,
+        }
+
+    return compute_tracestate_from_data(data)
+
 
 
 def _format_sql(cursor, sql):
