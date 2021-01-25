@@ -9,7 +9,7 @@ import sentry_sdk
 from sentry_sdk.utils import logger
 from sentry_sdk.tracing_utils import (
     EnvironHeaders,
-    compute_new_tracestate,
+    compute_tracestate,
     extract_sentrytrace_data,
     extract_tracestate_data,
     has_tracing_enabled,
@@ -460,9 +460,7 @@ class Transaction(Span):
         Span.__init__(self, **kwargs)
         self.name = name
         self.parent_sampled = parent_sampled
-        self._sentry_tracestate_value = sentry_tracestate or compute_new_tracestate(
-            self
-        )
+        self._sentry_tracestate_value = sentry_tracestate or compute_tracestate(self)
         self._third_party_tracestate = third_party_tracestate
 
     def __repr__(self):
