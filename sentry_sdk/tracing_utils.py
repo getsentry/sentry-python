@@ -71,8 +71,8 @@ SENTRY_TRACESTATE_ENTRY_REGEX = re.compile(
     "(?:^|.+,)"
     # sentry's part
     "(sentry=[^,]*)"
-    # either there's another vendor's entry or we end
-    "(?:,|$)"
+    # either there's a comma and another vendor's entry or we end
+    "(?:,.+|$)"
 )
 
 
@@ -212,8 +212,7 @@ def maybe_create_breadcrumbs_from_span(hub, span):
 
 
 def extract_sentrytrace_data(header):
-    # type: (Optional[str]) -> typing.Mapping[str, Union[Optional[str], Optional[bool]]]
-
+    # type: (Optional[str]) -> typing.Mapping[str, Union[str, bool, None]]
     """
     Given a `sentry-trace` header string, return a dictionary of data.
     """

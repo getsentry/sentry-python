@@ -329,13 +329,18 @@ class _Client(object):
 
         attachments = hint.get("attachments")
         is_transaction = event_opt.get("type") == "transaction"
+
+        # this is outside of the `if` immediately below because even if we don't
+        # use the value, we want to make sure we remove it before the event is
+        # sent (which the `.pop()` does)
         raw_tracestate = (
             event_opt.get("contexts", {}).get("trace", {}).pop("tracestate", None)
         )
 
+        # Transactions or events with attachments should go to the /envelope/
+        # endpoint.
         if is_transaction or attachments:
-            # Transactions or events with attachments should go to the
-            # /envelope/ endpoint.
+
             headers = {
                 "event_id": event_opt["event_id"],
                 "sent_at": format_timestamp(datetime.utcnow()),

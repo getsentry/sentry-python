@@ -684,7 +684,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def iter_trace_propagation_headers(self):
         # type: () -> Generator[Tuple[str, str], None, None]
-        # TODO: Document
+        """
+        Returns a generator for the headers to attach to outgoing requests when
+        tracing.
+        """
         client, scope = self._stack[-1]
         span = scope.span
 
@@ -695,11 +698,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if not propagate_traces:
             return
 
-        yield "sentry-trace", span.to_traceparent()
-
-        tracestate = span.to_tracestate()
-        if tracestate:
-            yield "tracestate", tracestate
+        for header in span.iter_headers():
+            yield header
 
 
 GLOBAL_HUB = Hub()

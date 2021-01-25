@@ -46,13 +46,12 @@ def test_basic(sentry_init, capture_events, sample_rate):
         assert not events
 
 
-@pytest.mark.only
 @pytest.mark.parametrize("sampled", [True, False, None])
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
 def test_continue_from_headers(sentry_init, capture_events, sampled, sample_rate):
     """
-    Ensure sampling decision is actually passed along via headers, and that they
-    are read correctly.
+    Ensure data is actually passed along via headers, and that they are read
+    correctly.
     """
     sentry_init(traces_sample_rate=sample_rate)
     events = capture_events()

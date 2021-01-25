@@ -11,7 +11,6 @@ from sentry_sdk.tracing_utils import (
 )
 from sentry_sdk.utils import from_base64, to_base64
 
-# from sentry_sdk import Hub, Client
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -44,11 +43,6 @@ def test_tracestate_computation(sentry_init):
         "release": "off.leash.park",
         "public_key": "dogsarebadatkeepingsecrets",
     }
-
-    # assert reinflated_trace_data["trace_id"] == "12312012123120121231201212312012"
-    # assert reinflated_trace_data["environment"] == "dogpark"
-    # assert reinflated_trace_data["release"] == "off.leash.park"
-    # assert reinflated_trace_data["public_key"] == "dogsarebadatkeepingsecrets"
 
 
 def test_adds_new_tracestate_to_transaction_when_none_given(sentry_init):
@@ -198,7 +192,6 @@ def test_tracestate_extraction(
 
 
 def test_iter_headers(sentry_init, monkeypatch):
-
     monkeypatch.setattr(
         Transaction,
         "to_traceparent",
