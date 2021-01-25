@@ -178,15 +178,15 @@ def test_iter_stacktraces():
         # ascii only
         ("Dogs are great!", "RG9ncyBhcmUgZ3JlYXQh"),
         # emoji
-        ("🐶", "8J+Qtg=="),
+        (u"🐶", "8J+Qtg=="),
         # non-ascii
         (
-            "Καλό κορίτσι, Μάιζεϊ!",
+            u"Καλό κορίτσι, Μάιζεϊ!",
             "zprOsc67z4wgzrrOv8+Bzq/PhM+DzrksIM6czqzOuc62zrXPiiE=",
         ),
         # mix of ascii and non-ascii
         (
-            "Of margir hundar! Ég geri ráð fyrir að ég þurfi stærra rúm.",
+            u"Of margir hundar! Ég geri ráð fyrir að ég þurfi stærra rúm.",
             "T2YgbWFyZ2lyIGh1bmRhciEgw4lnIGdlcmkgcsOhw7AgZnlyaXIgYcOwIMOpZyDDvnVyZmkgc3TDpnJyYSByw7ptLg==",
         ),
     ],
@@ -219,7 +219,7 @@ def test_failed_base64_conversion(input):
     # input which isn't a valid base64 string
     assert from_base64(input) is None
 
-    # any string can be converted to base64, so it should only fail if given the
-    # wrong type
+    # any string can be converted to base64, so only type errors will cause
+    # failures
     if type(input) not in string_types:
         assert to_base64(input) is None
