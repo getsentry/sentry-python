@@ -6,6 +6,7 @@ import os
 import sys
 import threading
 import subprocess
+import re
 
 from datetime import datetime
 
@@ -40,6 +41,7 @@ logger = logging.getLogger("sentry_sdk.errors")
 
 MAX_STRING_LENGTH = 512
 MAX_FORMAT_PARAM_LENGTH = 128
+BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
 
 def json_dumps(data):
@@ -984,8 +986,11 @@ def from_base64(base64_string):
     utf8_string = None
 
     try:
+        only_valid_chars = BASE64_ALPHABET.match(base64_string)
+        assert only_valid_chars
+
         base64_bytes = base64_string.encode("UTF-8")
-        utf8_bytes = base64.b64decode(base64_bytes, validate=True)
+        utf8_bytes = base64.b64decode(base64_bytes)
         utf8_string = utf8_bytes.decode("UTF-8")
     except Exception as err:
         logger.warning(
