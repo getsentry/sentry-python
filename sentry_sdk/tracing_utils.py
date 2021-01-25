@@ -13,6 +13,7 @@ from sentry_sdk.utils import (
     logger,
     to_base64,
     to_string,
+    from_base64,
 )
 from sentry_sdk._compat import PY2
 from sentry_sdk._types import MYPY
@@ -315,6 +316,39 @@ def compute_tracestate(span):
 
     return compute_tracestate_from_data(data)
 
+
+def reinflate_tracestate(encoded_tracestate):
+    # type: (str) -> typing.Optional[Mapping[str, str]]
+    """
+    Given a sentry tracestate value in its encoded form, translate it back into
+    a dictionary of data.
+    """
+    inflated_tracestate = None
+
+    if encoded_tracestate:
+        # Base64-encoded strings always come out with a length which is a
+        # multiple of 4. In order to achieve this, the end is padded with one or
+        # more `=` signs. Because the tracestate standard calls for using `=`
+        # signs between vendor name and value (`sentry=xxx,dogsaregreat=yyy`),
+        # to avoid confusion we strip the `=` when the data is initially
+        # encoded. Python's decoding function requires they be put back.
+        # Fortunately, it doesn't complain if there are too many, so we just
+        # attach two `=` on spec (there will never be more than 2, see
+        # https://en.wikipedia.org/wiki/Base64#Decoding_Base64_without_padding).
+        tracestate_json = from_base64(encoded_tracestate + "==")
+
+        try:
+            assert tracestate_json is not None
+            inflated_tracestate = json.loads(tracestate_json)
+        except Exception as err:
+            logger.warning(
+                (
+                    "Unable to attach tracestate data to envelope header: {err}"
+                    + "\nTracestate value is {encoded_tracestate}"
+                ).format(err=err, encoded_tracestate=encoded_tracestate),
+            )
+
+    return inflated_tracestate
 
 
 def _format_sql(cursor, sql):
