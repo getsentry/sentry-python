@@ -3,7 +3,6 @@ import uuid
 import random
 from datetime import datetime
 import socket
-import json
 
 from sentry_sdk._compat import string_types, text_type, iteritems
 from sentry_sdk.utils import (
@@ -11,7 +10,6 @@ from sentry_sdk.utils import (
     current_stacktrace,
     disable_capture_event,
     format_timestamp,
-    from_base64,
     get_type_name,
     get_default_release,
     handle_in_app,
@@ -24,6 +22,7 @@ from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
+from sentry_sdk.tracing_utils import reinflate_tracestate
 
 from sentry_sdk._types import MYPY
 
@@ -342,30 +341,9 @@ class _Client(object):
                 "sent_at": format_timestamp(datetime.utcnow()),
             }
 
-            if raw_tracestate:
-                # Base64-encoded strings always come out with a length which is a multiple
-                # of 4. In order to achieve this, the end is padded with one or more `=`
-                # signs. Because the tracestate standard calls for using `=` signs between
-                # vendor name and value (`sentry=xxx,dogsaregreat=yyy`), to avoid confusion
-                # we strip the `=` when the data is initially encoded. Python's decoding
-                # function requires they be put back.
-
-                # The final mod 4 is necessary because 4 is represented as 4
-                # rather than 0.
-                missing_equals = (4 - (len(raw_tracestate) % 4)) % 4
-                base64_tracestate = raw_tracestate + "=" * missing_equals
-
-                tracestate_json = from_base64(base64_tracestate)
-
-                try:
-                    assert tracestate_json is not None
-                    headers["trace"] = json.loads(tracestate_json)
-                except Exception as err:
-                    logger.warning(
-                        "Unable to attach tracestate data to envelope header: {err}\nTracestate value is {base64_tracestate}".format(
-                            err=err, base64_tracestate=base64_tracestate
-                        ),
-                    )
+            tracestate_data = reinflate_tracestate(raw_tracestate)
+            if tracestate_data:
+                headers["trace"] = tracestate_data
 
             envelope = Envelope(headers=headers)
 
