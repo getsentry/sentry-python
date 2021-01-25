@@ -293,21 +293,29 @@ class Span(object):
 
     def to_tracestate(self):
         # type: () -> Optional[str]
+        """
+        Generates the `tracestate` header value to attach to outgoing requests.
+        """
+        header_value = None
+
         if isinstance(self, Transaction):
-            transaction = self
+            transaction = self  # type: Optional[Transaction]
         else:
             transaction = self._containing_transaction
 
-        if not transaction:
-            return None
+        # we should have the relevant values stored on the transaction, but if
+        # this is an orphan span, make a new value
+        if transaction and transaction._sentry_tracestate_value:
+            sentry_tracestate = transaction._sentry_tracestate_value
+            third_party_tracestate = transaction._third_party_tracestate
+        else:
+            sentry_tracestate = compute_tracestate(self)
+            third_party_tracestate = None
 
-        # it should never happen that thre's no tracestate value, so this "or"
-        # is just insurance ("e30" is the base64-encoded version of "{}", a
-        # jsonified empty dictionary)
-        header_value = "sentry=" + (transaction._sentry_tracestate_value or "e30")
+        header_value = "sentry=" + sentry_tracestate
 
-        if transaction._third_party_tracestate:
-            header_value = ",".join([header_value, transaction._third_party_tracestate])
+        if third_party_tracestate:
+            header_value = header_value + "," + third_party_tracestate
 
         return header_value
 
