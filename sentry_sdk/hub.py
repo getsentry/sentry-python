@@ -8,7 +8,7 @@ from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
 from sentry_sdk.tracing import Span, Transaction
-from sentry_sdk.sessions import Session
+from sentry_sdk.session import Session
 from sentry_sdk.utils import (
     exc_info_from_error,
     event_from_exception,

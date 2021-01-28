@@ -4,7 +4,7 @@ import mimetypes
 
 from sentry_sdk._compat import text_type
 from sentry_sdk._types import MYPY
-from sentry_sdk.sessions import Session
+from sentry_sdk.session import Session
 from sentry_sdk.utils import json_dumps, capture_internal_exceptions
 
 if MYPY:

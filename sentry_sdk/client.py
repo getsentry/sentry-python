@@ -33,7 +33,7 @@ if MYPY:
 
     from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
-    from sentry_sdk.sessions import Session
+    from sentry_sdk.session import Session
 
 
 _client_init_debug = ContextVar("client_init_debug")
@@ -98,6 +98,7 @@ class _Client(object):
         old_debug = _client_init_debug.get(False)
 
         def _capture_envelope(envelope):
+            # type: (Envelope) -> None
             if self.transport is not None:
                 self.transport.capture_envelope(envelope)
 
