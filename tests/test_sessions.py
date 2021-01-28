@@ -37,21 +37,17 @@ def test_basic(sentry_init, capture_envelopes):
         "release": "fun-release",
         "environment": "not-fun-env",
     }
-    # TODO: The SDK needs a setting to explicitly choose between application-mode
-    # or request-mode sessions.
-    # assert sess_event["did"] == "42"
-    # assert sess_event["init"]
-    # assert sess_event["status"] == "exited"
-    # assert sess_event["errors"] == 1
+    assert sess_event["did"] == "42"
+    assert sess_event["init"]
+    assert sess_event["status"] == "exited"
+    assert sess_event["errors"] == 1
 
 
 def test_aggregates(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release",
         environment="not-fun-env",
-        _experiments=dict(
-            auto_session_tracking=True,
-        ),
+        _experiments={"auto_session_tracking": True, "session_mode": "request"},
     )
     envelopes = capture_envelopes()
 
@@ -86,7 +82,6 @@ def test_aggregates(sentry_init, capture_envelopes):
     }
 
     aggregates = sorted_aggregates(sess_event)
-    assert len(aggregates) == 2
+    assert len(aggregates) == 1
     assert aggregates[0]["exited"] == 2
-    assert aggregates[1]["did"] == "42"
-    assert aggregates[1]["errored"] == 1
+    assert aggregates[0]["errored"] == 1

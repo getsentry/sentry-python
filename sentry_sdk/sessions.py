@@ -10,15 +10,12 @@ from sentry_sdk._types import MYPY
 from sentry_sdk.utils import format_timestamp
 
 if MYPY:
-    import sentry_sdk
-
     from typing import Optional
     from typing import Union
     from typing import Any
     from typing import Dict
     from typing import List
     from typing import Generator
-    from typing import Tuple
 
     from sentry_sdk._types import SessionStatus
 
@@ -78,11 +75,13 @@ def make_aggregate_envelope(aggregate_states, attrs):
 class SessionFlusher(object):
     def __init__(
         self,
-        capture_func,  # type: (Envelope) -> None
+        capture_func,  # type: (sentry_sdk.envelope.Envelope) -> None
+        session_mode,  # type: str
         flush_interval=60,  # type: int
     ):
         # type: (...) -> None
         self.capture_func = capture_func
+        self.session_mode = session_mode
         self.flush_interval = flush_interval
         self.pending_sessions = []  # type: List[Any]
         self.pending_aggregates = {}  # type: Dict[Any, Any]
@@ -102,7 +101,7 @@ class SessionFlusher(object):
             self.pending_aggregates = {}
 
         # NOTE: use absolute import here to avoid circular imports
-        Envelope = sentry_sdk.envelope.Envelope
+        Envelope = sentry_sdk.envelope.Envelope  # noqa
 
         envelope = Envelope()
         for session in pending_sessions:
@@ -144,37 +143,43 @@ class SessionFlusher(object):
             self._thread_for_pid = os.getpid()
         return None
 
-    def try_aggregate_session(
+    def add_aggregate_session(
         self, session  # type: Session
     ):
-        # cannot aggregate sessions with durations
-        if session.duration is not None:
-            return False
+        # NOTE on `session.did`:
+        # the protocol can deal with buckets that have a distinct-id, however
+        # in practice we expect the python SDK to have an extremely high cardinality
+        # here, effectively making aggregation useless, therefore we do not
+        # aggregate per-did.
 
         # For this part we can get away with using the global interpreter lock
         with self._aggregate_lock:
             attrs = session.get_json_attrs(with_user_info=False)
             primary_key = tuple(sorted(attrs.items()))
-            secondary_key = (session.truncated_started, session.did)
+            secondary_key = session.truncated_started  # (, session.did)
             states = self.pending_aggregates.setdefault(primary_key, {})
             state = states.setdefault(secondary_key, {})
 
             if "started" not in state:
                 state["started"] = format_timestamp(session.truncated_started)
-            if session.did is not None:
-                state["did"] = session.did
-            if session.errors > 0:
+            # if session.did is not None:
+            #     state["did"] = session.did
+            if session.status == "crashed":
+                state["crashed"] = state.get("crashed", 0) + 1
+            elif session.status == "abnormal":
+                state["abnormal"] = state.get("abnormal", 0) + 1
+            elif session.errors > 0:
                 state["errored"] = state.get("errored", 0) + 1
-            for status in ("exited", "crashed", "abnormal"):
-                if session.status == status:
-                    state[status] = state.get(status, 0) + 1
-        return True
+            else:
+                state["exited"] = state.get("exited", 0) + 1
 
     def add_session(
         self, session  # type: Session
     ):
         # type: (...) -> None
-        if not self.try_aggregate_session(session):
+        if self.session_mode == "request":
+            self.add_aggregate_session(session)
+        else:
             self.pending_sessions.append(session.to_json())
         self._ensure_running()
 

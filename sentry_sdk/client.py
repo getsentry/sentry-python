@@ -2,7 +2,6 @@ import os
 import uuid
 import random
 from datetime import datetime
-from itertools import islice
 import socket
 
 from sentry_sdk._compat import string_types, text_type, iteritems
@@ -31,7 +30,6 @@ if MYPY:
     from typing import Any
     from typing import Callable
     from typing import Dict
-    from typing import List
     from typing import Optional
 
     from sentry_sdk.scope import Scope
@@ -107,7 +105,12 @@ class _Client(object):
         try:
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
-            self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
+            session_mode = self.options["_experiments"].get(
+                "session_mode", "application"
+            )
+            self.session_flusher = SessionFlusher(
+                capture_func=_capture_envelope, session_mode=session_mode
+            )
 
             request_bodies = ("always", "never", "small", "medium")
             if self.options["request_bodies"] not in request_bodies:
