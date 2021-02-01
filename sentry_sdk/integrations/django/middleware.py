@@ -142,6 +142,10 @@ def _wrap_middleware(middleware, middleware_name):
 
         def __call__(self, *args, **kwargs):
             # type: (*Any, **Any) -> Any
+            # Readability refactor
+            if self.async_capable:
+                return self.__acall__(*args, **kwargs)
+
             f = self._call_method
             if f is None:
                 self._call_method = f = _get_wrapped_method(self._inner.__call__)
