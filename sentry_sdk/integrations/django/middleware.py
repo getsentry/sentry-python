@@ -143,14 +143,20 @@ def _wrap_middleware(middleware, middleware_name):
 
         def __call__(self, *args, **kwargs):
             # type: (*Any, **Any) -> Any
-            # Readability refactor
             if asyncio.iscoroutinefunction(self.get_response):
                 return self.__acall__(*args, **kwargs)
 
             f = self._call_method
             if f is None:
-                self._call_method = f = _get_wrapped_method(self._inner.__call__)
-            return f(*args, **kwargs)
+                self._call_method = f = self._inner.__call__
+
+            middleware_span = _check_middleware_span(old_method=f)
+
+            if middleware_span is None:
+                return f(*args, **kwargs)
+
+            with middleware_span:
+                return f(*args, **kwargs)
 
         async def __acall__(self, *args, **kwargs):
             f = self._acall_method
