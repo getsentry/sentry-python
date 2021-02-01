@@ -113,15 +113,24 @@ def _wrap_middleware(middleware, middleware_name):
         return old_method
 
     import asyncio
-    from django.utils.deprecation import MiddlewareMixin
 
-    class SentryWrappingMiddleware(MiddlewareMixin):
+    class SentryWrappingMiddleware(object):
 
-        def __init__(self, *args, **kwargs):
+        def __init__(self, get_response, *args, **kwargs):
             # type: (*Any, **Any) -> None
-            self._inner = middleware(*args, **kwargs)
+            self._inner = middleware(get_response, *args, **kwargs)
             self._call_method = None
             self._acall_method = None
+            self.get_response = get_response
+            self._async_check()
+
+        def _async_check(self):
+            """
+            If get_response is a coroutine function, turns us into async mode so
+            a thread is not consumed during a whole request.
+            """
+            if asyncio.iscoroutinefunction(self.get_response):
+                self._is_coroutine = asyncio.coroutines._is_coroutine
 
         # We need correct behavior for `hasattr()`, which we can only determine
         # when we have an instance of the middleware we're wrapping.
