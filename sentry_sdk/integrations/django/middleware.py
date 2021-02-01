@@ -116,7 +116,6 @@ def _wrap_middleware(middleware, middleware_name):
     from django.utils.deprecation import MiddlewareMixin
 
     class SentryWrappingMiddleware(MiddlewareMixin):
-
         def __init__(self, *args, **kwargs):
             # type: (*Any, **Any) -> None
             self._inner = middleware(*args, **kwargs)
@@ -128,11 +127,11 @@ def _wrap_middleware(middleware, middleware_name):
         def __getattr__(self, method_name):
             # type: (str) -> Any
             if method_name not in (
-                    "process_request",
-                    "process_view",
-                    "process_template_response",
-                    "process_response",
-                    "process_exception",
+                "process_request",
+                "process_view",
+                "process_template_response",
+                "process_response",
+                "process_exception",
             ):
                 raise AttributeError()
 
