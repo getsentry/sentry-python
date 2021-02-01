@@ -64,29 +64,37 @@ def _wrap_middleware(middleware, middleware_name):
     # type: (Any, str) -> Any
     from sentry_sdk.integrations.django import DjangoIntegration
 
+    def _check_middleware_span(old_method):
+        hub = Hub.current
+        integration = hub.get_integration(DjangoIntegration)
+        if integration is None or not integration.middleware_spans:
+            return None
+
+        function_name = transaction_from_function(old_method)
+
+        description = middleware_name
+        function_basename = getattr(old_method, "__name__", None)
+        if function_basename:
+            description = "{}.{}".format(description, function_basename)
+
+        middleware_span = hub.start_span(op="django.middleware", description=description)
+        middleware_span.set_tag("django.function_name", function_name)
+        middleware_span.set_tag("django.middleware_name", middleware_name)
+
+        return middleware_span
+
     def _get_wrapped_method(old_method):
         # type: (F) -> F
         with capture_internal_exceptions():
 
             def sentry_wrapped_method(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
-                hub = Hub.current
-                integration = hub.get_integration(DjangoIntegration)
-                if integration is None or not integration.middleware_spans:
+                middleware_span = _check_middleware_span(old_method)
+
+                if middleware_span is None:
                     return old_method(*args, **kwargs)
 
-                function_name = transaction_from_function(old_method)
-
-                description = middleware_name
-                function_basename = getattr(old_method, "__name__", None)
-                if function_basename:
-                    description = "{}.{}".format(description, function_basename)
-
-                with hub.start_span(
-                    op="django.middleware", description=description
-                ) as span:
-                    span.set_tag("django.function_name", function_name)
-                    span.set_tag("django.middleware_name", middleware_name)
+                with middleware_span:
                     return old_method(*args, **kwargs)
 
             try:
