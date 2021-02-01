@@ -110,11 +110,10 @@ def _wrap_middleware(middleware, middleware_name):
 
         return old_method
 
-    class SentryWrappingMiddleware(object):
-        import asyncio
+    import asyncio
+    from django.utils.deprecation import MiddlewareMixin
 
-        async_capable = middleware.async_capable
-        _is_coroutine = asyncio.coroutines._is_coroutine if async_capable else None
+    class SentryWrappingMiddleware(MiddlewareMixin):
 
         def __init__(self, *args, **kwargs):
             # type: (*Any, **Any) -> None
@@ -127,11 +126,11 @@ def _wrap_middleware(middleware, middleware_name):
         def __getattr__(self, method_name):
             # type: (str) -> Any
             if method_name not in (
-                "process_request",
-                "process_view",
-                "process_template_response",
-                "process_response",
-                "process_exception",
+                    "process_request",
+                    "process_view",
+                    "process_template_response",
+                    "process_response",
+                    "process_exception",
             ):
                 raise AttributeError()
 
@@ -143,7 +142,7 @@ def _wrap_middleware(middleware, middleware_name):
         def __call__(self, *args, **kwargs):
             # type: (*Any, **Any) -> Any
             # Readability refactor
-            if self.async_capable:
+            if asyncio.iscoroutinefunction(self.get_response):
                 return self.__acall__(*args, **kwargs)
 
             f = self._call_method
