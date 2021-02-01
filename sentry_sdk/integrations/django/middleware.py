@@ -111,10 +111,16 @@ def _wrap_middleware(middleware, middleware_name):
         return old_method
 
     class SentryWrappingMiddleware(object):
+        import asyncio
+
+        async_capable = middleware.async_capable
+        _is_coroutine = asyncio.coroutines._is_coroutine if async_capable else None
+
         def __init__(self, *args, **kwargs):
             # type: (*Any, **Any) -> None
             self._inner = middleware(*args, **kwargs)
             self._call_method = None
+            self._acall_method = None
 
         # We need correct behavior for `hasattr()`, which we can only determine
         # when we have an instance of the middleware we're wrapping.
@@ -140,6 +146,19 @@ def _wrap_middleware(middleware, middleware_name):
             if f is None:
                 self._call_method = f = _get_wrapped_method(self._inner.__call__)
             return f(*args, **kwargs)
+
+        async def __acall__(self, *args, **kwargs):
+            f = self._acall_method
+            if f is None:
+                self._acall_method = f = self._inner.__acall__
+
+            middleware_span = _check_middleware_span(old_method=f)
+
+            if middleware_span is None:
+                return await f(*args, **kwargs)
+
+            with middleware_span:
+                return await f(*args, **kwargs)
 
     if hasattr(middleware, "__name__"):
         SentryWrappingMiddleware.__name__ = middleware.__name__
