@@ -137,11 +137,11 @@ def _wrap_middleware(middleware, middleware_name):
         def __getattr__(self, method_name):
             # type: (str) -> Any
             if method_name not in (
-                    "process_request",
-                    "process_view",
-                    "process_template_response",
-                    "process_response",
-                    "process_exception",
+                "process_request",
+                "process_view",
+                "process_template_response",
+                "process_response",
+                "process_exception",
             ):
                 raise AttributeError()
 
