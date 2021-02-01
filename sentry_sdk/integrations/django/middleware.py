@@ -116,6 +116,8 @@ def _wrap_middleware(middleware, middleware_name):
 
     class SentryWrappingMiddleware(object):
 
+        async_capable = middleware.async_capable
+
         def __init__(self, get_response, *args, **kwargs):
             # type: (*Any, **Any) -> None
             self._inner = middleware(get_response, *args, **kwargs)
