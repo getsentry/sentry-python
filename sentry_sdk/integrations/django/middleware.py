@@ -115,7 +115,6 @@ def _wrap_middleware(middleware, middleware_name):
     import asyncio
 
     class SentryWrappingMiddleware(object):
-
         def __init__(self, get_response, *args, **kwargs):
             # type: (*Any, **Any) -> None
             self._inner = middleware(get_response, *args, **kwargs)
