@@ -65,6 +65,7 @@ def _wrap_middleware(middleware, middleware_name):
     from sentry_sdk.integrations.django import DjangoIntegration
 
     def _check_middleware_span(old_method):
+        # type: (F) -> Span
         hub = Hub.current
         integration = hub.get_integration(DjangoIntegration)
         if integration is None or not integration.middleware_spans:
@@ -127,9 +128,11 @@ def _wrap_middleware(middleware, middleware_name):
             self._async_check()
 
         def _async_check(self):
+            # type: () -> None
             """
             If get_response is a coroutine function, turns us into async mode so
             a thread is not consumed during a whole request.
+            Taken from django.utils.deprecation::MiddlewareMixin._async_check
             """
             if asyncio.iscoroutinefunction(self.get_response):
                 self._is_coroutine = asyncio.coroutines._is_coroutine
@@ -170,6 +173,7 @@ def _wrap_middleware(middleware, middleware_name):
                 return f(*args, **kwargs)
 
         async def __acall__(self, *args, **kwargs):
+            # type: (*Any, **Any) -> Any
             f = self._acall_method
             if f is None:
                 self._acall_method = f = self._inner.__acall__
