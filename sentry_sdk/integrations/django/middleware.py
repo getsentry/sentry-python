@@ -77,7 +77,9 @@ def _wrap_middleware(middleware, middleware_name):
         if function_basename:
             description = "{}.{}".format(description, function_basename)
 
-        middleware_span = hub.start_span(op="django.middleware", description=description)
+        middleware_span = hub.start_span(
+            op="django.middleware", description=description
+        )
         middleware_span.set_tag("django.function_name", function_name)
         middleware_span.set_tag("django.middleware_name", middleware_name)
 
