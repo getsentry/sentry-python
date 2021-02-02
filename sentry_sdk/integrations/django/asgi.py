@@ -95,10 +95,8 @@ def wrap_async_view(hub, callback):
     return sentry_wrapped_callback
 
 
-def _asgi_mixin_factory(middleware, _check_middleware_span):
+def _asgi_mixin_factory(_check_middleware_span):
     class SentryASGIMixin:
-
-        async_capable = getattr(middleware, 'async_capable', False)
 
         def __init__(self, get_response):
             self.get_response = get_response
@@ -115,7 +113,7 @@ def _asgi_mixin_factory(middleware, _check_middleware_span):
             if asyncio.iscoroutinefunction(self.get_response):
                 self._is_coroutine = asyncio.coroutines._is_coroutine
 
-        def __call__(self, *args, **kwargs):
+        def async_route_check(self, *args, **kwargs):
             # type: (*Any, **Any) -> Any
             if asyncio.iscoroutinefunction(self.get_response):
                 return self.__acall__(*args, **kwargs)
