@@ -126,6 +126,7 @@ def _wrap_middleware(middleware, middleware_name):
         def __init__(self, get_response, *args, **kwargs):
             # type: (*Any, **Any) -> None
             self._inner = middleware(get_response, *args, **kwargs)
+            self.get_response = get_response
             self._call_method = None
             if self.async_capable:
                 super(SentryWrappingMiddleware, self).__init__(get_response)
@@ -150,8 +151,8 @@ def _wrap_middleware(middleware, middleware_name):
 
         def __call__(self, *args, **kwargs):
             # type: (*Any, **Any) -> Any
-            if self.async_capable:
-                super(SentryWrappingMiddleware, self).async_route_check(*args, **kwargs)
+            if hasattr(self, "async_route_check") and self.async_route_check():
+                return self.__acall__(*args, **kwargs)
 
             f = self._call_method
             if f is None:
