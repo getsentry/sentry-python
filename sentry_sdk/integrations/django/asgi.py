@@ -95,13 +95,14 @@ def wrap_async_view(hub, callback):
     return sentry_wrapped_callback
 
 
-def _wrap_asgi_code(middleware, _check_middleware_span):
+def _asgi_mixin_factory(middleware, _check_middleware_span):
     class SentryASGIMixin:
 
-        async_capable = middleware.async_capable
+        async_capable = getattr(middleware, 'async_capable', False)
 
         def __init__(self, get_response):
             self.get_response = get_response
+            self._acall_method = None
             self._async_check()
 
         def _async_check(self):
