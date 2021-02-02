@@ -68,3 +68,36 @@ async def test_async_views(sentry_init, capture_events, application):
         "query_string": None,
         "url": "/async_message",
     }
+
+
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1),
+    reason="async views have been introduced in Django 3.1"
+)
+async def test_async_views_concurrent_execution(
+        sentry_init, capture_events, application, settings):
+
+    import asyncio
+    import time
+
+    if application is asgi_application:
+        settings.MIDDLEWARE = []
+        asgi_application.load_middleware(is_async=True)
+
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+
+    comm = HttpCommunicator(application, "GET", "/my_async_view")
+    comm2 = HttpCommunicator(application, "GET", "/my_async_view")
+    start = time.time()
+
+    (resp1, resp2), _ = await asyncio.wait([comm.get_response(timeout=5),
+                                            comm2.get_response(timeout=5)])
+
+    end = time.time()
+
+    assert resp1.result()["status"] == 200
+    assert resp2.result()["status"] == 200
+
+    assert end - start < 1.5
