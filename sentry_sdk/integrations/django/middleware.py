@@ -116,7 +116,6 @@ def _wrap_middleware(middleware, middleware_name):
     from .asgi import _wrap_asgi_code
 
     class SentryWrappingMiddleware(middleware, _wrap_asgi_code(_check_middleware_span)):
-
         def __init__(self, get_response, *args, **kwargs):
             # type: (*Any, **Any) -> None
             self._inner = middleware(get_response, *args, **kwargs)

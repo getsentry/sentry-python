@@ -132,4 +132,5 @@ def _wrap_asgi_code(middleware, _check_middleware_span):
 
             with middleware_span:
                 return await f(*args, **kwargs)
+
     return SentryASGIMixin
