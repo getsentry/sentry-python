@@ -73,11 +73,11 @@ async def test_async_views(sentry_init, capture_events, application):
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
 @pytest.mark.skipif(
-    django.VERSION < (3, 1),
-    reason="async views have been introduced in Django 3.1"
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
 async def test_async_views_concurrent_execution(
-        sentry_init, capture_events, application, settings):
+    sentry_init, capture_events, application, settings
+):
 
     import asyncio
     import time
@@ -92,8 +92,9 @@ async def test_async_views_concurrent_execution(
     comm2 = HttpCommunicator(application, "GET", "/my_async_view")
     start = time.time()
 
-    (resp1, resp2), _ = await asyncio.wait([comm.get_response(timeout=5),
-                                            comm2.get_response(timeout=5)])
+    (resp1, resp2), _ = await asyncio.wait(
+        [comm.get_response(timeout=5), comm2.get_response(timeout=5)]
+    )
 
     end = time.time()
 
