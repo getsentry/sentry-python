@@ -5,7 +5,13 @@ from sentry_sdk import capture_message
 from sentry_sdk.integrations.django import DjangoIntegration
 from tests.integrations.django.myapp.asgi import channels_application
 
+try:
+    from django.urls import reverse
+except ImportError:
+    from django.core.urlresolvers import reverse
+
 APPS = [channels_application]
+
 if django.VERSION >= (3, 0):
     from tests.integrations.django.myapp.asgi import asgi_application
 
@@ -102,3 +108,50 @@ async def test_async_views_concurrent_execution(
     assert resp2.result()["status"] == 200
 
     assert end - start < 1.5
+
+
+@pytest.mark.parametrize("application", [asgi_application])
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
+async def test_async_middleware_spans(sentry_init, render_span_tree,
+                                      capture_events, application, settings):
+
+    settings.MIDDLEWARE = [
+        "django.contrib.sessions.middleware.SessionMiddleware",
+        "django.contrib.auth.middleware.AuthenticationMiddleware",
+        "django.middleware.csrf.CsrfViewMiddleware",
+        "tests.integrations.django.myapp.settings.TestMiddleware"
+    ]
+    asgi_application.load_middleware(is_async=True)
+
+    sentry_init(
+        integrations=[DjangoIntegration(middleware_spans=True)],
+        traces_sample_rate=1.0,
+        _experiments={"record_sql_params": True}
+    )
+
+    events = capture_events()
+
+    comm = HttpCommunicator(application, "GET", "/async_message")
+    response = await comm.get_response()
+    assert response["status"] == 200
+
+    await comm.wait()
+
+    message, transaction = events
+
+    print(render_span_tree(transaction))
+
+    assert (
+        render_span_tree(transaction)
+            == """\
+- op="http.server": description=null
+  - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.__acall__"
+    - op="django.middleware": description="django.contrib.auth.middleware.AuthenticationMiddleware.__acall__"
+      - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.__acall__"
+        - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.__acall__"
+          - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
+          - op="django.view": description="async_message\""""
+    )
