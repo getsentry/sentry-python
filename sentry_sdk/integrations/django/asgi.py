@@ -6,6 +6,8 @@ Since this file contains `async def` it is conditionally imported in
 `django.core.handlers.asgi`.
 """
 
+import asyncio
+
 from sentry_sdk import Hub, _functools
 from sentry_sdk._types import MYPY
 
@@ -91,3 +93,43 @@ def wrap_async_view(hub, callback):
             return await callback(request, *args, **kwargs)
 
     return sentry_wrapped_callback
+
+
+def _wrap_asgi_code(middleware, _check_middleware_span):
+    class SentryASGIMixin:
+
+        async_capable = middleware.async_capable
+
+        def __init__(self, get_response):
+            self.get_response = get_response
+            self._async_check()
+
+        def _async_check(self):
+            # type: () -> None
+            """
+            If get_response is a coroutine function, turns us into async mode so
+            a thread is not consumed during a whole request.
+            Taken from django.utils.deprecation::MiddlewareMixin._async_check
+            """
+            if asyncio.iscoroutinefunction(self.get_response):
+                self._is_coroutine = asyncio.coroutines._is_coroutine
+
+        def __call__(self, *args, **kwargs):
+            # type: (*Any, **Any) -> Any
+            if asyncio.iscoroutinefunction(self.get_response):
+                return self.__acall__(*args, **kwargs)
+
+        async def __acall__(self, *args, **kwargs):
+            # type: (*Any, **Any) -> Any
+            f = self._acall_method
+            if f is None:
+                self._acall_method = f = self._inner.__acall__
+
+            middleware_span = _check_middleware_span(old_method=f)
+
+            if middleware_span is None:
+                return await f(*args, **kwargs)
+
+            with middleware_span:
+                return await f(*args, **kwargs)
+    return SentryASGIMixin

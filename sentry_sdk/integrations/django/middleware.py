@@ -113,29 +113,16 @@ def _wrap_middleware(middleware, middleware_name):
 
         return old_method
 
-    import asyncio
+    from .asgi import _wrap_asgi_code
 
-    class SentryWrappingMiddleware(object):
-
-        async_capable = middleware.async_capable
+    class SentryWrappingMiddleware(middleware, _wrap_asgi_code(_check_middleware_span)):
 
         def __init__(self, get_response, *args, **kwargs):
             # type: (*Any, **Any) -> None
             self._inner = middleware(get_response, *args, **kwargs)
             self._call_method = None
             self._acall_method = None
-            self.get_response = get_response
-            self._async_check()
-
-        def _async_check(self):
-            # type: () -> None
-            """
-            If get_response is a coroutine function, turns us into async mode so
-            a thread is not consumed during a whole request.
-            Taken from django.utils.deprecation::MiddlewareMixin._async_check
-            """
-            if asyncio.iscoroutinefunction(self.get_response):
-                self._is_coroutine = asyncio.coroutines._is_coroutine
+            super(SentryWrappingMiddleware, self).__init__(get_response)
 
         # We need correct behavior for `hasattr()`, which we can only determine
         # when we have an instance of the middleware we're wrapping.
@@ -157,8 +144,7 @@ def _wrap_middleware(middleware, middleware_name):
 
         def __call__(self, *args, **kwargs):
             # type: (*Any, **Any) -> Any
-            if asyncio.iscoroutinefunction(self.get_response):
-                return self.__acall__(*args, **kwargs)
+            super(SentryWrappingMiddleware, self).__call__(*args, **kwargs)
 
             f = self._call_method
             if f is None:
@@ -171,20 +157,6 @@ def _wrap_middleware(middleware, middleware_name):
 
             with middleware_span:
                 return f(*args, **kwargs)
-
-        async def __acall__(self, *args, **kwargs):
-            # type: (*Any, **Any) -> Any
-            f = self._acall_method
-            if f is None:
-                self._acall_method = f = self._inner.__acall__
-
-            middleware_span = _check_middleware_span(old_method=f)
-
-            if middleware_span is None:
-                return await f(*args, **kwargs)
-
-            with middleware_span:
-                return await f(*args, **kwargs)
 
     if hasattr(middleware, "__name__"):
         SentryWrappingMiddleware.__name__ = middleware.__name__
