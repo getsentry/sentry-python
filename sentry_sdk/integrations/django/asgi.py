@@ -119,14 +119,13 @@ def _asgi_mixin_factory(_check_middleware_span):
             if asyncio.iscoroutinefunction(self.get_response):
                 self._is_coroutine = asyncio.coroutines._is_coroutine
 
-        def async_route_check(self, *args, **kwargs):
-            # type: (*Any, **Any) -> Any
+        def async_route_check(self):
+            # type: () -> Boolean
             """
             Function that checks if we are in async mode,
             and if we are forwards the handling of requests to __acall__
             """
-            if asyncio.iscoroutinefunction(self.get_response):
-                return self.__acall__(*args, **kwargs)
+            return asyncio.iscoroutinefunction(self.get_response)
 
         async def __acall__(self, *args, **kwargs):
             # type: (*Any, **Any) -> Any
