@@ -142,8 +142,6 @@ async def test_async_middleware_spans(sentry_init, render_span_tree,
 
     message, transaction = events
 
-    print(render_span_tree(transaction))
-
     assert (
         render_span_tree(transaction)
             == """\
