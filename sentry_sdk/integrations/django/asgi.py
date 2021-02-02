@@ -96,9 +96,15 @@ def wrap_async_view(hub, callback):
 
 
 def _asgi_mixin_factory(_check_middleware_span):
+    # type: (F) -> Any
+    """
+    Class factory that generates a class that deals with handling requests
+    in async mode.
+    """
     class SentryASGIMixin:
 
         def __init__(self, get_response):
+            # type: (F) -> None
             self.get_response = get_response
             self._acall_method = None
             self._async_check()
@@ -115,6 +121,10 @@ def _asgi_mixin_factory(_check_middleware_span):
 
         def async_route_check(self, *args, **kwargs):
             # type: (*Any, **Any) -> Any
+            """
+            Function that checks if we are in async mode,
+            and if we are forwards the handling of requests to __acall__
+            """
             if asyncio.iscoroutinefunction(self.get_response):
                 return self.__acall__(*args, **kwargs)
 
