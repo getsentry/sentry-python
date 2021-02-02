@@ -97,7 +97,6 @@ def wrap_async_view(hub, callback):
 
 def _asgi_mixin_factory(_check_middleware_span):
     class SentryASGIMixin:
-
         def __init__(self, get_response):
             self.get_response = get_response
             self._acall_method = None
