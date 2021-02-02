@@ -119,13 +119,14 @@ def _wrap_middleware(middleware, middleware_name):
 
         return old_method
 
-    class SentryWrappingMiddleware(_asgi_mixin_factory(middleware, _check_middleware_span)):
-
+    class SentryWrappingMiddleware(
+        _asgi_mixin_factory(middleware, _check_middleware_span)
+    ):
         def __init__(self, get_response, *args, **kwargs):
             # type: (*Any, **Any) -> None
             self._inner = middleware(get_response, *args, **kwargs)
             self._call_method = None
-            if getattr(middleware, 'async_capable', False):
+            if getattr(middleware, "async_capable", False):
                 super(SentryWrappingMiddleware, self).__init__(get_response)
 
         # We need correct behavior for `hasattr()`, which we can only determine
@@ -148,7 +149,7 @@ def _wrap_middleware(middleware, middleware_name):
 
         def __call__(self, *args, **kwargs):
             # type: (*Any, **Any) -> Any
-            if getattr(middleware, 'async_capable', False):
+            if getattr(middleware, "async_capable", False):
                 super(SentryWrappingMiddleware, self).__call__(*args, **kwargs)
 
             f = self._call_method
