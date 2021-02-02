@@ -139,7 +139,12 @@ if VERSION >= (3, 1):
     exec(
         """async def async_message(request):
     sentry_sdk.capture_message("hi")
-    return HttpResponse("ok")"""
-    )
+    return HttpResponse("ok")""")
+    
+    exec("""async def my_async_view(request):
+    import asyncio
+    await asyncio.sleep(1)
+    return HttpResponse('Hello World')""")
 else:
     async_message = None
+    my_async_view = None
