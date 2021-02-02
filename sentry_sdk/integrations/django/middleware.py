@@ -31,7 +31,7 @@ else:
 
 
 if DJANGO_VERSION < (3, 1):
-    _asgi_mixin_factory = lambda **_: object
+    _asgi_mixin_factory = lambda _: object
 else:
     from .asgi import _asgi_mixin_factory
 
