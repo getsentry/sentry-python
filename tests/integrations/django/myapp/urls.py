@@ -63,6 +63,10 @@ urlpatterns = [
 if views.async_message is not None:
     urlpatterns.append(path("async_message", views.async_message, name="async_message"))
 
+if views.my_async_view is not None:
+    urlpatterns.append(
+        path("my_async_view", views.my_async_view, name="my_async_view"))
+
 # rest framework
 try:
     urlpatterns.append(
