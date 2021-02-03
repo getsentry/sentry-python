@@ -6,7 +6,6 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from tests.integrations.django.myapp.asgi import channels_application
 
 APPS = [channels_application]
-
 if django.VERSION >= (3, 0):
     from tests.integrations.django.myapp.asgi import asgi_application
     APPS += [asgi_application]
@@ -70,26 +69,23 @@ async def test_async_views(sentry_init, capture_events, application):
     }
 
 
-@pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
 async def test_async_views_concurrent_execution(
-    sentry_init, capture_events, application, settings
+    sentry_init, capture_events, settings
 ):
-
     import asyncio
     import time
 
-    if application is asgi_application:
-        settings.MIDDLEWARE = []
-        asgi_application.load_middleware(is_async=True)
+    settings.MIDDLEWARE = []
+    asgi_application.load_middleware(is_async=True)
 
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
 
-    comm = HttpCommunicator(application, "GET", "/my_async_view")
-    comm2 = HttpCommunicator(application, "GET", "/my_async_view")
+    comm = HttpCommunicator(asgi_application, "GET", "/my_async_view")
+    comm2 = HttpCommunicator(asgi_application, "GET", "/my_async_view")
 
     loop = asyncio.get_event_loop()
 
@@ -115,7 +111,6 @@ async def test_async_views_concurrent_execution(
 async def test_async_middleware_spans(
     sentry_init, render_span_tree, capture_events, settings
 ):
-
     settings.MIDDLEWARE = [
         "django.contrib.sessions.middleware.SessionMiddleware",
         "django.contrib.auth.middleware.AuthenticationMiddleware",
