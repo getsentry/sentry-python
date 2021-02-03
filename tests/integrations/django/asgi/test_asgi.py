@@ -11,11 +11,13 @@ except ImportError:
     from django.core.urlresolvers import reverse
 
 APPS = [channels_application]
+ASGI_APP = []
 
 if django.VERSION >= (3, 0):
     from tests.integrations.django.myapp.asgi import asgi_application
 
-    APPS += [asgi_application]
+    ASGI_APP = [asgi_application]
+    APPS += ASGI_APP
 
 
 @pytest.mark.parametrize("application", APPS)
@@ -110,7 +112,7 @@ async def test_async_views_concurrent_execution(
     assert end - start < 1.5
 
 
-@pytest.mark.parametrize("application", [asgi_application])
+@pytest.mark.parametrize("application", ASGI_APP)
 @pytest.mark.asyncio
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
