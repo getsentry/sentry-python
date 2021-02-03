@@ -6,13 +6,10 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from tests.integrations.django.myapp.asgi import channels_application
 
 APPS = [channels_application]
-ASGI_APP = []
 
 if django.VERSION >= (3, 0):
     from tests.integrations.django.myapp.asgi import asgi_application
-
-    ASGI_APP = [asgi_application]
-    APPS += ASGI_APP
+    APPS += [asgi_application]
 
 
 @pytest.mark.parametrize("application", APPS)
@@ -93,11 +90,15 @@ async def test_async_views_concurrent_execution(
 
     comm = HttpCommunicator(application, "GET", "/my_async_view")
     comm2 = HttpCommunicator(application, "GET", "/my_async_view")
+
+    loop = asyncio.get_event_loop()
+
     start = time.time()
 
-    (resp1, resp2), _ = await asyncio.wait(
-        [comm.get_response(timeout=5), comm2.get_response(timeout=5)]
-    )
+    r1 = loop.create_task(comm.get_response(timeout=5))
+    r2 = loop.create_task(comm2.get_response(timeout=5))
+
+    (resp1, resp2), _ = await asyncio.wait({r1, r2})
 
     end = time.time()
 
@@ -107,13 +108,12 @@ async def test_async_views_concurrent_execution(
     assert end - start < 1.5
 
 
-@pytest.mark.parametrize("application", ASGI_APP)
 @pytest.mark.asyncio
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
 async def test_async_middleware_spans(
-    sentry_init, render_span_tree, capture_events, application, settings
+    sentry_init, render_span_tree, capture_events, settings
 ):
 
     settings.MIDDLEWARE = [
@@ -132,7 +132,7 @@ async def test_async_middleware_spans(
 
     events = capture_events()
 
-    comm = HttpCommunicator(application, "GET", "/async_message")
+    comm = HttpCommunicator(asgi_application, "GET", "/async_message")
     response = await comm.get_response()
     assert response["status"] == 200
 
