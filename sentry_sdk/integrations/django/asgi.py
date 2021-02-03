@@ -99,13 +99,12 @@ def wrap_async_view(hub, callback):
     return sentry_wrapped_callback
 
 
-def _asgi_mixin_factory(_check_middleware_span):
+def _asgi_middleware_mixin_factory(_check_middleware_span):
     # type: (F) -> Any
     """
-    Class factory that generates a class that deals with handling requests
+    Mixin class factory that generates a middleware mixin for handling requests
     in async mode.
     """
-
     class SentryASGIMixin:
         def __init__(self, get_response):
             # type: (F) -> None

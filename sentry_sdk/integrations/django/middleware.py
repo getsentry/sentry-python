@@ -33,9 +33,9 @@ else:
 
 
 if DJANGO_VERSION < (3, 1):
-    _asgi_mixin_factory = lambda _: object
+    _asgi_middleware_mixin_factory = lambda _: object
 else:
-    from .asgi import _asgi_mixin_factory
+    from .asgi import _asgi_middleware_mixin_factory
 
 
 def patch_django_middlewares():
@@ -121,7 +121,7 @@ def _wrap_middleware(middleware, middleware_name):
 
         return old_method
 
-    class SentryWrappingMiddleware(_asgi_mixin_factory(_check_middleware_span)):
+    class SentryWrappingMiddleware(_asgi_middleware_mixin_factory(_check_middleware_span)):
 
         async_capable = getattr(middleware, "async_capable", False)
 
