@@ -5,11 +5,6 @@ from sentry_sdk import capture_message
 from sentry_sdk.integrations.django import DjangoIntegration
 from tests.integrations.django.myapp.asgi import channels_application
 
-try:
-    from django.urls import reverse
-except ImportError:
-    from django.core.urlresolvers import reverse
-
 APPS = [channels_application]
 ASGI_APP = []
 
