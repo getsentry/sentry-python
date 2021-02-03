@@ -125,9 +125,12 @@ def _wrap_middleware(middleware, middleware_name):
 
         async_capable = getattr(middleware, "async_capable", False)
 
-        def __init__(self, get_response, *args, **kwargs):
+        def __init__(self, get_response=None, *args, **kwargs):
             # type: (F, *Any, **Any) -> None
-            self._inner = middleware(get_response, *args, **kwargs)
+            if get_response:
+                self._inner = middleware(get_response, *args, **kwargs)
+            else:
+                self._inner = middleware(*args, **kwargs)
             self.get_response = get_response
             self._call_method = None
             if self.async_capable:
