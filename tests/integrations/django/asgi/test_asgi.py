@@ -117,21 +117,22 @@ async def test_async_views_concurrent_execution(
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_async_middleware_spans(sentry_init, render_span_tree,
-                                      capture_events, application, settings):
+async def test_async_middleware_spans(
+    sentry_init, render_span_tree, capture_events, application, settings
+):
 
     settings.MIDDLEWARE = [
         "django.contrib.sessions.middleware.SessionMiddleware",
         "django.contrib.auth.middleware.AuthenticationMiddleware",
         "django.middleware.csrf.CsrfViewMiddleware",
-        "tests.integrations.django.myapp.settings.TestMiddleware"
+        "tests.integrations.django.myapp.settings.TestMiddleware",
     ]
     asgi_application.load_middleware(is_async=True)
 
     sentry_init(
         integrations=[DjangoIntegration(middleware_spans=True)],
         traces_sample_rate=1.0,
-        _experiments={"record_sql_params": True}
+        _experiments={"record_sql_params": True},
     )
 
     events = capture_events()
