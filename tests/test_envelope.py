@@ -1,5 +1,5 @@
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.sessions import Session
+from sentry_sdk.session import Session
 
 
 def generate_transaction_item():

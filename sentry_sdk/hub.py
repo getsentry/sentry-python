@@ -8,7 +8,7 @@ from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
 from sentry_sdk.tracing import Span, Transaction
-from sentry_sdk.sessions import Session
+from sentry_sdk.session import Session
 from sentry_sdk.utils import (
     exc_info_from_error,
     event_from_exception,
@@ -639,11 +639,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """Ends the current session if there is one."""
         client, scope = self._stack[-1]
         session = scope._session
+        self.scope._session = None
+
         if session is not None:
             session.close()
             if client is not None:
                 client.capture_session(session)
-        self.scope._session = None
 
     def stop_auto_session_tracking(self):
         # type: (...) -> None
