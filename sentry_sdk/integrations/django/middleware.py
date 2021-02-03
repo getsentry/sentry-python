@@ -16,6 +16,7 @@ from sentry_sdk.utils import (
 if MYPY:
     from typing import Any
     from typing import Callable
+    from typing import Optional
     from typing import TypeVar
 
     from sentry_sdk.tracing import Span
@@ -73,7 +74,7 @@ def _wrap_middleware(middleware, middleware_name):
     from sentry_sdk.integrations.django import DjangoIntegration
 
     def _check_middleware_span(old_method):
-        # type: (F) -> Span
+        # type: (Callable[..., Any]) -> Optional[Span]
         hub = Hub.current
         integration = hub.get_integration(DjangoIntegration)
         if integration is None or not integration.middleware_spans:
@@ -122,13 +123,13 @@ def _wrap_middleware(middleware, middleware_name):
         return old_method
 
     class SentryWrappingMiddleware(
-        _asgi_middleware_mixin_factory(_check_middleware_span)
+        _asgi_middleware_mixin_factory(_check_middleware_span)  # type: ignore
     ):
 
         async_capable = getattr(middleware, "async_capable", False)
 
         def __init__(self, get_response=None, *args, **kwargs):
-            # type: (F, *Any, **Any) -> None
+            # type: (Optional[Callable[..., Any]], *Any, **Any) -> None
             if get_response:
                 self._inner = middleware(get_response, *args, **kwargs)
             else:
