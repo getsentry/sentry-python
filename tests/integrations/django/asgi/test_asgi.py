@@ -146,7 +146,8 @@ async def test_async_middleware_spans(
     message, transaction = events
 
     assert (
-        render_span_tree(transaction) == """\
+        render_span_tree(transaction)
+        == """\
 - op="http.server": description=null
   - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.__acall__"
     - op="django.middleware": description="django.contrib.auth.middleware.AuthenticationMiddleware.__acall__"
