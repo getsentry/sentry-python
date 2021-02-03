@@ -16,8 +16,12 @@ from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 if MYPY:
     from typing import Any
     from typing import Union
+    from typing import TypeVar
+    from typing import Callable
 
     from django.http.response import HttpResponse
+
+    F = TypeVar("F", bound=Callable[..., Any])
 
 
 def patch_django_asgi_handler_impl(cls):
@@ -120,7 +124,7 @@ def _asgi_mixin_factory(_check_middleware_span):
                 self._is_coroutine = asyncio.coroutines._is_coroutine
 
         def async_route_check(self):
-            # type: () -> Boolean
+            # type: () -> bool
             """
             Function that checks if we are in async mode,
             and if we are forwards the handling of requests to __acall__

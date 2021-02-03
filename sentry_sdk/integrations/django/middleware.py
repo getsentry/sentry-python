@@ -18,6 +18,8 @@ if MYPY:
     from typing import Callable
     from typing import TypeVar
 
+    from sentry_sdk.tracing import Span
+
     F = TypeVar("F", bound=Callable[..., Any])
 
 _import_string_should_wrap_middleware = ContextVar(
@@ -124,7 +126,7 @@ def _wrap_middleware(middleware, middleware_name):
         async_capable = getattr(middleware, "async_capable", False)
 
         def __init__(self, get_response, *args, **kwargs):
-            # type: (*Any, **Any) -> None
+            # type: (F, *Any, **Any) -> None
             self._inner = middleware(get_response, *args, **kwargs)
             self.get_response = get_response
             self._call_method = None
