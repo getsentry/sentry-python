@@ -8,6 +8,7 @@ from tests.integrations.django.myapp.asgi import channels_application
 APPS = [channels_application]
 if django.VERSION >= (3, 0):
     from tests.integrations.django.myapp.asgi import asgi_application
+
     APPS += [asgi_application]
 
 
@@ -73,9 +74,7 @@ async def test_async_views(sentry_init, capture_events, application):
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_async_views_concurrent_execution(
-    sentry_init, capture_events, settings
-):
+async def test_async_views_concurrent_execution(sentry_init, capture_events, settings):
     import asyncio
     import time
 

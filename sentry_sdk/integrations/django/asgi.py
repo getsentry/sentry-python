@@ -105,6 +105,7 @@ def _asgi_middleware_mixin_factory(_check_middleware_span):
     Mixin class factory that generates a middleware mixin for handling requests
     in async mode.
     """
+
     class SentryASGIMixin:
         def __init__(self, get_response):
             # type: (F) -> None

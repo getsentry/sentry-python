@@ -121,7 +121,9 @@ def _wrap_middleware(middleware, middleware_name):
 
         return old_method
 
-    class SentryWrappingMiddleware(_asgi_middleware_mixin_factory(_check_middleware_span)):
+    class SentryWrappingMiddleware(
+        _asgi_middleware_mixin_factory(_check_middleware_span)
+    ):
 
         async_capable = getattr(middleware, "async_capable", False)
 
