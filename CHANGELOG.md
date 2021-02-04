@@ -7,7 +7,7 @@ We decided to use [semver](https://semver.org/) versioning from now on for the S
 - Added power support(ppc64le) with ci and testing to the project for architecture-independent
 - Fix for header extraction for AWS lambda/API extraction
 - Fix that unpins pytest, stop testing eventlet #965
-- Remove Travis VI #962
+- Remove Travis CI #962
 - Use full git sha as release name #960
 - Fix multiple **kwargs type hints
 - Added feature Django rendering monkey patching #957
