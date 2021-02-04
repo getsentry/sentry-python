@@ -1,26 +1,27 @@
 # Changelog and versioning
 
+## Versioning Policy
+We decided to use [semver](https://semver.org/) versioning from now on for the SDK. with two additions:
+
+- All undocumented APIs are considered internal. They are not part of this contract.
+- Certain features (e.g. integrations) may be explicitly called out as "experimental" or "unstable" in the documentation. They come with their own versioning policy described in the documentation.
+
+
 ## 1.0.0
 
-We decided to use [semver](https://semver.org/) versioning from now on for the SDK. The bump to 1.0 doesn't contain any breaking changes.
+The bump to 1.0 contains a breaking change.
 
-- Added power support(ppc64le) with ci and testing to the project for architecture independence
-- Fix for header extraction for AWS lambda/API extraction
-- Fix that unpins pytest, stop testing eventlet #965
-- Remove Travis CI #962
-- Use full git sha as release name #960
-- Fix multiple **kwargs type hints
-- Added feature Django rendering monkey patching #957
-- Fix that corrects hypothesis tests #978
+- Fix for header extraction for AWS lambda/API extractio
+- Fix multiple **kwargs type hints # 967
 - Fix that corrects AWS lambda integration failure to detect the aws-lambda-ric 1.0 bootstrap #976
-- Fix unbound local crash on handling aws lambda exception - Timeout #977
-- Fix that removes release condition on default #980
-- Added Make pytest run instruction clear in contribution guide #981
+- Fix AWSLambda integration: variable "timeout_thread" referenced before assignment #977
+- Use full git sha as release name #960
+- the default environment is now production, not based on release **(breaking change)**
+- Django integration now creates transaction spans for template rendering
 - Fix headers not parsed correctly in ASGI middleware, Decode headers before creating transaction #984
-- CI Fix `py3.5-celery` and `*-django-dev`
-- Ref: Restore ability to have tracing disabled #991
+- Restored ability to have tracing disabled #991
 - Fix Django async views not behaving asynchronously
-- Feat: Supported pre-aggregated sessions
+- Performance improvement: supported pre-aggregated sessions
 
 ## 0.19.5
 
