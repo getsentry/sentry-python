@@ -2,9 +2,9 @@
 
 ## 1.0.0
 
-- This product follows [semver](https://semver.org/) from now on
-- No breaking changes, SDK is stable
-- Added power support(ppc64le) with ci and testing to the project for architecture independent
+We decided to use [semver](https://semver.org/) versioning from now on for the SDK. The bump to 1.0 doesn't contain any breaking changes.
+
+- Added power support(ppc64le) with ci and testing to the project for architecture-independent
 - Fix for header extraction for AWS lambda/API extraction
 - Fix that unpins pytest, stop testing eventlet #965
 - Remove Travis VI #962
@@ -19,7 +19,7 @@
 - Fix headers not parsed correctly in ASGI middleware, Decode headers before creating transaction #984
 - CI Fix `py3.5-celery` and `*-django-dev`
 - Ref: Restore ability to have tracing disabled #991
-- Fix Django async views not behaving asyncronuously
+- Fix Django async views not behaving asynchronously
 - Feat: Supported pre-aggregated sessions
 
 ## 0.19.5
