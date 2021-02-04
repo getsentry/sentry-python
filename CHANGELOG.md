@@ -1,24 +1,26 @@
 # Changelog and versioning
 
-## Versioning Policy
+## 1.0.0
 
-This project follows [semver](https://semver.org/), with three additions:
-
-- Semver says that major version `0` can include breaking changes at any time. Still, it is common practice to assume that only `0.x` releases (minor versions) can contain breaking changes while `0.x.y` releases (patch versions) are used for backwards-compatible changes (bugfixes and features). This project also follows that practice.
-
-- All undocumented APIs are considered internal. They are not part of this contract.
-
-- Certain features (e.g. integrations) may be explicitly called out as "experimental" or "unstable" in the documentation. They come with their own versioning policy described in the documentation.
-
-We recommend to pin your version requirements against `0.x.*` or `0.x.y`.
-Either one of the following is fine:
-
-```
-sentry-sdk>=0.10.0,<0.11.0
-sentry-sdk==0.10.1
-```
-
-A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
+- This product follows [semver](https://semver.org/) from now on
+- No breaking changes, SDK is stable
+- Added power support(ppc64le) with ci and testing to the project for architecture independent
+- Fix for header extraction for AWS lambda/API extraction
+- Fix that unpins pytest, stop testing eventlet #965
+- Remove Travis VI #962
+- Use full git sha as release name #960
+- Fix multiple **kwargs type hints
+- Added feature Django rendering monkey patching #957
+- Fix that corrects hypothesis tests #978
+- Fix that corrects AWS lambda integration failure to detect the aws-lambda-ric 1.0 bootstrap #976
+- Fix unbound local crash on handling aws lambda exception - Timeout #977
+- Fix that removes release condition on default #980
+- Added Make pytest run instruction clear in contribution guide #981
+- Fix headers not parsed correctly in ASGI middleware, Decode headers before creating transaction #984
+- CI Fix `py3.5-celery` and `*-django-dev`
+- Ref: Restore ability to have tracing disabled #991
+- Fix Django async views not behaving asyncronuously
+- Feat: Supported pre-aggregated sessions
 
 ## 0.19.5
 
