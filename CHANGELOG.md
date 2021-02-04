@@ -4,7 +4,7 @@
 
 We decided to use [semver](https://semver.org/) versioning from now on for the SDK. The bump to 1.0 doesn't contain any breaking changes.
 
-- Added power support(ppc64le) with ci and testing to the project for architecture-independent
+- Added power support(ppc64le) with ci and testing to the project for architecture independence
 - Fix for header extraction for AWS lambda/API extraction
 - Fix that unpins pytest, stop testing eventlet #965
 - Remove Travis CI #962
