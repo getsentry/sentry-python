@@ -11,8 +11,7 @@ def sorted_aggregates(item):
 
 
 def test_basic(sentry_init, capture_envelopes):
-    sentry_init(release="fun-release",
-                environment="not-fun-env")
+    sentry_init(release="fun-release", environment="not-fun-env")
     envelopes = capture_envelopes()
 
     hub = Hub.current
@@ -89,7 +88,8 @@ def test_aggregates(sentry_init, capture_envelopes):
 
 
 def test_aggregates_explicitly_disabled_session_tracking_request_mode(
-        sentry_init, capture_envelopes):
+    sentry_init, capture_envelopes
+):
     sentry_init(
         release="fun-release",
         environment="not-fun-env",
