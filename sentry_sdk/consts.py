@@ -75,6 +75,8 @@ class ClientConstructor(object):
         traces_sample_rate=None,  # type: Optional[float]
         traces_sampler=None,  # type: Optional[TracesSampler]
         auto_enabling_integrations=True,  # type: bool
+        auto_session_tracking=True,  # type: bool
+        session_mode="application",  # type: str
         _experiments={},  # type: Experiments  # noqa: B006
     ):
         # type: (...) -> None

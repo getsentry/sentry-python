@@ -105,7 +105,7 @@ class _Client(object):
         try:
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
-            session_mode = self.options["_experiments"].get(
+            session_mode = self.options.get(
                 "session_mode", "application"
             )
             self.session_flusher = SessionFlusher(
