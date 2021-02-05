@@ -7,7 +7,7 @@ We decided to use [semver](https://semver.org/) versioning from now on for the S
 - Certain features (e.g. integrations) may be explicitly called out as "experimental" or "unstable" in the documentation. They come with their own versioning policy described in the documentation.
 
 
-## 1.0.0
+## 0.19.6
 
 The bump to 1.0 contains a breaking change.
 
@@ -22,6 +22,8 @@ The bump to 1.0 contains a breaking change.
 - Restored ability to have tracing disabled #991
 - Fix Django async views not behaving asynchronously
 - Performance improvement: supported pre-aggregated sessions
+- **BREAKING CHANGE**: Enabled auto_session_tracking by default
+- **BREAKING CHANGE**: `auto_session_tracking` and `session_mode` are no longer experimental options
 
 ## 0.19.5
 
