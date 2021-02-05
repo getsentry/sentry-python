@@ -31,7 +31,6 @@ if MYPY:
         {
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
-            "auto_session_tracking": Optional[bool],
             "smart_transaction_trimming": Optional[bool],
         },
         total=False,
