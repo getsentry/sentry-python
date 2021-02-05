@@ -11,12 +11,12 @@ We decided to use [semver](https://semver.org/) versioning from now on for the S
 
 The bump to 1.0 contains a breaking change.
 
-- Fix for header extraction for AWS lambda/API extractio
+- Fix for header extraction for AWS lambda/API extraction
 - Fix multiple **kwargs type hints # 967
 - Fix that corrects AWS lambda integration failure to detect the aws-lambda-ric 1.0 bootstrap #976
 - Fix AWSLambda integration: variable "timeout_thread" referenced before assignment #977
 - Use full git sha as release name #960
-- the default environment is now production, not based on release **(breaking change)**
+- **BREAKING CHANGE**: The default environment is now production, not based on release
 - Django integration now creates transaction spans for template rendering
 - Fix headers not parsed correctly in ASGI middleware, Decode headers before creating transaction #984
 - Restored ability to have tracing disabled #991
