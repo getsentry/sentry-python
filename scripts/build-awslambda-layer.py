@@ -8,6 +8,9 @@ from sentry_sdk.consts import VERSION as SDK_VERSION
 DIST_DIRNAME = "dist"
 DIST_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", DIST_DIRNAME))
 DEST_ZIP_FILENAME = f"sentry-python-serverless-{SDK_VERSION}.zip"
+WHEELS_FILEPATH = os.path.join(
+    DIST_DIRNAME, f"sentry_sdk-{SDK_VERSION}-py2.py3-none-any.whl"
+)
 
 
 class PackageBuilder:
@@ -20,16 +23,13 @@ class PackageBuilder:
         os.makedirs(self.packages_inner_dir)
 
     def install_python_binaries(self):
-        wheels_filepath = os.path.join(
-            DIST_DIRNAME, f"sentry_sdk-{SDK_VERSION}-py2.py3-none-any.whl"
-        )
         subprocess.run(
             [
                 "pip",
                 "install",
                 "--no-cache-dir",  # Disables the cache -> always accesses PyPI
                 "-q",  # Quiet
-                wheels_filepath,  # Copied to the target directory before installation
+                WHEELS_FILEPATH,  # Copied to the target directory before installation
                 "-t",  # Target directory flag
                 self.packages_inner_dir,
             ],
