@@ -12,15 +12,19 @@ WHEELS_FILEPATH = os.path.join(
     DIST_DIRNAME, f"sentry_sdk-{SDK_VERSION}-py2.py3-none-any.whl"
 )
 
+# Top directory in the ZIP file. Placing the Sentry package in `/python` avoids
+# creating a directory for a specific version. For more information, see
+# https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-path
+PACKAGE_PARENT_DIRECTORY = "python"
+
 
 class PackageBuilder:
-    def __init__(self, base_dir, packages_dir) -> None:
+    def __init__(self, base_dir) -> None:
         self.base_dir = base_dir
-        self.packages_dir = packages_dir
-        self.packages_inner_dir = self.get_relative_path_of(self.packages_dir)
+        self.packages_dir = self.get_relative_path_of(PACKAGE_PARENT_DIRECTORY)
 
     def make_directories(self):
-        os.makedirs(self.packages_inner_dir)
+        os.makedirs(self.packages_dir)
 
     def install_python_binaries(self):
         subprocess.run(
@@ -31,7 +35,7 @@ class PackageBuilder:
                 "-q",  # Quiet
                 WHEELS_FILEPATH,  # Copied to the target directory before installation
                 "-t",  # Target directory flag
-                self.packages_inner_dir,
+                self.packages_dir,
             ],
             check=True,
         )
@@ -45,7 +49,7 @@ class PackageBuilder:
                 "**/__pycache__/*",  # Files to be excluded
                 "-r",  # Recurse paths
                 filename,  # Output filename
-                self.packages_dir,  # Files to be zipped
+                PACKAGE_PARENT_DIRECTORY,  # Files to be zipped
             ],
             cwd=self.base_dir,
             check=True,  # Raises CalledProcessError if exit status is non-zero
@@ -56,9 +60,8 @@ class PackageBuilder:
 
 
 def build_packaged_zip():
-    packages_dir = os.path.join("python", "lib", "python", "site-packages")
     with tempfile.TemporaryDirectory() as tmp_dir:
-        package_builder = PackageBuilder(tmp_dir, packages_dir)
+        package_builder = PackageBuilder(tmp_dir)
         package_builder.make_directories()
         package_builder.install_python_binaries()
         package_builder.zip(DEST_ZIP_FILENAME)
