@@ -56,7 +56,7 @@ class PackageBuilder:
 
 
 def build_packaged_zip():
-    packages_dir = os.path.join("python", "lib", "pythonX.Y", "site-packages")
+    packages_dir = os.path.join("python", "lib", "python", "site-packages")
     with tempfile.TemporaryDirectory() as tmp_dir:
         package_builder = PackageBuilder(tmp_dir, packages_dir)
         package_builder.make_directories()
