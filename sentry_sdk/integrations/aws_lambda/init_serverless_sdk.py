@@ -12,7 +12,7 @@ from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 
 # Configure Sentry SDK
 sentry_sdk.init(
-    dsn=os.environ['DSN'],
+    dsn=os.environ["DSN"],
     integrations=[AwsLambdaIntegration(timeout_warning=True)],
 )
 
@@ -23,7 +23,7 @@ def sentry_lambda_handler(event, context):
     environment vairables as "INITIAL_HANDLER"
     """
     try:
-        module_name, handler_name = os.environ['INITIAL_HANDLER'].rsplit('.', 1)
+        module_name, handler_name = os.environ["INITIAL_HANDLER"].rsplit(".", 1)
     except ValueError:
         raise ValueError("Incorrect AWS Handler path (Not a path)")
     lambda_function = __import__(module_name)
