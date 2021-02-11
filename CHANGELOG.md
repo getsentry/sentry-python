@@ -20,7 +20,7 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
-## 0.19.6
+## 0.20.0
 
 - Fix for header extraction for AWS lambda/API extraction
 - Fix multiple **kwargs type hints # 967
