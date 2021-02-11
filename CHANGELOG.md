@@ -22,8 +22,6 @@ The bump to 1.0 contains a breaking change.
 - Restored ability to have tracing disabled #991
 - Fix Django async views not behaving asynchronously
 - Performance improvement: supported pre-aggregated sessions
-- **BREAKING CHANGE**: Enabled auto_session_tracking by default
-- **BREAKING CHANGE**: `auto_session_tracking` and `session_mode` are no longer experimental options
 
 ## 0.19.5
 
