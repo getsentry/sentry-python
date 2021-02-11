@@ -9,8 +9,6 @@ We decided to use [semver](https://semver.org/) versioning from now on for the S
 
 ## 0.19.6
 
-The bump to 1.0 contains a breaking change.
-
 - Fix for header extraction for AWS lambda/API extraction
 - Fix multiple **kwargs type hints # 967
 - Fix that corrects AWS lambda integration failure to detect the aws-lambda-ric 1.0 bootstrap #976
