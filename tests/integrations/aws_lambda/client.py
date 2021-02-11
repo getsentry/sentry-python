@@ -25,6 +25,7 @@ def run_lambda_function(
     add_finalizer,
     syntax_check=True,
     timeout=30,
+    layer=None,
     subprocess_kwargs=(),
 ):
     subprocess_kwargs = dict(subprocess_kwargs)
@@ -64,16 +65,20 @@ def run_lambda_function(
 
         fn_name = "test_function_{}".format(uuid.uuid4())
 
-        with open(os.path.join(tmpdir, "ball.zip"), "rb") as zip:
-            client.create_function(
-                FunctionName=fn_name,
-                Runtime=runtime,
-                Timeout=timeout,
-                Role=os.environ["SENTRY_PYTHON_TEST_AWS_IAM_ROLE"],
-                Handler="test_lambda.test_handler",
-                Code={"ZipFile": zip.read()},
-                Description="Created as part of testsuite for getsentry/sentry-python",
-            )
+        # ToDo: Add a Layer
+        if layer is not None:
+            with open(os.path.join(tmpdir, "ball.zip"), "rb") as zip:
+                client.create_function(
+                    FunctionName=fn_name,
+                    Runtime=runtime,
+                    Timeout=timeout,
+                    Role=os.environ["SENTRY_PYTHON_TEST_AWS_IAM_ROLE"],
+                    Handler="test_lambda.test_handler",
+                    Code={"ZipFile": zip.read()},
+                    Description="Created as part of testsuite for getsentry/sentry-python",
+                )
+        else:
+            #ToDO: create fyunction with layer
 
         @add_finalizer
         def clean_up():

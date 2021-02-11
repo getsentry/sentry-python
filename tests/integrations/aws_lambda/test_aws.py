@@ -95,6 +95,76 @@ def init_sdk(timeout_warning=False, **extra_init_args):
 """
 
 
+LAMBDA_PRELUDE_FOR_SERVERLESS = """
+from __future__ import print_function
+
+from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration, get_lambda_bootstrap
+import sentry_sdk
+import json
+import time
+
+from sentry_sdk.transport import HttpTransport
+
+def event_processor(event):
+    # AWS Lambda truncates the log output to 4kb, which is small enough to miss
+    # parts of even a single error-event/transaction-envelope pair if considered
+    # in full, so only grab the data we need.
+
+    event_data = {}
+    event_data["contexts"] = {}
+    event_data["contexts"]["trace"] = event.get("contexts", {}).get("trace")
+    event_data["exception"] = event.get("exception")
+    event_data["extra"] = event.get("extra")
+    event_data["level"] = event.get("level")
+    event_data["request"] = event.get("request")
+    event_data["tags"] = event.get("tags")
+    event_data["transaction"] = event.get("transaction")
+
+    return event_data
+
+def envelope_processor(envelope):
+    # AWS Lambda truncates the log output to 4kb, which is small enough to miss
+    # parts of even a single error-event/transaction-envelope pair if considered
+    # in full, so only grab the data we need.
+
+    (item,) = envelope.items
+    envelope_json = json.loads(item.get_bytes())
+
+    envelope_data = {}
+    envelope_data["contexts"] = {}
+    envelope_data["type"] = envelope_json["type"]
+    envelope_data["transaction"] = envelope_json["transaction"]
+    envelope_data["contexts"]["trace"] = envelope_json["contexts"]["trace"]
+    envelope_data["request"] = envelope_json["request"]
+    envelope_data["tags"] = envelope_json["tags"]
+
+    return envelope_data
+
+
+class TestTransport(HttpTransport):
+    def _send_event(self, event):
+        event = event_processor(event)
+        # Writing a single string to stdout holds the GIL (seems like) and
+        # therefore cannot be interleaved with other threads. This is why we
+        # explicitly add a newline at the end even though `print` would provide
+        # us one.
+        print("\\nEVENT: {}\\n".format(json.dumps(event)))
+
+    def _send_envelope(self, envelope):
+        envelope = envelope_processor(envelope)
+        print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
+"""
+
+# Hub.current.client.transport = TestTransport
+# assert Hub.current.client is not None
+# access client.options
+# access client.options.integrations
+# assert all env variables are made into options
+# assert response not a 500
+# Run assertions within the test_handler function and if an error is raised -> 500 response
+# assertions outside
+
+
 @pytest.fixture
 def lambda_client():
     if "SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID" not in os.environ:
@@ -612,6 +682,8 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     )
 
     assert response["Payload"]["AssertionError raised"] is False
+
+
 
 
 def test_serverless_no_code_instrumentation(run_lambda_function):
