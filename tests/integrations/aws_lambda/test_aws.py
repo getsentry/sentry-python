@@ -612,3 +612,11 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     )
 
     assert response["Payload"]["AssertionError raised"] is False
+
+
+def test_serverless_no_code_instrumentation(run_lambda_function):
+    """
+    Test that ensures that just by adding a lambda layer containing the
+    python sdk, with no code changes sentry is able to capture errors
+    """
+    pass
