@@ -12,6 +12,22 @@ targets:
     type: sdk
     config:
       canonical: pypi:sentry-sdk
+  - name: aws-lambda-layer
+    includeNames: /^sentry-python-serverless-\d+(\.\d+)*\.zip$/
+    layerName: SentryPythonServerlessSDK
+    compatibleRuntimes:
+      - name: python
+        versions:
+        # The number of versions must be, at most, the maximum number of
+        # runtimes AWS Lambda permits for a layer.
+        # On the other hand, AWS Lambda does not support every Python runtime.
+        # The supported runtimes are available in the following link:
+        # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html
+          - python2.7
+          - python3.6
+          - python3.7
+          - python3.8
+    license: MIT
 
 changelog: CHANGELOG.md
 changelogPolicy: simple
