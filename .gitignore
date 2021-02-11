@@ -11,6 +11,7 @@ pip-log.txt
 *.egg-info
 /build
 /dist
+/dist-serverless
 .cache
 .idea
 .eggs
