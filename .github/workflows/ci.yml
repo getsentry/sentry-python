@@ -28,7 +28,9 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: ${{ github.sha }}
-          path: dist/*
+          path: |
+            dist/*
+            dist-serverless/*
 
   docs:
     timeout-minutes: 10
