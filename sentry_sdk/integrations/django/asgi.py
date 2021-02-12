@@ -104,6 +104,9 @@ def _asgi_middleware_mixin_factory(_check_middleware_span):
     """
 
     class SentryASGIMixin:
+        if MYPY:
+            _inner = None
+
         def __init__(self, get_response):
             # type: (Callable[..., Any]) -> None
             self.get_response = get_response
