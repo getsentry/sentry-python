@@ -5,14 +5,13 @@ import shutil
 from sentry_sdk.consts import VERSION as SDK_VERSION
 
 
-DIST_DIRNAME = "dist"
-DEST_REL_PATH = "dist-serverless"
+DIST_REL_PATH = "dist"
 DEST_ABS_PATH = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", DEST_REL_PATH)
+    os.path.join(os.path.dirname(__file__), "..", DIST_REL_PATH)
 )
 DEST_ZIP_FILENAME = f"sentry-python-serverless-{SDK_VERSION}.zip"
 WHEELS_FILEPATH = os.path.join(
-    DIST_DIRNAME, f"sentry_sdk-{SDK_VERSION}-py2.py3-none-any.whl"
+    DIST_REL_PATH, f"sentry_sdk-{SDK_VERSION}-py2.py3-none-any.whl"
 )
 
 # Top directory in the ZIP file. Placing the Sentry package in `/python` avoids
@@ -68,8 +67,8 @@ def build_packaged_zip():
         package_builder.make_directories()
         package_builder.install_python_binaries()
         package_builder.zip(DEST_ZIP_FILENAME)
-        if not os.path.exists(DEST_REL_PATH):
-            os.makedirs(DEST_REL_PATH)
+        if not os.path.exists(DIST_REL_PATH):
+            os.makedirs(DIST_REL_PATH)
         shutil.copy(
             package_builder.get_relative_path_of(DEST_ZIP_FILENAME), DEST_ABS_PATH
         )
