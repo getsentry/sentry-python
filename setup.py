@@ -27,7 +27,7 @@ setup(
     url="https://github.com/getsentry/sentry-python",
     project_urls={
         "Documentation": "https://docs.sentry.io/platforms/python/",
-        "Changelog": "https://github.com/getsentry/sentry-python/blob/master/CHANGES.md",
+        "Changelog": "https://github.com/getsentry/sentry-python/blob/master/CHANGELOG.md",
     },
     description="Python client for Sentry (https://sentry.io)",
     long_description=get_file_text("README.md"),
@@ -69,6 +69,7 @@ setup(
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
 )
