@@ -15,7 +15,6 @@ class PackageBuilder:
     def make_directories(self):
         os.makedirs(self.packages_dir)
 
-
     def install_python_binaries(self):
         wheels_filepath = os.path.join(
             self.dist_dir_name, f"sentry_sdk-{SDK_VERSION}-py2.py3-none-any.whl"
