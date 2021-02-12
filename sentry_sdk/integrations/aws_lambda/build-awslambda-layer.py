@@ -63,7 +63,7 @@ def build_packaged_zip(
     pkg_parent_dir="python"
 ):
     dest_abs_path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", dest_rel_path)
+        os.path.join(os.path.dirname(__file__), "../../..", dest_rel_path)
     )
     with tempfile.TemporaryDirectory() as tmp_dir:
         package_builder = PackageBuilder(tmp_dir, pkg_parent_dir, dist_dirname)
