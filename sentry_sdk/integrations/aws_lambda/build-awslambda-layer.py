@@ -70,7 +70,8 @@ def build_packaged_zip(
         package_builder.make_directories()
         package_builder.install_python_binaries()
         package_builder.zip(dest_zip_filename)
-        os.makedirs(dest_rel_path)
+        if not os.path.exists(dest_rel_path):
+            os.makedirs(dest_rel_path)
         shutil.copy(
             package_builder.get_relative_path_of(dest_zip_filename),
             dest_abs_path
