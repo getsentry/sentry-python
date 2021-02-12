@@ -132,7 +132,7 @@ def _asgi_middleware_mixin_factory(_check_middleware_span):
             # type: (*Any, **Any) -> Any
             f = self._acall_method
             if f is None:
-                if hasattr(self._inner, '__acall__'):
+                if hasattr(self._inner, "__acall__"):
                     self._acall_method = f = self._inner.__acall__  # type: ignore
                 else:
                     self._acall_method = f = self._inner
