@@ -6,6 +6,7 @@ github:
 
 targets:
   - name: pypi
+    excludeNames: /^sentry-python-serverless-\d+(\.\d+)*\.zip$/
   - name: github
   - name: gh-pages
   - name: registry
