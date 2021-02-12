@@ -2,6 +2,7 @@ import os
 import subprocess
 import tempfile
 import shutil
+
 from sentry_sdk.consts import VERSION as SDK_VERSION
 
 
