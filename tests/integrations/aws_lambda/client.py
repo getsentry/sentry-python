@@ -66,7 +66,8 @@ def run_lambda_function(
         fn_name = "test_function_{}".format(uuid.uuid4())
 
         # ToDo: Add a Layer
-        if layer is not None:
+        if layer is None:
+            print("No Layer!")
             with open(os.path.join(tmpdir, "ball.zip"), "rb") as zip:
                 client.create_function(
                     FunctionName=fn_name,
@@ -78,7 +79,21 @@ def run_lambda_function(
                     Description="Created as part of testsuite for getsentry/sentry-python",
                 )
         else:
+            from sentry_sdk.integrations.aws_lambda.build_awslambda_layer import
+
             #ToDO: create fyunction with layer
+            response = client.publish_layer_version(
+                LayerName='string',
+                Description='string',
+                Content={
+                    'S3Bucket': 'string',
+                    'S3Key': 'string',
+                    'S3ObjectVersion': 'string',
+                    'ZipFile': b'bytes'
+                },
+                LicenseInfo='string'
+            )
+            print(response.json())
 
         @add_finalizer
         def clean_up():

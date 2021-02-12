@@ -684,11 +684,60 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     assert response["Payload"]["AssertionError raised"] is False
 
 
-
-
 def test_serverless_no_code_instrumentation(run_lambda_function):
     """
     Test that ensures that just by adding a lambda layer containing the
     python sdk, with no code changes sentry is able to capture errors
     """
-    pass
+
+    envelopes, events, response = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk()
+
+        def event_processor(event):
+            # Delay event output like this to test proper shutdown
+            time.sleep(1)
+            return event
+
+        def test_handler(event, context):
+            raise Exception("something went wrong")
+        """
+        ),
+        b'{"foo": "bar"}',
+    )
+
+    assert response["FunctionError"] == "Unhandled"
+
+    (event,) = events
+    assert event["level"] == "error"
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "Exception"
+    assert exception["value"] == "something went wrong"
+
+    (frame1,) = exception["stacktrace"]["frames"]
+    assert frame1["filename"] == "test_lambda.py"
+    assert frame1["abs_path"] == "/var/task/test_lambda.py"
+    assert frame1["function"] == "test_handler"
+
+    assert frame1["in_app"] is True
+
+    assert exception["mechanism"] == {"type": "aws_lambda",
+                                      "handled": False}
+
+    assert event["extra"]["lambda"]["function_name"].startswith(
+        "test_function_")
+
+    logs_url = event["extra"]["cloudwatch logs"]["url"]
+    assert logs_url.startswith(
+        "https://console.aws.amazon.com/cloudwatch/home?region=")
+    assert not re.search("(=;|=$)", logs_url)
+    assert event["extra"]["cloudwatch logs"]["log_group"].startswith(
+        "/aws/lambda/test_function_"
+    )
+
+    log_stream_re = "^[0-9]{4}/[0-9]{2}/[0-9]{2}/\\[[^\\]]+][a-f0-9]+$"
+    log_stream = event["extra"]["cloudwatch logs"]["log_stream"]
+
+    assert re.match(log_stream_re, log_stream)
