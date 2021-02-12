@@ -40,7 +40,7 @@ must have `twine` installed globally.
 
 The usual release process goes like this:
 
-1. Go through git log and write new entry into `CHANGES.md`, commit to master
+1. Go through git log and write new entry into `CHANGELOG.md`, commit to master
 2. `craft p a.b.c`
 3. `craft pp a.b.c`
 
