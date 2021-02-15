@@ -17,6 +17,49 @@ def get_boto_client():
     )
 
 
+def build_no_code_serverless_function_and_layer(client, tmpdir, fn_name, runtime, timeout):
+    """
+    Util function that auto instruments the no code implementation of the python
+    sdk by creating a layer containing the Python-sdk, and then creating a func
+    that uses that layer
+    """
+    from sentry_sdk.integrations.aws_lambda.build_awslambda_layer import \
+        build_packaged_zip
+    build_packaged_zip(dest_abs_path=tmpdir,
+                       dest_zip_filename="serverless-ball.zip")
+
+    with open(
+            os.path.join(
+                tmpdir, "serverless-ball.zip"), "rb") as serverless_zip:
+        response = client.publish_layer_version(
+            LayerName='python-serverless-sdk-test',
+            Description="Created as part of testsuite for getsentry/sentry-python",
+            Content={
+                'ZipFile': serverless_zip.read()
+            }
+        )
+
+    with open(os.path.join(tmpdir, "ball.zip"), "rb") as zip:
+        client.create_function(
+            FunctionName=fn_name,
+            Runtime=runtime,
+            Timeout=timeout,
+            Environment={
+                'Variables': {
+                    'INITIAL_HANDLER': 'test_lambda.test_handler',
+                    'DSN': 'https://123abc@example.com/123'
+                }
+            },
+            Role=os.environ["SENTRY_PYTHON_TEST_AWS_IAM_ROLE"],
+            Handler="sentry_sdk.integrations.aws_lambda.init_serverless_sdk.sentry_lambda_handler",
+            Layers=[
+                response['LayerVersionArn']
+            ],
+            Code={"ZipFile": zip.read()},
+            Description="Created as part of testsuite for getsentry/sentry-python",
+        )
+
+
 def run_lambda_function(
     client,
     runtime,
@@ -41,7 +84,9 @@ def run_lambda_function(
             # such as chalice's)
             subprocess.check_call([sys.executable, test_lambda_py])
 
-        if not layer:
+        fn_name = "test_function_{}".format(uuid.uuid4())
+
+        if layer is None:
             setup_cfg = os.path.join(tmpdir, "setup.cfg")
             with open(setup_cfg, "w") as f:
                 f.write("[install]\nprefix=")
@@ -64,24 +109,7 @@ def run_lambda_function(
             )
 
             shutil.make_archive(os.path.join(tmpdir, "ball"), "zip", tmpdir)
-        else:
-            subprocess.run(
-                [
-                    "zip",
-                    "-q",  # Quiet
-                    "-x",  # Exclude files
-                    "**/__pycache__/*",  # Files to be excluded
-                    "-r",  # Recurse paths
-                    "ball.zip",  # Output filename
-                    './',  # Files to be zipped
-                ],
-                cwd=tmpdir,
-                check=True,  # Raises CalledProcessError if exit status is non-zero
-            )
 
-        fn_name = "test_function_{}".format(uuid.uuid4())
-
-        if layer is None:
             with open(os.path.join(tmpdir, "ball.zip"), "rb") as zip:
                 client.create_function(
                     FunctionName=fn_name,
@@ -93,39 +121,12 @@ def run_lambda_function(
                     Description="Created as part of testsuite for getsentry/sentry-python",
                 )
         else:
-            from sentry_sdk.integrations.aws_lambda.build_awslambda_layer import build_packaged_zip
-            build_packaged_zip(dest_abs_path=tmpdir, dest_zip_filename="serverless-ball.zip")
-
-            with open(
-                    os.path.join(
-                        tmpdir, "serverless-ball.zip"), "rb") as serverless_zip:
-                response = client.publish_layer_version(
-                    LayerName='python-serverless-sdk-test',
-                    Description="Created as part of testsuite for getsentry/sentry-python",
-                    Content={
-                        'ZipFile': serverless_zip.read()
-                    }
-                )
-
-            with open(os.path.join(tmpdir, "ball.zip"), "rb") as zip:
-                client.create_function(
-                    FunctionName=fn_name,
-                    Runtime=runtime,
-                    Timeout=timeout,
-                    Environment={
-                        'Variables': {
-                            'INITIAL_HANDLER': 'test_lambda.test_handler',
-                            'DSN': 'https://123abc@example.com/123'
-                        }
-                    },
-                    Role=os.environ["SENTRY_PYTHON_TEST_AWS_IAM_ROLE"],
-                    Handler="sentry_sdk.integrations.aws_lambda.init_serverless_sdk.sentry_lambda_handler",
-                    Layers=[
-                        response['LayerVersionArn']
-                    ],
-                    Code={"ZipFile": zip.read()},
-                    Description="Created as part of testsuite for getsentry/sentry-python",
-                )
+            subprocess.run(
+                ["zip", "-q", "-x", "**/__pycache__/*", "-r", "ball.zip", './'],
+                cwd=tmpdir, check=True,
+            )
+            build_no_code_serverless_function_and_layer(
+                client, tmpdir, fn_name, runtime, timeout)
 
         @add_finalizer
         def clean_up():
