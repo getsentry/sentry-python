@@ -8,7 +8,12 @@ Then the Handler function sstring should be replaced with
 import os
 
 import sentry_sdk
+from sentry_sdk._types import MYPY
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
+
+if MYPY:
+    from typing import Any
+
 
 # Configure Sentry SDK
 sentry_sdk.init(
@@ -18,6 +23,7 @@ sentry_sdk.init(
 
 
 def sentry_lambda_handler(event, context):
+    # type: (Any, Any) -> None
     """
     Handler function that invokes a lambda handler which path is defined in
     environment vairables as "INITIAL_HANDLER"

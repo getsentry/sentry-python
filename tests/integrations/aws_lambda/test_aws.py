@@ -123,7 +123,7 @@ def run_lambda_function(request, lambda_client, lambda_runtime):
             add_finalizer=request.addfinalizer,
             timeout=timeout,
             syntax_check=syntax_check,
-            layer=layer
+            layer=layer,
         )
 
         # for better debugging
@@ -625,28 +625,28 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
         dedent(
             """
         import sentry_sdk
-        
+
         def test_handler(event, context):
             current_client = sentry_sdk.Hub.current.client
-            
+
             assert current_client is not None
-            
+
             assert len(current_client.options['integrations']) == 1
-            assert isinstance(current_client.options['integrations'][0], 
+            assert isinstance(current_client.options['integrations'][0],
                               sentry_sdk.integrations.aws_lambda.AwsLambdaIntegration)
-            
+
             raise Exception("something went wrong")
         """
         ),
         b'{"foo": "bar"}',
-        layer=True
+        layer=True,
     )
     assert response["FunctionError"] == "Unhandled"
     assert response["StatusCode"] == 200
 
-    assert response["Payload"]["errorType"] != 'AssertionError'
+    assert response["Payload"]["errorType"] != "AssertionError"
 
-    assert response["Payload"]["errorType"] == 'Exception'
-    assert response["Payload"]["errorMessage"] == 'something went wrong'
+    assert response["Payload"]["errorType"] == "Exception"
+    assert response["Payload"]["errorMessage"] == "something went wrong"
 
     assert "sentry_handler" in response["LogResult"][3].decode("utf-8")
