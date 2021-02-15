@@ -81,9 +81,7 @@ def run_lambda_function(
 
         fn_name = "test_function_{}".format(uuid.uuid4())
 
-        # ToDo: Add a Layer
         if layer is None:
-            print("No Layer!")
             with open(os.path.join(tmpdir, "ball.zip"), "rb") as zip:
                 client.create_function(
                     FunctionName=fn_name,
@@ -95,12 +93,9 @@ def run_lambda_function(
                     Description="Created as part of testsuite for getsentry/sentry-python",
                 )
         else:
-            print("Yes Layer!")
             from sentry_sdk.integrations.aws_lambda.build_awslambda_layer import build_packaged_zip
             build_packaged_zip(dest_abs_path=tmpdir, dest_zip_filename="serverless-ball.zip")
-            print(os.listdir(tmpdir))
 
-            #ToDO: create fyunction with layer
             with open(
                     os.path.join(
                         tmpdir, "serverless-ball.zip"), "rb") as serverless_zip:
@@ -134,7 +129,6 @@ def run_lambda_function(
 
         @add_finalizer
         def clean_up():
-            # ToDo uncomment this!
             client.delete_function(FunctionName=fn_name)
 
             # this closes the web socket so we don't get a
