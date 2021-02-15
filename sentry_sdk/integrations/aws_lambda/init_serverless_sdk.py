@@ -13,6 +13,8 @@ from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 # Configure Sentry SDK
 sentry_sdk.init(
     dsn=os.environ["DSN"],
+    # ToDo remove this
+    transport=TestTransport,
     integrations=[AwsLambdaIntegration(timeout_warning=True)],
 )
 
