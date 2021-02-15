@@ -95,76 +95,6 @@ def init_sdk(timeout_warning=False, **extra_init_args):
 """
 
 
-LAMBDA_PRELUDE_FOR_SERVERLESS = """
-from __future__ import print_function
-
-from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration, get_lambda_bootstrap
-import sentry_sdk
-import json
-import time
-
-from sentry_sdk.transport import HttpTransport
-
-def event_processor(event):
-    # AWS Lambda truncates the log output to 4kb, which is small enough to miss
-    # parts of even a single error-event/transaction-envelope pair if considered
-    # in full, so only grab the data we need.
-
-    event_data = {}
-    event_data["contexts"] = {}
-    event_data["contexts"]["trace"] = event.get("contexts", {}).get("trace")
-    event_data["exception"] = event.get("exception")
-    event_data["extra"] = event.get("extra")
-    event_data["level"] = event.get("level")
-    event_data["request"] = event.get("request")
-    event_data["tags"] = event.get("tags")
-    event_data["transaction"] = event.get("transaction")
-
-    return event_data
-
-def envelope_processor(envelope):
-    # AWS Lambda truncates the log output to 4kb, which is small enough to miss
-    # parts of even a single error-event/transaction-envelope pair if considered
-    # in full, so only grab the data we need.
-
-    (item,) = envelope.items
-    envelope_json = json.loads(item.get_bytes())
-
-    envelope_data = {}
-    envelope_data["contexts"] = {}
-    envelope_data["type"] = envelope_json["type"]
-    envelope_data["transaction"] = envelope_json["transaction"]
-    envelope_data["contexts"]["trace"] = envelope_json["contexts"]["trace"]
-    envelope_data["request"] = envelope_json["request"]
-    envelope_data["tags"] = envelope_json["tags"]
-
-    return envelope_data
-
-
-class TestTransport(HttpTransport):
-    def _send_event(self, event):
-        event = event_processor(event)
-        # Writing a single string to stdout holds the GIL (seems like) and
-        # therefore cannot be interleaved with other threads. This is why we
-        # explicitly add a newline at the end even though `print` would provide
-        # us one.
-        print("\\nEVENT: {}\\n".format(json.dumps(event)))
-
-    def _send_envelope(self, envelope):
-        envelope = envelope_processor(envelope)
-        print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
-"""
-
-# Hub.current.client.transport = TestTransport
-# assert Hub.current.client is not None
-# access client.options
-# access client.options.integrations
-# assert all env variables are made into options
-# assert response not a 500
-# Run assertions within the test_handler function and if an error is raised -> 500 response
-# assertions outside
-
-
 @pytest.fixture
 def lambda_client():
     if "SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID" not in os.environ:
@@ -691,53 +621,32 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
     python sdk, with no code changes sentry is able to capture errors
     """
 
-    envelopes, events, response = run_lambda_function(
-        LAMBDA_PRELUDE
-        + dedent(
+    _, _, response = run_lambda_function(
+        dedent(
             """
-        def event_processor(event):
-            # Delay event output like this to test proper shutdown
-            time.sleep(1)
-            return event
-
+        import sentry_sdk
+        
         def test_handler(event, context):
+            current_client = sentry_sdk.Hub.current.client
+            
+            assert current_client is not None
+            
+            assert len(current_client.options['integrations']) == 1
+            assert isinstance(current_client.options['integrations'][0], 
+                              sentry_sdk.integrations.aws_lambda.AwsLambdaIntegration)
+            
             raise Exception("something went wrong")
         """
         ),
         b'{"foo": "bar"}',
         layer=True
     )
-
     assert response["FunctionError"] == "Unhandled"
+    assert response["StatusCode"] == 200
 
-    (event,) = events
-    assert event["level"] == "error"
-    (exception,) = event["exception"]["values"]
-    assert exception["type"] == "Exception"
-    assert exception["value"] == "something went wrong"
+    assert response["Payload"]["errorType"] != 'AssertionError'
 
-    (frame1,) = exception["stacktrace"]["frames"]
-    assert frame1["filename"] == "test_lambda.py"
-    assert frame1["abs_path"] == "/var/task/test_lambda.py"
-    assert frame1["function"] == "test_handler"
+    assert response["Payload"]["errorType"] == 'Exception'
+    assert response["Payload"]["errorMessage"] == 'something went wrong'
 
-    assert frame1["in_app"] is True
-
-    assert exception["mechanism"] == {"type": "aws_lambda",
-                                      "handled": False}
-
-    assert event["extra"]["lambda"]["function_name"].startswith(
-        "test_function_")
-
-    logs_url = event["extra"]["cloudwatch logs"]["url"]
-    assert logs_url.startswith(
-        "https://console.aws.amazon.com/cloudwatch/home?region=")
-    assert not re.search("(=;|=$)", logs_url)
-    assert event["extra"]["cloudwatch logs"]["log_group"].startswith(
-        "/aws/lambda/test_function_"
-    )
-
-    log_stream_re = "^[0-9]{4}/[0-9]{2}/[0-9]{2}/\\[[^\\]]+][a-f0-9]+$"
-    log_stream = event["extra"]["cloudwatch logs"]["log_stream"]
-
-    assert re.match(log_stream_re, log_stream)
+    assert "sentry_handler" in response["LogResult"][3].decode("utf-8")
