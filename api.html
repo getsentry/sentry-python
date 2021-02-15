@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Main API &#8212; sentry-python 0.20.1 documentation</title>
+    <title>Main API &#8212; sentry-python 0.20.2 documentation</title>
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
@@ -36,10 +36,10 @@
 <h1>Main API<a class="headerlink" href="#main-api" title="Permalink to this headline">¶</a></h1>
 <span class="target" id="module-sentry_sdk"></span><dl class="py class">
 <dt id="sentry_sdk.Client">
-<em class="property">class </em><code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">Client</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">dsn</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">with_locals</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">max_breadcrumbs</span><span class="o">=</span><span class="default_value">100</span></em>, <em class="sig-param"><span class="n">release</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">environment</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">server_name</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">shutdown_timeout</span><span class="o">=</span><span class="default_value">2</span></em>, <em class="sig-param"><span class="n">integrations</span><span class="o">=</span><span class="default_value">[]</span></em>, <em class="sig-param"><span class="n">in_app_include</span><span class="o">=</span><span class="default_value">[]</span></em>, <em class="sig-param"><span class="n">in_app_exclude</span><span class="o">=</span><span class="default_value">[]</span></em>, <em class="sig-param"><span class="n">default_integrations</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">dist</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">transport</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">transport_queue_size</span><span class="o">=</span><span class="default_value">100</span></em>, <em class="sig-param"><span class="n">sample_rate</span><span class="o">=</span><span class="default_value">1.0</span></em>, <em class="sig-param"><span class="n">send_default_pii</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">http_proxy</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">https_proxy</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">ignore_errors</span><span class="o">=</span><span class="default_value">[]</span></em>, <em class="sig-param"><span class="n">request_bodies</span><span class="o">=</span><span class="default_value">'medium'</span></em>, <em class="sig-param"><span class="n">before_send</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">before_breadcrumb</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">debug</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">attach_stacktrace</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">ca_certs</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">propagate_traces</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">traces_sample_rate</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">traces_sampler</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">auto_enabling_integrations</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">_experiments</span><span class="o">=</span><span class="default_value">{}</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/client.html#Client"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Client" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">Client</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dsn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">with_locals</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_breadcrumbs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">release</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">environment</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">server_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shutdown_timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">integrations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">in_app_include</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">in_app_exclude</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_integrations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dist</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transport</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transport_queue_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_rate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">send_default_pii</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">http_proxy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">https_proxy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ignore_errors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">request_bodies</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'medium'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">before_send</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">before_breadcrumb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attach_stacktrace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ca_certs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">propagate_traces</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">traces_sample_rate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">traces_sampler</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">auto_enabling_integrations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_experiments</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/client.html#Client"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Client" title="Permalink to this definition">¶</a></dt>
 <dd><dl class="py method">
 <dt id="sentry_sdk.Client.capture_event">
-<code class="sig-name descname">capture_event</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">event</span></em>, <em class="sig-param"><span class="n">hint</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">scope</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#sentry_sdk.Client.capture_event" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">capture_event</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hint</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sentry_sdk.Client.capture_event" title="Permalink to this definition">¶</a></dt>
 <dd><p>Captures an event.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -59,7 +59,7 @@
 
 <dl class="py method">
 <dt id="sentry_sdk.Client.close">
-<code class="sig-name descname">close</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">timeout</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">callback</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#sentry_sdk.Client.close" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">close</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sentry_sdk.Client.close" title="Permalink to this definition">¶</a></dt>
 <dd><p>Close the client and shut down the transport. Arguments have the same
 semantics as <a class="reference internal" href="#sentry_sdk.Client.flush" title="sentry_sdk.Client.flush"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Client.flush()</span></code></a>.</p>
 <dl class="field-list simple">
@@ -71,7 +71,7 @@ semantics as <a class="reference internal" href="#sentry_sdk.Client.flush" title
 
 <dl class="py method">
 <dt id="sentry_sdk.Client.dsn">
-<em class="property">property </em><code class="sig-name descname">dsn</code><a class="headerlink" href="#sentry_sdk.Client.dsn" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">property</span> </em><code class="sig-name descname"><span class="pre">dsn</span></code><a class="headerlink" href="#sentry_sdk.Client.dsn" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the configured DSN as string.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -82,7 +82,7 @@ semantics as <a class="reference internal" href="#sentry_sdk.Client.flush" title
 
 <dl class="py method">
 <dt id="sentry_sdk.Client.flush">
-<code class="sig-name descname">flush</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">timeout</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">callback</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#sentry_sdk.Client.flush" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">flush</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sentry_sdk.Client.flush" title="Permalink to this definition">¶</a></dt>
 <dd><p>Wait for the current events to be sent.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -101,11 +101,11 @@ semantics as <a class="reference internal" href="#sentry_sdk.Client.flush" title
 
 <dl class="py class">
 <dt id="sentry_sdk.HttpTransport">
-<em class="property">class </em><code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">HttpTransport</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">options</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#HttpTransport"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.HttpTransport" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">HttpTransport</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">options</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#HttpTransport"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.HttpTransport" title="Permalink to this definition">¶</a></dt>
 <dd><p>The default HTTP transport.</p>
 <dl class="py method">
 <dt id="sentry_sdk.HttpTransport.capture_envelope">
-<code class="sig-name descname">capture_envelope</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">envelope</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#HttpTransport.capture_envelope"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.HttpTransport.capture_envelope" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">capture_envelope</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">envelope</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#HttpTransport.capture_envelope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.HttpTransport.capture_envelope" title="Permalink to this definition">¶</a></dt>
 <dd><p>Send an envelope to Sentry.</p>
 <p>Envelopes are a data container format that can hold any type of data
 submitted to Sentry. We use it for transactions and sessions, but
@@ -120,7 +120,7 @@ compat.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.HttpTransport.capture_event">
-<code class="sig-name descname">capture_event</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">event</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#HttpTransport.capture_event"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.HttpTransport.capture_event" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">capture_event</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#HttpTransport.capture_event"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.HttpTransport.capture_event" title="Permalink to this definition">¶</a></dt>
 <dd><p>This gets invoked with the event dictionary when an event should
 be sent to sentry.</p>
 <dl class="field-list simple">
@@ -132,7 +132,7 @@ be sent to sentry.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.HttpTransport.flush">
-<code class="sig-name descname">flush</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">timeout</span></em>, <em class="sig-param"><span class="n">callback</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#HttpTransport.flush"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.HttpTransport.flush" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">flush</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">timeout</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#HttpTransport.flush"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.HttpTransport.flush" title="Permalink to this definition">¶</a></dt>
 <dd><p>Wait <cite>timeout</cite> seconds for the current events to be sent out.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -143,7 +143,7 @@ be sent to sentry.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.HttpTransport.kill">
-<code class="sig-name descname">kill</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#HttpTransport.kill"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.HttpTransport.kill" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">kill</span></code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#HttpTransport.kill"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.HttpTransport.kill" title="Permalink to this definition">¶</a></dt>
 <dd><p>Forcefully kills the transport.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -156,14 +156,14 @@ be sent to sentry.</p>
 
 <dl class="py class">
 <dt id="sentry_sdk.Hub">
-<em class="property">class </em><code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">Hub</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">client_or_hub</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">scope</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">Hub</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">client_or_hub</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub" title="Permalink to this definition">¶</a></dt>
 <dd><p>The hub wraps the concurrency management of the SDK.  Each thread has
 its own hub but the hub might transfer with the flow of execution if
 context vars are available.</p>
 <p>If the hub is used with a with statement it’s temporarily activated.</p>
 <dl class="py method">
 <dt id="sentry_sdk.Hub.add_breadcrumb">
-<code class="sig-name descname">add_breadcrumb</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">crumb</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">hint</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">kwargs</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.add_breadcrumb"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.add_breadcrumb" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">add_breadcrumb</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">crumb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hint</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.add_breadcrumb"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.add_breadcrumb" title="Permalink to this definition">¶</a></dt>
 <dd><p>Adds a breadcrumb.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -181,7 +181,7 @@ to customize the breadcrumbs that are emitted.</p></li>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.bind_client">
-<code class="sig-name descname">bind_client</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">new</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.bind_client"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.bind_client" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">bind_client</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">new</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.bind_client"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.bind_client" title="Permalink to this definition">¶</a></dt>
 <dd><p>Binds a new client to the hub.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -192,7 +192,7 @@ to customize the breadcrumbs that are emitted.</p></li>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.capture_event">
-<code class="sig-name descname">capture_event</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">event</span></em>, <em class="sig-param"><span class="n">hint</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">scope</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">scope_args</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.capture_event"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.capture_event" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">capture_event</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hint</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">scope_args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.capture_event"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.capture_event" title="Permalink to this definition">¶</a></dt>
 <dd><p>Captures an event. Alias of <a class="reference internal" href="#sentry_sdk.Client.capture_event" title="sentry_sdk.Client.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Client.capture_event()</span></code></a>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -203,7 +203,7 @@ to customize the breadcrumbs that are emitted.</p></li>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.capture_exception">
-<code class="sig-name descname">capture_exception</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">error</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">scope</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">scope_args</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.capture_exception"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.capture_exception" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">capture_exception</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">error</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">scope_args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.capture_exception"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.capture_exception" title="Permalink to this definition">¶</a></dt>
 <dd><p>Captures an exception.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -220,7 +220,7 @@ to customize the breadcrumbs that are emitted.</p></li>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.capture_message">
-<code class="sig-name descname">capture_message</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">message</span></em>, <em class="sig-param"><span class="n">level</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">scope</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">scope_args</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.capture_message"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.capture_message" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">capture_message</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">scope_args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.capture_message"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.capture_message" title="Permalink to this definition">¶</a></dt>
 <dd><p>Captures a message.  The message is just a string.  If no level
 is provided the default level is <cite>info</cite>.</p>
 <dl class="field-list simple">
@@ -235,7 +235,7 @@ is provided the default level is <cite>info</cite>.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.client">
-<em class="property">property </em><code class="sig-name descname">client</code><a class="headerlink" href="#sentry_sdk.Hub.client" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">property</span> </em><code class="sig-name descname"><span class="pre">client</span></code><a class="headerlink" href="#sentry_sdk.Hub.client" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the current client on the hub.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -246,9 +246,9 @@ is provided the default level is <cite>info</cite>.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.configure_scope">
-<code class="sig-name descname">configure_scope</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">callback</span><span class="o">=</span><span class="default_value">'None'</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.configure_scope"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.configure_scope" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">configure_scope</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.configure_scope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.configure_scope" title="Permalink to this definition">¶</a></dt>
 <dt>
-<code class="sig-name descname">configure_scope</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">callback</span></em><span class="sig-paren">)</span></dt>
+<code class="sig-name descname"><span class="pre">configure_scope</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span></em><span class="sig-paren">)</span></dt>
 <dd><p>Reconfigures the scope.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -265,7 +265,7 @@ is provided the default level is <cite>info</cite>.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.end_session">
-<code class="sig-name descname">end_session</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.end_session"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.end_session" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">end_session</span></code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.end_session"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.end_session" title="Permalink to this definition">¶</a></dt>
 <dd><p>Ends the current session if there is one.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -276,7 +276,7 @@ is provided the default level is <cite>info</cite>.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.flush">
-<code class="sig-name descname">flush</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">timeout</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">callback</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.flush"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.flush" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">flush</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.flush"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.flush" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Client.flush" title="sentry_sdk.Client.flush"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Client.flush()</span></code></a></p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -287,7 +287,7 @@ is provided the default level is <cite>info</cite>.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.get_integration">
-<code class="sig-name descname">get_integration</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">name_or_class</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.get_integration"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.get_integration" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">get_integration</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name_or_class</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.get_integration"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.get_integration" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the integration for this hub by name or class.  If there
 is no client bound or the client does not have that integration
 then <cite>None</cite> is returned.</p>
@@ -302,7 +302,7 @@ client attached.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.last_event_id">
-<code class="sig-name descname">last_event_id</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.last_event_id"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.last_event_id" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">last_event_id</span></code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.last_event_id"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.last_event_id" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the last event ID.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -313,7 +313,7 @@ client attached.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.pop_scope_unsafe">
-<code class="sig-name descname">pop_scope_unsafe</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.pop_scope_unsafe"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.pop_scope_unsafe" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">pop_scope_unsafe</span></code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.pop_scope_unsafe"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.pop_scope_unsafe" title="Permalink to this definition">¶</a></dt>
 <dd><p>Pops a scope layer from the stack.</p>
 <p>Try to use the context manager <a class="reference internal" href="#sentry_sdk.push_scope" title="sentry_sdk.push_scope"><code class="xref py py-meth docutils literal notranslate"><span class="pre">push_scope()</span></code></a> instead.</p>
 <dl class="field-list simple">
@@ -325,9 +325,9 @@ client attached.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.push_scope">
-<code class="sig-name descname">push_scope</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">callback</span><span class="o">=</span><span class="default_value">'None'</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.push_scope"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.push_scope" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">push_scope</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.push_scope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.push_scope" title="Permalink to this definition">¶</a></dt>
 <dt>
-<code class="sig-name descname">push_scope</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">callback</span></em><span class="sig-paren">)</span></dt>
+<code class="sig-name descname"><span class="pre">push_scope</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span></em><span class="sig-paren">)</span></dt>
 <dd><p>Pushes a new layer on the scope stack.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -346,7 +346,7 @@ be used to pop the scope again.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.resume_auto_session_tracking">
-<code class="sig-name descname">resume_auto_session_tracking</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.resume_auto_session_tracking"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.resume_auto_session_tracking" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">resume_auto_session_tracking</span></code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.resume_auto_session_tracking"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.resume_auto_session_tracking" title="Permalink to this definition">¶</a></dt>
 <dd><p>Resumes automatic session tracking for the current scope if
 disabled earlier.  This requires that generally automatic session
 tracking is enabled.</p>
@@ -359,7 +359,7 @@ tracking is enabled.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.run">
-<code class="sig-name descname">run</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">callback</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.run" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">run</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.run" title="Permalink to this definition">¶</a></dt>
 <dd><p>Runs a callback in the context of the hub.  Alternatively the
 with statement can be used on the hub directly.</p>
 <dl class="field-list simple">
@@ -371,7 +371,7 @@ with statement can be used on the hub directly.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.scope">
-<em class="property">property </em><code class="sig-name descname">scope</code><a class="headerlink" href="#sentry_sdk.Hub.scope" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">property</span> </em><code class="sig-name descname"><span class="pre">scope</span></code><a class="headerlink" href="#sentry_sdk.Hub.scope" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the current scope on the hub.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -382,7 +382,7 @@ with statement can be used on the hub directly.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.start_session">
-<code class="sig-name descname">start_session</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.start_session"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.start_session" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">start_session</span></code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.start_session"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.start_session" title="Permalink to this definition">¶</a></dt>
 <dd><p>Starts a new session.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -393,7 +393,7 @@ with statement can be used on the hub directly.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.start_span">
-<code class="sig-name descname">start_span</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">span</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">kwargs</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.start_span"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.start_span" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">start_span</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">span</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.start_span"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.start_span" title="Permalink to this definition">¶</a></dt>
 <dd><p>Create and start timing a new span whose parent is the currently active
 span or transaction, if any. The return value is a span instance,
 typically used as a context manager to start and stop timing in a <cite>with</cite>
@@ -411,7 +411,7 @@ transaction when one is not already in progress.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.start_transaction">
-<code class="sig-name descname">start_transaction</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">transaction</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">kwargs</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.start_transaction"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.start_transaction" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">start_transaction</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">transaction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.start_transaction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.start_transaction" title="Permalink to this definition">¶</a></dt>
 <dd><p>Start and return a transaction.</p>
 <p>Start an existing transaction if given, otherwise create and start a new
 transaction with kwargs.</p>
@@ -435,7 +435,7 @@ finished child spans.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Hub.stop_auto_session_tracking">
-<code class="sig-name descname">stop_auto_session_tracking</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.stop_auto_session_tracking"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Hub.stop_auto_session_tracking" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">stop_auto_session_tracking</span></code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.stop_auto_session_tracking"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.stop_auto_session_tracking" title="Permalink to this definition">¶</a></dt>
 <dd><p>Stops automatic session tracking.</p>
 <p>This temporarily session tracking for the current scope when called.
 To resume session tracking call <cite>resume_auto_session_tracking</cite>.</p>
@@ -450,12 +450,12 @@ To resume session tracking call <cite>resume_auto_session_tracking</cite>.</p>
 
 <dl class="py class">
 <dt id="sentry_sdk.Scope">
-<em class="property">class </em><code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">Scope</code><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">Scope</span></code><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope" title="Permalink to this definition">¶</a></dt>
 <dd><p>The scope holds extra information that should be sent with all
 events that belong to it.</p>
 <dl class="py method">
 <dt id="sentry_sdk.Scope.add_attachment">
-<code class="sig-name descname">add_attachment</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">bytes</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">filename</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">path</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">content_type</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">add_to_transactions</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.add_attachment"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope.add_attachment" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">add_attachment</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bytes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">content_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">add_to_transactions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.add_attachment"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.add_attachment" title="Permalink to this definition">¶</a></dt>
 <dd><p>Adds an attachment to future events sent.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -466,7 +466,7 @@ events that belong to it.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.add_error_processor">
-<code class="sig-name descname">add_error_processor</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">func</span></em>, <em class="sig-param"><span class="n">cls</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.add_error_processor"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope.add_error_processor" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">add_error_processor</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cls</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.add_error_processor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.add_error_processor" title="Permalink to this definition">¶</a></dt>
 <dd><p>Register a scope local error processor on the scope.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -483,7 +483,7 @@ events that belong to it.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.add_event_processor">
-<code class="sig-name descname">add_event_processor</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">func</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.add_event_processor"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope.add_event_processor" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">add_event_processor</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.add_event_processor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.add_event_processor" title="Permalink to this definition">¶</a></dt>
 <dd><p>Register a scope local event processor on the scope.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -497,7 +497,7 @@ events that belong to it.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.apply_to_event">
-<code class="sig-name descname">apply_to_event</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">event</span></em>, <em class="sig-param"><span class="n">hint</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.apply_to_event"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope.apply_to_event" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">apply_to_event</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hint</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.apply_to_event"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.apply_to_event" title="Permalink to this definition">¶</a></dt>
 <dd><p>Applies the information contained on the scope to the given event.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -508,7 +508,7 @@ events that belong to it.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.clear">
-<code class="sig-name descname">clear</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.clear"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope.clear" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">clear</span></code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.clear"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.clear" title="Permalink to this definition">¶</a></dt>
 <dd><p>Clears the entire scope.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -519,7 +519,7 @@ events that belong to it.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.clear_breadcrumbs">
-<code class="sig-name descname">clear_breadcrumbs</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.clear_breadcrumbs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope.clear_breadcrumbs" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">clear_breadcrumbs</span></code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.clear_breadcrumbs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.clear_breadcrumbs" title="Permalink to this definition">¶</a></dt>
 <dd><p>Clears breadcrumb buffer.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -530,19 +530,19 @@ events that belong to it.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.fingerprint">
-<em class="property">property </em><code class="sig-name descname">fingerprint</code><a class="headerlink" href="#sentry_sdk.Scope.fingerprint" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">property</span> </em><code class="sig-name descname"><span class="pre">fingerprint</span></code><a class="headerlink" href="#sentry_sdk.Scope.fingerprint" title="Permalink to this definition">¶</a></dt>
 <dd><p>When set this overrides the default fingerprint.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.level">
-<em class="property">property </em><code class="sig-name descname">level</code><a class="headerlink" href="#sentry_sdk.Scope.level" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">property</span> </em><code class="sig-name descname"><span class="pre">level</span></code><a class="headerlink" href="#sentry_sdk.Scope.level" title="Permalink to this definition">¶</a></dt>
 <dd><p>When set this overrides the level. Deprecated in favor of set_level.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.remove_context">
-<code class="sig-name descname">remove_context</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">key</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.remove_context"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope.remove_context" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">remove_context</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.remove_context"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.remove_context" title="Permalink to this definition">¶</a></dt>
 <dd><p>Removes a context.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -553,7 +553,7 @@ events that belong to it.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.remove_extra">
-<code class="sig-name descname">remove_extra</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">key</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.remove_extra"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope.remove_extra" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">remove_extra</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.remove_extra"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.remove_extra" title="Permalink to this definition">¶</a></dt>
 <dd><p>Removes a specific extra key.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -564,7 +564,7 @@ events that belong to it.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.remove_tag">
-<code class="sig-name descname">remove_tag</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">key</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.remove_tag"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope.remove_tag" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">remove_tag</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.remove_tag"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.remove_tag" title="Permalink to this definition">¶</a></dt>
 <dd><p>Removes a specific tag.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -575,7 +575,7 @@ events that belong to it.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.set_context">
-<code class="sig-name descname">set_context</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">key</span></em>, <em class="sig-param"><span class="n">value</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.set_context"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope.set_context" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">set_context</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.set_context"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.set_context" title="Permalink to this definition">¶</a></dt>
 <dd><p>Binds a context at a certain key to a specific value.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -586,7 +586,7 @@ events that belong to it.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.set_extra">
-<code class="sig-name descname">set_extra</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">key</span></em>, <em class="sig-param"><span class="n">value</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.set_extra"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope.set_extra" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">set_extra</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.set_extra"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.set_extra" title="Permalink to this definition">¶</a></dt>
 <dd><p>Sets an extra key to a specific value.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -597,7 +597,7 @@ events that belong to it.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.set_level">
-<code class="sig-name descname">set_level</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">value</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.set_level"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope.set_level" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">set_level</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.set_level"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.set_level" title="Permalink to this definition">¶</a></dt>
 <dd><p>Sets the level for the scope.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -608,7 +608,7 @@ events that belong to it.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.set_tag">
-<code class="sig-name descname">set_tag</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">key</span></em>, <em class="sig-param"><span class="n">value</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.set_tag"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope.set_tag" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">set_tag</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.set_tag"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.set_tag" title="Permalink to this definition">¶</a></dt>
 <dd><p>Sets a tag for a key to a specific value.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -619,7 +619,7 @@ events that belong to it.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.set_user">
-<code class="sig-name descname">set_user</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">value</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.set_user"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Scope.set_user" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">set_user</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.set_user"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.set_user" title="Permalink to this definition">¶</a></dt>
 <dd><p>Sets a user for the scope.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -630,7 +630,7 @@ events that belong to it.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.span">
-<em class="property">property </em><code class="sig-name descname">span</code><a class="headerlink" href="#sentry_sdk.Scope.span" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">property</span> </em><code class="sig-name descname"><span class="pre">span</span></code><a class="headerlink" href="#sentry_sdk.Scope.span" title="Permalink to this definition">¶</a></dt>
 <dd><p>Get/set current tracing span or transaction.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -641,7 +641,7 @@ events that belong to it.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.transaction">
-<em class="property">property </em><code class="sig-name descname">transaction</code><a class="headerlink" href="#sentry_sdk.Scope.transaction" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">property</span> </em><code class="sig-name descname"><span class="pre">transaction</span></code><a class="headerlink" href="#sentry_sdk.Scope.transaction" title="Permalink to this definition">¶</a></dt>
 <dd><p>Return the transaction (root span) in the scope, if any.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -652,7 +652,7 @@ events that belong to it.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Scope.user">
-<em class="property">property </em><code class="sig-name descname">user</code><a class="headerlink" href="#sentry_sdk.Scope.user" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">property</span> </em><code class="sig-name descname"><span class="pre">user</span></code><a class="headerlink" href="#sentry_sdk.Scope.user" title="Permalink to this definition">¶</a></dt>
 <dd><p>When set a specific user is bound to the scope. Deprecated in favor of set_user.</p>
 </dd></dl>
 
@@ -660,12 +660,12 @@ events that belong to it.</p>
 
 <dl class="py class">
 <dt id="sentry_sdk.Transport">
-<em class="property">class </em><code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">Transport</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">options</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#Transport"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Transport" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">Transport</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#Transport"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Transport" title="Permalink to this definition">¶</a></dt>
 <dd><p>Baseclass for all transports.</p>
 <p>A transport is used to send an event to sentry.</p>
 <dl class="py method">
 <dt id="sentry_sdk.Transport.capture_envelope">
-<code class="sig-name descname">capture_envelope</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">envelope</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#Transport.capture_envelope"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Transport.capture_envelope" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">capture_envelope</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">envelope</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#Transport.capture_envelope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Transport.capture_envelope" title="Permalink to this definition">¶</a></dt>
 <dd><p>Send an envelope to Sentry.</p>
 <p>Envelopes are a data container format that can hold any type of data
 submitted to Sentry. We use it for transactions and sessions, but
@@ -680,7 +680,7 @@ compat.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Transport.capture_event">
-<code class="sig-name descname">capture_event</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">event</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#Transport.capture_event"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Transport.capture_event" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">capture_event</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#Transport.capture_event"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Transport.capture_event" title="Permalink to this definition">¶</a></dt>
 <dd><p>This gets invoked with the event dictionary when an event should
 be sent to sentry.</p>
 <dl class="field-list simple">
@@ -692,7 +692,7 @@ be sent to sentry.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Transport.flush">
-<code class="sig-name descname">flush</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">timeout</span></em>, <em class="sig-param"><span class="n">callback</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#Transport.flush"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Transport.flush" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">flush</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">timeout</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#Transport.flush"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Transport.flush" title="Permalink to this definition">¶</a></dt>
 <dd><p>Wait <cite>timeout</cite> seconds for the current events to be sent out.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -703,7 +703,7 @@ be sent to sentry.</p>
 
 <dl class="py method">
 <dt id="sentry_sdk.Transport.kill">
-<code class="sig-name descname">kill</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#Transport.kill"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.Transport.kill" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname"><span class="pre">kill</span></code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/transport.html#Transport.kill"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Transport.kill" title="Permalink to this definition">¶</a></dt>
 <dd><p>Forcefully kills the transport.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type</dt>
@@ -716,7 +716,7 @@ be sent to sentry.</p>
 
 <dl class="py function">
 <dt id="sentry_sdk.add_breadcrumb">
-<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">add_breadcrumb</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">crumb</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">hint</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">kwargs</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#add_breadcrumb"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.add_breadcrumb" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">add_breadcrumb</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">crumb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hint</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#add_breadcrumb"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.add_breadcrumb" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Hub.add_breadcrumb" title="sentry_sdk.Hub.add_breadcrumb"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.add_breadcrumb()</span></code></a></p>
 <p>Adds a breadcrumb.</p>
 <dl class="field-list simple">
@@ -735,7 +735,7 @@ to customize the breadcrumbs that are emitted.</p></li>
 
 <dl class="py function">
 <dt id="sentry_sdk.capture_event">
-<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">capture_event</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">event</span></em>, <em class="sig-param"><span class="n">hint</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">scope</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">scope_args</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#capture_event"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.capture_event" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">capture_event</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hint</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">scope_args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#capture_event"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.capture_event" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Hub.capture_event" title="sentry_sdk.Hub.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.capture_event()</span></code></a></p>
 <p>Captures an event. Alias of <a class="reference internal" href="#sentry_sdk.Client.capture_event" title="sentry_sdk.Client.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Client.capture_event()</span></code></a>.</p>
 <dl class="field-list simple">
@@ -747,7 +747,7 @@ to customize the breadcrumbs that are emitted.</p></li>
 
 <dl class="py function">
 <dt id="sentry_sdk.capture_exception">
-<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">capture_exception</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">error</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">scope</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">scope_args</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#capture_exception"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.capture_exception" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">capture_exception</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">error</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">scope_args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#capture_exception"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.capture_exception" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Hub.capture_exception" title="sentry_sdk.Hub.capture_exception"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.capture_exception()</span></code></a></p>
 <p>Captures an exception.</p>
 <dl class="field-list simple">
@@ -765,7 +765,7 @@ to customize the breadcrumbs that are emitted.</p></li>
 
 <dl class="py function">
 <dt id="sentry_sdk.capture_message">
-<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">capture_message</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">message</span></em>, <em class="sig-param"><span class="n">level</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">scope</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">scope_args</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#capture_message"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.capture_message" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">capture_message</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">scope_args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#capture_message"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.capture_message" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Hub.capture_message" title="sentry_sdk.Hub.capture_message"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.capture_message()</span></code></a></p>
 <p>Captures a message.  The message is just a string.  If no level
 is provided the default level is <cite>info</cite>.</p>
@@ -781,7 +781,7 @@ is provided the default level is <cite>info</cite>.</p>
 
 <dl class="py function">
 <dt id="sentry_sdk.configure_scope">
-<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">configure_scope</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">callback</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#configure_scope"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.configure_scope" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">configure_scope</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#configure_scope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.configure_scope" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Hub.configure_scope" title="sentry_sdk.Hub.configure_scope"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.configure_scope()</span></code></a></p>
 <p>Reconfigures the scope.</p>
 <dl class="field-list simple">
@@ -799,7 +799,7 @@ is provided the default level is <cite>info</cite>.</p>
 
 <dl class="py function">
 <dt id="sentry_sdk.flush">
-<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">flush</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">timeout</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">callback</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#flush"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.flush" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">flush</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#flush"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.flush" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Hub.flush" title="sentry_sdk.Hub.flush"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.flush()</span></code></a></p>
 <p>Alias for <a class="reference internal" href="#sentry_sdk.Client.flush" title="sentry_sdk.Client.flush"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Client.flush()</span></code></a></p>
 <dl class="field-list simple">
@@ -811,12 +811,12 @@ is provided the default level is <cite>info</cite>.</p>
 
 <dl class="py class">
 <dt id="sentry_sdk.init">
-<em class="property">class </em><code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">init</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">dsn</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">with_locals</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">max_breadcrumbs</span><span class="o">=</span><span class="default_value">100</span></em>, <em class="sig-param"><span class="n">release</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">environment</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">server_name</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">shutdown_timeout</span><span class="o">=</span><span class="default_value">2</span></em>, <em class="sig-param"><span class="n">integrations</span><span class="o">=</span><span class="default_value">[]</span></em>, <em class="sig-param"><span class="n">in_app_include</span><span class="o">=</span><span class="default_value">[]</span></em>, <em class="sig-param"><span class="n">in_app_exclude</span><span class="o">=</span><span class="default_value">[]</span></em>, <em class="sig-param"><span class="n">default_integrations</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">dist</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">transport</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">transport_queue_size</span><span class="o">=</span><span class="default_value">100</span></em>, <em class="sig-param"><span class="n">sample_rate</span><span class="o">=</span><span class="default_value">1.0</span></em>, <em class="sig-param"><span class="n">send_default_pii</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">http_proxy</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">https_proxy</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">ignore_errors</span><span class="o">=</span><span class="default_value">[]</span></em>, <em class="sig-param"><span class="n">request_bodies</span><span class="o">=</span><span class="default_value">'medium'</span></em>, <em class="sig-param"><span class="n">before_send</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">before_breadcrumb</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">debug</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">attach_stacktrace</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">ca_certs</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">propagate_traces</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">traces_sample_rate</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">traces_sampler</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">auto_enabling_integrations</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">_experiments</span><span class="o">=</span><span class="default_value">{}</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#init"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.init" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span> </em><code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">init</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dsn</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">with_locals</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_breadcrumbs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">release</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">environment</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">server_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shutdown_timeout</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">integrations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">in_app_include</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">in_app_exclude</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_integrations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dist</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transport</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transport_queue_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_rate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">send_default_pii</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">http_proxy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">https_proxy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ignore_errors</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">request_bodies</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'medium'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">before_send</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">before_breadcrumb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">debug</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attach_stacktrace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ca_certs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">propagate_traces</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">traces_sample_rate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">traces_sampler</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">auto_enabling_integrations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_experiments</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#init"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.init" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py function">
 <dt id="sentry_sdk.last_event_id">
-<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">last_event_id</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#last_event_id"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.last_event_id" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">last_event_id</span></code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#last_event_id"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.last_event_id" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Hub.last_event_id" title="sentry_sdk.Hub.last_event_id"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.last_event_id()</span></code></a></p>
 <p>Returns the last event ID.</p>
 <dl class="field-list simple">
@@ -828,7 +828,7 @@ is provided the default level is <cite>info</cite>.</p>
 
 <dl class="py function">
 <dt id="sentry_sdk.push_scope">
-<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">push_scope</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">callback</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#push_scope"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.push_scope" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">push_scope</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#push_scope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.push_scope" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Hub.push_scope" title="sentry_sdk.Hub.push_scope"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.push_scope()</span></code></a></p>
 <p>Pushes a new layer on the scope stack.</p>
 <dl class="field-list simple">
@@ -848,7 +848,7 @@ be used to pop the scope again.</p>
 
 <dl class="py function">
 <dt id="sentry_sdk.set_context">
-<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">set_context</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">key</span></em>, <em class="sig-param"><span class="n">value</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#set_context"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.set_context" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">set_context</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#set_context"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.set_context" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Scope.set_context" title="sentry_sdk.Scope.set_context"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.set_context()</span></code></a></p>
 <p>Binds a context at a certain key to a specific value.</p>
 <dl class="field-list simple">
@@ -860,7 +860,7 @@ be used to pop the scope again.</p>
 
 <dl class="py function">
 <dt id="sentry_sdk.set_extra">
-<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">set_extra</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">key</span></em>, <em class="sig-param"><span class="n">value</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#set_extra"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.set_extra" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">set_extra</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#set_extra"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.set_extra" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Scope.set_extra" title="sentry_sdk.Scope.set_extra"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.set_extra()</span></code></a></p>
 <p>Sets an extra key to a specific value.</p>
 <dl class="field-list simple">
@@ -872,7 +872,7 @@ be used to pop the scope again.</p>
 
 <dl class="py function">
 <dt id="sentry_sdk.set_level">
-<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">set_level</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">value</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#set_level"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.set_level" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">set_level</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#set_level"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.set_level" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Scope.set_level" title="sentry_sdk.Scope.set_level"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.set_level()</span></code></a></p>
 <p>Sets the level for the scope.</p>
 <dl class="field-list simple">
@@ -884,7 +884,7 @@ be used to pop the scope again.</p>
 
 <dl class="py function">
 <dt id="sentry_sdk.set_tag">
-<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">set_tag</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">key</span></em>, <em class="sig-param"><span class="n">value</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#set_tag"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.set_tag" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">set_tag</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#set_tag"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.set_tag" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Scope.set_tag" title="sentry_sdk.Scope.set_tag"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.set_tag()</span></code></a></p>
 <p>Sets a tag for a key to a specific value.</p>
 <dl class="field-list simple">
@@ -896,7 +896,7 @@ be used to pop the scope again.</p>
 
 <dl class="py function">
 <dt id="sentry_sdk.set_user">
-<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">set_user</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">value</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#set_user"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.set_user" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">set_user</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#set_user"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.set_user" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Scope.set_user" title="sentry_sdk.Scope.set_user"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.set_user()</span></code></a></p>
 <p>Sets a user for the scope.</p>
 <dl class="field-list simple">
@@ -908,7 +908,7 @@ be used to pop the scope again.</p>
 
 <dl class="py function">
 <dt id="sentry_sdk.start_span">
-<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">start_span</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">span</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">kwargs</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#start_span"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.start_span" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">start_span</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">span</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#start_span"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.start_span" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Hub.start_span" title="sentry_sdk.Hub.start_span"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.start_span()</span></code></a></p>
 <p>Create and start timing a new span whose parent is the currently active
 span or transaction, if any. The return value is a span instance,
@@ -927,7 +927,7 @@ transaction when one is not already in progress.</p>
 
 <dl class="py function">
 <dt id="sentry_sdk.start_transaction">
-<code class="sig-prename descclassname">sentry_sdk.</code><code class="sig-name descname">start_transaction</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">transaction</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">kwargs</span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#start_transaction"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#sentry_sdk.start_transaction" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></code><code class="sig-name descname"><span class="pre">start_transaction</span></code><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">transaction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#start_transaction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.start_transaction" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Hub.start_transaction" title="sentry_sdk.Hub.start_transaction"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.start_transaction()</span></code></a></p>
 <p>Start and return a transaction.</p>
 <p>Start an existing transaction if given, otherwise create and start a new
@@ -1009,7 +1009,7 @@ finished child spans.</p>
       &copy;2019, Sentry Team and Contributors.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.4.0</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.5.0</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |
