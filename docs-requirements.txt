@@ -1,4 +1,4 @@
-sphinx==3.4.0
+sphinx==3.5.0
 sphinx-rtd-theme
 sphinx-autodoc-typehints[type_comments]>=1.8.0
 typing-extensions
