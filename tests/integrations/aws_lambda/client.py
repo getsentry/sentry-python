@@ -41,27 +41,43 @@ def run_lambda_function(
             # such as chalice's)
             subprocess.check_call([sys.executable, test_lambda_py])
 
-        setup_cfg = os.path.join(tmpdir, "setup.cfg")
-        with open(setup_cfg, "w") as f:
-            f.write("[install]\nprefix=")
+        if not layer:
+            setup_cfg = os.path.join(tmpdir, "setup.cfg")
+            with open(setup_cfg, "w") as f:
+                f.write("[install]\nprefix=")
 
-        subprocess.check_call(
-            [sys.executable, "setup.py", "sdist", "-d", os.path.join(tmpdir, "..")],
-            **subprocess_kwargs
-        )
+            subprocess.check_call(
+                [sys.executable, "setup.py", "sdist", "-d", os.path.join(tmpdir, "..")],
+                **subprocess_kwargs
+            )
 
-        subprocess.check_call(
-            "pip install mock==3.0.0 funcsigs -t .",
-            cwd=tmpdir,
-            shell=True,
-            **subprocess_kwargs
-        )
+            subprocess.check_call(
+                "pip install mock==3.0.0 funcsigs -t .",
+                cwd=tmpdir,
+                shell=True,
+                **subprocess_kwargs
+            )
 
-        # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
-        subprocess.check_call(
-            "pip install ../*.tar.gz -t .", cwd=tmpdir, shell=True, **subprocess_kwargs
-        )
-        shutil.make_archive(os.path.join(tmpdir, "ball"), "zip", tmpdir)
+            # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
+            subprocess.check_call(
+                "pip install ../*.tar.gz -t .", cwd=tmpdir, shell=True, **subprocess_kwargs
+            )
+
+            shutil.make_archive(os.path.join(tmpdir, "ball"), "zip", tmpdir)
+        else:
+            subprocess.run(
+                [
+                    "zip",
+                    "-q",  # Quiet
+                    "-x",  # Exclude files
+                    "**/__pycache__/*",  # Files to be excluded
+                    "-r",  # Recurse paths
+                    "ball.zip",  # Output filename
+                    './',  # Files to be zipped
+                ],
+                cwd=tmpdir,
+                check=True,  # Raises CalledProcessError if exit status is non-zero
+            )
 
         fn_name = "test_function_{}".format(uuid.uuid4())
 
@@ -79,24 +95,46 @@ def run_lambda_function(
                     Description="Created as part of testsuite for getsentry/sentry-python",
                 )
         else:
-            from sentry_sdk.integrations.aws_lambda.build_awslambda_layer import
+            print("Yes Layer!")
+            from sentry_sdk.integrations.aws_lambda.build_awslambda_layer import build_packaged_zip
+            build_packaged_zip(dest_abs_path=tmpdir, dest_zip_filename="serverless-ball.zip")
+            print(os.listdir(tmpdir))
 
             #ToDO: create fyunction with layer
-            response = client.publish_layer_version(
-                LayerName='string',
-                Description='string',
-                Content={
-                    'S3Bucket': 'string',
-                    'S3Key': 'string',
-                    'S3ObjectVersion': 'string',
-                    'ZipFile': b'bytes'
-                },
-                LicenseInfo='string'
-            )
-            print(response.json())
+            with open(
+                    os.path.join(
+                        tmpdir, "serverless-ball.zip"), "rb") as serverless_zip:
+                response = client.publish_layer_version(
+                    LayerName='python-serverless-sdk-test',
+                    Description="Created as part of testsuite for getsentry/sentry-python",
+                    Content={
+                        'ZipFile': serverless_zip.read()
+                    }
+                )
+
+            with open(os.path.join(tmpdir, "ball.zip"), "rb") as zip:
+                client.create_function(
+                    FunctionName=fn_name,
+                    Runtime=runtime,
+                    Timeout=timeout,
+                    Environment={
+                        'Variables': {
+                            'INITIAL_HANDLER': 'test_lambda.test_handler',
+                            'DSN': 'https://123abc@example.com/123'
+                        }
+                    },
+                    Role=os.environ["SENTRY_PYTHON_TEST_AWS_IAM_ROLE"],
+                    Handler="sentry_sdk.integrations.aws_lambda.init_serverless_sdk.sentry_lambda_handler",
+                    Layers=[
+                        response['LayerVersionArn']
+                    ],
+                    Code={"ZipFile": zip.read()},
+                    Description="Created as part of testsuite for getsentry/sentry-python",
+                )
 
         @add_finalizer
         def clean_up():
+            # ToDo uncomment this!
             client.delete_function(FunctionName=fn_name)
 
             # this closes the web socket so we don't get a

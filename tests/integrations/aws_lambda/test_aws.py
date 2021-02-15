@@ -182,7 +182,7 @@ def lambda_runtime(request):
 
 @pytest.fixture
 def run_lambda_function(request, lambda_client, lambda_runtime):
-    def inner(code, payload, timeout=30, syntax_check=True):
+    def inner(code, payload, timeout=30, syntax_check=True, layer=None):
         from tests.integrations.aws_lambda.client import run_lambda_function
 
         response = run_lambda_function(
@@ -193,6 +193,7 @@ def run_lambda_function(request, lambda_client, lambda_runtime):
             add_finalizer=request.addfinalizer,
             timeout=timeout,
             syntax_check=syntax_check,
+            layer=layer
         )
 
         # for better debugging
@@ -694,8 +695,6 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
         LAMBDA_PRELUDE
         + dedent(
             """
-        init_sdk()
-
         def event_processor(event):
             # Delay event output like this to test proper shutdown
             time.sleep(1)
@@ -706,6 +705,7 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
         """
         ),
         b'{"foo": "bar"}',
+        layer=True
     )
 
     assert response["FunctionError"] == "Unhandled"
