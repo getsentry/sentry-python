@@ -4,6 +4,10 @@ import tempfile
 import shutil
 
 from sentry_sdk.consts import VERSION as SDK_VERSION
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from typing import Union
 
 
 class PackageBuilder:
@@ -71,13 +75,13 @@ class PackageBuilder:
 # creating a directory for a specific version. For more information, see
 #  https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-path
 def build_packaged_zip(
-    dist_rel_path="dist",
-    dest_zip_filename=f"sentry-python-serverless-{SDK_VERSION}.zip",
-    pkg_parent_dir="python",
-    dest_abs_path=None,
+    dist_rel_path="dist",  # type: str
+    dest_zip_filename=f"sentry-python-serverless-{SDK_VERSION}.zip",  # type: str
+    pkg_parent_dir="python",  # type: str
+    dest_abs_path=None,  # type: Union[str, None]
 ):
     # type: (...) -> None
-    if not dest_abs_path:
+    if dest_abs_path is None:
         dest_abs_path = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "../../..", dist_rel_path)
         )
