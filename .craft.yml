@@ -6,6 +6,7 @@ github:
 
 targets:
   - name: pypi
+    includeNames: /^sentry[_\-]sdk.*$/
   - name: github
   - name: gh-pages
   - name: registry

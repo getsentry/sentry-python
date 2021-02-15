@@ -7,10 +7,10 @@ from sentry_sdk.consts import VERSION as SDK_VERSION
 
 
 class PackageBuilder:
-    def __init__(self, base_dir, pkg_parent_dir, dist_dir_name) -> None:
+    def __init__(self, base_dir, pkg_parent_dir, dist_rel_path) -> None:
         self.base_dir = base_dir
         self.pkg_parent_dir = pkg_parent_dir
-        self.dist_dir_name = dist_dir_name
+        self.dist_rel_path = dist_rel_path
         self.packages_dir = self.get_relative_path_of(pkg_parent_dir)
 
     def make_directories(self):
@@ -18,7 +18,7 @@ class PackageBuilder:
 
     def install_python_binaries(self):
         wheels_filepath = os.path.join(
-            self.dist_dir_name, f"sentry_sdk-{SDK_VERSION}-py2.py3-none-any.whl"
+            self.dist_rel_path, f"sentry_sdk-{SDK_VERSION}-py2.py3-none-any.whl"
         )
         subprocess.run(
             [
@@ -57,21 +57,20 @@ class PackageBuilder:
 # creating a directory for a specific version. For more information, see
 #  https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-path
 def build_packaged_zip(
-    dist_dirname='dist',
-    dest_rel_path="dist-serverless",
+    dist_rel_path="dist",
     dest_zip_filename=f"sentry-python-serverless-{SDK_VERSION}.zip",
     pkg_parent_dir="python"
 ):
     dest_abs_path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "../../..", dest_rel_path)
+        os.path.join(os.path.dirname(__file__), "../../..", dist_rel_path)
     )
     with tempfile.TemporaryDirectory() as tmp_dir:
-        package_builder = PackageBuilder(tmp_dir, pkg_parent_dir, dist_dirname)
+        package_builder = PackageBuilder(tmp_dir, pkg_parent_dir, dist_rel_path)
         package_builder.make_directories()
         package_builder.install_python_binaries()
         package_builder.zip(dest_zip_filename)
-        if not os.path.exists(dest_rel_path):
-            os.makedirs(dest_rel_path)
+        if not os.path.exists(dist_rel_path):
+            os.makedirs(dist_rel_path)
         shutil.copy(
             package_builder.get_relative_path_of(dest_zip_filename),
             dest_abs_path
