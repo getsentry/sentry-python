@@ -59,11 +59,13 @@ class PackageBuilder:
 def build_packaged_zip(
     dist_rel_path="dist",
     dest_zip_filename=f"sentry-python-serverless-{SDK_VERSION}.zip",
-    pkg_parent_dir="python"
+    pkg_parent_dir="python",
+    dest_abs_path=None
 ):
-    dest_abs_path = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "../../..", dist_rel_path)
-    )
+    if not dest_abs_path:
+        dest_abs_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "../../..", dist_rel_path)
+        )
     with tempfile.TemporaryDirectory() as tmp_dir:
         package_builder = PackageBuilder(tmp_dir, pkg_parent_dir, dist_rel_path)
         package_builder.make_directories()
