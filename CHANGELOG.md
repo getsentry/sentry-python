@@ -20,6 +20,10 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 0.20.2
+
+- Fix incorrect regex in craft to include wheel file in pypi release
+
 ## 0.20.1
 
 - Fix for error that occurs with Async Middlewares when the middleware is a function rather than a class
