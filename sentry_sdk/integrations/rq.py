@@ -123,6 +123,8 @@ def _make_event_processor(weak_job):
                     "args": job.args,
                     "kwargs": job.kwargs,
                     "description": job.description,
+                    "enqueued_at": str(job.enqueued_at),
+                    "started_at": str(job.started_at),
                 }
 
         if "exc_info" in hint:
