@@ -48,8 +48,12 @@ def test_basic(sentry_init, capture_events):
     queue = rq.Queue(connection=FakeStrictRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
-    queue.enqueue(crashing_job, foo=42)
+    job = queue.enqueue(crashing_job, foo=42)
+    job.save()
+
     worker.work(burst=True)
+
+    job.refresh()
 
     (event,) = events
 
@@ -65,6 +69,8 @@ def test_basic(sentry_init, capture_events):
         "func": "tests.integrations.rq.test_rq.crashing_job",
         "job_id": event["extra"]["rq-job"]["job_id"],
         "kwargs": {"foo": 42},
+        "enqueued_at": str(job.enqueued_at),
+        "started_at": str(job.started_at),
     }
 
 
@@ -158,8 +164,12 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     queue = rq.Queue(connection=FakeStrictRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
-    queue.enqueue(do_trick, "Bodhi", trick="roll over")
+    job = queue.enqueue(do_trick, "Bodhi", trick="roll over")
+    job.save()
+
     worker.work(burst=True)
+
+    job.refresh()
 
     traces_sampler.assert_any_call(
         DictionaryContaining(
@@ -172,6 +182,8 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                         "func_name": "tests.integrations.rq.test_rq.do_trick",
                         "args": ("Bodhi",),
                         "kwargs": {"trick": "roll over"},
+                        "enqueued_at": job.enqueued_at,
+                        "started_at": job.started_at,
                     },
                 ),
             }
