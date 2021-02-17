@@ -25,7 +25,7 @@ def build_no_code_serverless_function_and_layer(
     sdk by creating a layer containing the Python-sdk, and then creating a func
     that uses that layer
     """
-    from sentry_sdk.integrations.aws_lambda.build_awslambda_layer import (
+    from scripts.build_awslambda_layer import (
         build_packaged_zip,
     )
 
@@ -50,7 +50,7 @@ def build_no_code_serverless_function_and_layer(
                 }
             },
             Role=os.environ["SENTRY_PYTHON_TEST_AWS_IAM_ROLE"],
-            Handler="sentry_sdk.integrations.aws_lambda.init_serverless_sdk.sentry_lambda_handler",
+            Handler="sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler",
             Layers=[response["LayerVersionArn"]],
             Code={"ZipFile": zip.read()},
             Description="Created as part of testsuite for getsentry/sentry-python",

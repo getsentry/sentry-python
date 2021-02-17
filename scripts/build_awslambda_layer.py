@@ -45,6 +45,19 @@ class PackageBuilder:
             check=True,
         )
 
+    def create_init_serverless_sdk_package(self):
+        # type: (...) -> None
+        """
+        Method that creates the init_serverless_sdk pkg in the
+        sentry-python-serverless zip
+        """
+        serverless_sdk_path = f'{self.packages_dir}/sentry_sdk/' \
+                              f'integrations/init_serverless_sdk'
+        if not os.path.exists(serverless_sdk_path):
+            os.makedirs(serverless_sdk_path)
+        shutil.copy('scripts/init_serverless_sdk.py',
+                    f'{serverless_sdk_path}/__init__.py')
+
     def zip(
         self, filename  # type: str
     ):
@@ -83,12 +96,13 @@ def build_packaged_zip(
     # type: (...) -> None
     if dest_abs_path is None:
         dest_abs_path = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "../../..", dist_rel_path)
+            os.path.join(os.path.dirname(__file__), "..", dist_rel_path)
         )
     with tempfile.TemporaryDirectory() as tmp_dir:
         package_builder = PackageBuilder(tmp_dir, pkg_parent_dir, dist_rel_path)
         package_builder.make_directories()
         package_builder.install_python_binaries()
+        package_builder.create_init_serverless_sdk_package()
         package_builder.zip(dest_zip_filename)
         if not os.path.exists(dist_rel_path):
             os.makedirs(dist_rel_path)

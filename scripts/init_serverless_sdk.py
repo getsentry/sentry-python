@@ -3,7 +3,7 @@ For manual instrumentation,
 The Handler function string of an aws lambda function should be added as an
 environment variable with a key of 'INITIAL_HANDLER' along with the 'DSN'
 Then the Handler function sstring should be replaced with
-'sentry_sdk.integrations.aws_lambda.init_serverless_sdk.sentry_lambda_handler'
+'scripts.init_serverless_sdk.sentry_lambda_handler'
 """
 import os
 
