@@ -1,7 +1,7 @@
 """
 For manual instrumentation,
 The Handler function string of an aws lambda function should be added as an
-environment variable with a key of 'INITIAL_HANDLER' along with the 'DSN'
+environment variable with a key of 'SENTRY_INITIAL_HANDLER' along with the 'DSN'
 Then the Handler function sstring should be replaced with
 'sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler'
 """
@@ -17,8 +17,9 @@ if MYPY:
 
 # Configure Sentry SDK
 sentry_sdk.init(
-    dsn=os.environ["DSN"],
+    dsn=os.environ["SENTRY_DSN"],
     integrations=[AwsLambdaIntegration(timeout_warning=True)],
+    traces_sample_rate=float(os.environ["SENTRY_TRACES_SAMPLE_RATE"])
 )
 
 
@@ -26,10 +27,10 @@ def sentry_lambda_handler(event, context):
     # type: (Any, Any) -> None
     """
     Handler function that invokes a lambda handler which path is defined in
-    environment vairables as "INITIAL_HANDLER"
+    environment vairables as "SENTRY_INITIAL_HANDLER"
     """
     try:
-        module_name, handler_name = os.environ["INITIAL_HANDLER"].rsplit(".", 1)
+        module_name, handler_name = os.environ["SENTRY_INITIAL_HANDLER"].rsplit(".", 1)
     except ValueError:
         raise ValueError("Incorrect AWS Handler path (Not a path)")
     lambda_function = __import__(module_name)
