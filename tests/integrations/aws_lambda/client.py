@@ -45,8 +45,9 @@ def build_no_code_serverless_function_and_layer(
             Timeout=timeout,
             Environment={
                 "Variables": {
-                    "INITIAL_HANDLER": "test_lambda.test_handler",
-                    "DSN": "https://123abc@example.com/123",
+                    "SENTRY_INITIAL_HANDLER": "test_lambda.test_handler",
+                    "SENTRY_DSN": "https://123abc@example.com/123",
+                    "SENTRY_TRACES_SAMPLE_RATE": "1.0"
                 }
             },
             Role=os.environ["SENTRY_PYTHON_TEST_AWS_IAM_ROLE"],
