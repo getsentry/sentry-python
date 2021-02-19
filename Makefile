@@ -9,6 +9,7 @@ help:
 	@echo "make test: Run basic tests (not testing most integrations)"
 	@echo "make test-all: Run ALL tests (slow, closest to CI)"
 	@echo "make format: Run code formatters (destructive)"
+	@echo "make aws-lambda-layer-build: Build serverless ZIP dist package"
 	@echo
 	@echo "Also make sure to read ./CONTRIBUTING.md"
 	@false
@@ -58,3 +59,9 @@ apidocs-hotfix: apidocs
 	@$(VENV_PATH)/bin/pip install ghp-import
 	@$(VENV_PATH)/bin/ghp-import -pf docs/_build
 .PHONY: apidocs-hotfix
+
+aws-lambda-layer-build: dist
+	$(VENV_PATH)/bin/pip install urllib3
+	$(VENV_PATH)/bin/pip install certifi
+	$(VENV_PATH)/bin/python -m scripts.build_awslambda_layer
+.PHONY: aws-lambda-layer-build

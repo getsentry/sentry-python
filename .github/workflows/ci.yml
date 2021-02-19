@@ -14,8 +14,6 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-16.04
 
-    if: "startsWith(github.ref, 'refs/heads/release/')"
-
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1
@@ -25,12 +23,14 @@ jobs:
 
       - run: |
           pip install virtualenv
-          make dist
+          make aws-lambda-layer-build
 
       - uses: actions/upload-artifact@v2
         with:
           name: ${{ github.sha }}
-          path: dist/*
+          path: |
+            dist/*
+            dist-serverless/*
 
   docs:
     timeout-minutes: 10
