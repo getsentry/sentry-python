@@ -330,7 +330,7 @@ def _before_get_response(request):
                     resolve(request.path).func
                 )
             elif integration.transaction_style == "url":
-                scope.transaction = LEGACY_RESOLVER.resolve(request.path)
+                scope.transaction = LEGACY_RESOLVER.resolve(request.path_info)
         except Exception:
             pass
 
