@@ -108,7 +108,6 @@ class BackgroundWorker(object):
                 pending = self._queue.qsize() + 1
                 logger.error("flush timed out, dropped %s events", pending)
 
-
     def submit(self, callback):
         # type: (Callable[[], None]) -> None
         self._ensure_thread()
