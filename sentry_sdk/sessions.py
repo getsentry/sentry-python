@@ -32,17 +32,14 @@ def is_auto_session_tracking_enabled(hub=None):
 
 
 @contextmanager
-def auto_session_tracking(hub=None, session_mode=None):
-    # type: (Optional[sentry_sdk.Hub], Optional[str]) -> Generator[None, None, None]
+def auto_session_tracking(hub=None, session_mode="application"):
+    # type: (Optional[sentry_sdk.Hub], str) -> Generator[None, None, None]
     """Starts and stops a session automatically around a block."""
     if hub is None:
         hub = sentry_sdk.Hub.current
     should_track = is_auto_session_tracking_enabled(hub)
     if should_track:
-        if session_mode:
-            hub.start_session(session_mode=session_mode)
-        else:
-            hub.start_session()
+        hub.start_session(session_mode=session_mode)
     try:
         yield
     finally:
