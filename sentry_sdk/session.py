@@ -30,7 +30,6 @@ def _make_uuid(
 class Session(object):
     def __init__(
         self,
-        session_mode="application",  # type: str
         sid=None,  # type: Optional[Union[str, uuid.UUID]]
         did=None,  # type: Optional[str]
         timestamp=None,  # type: Optional[datetime]
@@ -43,6 +42,7 @@ class Session(object):
         ip_address=None,  # type: Optional[str]
         errors=None,  # type: Optional[int]
         user=None,  # type: Optional[Any]
+        session_mode="application",  # type: str
     ):
         # type: (...) -> None
         if sid is None:
