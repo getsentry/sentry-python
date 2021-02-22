@@ -42,6 +42,7 @@ class Session(object):
         ip_address=None,  # type: Optional[str]
         errors=None,  # type: Optional[int]
         user=None,  # type: Optional[Any]
+        session_mode="application",  # type: str
     ):
         # type: (...) -> None
         if sid is None:
@@ -58,6 +59,7 @@ class Session(object):
         self.duration = None  # type: Optional[float]
         self.user_agent = None  # type: Optional[str]
         self.ip_address = None  # type: Optional[str]
+        self.session_mode = session_mode  # type: str
         self.errors = 0
 
         self.update(

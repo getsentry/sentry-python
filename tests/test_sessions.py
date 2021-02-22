@@ -47,13 +47,12 @@ def test_aggregates(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release",
         environment="not-fun-env",
-        _experiments={"auto_session_tracking": True, "session_mode": "request"},
     )
     envelopes = capture_envelopes()
 
     hub = Hub.current
 
-    with auto_session_tracking():
+    with auto_session_tracking(session_mode="request"):
         with sentry_sdk.push_scope():
             try:
                 with sentry_sdk.configure_scope() as scope:
@@ -62,10 +61,10 @@ def test_aggregates(sentry_init, capture_envelopes):
             except Exception:
                 sentry_sdk.capture_exception()
 
-    with auto_session_tracking():
+    with auto_session_tracking(session_mode="request"):
         pass
 
-    hub.start_session()
+    hub.start_session(session_mode="request")
     hub.end_session()
 
     sentry_sdk.flush()
@@ -85,3 +84,38 @@ def test_aggregates(sentry_init, capture_envelopes):
     assert len(aggregates) == 1
     assert aggregates[0]["exited"] == 2
     assert aggregates[0]["errored"] == 1
+
+
+def test_aggregates_explicitly_disabled_session_tracking_request_mode(
+    sentry_init, capture_envelopes
+):
+    sentry_init(
+        release="fun-release", environment="not-fun-env", auto_session_tracking=False
+    )
+    envelopes = capture_envelopes()
+
+    hub = Hub.current
+
+    with auto_session_tracking(session_mode="request"):
+        with sentry_sdk.push_scope():
+            try:
+                raise Exception("all is wrong")
+            except Exception:
+                sentry_sdk.capture_exception()
+
+    with auto_session_tracking(session_mode="request"):
+        pass
+
+    hub.start_session(session_mode="request")
+    hub.end_session()
+
+    sentry_sdk.flush()
+
+    sess = envelopes[1]
+    assert len(sess.items) == 1
+    sess_event = sess.items[0].payload.json
+
+    aggregates = sorted_aggregates(sess_event)
+    assert len(aggregates) == 1
+    assert aggregates[0]["exited"] == 1
+    assert "errored" not in aggregates[0]

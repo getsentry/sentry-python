@@ -247,9 +247,6 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         release="demo-release",
-        _experiments=dict(
-            auto_session_tracking=True,
-        ),
     )
 
     @app.route("/")
@@ -276,16 +273,15 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     first_event = first_event.get_event()
     error_event = error_event.get_event()
     session = session.items[0].payload.json
+    aggregates = session["aggregates"]
 
     assert first_event["exception"]["values"][0]["type"] == "ValueError"
     assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
-    assert session["status"] == "crashed"
-    assert session["did"] == "42"
-    assert session["errors"] == 2
-    assert session["init"]
+
+    assert len(aggregates) == 1
+    assert aggregates[0]["crashed"] == 1
+    assert aggregates[0]["started"]
     assert session["attrs"]["release"] == "demo-release"
-    assert session["attrs"]["ip_address"] == "1.2.3.4"
-    assert session["attrs"]["user_agent"] == "blafasel/1.0"
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
