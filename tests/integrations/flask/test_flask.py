@@ -276,7 +276,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     first_event = first_event.get_event()
     error_event = error_event.get_event()
     session = session.items[0].payload.json
-    aggregates = session['aggregates']
+    aggregates = session["aggregates"]
 
     assert first_event["exception"]["values"][0]["type"] == "ValueError"
     assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
