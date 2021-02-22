@@ -90,9 +90,7 @@ def test_aggregates_explicitly_disabled_session_tracking_request_mode(
     sentry_init, capture_envelopes
 ):
     sentry_init(
-        release="fun-release",
-        environment="not-fun-env",
-        auto_session_tracking=False
+        release="fun-release", environment="not-fun-env", auto_session_tracking=False
     )
     envelopes = capture_envelopes()
 

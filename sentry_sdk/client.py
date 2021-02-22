@@ -106,9 +106,7 @@ class _Client(object):
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
 
-            self.session_flusher = SessionFlusher(
-                capture_func=_capture_envelope
-            )
+            self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
             request_bodies = ("always", "never", "small", "medium")
             if self.options["request_bodies"] not in request_bodies:
