@@ -16,11 +16,10 @@ if MYPY:
     from typing import Dict
     from typing import List
     from typing import Generator
-    from typing import Union
 
 
 def is_auto_session_tracking_enabled(hub=None):
-    # type: (Optional[sentry_sdk.Hub]) -> Union[bool, None]
+    # type: (Optional[sentry_sdk.Hub]) -> bool
     """Utility function to find out if session tracking is enabled."""
     if hub is None:
         hub = sentry_sdk.Hub.current
