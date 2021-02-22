@@ -247,9 +247,6 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         release="demo-release",
-        _experiments=dict(
-            auto_session_tracking=True,
-        ),
     )
 
     @app.route("/")
@@ -285,8 +282,6 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     assert aggregates[0]["crashed"] == 1
     assert aggregates[0]["started"]
     assert session["attrs"]["release"] == "demo-release"
-    assert session["attrs"]["ip_address"] == "1.2.3.4"
-    assert session["attrs"]["user_agent"] == "blafasel/1.0"
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
