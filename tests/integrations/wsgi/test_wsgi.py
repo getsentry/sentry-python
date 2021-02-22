@@ -204,12 +204,15 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     )
 
 
-def test_session_mode_defaults_to_request_mode_in_wsgi_handler(capture_envelopes, sentry_init):
+def test_session_mode_defaults_to_request_mode_in_wsgi_handler(
+    capture_envelopes, sentry_init
+):
     """
     Test that ensures that even though the default `session_mode` for
     auto_session_tracking is `application`, that flips to `request` when we are
     in the WSGI handler
     """
+
     def app(environ, start_response):
         start_response("200 OK", [])
         return ["Go get the ball! Good dog!"]
