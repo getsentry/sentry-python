@@ -623,7 +623,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return inner()
 
-    def start_session(self):
+    def start_session(
+        self, session_mode="application"  # type: str
+    ):
         # type: (...) -> None
         """Starts a new session."""
         self.end_session()
@@ -632,6 +634,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             release=client.options["release"] if client else None,
             environment=client.options["environment"] if client else None,
             user=scope._user,
+            session_mode=session_mode,
         )
 
     def end_session(self):

@@ -25,20 +25,20 @@ def is_auto_session_tracking_enabled(hub=None):
         hub = sentry_sdk.Hub.current
     should_track = hub.scope._force_auto_session_tracking
     if should_track is None:
-        exp = hub.client.options["_experiments"] if hub.client else {}
-        should_track = exp.get("auto_session_tracking")
+        client_options = hub.client.options if hub.client else {}
+        should_track = client_options["auto_session_tracking"]
     return should_track
 
 
 @contextmanager
-def auto_session_tracking(hub=None):
-    # type: (Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
+def auto_session_tracking(hub=None, session_mode="application"):
+    # type: (Optional[sentry_sdk.Hub], str) -> Generator[None, None, None]
     """Starts and stops a session automatically around a block."""
     if hub is None:
         hub = sentry_sdk.Hub.current
     should_track = is_auto_session_tracking_enabled(hub)
     if should_track:
-        hub.start_session()
+        hub.start_session(session_mode=session_mode)
     try:
         yield
     finally:
@@ -59,12 +59,10 @@ class SessionFlusher(object):
     def __init__(
         self,
         capture_func,  # type: Callable[[Envelope], None]
-        session_mode,  # type: str
         flush_interval=60,  # type: int
     ):
         # type: (...) -> None
         self.capture_func = capture_func
-        self.session_mode = session_mode
         self.flush_interval = flush_interval
         self.pending_sessions = []  # type: List[Any]
         self.pending_aggregates = {}  # type: Dict[Any, Any]
@@ -158,7 +156,7 @@ class SessionFlusher(object):
         self, session  # type: Session
     ):
         # type: (...) -> None
-        if self.session_mode == "request":
+        if session.session_mode == "request":
             self.add_aggregate_session(session)
         else:
             self.pending_sessions.append(session.to_json())

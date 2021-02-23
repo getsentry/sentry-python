@@ -1,6 +1,7 @@
 from werkzeug.test import Client
 import pytest
 
+import sentry_sdk
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 
 try:
@@ -201,3 +202,37 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
             }
         )
     )
+
+
+def test_session_mode_defaults_to_request_mode_in_wsgi_handler(
+    capture_envelopes, sentry_init
+):
+    """
+    Test that ensures that even though the default `session_mode` for
+    auto_session_tracking is `application`, that flips to `request` when we are
+    in the WSGI handler
+    """
+
+    def app(environ, start_response):
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    traces_sampler = mock.Mock(return_value=True)
+    sentry_init(send_default_pii=True, traces_sampler=traces_sampler)
+
+    app = SentryWsgiMiddleware(app)
+    envelopes = capture_envelopes()
+
+    client = Client(app)
+
+    client.get("/dogs/are/great/")
+
+    sentry_sdk.flush()
+
+    sess = envelopes[1]
+    assert len(sess.items) == 1
+    sess_event = sess.items[0].payload.json
+
+    aggregates = sess_event["aggregates"]
+    assert len(aggregates) == 1
+    assert aggregates[0]["exited"] == 1
