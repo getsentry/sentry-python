@@ -332,14 +332,15 @@ def test_flask_medium_formdata_request(sentry_init, capture_events, app):
     assert len(event["request"]["data"]["foo"]) == 512
 
 
-def test_flask_formdata_request_appear_transaction_body(sentry_init, capture_events, app):
+def test_flask_formdata_request_appear_transaction_body(
+    sentry_init, capture_events, app
+):
     """
     Test that ensures that transaction request data contains body, even if no exception was raised
     """
     sentry_init(integrations=[flask_sentry.FlaskIntegration()], traces_sample_rate=1.0)
 
-    data = {"username": "sentry-user",
-            "age": "26"}
+    data = {"username": "sentry-user", "age": "26"}
 
     @app.route("/", methods=["POST"])
     def index():
