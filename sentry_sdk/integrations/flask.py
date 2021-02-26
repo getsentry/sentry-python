@@ -111,9 +111,7 @@ def _request_started(sender, **kwargs):
         except Exception:
             pass
 
-        evt_processor = _make_request_event_processor(
-            app, request, integration  # type: ignore
-        )
+        evt_processor = _make_request_event_processor(app, request, integration)
         scope.add_event_processor(evt_processor)
 
 
