@@ -334,7 +334,7 @@ class _Client(object):
         # use the value, we want to make sure we remove it before the event is
         # sent (which the `.pop()` does)
         raw_tracestate = (
-            event_opt.get("contexts", {}).get("trace", {}).pop("tracestate", None)
+            event_opt.get("contexts", {}).get("trace", {}).pop("tracestate", "")
         )
 
         # Transactions or events with attachments should go to the /envelope/
@@ -346,7 +346,9 @@ class _Client(object):
                 "sent_at": format_timestamp(datetime.utcnow()),
             }
 
-            tracestate_data = reinflate_tracestate(raw_tracestate)
+            tracestate_data = reinflate_tracestate(
+                raw_tracestate.replace("sentry=", "")
+            )
             if tracestate_data:
                 headers["trace"] = tracestate_data
 

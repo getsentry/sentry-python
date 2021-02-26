@@ -63,7 +63,7 @@ def test_continue_from_headers(sentry_init, capture_events, sampled, sample_rate
         with start_span() as old_span:
             old_span.sampled = sampled
             headers = dict(Hub.current.iter_trace_propagation_headers())
-            tracestate = parent_transaction._sentry_tracestate_value
+            tracestate = parent_transaction._sentry_tracestate
 
     # child transaction, to prove that we can read 'sentry-trace' and
     # `tracestate` header data correctly
@@ -74,7 +74,7 @@ def test_continue_from_headers(sentry_init, capture_events, sampled, sample_rate
     assert child_transaction.same_process_as_parent is False
     assert child_transaction.parent_span_id == old_span.span_id
     assert child_transaction.span_id != old_span.span_id
-    assert child_transaction._sentry_tracestate_value == tracestate
+    assert child_transaction._sentry_tracestate == tracestate
 
     # add child transaction to the scope, to show that the captured message will
     # be tagged with the trace id (since it happens while the transaction is

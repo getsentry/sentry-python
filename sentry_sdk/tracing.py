@@ -9,7 +9,7 @@ import sentry_sdk
 from sentry_sdk.utils import logger
 from sentry_sdk.tracing_utils import (
     EnvironHeaders,
-    compute_tracestate,
+    compute_tracestate_entry,
     extract_sentrytrace_data,
     extract_tracestate_data,
     has_tracing_enabled,
@@ -237,6 +237,7 @@ class Span(object):
         Create a transaction with the given params (including any data pulled from
         the 'sentry-trace' and 'tracestate' headers).
         """
+        # TODO move this to the Transaction class
         if cls is Span:
             logger.warning(
                 "Deprecated: use Transaction.continue_from_headers "
@@ -305,14 +306,14 @@ class Span(object):
 
         # we should have the relevant values stored on the transaction, but if
         # this is an orphan span, make a new value
-        if transaction and transaction._sentry_tracestate_value:
-            sentry_tracestate = transaction._sentry_tracestate_value
+        if transaction:
+            sentry_tracestate = transaction._sentry_tracestate
             third_party_tracestate = transaction._third_party_tracestate
         else:
-            sentry_tracestate = compute_tracestate(self)
+            sentry_tracestate = compute_tracestate_entry(self)
             third_party_tracestate = None
 
-        header_value = "sentry=" + sentry_tracestate
+        header_value = sentry_tracestate
 
         if third_party_tracestate:
             header_value = header_value + "," + third_party_tracestate
@@ -431,7 +432,7 @@ class Span(object):
             transaction = self._containing_transaction
 
         if transaction:
-            rv["tracestate"] = transaction._sentry_tracestate_value
+            rv["tracestate"] = transaction._sentry_tracestate
 
         return rv
 
@@ -440,9 +441,11 @@ class Transaction(Span):
     __slots__ = (
         "name",
         "parent_sampled",
-        # base64-encoded json of trace correlation context, missing trailing =
-        # (note: does NOT include the `sentry=`)
-        "_sentry_tracestate_value",
+        # the sentry portion of the `tracestate` header used to transmit
+        # correlation context for server-side dynamic sampling, of the form
+        # `sentry=xxxxx`, where `xxxxx` is the base64-encoded json of the
+        # correlation context data, missing trailing any =
+        "_sentry_tracestate",
         # tracestate data from other vendors, of the form `dogs=yes,cats=maybe`
         "_third_party_tracestate",
     )
@@ -468,7 +471,7 @@ class Transaction(Span):
         Span.__init__(self, **kwargs)
         self.name = name
         self.parent_sampled = parent_sampled
-        self._sentry_tracestate_value = sentry_tracestate or compute_tracestate(self)
+        self._sentry_tracestate = sentry_tracestate or compute_tracestate_entry(self)
         self._third_party_tracestate = third_party_tracestate
 
     def __repr__(self):

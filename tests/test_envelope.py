@@ -1,7 +1,7 @@
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.session import Session
 from sentry_sdk import capture_event
-from sentry_sdk.tracing_utils import compute_tracestate_from_data
+from sentry_sdk.tracing_utils import compute_tracestate_value
 import sentry_sdk.client
 
 
@@ -19,7 +19,7 @@ def generate_transaction_item():
                 "parent_span_id": None,
                 "description": "<OrganizationContext>",
                 "op": "greeting.sniff",
-                "tracestate": compute_tracestate_from_data(
+                "tracestate": compute_tracestate_value(
                     {
                         "trace_id": "12312012123120121231201212312012",
                         "environment": "dogpark",

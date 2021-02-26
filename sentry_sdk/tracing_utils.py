@@ -69,7 +69,7 @@ SENTRY_TRACESTATE_ENTRY_REGEX = re.compile(
     # either sentry is the first entry or there's stuff immediately before it,
     # ending in a commma (this prevents matching something like `coolsentry=xxx`)
     "(?:^|.+,)"
-    # sentry's part
+    # sentry's part, not including the potential comma
     "(sentry=[^,]*)"
     # either there's a comma and another vendor's entry or we end
     "(?:,.+|$)"
@@ -247,7 +247,7 @@ def extract_tracestate_data(header):
     Extracts the sentry tracestate value and any third-party data from the given
     tracestate header, returning a dictionary of data.
     """
-    sentry_value = third_party = None
+    sentry_entry = third_party_entry = None
     before = after = ""
 
     if header:
@@ -257,27 +257,31 @@ def extract_tracestate_data(header):
         if sentry_match:
             sentry_entry = sentry_match.group(1)
 
-            # we have to strip them after the split so we don't end up with
+            # remove the commas after the split so we don't end up with
             # `xxx=yyy,,zzz=qqq` (double commas) when we put them back together
             before, after = map(lambda s: s.strip(","), header.split(sentry_entry))
 
             # extract sentry's value from its entry and test to make sure it's
-            # valid; if it isn't, discard it so that a new one will be created
+            # valid; if it isn't, discard the entire entry so that a new one
+            # will be created
             sentry_value = sentry_entry.replace("sentry=", "")
             if not re.search("^{b64}$".format(b64=base64_stripped), sentry_value):
-                sentry_value = None
+                sentry_entry = None
         else:
             after = header
 
         # if either part is invalid or empty, remove it before gluing them together
-        third_party = (
+        third_party_entry = (
             ",".join(filter(TRACESTATE_ENTRIES_REGEX.search, [before, after])) or None
         )
 
-    return {"sentry_tracestate": sentry_value, "third_party_tracestate": third_party}
+    return {
+        "sentry_tracestate": sentry_entry,
+        "third_party_tracestate": third_party_entry,
+    }
 
 
-def compute_tracestate_from_data(data):
+def compute_tracestate_value(data):
     # type: (typing.Mapping[str, str]) -> str
     """
     Computes a new tracestate value using the given data.
@@ -293,7 +297,7 @@ def compute_tracestate_from_data(data):
     return (to_base64(tracestate_json) or "").rstrip("=")
 
 
-def compute_tracestate(span):
+def compute_tracestate_entry(span):
     # type: (Span) -> str
     """
     Computes a new tracestate value for the span.
@@ -313,7 +317,7 @@ def compute_tracestate(span):
             "public_key": Dsn(options["dsn"]).public_key,
         }
 
-    return compute_tracestate_from_data(data)
+    return "sentry=" + compute_tracestate_value(data)
 
 
 def reinflate_tracestate(encoded_tracestate):

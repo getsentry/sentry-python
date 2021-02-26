@@ -4,7 +4,7 @@ import pytest
 
 from sentry_sdk.tracing import Transaction, Span
 from sentry_sdk.tracing_utils import (
-    compute_tracestate_from_data,
+    compute_tracestate_value,
     extract_sentrytrace_data,
     extract_tracestate_data,
     reinflate_tracestate,
@@ -31,7 +31,7 @@ def test_tracestate_computation(sentry_init):
         trace_id="12312012123120121231201212312012",
     )
 
-    computed_value = transaction._sentry_tracestate_value
+    computed_value = transaction._sentry_tracestate.replace("sentry=", "")
     # we have to decode and reinflate the data because we can guarantee that the
     # order of the entries in the jsonified dict will be the same here as when
     # the tracestate is computed
@@ -58,7 +58,7 @@ def test_adds_new_tracestate_to_transaction_when_none_given(sentry_init):
         # sentry_tracestate=< value would be passed here >
     )
 
-    assert transaction._sentry_tracestate_value is not None
+    assert transaction._sentry_tracestate is not None
 
 
 @pytest.mark.parametrize("sampled", [True, False, None])
@@ -92,7 +92,7 @@ def test_to_tracestate(sentry_init):
     # containing transaction
     transaction_no_third_party = Transaction(
         trace_id="12312012123120121231201212312012",
-        sentry_tracestate="doGsaREgReaT",
+        sentry_tracestate="sentry=doGsaREgReaT",
     )
     non_orphan_span = Span()
     non_orphan_span._containing_transaction = transaction_no_third_party
@@ -102,7 +102,7 @@ def test_to_tracestate(sentry_init):
     # it combines sentry and third-party values correctly
     transaction_with_third_party = Transaction(
         trace_id="12312012123120121231201212312012",
-        sentry_tracestate="doGsaREgReaT",
+        sentry_tracestate="sentry=doGsaREgReaT",
         third_party_tracestate="maisey=silly",
     )
     assert (
@@ -115,7 +115,7 @@ def test_to_tracestate(sentry_init):
         trace_id="12312012123120121231201212312012",
     )
     assert orphan_span._containing_transaction is None
-    assert orphan_span.to_tracestate() == "sentry=" + compute_tracestate_from_data(
+    assert orphan_span.to_tracestate() == "sentry=" + compute_tracestate_value(
         {
             "trace_id": "12312012123120121231201212312012",
             "environment": "dogpark",
@@ -141,42 +141,42 @@ def test_sentrytrace_extraction(sampling_decision):
     ("incoming_header", "expected_sentry_value", "expected_third_party"),
     [
         # sentry only
-        ("sentry=doGsaREgReaT", "doGsaREgReaT", None),
+        ("sentry=doGsaREgReaT", "sentry=doGsaREgReaT", None),
         # sentry only, invalid (`!` isn't a valid base64 character)
         ("sentry=doGsaREgReaT!", None, None),
         # stuff before
-        ("maisey=silly,sentry=doGsaREgReaT", "doGsaREgReaT", "maisey=silly"),
+        ("maisey=silly,sentry=doGsaREgReaT", "sentry=doGsaREgReaT", "maisey=silly"),
         # stuff after
-        ("sentry=doGsaREgReaT,maisey=silly", "doGsaREgReaT", "maisey=silly"),
+        ("sentry=doGsaREgReaT,maisey=silly", "sentry=doGsaREgReaT", "maisey=silly"),
         # stuff before and after
         (
             "charlie=goofy,sentry=doGsaREgReaT,maisey=silly",
-            "doGsaREgReaT",
+            "sentry=doGsaREgReaT",
             "charlie=goofy,maisey=silly",
         ),
         # multiple before
         (
             "charlie=goofy,maisey=silly,sentry=doGsaREgReaT",
-            "doGsaREgReaT",
+            "sentry=doGsaREgReaT",
             "charlie=goofy,maisey=silly",
         ),
         # multiple after
         (
             "sentry=doGsaREgReaT,charlie=goofy,maisey=silly",
-            "doGsaREgReaT",
+            "sentry=doGsaREgReaT",
             "charlie=goofy,maisey=silly",
         ),
         # multiple before and after
         (
             "charlie=goofy,maisey=silly,sentry=doGsaREgReaT,bodhi=floppy,cory=loyal",
-            "doGsaREgReaT",
+            "sentry=doGsaREgReaT",
             "charlie=goofy,maisey=silly,bodhi=floppy,cory=loyal",
         ),
-        # only third party data
+        # only third-party data
         ("maisey=silly", None, "maisey=silly"),
-        # invalid third party data, valid sentry data
-        ("maisey_is_silly,sentry=doGsaREgReaT", "doGsaREgReaT", None),
-        # valid third party data, invalid sentry data
+        # invalid third-party data, valid sentry data
+        ("maisey_is_silly,sentry=doGsaREgReaT", "sentry=doGsaREgReaT", None),
+        # valid third-party data, invalid sentry data
         ("maisey=silly,sentry=doGsaREgReaT!", None, "maisey=silly"),
         # nothing valid at all
         ("maisey_is_silly,sentry=doGsaREgReaT!", None, None),
