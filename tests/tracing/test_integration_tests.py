@@ -58,7 +58,7 @@ def test_continue_from_headers(sentry_init, capture_events, sampled, sample_rate
     with start_transaction(name="hi", sampled=True if sample_rate == 0 else None):
         with start_span() as old_span:
             old_span.sampled = sampled
-            headers = dict(Hub.current.iter_trace_propagation_headers())
+            headers = dict(Hub.current.iter_trace_propagation_headers(old_span))
 
     # test that the sampling decision is getting encoded in the header correctly
     header = headers["sentry-trace"]

@@ -682,14 +682,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if client is not None:
             return client.flush(timeout=timeout, callback=callback)
 
-    def iter_trace_propagation_headers(self):
-        # type: () -> Generator[Tuple[str, str], None, None]
+    def iter_trace_propagation_headers(self, span=None):
+        # type: (Optional[Span]) -> Generator[Tuple[str, str], None, None]
         # TODO: Document
-        client, scope = self._stack[-1]
-        span = scope.span
-
-        if span is None:
+        span = span or self.scope.span
+        if not span:
             return
+
+        client = self._stack[-1][0]
 
         propagate_traces = client and client.options["propagate_traces"]
         if not propagate_traces:
