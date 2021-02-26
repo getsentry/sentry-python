@@ -1,7 +1,5 @@
 from __future__ import absolute_import
 
-import weakref
-
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -113,9 +111,8 @@ def _request_started(sender, **kwargs):
         except Exception:
             pass
 
-        weak_request = weakref.ref(request)
         evt_processor = _make_request_event_processor(
-            app, weak_request, integration  # type: ignore
+            app, request, integration  # type: ignore
         )
         scope.add_event_processor(evt_processor)
 
@@ -157,11 +154,11 @@ class FlaskRequestExtractor(RequestExtractor):
         return file.content_length
 
 
-def _make_request_event_processor(app, weak_request, integration):
+def _make_request_event_processor(app, request, integration):
     # type: (Flask, Callable[[], Request], FlaskIntegration) -> EventProcessor
+
     def inner(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-        request = weak_request()
 
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
