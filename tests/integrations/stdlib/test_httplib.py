@@ -17,7 +17,12 @@ except ImportError:
     # py3
     from http.client import HTTPSConnection
 
-from sentry_sdk import capture_message
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
+
+from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 
 
@@ -110,3 +115,35 @@ def test_httplib_misuse(sentry_init, capture_events):
         "status_code": 200,
         "reason": "OK",
     }
+
+
+def test_outgoing_trace_headers(
+    sentry_init, monkeypatch, StringContaining  # noqa: N803
+):
+    # HTTPSConnection.send is passed a string containing (among other things)
+    # the headers on the request. Mock it so we can check the headers, and also
+    # so it doesn't try to actually talk to the internet.
+    mock_send = mock.Mock()
+    monkeypatch.setattr(HTTPSConnection, "send", mock_send)
+
+    sentry_init(traces_sample_rate=1.0)
+
+    with start_transaction(
+        name="/interactions/other-dogs/new-dog",
+        op="greeting.sniff",
+        trace_id="12312012123120121231201212312012",
+    ) as transaction:
+
+        HTTPSConnection("www.squirrelchasers.com").request("GET", "/top-chasers")
+
+        request_span = transaction._span_recorder.spans[-1]
+
+        expected_sentry_trace = (
+            "sentry-trace: {trace_id}-{parent_span_id}-{sampled}".format(
+                trace_id=transaction.trace_id,
+                parent_span_id=request_span.span_id,
+                sampled=1,
+            )
+        )
+
+        mock_send.assert_called_with(StringContaining(expected_sentry_trace))
