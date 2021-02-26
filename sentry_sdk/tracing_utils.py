@@ -1,5 +1,6 @@
 import re
 import contextlib
+import json
 import math
 
 from numbers import Real
@@ -8,8 +9,11 @@ import sentry_sdk
 
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    Dsn,
     logger,
+    to_base64,
     to_string,
+    from_base64,
 )
 from sentry_sdk._compat import PY2
 from sentry_sdk._types import MYPY
@@ -26,6 +30,7 @@ if MYPY:
     from typing import Optional
     from typing import Any
     from typing import Dict
+    from typing import Union
 
     from sentry_sdk.tracing import Span
 
@@ -36,6 +41,38 @@ SENTRY_TRACE_REGEX = re.compile(
     "-?([0-9a-f]{16})?"  # span_id
     "-?([01])?"  # sampled
     "[ \t]*$"  # whitespace
+)
+
+# This is a normal base64 regex, modified to reflect that fact that we strip the
+# trailing = or == off
+base64_stripped = (
+    # any of the characters in the base64 "alphabet", in multiples of 4
+    "([a-zA-Z0-9+/]{4})*"
+    # either nothing or 2 or 3 base64-alphabet characters (see
+    # https://en.wikipedia.org/wiki/Base64#Decoding_Base64_without_padding for
+    # why there's never only 1 extra character)
+    "([a-zA-Z0-9+/]{2,3})?"
+)
+
+# comma-delimited list of entries of the form `xxx=yyy`
+tracestate_entry = "[^=]+=[^=]+"
+TRACESTATE_ENTRIES_REGEX = re.compile(
+    # one or more xxxxx=yyyy entries
+    "^({te})+"
+    # each entry except the last must be followed by a comma
+    "(,|$)".format(te=tracestate_entry)
+)
+
+# this doesn't check that the value is valid, just that there's something there
+# of the form `sentry=xxxx`
+SENTRY_TRACESTATE_ENTRY_REGEX = re.compile(
+    # either sentry is the first entry or there's stuff immediately before it,
+    # ending in a commma (this prevents matching something like `coolsentry=xxx`)
+    "(?:^|.+,)"
+    # sentry's part, not including the potential comma
+    "(sentry=[^,]*)"
+    # either there's a comma and another vendor's entry or we end
+    "(?:,.+|$)"
 )
 
 
@@ -172,6 +209,149 @@ def maybe_create_breadcrumbs_from_span(hub, span):
             message=span.description,
             data=span._data,
         )
+
+
+def extract_sentrytrace_data(header):
+    # type: (Optional[str]) -> typing.Mapping[str, Union[str, bool, None]]
+    """
+    Given a `sentry-trace` header string, return a dictionary of data.
+    """
+    trace_id = parent_span_id = parent_sampled = None
+
+    if header:
+        if header.startswith("00-") and header.endswith("-00"):
+            header = header[3:-3]
+
+        match = SENTRY_TRACE_REGEX.match(header)
+
+        if match:
+            trace_id, parent_span_id, sampled_str = match.groups()
+
+            if trace_id:
+                trace_id = "{:032x}".format(int(trace_id, 16))
+            if parent_span_id:
+                parent_span_id = "{:016x}".format(int(parent_span_id, 16))
+            if sampled_str:
+                parent_sampled = sampled_str != "0"
+
+    return {
+        "trace_id": trace_id,
+        "parent_span_id": parent_span_id,
+        "parent_sampled": parent_sampled,
+    }
+
+
+def extract_tracestate_data(header):
+    # type: (Optional[str]) -> typing.Mapping[str, Optional[str]]
+    """
+    Extracts the sentry tracestate value and any third-party data from the given
+    tracestate header, returning a dictionary of data.
+    """
+    sentry_entry = third_party_entry = None
+    before = after = ""
+
+    if header:
+        # find sentry's entry, if any
+        sentry_match = SENTRY_TRACESTATE_ENTRY_REGEX.search(header)
+
+        if sentry_match:
+            sentry_entry = sentry_match.group(1)
+
+            # remove the commas after the split so we don't end up with
+            # `xxx=yyy,,zzz=qqq` (double commas) when we put them back together
+            before, after = map(lambda s: s.strip(","), header.split(sentry_entry))
+
+            # extract sentry's value from its entry and test to make sure it's
+            # valid; if it isn't, discard the entire entry so that a new one
+            # will be created
+            sentry_value = sentry_entry.replace("sentry=", "")
+            if not re.search("^{b64}$".format(b64=base64_stripped), sentry_value):
+                sentry_entry = None
+        else:
+            after = header
+
+        # if either part is invalid or empty, remove it before gluing them together
+        third_party_entry = (
+            ",".join(filter(TRACESTATE_ENTRIES_REGEX.search, [before, after])) or None
+        )
+
+    return {
+        "sentry_tracestate": sentry_entry,
+        "third_party_tracestate": third_party_entry,
+    }
+
+
+def compute_tracestate_value(data):
+    # type: (typing.Mapping[str, str]) -> str
+    """
+    Computes a new tracestate value using the given data.
+    """
+
+    tracestate_json = json.dumps(data)
+
+    # Base64-encoded strings always come out with a length which is a multiple
+    # of 4. In order to achieve this, the end is padded with one or more `=`
+    # signs. Because the tracestate standard calls for using `=` signs between
+    # vendor name and value (`sentry=xxx,dogsaregreat=yyy`), to avoid confusion
+    # we strip the `=`
+    return (to_base64(tracestate_json) or "").rstrip("=")
+
+
+def compute_tracestate_entry(span):
+    # type: (Span) -> str
+    """
+    Computes a new tracestate value for the span.
+    """
+    data = {}
+
+    client = (span.hub or sentry_sdk.Hub.current).client
+
+    # if there's no client and/or no DSN, we're not sending anything anywhere,
+    # so it's fine to not have any tracestate data
+    if client and client.options.get("dsn"):
+        options = client.options
+        data = {
+            "trace_id": span.trace_id,
+            "environment": options["environment"],
+            "release": options.get("release"),
+            "public_key": Dsn(options["dsn"]).public_key,
+        }
+
+    return "sentry=" + compute_tracestate_value(data)
+
+
+def reinflate_tracestate(encoded_tracestate):
+    # type: (str) -> typing.Optional[Mapping[str, str]]
+    """
+    Given a sentry tracestate value in its encoded form, translate it back into
+    a dictionary of data.
+    """
+    inflated_tracestate = None
+
+    if encoded_tracestate:
+        # Base64-encoded strings always come out with a length which is a
+        # multiple of 4. In order to achieve this, the end is padded with one or
+        # more `=` signs. Because the tracestate standard calls for using `=`
+        # signs between vendor name and value (`sentry=xxx,dogsaregreat=yyy`),
+        # to avoid confusion we strip the `=` when the data is initially
+        # encoded. Python's decoding function requires they be put back.
+        # Fortunately, it doesn't complain if there are too many, so we just
+        # attach two `=` on spec (there will never be more than 2, see
+        # https://en.wikipedia.org/wiki/Base64#Decoding_Base64_without_padding).
+        tracestate_json = from_base64(encoded_tracestate + "==")
+
+        try:
+            assert tracestate_json is not None
+            inflated_tracestate = json.loads(tracestate_json)
+        except Exception as err:
+            logger.warning(
+                (
+                    "Unable to attach tracestate data to envelope header: {err}"
+                    + "\nTracestate value is {encoded_tracestate}"
+                ).format(err=err, encoded_tracestate=encoded_tracestate),
+            )
+
+    return inflated_tracestate
 
 
 def _format_sql(cursor, sql):
