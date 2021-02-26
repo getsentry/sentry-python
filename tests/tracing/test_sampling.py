@@ -232,7 +232,9 @@ def test_passes_parent_sampling_decision_in_sampling_context(
         )
     )
 
-    transaction = Transaction.from_traceparent(sentry_trace_header, name="dogpark")
+    transaction = Transaction.continue_from_headers(
+        headers={"sentry-trace": sentry_trace_header}, name="dogpark"
+    )
     spy = mock.Mock(wraps=transaction)
     start_transaction(transaction=spy)
 

@@ -699,7 +699,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if not propagate_traces:
             return
 
-        yield "sentry-trace", span.to_traceparent()
+        for header in span.iter_headers():
+            yield header
 
 
 GLOBAL_HUB = Hub()
