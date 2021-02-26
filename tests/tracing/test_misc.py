@@ -25,30 +25,51 @@ def test_span_trimming(sentry_init, capture_events):
     assert span2["op"] == "foo1"
 
 
-def test_transaction_method_signature(sentry_init, capture_events):
+def test_transaction_naming(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
+    # only transactions have names - spans don't
     with pytest.raises(TypeError):
         start_span(name="foo")
     assert len(events) == 0
 
+    # default name in event if no name is passed
     with start_transaction() as transaction:
         pass
-    assert transaction.name == "<unlabeled transaction>"
     assert len(events) == 1
+    assert events[0]["transaction"] == "<unlabeled transaction>"
 
+    # the name can be set once the transaction's already started
     with start_transaction() as transaction:
         transaction.name = "name-known-after-transaction-started"
     assert len(events) == 2
+    assert events[1]["transaction"] == "name-known-after-transaction-started"
 
+    # passing in a name works, too
     with start_transaction(name="a"):
         pass
     assert len(events) == 3
+    assert events[2]["transaction"] == "a"
 
-    with start_transaction(Transaction(name="c")):
-        pass
-    assert len(events) == 4
+
+def test_start_transaction(sentry_init):
+    sentry_init(traces_sample_rate=1.0)
+
+    # you can have it start a transaction for you
+    result1 = start_transaction(
+        name="/interactions/other-dogs/new-dog", op="greeting.sniff"
+    )
+    assert isinstance(result1, Transaction)
+    assert result1.name == "/interactions/other-dogs/new-dog"
+    assert result1.op == "greeting.sniff"
+
+    # or you can pass it an already-created transaction
+    preexisting_transaction = Transaction(
+        name="/interactions/other-dogs/new-dog", op="greeting.sniff"
+    )
+    result2 = start_transaction(preexisting_transaction)
+    assert result2 is preexisting_transaction
 
 
 def test_finds_transaction_on_scope(sentry_init):
@@ -77,7 +98,7 @@ def test_finds_transaction_on_scope(sentry_init):
     assert scope._span.name == "dogpark"
 
 
-def test_finds_transaction_when_decedent_span_is_on_scope(
+def test_finds_transaction_when_descendent_span_is_on_scope(
     sentry_init,
 ):
     sentry_init(traces_sample_rate=1.0)

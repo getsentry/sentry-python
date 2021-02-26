@@ -8,8 +8,10 @@ import sentry_sdk
 
 from sentry_sdk.utils import logger
 from sentry_sdk.tracing_utils import (
-    SENTRY_TRACE_REGEX,
     EnvironHeaders,
+    compute_tracestate_entry,
+    extract_sentrytrace_data,
+    extract_tracestate_data,
     has_tracing_enabled,
     is_valid_sample_rate,
     maybe_create_breadcrumbs_from_span,
@@ -210,11 +212,12 @@ class Span(object):
         # type: (...) -> Transaction
         """
         Create a Transaction with the given params, then add in data pulled from
-        the 'sentry-trace' header in the environ (if any) before returning the
-        Transaction.
+        the 'sentry-trace' and 'tracestate' headers from the environ (if any)
+        before returning the Transaction.
 
-        If the 'sentry-trace' header is malformed or missing, just create and
-        return a Transaction instance with the given params.
+        This is different from `continue_from_headers` in that it assumes header
+        names in the form "HTTP_HEADER_NAME" - such as you would get from a wsgi
+        environ - rather than the form "header-name".
         """
         if cls is Span:
             logger.warning(
@@ -231,28 +234,30 @@ class Span(object):
     ):
         # type: (...) -> Transaction
         """
-        Create a Transaction with the given params, then add in data pulled from
-        the 'sentry-trace' header (if any) before returning the Transaction.
-
-        If the 'sentry-trace' header is malformed or missing, just create and
-        return a Transaction instance with the given params.
+        Create a transaction with the given params (including any data pulled from
+        the 'sentry-trace' and 'tracestate' headers).
         """
+        # TODO move this to the Transaction class
         if cls is Span:
             logger.warning(
                 "Deprecated: use Transaction.continue_from_headers "
                 "instead of Span.continue_from_headers."
             )
-        transaction = Transaction.from_traceparent(
-            headers.get("sentry-trace"), **kwargs
-        )
-        if transaction is None:
-            transaction = Transaction(**kwargs)
+
+        kwargs.update(extract_sentrytrace_data(headers.get("sentry-trace")))
+        kwargs.update(extract_tracestate_data(headers.get("tracestate")))
+
+        transaction = Transaction(**kwargs)
         transaction.same_process_as_parent = False
+
         return transaction
 
     def iter_headers(self):
         # type: () -> Generator[Tuple[str, str], None, None]
         yield "sentry-trace", self.to_traceparent()
+        tracestate = self.to_tracestate()
+        if tracestate:
+            yield "tracestate", tracestate
 
     @classmethod
     def from_traceparent(
@@ -262,46 +267,21 @@ class Span(object):
     ):
         # type: (...) -> Optional[Transaction]
         """
+        DEPRECATED: Use Transaction.continue_from_headers(headers, **kwargs)
+
         Create a Transaction with the given params, then add in data pulled from
         the given 'sentry-trace' header value before returning the Transaction.
 
-        If the header value is malformed or missing, just create and return a
-        Transaction instance with the given params.
         """
-        if cls is Span:
-            logger.warning(
-                "Deprecated: use Transaction.from_traceparent "
-                "instead of Span.from_traceparent."
-            )
+        logger.warning(
+            "Deprecated: Use Transaction.continue_from_headers(headers, **kwargs) "
+            "instead of from_traceparent(traceparent, **kwargs)"
+        )
 
         if not traceparent:
             return None
 
-        if traceparent.startswith("00-") and traceparent.endswith("-00"):
-            traceparent = traceparent[3:-3]
-
-        match = SENTRY_TRACE_REGEX.match(str(traceparent))
-        if match is None:
-            return None
-
-        trace_id, parent_span_id, sampled_str = match.groups()
-
-        if trace_id is not None:
-            trace_id = "{:032x}".format(int(trace_id, 16))
-        if parent_span_id is not None:
-            parent_span_id = "{:016x}".format(int(parent_span_id, 16))
-
-        if sampled_str:
-            parent_sampled = sampled_str != "0"  # type: Optional[bool]
-        else:
-            parent_sampled = None
-
-        return Transaction(
-            trace_id=trace_id,
-            parent_span_id=parent_span_id,
-            parent_sampled=parent_sampled,
-            **kwargs
-        )
+        return cls.continue_from_headers({"sentry-trace": traceparent}, **kwargs)
 
     def to_traceparent(self):
         # type: () -> str
@@ -311,6 +291,34 @@ class Span(object):
         if self.sampled is False:
             sampled = "0"
         return "%s-%s-%s" % (self.trace_id, self.span_id, sampled)
+
+    def to_tracestate(self):
+        # type: () -> Optional[str]
+        """
+        Generates the `tracestate` header value to attach to outgoing requests.
+        """
+        header_value = None
+
+        if isinstance(self, Transaction):
+            transaction = self  # type: Optional[Transaction]
+        else:
+            transaction = self._containing_transaction
+
+        # we should have the relevant values stored on the transaction, but if
+        # this is an orphan span, make a new value
+        if transaction:
+            sentry_tracestate = transaction._sentry_tracestate
+            third_party_tracestate = transaction._third_party_tracestate
+        else:
+            sentry_tracestate = compute_tracestate_entry(self)
+            third_party_tracestate = None
+
+        header_value = sentry_tracestate
+
+        if third_party_tracestate:
+            header_value = header_value + "," + third_party_tracestate
+
+        return header_value
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
@@ -418,16 +426,36 @@ class Span(object):
         if self.status:
             rv["status"] = self.status
 
+        if isinstance(self, Transaction):
+            transaction = self  # type: Optional[Transaction]
+        else:
+            transaction = self._containing_transaction
+
+        if transaction:
+            rv["tracestate"] = transaction._sentry_tracestate
+
         return rv
 
 
 class Transaction(Span):
-    __slots__ = ("name", "parent_sampled")
+    __slots__ = (
+        "name",
+        "parent_sampled",
+        # the sentry portion of the `tracestate` header used to transmit
+        # correlation context for server-side dynamic sampling, of the form
+        # `sentry=xxxxx`, where `xxxxx` is the base64-encoded json of the
+        # correlation context data, missing trailing any =
+        "_sentry_tracestate",
+        # tracestate data from other vendors, of the form `dogs=yes,cats=maybe`
+        "_third_party_tracestate",
+    )
 
     def __init__(
         self,
         name="",  # type: str
         parent_sampled=None,  # type: Optional[bool]
+        sentry_tracestate=None,  # type: Optional[str]
+        third_party_tracestate=None,  # type: Optional[str]
         **kwargs  # type: Any
     ):
         # type: (...) -> None
@@ -443,6 +471,8 @@ class Transaction(Span):
         Span.__init__(self, **kwargs)
         self.name = name
         self.parent_sampled = parent_sampled
+        self._sentry_tracestate = sentry_tracestate or compute_tracestate_entry(self)
+        self._third_party_tracestate = third_party_tracestate
 
     def __repr__(self):
         # type: () -> str
