@@ -684,7 +684,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def iter_trace_propagation_headers(self, span=None):
         # type: (Optional[Span]) -> Generator[Tuple[str, str], None, None]
-        # TODO: Document
+        """
+        Return HTTP headers which allow propagation of trace data. Data taken
+        from the span representing the request, if available, or the current
+        span on the scope if not.
+        """
         span = span or self.scope.span
         if not span:
             return
