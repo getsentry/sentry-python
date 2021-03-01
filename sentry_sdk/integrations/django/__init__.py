@@ -121,10 +121,12 @@ class DjangoIntegration(Integration):
             bound_old_app = old_app.__get__(self, WSGIHandler)
 
             from django.conf import settings
-            use_x_forwarded_for = settings.get('USE_X_FORWARDED_HOST', False)
 
-            return SentryWsgiMiddleware(
-                bound_old_app, use_x_forwarded_for)(environ, start_response)
+            use_x_forwarded_for = settings.get("USE_X_FORWARDED_HOST", False)
+
+            return SentryWsgiMiddleware(bound_old_app, use_x_forwarded_for)(
+                environ, start_response
+            )
 
         WSGIHandler.__call__ = sentry_patched_wsgi_handler
 

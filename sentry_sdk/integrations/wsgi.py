@@ -55,10 +55,10 @@ else:
 
 
 def get_host(environ, use_x_forwarded_for=False):
-    # type: (Dict[str, str]) -> str
+    # type: (Dict[str, str], bool) -> str
     """Return the host for the given WSGI environment. Yanked from Werkzeug."""
-    if use_x_forwarded_for and 'HTTP_X_FORWARDED_HOST' in environ:
-        rv = environ['HTTP_X_FORWARDED_HOST']
+    if use_x_forwarded_for and "HTTP_X_FORWARDED_HOST" in environ:
+        rv = environ["HTTP_X_FORWARDED_HOST"]
         if environ["wsgi.url_scheme"] == "http" and rv.endswith(":80"):
             rv = rv[:-3]
         elif environ["wsgi.url_scheme"] == "https" and rv.endswith(":443"):
@@ -84,7 +84,7 @@ def get_host(environ, use_x_forwarded_for=False):
 
 
 def get_request_url(environ, use_x_forwarded_for=False):
-    # type: (Dict[str, str]) -> str
+    # type: (Dict[str, str], bool) -> str
     """Return the absolute URL without query string for the given WSGI
     environment."""
     return "%s://%s/%s" % (
@@ -95,10 +95,10 @@ def get_request_url(environ, use_x_forwarded_for=False):
 
 
 class SentryWsgiMiddleware(object):
-    __slots__ = ("app",)
+    __slots__ = ("app", "use_x_forwarded_for")
 
     def __init__(self, app, use_x_forwarded_for=False):
-        # type: (Callable[[Dict[str, str], Callable[..., Any]], Any]) -> None
+        # type: (Callable[[Dict[str, str], Callable[..., Any]], Any], bool) -> None
         self.app = app
         self.use_x_forwarded_for = use_x_forwarded_for
 
@@ -117,8 +117,9 @@ class SentryWsgiMiddleware(object):
                             scope.clear_breadcrumbs()
                             scope._name = "wsgi"
                             scope.add_event_processor(
-                                _make_wsgi_event_processor(environ,
-                                                           self.use_x_forwarded_for)
+                                _make_wsgi_event_processor(
+                                    environ, self.use_x_forwarded_for
+                                )
                             )
 
                     transaction = Transaction.continue_from_environ(
@@ -278,7 +279,7 @@ class _ScopedResponse(object):
 
 
 def _make_wsgi_event_processor(environ, use_x_forwarded_for):
-    # type: (Dict[str, str]) -> EventProcessor
+    # type: (Dict[str, str], bool) -> EventProcessor
     # It's a bit unfortunate that we have to extract and parse the request data
     # from the environ so eagerly, but there are a few good reasons for this.
     #
