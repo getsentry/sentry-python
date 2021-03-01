@@ -54,10 +54,16 @@ else:
         return s.encode("latin1").decode(charset, errors)
 
 
-def get_host(environ):
+def get_host(environ, use_x_forwarded_for=False):
     # type: (Dict[str, str]) -> str
     """Return the host for the given WSGI environment. Yanked from Werkzeug."""
-    if environ.get("HTTP_HOST"):
+    if use_x_forwarded_for and 'HTTP_X_FORWARDED_HOST' in environ:
+        rv = environ['HTTP_X_FORWARDED_HOST']
+        if environ["wsgi.url_scheme"] == "http" and rv.endswith(":80"):
+            rv = rv[:-3]
+        elif environ["wsgi.url_scheme"] == "https" and rv.endswith(":443"):
+            rv = rv[:-4]
+    elif environ.get("HTTP_HOST"):
         rv = environ["HTTP_HOST"]
         if environ["wsgi.url_scheme"] == "http" and rv.endswith(":80"):
             rv = rv[:-3]
@@ -77,13 +83,13 @@ def get_host(environ):
     return rv
 
 
-def get_request_url(environ):
+def get_request_url(environ, use_x_forwarded_for=False):
     # type: (Dict[str, str]) -> str
     """Return the absolute URL without query string for the given WSGI
     environment."""
     return "%s://%s/%s" % (
         environ.get("wsgi.url_scheme"),
-        get_host(environ),
+        get_host(environ, use_x_forwarded_for),
         wsgi_decoding_dance(environ.get("PATH_INFO") or "").lstrip("/"),
     )
 
@@ -91,9 +97,10 @@ def get_request_url(environ):
 class SentryWsgiMiddleware(object):
     __slots__ = ("app",)
 
-    def __init__(self, app):
+    def __init__(self, app, use_x_forwarded_for=False):
         # type: (Callable[[Dict[str, str], Callable[..., Any]], Any]) -> None
         self.app = app
+        self.use_x_forwarded_for = use_x_forwarded_for
 
     def __call__(self, environ, start_response):
         # type: (Dict[str, str], Callable[..., Any]) -> _ScopedResponse
@@ -110,7 +117,8 @@ class SentryWsgiMiddleware(object):
                             scope.clear_breadcrumbs()
                             scope._name = "wsgi"
                             scope.add_event_processor(
-                                _make_wsgi_event_processor(environ)
+                                _make_wsgi_event_processor(environ,
+                                                           self.use_x_forwarded_for)
                             )
 
                     transaction = Transaction.continue_from_environ(
@@ -269,7 +277,7 @@ class _ScopedResponse(object):
                 reraise(*_capture_exception(self._hub))
 
 
-def _make_wsgi_event_processor(environ):
+def _make_wsgi_event_processor(environ, use_x_forwarded_for):
     # type: (Dict[str, str]) -> EventProcessor
     # It's a bit unfortunate that we have to extract and parse the request data
     # from the environ so eagerly, but there are a few good reasons for this.
@@ -284,7 +292,7 @@ def _make_wsgi_event_processor(environ):
     # https://github.com/unbit/uwsgi/issues/1950
 
     client_ip = get_client_ip(environ)
-    request_url = get_request_url(environ)
+    request_url = get_request_url(environ, use_x_forwarded_for)
     query_string = environ.get("QUERY_STRING")
     method = environ.get("REQUEST_METHOD")
     env = dict(_get_environ(environ))
