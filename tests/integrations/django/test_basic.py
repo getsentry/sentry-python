@@ -40,6 +40,49 @@ def test_view_exceptions(sentry_init, client, capture_exceptions, capture_events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "django"
 
 
+def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
+        sentry_init, client, capture_exceptions, capture_events):
+    """
+    Test that ensures if django settings.USE_X_FORWARDED_HOST is set to True
+    then the SDK sets the request url to the `HTTP_X_FORWARDED_FOR`
+    """
+    from django.conf import settings
+    settings.USE_X_FORWARDED_HOST = True
+
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    exceptions = capture_exceptions()
+    events = capture_events()
+    client.get(reverse("view_exc"),
+               headers={"X_FORWARDED_HOST": 'example.com'})
+
+    (error,) = exceptions
+    assert isinstance(error, ZeroDivisionError)
+
+    (event,) = events
+    assert event["request"]["url"] == 'http://example.com/view-exc'
+
+    settings.USE_X_FORWARDED_HOST = False
+
+
+def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
+        sentry_init, client, capture_exceptions, capture_events):
+    """
+    Test that ensures if django settings.USE_X_FORWARDED_HOST is set to False
+    then the SDK sets the request url to the `HTTP_POST`
+    """
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    exceptions = capture_exceptions()
+    events = capture_events()
+    client.get(reverse("view_exc"),
+               headers={"X_FORWARDED_HOST": 'example.com'})
+
+    (error,) = exceptions
+    assert isinstance(error, ZeroDivisionError)
+
+    (event,) = events
+    assert event["request"]["url"] == 'http://localhost/view-exc'
+
+
 def test_middleware_exceptions(sentry_init, client, capture_exceptions):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     exceptions = capture_exceptions()
