@@ -20,6 +20,16 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 1.0.0
+
+This release contains breaking changes
+
+- Feat: Moved `auto_session_tracking` experimental flag to a proper option and removed `session_mode`, hence enabling release health by default #994
+- Fixed Django transaction name by setting the name to  `request.path_info` rather than `request.path`
+- Fix for tracing by getting HTTP headers from span rather than transaction when possible #1035
+- Fix for Flask transactions missing request body in non errored transactions #1034
+- Fix for honoring the `X-Forwarded-For` header #1037
+
 ## 0.20.3
 
 - Added scripts to support auto instrumentation of no code AWS lambda Python functions
