@@ -41,14 +41,12 @@ def test_view_exceptions(sentry_init, client, capture_exceptions, capture_events
 
 
 def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
-    sentry_init, client, capture_exceptions, capture_events
+    sentry_init, client, capture_exceptions, capture_events, settings
 ):
     """
     Test that ensures if django settings.USE_X_FORWARDED_HOST is set to True
     then the SDK sets the request url to the `HTTP_X_FORWARDED_FOR`
     """
-    from django.conf import settings
-
     settings.USE_X_FORWARDED_HOST = True
 
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
@@ -61,8 +59,6 @@ def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
 
     (event,) = events
     assert event["request"]["url"] == "http://example.com/view-exc"
-
-    settings.USE_X_FORWARDED_HOST = False
 
 
 def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
