@@ -29,6 +29,7 @@ This release contains breaking changes
 - Fix for tracing by getting HTTP headers from span rather than transaction when possible #1035
 - Fix for Flask transactions missing request body in non errored transactions #1034
 - Fix for honoring the `X-Forwarded-For` header #1037
+- Fix for worker that logs data dropping of events with level error #1032
 
 ## 0.20.3
 
