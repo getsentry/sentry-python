@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>sentry_sdk.client &#8212; sentry-python 0.20.3 documentation</title>
+    <title>sentry_sdk.client &#8212; sentry-python 1.0.0 documentation</title>
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -138,12 +138,8 @@
         <span class="k">try</span><span class="p">:</span>
             <span class="n">_client_init_debug</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;debug&quot;</span><span class="p">])</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="n">make_transport</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
-            <span class="n">session_mode</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;_experiments&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-                <span class="s2">&quot;session_mode&quot;</span><span class="p">,</span> <span class="s2">&quot;application&quot;</span>
-            <span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">session_flusher</span> <span class="o">=</span> <span class="n">SessionFlusher</span><span class="p">(</span>
-                <span class="n">capture_func</span><span class="o">=</span><span class="n">_capture_envelope</span><span class="p">,</span> <span class="n">session_mode</span><span class="o">=</span><span class="n">session_mode</span>
-            <span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">session_flusher</span> <span class="o">=</span> <span class="n">SessionFlusher</span><span class="p">(</span><span class="n">capture_func</span><span class="o">=</span><span class="n">_capture_envelope</span><span class="p">)</span>
 
             <span class="n">request_bodies</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;always&quot;</span><span class="p">,</span> <span class="s2">&quot;never&quot;</span><span class="p">,</span> <span class="s2">&quot;small&quot;</span><span class="p">,</span> <span class="s2">&quot;medium&quot;</span><span class="p">)</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;request_bodies&quot;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">request_bodies</span><span class="p">:</span>
@@ -524,7 +520,7 @@
       &copy;2019, Sentry Team and Contributors.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.5.0</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.5.1</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
     </div>
