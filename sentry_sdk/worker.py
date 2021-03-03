@@ -99,11 +99,14 @@ class BackgroundWorker(object):
         # type: (float, Optional[Any]) -> None
         initial_timeout = min(0.1, timeout)
         if not self._timed_queue_join(initial_timeout):
-            pending = self._queue.qsize()
+            pending = self._queue.qsize() + 1
             logger.debug("%d event(s) pending on flush", pending)
             if callback is not None:
                 callback(pending, timeout)
-            self._timed_queue_join(timeout - initial_timeout)
+
+            if not self._timed_queue_join(timeout - initial_timeout):
+                pending = self._queue.qsize() + 1
+                logger.error("flush timed out, dropped %s events", pending)
 
     def submit(self, callback):
         # type: (Callable[[], None]) -> None
@@ -115,7 +118,7 @@ class BackgroundWorker(object):
 
     def on_full_queue(self, callback):
         # type: (Optional[Any]) -> None
-        logger.debug("background worker queue full, dropping event")
+        logger.error("background worker queue full, dropping event")
 
     def _target(self):
         # type: () -> None
