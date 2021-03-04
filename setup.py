@@ -72,4 +72,5 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
+    options={"bdist_wheel": {"universal": "1"}},
 )
