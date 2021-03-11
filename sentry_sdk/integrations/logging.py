@@ -98,8 +98,8 @@ class LoggingIntegration(Integration):
 
 
 def _can_record(record):
-    """Prevents ignored loggers from recording"""
     # type: (LogRecord) -> bool
+    """Prevents ignored loggers from recording"""
     for logger in _IGNORED_LOGGERS:
         if fnmatch(record.name, logger):
             return False
