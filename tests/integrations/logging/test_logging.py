@@ -3,7 +3,7 @@ import sys
 import pytest
 import logging
 
-from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger, _IGNORED_LOGGERS
 
 other_logger = logging.getLogger("testfoo")
 logger = logging.getLogger(__name__)
@@ -131,6 +131,33 @@ def test_logging_filters(sentry_init, capture_events):
 
     should_log = True
     logger.error("hi")
+
+    (event,) = events
+    assert event["logentry"]["message"] == "hi"
+
+
+def test_ignore_logger(sentry_init, capture_events):
+    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    events = capture_events()
+
+    ignore_logger("testfoo")
+
+    other_logger.error("hi")
+
+    assert not events
+
+
+def test_ignore_logger_wildcard(sentry_init, capture_events):
+    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    events = capture_events()
+
+    ignore_logger("testfoo.*")
+
+    nested_logger = logging.getLogger("testfoo.submodule")
+
+    logger.error("hi")
+
+    nested_logger.error("bye")
 
     (event,) = events
     assert event["logentry"]["message"] == "hi"
