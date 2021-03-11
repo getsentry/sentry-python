@@ -3,7 +3,11 @@ import sys
 import pytest
 import logging
 
-from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger, _IGNORED_LOGGERS
+from sentry_sdk.integrations.logging import (
+    LoggingIntegration,
+    ignore_logger,
+    _IGNORED_LOGGERS,
+)
 
 other_logger = logging.getLogger("testfoo")
 logger = logging.getLogger(__name__)
