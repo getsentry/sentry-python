@@ -42,6 +42,14 @@ def get_template_frame_from_exception(exc_value):
     return None
 
 
+def _get_template_name_description(template_name):
+    if isinstance(template_name, (list, tuple)):
+        if template_name:
+            return "[%s, ...]".format(template_name[0])
+    else:
+        return template_name
+
+
 def patch_templates():
     # type: () -> None
     from django.template.response import SimpleTemplateResponse
@@ -57,7 +65,8 @@ def patch_templates():
             return real_rendered_content.fget(self)
 
         with hub.start_span(
-            op="django.template.render", description=self.template_name
+            op="django.template.render",
+            description=_get_template_name_description(self.template_name),
         ) as span:
             span.set_data("context", self.context_data)
             return real_rendered_content.fget(self)
@@ -78,7 +87,8 @@ def patch_templates():
             return real_render(request, template_name, context, *args, **kwargs)
 
         with hub.start_span(
-            op="django.template.render", description=template_name
+            op="django.template.render",
+            description=_get_template_name_description(template_name),
         ) as span:
             span.set_data("context", context)
             return real_render(request, template_name, context, *args, **kwargs)

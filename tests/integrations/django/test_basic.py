@@ -523,18 +523,19 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
     )
-    views_urls = [reverse("template_test2")]
+    views_tests = [
+        (reverse("template_test2"), '- op="django.template.render": description="[user_name.html, ...]"'),
+    ]
     if DJANGO_VERSION >= (1, 7):
-        views_urls.append(reverse("template_test"))
+        views_tests.append(
+            (reverse("template_test"), '- op="django.template.render": description="user_name.html"'),
+        )
 
-    for url in views_urls:
+    for url, expected_line in views_tests:
         events = capture_events()
         _content, status, _headers = client.get(url)
         transaction = events[0]
-        assert (
-            '- op="django.template.render": description="user_name.html"'
-            in render_span_tree(transaction)
-        )
+        assert expected_line in render_span_tree(transaction)
 
 
 def test_middleware_spans(sentry_init, client, capture_events, render_span_tree):

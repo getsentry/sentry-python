@@ -122,7 +122,7 @@ def template_test(request, *args, **kwargs):
 
 @csrf_exempt
 def template_test2(request, *args, **kwargs):
-    return TemplateResponse(request, "user_name.html", {"user_age": 25})
+    return TemplateResponse(request, ("user_name.html", "another_template.html"), {"user_age": 25})
 
 
 @csrf_exempt
