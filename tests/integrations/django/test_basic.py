@@ -564,11 +564,17 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
         traces_sample_rate=1.0,
     )
     views_tests = [
-        (reverse("template_test2"), '- op="django.template.render": description="[user_name.html, ...]"'),
+        (
+            reverse("template_test2"),
+            '- op="django.template.render": description="[user_name.html, ...]"',
+        ),
     ]
     if DJANGO_VERSION >= (1, 7):
         views_tests.append(
-            (reverse("template_test"), '- op="django.template.render": description="user_name.html"'),
+            (
+                reverse("template_test"),
+                '- op="django.template.render": description="user_name.html"',
+            ),
         )
 
     for url, expected_line in views_tests:
