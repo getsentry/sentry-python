@@ -31,7 +31,6 @@ if MYPY:
         {
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
-            "auto_session_tracking": Optional[bool],
             "smart_transaction_trimming": Optional[bool],
         },
         total=False,
@@ -72,9 +71,10 @@ class ClientConstructor(object):
         attach_stacktrace=False,  # type: bool
         ca_certs=None,  # type: Optional[str]
         propagate_traces=True,  # type: bool
-        traces_sample_rate=0.0,  # type: float
+        traces_sample_rate=None,  # type: Optional[float]
         traces_sampler=None,  # type: Optional[TracesSampler]
         auto_enabling_integrations=True,  # type: bool
+        auto_session_tracking=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
     ):
         # type: (...) -> None
@@ -99,7 +99,7 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "0.19.5"
+VERSION = "1.0.0"
 SDK_INFO = {
     "name": "sentry.python",
     "version": VERSION,

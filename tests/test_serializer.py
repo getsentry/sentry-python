@@ -11,15 +11,21 @@ except ImportError:
     pass
 else:
 
-    @given(binary=st.binary(min_size=1))
-    def test_bytes_serialization_decode_many(binary, message_normalizer):
-        result = message_normalizer(binary, should_repr_strings=False)
-        assert result == binary.decode("utf-8", "replace")
+    def test_bytes_serialization_decode_many(message_normalizer):
+        @given(binary=st.binary(min_size=1))
+        def inner(binary):
+            result = message_normalizer(binary, should_repr_strings=False)
+            assert result == binary.decode("utf-8", "replace")
 
-    @given(binary=st.binary(min_size=1))
-    def test_bytes_serialization_repr_many(binary, message_normalizer):
-        result = message_normalizer(binary, should_repr_strings=True)
-        assert result == repr(binary)
+        inner()
+
+    def test_bytes_serialization_repr_many(message_normalizer):
+        @given(binary=st.binary(min_size=1))
+        def inner(binary):
+            result = message_normalizer(binary, should_repr_strings=True)
+            assert result == repr(binary)
+
+        inner()
 
 
 @pytest.fixture

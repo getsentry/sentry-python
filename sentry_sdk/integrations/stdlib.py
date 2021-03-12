@@ -85,7 +85,7 @@ def _install_httplib():
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
-        for key, value in hub.iter_trace_propagation_headers():
+        for key, value in hub.iter_trace_propagation_headers(span):
             self.putheader(key, value)
 
         self._sentrysdk_span = span
@@ -178,12 +178,15 @@ def _install_subprocess():
 
         env = None
 
-        for k, v in hub.iter_trace_propagation_headers():
-            if env is None:
-                env = _init_argument(a, kw, "env", 10, lambda x: dict(x or os.environ))
-            env["SUBPROCESS_" + k.upper().replace("-", "_")] = v
-
         with hub.start_span(op="subprocess", description=description) as span:
+
+            for k, v in hub.iter_trace_propagation_headers(span):
+                if env is None:
+                    env = _init_argument(
+                        a, kw, "env", 10, lambda x: dict(x or os.environ)
+                    )
+                env["SUBPROCESS_" + k.upper().replace("-", "_")] = v
+
             if cwd:
                 span.set_data("subprocess.cwd", cwd)
 

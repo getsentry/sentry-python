@@ -20,6 +20,43 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 1.0.0
+
+This release contains a breaking change
+
+- **BREAKING CHANGE**: Feat: Moved `auto_session_tracking` experimental flag to a proper option and removed explicitly setting experimental `session_mode` in favor of auto detecting its value, hence enabling release health by default #994
+- Fixed Django transaction name by setting the name to  `request.path_info` rather than `request.path`
+- Fix for tracing by getting HTTP headers from span rather than transaction when possible #1035
+- Fix for Flask transactions missing request body in non errored transactions #1034
+- Fix for honoring the `X-Forwarded-For` header #1037
+- Fix for worker that logs data dropping of events with level error #1032
+
+## 0.20.3
+
+- Added scripts to support auto instrumentation of no code AWS lambda Python functions
+
+## 0.20.2
+
+- Fix incorrect regex in craft to include wheel file in pypi release
+
+## 0.20.1
+
+- Fix for error that occurs with Async Middlewares when the middleware is a function rather than a class
+
+## 0.20.0
+
+- Fix for header extraction for AWS lambda/API extraction
+- Fix multiple **kwargs type hints # 967
+- Fix that corrects AWS lambda integration failure to detect the aws-lambda-ric 1.0 bootstrap #976
+- Fix AWSLambda integration: variable "timeout_thread" referenced before assignment #977
+- Use full git sha as release name #960
+- **BREAKING CHANGE**: The default environment is now production, not based on release
+- Django integration now creates transaction spans for template rendering
+- Fix headers not parsed correctly in ASGI middleware, Decode headers before creating transaction #984
+- Restored ability to have tracing disabled #991
+- Fix Django async views not behaving asynchronously
+- Performance improvement: supported pre-aggregated sessions
+
 ## 0.19.5
 
 - Fix two regressions added in 0.19.2 with regard to sampling behavior when reading the sampling decision from headers.

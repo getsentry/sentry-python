@@ -28,7 +28,7 @@ if MYPY:
     )
 
     from sentry_sdk.tracing import Span
-    from sentry_sdk.sessions import Session
+    from sentry_sdk.session import Session
 
     F = TypeVar("F", bound=Callable[..., Any])
     T = TypeVar("T")

@@ -247,9 +247,6 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         release="demo-release",
-        _experiments=dict(
-            auto_session_tracking=True,
-        ),
     )
 
     @app.route("/")
@@ -276,16 +273,15 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     first_event = first_event.get_event()
     error_event = error_event.get_event()
     session = session.items[0].payload.json
+    aggregates = session["aggregates"]
 
     assert first_event["exception"]["values"][0]["type"] == "ValueError"
     assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
-    assert session["status"] == "crashed"
-    assert session["did"] == "42"
-    assert session["errors"] == 2
-    assert session["init"]
+
+    assert len(aggregates) == 1
+    assert aggregates[0]["crashed"] == 1
+    assert aggregates[0]["started"]
     assert session["attrs"]["release"] == "demo-release"
-    assert session["attrs"]["ip_address"] == "1.2.3.4"
-    assert session["attrs"]["user_agent"] == "blafasel/1.0"
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
@@ -334,6 +330,39 @@ def test_flask_medium_formdata_request(sentry_init, capture_events, app):
         "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
     }
     assert len(event["request"]["data"]["foo"]) == 512
+
+
+def test_flask_formdata_request_appear_transaction_body(
+    sentry_init, capture_events, app
+):
+    """
+    Test that ensures that transaction request data contains body, even if no exception was raised
+    """
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], traces_sample_rate=1.0)
+
+    data = {"username": "sentry-user", "age": "26"}
+
+    @app.route("/", methods=["POST"])
+    def index():
+        assert request.form["username"] == data["username"]
+        assert request.form["age"] == data["age"]
+        assert not request.get_data()
+        assert not request.get_json()
+        set_tag("view", "yes")
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.post("/", data=data)
+    assert response.status_code == 200
+
+    event, transaction_event = events
+
+    assert "request" in transaction_event
+    assert "data" in transaction_event["request"]
+    assert transaction_event["request"]["data"] == data
 
 
 @pytest.mark.parametrize("input_char", [u"a", b"a"])

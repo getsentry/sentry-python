@@ -76,7 +76,6 @@ def test_filename():
     assert x("bogus", "bogus") == "bogus"
 
     assert x("os", os.__file__) == "os.py"
-    assert x("pytest", pytest.__file__) == "pytest.py"
 
     import sentry_sdk.utils
 

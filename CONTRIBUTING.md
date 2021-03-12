@@ -21,7 +21,8 @@ for you. Run `make` or `make help` to list commands.
 Of course you can always run the underlying commands yourself, which is
 particularly useful when wanting to provide arguments to `pytest` to run
 specific tests. If you want to do that, we expect you to know your way around
-Python development, and you can run the following to get started with `pytest`:
+Python development. To get started, clone the SDK repository, cd into it, set
+up a virtualenv and run:
 
     # This is "advanced mode". Use `make help` if you have no clue what's
     # happening here!
@@ -39,7 +40,7 @@ must have `twine` installed globally.
 
 The usual release process goes like this:
 
-1. Go through git log and write new entry into `CHANGES.md`, commit to master
+1. Go through git log and write new entry into `CHANGELOG.md`, commit to master
 2. `craft p a.b.c`
 3. `craft pp a.b.c`
 

@@ -120,7 +120,13 @@ class DjangoIntegration(Integration):
 
             bound_old_app = old_app.__get__(self, WSGIHandler)
 
-            return SentryWsgiMiddleware(bound_old_app)(environ, start_response)
+            from django.conf import settings
+
+            use_x_forwarded_for = settings.USE_X_FORWARDED_HOST
+
+            return SentryWsgiMiddleware(bound_old_app, use_x_forwarded_for)(
+                environ, start_response
+            )
 
         WSGIHandler.__call__ = sentry_patched_wsgi_handler
 
@@ -330,7 +336,7 @@ def _before_get_response(request):
                     resolve(request.path).func
                 )
             elif integration.transaction_style == "url":
-                scope.transaction = LEGACY_RESOLVER.resolve(request.path)
+                scope.transaction = LEGACY_RESOLVER.resolve(request.path_info)
         except Exception:
             pass
 

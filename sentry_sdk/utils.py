@@ -64,7 +64,7 @@ def get_default_release():
         try:
             release = (
                 subprocess.Popen(
-                    ["git", "rev-parse", "--short", "HEAD"],
+                    ["git", "rev-parse", "HEAD"],
                     stdout=subprocess.PIPE,
                     stderr=null,
                     stdin=null,
@@ -89,18 +89,6 @@ def get_default_release():
         release = os.environ.get(var)
         if release:
             return release
-    return None
-
-
-def get_default_environment(
-    release=None,  # type: Optional[str]
-):
-    # type: (...) -> Optional[str]
-    rv = os.environ.get("SENTRY_ENVIRONMENT")
-    if rv:
-        return rv
-    if release is not None:
-        return "production"
     return None
 
 

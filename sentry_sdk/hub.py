@@ -8,7 +8,7 @@ from sentry_sdk._compat import with_metaclass
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
 from sentry_sdk.tracing import Span, Transaction
-from sentry_sdk.sessions import Session
+from sentry_sdk.session import Session
 from sentry_sdk.utils import (
     exc_info_from_error,
     event_from_exception,
@@ -311,7 +311,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         event,  # type: Event
         hint=None,  # type: Optional[Hint]
         scope=None,  # type: Optional[Any]
-        **scope_args  # type: Dict[str, Any]
+        **scope_args  # type: Any
     ):
         # type: (...) -> Optional[str]
         """Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`."""
@@ -329,7 +329,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         message,  # type: str
         level=None,  # type: Optional[str]
         scope=None,  # type: Optional[Any]
-        **scope_args  # type: Dict[str, Any]
+        **scope_args  # type: Any
     ):
         # type: (...) -> Optional[str]
         """Captures a message.  The message is just a string.  If no level
@@ -349,7 +349,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self,
         error=None,  # type: Optional[Union[BaseException, ExcInfo]]
         scope=None,  # type: Optional[Any]
-        **scope_args  # type: Dict[str, Any]
+        **scope_args  # type: Any
     ):
         # type: (...) -> Optional[str]
         """Captures an exception.
@@ -623,7 +623,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return inner()
 
-    def start_session(self):
+    def start_session(
+        self, session_mode="application"  # type: str
+    ):
         # type: (...) -> None
         """Starts a new session."""
         self.end_session()
@@ -632,6 +634,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             release=client.options["release"] if client else None,
             environment=client.options["environment"] if client else None,
             user=scope._user,
+            session_mode=session_mode,
         )
 
     def end_session(self):
@@ -639,11 +642,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """Ends the current session if there is one."""
         client, scope = self._stack[-1]
         session = scope._session
+        self.scope._session = None
+
         if session is not None:
             session.close()
             if client is not None:
                 client.capture_session(session)
-        self.scope._session = None
 
     def stop_auto_session_tracking(self):
         # type: (...) -> None
@@ -678,14 +682,18 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if client is not None:
             return client.flush(timeout=timeout, callback=callback)
 
-    def iter_trace_propagation_headers(self):
-        # type: () -> Generator[Tuple[str, str], None, None]
-        # TODO: Document
-        client, scope = self._stack[-1]
-        span = scope.span
-
-        if span is None:
+    def iter_trace_propagation_headers(self, span=None):
+        # type: (Optional[Span]) -> Generator[Tuple[str, str], None, None]
+        """
+        Return HTTP headers which allow propagation of trace data. Data taken
+        from the span representing the request, if available, or the current
+        span on the scope if not.
+        """
+        span = span or self.scope.span
+        if not span:
             return
+
+        client = self._stack[-1][0]
 
         propagate_traces = client and client.options["propagate_traces"]
         if not propagate_traces:

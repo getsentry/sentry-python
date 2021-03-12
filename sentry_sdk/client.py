@@ -2,7 +2,6 @@ import os
 import uuid
 import random
 from datetime import datetime
-from itertools import islice
 import socket
 
 from sentry_sdk._compat import string_types, text_type, iteritems
@@ -13,7 +12,6 @@ from sentry_sdk.utils import (
     format_timestamp,
     get_type_name,
     get_default_release,
-    get_default_environment,
     handle_in_app,
     logger,
 )
@@ -31,12 +29,11 @@ if MYPY:
     from typing import Any
     from typing import Callable
     from typing import Dict
-    from typing import List
     from typing import Optional
 
     from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
-    from sentry_sdk.sessions import Session
+    from sentry_sdk.session import Session
 
 
 _client_init_debug = ContextVar("client_init_debug")
@@ -67,7 +64,7 @@ def _get_options(*args, **kwargs):
         rv["release"] = get_default_release()
 
     if rv["environment"] is None:
-        rv["environment"] = get_default_environment(rv["release"])
+        rv["environment"] = os.environ.get("SENTRY_ENVIRONMENT") or "production"
 
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
@@ -100,24 +97,16 @@ class _Client(object):
         # type: () -> None
         old_debug = _client_init_debug.get(False)
 
-        def _send_sessions(sessions):
-            # type: (List[Any]) -> None
-            transport = self.transport
-            if not transport or not sessions:
-                return
-            sessions_iter = iter(sessions)
-            while True:
-                envelope = Envelope()
-                for session in islice(sessions_iter, 100):
-                    envelope.add_session(session)
-                if not envelope.items:
-                    break
-                transport.capture_envelope(envelope)
+        def _capture_envelope(envelope):
+            # type: (Envelope) -> None
+            if self.transport is not None:
+                self.transport.capture_envelope(envelope)
 
         try:
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
-            self.session_flusher = SessionFlusher(flush_func=_send_sessions)
+
+            self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
             request_bodies = ("always", "never", "small", "medium")
             if self.options["request_bodies"] not in request_bodies:
