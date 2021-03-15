@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import logging
 import datetime
+from fnmatch import fnmatch
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import (
@@ -98,7 +99,11 @@ class LoggingIntegration(Integration):
 
 def _can_record(record):
     # type: (LogRecord) -> bool
-    return record.name not in _IGNORED_LOGGERS
+    """Prevents ignored loggers from recording"""
+    for logger in _IGNORED_LOGGERS:
+        if fnmatch(record.name, logger):
+            return False
+    return True
 
 
 def _breadcrumb_from_record(record):

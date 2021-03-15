@@ -51,12 +51,14 @@ class PackageBuilder:
         Method that creates the init_serverless_sdk pkg in the
         sentry-python-serverless zip
         """
-        serverless_sdk_path = f'{self.packages_dir}/sentry_sdk/' \
-                              f'integrations/init_serverless_sdk'
+        serverless_sdk_path = (
+            f"{self.packages_dir}/sentry_sdk/" f"integrations/init_serverless_sdk"
+        )
         if not os.path.exists(serverless_sdk_path):
             os.makedirs(serverless_sdk_path)
-        shutil.copy('scripts/init_serverless_sdk.py',
-                    f'{serverless_sdk_path}/__init__.py')
+        shutil.copy(
+            "scripts/init_serverless_sdk.py", f"{serverless_sdk_path}/__init__.py"
+        )
 
     def zip(
         self, filename  # type: str
