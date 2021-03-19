@@ -40,6 +40,11 @@ class CrashingHandler(RequestHandler):
             scope.set_tag("foo", "42")
         1 / 0
 
+    def post(self):
+        with configure_scope() as scope:
+            scope.set_tag("foo", "43")
+        1 / 0
+
 
 def test_basic(tornado_testcase, sentry_init, capture_events):
     sentry_init(integrations=[TornadoIntegration()], send_default_pii=True)
@@ -90,7 +95,7 @@ def test_transactions(tornado_testcase, sentry_init, capture_events):
     with start_transaction(name="client") as span:
         pass
 
-    response = client.fetch("/hi", headers=dict(span.iter_headers()))
+    response = client.fetch("/hi", method="POST", body=b"heyoo", headers=dict(span.iter_headers()))
     assert response.code == 500
 
     client_tx, server_error, server_tx = events
@@ -103,8 +108,24 @@ def test_transactions(tornado_testcase, sentry_init, capture_events):
     assert (
         server_tx["transaction"]
         == server_error["transaction"]
-        == "tests.integrations.tornado.test_tornado.CrashingHandler.get"
+        == "tests.integrations.tornado.test_tornado.CrashingHandler.post"
     )
+
+
+    request = server_tx["request"]
+    host = request["headers"]["Host"]
+    assert server_tx["request"] == {
+        "env": {"REMOTE_ADDR": "127.0.0.1"},
+        "headers": {
+            "Accept-Encoding": "gzip",
+            "Connection": "close",
+            **request["headers"],
+        },
+        "method": "POST",
+        "query_string": "",
+        "data": {"heyoo": ['']},
+        "url": "http://{host}/hi".format(host=host),
+    }
 
     assert (
         client_tx["contexts"]["trace"]["trace_id"]
