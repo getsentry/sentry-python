@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from sentry_sdk import configure_scope
+from sentry_sdk import configure_scope, start_transaction
 from sentry_sdk.integrations.tornado import TornadoIntegration
 
 from tornado.web import RequestHandler, Application, HTTPError
@@ -80,6 +80,37 @@ def test_basic(tornado_testcase, sentry_init, capture_events):
 
     with configure_scope() as scope:
         assert not scope._tags
+
+
+def test_transactions(tornado_testcase, sentry_init, capture_events):
+    sentry_init(integrations=[TornadoIntegration()], traces_sample_rate=1.0, debug=True)
+    events = capture_events()
+    client = tornado_testcase(Application([(r"/hi", CrashingHandler)]))
+
+    with start_transaction(name="client") as span:
+        pass
+
+    response = client.fetch("/hi", headers=dict(span.iter_headers()))
+    assert response.code == 500
+
+    client_tx, server_error, server_tx = events
+
+    assert client_tx["type"] == "transaction"
+    assert client_tx["transaction"] == "client"
+
+    assert server_error["exception"]["values"][0]["type"] == "ZeroDivisionError"
+    assert server_tx["type"] == "transaction"
+    assert (
+        server_tx["transaction"]
+        == server_error["transaction"]
+        == "tests.integrations.tornado.test_tornado.CrashingHandler.get"
+    )
+
+    assert (
+        client_tx["contexts"]["trace"]["trace_id"]
+        == server_error["contexts"]["trace"]["trace_id"]
+        == server_tx["contexts"]["trace"]["trace_id"]
+    )
 
 
 def test_400_not_logged(tornado_testcase, sentry_init, capture_events):
