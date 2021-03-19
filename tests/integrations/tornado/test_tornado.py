@@ -101,10 +101,13 @@ def test_basic(tornado_testcase, sentry_init, capture_events):
         assert not scope._tags
 
 
-@pytest.mark.parametrize("handler,code", [
-    (CrashingHandler, 500),
-    (HelloHandler, 200),
-])
+@pytest.mark.parametrize(
+    "handler,code",
+    [
+        (CrashingHandler, 500),
+        (HelloHandler, 200),
+    ],
+)
 def test_transactions(tornado_testcase, sentry_init, capture_events, handler, code):
     sentry_init(integrations=[TornadoIntegration()], traces_sample_rate=1.0, debug=True)
     events = capture_events()
@@ -113,7 +116,9 @@ def test_transactions(tornado_testcase, sentry_init, capture_events, handler, co
     with start_transaction(name="client") as span:
         pass
 
-    response = client.fetch("/hi", method="POST", body=b"heyoo", headers=dict(span.iter_headers()))
+    response = client.fetch(
+        "/hi", method="POST", body=b"heyoo", headers=dict(span.iter_headers())
+    )
     assert response.code == code
 
     if code == 200:
@@ -127,15 +132,23 @@ def test_transactions(tornado_testcase, sentry_init, capture_events, handler, co
 
     if server_error is not None:
         assert server_error["exception"]["values"][0]["type"] == "ZeroDivisionError"
-        assert server_error["transaction"] == "tests.integrations.tornado.test_tornado.CrashingHandler.post"
+        assert (
+            server_error["transaction"]
+            == "tests.integrations.tornado.test_tornado.CrashingHandler.post"
+        )
 
     if code == 200:
-        assert server_tx["transaction"] == "tests.integrations.tornado.test_tornado.HelloHandler.post"
+        assert (
+            server_tx["transaction"]
+            == "tests.integrations.tornado.test_tornado.HelloHandler.post"
+        )
     else:
-        assert server_tx["transaction"] == "tests.integrations.tornado.test_tornado.CrashingHandler.post"
+        assert (
+            server_tx["transaction"]
+            == "tests.integrations.tornado.test_tornado.CrashingHandler.post"
+        )
 
     assert server_tx["type"] == "transaction"
-
 
     request = server_tx["request"]
     host = request["headers"]["Host"]
@@ -148,7 +161,7 @@ def test_transactions(tornado_testcase, sentry_init, capture_events, handler, co
         },
         "method": "POST",
         "query_string": "",
-        "data": {"heyoo": ['']},
+        "data": {"heyoo": [""]},
         "url": "http://{host}/hi".format(host=host),
     }
 
@@ -157,9 +170,11 @@ def test_transactions(tornado_testcase, sentry_init, capture_events, handler, co
         == server_tx["contexts"]["trace"]["trace_id"]
     )
 
-
     if server_error is not None:
-        assert server_error["contexts"]["trace"]["trace_id"] == server_tx["contexts"]["trace"]["trace_id"]
+        assert (
+            server_error["contexts"]["trace"]["trace_id"]
+            == server_tx["contexts"]["trace"]["trace_id"]
+        )
 
 
 def test_400_not_logged(tornado_testcase, sentry_init, capture_events):
