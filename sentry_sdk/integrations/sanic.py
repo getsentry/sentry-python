@@ -98,7 +98,7 @@ class SanicIntegration(Integration):
 
         def sentry_router_get(self, request, *args):
             # type: (Any, Request, Any) -> Any
-            if version < (21, 3):
+            if version >= (21, 3):
                 rv = old_router_get(self, request, args[0], args[1])
             else:
                 rv = old_router_get(self, request)
