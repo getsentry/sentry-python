@@ -400,7 +400,7 @@ def _get_cloudwatch_logs_url(aws_context, start_time):
         str -- AWS Console URL to logs.
     """
     formatstring = "%Y-%m-%dT%H:%M:%SZ"
-    region = environ.get("AWS_REGION")
+    region = environ.get("AWS_REGION", "")
 
     url = (
         "https://console.{domain}/cloudwatch/home?region={region}"
