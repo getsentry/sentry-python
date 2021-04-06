@@ -17,7 +17,7 @@ if MYPY:
 
 try:
     import falcon  # type: ignore
-    import falcon.api_helpers  # type: ignore
+    import falcon.app_helper  # type: ignore
 
     from falcon import __version__ as FALCON_VERSION
 except ImportError:
@@ -171,7 +171,7 @@ def _patch_handle_exception():
 
 def _patch_prepare_middleware():
     # type: () -> None
-    original_prepare_middleware = falcon.api_helpers.prepare_middleware
+    original_prepare_middleware = falcon.app_helpers.prepare_middleware
 
     def sentry_patched_prepare_middleware(
         middleware=None, independent_middleware=False
@@ -183,7 +183,7 @@ def _patch_prepare_middleware():
             middleware = [SentryFalconMiddleware()] + (middleware or [])
         return original_prepare_middleware(middleware, independent_middleware)
 
-    falcon.api_helpers.prepare_middleware = sentry_patched_prepare_middleware
+    falcon.app_helpers.prepare_middleware = sentry_patched_prepare_middleware
 
 
 def _is_falcon_http_error(ex):
