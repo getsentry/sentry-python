@@ -89,7 +89,10 @@ class RqIntegration(Integration):
 
         def sentry_patched_handle_exception(self, job, *exc_info, **kwargs):
             # type: (Worker, Any, *Any, **Any) -> Any
-            _capture_exception(exc_info)  # type: ignore
+
+            if job.is_failed:
+                _capture_exception(exc_info)  # type: ignore
+
             return old_handle_exception(self, job, *exc_info, **kwargs)
 
         Worker.handle_exception = sentry_patched_handle_exception
