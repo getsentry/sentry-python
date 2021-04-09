@@ -60,11 +60,17 @@ def get_default_release():
     if release:
         return release
 
+    startupinfo = None
+    if sys.platform == "win32" or sys.platform == "cygwin":
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
     with open(os.path.devnull, "w+") as null:
         try:
             release = (
                 subprocess.Popen(
                     ["git", "rev-parse", "HEAD"],
+                    startupinfo=startupinfo,
                     stdout=subprocess.PIPE,
                     stderr=null,
                     stdin=null,
