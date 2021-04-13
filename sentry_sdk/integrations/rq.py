@@ -108,7 +108,6 @@ class RqIntegration(Integration):
 
         Queue.enqueue_job = sentry_patched_enqueue_job
 
-
         ignore_logger("rq.worker")
 
 

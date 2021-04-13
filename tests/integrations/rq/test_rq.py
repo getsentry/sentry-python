@@ -177,6 +177,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
         )
     )
 
+
 def test_job_with_retries(sentry_init, capture_events):
     sentry_init(integrations=[RqIntegration()])
     events = capture_events()
@@ -188,4 +189,3 @@ def test_job_with_retries(sentry_init, capture_events):
     worker.work(burst=True)
 
     assert len(events) == 1
-
