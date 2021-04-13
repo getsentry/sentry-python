@@ -57,7 +57,7 @@ class BottleIntegration(Integration):
         # type: () -> None
 
         try:
-            version = tuple(map(int, BOTTLE_VERSION.split(".")))
+            version = tuple(map(int, BOTTLE_VERSION.replace("-dev", "").split(".")))
         except (TypeError, ValueError):
             raise DidNotEnable("Unparsable Bottle version: {}".format(version))
 
