@@ -177,7 +177,9 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
         )
     )
 
-
+@pytest.mark.skipif(
+    rq.__version__.split(".") < ["1", "5"], reason="At least rq-1.5 required"
+)
 def test_job_with_retries(sentry_init, capture_events):
     sentry_init(integrations=[RqIntegration()])
     events = capture_events()
