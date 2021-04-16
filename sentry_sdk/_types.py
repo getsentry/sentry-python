@@ -5,7 +5,6 @@ except ImportError:
 
 
 if MYPY:
-    from numbers import Real
     from types import TracebackType
     from typing import Any
     from typing import Callable
@@ -32,7 +31,7 @@ if MYPY:
     ErrorProcessor = Callable[[Event, ExcInfo], Optional[Event]]
     BreadcrumbProcessor = Callable[[Breadcrumb, BreadcrumbHint], Optional[Breadcrumb]]
 
-    TracesSampler = Callable[[SamplingContext], Union[Real, bool]]
+    TracesSampler = Callable[[SamplingContext], Union[float, int, bool]]
 
     # https://github.com/python/mypy/issues/5710
     NotImplementedType = Any
