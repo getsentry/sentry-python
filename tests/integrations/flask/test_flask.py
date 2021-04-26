@@ -365,7 +365,7 @@ def test_flask_formdata_request_appear_transaction_body(
     assert transaction_event["request"]["data"] == data
 
 
-@pytest.mark.parametrize("input_char", [u"a", b"a"])
+@pytest.mark.parametrize("input_char", ["a", b"a"])
 def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="small")
 

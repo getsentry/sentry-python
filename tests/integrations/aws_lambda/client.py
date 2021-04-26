@@ -91,14 +91,14 @@ def run_lambda_function(
 
             subprocess.check_call(
                 [sys.executable, "setup.py", "sdist", "-d", os.path.join(tmpdir, "..")],
-                **subprocess_kwargs
+                **subprocess_kwargs,
             )
 
             subprocess.check_call(
                 "pip install mock==3.0.0 funcsigs -t .",
                 cwd=tmpdir,
                 shell=True,
-                **subprocess_kwargs
+                **subprocess_kwargs,
             )
 
             # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
@@ -106,7 +106,7 @@ def run_lambda_function(
                 "pip install ../*.tar.gz -t .",
                 cwd=tmpdir,
                 shell=True,
-                **subprocess_kwargs
+                **subprocess_kwargs,
             )
 
             shutil.make_archive(os.path.join(tmpdir, "ball"), "zip", tmpdir)
