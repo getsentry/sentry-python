@@ -206,6 +206,7 @@ class HttpTransport(Transport):
             response.close()
 
     def on_dropped_event(self, reason):
+        # type: (str) -> None
         pass
 
     def _check_disabled(self, category):
