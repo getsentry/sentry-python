@@ -52,7 +52,7 @@ class PackageBuilder:
         sentry-python-serverless zip
         """
         serverless_sdk_path = (
-            f"{self.packages_dir}/sentry_sdk/" f"integrations/init_serverless_sdk"
+            f"{self.packages_dir}/init_serverless_sdk"
         )
         if not os.path.exists(serverless_sdk_path):
             os.makedirs(serverless_sdk_path)
