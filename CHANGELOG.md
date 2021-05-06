@@ -20,6 +20,14 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+# 1.1.0
+
+- Fix for `AWSLambda` integration returns value of original handler #1106
+- Fix for `RQ` integration that only captures exception if RQ job has failed and ignore retries #1076
+- Feature that supports Tracing for the `Tornado` integration #1060
+- Feature that supports wild cards in `ignore_logger` in the `Logging` Integration #1053
+- Fix for django that deals with template span description names that are either lists or tuples #1054
+
 ## 1.0.0
 
 This release contains a breaking change
