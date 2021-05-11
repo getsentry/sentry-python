@@ -77,7 +77,7 @@ jobs:
     strategy:
       matrix:
         python-version:
-          ["2.7", "pypy-2.7", "3.4", "3.5", "3.6", "3.7", "3.8", "3.9"]
+          ["2.7", "3.4", "3.5", "3.6", "3.7", "3.8", "3.9"]
 
     services:
       # Label used to access the service container
