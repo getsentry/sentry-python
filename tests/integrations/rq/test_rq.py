@@ -1,8 +1,7 @@
+import pytest
+from fakeredis import FakeStrictRedis
 from sentry_sdk.integrations.rq import RqIntegration
 
-import pytest
-
-from fakeredis import FakeStrictRedis
 import rq
 
 try:
@@ -177,3 +176,19 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
             }
         )
     )
+
+
+@pytest.mark.skipif(
+    rq.__version__.split(".") < ["1", "5"], reason="At least rq-1.5 required"
+)
+def test_job_with_retries(sentry_init, capture_events):
+    sentry_init(integrations=[RqIntegration()])
+    events = capture_events()
+
+    queue = rq.Queue(connection=FakeStrictRedis())
+    worker = rq.SimpleWorker([queue], connection=queue.connection)
+
+    queue.enqueue(crashing_job, foo=42, retry=rq.Retry(max=1))
+    worker.work(burst=True)
+
+    assert len(events) == 1

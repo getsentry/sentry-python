@@ -65,13 +65,17 @@ class FlaskIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+
+        # This version parsing is absolutely naive but the alternative is to
+        # import pkg_resources which slows down the SDK a lot.
         try:
             version = tuple(map(int, FLASK_VERSION.split(".")[:3]))
         except (ValueError, TypeError):
-            raise DidNotEnable("Unparsable Flask version: {}".format(FLASK_VERSION))
-
-        if version < (0, 10):
-            raise DidNotEnable("Flask 0.10 or newer is required.")
+            # It's probably a release candidate, we assume it's fine.
+            pass
+        else:
+            if version < (0, 10):
+                raise DidNotEnable("Flask 0.10 or newer is required.")
 
         request_started.connect(_request_started)
         got_request_exception.connect(_capture_exception)

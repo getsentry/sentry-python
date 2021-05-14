@@ -332,8 +332,9 @@ def _before_get_response(request):
         # Rely on WSGI middleware to start a trace
         try:
             if integration.transaction_style == "function_name":
+                fn = resolve(request.path).func
                 scope.transaction = transaction_from_function(
-                    resolve(request.path).func
+                    getattr(fn, "view_class", fn)
                 )
             elif integration.transaction_style == "url":
                 scope.transaction = LEGACY_RESOLVER.resolve(request.path_info)
