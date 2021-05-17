@@ -109,16 +109,13 @@ class BackgroundWorker(object):
                 logger.error("flush timed out, dropped %s events", pending)
 
     def submit(self, callback):
-        # type: (Callable[[], None]) -> None
+        # type: (Callable[[], None]) -> bool
         self._ensure_thread()
         try:
             self._queue.put_nowait(callback)
+            return True
         except Full:
-            self.on_full_queue(callback)
-
-    def on_full_queue(self, callback):
-        # type: (Optional[Any]) -> None
-        logger.error("background worker queue full, dropping event")
+            return False
 
     def _target(self):
         # type: () -> None

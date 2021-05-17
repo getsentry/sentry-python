@@ -150,12 +150,14 @@ class HttpTransport(Transport):
         # no matter of the status code to update our internal rate limits.
         header = response.headers.get("x-sentry-rate-limits")
         if header:
+            logger.warning("Rate-limited via x-sentry-rate-limits")
             self._disabled_until.update(_parse_rate_limits(header))
 
         # old sentries only communicate global rate limit hits via the
         # retry-after header on 429.  This header can also be emitted on new
         # sentries if a proxy in front wants to globally slow things down.
         elif response.status == 429:
+            logger.warning("Rate-limited via 429")
             self._disabled_until[None] = datetime.utcnow() + timedelta(
                 seconds=self._retry.get_retry_after(response) or 60
             )
@@ -173,12 +175,16 @@ class HttpTransport(Transport):
                 "X-Sentry-Auth": str(self._auth.to_header()),
             }
         )
-        response = self._pool.request(
-            "POST",
-            str(self._auth.get_api_url(endpoint_type)),
-            body=body,
-            headers=headers,
-        )
+        try:
+            response = self._pool.request(
+                "POST",
+                str(self._auth.get_api_url(endpoint_type)),
+                body=body,
+                headers=headers,
+            )
+        except Exception:
+            self.on_dropped_event("network")
+            raise
 
         try:
             self._update_rate_limits(response)
@@ -186,6 +192,7 @@ class HttpTransport(Transport):
             if response.status == 429:
                 # if we hit a 429.  Something was rate limited but we already
                 # acted on this in `self._update_rate_limits`.
+                self.on_dropped_event("status_429")
                 pass
 
             elif response.status >= 300 or response.status < 200:
@@ -194,8 +201,13 @@ class HttpTransport(Transport):
                     response.status,
                     response.data,
                 )
+                self.on_dropped_event("status_{}".format(response.status))
         finally:
             response.close()
+
+    def on_dropped_event(self, reason):
+        # type: (str) -> None
+        pass
 
     def _check_disabled(self, category):
         # type: (str) -> bool
@@ -212,6 +224,7 @@ class HttpTransport(Transport):
         # type: (...) -> None
 
         if self._check_disabled("error"):
+            self.on_dropped_event("self_rate_limits")
             return None
 
         body = io.BytesIO()
@@ -325,7 +338,8 @@ class HttpTransport(Transport):
                 with capture_internal_exceptions():
                     self._send_event(event)
 
-        self._worker.submit(send_event_wrapper)
+        if not self._worker.submit(send_event_wrapper):
+            self.on_dropped_event("full_queue")
 
     def capture_envelope(
         self, envelope  # type: Envelope
@@ -339,7 +353,8 @@ class HttpTransport(Transport):
                 with capture_internal_exceptions():
                     self._send_envelope(envelope)
 
-        self._worker.submit(send_envelope_wrapper)
+        if not self._worker.submit(send_envelope_wrapper):
+            self.on_dropped_event("full_queue")
 
     def flush(
         self,
