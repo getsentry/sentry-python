@@ -1,5 +1,11 @@
 from sentry_sdk import Hub
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import Integration, DidNotEnable
+
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from typing import Any
+
 
 try:
     from httpx import AsyncClient, Client, Request, Response
@@ -20,15 +26,17 @@ class HttpxIntegration(Integration):
 
 
 def _install_httpx_client():
+    # type: () -> None
     real_send = Client.send
 
-    def send(self, request: Request, **kwargs) -> Response:
+    def send(self, request, **kwargs):
+        # type: (Client, Request, **Any) -> Response
         hub = Hub.current
         if hub.get_integration(HttpxIntegration) is None:
             return real_send(self, request, **kwargs)
 
         with hub.start_span(
-                op="http", description="%s %s" % (request.method, request.url)
+            op="http", description="%s %s" % (request.method, request.url)
         ) as span:
             span.set_data("method", request.method)
             span.set_data("url", str(request.url))
@@ -45,15 +53,17 @@ def _install_httpx_client():
 
 
 def _install_httpx_async_client():
+    # type: () -> None
     real_send = AsyncClient.send
 
-    async def send(self, request: Request, **kwargs) -> Response:
+    async def send(self, request, **kwargs):
+        # type: (AsyncClient, Request, **Any) -> Response
         hub = Hub.current
         if hub.get_integration(HttpxIntegration) is None:
             return await real_send(self, request, **kwargs)
 
         with hub.start_span(
-                op="http", description="%s %s" % (request.method, request.url)
+            op="http", description="%s %s" % (request.method, request.url)
         ) as span:
             span.set_data("method", request.method)
             span.set_data("url", str(request.url))
