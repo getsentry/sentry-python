@@ -56,7 +56,7 @@ class RedisIntegration(Integration):
         try:
             _patch_rediscluster()
         except Exception:
-            logger.exception("Error occured while patching `rediscluster` library")
+            logger.exception("Error occurred while patching `rediscluster` library")
 
 
 def patch_redis_client(cls):
