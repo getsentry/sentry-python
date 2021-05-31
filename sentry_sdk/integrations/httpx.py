@@ -8,7 +8,7 @@ if MYPY:
 
 
 try:
-    from httpx import AsyncClient, Client, Request, Response
+    from httpx import AsyncClient, Client, Request, Response # type: ignore
 except ImportError:
     raise DidNotEnable("httpx is not installed")
 
