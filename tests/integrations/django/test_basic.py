@@ -26,7 +26,7 @@ from tests.integrations.django.myapp.wsgi import application
 # requires explicit database allow from failing the test
 pytest_mark_django_db_decorator = pytest.mark.django_db
 try:
-    pytest_version = tuple(map(int, pytest_django.__version__.split('.')))
+    pytest_version = tuple(map(int, pytest_django.__version__.split(".")))
     if pytest_version > (4, 2, 0):
         pytest_mark_django_db_decorator = pytest.mark.django_db(databases="__all__")
 except AttributeError:
