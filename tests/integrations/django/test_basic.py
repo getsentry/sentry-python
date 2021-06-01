@@ -245,7 +245,7 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
 
 
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest.mark.django_db(databases="__all__")
 def test_sql_dict_query_params(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -257,8 +257,6 @@ def test_sql_dict_query_params(sentry_init, capture_events):
 
     if "postgres" not in connections:
         pytest.skip("postgres tests disabled")
-
-    pytest.mark.django_db.databases.append("postgres")
 
     sql = connections["postgres"].cursor()
 
@@ -292,7 +290,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     ],
 )
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest.mark.django_db(databases="__all__")
 def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -305,7 +303,6 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
         pytest.skip("postgres tests disabled")
 
     import psycopg2.sql
-    pytest.mark.django_db.databases.append("postgres")
 
     sql = connections["postgres"].cursor()
 
@@ -326,7 +323,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
 
 
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest.mark.django_db(databases="__all__")
 def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -339,7 +336,6 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
         pytest.skip("postgres tests disabled")
 
     import psycopg2.sql
-    pytest.mark.django_db.databases.append("postgres")
 
     sql = connections["postgres"].cursor()
 
