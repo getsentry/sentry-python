@@ -21,7 +21,7 @@ from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk._compat import iteritems
 
 try:
-    from tornado import version_info as TORNADO_VERSION  # type: ignore
+    from tornado import version_info as TORNADO_VERSION
     from tornado.web import RequestHandler, HTTPError
     from tornado.gen import coroutine
 except ImportError:
@@ -58,7 +58,7 @@ class TornadoIntegration(Integration):
 
         ignore_logger("tornado.access")
 
-        old_execute = RequestHandler._execute  # type: ignore
+        old_execute = RequestHandler._execute
 
         awaitable = iscoroutinefunction(old_execute)
 
@@ -72,11 +72,11 @@ class TornadoIntegration(Integration):
 
         else:
 
-            @coroutine  # type: ignore
+            @coroutine
             def sentry_execute_request_handler(self, *args, **kwargs):  # type: ignore
                 # type: (RequestHandler, *Any, **Any) -> Any
                 with _handle_request_impl(self):
-                    result = yield from old_execute(self, *args, **kwargs)
+                    result = yield from old_execute(self, *args, **kwargs)  # type: ignore
                     return result
 
         RequestHandler._execute = sentry_execute_request_handler  # type: ignore
