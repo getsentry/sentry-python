@@ -53,6 +53,7 @@ setup(
         "pyspark": ["pyspark>=2.4.4"],
         "pure_eval": ["pure_eval", "executing", "asttokens"],
         "chalice": ["chalice>=1.16.0"],
+        "httpx": ["httpx>=0.16.0"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",

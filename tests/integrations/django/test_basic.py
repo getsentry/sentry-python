@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import pytest
+import pytest_django
 import json
 
 from werkzeug.test import Client
@@ -20,6 +21,19 @@ from sentry_sdk import capture_message, capture_exception, configure_scope
 from sentry_sdk.integrations.django import DjangoIntegration
 
 from tests.integrations.django.myapp.wsgi import application
+
+# Hack to prevent from experimental feature introduced in version `4.3.0` in `pytest-django` that
+# requires explicit database allow from failing the test
+pytest_mark_django_db_decorator = pytest.mark.django_db
+try:
+    pytest_version = tuple(map(int, pytest_django.__version__.split(".")))
+    if pytest_version > (4, 2, 0):
+        pytest_mark_django_db_decorator = pytest.mark.django_db(databases="__all__")
+except ValueError:
+    if "dev" in pytest_django.__version__:
+        pytest_mark_django_db_decorator = pytest.mark.django_db(databases="__all__")
+except AttributeError:
+    pass
 
 
 @pytest.fixture
@@ -245,7 +259,7 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
 
 
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest_mark_django_db_decorator
 def test_sql_dict_query_params(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -290,7 +304,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     ],
 )
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest_mark_django_db_decorator
 def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -323,7 +337,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
 
 
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest_mark_django_db_decorator
 def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
