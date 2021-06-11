@@ -1,18 +1,12 @@
----
-minVersion: "0.14.0"
-github:
-  owner: getsentry
-  repo: sentry-python
-
+minVersion: 0.23.1
 targets:
   - name: pypi
     includeNames: /^sentry[_\-]sdk.*$/
   - name: github
   - name: gh-pages
   - name: registry
-    type: sdk
-    config:
-      canonical: pypi:sentry-sdk
+    sdks:
+      pypi:sentry-sdk:
   - name: aws-lambda-layer
     includeNames: /^sentry-python-serverless-\d+(\.\d+)*\.zip$/
     layerName: SentryPythonServerlessSDK
@@ -29,11 +23,5 @@ targets:
           - python3.7
           - python3.8
     license: MIT
-
 changelog: CHANGELOG.md
 changelogPolicy: simple
-
-statusProvider:
-  name: github
-artifactProvider:
-  name: github
