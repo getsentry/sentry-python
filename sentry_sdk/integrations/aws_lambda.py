@@ -400,13 +400,15 @@ def _get_cloudwatch_logs_url(aws_context, start_time):
         str -- AWS Console URL to logs.
     """
     formatstring = "%Y-%m-%dT%H:%M:%SZ"
+    region = environ.get("AWS_REGION", "")
 
     url = (
-        "https://console.aws.amazon.com/cloudwatch/home?region={region}"
+        "https://console.{domain}/cloudwatch/home?region={region}"
         "#logEventViewer:group={log_group};stream={log_stream}"
         ";start={start_time};end={end_time}"
     ).format(
-        region=environ.get("AWS_REGION"),
+        domain="amazonaws.cn" if region.startswith("cn-") else "aws.amazon.com",
+        region=region,
         log_group=aws_context.log_group_name,
         log_stream=aws_context.log_stream_name,
         start_time=(start_time - timedelta(seconds=1)).strftime(formatstring),
