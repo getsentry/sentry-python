@@ -78,7 +78,7 @@ def run_lambda_function(
             # `test_lambda.test_handler`, then create another dir level so that our path is
             # test_dir.test_lambda.test_handler
             test_dir_path = os.path.join(tmpdir, "test_dir")
-            python_init_file = os.path.join(test_dir_path, '__init__.py')
+            python_init_file = os.path.join(test_dir_path, "__init__.py")
             os.makedirs(test_dir_path)
             with open(python_init_file, "w"):
                 # Create __init__ file to make it a python package

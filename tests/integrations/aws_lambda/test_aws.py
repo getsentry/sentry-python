@@ -112,7 +112,9 @@ def lambda_runtime(request):
 
 @pytest.fixture
 def run_lambda_function(request, lambda_client, lambda_runtime):
-    def inner(code, payload, timeout=30, syntax_check=True, layer=None, initial_handler=None):
+    def inner(
+        code, payload, timeout=30, syntax_check=True, layer=None, initial_handler=None
+    ):
         from tests.integrations.aws_lambda.client import run_lambda_function
 
         response = run_lambda_function(
@@ -124,7 +126,7 @@ def run_lambda_function(request, lambda_client, lambda_runtime):
             timeout=timeout,
             syntax_check=syntax_check,
             layer=layer,
-            initial_handler=initial_handler
+            initial_handler=initial_handler,
         )
 
         # for better debugging
@@ -622,9 +624,11 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
     python sdk, with no code changes sentry is able to capture errors
     """
 
-    for initial_handler in [None,
-                            "test_dir/test_lambda.test_handler",
-                            "test_dir.test_lambda.test_handler"]:
+    for initial_handler in [
+        None,
+        "test_dir/test_lambda.test_handler",
+        "test_dir.test_lambda.test_handler",
+    ]:
         print("Testing Initial Handler ", initial_handler)
         _, _, response = run_lambda_function(
             dedent(
@@ -645,7 +649,7 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
             ),
             b'{"foo": "bar"}',
             layer=True,
-            initial_handler=initial_handler
+            initial_handler=initial_handler,
         )
         assert response["FunctionError"] == "Unhandled"
         assert response["StatusCode"] == 200
