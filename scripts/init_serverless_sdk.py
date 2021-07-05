@@ -6,6 +6,8 @@ Then the Handler function sstring should be replaced with
 'sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler'
 """
 import os
+import sys
+import re
 
 import sentry_sdk
 from sentry_sdk._types import MYPY
@@ -23,16 +25,53 @@ sentry_sdk.init(
 )
 
 
+class AWSLambdaModuleLoader:
+    DIR_PATH_REGEX = r"^(.+)\/([^\/]+)$"
+
+    def __init__(self, sentry_initial_handler):
+        try:
+            module_path, self.handler_name = sentry_initial_handler.rsplit(".", 1)
+        except ValueError:
+            raise ValueError("Incorrect AWS Handler path (Not a path)")
+
+        self.extract_and_load_lambda_function_module(module_path)
+
+    def extract_and_load_lambda_function_module(self, module_path):
+        """
+        Method that extracts and loads lambda function module from module_path
+        """
+        py_version = sys.version_info
+
+        if re.match(self.DIR_PATH_REGEX, module_path):
+            # With a path like -> `scheduler/scheduler/event`
+            # `module_name` is `event`, and `module_file_path` is `scheduler/scheduler/event.py`
+            module_name = module_path.split(os.path.sep)[-1]
+            module_file_path = module_path + ".py"
+
+            # Supported python versions are 2.7, 3.6, 3.7, 3.8
+            if py_version >= (3, 5):
+                import importlib.util
+                spec = importlib.util.spec_from_file_location(module_name, module_file_path)
+                self.lambda_function_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(self.lambda_function_module)
+            elif py_version[0] < 3:
+                import imp
+                self.lambda_function_module = imp.load_source(module_name, module_file_path)
+            else:
+                raise ValueError("Python version %s is not supported." % py_version)
+        else:
+            import importlib
+            self.lambda_function_module = importlib.import_module(module_path)
+
+    def get_lambda_handler(self):
+        return getattr(self.lambda_function_module, self.handler_name)
+
+
 def sentry_lambda_handler(event, context):
     # type: (Any, Any) -> None
     """
     Handler function that invokes a lambda handler which path is defined in
-    environment vairables as "SENTRY_INITIAL_HANDLER"
+    environment variables as "SENTRY_INITIAL_HANDLER"
     """
-    try:
-        module_name, handler_name = os.environ["SENTRY_INITIAL_HANDLER"].rsplit(".", 1)
-    except ValueError:
-        raise ValueError("Incorrect AWS Handler path (Not a path)")
-    lambda_function = __import__(module_name)
-    lambda_handler = getattr(lambda_function, handler_name)
-    return lambda_handler(event, context)
+    module_loader = AWSLambdaModuleLoader(os.environ["SENTRY_INITIAL_HANDLER"])
+    return module_loader.get_lambda_handler()(event, context)

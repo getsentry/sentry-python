@@ -18,7 +18,7 @@ def get_boto_client():
 
 
 def build_no_code_serverless_function_and_layer(
-    client, tmpdir, fn_name, runtime, timeout
+    client, tmpdir, fn_name, runtime, timeout, initial_handler
 ):
     """
     Util function that auto instruments the no code implementation of the python
@@ -45,7 +45,7 @@ def build_no_code_serverless_function_and_layer(
             Timeout=timeout,
             Environment={
                 "Variables": {
-                    "SENTRY_INITIAL_HANDLER": "test_lambda.test_handler",
+                    "SENTRY_INITIAL_HANDLER": initial_handler,
                     "SENTRY_DSN": "https://123abc@example.com/123",
                     "SENTRY_TRACES_SAMPLE_RATE": "1.0",
                 }
@@ -67,12 +67,27 @@ def run_lambda_function(
     syntax_check=True,
     timeout=30,
     layer=None,
+    initial_handler=None,
     subprocess_kwargs=(),
 ):
     subprocess_kwargs = dict(subprocess_kwargs)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        test_lambda_py = os.path.join(tmpdir, "test_lambda.py")
+        if initial_handler:
+            # If Initial handler value is provided i.e. it is not the default
+            # `test_lambda.test_handler`, then create another dir level so that our path is
+            # test_dir.test_lambda.test_handler
+            test_dir_path = os.path.join(tmpdir, "test_dir")
+            python_init_file = os.path.join(test_dir_path, '__init__.py')
+            os.makedirs(test_dir_path)
+            with open(python_init_file, "w"):
+                # Create __init__ file to make it a python package
+                pass
+
+            test_lambda_py = os.path.join(tmpdir, "test_dir", "test_lambda.py")
+        else:
+            test_lambda_py = os.path.join(tmpdir, "test_lambda.py")
+
         with open(test_lambda_py, "w") as f:
             f.write(code)
 
@@ -127,8 +142,13 @@ def run_lambda_function(
                 cwd=tmpdir,
                 check=True,
             )
+
+            # Default initial handler
+            if not initial_handler:
+                initial_handler = "test_lambda.test_handler"
+
             build_no_code_serverless_function_and_layer(
-                client, tmpdir, fn_name, runtime, timeout
+                client, tmpdir, fn_name, runtime, timeout, initial_handler
             )
 
         @add_finalizer
