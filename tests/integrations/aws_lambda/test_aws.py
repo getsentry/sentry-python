@@ -634,16 +634,16 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
             dedent(
                 """
             import sentry_sdk
-    
+
             def test_handler(event, context):
                 current_client = sentry_sdk.Hub.current.client
-    
+
                 assert current_client is not None
-    
+
                 assert len(current_client.options['integrations']) == 1
                 assert isinstance(current_client.options['integrations'][0],
                                   sentry_sdk.integrations.aws_lambda.AwsLambdaIntegration)
-    
+
                 raise Exception("something went wrong")
             """
             ),
