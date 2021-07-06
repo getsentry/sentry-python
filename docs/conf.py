@@ -5,6 +5,13 @@ import sys
 
 import typing
 
+# prevent circular imports
+import sphinx.builders.html
+import sphinx.builders.latex
+import sphinx.builders.texinfo
+import sphinx.builders.text
+import sphinx.ext.autodoc
+
 typing.TYPE_CHECKING = True
 
 #
