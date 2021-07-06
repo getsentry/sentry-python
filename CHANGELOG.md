@@ -20,7 +20,7 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
-## 1.1.1
+## 1.2.0
 
 - Fix for `AWSLambda` Integration to handle other path formats for function initial handler #1139
 - Fix for worker to set deamon attribute instead of deprecated setDaemon method #1093
