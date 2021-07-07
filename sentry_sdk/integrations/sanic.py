@@ -96,14 +96,21 @@ class SanicIntegration(Integration):
 
         old_router_get = Router.get
 
-        def sentry_router_get(self, request):
-            # type: (Any, Request) -> Any
-            rv = old_router_get(self, request)
+        def sentry_router_get(self, *args):
+            # type: (Any, Union[Any, Request]) -> Any
+            if version >= (21, 3):
+                rv = old_router_get(self, *args)
+            else:
+                request = args[0]
+                rv = old_router_get(self, request)
             hub = Hub.current
             if hub.get_integration(SanicIntegration) is not None:
                 with capture_internal_exceptions():
                     with hub.configure_scope() as scope:
-                        scope.transaction = rv[0].__name__
+                        if version >= (21, 3):
+                            scope.transaction = rv[0].name
+                        else:
+                            scope.transaction = rv[0].__name__
             return rv
 
         Router.get = sentry_router_get
