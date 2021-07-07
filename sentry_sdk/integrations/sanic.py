@@ -104,7 +104,11 @@ class SanicIntegration(Integration):
                 with capture_internal_exceptions():
                     with hub.configure_scope() as scope:
                         if version >= (21, 3):
-                            scope.transaction = rv[0].name
+                            # Sanic versions above and including 21.3 append the app name to the
+                            # route name, and so we need to remove it from Route name so the
+                            # transaction name is consistent across all versions
+                            sanic_app_name = self.ctx.app.name
+                            scope.transaction = rv[0].name.split("%s." % sanic_app_name)[1]
                         else:
                             scope.transaction = rv[0].__name__
             return rv

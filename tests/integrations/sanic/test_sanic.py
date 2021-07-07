@@ -40,11 +40,8 @@ def test_request_data(sentry_init, app, capture_events):
     assert response.status == 200
 
     (event,) = events
-    # Sanic versions above and including 21.3 append the app name to the route name
-    if SANIC_VERSION >= (21, 3):
-        assert event["transaction"] == "%s.hi" % __name__
-    else:
-        assert event["transaction"] == "hi"
+
+    assert event["transaction"] == "hi"
     assert event["request"]["env"] == {"REMOTE_ADDR": ""}
     assert set(event["request"]["headers"]) >= {
         "accept",
@@ -77,11 +74,7 @@ def test_errors(sentry_init, app, capture_events):
     assert response.status == 500
 
     (event,) = events
-    # Sanic versions above and including 21.3 append the app name to the route name
-    if SANIC_VERSION >= (21, 3):
-        assert event["transaction"] == "%s.myerror" % __name__
-    else:
-        assert event["transaction"] == "myerror"
+    assert event["transaction"] == "myerror"
 
     (exception,) = event["exception"]["values"]
 
@@ -190,8 +183,8 @@ def test_concurrency(sentry_init, app):
 
             class MockAsyncStreamer:
                 def __init__(self, request_body):
-                    self.request_body = request_body.encode("ASCII")
-                    self.iter = iter(request_body)
+                    self.request_body = request_body
+                    self.iter = iter(self.request_body)
                     self.response = b"success"
 
                 def respond(self, response):
@@ -214,7 +207,7 @@ def test_concurrency(sentry_init, app):
                         raise StopAsyncIteration
 
             patched_request = request.Request(**kwargs)
-            patched_request.stream = MockAsyncStreamer("hellowold")
+            patched_request.stream = MockAsyncStreamer([b"hello", b"foo"])
 
             await app.handle_request(
                 patched_request,
