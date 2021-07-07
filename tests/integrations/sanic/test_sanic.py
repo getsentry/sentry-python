@@ -40,7 +40,6 @@ def test_request_data(sentry_init, app, capture_events):
     assert response.status == 200
 
     (event,) = events
-
     assert event["transaction"] == "hi"
     assert event["request"]["env"] == {"REMOTE_ADDR": ""}
     assert set(event["request"]["headers"]) >= {
@@ -75,7 +74,6 @@ def test_errors(sentry_init, app, capture_events):
 
     (event,) = events
     assert event["transaction"] == "myerror"
-
     (exception,) = event["exception"]["values"]
 
     assert exception["type"] == "ValueError"
@@ -189,12 +187,8 @@ def test_concurrency(sentry_init, app):
 
                 def respond(self, response):
                     responses.append(response)
-
-                    def send_patched(*args, **kwargs):
-                        return lambda end_stream: asyncio.sleep(0.001)
-
                     patched_response = HTTPResponse()
-                    patched_response.send = send_patched()
+                    patched_response.send = lambda end_stream: asyncio.sleep(0.001)
                     return patched_response
 
                 def __aiter__(self):
