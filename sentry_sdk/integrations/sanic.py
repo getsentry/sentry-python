@@ -98,11 +98,7 @@ class SanicIntegration(Integration):
 
         def sentry_router_get(self, *args):
             # type: (Any, Union[Any, Request]) -> Any
-            if version >= (21, 3):
-                rv = old_router_get(self, *args)
-            else:
-                request = args[0]
-                rv = old_router_get(self, request)
+            rv = old_router_get(self, *args)
             hub = Hub.current
             if hub.get_integration(SanicIntegration) is not None:
                 with capture_internal_exceptions():
