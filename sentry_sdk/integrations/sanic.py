@@ -108,7 +108,9 @@ class SanicIntegration(Integration):
                             # route name, and so we need to remove it from Route name so the
                             # transaction name is consistent across all versions
                             sanic_app_name = self.ctx.app.name
-                            scope.transaction = rv[0].name.split("%s." % sanic_app_name)[1]
+                            scope.transaction = rv[0].name.split(
+                                "%s." % sanic_app_name
+                            )[1]
                         else:
                             scope.transaction = rv[0].__name__
             return rv
