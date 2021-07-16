@@ -70,10 +70,13 @@ class CeleryIntegration(Integration):
             return _wrap_tracer(task, old_build_tracer(name, task, *args, **kwargs))
 
         trace.build_tracer = sentry_build_tracer
+        if CELERY_VERSION < (5,):
+            # Keeping compatibility with celery 4.x.x BaseTask subclass like PeriodicTasks
+            from celery.task.base import BaseTask  # type: ignore
+        else:
+            from celery.app.task import BaseTask # type: ignore
 
-        from celery.app.task import Task  # type: ignore
-
-        Task.apply_async = _wrap_apply_async(Task.apply_async)
+        BaseTask.apply_async = _wrap_apply_async(BaseTask.apply_async)
 
         _patch_worker_exit()
 
