@@ -5,6 +5,7 @@ import os
 import sys
 import threading
 import subprocess
+import sys
 
 from datetime import datetime
 
@@ -787,8 +788,9 @@ def _is_contextvars_broken():
     try:
         import gevent
         from gevent.monkey import is_object_patched  # type: ignore
+
         # Get the MAJOR and MINOR version numbers of Gevent
-        gevent_version_parts = [int(part) for part in gevent.__version__.split(".")[:2]]
+        version_tuple = tuple([int(part) for part in gevent.__version__.split(".")[:2]])
         if is_object_patched("threading", "local"):
             # Gevent 20.9.0 depends on Greenlet 0.4.17 which natively handles switching
             # context vars when greenlets are switched, so, Gevent 20.9.0+ is all fine.
@@ -797,14 +799,10 @@ def _is_contextvars_broken():
             # for contextvars, is able to patch both thread locals and contextvars, in
             # that case, check if contextvars are effectively patched.
             if (
-                # Gevent > 20
-                (gevent_version_parts[0] > 20)
                 # Gevent 20.9.0+
-                or (gevent_version_parts[0] == 20 and gevent_version_parts[1] >= 9)
-                # Gevent 20.5.0+
-                or (
-                    is_object_patched("contextvars", "ContextVar")
-                )
+                (sys.version_info >= (3, 7) and version_tuple >= (20, 9))
+                # Gevent 20.5.0+ or Python < 3.7
+                or (is_object_patched("contextvars", "ContextVar"))
             ):
                 return False
 
