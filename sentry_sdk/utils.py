@@ -785,12 +785,27 @@ def _is_contextvars_broken():
     Returns whether gevent/eventlet have patched the stdlib in a way where thread locals are now more "correct" than contextvars.
     """
     try:
+        import gevent
         from gevent.monkey import is_object_patched  # type: ignore
-
+        # Get the MAJOR and MINOR version numbers of Gevent
+        gevent_version_parts = [int(part) for part in gevent.__version__.split(".")[:2]]
         if is_object_patched("threading", "local"):
-            # Gevent 20.5 is able to patch both thread locals and contextvars,
-            # in that case all is good.
-            if is_object_patched("contextvars", "ContextVar"):
+            # Gevent 20.9.0 depends on Greenlet 0.4.17 which natively handles switching
+            # context vars when greenlets are switched, so, Gevent 20.9.0+ is all fine.
+            # Ref: https://github.com/gevent/gevent/blob/83c9e2ae5b0834b8f84233760aabe82c3ba065b4/src/gevent/monkey.py#L604-L609
+            # Gevent 20.5, that doesn't depend on Greenlet 0.4.17 with native support
+            # for contextvars, is able to patch both thread locals and contextvars, in
+            # that case, check if contextvars are effectively patched.
+            if (
+                # Gevent > 20
+                (gevent_version_parts[0] > 20)
+                # Gevent 20.9.0+
+                or (gevent_version_parts[0] == 20 and gevent_version_parts[1] >= 9)
+                # Gevent 20.5.0+
+                or (
+                    is_object_patched("contextvars", "ContextVar")
+                )
+            ):
                 return False
 
             return True
