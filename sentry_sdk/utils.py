@@ -5,7 +5,6 @@ import os
 import sys
 import threading
 import subprocess
-import sys
 
 from datetime import datetime
 
