@@ -785,7 +785,7 @@ def _is_contextvars_broken():
     Returns whether gevent/eventlet have patched the stdlib in a way where thread locals are now more "correct" than contextvars.
     """
     try:
-        import gevent
+        import gevent  # type: ignore
         from gevent.monkey import is_object_patched  # type: ignore
 
         # Get the MAJOR and MINOR version numbers of Gevent
