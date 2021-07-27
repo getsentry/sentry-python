@@ -20,6 +20,10 @@ sentry-sdk==0.10.1
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 1.3.1
+
+- Fix detection of contextvars compatibility with Gevent versions >=20.9.0 #1157
+
 ## 1.3.0
 
 - Add support for Sanic versions 20 and 21 #1146
