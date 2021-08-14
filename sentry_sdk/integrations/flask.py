@@ -1,7 +1,5 @@
 from __future__ import absolute_import
 
-import weakref
-
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -67,13 +65,17 @@ class FlaskIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+
+        # This version parsing is absolutely naive but the alternative is to
+        # import pkg_resources which slows down the SDK a lot.
         try:
             version = tuple(map(int, FLASK_VERSION.split(".")[:3]))
         except (ValueError, TypeError):
-            raise DidNotEnable("Unparsable Flask version: {}".format(FLASK_VERSION))
-
-        if version < (0, 10):
-            raise DidNotEnable("Flask 0.10 or newer is required.")
+            # It's probably a release candidate, we assume it's fine.
+            pass
+        else:
+            if version < (0, 10):
+                raise DidNotEnable("Flask 0.10 or newer is required.")
 
         request_started.connect(_request_started)
         got_request_exception.connect(_capture_exception)
@@ -113,10 +115,7 @@ def _request_started(sender, **kwargs):
         except Exception:
             pass
 
-        weak_request = weakref.ref(request)
-        evt_processor = _make_request_event_processor(
-            app, weak_request, integration  # type: ignore
-        )
+        evt_processor = _make_request_event_processor(app, request, integration)
         scope.add_event_processor(evt_processor)
 
 
@@ -157,11 +156,11 @@ class FlaskRequestExtractor(RequestExtractor):
         return file.content_length
 
 
-def _make_request_event_processor(app, weak_request, integration):
+def _make_request_event_processor(app, request, integration):
     # type: (Flask, Callable[[], Request], FlaskIntegration) -> EventProcessor
+
     def inner(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-        request = weak_request()
 
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to

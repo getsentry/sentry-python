@@ -5,6 +5,13 @@ import sys
 
 import typing
 
+# prevent circular imports
+import sphinx.builders.html
+import sphinx.builders.latex
+import sphinx.builders.texinfo
+import sphinx.builders.text
+import sphinx.ext.autodoc
+
 typing.TYPE_CHECKING = True
 
 #
@@ -22,7 +29,7 @@ project = u"sentry-python"
 copyright = u"2019, Sentry Team and Contributors"
 author = u"Sentry Team and Contributors"
 
-release = "0.20.3"
+release = "1.3.1"
 version = ".".join(release.split(".")[:2])  # The short X.Y version.
 
 

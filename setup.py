@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="0.20.3",
+    version="1.3.1",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -53,6 +53,7 @@ setup(
         "pyspark": ["pyspark>=2.4.4"],
         "pure_eval": ["pure_eval", "executing", "asttokens"],
         "chalice": ["chalice>=1.16.0"],
+        "httpx": ["httpx>=0.16.0"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
@@ -72,4 +73,5 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
+    options={"bdist_wheel": {"universal": "1"}},
 )

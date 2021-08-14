@@ -3,30 +3,28 @@ from __future__ import absolute_import
 import weakref
 
 from sentry_sdk.hub import Hub
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
-
 try:
-    from rq.version import VERSION as RQ_VERSION
-    from rq.timeouts import JobTimeoutException
-    from rq.worker import Worker
     from rq.queue import Queue
+    from rq.timeouts import JobTimeoutException
+    from rq.version import VERSION as RQ_VERSION
+    from rq.worker import Worker
 except ImportError:
     raise DidNotEnable("RQ not installed")
 
 from sentry_sdk._types import MYPY
 
 if MYPY:
-    from typing import Any
-    from typing import Dict
-    from typing import Callable
+    from typing import Any, Callable, Dict
+
+    from sentry_sdk._types import EventProcessor
+    from sentry_sdk.utils import ExcInfo
 
     from rq.job import Job
-
-    from sentry_sdk.utils import ExcInfo
-    from sentry_sdk._types import EventProcessor
 
 
 class RqIntegration(Integration):
@@ -89,7 +87,9 @@ class RqIntegration(Integration):
 
         def sentry_patched_handle_exception(self, job, *exc_info, **kwargs):
             # type: (Worker, Any, *Any, **Any) -> Any
-            _capture_exception(exc_info)  # type: ignore
+            if job.is_failed:
+                _capture_exception(exc_info)  # type: ignore
+
             return old_handle_exception(self, job, *exc_info, **kwargs)
 
         Worker.handle_exception = sentry_patched_handle_exception
@@ -107,6 +107,8 @@ class RqIntegration(Integration):
             return old_enqueue_job(self, job, **kwargs)
 
         Queue.enqueue_job = sentry_patched_enqueue_job
+
+        ignore_logger("rq.worker")
 
 
 def _make_event_processor(weak_job):

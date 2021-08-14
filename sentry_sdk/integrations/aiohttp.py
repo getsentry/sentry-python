@@ -92,7 +92,7 @@ class AioHttpIntegration(Integration):
 
             weak_request = weakref.ref(request)
 
-            with Hub(Hub.current) as hub:
+            with Hub(hub) as hub:
                 # Scope data will not leak between requests because aiohttp
                 # create a task to wrap each request.
                 with hub.configure_scope() as scope:

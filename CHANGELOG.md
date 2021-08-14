@@ -10,7 +10,7 @@ This project follows [semver](https://semver.org/), with three additions:
 
 - Certain features (e.g. integrations) may be explicitly called out as "experimental" or "unstable" in the documentation. They come with their own versioning policy described in the documentation.
 
-We recommend to pin your version requirements against `0.x.*` or `0.x.y`.
+We recommend to pin your version requirements against `1.x.*` or `1.x.y`.
 Either one of the following is fine:
 
 ```
@@ -19,6 +19,42 @@ sentry-sdk==0.10.1
 ```
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
+
+## 1.3.1
+
+- Fix detection of contextvars compatibility with Gevent versions >=20.9.0 #1157
+
+## 1.3.0
+
+- Add support for Sanic versions 20 and 21 #1146
+
+## 1.2.0
+
+- Fix for `AWSLambda` Integration to handle other path formats for function initial handler #1139
+- Fix for worker to set deamon attribute instead of deprecated setDaemon method #1093
+- Fix for `bottle` Integration that discards `-dev` for version extraction #1085
+- Fix for transport that adds a unified hook for capturing metrics about dropped events #1100
+- Add `Httpx` Integration #1119
+- Add support for china domains in `AWSLambda` Integration #1051
+
+## 1.1.0
+
+- Fix for `AWSLambda` integration returns value of original handler #1106
+- Fix for `RQ` integration that only captures exception if RQ job has failed and ignore retries #1076
+- Feature that supports Tracing for the `Tornado` integration #1060
+- Feature that supports wild cards in `ignore_logger` in the `Logging` Integration #1053
+- Fix for django that deals with template span description names that are either lists or tuples #1054
+
+## 1.0.0
+
+This release contains a breaking change
+
+- **BREAKING CHANGE**: Feat: Moved `auto_session_tracking` experimental flag to a proper option and removed explicitly setting experimental `session_mode` in favor of auto detecting its value, hence enabling release health by default #994
+- Fixed Django transaction name by setting the name to  `request.path_info` rather than `request.path`
+- Fix for tracing by getting HTTP headers from span rather than transaction when possible #1035
+- Fix for Flask transactions missing request body in non errored transactions #1034
+- Fix for honoring the `X-Forwarded-For` header #1037
+- Fix for worker that logs data dropping of events with level error #1032
 
 ## 0.20.3
 

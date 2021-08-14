@@ -368,14 +368,20 @@ def string_containing_matcher():
             self.substring = substring
 
             try:
-                # unicode only exists in python 2
+                # the `unicode` type only exists in python 2, so if this blows up,
+                # we must be in py3 and have the `bytes` type
                 self.valid_types = (str, unicode)  # noqa
             except NameError:
-                self.valid_types = (str,)
+                self.valid_types = (str, bytes)
 
         def __eq__(self, test_string):
             if not isinstance(test_string, self.valid_types):
                 return False
+
+            # this is safe even in py2 because as of 2.6, `bytes` exists in py2
+            # as an alias for `str`
+            if isinstance(test_string, bytes):
+                test_string = test_string.decode()
 
             if len(self.substring) > len(test_string):
                 return False

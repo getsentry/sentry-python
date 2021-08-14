@@ -72,12 +72,12 @@ jobs:
 
   test:
     continue-on-error: true
-    timeout-minutes: 35
+    timeout-minutes: 45
     runs-on: ubuntu-18.04
     strategy:
       matrix:
         python-version:
-          ["2.7", "pypy-2.7", "3.4", "3.5", "3.6", "3.7", "3.8", "3.9"]
+          ["2.7", "3.4", "3.5", "3.6", "3.7", "3.8", "3.9"]
 
     services:
       # Label used to access the service container
@@ -132,6 +132,7 @@ jobs:
       - name: run tests
         env:
           CI_PYTHON_VERSION: ${{ matrix.python-version }}
+        timeout-minutes: 45
         run: |
           coverage erase
           ./scripts/runtox.sh '' --cov=tests --cov=sentry_sdk --cov-report= --cov-branch

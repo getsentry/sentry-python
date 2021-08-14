@@ -66,7 +66,7 @@ class BackgroundWorker(object):
                 self._thread = threading.Thread(
                     target=self._target, name="raven-sentry.BackgroundWorker"
                 )
-                self._thread.setDaemon(True)
+                self._thread.daemon = True
                 self._thread.start()
                 self._thread_for_pid = os.getpid()
 
@@ -99,23 +99,23 @@ class BackgroundWorker(object):
         # type: (float, Optional[Any]) -> None
         initial_timeout = min(0.1, timeout)
         if not self._timed_queue_join(initial_timeout):
-            pending = self._queue.qsize()
+            pending = self._queue.qsize() + 1
             logger.debug("%d event(s) pending on flush", pending)
             if callback is not None:
                 callback(pending, timeout)
-            self._timed_queue_join(timeout - initial_timeout)
+
+            if not self._timed_queue_join(timeout - initial_timeout):
+                pending = self._queue.qsize() + 1
+                logger.error("flush timed out, dropped %s events", pending)
 
     def submit(self, callback):
-        # type: (Callable[[], None]) -> None
+        # type: (Callable[[], None]) -> bool
         self._ensure_thread()
         try:
             self._queue.put_nowait(callback)
+            return True
         except Full:
-            self.on_full_queue(callback)
-
-    def on_full_queue(self, callback):
-        # type: (Optional[Any]) -> None
-        logger.debug("background worker queue full, dropping event")
+            return False
 
     def _target(self):
         # type: () -> None

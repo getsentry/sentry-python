@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import pytest
+import pytest_django
 import json
 
 from werkzeug.test import Client
@@ -21,6 +22,19 @@ from sentry_sdk.integrations.django import DjangoIntegration
 
 from tests.integrations.django.myapp.wsgi import application
 
+# Hack to prevent from experimental feature introduced in version `4.3.0` in `pytest-django` that
+# requires explicit database allow from failing the test
+pytest_mark_django_db_decorator = pytest.mark.django_db
+try:
+    pytest_version = tuple(map(int, pytest_django.__version__.split(".")))
+    if pytest_version > (4, 2, 0):
+        pytest_mark_django_db_decorator = pytest.mark.django_db(databases="__all__")
+except ValueError:
+    if "dev" in pytest_django.__version__:
+        pytest_mark_django_db_decorator = pytest.mark.django_db(databases="__all__")
+except AttributeError:
+    pass
+
 
 @pytest.fixture
 def client():
@@ -38,6 +52,46 @@ def test_view_exceptions(sentry_init, client, capture_exceptions, capture_events
 
     (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "django"
+
+
+def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
+    sentry_init, client, capture_exceptions, capture_events, settings
+):
+    """
+    Test that ensures if django settings.USE_X_FORWARDED_HOST is set to True
+    then the SDK sets the request url to the `HTTP_X_FORWARDED_FOR`
+    """
+    settings.USE_X_FORWARDED_HOST = True
+
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    exceptions = capture_exceptions()
+    events = capture_events()
+    client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
+
+    (error,) = exceptions
+    assert isinstance(error, ZeroDivisionError)
+
+    (event,) = events
+    assert event["request"]["url"] == "http://example.com/view-exc"
+
+
+def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
+    sentry_init, client, capture_exceptions, capture_events
+):
+    """
+    Test that ensures if django settings.USE_X_FORWARDED_HOST is set to False
+    then the SDK sets the request url to the `HTTP_POST`
+    """
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    exceptions = capture_exceptions()
+    events = capture_events()
+    client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
+
+    (error,) = exceptions
+    assert isinstance(error, ZeroDivisionError)
+
+    (event,) = events
+    assert event["request"]["url"] == "http://localhost/view-exc"
 
 
 def test_middleware_exceptions(sentry_init, client, capture_exceptions):
@@ -205,7 +259,7 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
 
 
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest_mark_django_db_decorator
 def test_sql_dict_query_params(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -250,7 +304,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     ],
 )
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest_mark_django_db_decorator
 def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -283,7 +337,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
 
 
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest_mark_django_db_decorator
 def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -523,18 +577,25 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
     )
-    views_urls = [reverse("template_test2")]
+    views_tests = [
+        (
+            reverse("template_test2"),
+            '- op="django.template.render": description="[user_name.html, ...]"',
+        ),
+    ]
     if DJANGO_VERSION >= (1, 7):
-        views_urls.append(reverse("template_test"))
+        views_tests.append(
+            (
+                reverse("template_test"),
+                '- op="django.template.render": description="user_name.html"',
+            ),
+        )
 
-    for url in views_urls:
+    for url, expected_line in views_tests:
         events = capture_events()
         _content, status, _headers = client.get(url)
         transaction = events[0]
-        assert (
-            '- op="django.template.render": description="user_name.html"'
-            in render_span_tree(transaction)
-        )
+        assert expected_line in render_span_tree(transaction)
 
 
 def test_middleware_spans(sentry_init, client, capture_events, render_span_tree):

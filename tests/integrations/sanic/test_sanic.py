@@ -9,6 +9,7 @@ from sentry_sdk import capture_message, configure_scope
 from sentry_sdk.integrations.sanic import SanicIntegration
 
 from sanic import Sanic, request, response, __version__ as SANIC_VERSION_RAW
+from sanic.response import HTTPResponse
 from sanic.exceptions import abort
 
 SANIC_VERSION = tuple(map(int, SANIC_VERSION_RAW.split(".")))
@@ -16,7 +17,12 @@ SANIC_VERSION = tuple(map(int, SANIC_VERSION_RAW.split(".")))
 
 @pytest.fixture
 def app():
-    app = Sanic(__name__)
+    if SANIC_VERSION >= (20, 12):
+        # Build (20.12.0) adds a feature where the instance is stored in an internal class
+        # registry for later retrieval, and so add register=False to disable that
+        app = Sanic(__name__, register=False)
+    else:
+        app = Sanic(__name__)
 
     @app.route("/message")
     def hi(request):
@@ -166,11 +172,46 @@ def test_concurrency(sentry_init, app):
         if SANIC_VERSION >= (19,):
             kwargs["app"] = app
 
-        await app.handle_request(
-            request.Request(**kwargs),
-            write_callback=responses.append,
-            stream_callback=responses.append,
-        )
+        if SANIC_VERSION >= (21, 3):
+            try:
+                app.router.reset()
+                app.router.finalize()
+            except AttributeError:
+                ...
+
+            class MockAsyncStreamer:
+                def __init__(self, request_body):
+                    self.request_body = request_body
+                    self.iter = iter(self.request_body)
+                    self.response = b"success"
+
+                def respond(self, response):
+                    responses.append(response)
+                    patched_response = HTTPResponse()
+                    patched_response.send = lambda end_stream: asyncio.sleep(0.001)
+                    return patched_response
+
+                def __aiter__(self):
+                    return self
+
+                async def __anext__(self):
+                    try:
+                        return next(self.iter)
+                    except StopIteration:
+                        raise StopAsyncIteration
+
+            patched_request = request.Request(**kwargs)
+            patched_request.stream = MockAsyncStreamer([b"hello", b"foo"])
+
+            await app.handle_request(
+                patched_request,
+            )
+        else:
+            await app.handle_request(
+                request.Request(**kwargs),
+                write_callback=responses.append,
+                stream_callback=responses.append,
+            )
 
         (r,) = responses
         assert r.status == 200

@@ -120,7 +120,13 @@ class DjangoIntegration(Integration):
 
             bound_old_app = old_app.__get__(self, WSGIHandler)
 
-            return SentryWsgiMiddleware(bound_old_app)(environ, start_response)
+            from django.conf import settings
+
+            use_x_forwarded_for = settings.USE_X_FORWARDED_HOST
+
+            return SentryWsgiMiddleware(bound_old_app, use_x_forwarded_for)(
+                environ, start_response
+            )
 
         WSGIHandler.__call__ = sentry_patched_wsgi_handler
 
@@ -326,8 +332,9 @@ def _before_get_response(request):
         # Rely on WSGI middleware to start a trace
         try:
             if integration.transaction_style == "function_name":
+                fn = resolve(request.path).func
                 scope.transaction = transaction_from_function(
-                    resolve(request.path).func
+                    getattr(fn, "view_class", fn)
                 )
             elif integration.transaction_style == "url":
                 scope.transaction = LEGACY_RESOLVER.resolve(request.path_info)
