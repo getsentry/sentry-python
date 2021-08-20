@@ -171,7 +171,7 @@ def set_extra(key, value):
 
 @scopemethod  # noqa
 def set_user(value):
-    # type: (Dict[str, Any]) -> None
+    # type: (Optional[Dict[str, Any]]) -> None
     return Hub.current.scope.set_user(value)
 
 
