@@ -185,12 +185,12 @@ class Scope(object):
 
     @_attr_setter
     def user(self, value):
-        # type: (Dict[str, Any]) -> None
+        # type: (Optional[Dict[str, Any]]) -> None
         """When set a specific user is bound to the scope. Deprecated in favor of set_user."""
         self.set_user(value)
 
     def set_user(self, value):
-        # type: (Dict[str, Any]) -> None
+        # type: (Optional[Dict[str, Any]]) -> None
         """Sets a user for the scope."""
         self._user = value
         if self._session is not None:
