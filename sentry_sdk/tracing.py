@@ -73,8 +73,6 @@ class Span(object):
         "_span_recorder",
         "hub",
         "_context_manager_state",
-        # TODO: rename this "transaction" once we fully and truly deprecate the
-        # old "transaction" attribute (which was actually the transaction name)?
         "_containing_transaction",
     )
 
@@ -104,6 +102,7 @@ class Span(object):
         hub=None,  # type: Optional[sentry_sdk.Hub]
         status=None,  # type: Optional[str]
         transaction=None,  # type: Optional[str] # deprecated
+        containing_transaction=None,  # type: Optional[Transaction]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -117,6 +116,7 @@ class Span(object):
         self.hub = hub
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
+        self._containing_transaction = containing_transaction
         self.start_timestamp = datetime.utcnow()
         try:
             # TODO: For Python 3.7+, we could use a clock with ns resolution:
@@ -131,7 +131,6 @@ class Span(object):
         self.timestamp = None  # type: Optional[datetime]
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
-        self._containing_transaction = None  # type: Optional[Transaction]
 
     def init_span_recorder(self, maxlen):
         # type: (int) -> None
@@ -172,6 +171,15 @@ class Span(object):
         self.finish(hub)
         scope.span = old_span
 
+    @property
+    def containing_transaction(self):
+        # type: () -> Optional[Transaction]
+
+        # this is a getter rather than a regular attribute so that transactions
+        # can return `self` here instead (as a way to prevent them circularly
+        # referencing themselves)
+        return self._containing_transaction
+
     def start_child(self, **kwargs):
         # type: (**Any) -> Span
         """
@@ -184,13 +192,11 @@ class Span(object):
         kwargs.setdefault("sampled", self.sampled)
 
         child = Span(
-            trace_id=self.trace_id, span_id=None, parent_span_id=self.span_id, **kwargs
+            trace_id=self.trace_id,
+            parent_span_id=self.span_id,
+            containing_transaction=self.containing_transaction,
+            **kwargs
         )
-
-        if isinstance(self, Transaction):
-            child._containing_transaction = self
-        else:
-            child._containing_transaction = self._containing_transaction
 
         child._span_recorder = recorder = self._span_recorder
         if recorder:
@@ -307,10 +313,7 @@ class Span(object):
         Returns None if there's no client and/or no DSN.
         """
 
-        if isinstance(self, Transaction):
-            transaction = self  # type: Optional[Transaction]
-        else:
-            transaction = self._containing_transaction
+        transaction = self.containing_transaction
 
         # we should have the relevant values stored on the transaction, but if
         # this is an orphan span, make a new value
@@ -437,10 +440,7 @@ class Span(object):
         if self.status:
             rv["status"] = self.status
 
-        if isinstance(self, Transaction):
-            transaction = self  # type: Optional[Transaction]
-        else:
-            transaction = self._containing_transaction
+        transaction = self.containing_transaction
 
         if transaction:
             rv["tracestate"] = transaction._sentry_tracestate
@@ -496,6 +496,15 @@ class Transaction(Span):
             self.parent_span_id,
             self.sampled,
         )
+
+    @property
+    def containing_transaction(self):
+        # type: () -> Transaction
+
+        # Transactions (as spans) belong to themselves (as transactions). This
+        # is a getter rather than a regular attribute to avoid having a circular
+        # reference.
+        return self
 
     def finish(self, hub=None):
         # type: (Optional[sentry_sdk.Hub]) -> Optional[str]

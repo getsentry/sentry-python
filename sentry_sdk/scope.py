@@ -150,19 +150,13 @@ class Scope(object):
         if self._span is None:
             return None
 
-        # the span on the scope is itself a transaction
-        if isinstance(self._span, Transaction):
-            return self._span
+        # there is an orphan span on the scope
+        if self._span.containing_transaction is None:
+            return None
 
-        # the span on the scope isn't a transaction but belongs to one
-        if self._span._containing_transaction:
-            return self._span._containing_transaction
-
-        # there's a span (not a transaction) on the scope, but it was started on
-        # its own, not as the descendant of a transaction (this is deprecated
-        # behavior, but as long as the start_span function exists, it can still
-        # happen)
-        return None
+        # there is either a transaction (which is its own containing
+        # transaction) or a non-orphan span on the scope
+        return self._span.containing_transaction
 
     @transaction.setter
     def transaction(self, value):
