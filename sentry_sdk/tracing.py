@@ -263,6 +263,10 @@ class Span(object):
         """
         Creates a generator which returns the span's `sentry-trace` and
         `tracestate` headers.
+
+        If the span's containing transaction doesn't yet have a
+        `sentry_tracestate` value, this will cause one to be generated and
+        stored.
         """
         yield "sentry-trace", self.to_traceparent()
 
@@ -310,19 +314,21 @@ class Span(object):
         Computes the `tracestate` header value using data from the containing
         transaction.
 
+        If the containing transaction doesn't yet have a `sentry_tracestate`
+        value, this will cause one to be generated and stored.
+
+        If there is no containing transaction, a value will be generated but not
+        stored.
+
         Returns None if there's no client and/or no DSN.
         """
 
-        transaction = self.containing_transaction
-
-        # we should have the relevant values stored on the transaction, but if
-        # this is an orphan span, make a new value
-        if transaction:
-            sentry_tracestate = transaction._sentry_tracestate
-            third_party_tracestate = transaction._third_party_tracestate
-        else:
-            sentry_tracestate = compute_tracestate_entry(self)
-            third_party_tracestate = None
+        sentry_tracestate = self.get_or_set_sentry_tracestate()
+        third_party_tracestate = (
+            self.containing_transaction._third_party_tracestate
+            if self.containing_transaction
+            else None
+        )
 
         if not sentry_tracestate:
             return None
@@ -333,6 +339,25 @@ class Span(object):
             header_value = header_value + "," + third_party_tracestate
 
         return header_value
+
+    def get_or_set_sentry_tracestate(self):
+        # type: (Span) -> Optional[str]
+        """
+        Read sentry tracestate off of the span's containing transaction.
+
+        If the transaction doesn't yet have a `_sentry_tracestate` value,
+        compute one and store it.
+        """
+        transaction = self.containing_transaction
+
+        if transaction:
+            if not transaction._sentry_tracestate:
+                transaction._sentry_tracestate = compute_tracestate_entry(self)
+
+            return transaction._sentry_tracestate
+
+        # orphan span - nowhere to store the value, so just return it
+        return compute_tracestate_entry(self)
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
@@ -440,10 +465,14 @@ class Span(object):
         if self.status:
             rv["status"] = self.status
 
-        transaction = self.containing_transaction
+        # if the transaction didn't inherit a tracestate value, and no outgoing
+        # requests - whose need for headers would have caused a tracestate value
+        # to be created - were made as part of the transaction, the transaction
+        # still won't have a tracestate value, so compute one now
+        sentry_tracestate = self.get_or_set_sentry_tracestate()
 
-        if transaction:
-            rv["tracestate"] = transaction._sentry_tracestate
+        if sentry_tracestate:
+            rv["tracestate"] = sentry_tracestate
 
         return rv
 
@@ -482,7 +511,10 @@ class Transaction(Span):
         Span.__init__(self, **kwargs)
         self.name = name
         self.parent_sampled = parent_sampled
-        self._sentry_tracestate = sentry_tracestate or compute_tracestate_entry(self)
+        # if tracestate isn't inherited and set here, it will get set lazily,
+        # either the first time an outgoing request needs it for a header or the
+        # first time an event needs it for inclusion in the captured data
+        self._sentry_tracestate = sentry_tracestate
         self._third_party_tracestate = third_party_tracestate
 
     def __repr__(self):
