@@ -321,6 +321,9 @@ class Span(object):
             sentry_tracestate = compute_tracestate_entry(self)
             third_party_tracestate = None
 
+        if not sentry_tracestate:
+            return None
+
         header_value = sentry_tracestate
 
         if third_party_tracestate:
