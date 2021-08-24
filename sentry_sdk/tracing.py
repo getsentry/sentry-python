@@ -183,19 +183,19 @@ class Span(object):
         """
         kwargs.setdefault("sampled", self.sampled)
 
-        rv = Span(
+        child = Span(
             trace_id=self.trace_id, span_id=None, parent_span_id=self.span_id, **kwargs
         )
 
         if isinstance(self, Transaction):
-            rv._containing_transaction = self
+            child._containing_transaction = self
         else:
-            rv._containing_transaction = self._containing_transaction
+            child._containing_transaction = self._containing_transaction
 
-        rv._span_recorder = recorder = self._span_recorder
+        child._span_recorder = recorder = self._span_recorder
         if recorder:
-            recorder.add(rv)
-        return rv
+            recorder.add(child)
+        return child
 
     def new_span(self, **kwargs):
         # type: (**Any) -> Span
