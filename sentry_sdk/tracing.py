@@ -306,7 +306,6 @@ class Span(object):
 
         Returns None if there's no client and/or no DSN.
         """
-        header_value = None
 
         if isinstance(self, Transaction):
             transaction = self  # type: Optional[Transaction]
