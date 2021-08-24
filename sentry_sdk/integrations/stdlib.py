@@ -7,7 +7,7 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing_utils import EnvironHeaders
-from sentry_sdk.utils import capture_internal_exceptions, safe_repr
+from sentry_sdk.utils import capture_internal_exceptions, logger, safe_repr
 
 from sentry_sdk._types import MYPY
 
@@ -86,6 +86,11 @@ def _install_httplib():
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
         for key, value in hub.iter_trace_propagation_headers(span):
+            logger.debug(
+                "[Tracing] Adding `{key}` header {value} to outgoing request to {real_url}.".format(
+                    key=key, value=value, real_url=real_url
+                )
+            )
             self.putheader(key, value)
 
         self._sentrysdk_span = span
