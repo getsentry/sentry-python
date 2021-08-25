@@ -22,12 +22,12 @@ from sentry_sdk._types import MYPY
 if MYPY:
     import typing
 
-    from typing import Generator
     from typing import Optional
     from typing import Any
     from typing import Dict
     from typing import List
     from typing import Tuple
+    from typing import Iterator
 
     from sentry_sdk._types import SamplingContext
 
@@ -183,19 +183,19 @@ class Span(object):
         """
         kwargs.setdefault("sampled", self.sampled)
 
-        rv = Span(
+        child = Span(
             trace_id=self.trace_id, span_id=None, parent_span_id=self.span_id, **kwargs
         )
 
         if isinstance(self, Transaction):
-            rv._containing_transaction = self
+            child._containing_transaction = self
         else:
-            rv._containing_transaction = self._containing_transaction
+            child._containing_transaction = self._containing_transaction
 
-        rv._span_recorder = recorder = self._span_recorder
+        child._span_recorder = recorder = self._span_recorder
         if recorder:
-            recorder.add(rv)
-        return rv
+            recorder.add(child)
+        return child
 
     def new_span(self, **kwargs):
         # type: (**Any) -> Span
@@ -253,9 +253,15 @@ class Span(object):
         return transaction
 
     def iter_headers(self):
-        # type: () -> Generator[Tuple[str, str], None, None]
+        # type: () -> Iterator[Tuple[str, str]]
+        """
+        Creates a generator which returns the span's `sentry-trace` and
+        `tracestate` headers.
+        """
         yield "sentry-trace", self.to_traceparent()
+
         tracestate = self.to_tracestate()
+        # `tracestate` will only be `None` if there's no client or no DSN
         if tracestate:
             yield "tracestate", tracestate
 
@@ -295,9 +301,11 @@ class Span(object):
     def to_tracestate(self):
         # type: () -> Optional[str]
         """
-        Generates the `tracestate` header value to attach to outgoing requests.
+        Computes the `tracestate` header value using data from the containing
+        transaction.
+
+        Returns None if there's no client and/or no DSN.
         """
-        header_value = None
 
         if isinstance(self, Transaction):
             transaction = self  # type: Optional[Transaction]

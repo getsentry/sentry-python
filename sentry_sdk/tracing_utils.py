@@ -285,6 +285,9 @@ def compute_tracestate_value(data):
     # type: (typing.Mapping[str, str]) -> str
     """
     Computes a new tracestate value using the given data.
+
+    Note: Returns just the base64-encoded data, NOT the full `sentry=...`
+    tracestate entry.
     """
 
     tracestate_json = json.dumps(data)
@@ -300,7 +303,9 @@ def compute_tracestate_value(data):
 def compute_tracestate_entry(span):
     # type: (Span) -> str
     """
-    Computes a new tracestate value for the span.
+    Computes a new sentry tracestate for the span. Includes the `sentry=`.
+
+    Will return `None` if there's no client and/or no DSN.
     """
     data = {}
 
