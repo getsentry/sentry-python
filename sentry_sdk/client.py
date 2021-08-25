@@ -332,7 +332,7 @@ class _Client(object):
 
         # this is outside of the `if` immediately below because even if we don't
         # use the value, we want to make sure we remove it before the event is
-        # sent (which the `.pop()` does)
+        # sent
         raw_tracestate = (
             event_opt.get("contexts", {}).get("trace", {}).pop("tracestate", "")
         )

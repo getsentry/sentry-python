@@ -174,7 +174,7 @@ class Scope(object):
         # anything set in the scope.
         # XXX: note that with the introduction of the Scope.transaction getter,
         # there is a semantic and type mismatch between getter and setter. The
-        # getter returns a transaction, the setter sets a transaction name.
+        # getter returns a Transaction, the setter sets a transaction name.
         # Without breaking version compatibility, we could make the setter set a
         # transaction name or transaction (self._span) depending on the type of
         # the value argument.
