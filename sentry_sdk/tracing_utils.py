@@ -320,6 +320,9 @@ def compute_tracestate_entry(span):
             "public_key": Dsn(options["dsn"]).public_key,
         }
 
+        if span.containing_transaction:
+            data["transaction"] = span.containing_transaction.name
+
         return "sentry=" + compute_tracestate_value(data)
 
     return None

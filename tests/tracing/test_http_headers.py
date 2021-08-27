@@ -46,6 +46,7 @@ def test_tracestate_computation(sentry_init):
         "environment": "dogpark",
         "release": "off.leash.park",
         "public_key": "dogsarebadatkeepingsecrets",
+        "transaction": "/interactions/other-dogs/new-dog",
     }
 
 
