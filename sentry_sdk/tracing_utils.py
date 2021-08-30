@@ -309,16 +309,32 @@ def compute_tracestate_entry(span):
     """
     data = {}
 
-    client = (span.hub or sentry_sdk.Hub.current).client
+    hub = span.hub or sentry_sdk.Hub.current
+
+    client = hub.client
+    scope = hub.scope
 
     if client and client.options.get("dsn"):
         options = client.options
+        user = scope._user
+
         data = {
             "trace_id": span.trace_id,
             "environment": options["environment"],
             "release": options.get("release"),
             "public_key": Dsn(options["dsn"]).public_key,
         }
+
+        if user and (user.get("id") or user.get("segment")):
+            user_data = {}
+
+            if user.get("id"):
+                user_data["id"] = user["id"]
+
+            if user.get("segment"):
+                user_data["segment"] = user["segment"]
+
+            data["user"] = user_data
 
         if span.containing_transaction:
             data["transaction"] = span.containing_transaction.name
