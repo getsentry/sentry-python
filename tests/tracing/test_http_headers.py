@@ -26,6 +26,8 @@ def test_tracestate_computation(sentry_init):
         release="off.leash.park",
     )
 
+    sentry_sdk.set_user({"id": 12312013, "segment": "bigs"})
+
     transaction = Transaction(
         name="/interactions/other-dogs/new-dog",
         op="greeting.sniff",
@@ -46,6 +48,8 @@ def test_tracestate_computation(sentry_init):
         "environment": "dogpark",
         "release": "off.leash.park",
         "public_key": "dogsarebadatkeepingsecrets",
+        "user": {"id": 12312013, "segment": "bigs"},
+        "transaction": "/interactions/other-dogs/new-dog",
     }
 
 
