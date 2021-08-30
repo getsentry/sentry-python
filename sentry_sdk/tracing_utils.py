@@ -301,7 +301,7 @@ def compute_tracestate_value(data):
 
 
 def compute_tracestate_entry(span):
-    # type: (Span) -> str
+    # type: (Span) -> Optional[str]
     """
     Computes a new sentry tracestate for the span. Includes the `sentry=`.
 
@@ -311,8 +311,6 @@ def compute_tracestate_entry(span):
 
     client = (span.hub or sentry_sdk.Hub.current).client
 
-    # if there's no client and/or no DSN, we're not sending anything anywhere,
-    # so it's fine to not have any tracestate data
     if client and client.options.get("dsn"):
         options = client.options
         data = {
@@ -322,7 +320,9 @@ def compute_tracestate_entry(span):
             "public_key": Dsn(options["dsn"]).public_key,
         }
 
-    return "sentry=" + compute_tracestate_value(data)
+        return "sentry=" + compute_tracestate_value(data)
+
+    return None
 
 
 def reinflate_tracestate(encoded_tracestate):

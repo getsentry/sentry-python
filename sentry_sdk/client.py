@@ -346,7 +346,7 @@ class _Client(object):
                 "sent_at": format_timestamp(datetime.utcnow()),
             }
 
-            tracestate_data = reinflate_tracestate(
+            tracestate_data = raw_tracestate and reinflate_tracestate(
                 raw_tracestate.replace("sentry=", "")
             )
             if tracestate_data:
