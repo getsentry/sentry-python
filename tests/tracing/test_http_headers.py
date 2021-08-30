@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+import sentry_sdk
 from sentry_sdk.tracing import Transaction, Span
 from sentry_sdk.tracing_utils import (
     compute_tracestate_value,
@@ -31,6 +32,9 @@ def test_tracestate_computation(sentry_init):
         trace_id="12312012123120121231201212312012",
     )
 
+    # force lazy computation to create a value
+    transaction.to_tracestate()
+
     computed_value = transaction._sentry_tracestate.replace("sentry=", "")
     # we have to decode and reinflate the data because we can guarantee that the
     # order of the entries in the jsonified dict will be the same here as when
@@ -45,7 +49,7 @@ def test_tracestate_computation(sentry_init):
     }
 
 
-def test_adds_new_tracestate_to_transaction_when_none_given(sentry_init):
+def test_doesnt_add_new_tracestate_to_transaction_when_none_given(sentry_init):
     sentry_init(
         dsn="https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
         environment="dogpark",
@@ -58,7 +62,90 @@ def test_adds_new_tracestate_to_transaction_when_none_given(sentry_init):
         # sentry_tracestate=< value would be passed here >
     )
 
+    assert transaction._sentry_tracestate is None
+
+
+def test_adds_tracestate_to_transaction_when_to_traceparent_called(sentry_init):
+    sentry_init(
+        dsn="https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+        environment="dogpark",
+        release="off.leash.park",
+    )
+
+    transaction = Transaction(
+        name="/interactions/other-dogs/new-dog",
+        op="greeting.sniff",
+    )
+
+    # no inherited tracestate, and none created in Transaction constructor
+    assert transaction._sentry_tracestate is None
+
+    transaction.to_tracestate()
+
     assert transaction._sentry_tracestate is not None
+
+
+def test_adds_tracestate_to_transaction_when_getting_trace_context(sentry_init):
+    sentry_init(
+        dsn="https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+        environment="dogpark",
+        release="off.leash.park",
+    )
+
+    transaction = Transaction(
+        name="/interactions/other-dogs/new-dog",
+        op="greeting.sniff",
+    )
+
+    # no inherited tracestate, and none created in Transaction constructor
+    assert transaction._sentry_tracestate is None
+
+    transaction.get_trace_context()
+
+    assert transaction._sentry_tracestate is not None
+
+
+@pytest.mark.parametrize(
+    "set_by", ["inheritance", "to_tracestate", "get_trace_context"]
+)
+def test_tracestate_is_immutable_once_set(sentry_init, monkeypatch, set_by):
+    monkeypatch.setattr(
+        sentry_sdk.tracing,
+        "compute_tracestate_entry",
+        mock.Mock(return_value="sentry=doGsaREgReaT"),
+    )
+
+    sentry_init(
+        dsn="https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+        environment="dogpark",
+        release="off.leash.park",
+    )
+
+    # for each scenario, get to the point where tracestate has been set
+    if set_by == "inheritance":
+        transaction = Transaction(
+            name="/interactions/other-dogs/new-dog",
+            op="greeting.sniff",
+            sentry_tracestate=("sentry=doGsaREgReaT"),
+        )
+    else:
+        transaction = Transaction(
+            name="/interactions/other-dogs/new-dog",
+            op="greeting.sniff",
+        )
+
+        if set_by == "to_tracestate":
+            transaction.to_tracestate()
+        if set_by == "get_trace_context":
+            transaction.get_trace_context()
+
+    assert transaction._sentry_tracestate == "sentry=doGsaREgReaT"
+
+    # user data would be included in tracestate if it were recomputed at this point
+    sentry_sdk.set_user({"id": 12312013, "segment": "bigs"})
+
+    # value hasn't changed
+    assert transaction._sentry_tracestate == "sentry=doGsaREgReaT"
 
 
 @pytest.mark.parametrize("sampled", [True, False, None])
