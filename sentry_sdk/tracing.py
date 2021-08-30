@@ -73,8 +73,6 @@ class Span(object):
         "_span_recorder",
         "hub",
         "_context_manager_state",
-        # TODO: rename this "transaction" once we fully and truly deprecate the
-        # old "transaction" attribute (which was actually the transaction name)?
         "_containing_transaction",
     )
 
@@ -104,6 +102,7 @@ class Span(object):
         hub=None,  # type: Optional[sentry_sdk.Hub]
         status=None,  # type: Optional[str]
         transaction=None,  # type: Optional[str] # deprecated
+        containing_transaction=None,  # type: Optional[Transaction]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -117,6 +116,7 @@ class Span(object):
         self.hub = hub
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
+        self._containing_transaction = containing_transaction
         self.start_timestamp = datetime.utcnow()
         try:
             # TODO: For Python 3.7+, we could use a clock with ns resolution:
@@ -131,7 +131,6 @@ class Span(object):
         self.timestamp = None  # type: Optional[datetime]
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
-        self._containing_transaction = None  # type: Optional[Transaction]
 
     def init_span_recorder(self, maxlen):
         # type: (int) -> None
@@ -172,6 +171,15 @@ class Span(object):
         self.finish(hub)
         scope.span = old_span
 
+    @property
+    def containing_transaction(self):
+        # type: () -> Optional[Transaction]
+
+        # this is a getter rather than a regular attribute so that transactions
+        # can return `self` here instead (as a way to prevent them circularly
+        # referencing themselves)
+        return self._containing_transaction
+
     def start_child(self, **kwargs):
         # type: (**Any) -> Span
         """
@@ -184,13 +192,11 @@ class Span(object):
         kwargs.setdefault("sampled", self.sampled)
 
         child = Span(
-            trace_id=self.trace_id, span_id=None, parent_span_id=self.span_id, **kwargs
+            trace_id=self.trace_id,
+            parent_span_id=self.span_id,
+            containing_transaction=self.containing_transaction,
+            **kwargs
         )
-
-        if isinstance(self, Transaction):
-            child._containing_transaction = self
-        else:
-            child._containing_transaction = self._containing_transaction
 
         child._span_recorder = recorder = self._span_recorder
         if recorder:
@@ -257,6 +263,10 @@ class Span(object):
         """
         Creates a generator which returns the span's `sentry-trace` and
         `tracestate` headers.
+
+        If the span's containing transaction doesn't yet have a
+        `sentry_tracestate` value, this will cause one to be generated and
+        stored.
         """
         yield "sentry-trace", self.to_traceparent()
 
@@ -304,22 +314,24 @@ class Span(object):
         Computes the `tracestate` header value using data from the containing
         transaction.
 
+        If the containing transaction doesn't yet have a `sentry_tracestate`
+        value, this will cause one to be generated and stored.
+
+        If there is no containing transaction, a value will be generated but not
+        stored.
+
         Returns None if there's no client and/or no DSN.
         """
 
-        if isinstance(self, Transaction):
-            transaction = self  # type: Optional[Transaction]
-        else:
-            transaction = self._containing_transaction
+        sentry_tracestate = self.get_or_set_sentry_tracestate()
+        third_party_tracestate = (
+            self.containing_transaction._third_party_tracestate
+            if self.containing_transaction
+            else None
+        )
 
-        # we should have the relevant values stored on the transaction, but if
-        # this is an orphan span, make a new value
-        if transaction:
-            sentry_tracestate = transaction._sentry_tracestate
-            third_party_tracestate = transaction._third_party_tracestate
-        else:
-            sentry_tracestate = compute_tracestate_entry(self)
-            third_party_tracestate = None
+        if not sentry_tracestate:
+            return None
 
         header_value = sentry_tracestate
 
@@ -327,6 +339,25 @@ class Span(object):
             header_value = header_value + "," + third_party_tracestate
 
         return header_value
+
+    def get_or_set_sentry_tracestate(self):
+        # type: (Span) -> Optional[str]
+        """
+        Read sentry tracestate off of the span's containing transaction.
+
+        If the transaction doesn't yet have a `_sentry_tracestate` value,
+        compute one and store it.
+        """
+        transaction = self.containing_transaction
+
+        if transaction:
+            if not transaction._sentry_tracestate:
+                transaction._sentry_tracestate = compute_tracestate_entry(self)
+
+            return transaction._sentry_tracestate
+
+        # orphan span - nowhere to store the value, so just return it
+        return compute_tracestate_entry(self)
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
@@ -434,13 +465,14 @@ class Span(object):
         if self.status:
             rv["status"] = self.status
 
-        if isinstance(self, Transaction):
-            transaction = self  # type: Optional[Transaction]
-        else:
-            transaction = self._containing_transaction
+        # if the transaction didn't inherit a tracestate value, and no outgoing
+        # requests - whose need for headers would have caused a tracestate value
+        # to be created - were made as part of the transaction, the transaction
+        # still won't have a tracestate value, so compute one now
+        sentry_tracestate = self.get_or_set_sentry_tracestate()
 
-        if transaction:
-            rv["tracestate"] = transaction._sentry_tracestate
+        if sentry_tracestate:
+            rv["tracestate"] = sentry_tracestate
 
         return rv
 
@@ -479,7 +511,10 @@ class Transaction(Span):
         Span.__init__(self, **kwargs)
         self.name = name
         self.parent_sampled = parent_sampled
-        self._sentry_tracestate = sentry_tracestate or compute_tracestate_entry(self)
+        # if tracestate isn't inherited and set here, it will get set lazily,
+        # either the first time an outgoing request needs it for a header or the
+        # first time an event needs it for inclusion in the captured data
+        self._sentry_tracestate = sentry_tracestate
         self._third_party_tracestate = third_party_tracestate
 
     def __repr__(self):
@@ -493,6 +528,15 @@ class Transaction(Span):
             self.parent_span_id,
             self.sampled,
         )
+
+    @property
+    def containing_transaction(self):
+        # type: () -> Transaction
+
+        # Transactions (as spans) belong to themselves (as transactions). This
+        # is a getter rather than a regular attribute to avoid having a circular
+        # reference.
+        return self
 
     def finish(self, hub=None):
         # type: (Optional[sentry_sdk.Hub]) -> Optional[str]
