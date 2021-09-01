@@ -12,7 +12,7 @@ jobs:
   dist:
     name: distribution packages
     timeout-minutes: 10
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
@@ -35,7 +35,7 @@ jobs:
   docs:
     timeout-minutes: 10
     name: build documentation
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-latest
 
     if: "startsWith(github.ref, 'refs/heads/release/')"
 
@@ -58,7 +58,7 @@ jobs:
 
   lint:
     timeout-minutes: 10
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
@@ -73,11 +73,10 @@ jobs:
   test:
     continue-on-error: true
     timeout-minutes: 45
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version:
-          ["2.7", "3.4", "3.5", "3.6", "3.7", "3.8", "3.9"]
+        python-version: ["2.7", "3.4", "3.5", "3.6", "3.7", "3.8", "3.9"]
 
     services:
       # Label used to access the service container
