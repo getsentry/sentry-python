@@ -396,3 +396,12 @@ def _format_sql(cursor, sql):
         real_sql = None
 
     return real_sql or to_string(sql)
+
+
+def has_tracestate_enabled(span=None):
+    # type: (Optional[Span]) -> bool
+
+    client = ((span and span.hub) or sentry_sdk.Hub.current).client
+    options = client and client.options
+
+    return bool(options and options["_experiments"].get("propagate_tracestate"))
