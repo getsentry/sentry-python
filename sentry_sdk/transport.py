@@ -220,19 +220,31 @@ class HttpTransport(Transport):
         self.record_lost_event(reason)
 
     def _flush_stats(self, force=False):
-        if not (force or self._last_event_loss_sent is None or \
-            self._last_event_loss_sent < time.time() - 60):
+        if not (
+            force
+            or self._last_event_loss_sent is None
+            or self._last_event_loss_sent < time.time() - 60
+        ):
             return
         outcomes = self._event_loss_counters
         self._event_loss_counters = {}
 
         if outcomes:
-            self.capture_envelope(Envelope(
-                items=[Item(PayloadRef(json={
-                    "timestamp": time.time(),
-                    "outcomes": outcomes,
-                }), type="sdk_outomes")],
-            ))
+            self.capture_envelope(
+                Envelope(
+                    items=[
+                        Item(
+                            PayloadRef(
+                                json={
+                                    "timestamp": time.time(),
+                                    "outcomes": outcomes,
+                                }
+                            ),
+                            type="sdk_outomes",
+                        )
+                    ],
+                )
+            )
 
         self._last_event_loss_sent = time.time()
 
