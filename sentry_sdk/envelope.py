@@ -236,6 +236,8 @@ class Item(object):
             return "transaction"
         elif ty == "event":
             return "error"
+        elif ty == "sdk_outcomes":
+            return "sdk_outcomes"
         else:
             return "default"
 

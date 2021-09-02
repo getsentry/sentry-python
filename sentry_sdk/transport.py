@@ -4,12 +4,13 @@ import io
 import urllib3  # type: ignore
 import certifi
 import gzip
+import time
 
 from datetime import datetime, timedelta
 
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions, json_dumps
 from sentry_sdk.worker import BackgroundWorker
-from sentry_sdk.envelope import Envelope
+from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
 from sentry_sdk._types import MYPY
 
@@ -131,6 +132,8 @@ class HttpTransport(Transport):
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
         self._disabled_until = {}  # type: Dict[DataCategory, datetime]
         self._retry = urllib3.util.Retry()
+        self._event_loss_counters = {}
+        self._last_event_loss_sent = None
 
         self._pool = self._make_pool(
             self.parsed_dsn,
@@ -142,6 +145,13 @@ class HttpTransport(Transport):
         from sentry_sdk import Hub
 
         self.hub_cls = Hub
+
+    def record_lost_event(self, reason):
+        """This increments a counter for event loss by reason.  The counters are flushed
+        periodically automatically (typically once a minute).
+        """
+        # This is not locked because we are okay with small mismeasuring.
+        self._event_loss_counters[reason] = self._event_loss_counters.get(reason, 0) + 1
 
     def _update_rate_limits(self, response):
         # type: (urllib3.HTTPResponse) -> None
@@ -207,7 +217,24 @@ class HttpTransport(Transport):
 
     def on_dropped_event(self, reason):
         # type: (str) -> None
-        pass
+        self.record_lost_event(reason)
+
+    def _flush_stats(self, force=False):
+        if not (force or self._last_event_loss_sent is None or \
+            self._last_event_loss_sent < time.time() - 60):
+            return
+        outcomes = self._event_loss_counters
+        self._event_loss_counters = {}
+
+        if outcomes:
+            self.capture_envelope(Envelope(
+                items=[Item(PayloadRef(json={
+                    "timestamp": time.time(),
+                    "outcomes": outcomes,
+                }), type="sdk_outomes")],
+            ))
+
+        self._last_event_loss_sent = time.time()
 
     def _check_disabled(self, category):
         # type: (str) -> bool
@@ -254,9 +281,15 @@ class HttpTransport(Transport):
         # type: (...) -> None
 
         # remove all items from the envelope which are over quota
-        envelope.items[:] = [
-            x for x in envelope.items if not self._check_disabled(x.data_category)
-        ]
+        new_items = []
+        for item in envelope.items:
+            if self._check_disabled(item.data_category):
+                if item.data_category in ("transaction", "error", "default"):
+                    self.on_dropped_event("self_rate_limits")
+            else:
+                new_items.append(item)
+
+        envelope.items[:] = new_items
         if not envelope.items:
             return None
 
@@ -341,6 +374,8 @@ class HttpTransport(Transport):
         if not self._worker.submit(send_event_wrapper):
             self.on_dropped_event("full_queue")
 
+        self._flush_stats()
+
     def capture_envelope(
         self, envelope  # type: Envelope
     ):
@@ -356,6 +391,8 @@ class HttpTransport(Transport):
         if not self._worker.submit(send_envelope_wrapper):
             self.on_dropped_event("full_queue")
 
+        self._flush_stats()
+
     def flush(
         self,
         timeout,  # type: float
@@ -363,6 +400,7 @@ class HttpTransport(Transport):
     ):
         # type: (...) -> None
         logger.debug("Flushing HTTP transport")
+        self._flush_stats(force=True)
         if timeout > 0:
             self._worker.flush(timeout, callback)
 
