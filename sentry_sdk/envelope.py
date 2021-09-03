@@ -237,7 +237,7 @@ class Item(object):
         elif ty == "event":
             return "error"
         elif ty == "sdk_outcomes":
-            return "sdk_outcomes"
+            return "internal"
         else:
             return "default"
 
