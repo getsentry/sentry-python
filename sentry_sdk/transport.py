@@ -253,11 +253,14 @@ class HttpTransport(Transport):
         # type: (bool) -> None
         discarded_events = self._discarded_events
 
-        if not (
-            force
-            or self._last_event_loss_sent is None
-            or self._last_event_loss_sent < time.time() - 60
-        ) or not discarded_events:
+        if (
+            not (
+                force
+                or self._last_event_loss_sent is None
+                or self._last_event_loss_sent < time.time() - 60
+            )
+            or not discarded_events
+        ):
             return
 
         self._discarded_events = defaultdict(int)
