@@ -7,6 +7,7 @@ import gzip
 import time
 
 from datetime import datetime, timedelta
+from collections import defaultdict
 
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions, json_dumps
 from sentry_sdk.worker import BackgroundWorker
@@ -23,6 +24,7 @@ if MYPY:
     from typing import Tuple
     from typing import Type
     from typing import Union
+    from typing import DefaultDict
 
     from urllib3.poolmanager import PoolManager  # type: ignore
     from urllib3.poolmanager import ProxyManager
@@ -93,12 +95,16 @@ class Transport(object):
         """Forcefully kills the transport."""
         pass
 
-    def record_lost_event(self, reason, data_category="default"):
+    def record_lost_event(
+        self,
+        reason,  # type: str
+        data_category="default",  # type: str
+    ):
+        # type: (...) -> None
         """This increments a counter for event loss by reason and
         data category.
         """
-        # type: (...) -> None
-        pass
+        return None
 
     def __del__(self):
         # type: () -> None
@@ -139,8 +145,10 @@ class HttpTransport(Transport):
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
         self._disabled_until = {}  # type: Dict[DataCategory, datetime]
         self._retry = urllib3.util.Retry()
-        self._discarded_events = {}
-        self._last_event_loss_sent = None
+        self._discarded_events = defaultdict(
+            int
+        )  # type: DefaultDict[Tuple[str, str], int]
+        self._last_event_loss_sent = None  # type: Optional[float]
 
         self._pool = self._make_pool(
             self.parsed_dsn,
@@ -153,10 +161,13 @@ class HttpTransport(Transport):
 
         self.hub_cls = Hub
 
-    def record_lost_event(self, reason, data_category="default"):
-        # This is not locked because we are okay with small mismeasuring.
-        key = (data_category, reason)
-        self._discarded_events[key] = self._discarded_events.get(key, 0) + 1
+    def record_lost_event(
+        self,
+        reason,  # type: str
+        data_category="default",  # type: str
+    ):
+        # type: (...) -> None
+        self._discarded_events[data_category, reason] += 1
 
     def _update_rate_limits(self, response):
         # type: (urllib3.HTTPResponse) -> None
@@ -184,14 +195,16 @@ class HttpTransport(Transport):
         endpoint_type="store",  # type: EndpointType
         envelope=None,  # type: Optional[Envelope]
     ):
+        # type: (...) -> None
+
         def record_loss(reason):
+            # type: (str) -> None
             if envelope is None:
                 self.record_lost_event(reason, "error")
             else:
                 for item in envelope.items:
                     self.record_lost_event(reason, item.data_category)
 
-        # type: (...) -> None
         headers.update(
             {
                 "User-Agent": str(self._auth.client),
@@ -237,6 +250,7 @@ class HttpTransport(Transport):
         return None
 
     def _flush_stats(self, force=False):
+        # type: (bool) -> None
         discarded_events = self._discarded_events
 
         if not (
@@ -247,7 +261,7 @@ class HttpTransport(Transport):
         ):
             return
 
-        self._discarded_events = {}
+        self._discarded_events = defaultdict(int)
         self._last_event_loss_sent = time.time()
 
         client_report = Item(

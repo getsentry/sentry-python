@@ -244,7 +244,8 @@ class _Client(object):
             and random.random() >= self.options["sample_rate"]
         ):
             # record a lost event if we did not sample this.
-            self.transport.record_lost_event("sample_rate", "error")
+            if self.transport:
+                self.transport.record_lost_event("sample_rate", "error")
             return False
 
         if self._is_ignored_error(event, hint):

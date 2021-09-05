@@ -517,7 +517,7 @@ class Transaction(Span):
             # This is not entirely accurate because discards here are not
             # exclusively based on sample rate but also traces sampler, but
             # we handle this the same here.
-            if client:
+            if client and client.transport:
                 client.transport.record_lost_event("sample_rate", "transaction")
 
             return None
