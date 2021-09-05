@@ -167,7 +167,8 @@ class HttpTransport(Transport):
         data_category="default",  # type: str
     ):
         # type: (...) -> None
-        self._discarded_events[data_category, reason] += 1
+        if self.options["send_client_reports"]:
+            self._discarded_events[data_category, reason] += 1
 
     def _update_rate_limits(self, response):
         # type: (urllib3.HTTPResponse) -> None
@@ -251,6 +252,8 @@ class HttpTransport(Transport):
 
     def _flush_stats(self, force=False):
         # type: (bool) -> None
+        if not self.options["send_client_reports"]:
+            return
         discarded_events = self._discarded_events
 
         if (
@@ -454,8 +457,9 @@ class HttpTransport(Transport):
     ):
         # type: (...) -> None
         logger.debug("Flushing HTTP transport")
-        self._flush_stats(force=True)
+
         if timeout > 0:
+            self._worker.submit(lambda: self._flush_stats(force=True))
             self._worker.flush(timeout, callback)
 
     def kill(self):

@@ -130,8 +130,16 @@ def test_simple_rate_limits(httpserver, capsys, caplog, make_client):
 
 
 @pytest.mark.parametrize("response_code", [200, 429])
-def test_data_category_limits(httpserver, capsys, caplog, response_code, make_client):
-    client = make_client()
+def test_data_category_limits(
+    httpserver, capsys, caplog, response_code, make_client, monkeypatch
+):
+    client = make_client(send_client_reports=False)
+
+    captured_outcomes = []
+    monkeypatch.setattr(
+        client.transport, "record_lost_event", lambda *x: captured_outcomes.append(x)
+    )
+
     httpserver.serve_content(
         "hm",
         response_code,
@@ -157,6 +165,12 @@ def test_data_category_limits(httpserver, capsys, caplog, response_code, make_cl
     client.flush()
 
     assert len(httpserver.requests) == 1
+    assert httpserver.requests[0].url.endswith("/api/132/store/")
+
+    assert captured_outcomes == [
+        ("ratelimit_backoff", "transaction"),
+        ("ratelimit_backoff", "transaction"),
+    ]
 
 
 @pytest.mark.parametrize("response_code", [200, 429])
