@@ -93,6 +93,13 @@ class Transport(object):
         """Forcefully kills the transport."""
         pass
 
+    def record_lost_event(self, reason, data_category="default"):
+        """This increments a counter for event loss by reason and
+        data category.
+        """
+        # type: (...) -> None
+        pass
+
     def __del__(self):
         # type: () -> None
         try:
@@ -132,7 +139,7 @@ class HttpTransport(Transport):
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
         self._disabled_until = {}  # type: Dict[DataCategory, datetime]
         self._retry = urllib3.util.Retry()
-        self._event_loss_counters = {}
+        self._discarded_events = {}
         self._last_event_loss_sent = None
 
         self._pool = self._make_pool(
@@ -146,12 +153,10 @@ class HttpTransport(Transport):
 
         self.hub_cls = Hub
 
-    def record_lost_event(self, reason):
-        """This increments a counter for event loss by reason.  The counters are flushed
-        periodically automatically (typically once a minute).
-        """
+    def record_lost_event(self, reason, data_category="default"):
         # This is not locked because we are okay with small mismeasuring.
-        self._event_loss_counters[reason] = self._event_loss_counters.get(reason, 0) + 1
+        key = (data_category, reason)
+        self._discarded_events[key] = self._discarded_events.get(key, 0) + 1
 
     def _update_rate_limits(self, response):
         # type: (urllib3.HTTPResponse) -> None
@@ -177,7 +182,15 @@ class HttpTransport(Transport):
         body,  # type: bytes
         headers,  # type: Dict[str, str]
         endpoint_type="store",  # type: EndpointType
+        envelope=None,  # type: Optional[Envelope]
     ):
+        def record_loss(reason):
+            if envelope is None:
+                self.record_lost_event(reason, "error")
+            else:
+                for item in envelope.items:
+                    self.record_lost_event(reason, item.data_category)
+
         # type: (...) -> None
         headers.update(
             {
@@ -194,6 +207,7 @@ class HttpTransport(Transport):
             )
         except Exception:
             self.on_dropped_event("network")
+            record_loss("network_error")
             raise
 
         try:
@@ -201,7 +215,9 @@ class HttpTransport(Transport):
 
             if response.status == 429:
                 # if we hit a 429.  Something was rate limited but we already
-                # acted on this in `self._update_rate_limits`.
+                # acted on this in `self._update_rate_limits`.  Note that we
+                # do not want to record event loss here as we will have recorded
+                # an outcome in relay already.
                 self.on_dropped_event("status_429")
                 pass
 
@@ -212,41 +228,44 @@ class HttpTransport(Transport):
                     response.data,
                 )
                 self.on_dropped_event("status_{}".format(response.status))
+                record_loss("network_error")
         finally:
             response.close()
 
     def on_dropped_event(self, reason):
         # type: (str) -> None
-        self.record_lost_event(reason)
+        return None
 
     def _flush_stats(self, force=False):
+        discarded_events = self._discarded_events
+
         if not (
             force
+            or not discarded_events
             or self._last_event_loss_sent is None
             or self._last_event_loss_sent < time.time() - 60
         ):
             return
-        outcomes = self._event_loss_counters
-        self._event_loss_counters = {}
 
-        if outcomes:
-            self.capture_envelope(
-                Envelope(
-                    items=[
-                        Item(
-                            PayloadRef(
-                                json={
-                                    "timestamp": time.time(),
-                                    "outcomes": outcomes,
-                                }
-                            ),
-                            type="sdk_outomes",
-                        )
-                    ],
-                )
-            )
-
+        self._discarded_events = {}
         self._last_event_loss_sent = time.time()
+
+        client_report = Item(
+            PayloadRef(
+                json={
+                    "timestamp": time.time(),
+                    "discarded_events": [
+                        (data_category, reason, quantity)
+                        for (
+                            (data_category, reason),
+                            quantity,
+                        ) in discarded_events.items()
+                    ],
+                }
+            ),
+            type="client_report",
+        )
+        self.capture_envelope(Envelope(items=[client_report]))
 
     def _check_disabled(self, category):
         # type: (str) -> bool
@@ -264,6 +283,7 @@ class HttpTransport(Transport):
 
         if self._check_disabled("error"):
             self.on_dropped_event("self_rate_limits")
+            self.record_lost_event("ratelimit_backoff", "error")
             return None
 
         body = io.BytesIO()
@@ -298,6 +318,7 @@ class HttpTransport(Transport):
             if self._check_disabled(item.data_category):
                 if item.data_category in ("transaction", "error", "default"):
                     self.on_dropped_event("self_rate_limits")
+                    self.record_lost_event("ratelimit_backoff", item.data_category)
             else:
                 new_items.append(item)
 
@@ -316,6 +337,7 @@ class HttpTransport(Transport):
             self.parsed_dsn.project_id,
             self.parsed_dsn.host,
         )
+
         self._send_request(
             body.getvalue(),
             headers={
@@ -323,6 +345,7 @@ class HttpTransport(Transport):
                 "Content-Encoding": "gzip",
             },
             endpoint_type="envelope",
+            envelope=envelope,
         )
         return None
 
@@ -385,6 +408,7 @@ class HttpTransport(Transport):
 
         if not self._worker.submit(send_event_wrapper):
             self.on_dropped_event("full_queue")
+            self.record_lost_event("queue_overflow", "error")
 
         self._flush_stats()
 
@@ -402,6 +426,8 @@ class HttpTransport(Transport):
 
         if not self._worker.submit(send_envelope_wrapper):
             self.on_dropped_event("full_queue")
+            for item in envelope.items:
+                self.record_lost_event("queue_overflow", item.data_category)
 
         self._flush_stats()
 

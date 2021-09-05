@@ -200,7 +200,6 @@ class _Client(object):
                 new_event = before_send(event, hint or {})
             if new_event is None:
                 logger.info("before send dropped event (%s)", event)
-                self.transport.record_lost_event("before_send")
             event = new_event  # type: ignore
 
         return event
@@ -244,6 +243,8 @@ class _Client(object):
             self.options["sample_rate"] < 1.0
             and random.random() >= self.options["sample_rate"]
         ):
+            # record a lost event if we did not sample this.
+            self.transport.record_lost_event("sample_rate", "error")
             return False
 
         if self._is_ignored_error(event, hint):

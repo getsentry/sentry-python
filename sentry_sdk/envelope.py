@@ -236,7 +236,7 @@ class Item(object):
             return "transaction"
         elif ty == "event":
             return "error"
-        elif ty == "sdk_outcomes":
+        elif ty == "client_report":
             return "internal"
         else:
             return "default"
