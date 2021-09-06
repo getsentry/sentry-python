@@ -98,7 +98,8 @@ class Transport(object):
     def record_lost_event(
         self,
         reason,  # type: str
-        data_category="default",  # type: str
+        data_category=None,  # type: Optional[str]
+        item=None,  # type: Optional[Item]
     ):
         # type: (...) -> None
         """This increments a counter for event loss by reason and
@@ -164,11 +165,22 @@ class HttpTransport(Transport):
     def record_lost_event(
         self,
         reason,  # type: str
-        data_category="default",  # type: str
+        data_category=None,  # type: Optional[str]
+        item=None,  # type: Optional[Item]
     ):
         # type: (...) -> None
-        if self.options["send_client_reports"]:
-            self._discarded_events[data_category, reason] += 1
+        if not self.options["send_client_reports"]:
+            return
+
+        quantity = 1
+        if item is not None:
+            data_category = item.data_category
+            if data_category == "attachment":
+                quantity = len(item.get_bytes())
+        elif data_category is None:
+            raise TypeError("data category not provided")
+
+        self._discarded_events[data_category, reason] += quantity
 
     def _update_rate_limits(self, response):
         # type: (urllib3.HTTPResponse) -> None
@@ -201,10 +213,10 @@ class HttpTransport(Transport):
         def record_loss(reason):
             # type: (str) -> None
             if envelope is None:
-                self.record_lost_event(reason, "error")
+                self.record_lost_event(reason, data_category="error")
             else:
                 for item in envelope.items:
-                    self.record_lost_event(reason, item.data_category)
+                    self.record_lost_event(reason, item=item)
 
         headers.update(
             {
@@ -251,9 +263,9 @@ class HttpTransport(Transport):
         return None
 
     def _fetch_pending_client_report(self, force=False):
-        # type: (bool) -> None
+        # type: (bool) -> Optional[Item]
         if not self.options["send_client_reports"]:
-            return
+            return None
         discarded_events = self._discarded_events
 
         if (
@@ -264,7 +276,7 @@ class HttpTransport(Transport):
             )
             or not discarded_events
         ):
-            return
+            return None
 
         self._discarded_events = defaultdict(int)
         self._last_event_loss_sent = time.time()
@@ -307,7 +319,7 @@ class HttpTransport(Transport):
 
         if self._check_disabled("error"):
             self.on_dropped_event("self_rate_limits")
-            self.record_lost_event("ratelimit_backoff", "error")
+            self.record_lost_event("ratelimit_backoff", data_category="error")
             return None
 
         body = io.BytesIO()
@@ -342,7 +354,7 @@ class HttpTransport(Transport):
             if self._check_disabled(item.data_category):
                 if item.data_category in ("transaction", "error", "default"):
                     self.on_dropped_event("self_rate_limits")
-                    self.record_lost_event("ratelimit_backoff", item.data_category)
+                    self.record_lost_event("ratelimit_backoff", item=item)
             else:
                 new_items.append(item)
 
@@ -441,7 +453,7 @@ class HttpTransport(Transport):
 
         if not self._worker.submit(send_event_wrapper):
             self.on_dropped_event("full_queue")
-            self.record_lost_event("queue_overflow", "error")
+            self.record_lost_event("queue_overflow", data_category="error")
 
         self._flush_client_reports()
 
@@ -460,7 +472,7 @@ class HttpTransport(Transport):
         if not self._worker.submit(send_envelope_wrapper):
             self.on_dropped_event("full_queue")
             for item in envelope.items:
-                self.record_lost_event("queue_overflow", item.data_category)
+                self.record_lost_event("queue_overflow", item=item)
 
         self._flush_client_reports()
 

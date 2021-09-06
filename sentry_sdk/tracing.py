@@ -518,7 +518,9 @@ class Transaction(Span):
             # exclusively based on sample rate but also traces sampler, but
             # we handle this the same here.
             if client and client.transport:
-                client.transport.record_lost_event("sample_rate", "transaction")
+                client.transport.record_lost_event(
+                    "sample_rate", data_category="transaction"
+                )
 
             return None
 
