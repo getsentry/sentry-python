@@ -262,12 +262,12 @@ class HttpTransport(Transport):
         # type: (str) -> None
         return None
 
-    def _fetch_pending_client_report(self, force=False):
-        # type: (bool) -> Optional[Item]
+    def _fetch_pending_client_report(self, force=False, interval=60):
+        # type: (bool, int) -> Optional[Item]
         if not self.options["send_client_reports"]:
             return None
 
-        if not (force or self._last_client_report_sent < time.time() - 60):
+        if not (force or self._last_client_report_sent < time.time() - interval):
             return None
 
         discarded_events = self._discarded_events
@@ -295,7 +295,7 @@ class HttpTransport(Transport):
 
     def _flush_client_reports(self, force=False):
         # type: (bool) -> None
-        client_report = self._fetch_pending_client_report(force=force)
+        client_report = self._fetch_pending_client_report(force=force, interval=60)
         if client_report is not None:
             self.capture_envelope(Envelope(items=[client_report]))
 
@@ -363,7 +363,7 @@ class HttpTransport(Transport):
         # can attach it to this enveloped scheduled for sending.  This will
         # currently typically attach the client report to the most recent
         # session update.
-        client_report_item = self._fetch_pending_client_report()
+        client_report_item = self._fetch_pending_client_report(interval=30)
         if client_report_item is not None:
             envelope.items.append(client_report_item)
 
