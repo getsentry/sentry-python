@@ -250,7 +250,7 @@ class HttpTransport(Transport):
         # type: (str) -> None
         return None
 
-    def _flush_stats(self, force=False):
+    def _fetch_pending_client_report(self, force=False):
         # type: (bool) -> None
         if not self.options["send_client_reports"]:
             return
@@ -269,7 +269,7 @@ class HttpTransport(Transport):
         self._discarded_events = defaultdict(int)
         self._last_event_loss_sent = time.time()
 
-        client_report = Item(
+        return Item(
             PayloadRef(
                 json={
                     "timestamp": time.time(),
@@ -284,7 +284,12 @@ class HttpTransport(Transport):
             ),
             type="client_report",
         )
-        self.capture_envelope(Envelope(items=[client_report]))
+
+    def _flush_client_reports(self, force=False):
+        # type: (bool) -> None
+        client_report = self._fetch_pending_client_report(force=force)
+        if client_report is not None:
+            self.capture_envelope(Envelope(items=[client_report]))
 
     def _check_disabled(self, category):
         # type: (str) -> bool
@@ -344,6 +349,15 @@ class HttpTransport(Transport):
         envelope.items[:] = new_items
         if not envelope.items:
             return None
+
+        # since we're already in the business of sending out an envelope here
+        # check if we have one pending for the stats session envelopes so we
+        # can attach it to this enveloped scheduled for sending.  This will
+        # currently typically attach the client report to the most recent
+        # session update.
+        client_report_item = self._fetch_pending_client_report()
+        if client_report_item is not None:
+            envelope.items.append(client_report_item)
 
         body = io.BytesIO()
         with gzip.GzipFile(fileobj=body, mode="w") as f:
@@ -429,7 +443,7 @@ class HttpTransport(Transport):
             self.on_dropped_event("full_queue")
             self.record_lost_event("queue_overflow", "error")
 
-        self._flush_stats()
+        self._flush_client_reports()
 
     def capture_envelope(
         self, envelope  # type: Envelope
@@ -448,7 +462,7 @@ class HttpTransport(Transport):
             for item in envelope.items:
                 self.record_lost_event("queue_overflow", item.data_category)
 
-        self._flush_stats()
+        self._flush_client_reports()
 
     def flush(
         self,
@@ -459,7 +473,7 @@ class HttpTransport(Transport):
         logger.debug("Flushing HTTP transport")
 
         if timeout > 0:
-            self._worker.submit(lambda: self._flush_stats(force=True))
+            self._worker.submit(lambda: self._flush_client_reports(force=True))
             self._worker.flush(timeout, callback)
 
     def kill(self):
