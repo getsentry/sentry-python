@@ -274,9 +274,9 @@ class HttpTransport(Transport):
                 json={
                     "timestamp": time.time(),
                     "discarded_events": [
-                        (data_category, reason, quantity)
+                        {"reason": reason, "category": category, "quantity": quantity}
                         for (
-                            (data_category, reason),
+                            (category, reason),
                             quantity,
                         ) in discarded_events.items()
                     ],
