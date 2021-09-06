@@ -136,9 +136,13 @@ def test_data_category_limits(
     client = make_client(send_client_reports=False)
 
     captured_outcomes = []
-    monkeypatch.setattr(
-        client.transport, "record_lost_event", lambda *x: captured_outcomes.append(x)
-    )
+
+    def record_lost_event(reason, data_category=None, item=None):
+        if data_category is None:
+            data_category = item.data_category
+        return captured_outcomes.append((reason, data_category))
+
+    monkeypatch.setattr(client.transport, "record_lost_event", record_lost_event)
 
     httpserver.serve_content(
         "hm",
