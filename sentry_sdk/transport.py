@@ -149,7 +149,7 @@ class HttpTransport(Transport):
         self._discarded_events = defaultdict(
             int
         )  # type: DefaultDict[Tuple[str, str], int]
-        self._last_event_loss_sent = None  # type: Optional[float]
+        self._last_client_report_sent = time.time()
 
         self._pool = self._make_pool(
             self.parsed_dsn,
@@ -266,20 +266,16 @@ class HttpTransport(Transport):
         # type: (bool) -> Optional[Item]
         if not self.options["send_client_reports"]:
             return None
-        discarded_events = self._discarded_events
 
-        if (
-            not (
-                force
-                or self._last_event_loss_sent is None
-                or self._last_event_loss_sent < time.time() - 60
-            )
-            or not discarded_events
-        ):
+        if not (force or self._last_client_report_sent < time.time() - 60):
             return None
 
+        discarded_events = self._discarded_events
         self._discarded_events = defaultdict(int)
-        self._last_event_loss_sent = time.time()
+        self._last_client_report_sent = time.time()
+
+        if not discarded_events:
+            return None
 
         return Item(
             PayloadRef(
@@ -354,7 +350,7 @@ class HttpTransport(Transport):
             if self._check_disabled(item.data_category):
                 if item.data_category in ("transaction", "error", "default"):
                     self.on_dropped_event("self_rate_limits")
-                    self.record_lost_event("ratelimit_backoff", item=item)
+                self.record_lost_event("ratelimit_backoff", item=item)
             else:
                 new_items.append(item)
 
@@ -450,12 +446,11 @@ class HttpTransport(Transport):
             with hub:
                 with capture_internal_exceptions():
                     self._send_event(event)
+                    self._flush_client_reports()
 
         if not self._worker.submit(send_event_wrapper):
             self.on_dropped_event("full_queue")
             self.record_lost_event("queue_overflow", data_category="error")
-
-        self._flush_client_reports()
 
     def capture_envelope(
         self, envelope  # type: Envelope
@@ -468,13 +463,12 @@ class HttpTransport(Transport):
             with hub:
                 with capture_internal_exceptions():
                     self._send_envelope(envelope)
+                    self._flush_client_reports()
 
         if not self._worker.submit(send_envelope_wrapper):
             self.on_dropped_event("full_queue")
             for item in envelope.items:
                 self.record_lost_event("queue_overflow", item=item)
-
-        self._flush_client_reports()
 
     def flush(
         self,

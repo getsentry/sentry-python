@@ -1,14 +1,27 @@
 # coding: utf-8
+import time
 import logging
 import pickle
+import json
+import gzip
+import io
 
 from datetime import datetime, timedelta
 
 import pytest
 
-from sentry_sdk import Hub, Client, add_breadcrumb, capture_message
+from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
 from sentry_sdk.transport import _parse_rate_limits
+from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations.logging import LoggingIntegration
+
+
+def get_event(request):
+    return json.load(gzip.GzipFile(fileobj=io.BytesIO(request.data)))
+
+
+def get_envelope(request):
+    return Envelope.deserialize_from(gzip.GzipFile(fileobj=io.BytesIO(request.data)))
 
 
 @pytest.fixture
@@ -174,6 +187,78 @@ def test_data_category_limits(
     assert captured_outcomes == [
         ("ratelimit_backoff", "transaction"),
         ("ratelimit_backoff", "transaction"),
+    ]
+
+
+@pytest.mark.parametrize("response_code", [200, 429])
+def test_data_category_limits_reporting(
+    httpserver, capsys, caplog, response_code, make_client, monkeypatch
+):
+    client = make_client(send_client_reports=True)
+
+    httpserver.serve_content(
+        "hm",
+        response_code,
+        headers={
+            "X-Sentry-Rate-Limits": "4711:transaction:organization, 4711:attachment:organization"
+        },
+    )
+
+    client.capture_event({"type": "transaction"})
+    client.flush()
+
+    assert len(httpserver.requests) == 1
+    assert httpserver.requests[0].url.endswith("/api/132/envelope/")
+    del httpserver.requests[:]
+
+    assert set(client.transport._disabled_until) == set(["attachment", "transaction"])
+
+    client.capture_event({"type": "transaction"})
+    client.capture_event({"type": "transaction"})
+    del httpserver.requests[:]
+
+    # now trick the transport to force flush sending out the stats with the
+    # next envelope
+    time.sleep(0.2)
+    client.transport._last_client_report_sent = 0
+
+    scope = Scope()
+    scope.add_attachment(bytes=b"Hello World", filename="hello.txt")
+
+    client.capture_event({"type": "error"}, scope=scope)
+    client.flush()
+
+    # this goes out with an extra envelope because it's flushed after the last item
+    # that is normally in the queue.  This is quite funny in a way beacuse it means
+    # that the envelope that caused its own over quota report (an error with an
+    # attachment) will include its outcome since it's pending.
+    assert len(httpserver.requests) == 1
+    envelope = get_envelope(httpserver.requests[0])
+    assert envelope.items[0].type == "event"
+    assert envelope.items[1].type == "client_report"
+    report = json.loads(envelope.items[1].get_bytes())
+    assert report["discarded_events"] == [
+        {"category": "transaction", "reason": "ratelimit_backoff", "quantity": 2},
+        {"category": "attachment", "reason": "ratelimit_backoff", "quantity": 11},
+    ]
+    del httpserver.requests[:]
+
+    # here we sent a normal event
+    client.capture_event({"type": "transaction"})
+    client.capture_event({"type": "error", "release": "foo"})
+    client.flush()
+
+    assert len(httpserver.requests) == 2
+
+    event = get_event(httpserver.requests[0])
+    assert event["type"] == "error"
+    assert event["release"] == "foo"
+
+    envelope = get_envelope(httpserver.requests[1])
+    assert envelope.items[0].type == "client_report"
+    report = json.loads(envelope.items[0].get_bytes())
+    assert report["discarded_events"] == [
+        {"category": "transaction", "reason": "ratelimit_backoff", "quantity": 1},
     ]
 
 
