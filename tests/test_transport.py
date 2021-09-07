@@ -45,7 +45,7 @@ class CapturingServer(WSGIServer):
         request = Request(environ)
         event = envelope = None
         if request.mimetype == "application/json":
-            event = json.load(gzip.GzipFile(fileobj=io.BytesIO(request.data)))
+            event = json.loads(gzip.GzipFile(fileobj=io.BytesIO(request.data)).read())
         else:
             envelope = Envelope.deserialize_from(
                 gzip.GzipFile(fileobj=io.BytesIO(request.data))
