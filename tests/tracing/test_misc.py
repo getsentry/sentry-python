@@ -2,6 +2,7 @@ import pytest
 
 from sentry_sdk import Hub, start_span, start_transaction
 from sentry_sdk.tracing import Span, Transaction
+from sentry_sdk.tracing_utils import has_tracestate_enabled
 
 
 def test_span_trimming(sentry_init, capture_events):
@@ -149,3 +150,19 @@ def test_finds_non_orphan_span_on_scope(sentry_init):
     assert scope._span is not None
     assert isinstance(scope._span, Span)
     assert scope._span.op == "sniffing"
+
+
+# TODO (kmclb) remove this test once tracestate is a real feature
+@pytest.mark.parametrize("tracestate_enabled", [True, False, None])
+def test_has_tracestate_enabled(sentry_init, tracestate_enabled):
+    experiments = (
+        {"propagate_tracestate": tracestate_enabled}
+        if tracestate_enabled is not None
+        else {}
+    )
+    sentry_init(_experiments=experiments)
+
+    if tracestate_enabled is True:
+        assert has_tracestate_enabled() is True
+    else:
+        assert has_tracestate_enabled() is False

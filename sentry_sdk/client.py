@@ -22,7 +22,7 @@ from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.tracing_utils import reinflate_tracestate
+from sentry_sdk.tracing_utils import has_tracestate_enabled, reinflate_tracestate
 
 from sentry_sdk._types import MYPY
 
@@ -349,7 +349,7 @@ class _Client(object):
             tracestate_data = raw_tracestate and reinflate_tracestate(
                 raw_tracestate.replace("sentry=", "")
             )
-            if tracestate_data:
+            if tracestate_data and has_tracestate_enabled():
                 headers["trace"] = tracestate_data
 
             envelope = Envelope(headers=headers)

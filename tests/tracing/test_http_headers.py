@@ -282,7 +282,9 @@ def test_tracestate_extraction(
     }
 
 
-def test_iter_headers(sentry_init, monkeypatch):
+# TODO (kmclb) remove this parameterization once tracestate is a real feature
+@pytest.mark.parametrize("tracestate_enabled", [True, False])
+def test_iter_headers(sentry_init, monkeypatch, tracestate_enabled):
     monkeypatch.setattr(
         Transaction,
         "to_traceparent",
@@ -292,6 +294,11 @@ def test_iter_headers(sentry_init, monkeypatch):
         Transaction,
         "to_tracestate",
         mock.Mock(return_value="sentry=doGsaREgReaT,charlie=goofy"),
+    )
+    monkeypatch.setattr(
+        sentry_sdk.tracing,
+        "has_tracestate_enabled",
+        mock.Mock(return_value=tracestate_enabled),
     )
 
     transaction = Transaction(
@@ -303,7 +310,11 @@ def test_iter_headers(sentry_init, monkeypatch):
     assert (
         headers["sentry-trace"] == "12312012123120121231201212312012-0415201309082013-0"
     )
-    assert headers["tracestate"] == "sentry=doGsaREgReaT,charlie=goofy"
+    if tracestate_enabled:
+        assert "tracestate" in headers
+        assert headers["tracestate"] == "sentry=doGsaREgReaT,charlie=goofy"
+    else:
+        assert "tracestate" not in headers
 
 
 @pytest.mark.parametrize(

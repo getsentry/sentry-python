@@ -12,6 +12,7 @@ from sentry_sdk.tracing_utils import (
     compute_tracestate_entry,
     extract_sentrytrace_data,
     extract_tracestate_data,
+    has_tracestate_enabled,
     has_tracing_enabled,
     is_valid_sample_rate,
     maybe_create_breadcrumbs_from_span,
@@ -270,8 +271,10 @@ class Span(object):
         """
         yield "sentry-trace", self.to_traceparent()
 
-        tracestate = self.to_tracestate()
+        tracestate = self.to_tracestate() if has_tracestate_enabled(self) else None
         # `tracestate` will only be `None` if there's no client or no DSN
+        # TODO (kmclb) the above will be true once the feature is no longer
+        # behind a flag
         if tracestate:
             yield "tracestate", tracestate
 
