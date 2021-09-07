@@ -9,6 +9,9 @@ import io
 from datetime import datetime, timedelta
 
 import pytest
+from werkzeug.wrappers import Request, Response
+
+from pytest_localserver.http import WSGIServer
 
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
 from sentry_sdk.transport import _parse_rate_limits
@@ -16,19 +19,64 @@ from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 
-def get_event(request):
-    return json.load(gzip.GzipFile(fileobj=io.BytesIO(request.data)))
+class CapturedData(object):
+    def __init__(self, path, event=None, envelope=None):
+        self.path = path
+        self.event = event
+        self.envelope = envelope
 
 
-def get_envelope(request):
-    return Envelope.deserialize_from(gzip.GzipFile(fileobj=io.BytesIO(request.data)))
+class CapturingServer(WSGIServer):
+    def __init__(self, host="127.0.0.1", port=0, ssl_context=None):
+        WSGIServer.__init__(self, host, port, self, ssl_context=ssl_context)
+        self.code = 204
+        self.headers = {}
+        self.captured = []
+
+    def respond_with(self, code=200, headers=None):
+        self.code = code
+        if headers:
+            self.headers = headers
+
+    def clear_captured(self):
+        del self.captured[:]
+
+    def __call__(self, environ, start_response):
+        """
+        This is the WSGI application.
+        """
+        request = Request(environ)
+        event = envelope = None
+        if request.mimetype == "application/json":
+            event = json.load(gzip.GzipFile(fileobj=io.BytesIO(request.data)))
+        else:
+            envelope = Envelope.deserialize_from(
+                gzip.GzipFile(fileobj=io.BytesIO(request.data))
+            )
+
+        self.captured.append(
+            CapturedData(path=request.path, event=event, envelope=envelope)
+        )
+
+        response = Response(status=self.code)
+        response.headers.extend(self.headers)
+        return response(environ, start_response)
 
 
 @pytest.fixture
-def make_client(request, httpserver):
+def capturing_server(request):
+    server = CapturingServer()
+    server.start()
+    request.addfinalizer(server.stop)
+    return server
+
+
+@pytest.fixture
+def make_client(request, capturing_server):
     def inner(**kwargs):
         return Client(
-            "http://foobar@{}/132".format(httpserver.url[len("http://") :]), **kwargs
+            "http://foobar@{}/132".format(capturing_server.url[len("http://") :]),
+            **kwargs
         )
 
     return inner
@@ -39,7 +87,7 @@ def make_client(request, httpserver):
 @pytest.mark.parametrize("client_flush_method", ["close", "flush"])
 @pytest.mark.parametrize("use_pickle", (True, False))
 def test_transport_works(
-    httpserver,
+    capturing_server,
     request,
     capsys,
     caplog,
@@ -49,7 +97,6 @@ def test_transport_works(
     use_pickle,
     maybe_monkeypatched_threading,
 ):
-    httpserver.serve_content("ok", 200)
     caplog.set_level(logging.DEBUG)
     client = make_client(debug=debug)
 
@@ -66,14 +113,12 @@ def test_transport_works(
 
     out, err = capsys.readouterr()
     assert not err and not out
-    assert httpserver.requests
+    assert capturing_server.captured
 
     assert any("Sending event" in record.msg for record in caplog.records) == debug
 
 
-def test_transport_infinite_loop(httpserver, request, make_client):
-    httpserver.serve_content("ok", 200)
-
+def test_transport_infinite_loop(capturing_server, request, make_client):
     client = make_client(
         debug=True,
         # Make sure we cannot create events from our own logging
@@ -84,7 +129,7 @@ def test_transport_infinite_loop(httpserver, request, make_client):
         capture_message("hi")
         client.flush()
 
-    assert len(httpserver.requests) == 1
+    assert len(capturing_server.captured) == 1
 
 
 NOW = datetime(2014, 6, 2)
@@ -122,16 +167,16 @@ def test_parse_rate_limits(input, expected):
     assert dict(_parse_rate_limits(input, now=NOW)) == expected
 
 
-def test_simple_rate_limits(httpserver, capsys, caplog, make_client):
+def test_simple_rate_limits(capturing_server, capsys, caplog, make_client):
     client = make_client()
-    httpserver.serve_content("no", 429, headers={"Retry-After": "4"})
+    capturing_server.respond_with(code=429, headers={"Retry-After": "4"})
 
     client.capture_event({"type": "transaction"})
     client.flush()
 
-    assert len(httpserver.requests) == 1
-    assert httpserver.requests[0].url.endswith("/api/132/envelope/")
-    del httpserver.requests[:]
+    assert len(capturing_server.captured) == 1
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
+    capturing_server.clear_captured()
 
     assert set(client.transport._disabled_until) == set([None])
 
@@ -139,12 +184,12 @@ def test_simple_rate_limits(httpserver, capsys, caplog, make_client):
     client.capture_event({"type": "event"})
     client.flush()
 
-    assert not httpserver.requests
+    assert not capturing_server.captured
 
 
 @pytest.mark.parametrize("response_code", [200, 429])
 def test_data_category_limits(
-    httpserver, capsys, caplog, response_code, make_client, monkeypatch
+    capturing_server, capsys, caplog, response_code, make_client, monkeypatch
 ):
     client = make_client(send_client_reports=False)
 
@@ -157,18 +202,17 @@ def test_data_category_limits(
 
     monkeypatch.setattr(client.transport, "record_lost_event", record_lost_event)
 
-    httpserver.serve_content(
-        "hm",
-        response_code,
+    capturing_server.respond_with(
+        code=response_code,
         headers={"X-Sentry-Rate-Limits": "4711:transaction:organization"},
     )
 
     client.capture_event({"type": "transaction"})
     client.flush()
 
-    assert len(httpserver.requests) == 1
-    assert httpserver.requests[0].url.endswith("/api/132/envelope/")
-    del httpserver.requests[:]
+    assert len(capturing_server.captured) == 1
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
+    capturing_server.clear_captured()
 
     assert set(client.transport._disabled_until) == set(["transaction"])
 
@@ -176,13 +220,13 @@ def test_data_category_limits(
     client.capture_event({"type": "transaction"})
     client.flush()
 
-    assert not httpserver.requests
+    assert not capturing_server.captured
 
     client.capture_event({"type": "event"})
     client.flush()
 
-    assert len(httpserver.requests) == 1
-    assert httpserver.requests[0].url.endswith("/api/132/store/")
+    assert len(capturing_server.captured) == 1
+    assert capturing_server.captured[0].path == "/api/132/store/"
 
     assert captured_outcomes == [
         ("ratelimit_backoff", "transaction"),
@@ -192,13 +236,12 @@ def test_data_category_limits(
 
 @pytest.mark.parametrize("response_code", [200, 429])
 def test_data_category_limits_reporting(
-    httpserver, capsys, caplog, response_code, make_client, monkeypatch
+    capturing_server, capsys, caplog, response_code, make_client, monkeypatch
 ):
     client = make_client(send_client_reports=True)
 
-    httpserver.serve_content(
-        "hm",
-        response_code,
+    capturing_server.respond_with(
+        code=response_code,
         headers={
             "X-Sentry-Rate-Limits": "4711:transaction:organization, 4711:attachment:organization"
         },
@@ -207,15 +250,15 @@ def test_data_category_limits_reporting(
     client.capture_event({"type": "transaction"})
     client.flush()
 
-    assert len(httpserver.requests) == 1
-    assert httpserver.requests[0].url.endswith("/api/132/envelope/")
-    del httpserver.requests[:]
+    assert len(capturing_server.captured) == 1
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
+    capturing_server.clear_captured()
 
     assert set(client.transport._disabled_until) == set(["attachment", "transaction"])
 
     client.capture_event({"type": "transaction"})
     client.capture_event({"type": "transaction"})
-    del httpserver.requests[:]
+    capturing_server.clear_captured()
 
     # now trick the transport to force flush sending out the stats with the
     # next envelope
@@ -232,8 +275,8 @@ def test_data_category_limits_reporting(
     # that is normally in the queue.  This is quite funny in a way beacuse it means
     # that the envelope that caused its own over quota report (an error with an
     # attachment) will include its outcome since it's pending.
-    assert len(httpserver.requests) == 1
-    envelope = get_envelope(httpserver.requests[0])
+    assert len(capturing_server.captured) == 1
+    envelope = capturing_server.captured[0].envelope
     assert envelope.items[0].type == "event"
     assert envelope.items[1].type == "client_report"
     report = json.loads(envelope.items[1].get_bytes())
@@ -241,20 +284,20 @@ def test_data_category_limits_reporting(
         {"category": "transaction", "reason": "ratelimit_backoff", "quantity": 2},
         {"category": "attachment", "reason": "ratelimit_backoff", "quantity": 11},
     ]
-    del httpserver.requests[:]
+    capturing_server.clear_captured()
 
     # here we sent a normal event
     client.capture_event({"type": "transaction"})
     client.capture_event({"type": "error", "release": "foo"})
     client.flush()
 
-    assert len(httpserver.requests) == 2
+    assert len(capturing_server.captured) == 2
 
-    event = get_event(httpserver.requests[0])
+    event = capturing_server.captured[0].event
     assert event["type"] == "error"
     assert event["release"] == "foo"
 
-    envelope = get_envelope(httpserver.requests[1])
+    envelope = capturing_server.captured[1].envelope
     assert envelope.items[0].type == "client_report"
     report = json.loads(envelope.items[0].get_bytes())
     assert report["discarded_events"] == [
@@ -264,21 +307,20 @@ def test_data_category_limits_reporting(
 
 @pytest.mark.parametrize("response_code", [200, 429])
 def test_complex_limits_without_data_category(
-    httpserver, capsys, caplog, response_code, make_client
+    capturing_server, capsys, caplog, response_code, make_client
 ):
     client = make_client()
-    httpserver.serve_content(
-        "hm",
-        response_code,
+    capturing_server.respond_with(
+        code=response_code,
         headers={"X-Sentry-Rate-Limits": "4711::organization"},
     )
 
     client.capture_event({"type": "transaction"})
     client.flush()
 
-    assert len(httpserver.requests) == 1
-    assert httpserver.requests[0].url.endswith("/api/132/envelope/")
-    del httpserver.requests[:]
+    assert len(capturing_server.captured) == 1
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
+    capturing_server.clear_captured()
 
     assert set(client.transport._disabled_until) == set([None])
 
@@ -287,4 +329,4 @@ def test_complex_limits_without_data_category(
     client.capture_event({"type": "event"})
     client.flush()
 
-    assert len(httpserver.requests) == 0
+    assert len(capturing_server.captured) == 0
