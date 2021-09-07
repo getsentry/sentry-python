@@ -9,6 +9,7 @@ import io
 from datetime import datetime, timedelta
 
 import pytest
+from collections import namedtuple
 from werkzeug.wrappers import Request, Response
 
 from pytest_localserver.http import WSGIServer
@@ -19,11 +20,7 @@ from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 
-class CapturedData(object):
-    def __init__(self, path, event=None, envelope=None):
-        self.path = path
-        self.event = event
-        self.envelope = envelope
+CapturedData = namedtuple("CapturedData", ["path", "event", "envelope"])
 
 
 class CapturingServer(WSGIServer):
