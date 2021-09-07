@@ -16,14 +16,12 @@ def test_span_trimming(sentry_init, capture_events):
 
     (event,) = events
 
-    # the transaction is its own first span (which counts for max_spans) but it
-    # doesn't show up in the span list in the event, so this is 1 less than our
-    # max_spans value
-    assert len(event["spans"]) == 2
+    assert len(event["spans"]) == 3
 
-    span1, span2 = event["spans"]
+    span1, span2, span3 = event["spans"]
     assert span1["op"] == "foo0"
     assert span2["op"] == "foo1"
+    assert span3["op"] == "foo2"
 
 
 def test_transaction_naming(sentry_init, capture_events):

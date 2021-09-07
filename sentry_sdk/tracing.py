@@ -133,11 +133,12 @@ class Span(object):
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
 
+    # TODO this should really live on the Transaction class rather than the Span
+    # class
     def init_span_recorder(self, maxlen):
         # type: (int) -> None
         if self._span_recorder is None:
             self._span_recorder = _SpanRecorder(maxlen)
-        self._span_recorder.add(self)
 
     def __repr__(self):
         # type: () -> str
@@ -577,7 +578,7 @@ class Transaction(Span):
         finished_spans = [
             span.to_json()
             for span in self._span_recorder.spans
-            if span is not self and span.timestamp is not None
+            if span.timestamp is not None
         ]
 
         return hub.capture_event(
