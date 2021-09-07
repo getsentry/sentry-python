@@ -2,7 +2,6 @@
 import time
 import logging
 import pickle
-import json
 import gzip
 import io
 
