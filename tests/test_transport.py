@@ -276,7 +276,7 @@ def test_data_category_limits_reporting(
     envelope = capturing_server.captured[0].envelope
     assert envelope.items[0].type == "event"
     assert envelope.items[1].type == "client_report"
-    report = json.loads(envelope.items[1].get_bytes())
+    report = parse_json(envelope.items[1].get_bytes())
     assert report["discarded_events"] == [
         {"category": "transaction", "reason": "ratelimit_backoff", "quantity": 2},
         {"category": "attachment", "reason": "ratelimit_backoff", "quantity": 11},
@@ -296,7 +296,7 @@ def test_data_category_limits_reporting(
 
     envelope = capturing_server.captured[1].envelope
     assert envelope.items[0].type == "client_report"
-    report = json.loads(envelope.items[0].get_bytes())
+    report = parse_json(envelope.items[0].get_bytes())
     assert report["discarded_events"] == [
         {"category": "transaction", "reason": "ratelimit_backoff", "quantity": 1},
     ]
