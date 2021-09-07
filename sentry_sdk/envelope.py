@@ -19,6 +19,7 @@ if MYPY:
 
 
 def parse_json(data):
+    # type: (Union[bytes, text_type]) -> Any
     # on some python 3 versions this needs to be bytes
     if not PY2 and isinstance(data, bytes):
         data = data.decode("utf-8", "replace")
