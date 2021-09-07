@@ -16,7 +16,7 @@ from pytest_localserver.http import WSGIServer
 
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
 from sentry_sdk.transport import _parse_rate_limits
-from sentry_sdk.envelope import Envelope
+from sentry_sdk.envelope import Envelope, parse_json
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 
@@ -45,7 +45,7 @@ class CapturingServer(WSGIServer):
         request = Request(environ)
         event = envelope = None
         if request.mimetype == "application/json":
-            event = json.loads(gzip.GzipFile(fileobj=io.BytesIO(request.data)).read())
+            event = parse_json(gzip.GzipFile(fileobj=io.BytesIO(request.data)).read())
         else:
             envelope = Envelope.deserialize_from(
                 gzip.GzipFile(fileobj=io.BytesIO(request.data))
