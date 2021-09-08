@@ -243,6 +243,17 @@ def test_data_category_limits_reporting(
         },
     )
 
+    outcomes_enabled = True
+    real_fetch = client.transport._fetch_pending_client_report
+
+    def intercepting_fetch(*args, **kwargs):
+        if outcomes_enabled:
+            return real_fetch(*args, **kwargs)
+
+    monkeypatch.setattr(
+        client.transport, "_fetch_pending_client_report", intercepting_fetch
+    )
+
     client.capture_event({"type": "transaction"})
     client.flush()
 
@@ -252,18 +263,18 @@ def test_data_category_limits_reporting(
 
     assert set(client.transport._disabled_until) == set(["attachment", "transaction"])
 
+    outcomes_enabled = False
     client.capture_event({"type": "transaction"})
     client.capture_event({"type": "transaction"})
     capturing_server.clear_captured()
 
-    # now trick the transport to force flush sending out the stats with the
-    # next envelope
-    time.sleep(0.2)
+    # flush out the events but don't flush the client reports
+    client.flush()
     client.transport._last_client_report_sent = 0
+    outcomes_enabled = True
 
     scope = Scope()
     scope.add_attachment(bytes=b"Hello World", filename="hello.txt")
-
     client.capture_event({"type": "error"}, scope=scope)
     client.flush()
 
