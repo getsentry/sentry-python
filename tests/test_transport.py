@@ -1,5 +1,4 @@
 # coding: utf-8
-import time
 import logging
 import pickle
 import gzip
@@ -243,7 +242,7 @@ def test_data_category_limits_reporting(
         },
     )
 
-    outcomes_enabled = True
+    outcomes_enabled = False
     real_fetch = client.transport._fetch_pending_client_report
 
     def intercepting_fetch(*args, **kwargs):
@@ -253,6 +252,8 @@ def test_data_category_limits_reporting(
     monkeypatch.setattr(
         client.transport, "_fetch_pending_client_report", intercepting_fetch
     )
+    # get rid of threading making things hard to track
+    monkeypatch.setattr(client.transport._worker, "submit", lambda x: x() or True)
 
     client.capture_event({"type": "transaction"})
     client.flush()
@@ -263,7 +264,6 @@ def test_data_category_limits_reporting(
 
     assert set(client.transport._disabled_until) == set(["attachment", "transaction"])
 
-    outcomes_enabled = False
     client.capture_event({"type": "transaction"})
     client.capture_event({"type": "transaction"})
     capturing_server.clear_captured()
