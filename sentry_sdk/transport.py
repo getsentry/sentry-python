@@ -176,7 +176,9 @@ class HttpTransport(Transport):
         if item is not None:
             data_category = item.data_category
             if data_category == "attachment":
-                quantity = len(item.get_bytes())
+                # quantity of 0 is actually 1 as we do not want to count
+                # empty attachments as actually empty.
+                quantity = len(item.get_bytes()) or 1
         elif data_category is None:
             raise TypeError("data category not provided")
 
