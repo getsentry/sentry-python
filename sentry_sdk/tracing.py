@@ -583,6 +583,12 @@ class Transaction(Span):
             if span.timestamp is not None
         ]
 
+        # we do this to break the circular reference of transaction -> span
+        # recorder -> span -> containing transaction (which is where we started)
+        # before either the spans or the transaction goes out of scope and has
+        # to be garbage collected
+        del self._span_recorder
+
         return hub.capture_event(
             {
                 "type": "transaction",
