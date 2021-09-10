@@ -71,6 +71,11 @@ def test_event_id(sentry_init, capture_events):
     assert last_event_id() == event_id
     assert Hub.current.last_event_id() == event_id
 
+    new_event_id = Hub.current.capture_event({"type": "transaction"})
+    assert new_event_id is not None
+    assert new_event_id != event_id
+    assert Hub.current.last_event_id() == event_id
+
 
 def test_option_callback(sentry_init, capture_events):
     drop_events = False
