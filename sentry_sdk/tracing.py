@@ -200,9 +200,11 @@ class Span(object):
             **kwargs
         )
 
-        child._span_recorder = recorder = self._span_recorder
-        if recorder:
-            recorder.add(child)
+        span_recorder = (
+            self.containing_transaction and self.containing_transaction._span_recorder
+        )
+        if span_recorder:
+            span_recorder.add(child)
         return child
 
     def new_span(self, **kwargs):
