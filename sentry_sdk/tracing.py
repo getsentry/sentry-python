@@ -133,11 +133,12 @@ class Span(object):
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
 
+    # TODO this should really live on the Transaction class rather than the Span
+    # class
     def init_span_recorder(self, maxlen):
         # type: (int) -> None
         if self._span_recorder is None:
             self._span_recorder = _SpanRecorder(maxlen)
-        self._span_recorder.add(self)
 
     def __repr__(self):
         # type: () -> str
@@ -199,9 +200,11 @@ class Span(object):
             **kwargs
         )
 
-        child._span_recorder = recorder = self._span_recorder
-        if recorder:
-            recorder.add(child)
+        span_recorder = (
+            self.containing_transaction and self.containing_transaction._span_recorder
+        )
+        if span_recorder:
+            span_recorder.add(child)
         return child
 
     def new_span(self, **kwargs):
@@ -577,8 +580,14 @@ class Transaction(Span):
         finished_spans = [
             span.to_json()
             for span in self._span_recorder.spans
-            if span is not self and span.timestamp is not None
+            if span.timestamp is not None
         ]
+
+        # we do this to break the circular reference of transaction -> span
+        # recorder -> span -> containing transaction (which is where we started)
+        # before either the spans or the transaction goes out of scope and has
+        # to be garbage collected
+        del self._span_recorder
 
         return hub.capture_event(
             {
