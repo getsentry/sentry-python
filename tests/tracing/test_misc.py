@@ -1,5 +1,7 @@
 import pytest
 import gc
+import uuid
+import os
 
 import sentry_sdk
 from sentry_sdk import Hub, start_span, start_transaction
@@ -178,6 +180,20 @@ def test_circular_references(monkeypatch, sentry_init, request):
         "serialize",
         mock.Mock(
             return_value=None,
+        ),
+    )
+
+    # In certain versions of python, in some environments (specifically, python
+    # 3.4 when run in GH Actions), we run into a `ctypes` bug which creates
+    # circular references when `uuid4()` is called, as happens when we're
+    # generating event ids. Mocking it with an implementation which doesn't use
+    # the `ctypes` function lets us avoid having false positives when garbage
+    # collecting. See https://bugs.python.org/issue20519.
+    monkeypatch.setattr(
+        uuid,
+        "uuid4",
+        mock.Mock(
+            return_value=uuid.UUID(bytes=os.urandom(16)),
         ),
     )
 
