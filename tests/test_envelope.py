@@ -1,36 +1,58 @@
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.session import Session
+from sentry_sdk import capture_event
+from sentry_sdk.tracing_utils import compute_tracestate_value
+import sentry_sdk.client
+
+import pytest
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 
 def generate_transaction_item():
     return {
-        "event_id": "d2132d31b39445f1938d7e21b6bf0ec4",
+        "event_id": "15210411201320122115110420122013",
         "type": "transaction",
-        "transaction": "/organizations/:orgId/performance/:eventSlug/",
-        "start_timestamp": 1597976392.6542819,
-        "timestamp": 1597976400.6189718,
+        "transaction": "/interactions/other-dogs/new-dog",
+        "start_timestamp": 1353568872.11122131,
+        "timestamp": 1356942672.09040815,
         "contexts": {
             "trace": {
-                "trace_id": "4C79F60C11214EB38604F4AE0781BFB2",
-                "span_id": "FA90FDEAD5F74052",
-                "type": "trace",
+                "trace_id": "12312012123120121231201212312012",
+                "span_id": "0415201309082013",
+                "parent_span_id": None,
+                "description": "<OrganizationContext>",
+                "op": "greeting.sniff",
+                "tracestate": compute_tracestate_value(
+                    {
+                        "trace_id": "12312012123120121231201212312012",
+                        "environment": "dogpark",
+                        "release": "off.leash.park",
+                        "public_key": "dogsarebadatkeepingsecrets",
+                        "user": {"id": 12312013, "segment": "bigs"},
+                        "transaction": "/interactions/other-dogs/new-dog",
+                    }
+                ),
             }
         },
         "spans": [
             {
                 "description": "<OrganizationContext>",
-                "op": "react.mount",
-                "parent_span_id": "8f5a2b8768cafb4e",
-                "span_id": "bd429c44b67a3eb4",
-                "start_timestamp": 1597976393.4619668,
-                "timestamp": 1597976393.4718769,
-                "trace_id": "ff62a8b040f340bda5d830223def1d81",
+                "op": "greeting.sniff",
+                "parent_span_id": None,
+                "span_id": "0415201309082013",
+                "start_timestamp": 1353568872.11122131,
+                "timestamp": 1356942672.09040815,
+                "trace_id": "12312012123120121231201212312012",
             }
         ],
     }
 
 
-def test_basic_event():
+def test_add_and_get_basic_event():
     envelope = Envelope()
 
     expected = {"message": "Hello, World!"}
@@ -39,7 +61,7 @@ def test_basic_event():
     assert envelope.get_event() == {"message": "Hello, World!"}
 
 
-def test_transaction_event():
+def test_add_and_get_transaction_event():
     envelope = Envelope()
 
     transaction_item = generate_transaction_item()
@@ -55,7 +77,7 @@ def test_transaction_event():
     assert envelope.get_transaction_event() == transaction_item
 
 
-def test_session():
+def test_add_and_get_session():
     envelope = Envelope()
 
     expected = Session()
@@ -64,3 +86,49 @@ def test_session():
     for item in envelope:
         if item.type == "session":
             assert item.payload.json == expected.to_json()
+
+
+# TODO (kmclb) remove this parameterization once tracestate is a real feature
+@pytest.mark.parametrize("tracestate_enabled", [True, False])
+def test_envelope_headers(
+    sentry_init, capture_envelopes, monkeypatch, tracestate_enabled
+):
+    monkeypatch.setattr(
+        sentry_sdk.client,
+        "format_timestamp",
+        lambda x: "2012-11-21T12:31:12.415908Z",
+    )
+
+    monkeypatch.setattr(
+        sentry_sdk.client,
+        "has_tracestate_enabled",
+        mock.Mock(return_value=tracestate_enabled),
+    )
+
+    sentry_init(
+        dsn="https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+    )
+    envelopes = capture_envelopes()
+
+    capture_event(generate_transaction_item())
+
+    assert len(envelopes) == 1
+
+    if tracestate_enabled:
+        assert envelopes[0].headers == {
+            "event_id": "15210411201320122115110420122013",
+            "sent_at": "2012-11-21T12:31:12.415908Z",
+            "trace": {
+                "trace_id": "12312012123120121231201212312012",
+                "environment": "dogpark",
+                "release": "off.leash.park",
+                "public_key": "dogsarebadatkeepingsecrets",
+                "user": {"id": 12312013, "segment": "bigs"},
+                "transaction": "/interactions/other-dogs/new-dog",
+            },
+        }
+    else:
+        assert envelopes[0].headers == {
+            "event_id": "15210411201320122115110420122013",
+            "sent_at": "2012-11-21T12:31:12.415908Z",
+        }

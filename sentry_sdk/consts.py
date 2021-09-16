@@ -32,6 +32,7 @@ if MYPY:
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
             "smart_transaction_trimming": Optional[bool],
+            "propagate_tracestate": Optional[bool],
         },
         total=False,
     )
