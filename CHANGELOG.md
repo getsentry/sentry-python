@@ -29,6 +29,7 @@ A major release `N` implies the previous release `N-1` will no longer receive up
 - No longer set the last event id for transactions #1186
 - Added support for client reports (disabled by default for now) #1181
 - Added `tracestate` header handling #1179
+- Added real ip detection to asgi integration #1199
 
 ## 1.3.1
 
