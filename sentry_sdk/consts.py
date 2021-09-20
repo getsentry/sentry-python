@@ -76,7 +76,7 @@ class ClientConstructor(object):
         traces_sampler=None,  # type: Optional[TracesSampler]
         auto_enabling_integrations=True,  # type: bool
         auto_session_tracking=True,  # type: bool
-        send_client_reports=True,  # type: bool
+        send_client_reports=False,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
     ):
         # type: (...) -> None

@@ -23,7 +23,7 @@ A major release `N` implies the previous release `N-1` will no longer receive up
 ## Unreleased
 
 - No longer set the last event id for transactions #1186
-- Added support for client reports #1181
+- Added support for client reports (disabled by default for now) #1181
 
 ## 1.3.1
 
