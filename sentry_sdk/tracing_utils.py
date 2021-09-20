@@ -32,8 +32,6 @@ if MYPY:
     from typing import Dict
     from typing import Union
 
-    from sentry_sdk.tracing import Span
-
 
 SENTRY_TRACE_REGEX = re.compile(
     "^[ \t]*"  # whitespace
@@ -405,3 +403,9 @@ def has_tracestate_enabled(span=None):
     options = client and client.options
 
     return bool(options and options["_experiments"].get("propagate_tracestate"))
+
+
+# Circular imports
+
+if MYPY:
+    from sentry_sdk.tracing import Span
