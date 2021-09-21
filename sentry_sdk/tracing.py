@@ -7,16 +7,6 @@ from datetime import datetime, timedelta
 import sentry_sdk
 
 from sentry_sdk.utils import logger
-from sentry_sdk.tracing_utils import (
-    EnvironHeaders,
-    compute_tracestate_entry,
-    extract_sentrytrace_data,
-    extract_tracestate_data,
-    has_tracestate_enabled,
-    has_tracing_enabled,
-    is_valid_sample_rate,
-    maybe_create_breadcrumbs_from_span,
-)
 from sentry_sdk._types import MYPY
 
 
@@ -718,3 +708,17 @@ class Transaction(Span):
                     sample_rate=float(sample_rate),
                 )
             )
+
+
+# Circular imports
+
+from sentry_sdk.tracing_utils import (
+    EnvironHeaders,
+    compute_tracestate_entry,
+    extract_sentrytrace_data,
+    extract_tracestate_data,
+    has_tracestate_enabled,
+    has_tracing_enabled,
+    is_valid_sample_rate,
+    maybe_create_breadcrumbs_from_span,
+)
