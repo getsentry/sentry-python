@@ -258,7 +258,7 @@ def test_x_forwarded_for(sentry_init, app, capture_events):
     events = capture_events()
 
     client = TestClient(app)
-    response = client.get("/", headers={"X-Forwarded-For": "testproxy"})
+    response = client.get("/sync-message", headers={"X-Forwarded-For": "testproxy"})
 
     assert response.status_code == 200
 
@@ -272,7 +272,7 @@ def test_x_forwarded_for_multiple_entries(sentry_init, app, capture_events):
 
     client = TestClient(app)
     response = client.get(
-        "/", headers={"X-Forwarded-For": "testproxy1,testproxy2,testproxy3"}
+        "/sync-message", headers={"X-Forwarded-For": "testproxy1,testproxy2,testproxy3"}
     )
 
     assert response.status_code == 200
@@ -286,7 +286,7 @@ def test_x_real_ip(sentry_init, app, capture_events):
     events = capture_events()
 
     client = TestClient(app)
-    response = client.get("/", headers={"X-Real-IP": "1.2.3.4"})
+    response = client.get("/sync-message", headers={"X-Real-IP": "1.2.3.4"})
 
     assert response.status_code == 200
 

@@ -227,13 +227,17 @@ class SentryAsgiMiddleware:
 
     def _get_ip(self, scope):
         # type: (Any) -> str
+        """
+        Extract IP Address from the ASGI scope based on request headers with fallback to scope client.
+        """
+        headers = self._get_headers(scope)
         try:
-            return scope["headers"]["x_forwarded_for"].split(",")[0].strip()
+            return headers["x-forwarded-for"].split(",")[0].strip()
         except (KeyError, IndexError):
             pass
 
         try:
-            return scope["headers"]["x_real_ip"]
+            return headers["x-real-ip"]
         except KeyError:
             pass
 
