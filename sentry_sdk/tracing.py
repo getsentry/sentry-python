@@ -586,7 +586,7 @@ class Transaction(Span):
         # recorder -> span -> containing transaction (which is where we started)
         # before either the spans or the transaction goes out of scope and has
         # to be garbage collected
-        del self._span_recorder
+        self._span_recorder = None
 
         return hub.capture_event(
             {
