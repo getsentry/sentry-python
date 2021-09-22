@@ -24,6 +24,10 @@ A major release `N` implies the previous release `N-1` will no longer receive up
 
 - TBA
 
+## 1.4.1
+
+- Fix race condition between `finish` and `start_child` in tracing #1203
+
 ## 1.4.0
 
 - No longer set the last event id for transactions #1186
