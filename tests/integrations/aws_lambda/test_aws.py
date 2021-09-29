@@ -7,7 +7,7 @@ means for you is that those tests won't run without AWS access keys:
 
     export SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID=..
     export SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY=...
-    export SENTRY_PYTHON_TEST_AWS_IAM_ROLE="arn:aws:iam::926856021716:role/collections-sasha-us-west-2-lambdaRole"
+    export SENTRY_PYTHON_TEST_AWS_IAM_ROLE="arn:aws:iam::920901907255:role/service-role/lambda"
 
 If you need to debug a new runtime, use this REPL to figure things out:
 
