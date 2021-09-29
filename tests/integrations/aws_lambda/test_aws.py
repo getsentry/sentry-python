@@ -7,7 +7,7 @@ means for you is that those tests won't run without AWS access keys:
 
     export SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID=..
     export SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY=...
-    export SENTRY_PYTHON_TEST_AWS_IAM_ROLE="arn:aws:iam::920901907255:role/service-role/lambda"
+    export SENTRY_PYTHON_TEST_AWS_IAM_ROLE="arn:aws:iam::926856021716:role/collections-sasha-us-west-2-lambdaRole"
 
 If you need to debug a new runtime, use this REPL to figure things out:
 
@@ -105,7 +105,7 @@ def lambda_client():
     return get_boto_client()
 
 
-@pytest.fixture(params=["python3.6", "python3.7", "python3.8", "python2.7"])
+@pytest.fixture(params=["python3.6", "python3.7", "python3.8", "python3.9", "python2.7"])
 def lambda_runtime(request):
     return request.param
 
