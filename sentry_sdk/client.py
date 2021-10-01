@@ -201,6 +201,8 @@ class _Client(object):
                 new_event = before_send(event, hint or {})
             if new_event is None:
                 logger.info("before send dropped event (%s)", event)
+                if self.transport:
+                    self.transport.record_lost_event("before_send", data_category="error")
             event = new_event  # type: ignore
 
         return event
