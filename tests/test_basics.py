@@ -77,9 +77,13 @@ def test_event_id(sentry_init, capture_events):
     assert Hub.current.last_event_id() == event_id
 
 
-def test_option_callback(sentry_init, capture_events):
+def test_option_callback(sentry_init, capture_events, monkeypatch):
     drop_events = False
     drop_breadcrumbs = False
+    reports = []
+
+    def record_lost_event(reason, data_category=None, item=None):
+        reports.append((reason, data_category))
 
     def before_send(event, hint):
         assert isinstance(hint["exc_info"][1], ValueError)
@@ -96,6 +100,10 @@ def test_option_callback(sentry_init, capture_events):
     sentry_init(before_send=before_send, before_breadcrumb=before_breadcrumb)
     events = capture_events()
 
+    monkeypatch.setattr(
+        Hub.current.client.transport, "record_lost_event", record_lost_event
+    )
+
     def do_this():
         add_breadcrumb(message="Hello", hint={"foo": 42})
         try:
@@ -106,8 +114,10 @@ def test_option_callback(sentry_init, capture_events):
     do_this()
     drop_breadcrumbs = True
     do_this()
+    assert not reports
     drop_events = True
     do_this()
+    assert reports == [("before_send", "error")]
 
     normal, no_crumbs = events
 
