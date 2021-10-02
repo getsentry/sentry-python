@@ -125,10 +125,10 @@ class SanicIntegration(Integration):
 
         old_error_handler_lookup = ErrorHandler.lookup
 
-        def sentry_error_handler_lookup(self, exception):
+        def sentry_error_handler_lookup(self, exception, *args, **kwargs):
             # type: (Any, Exception) -> Optional[object]
             _capture_exception(exception)
-            old_error_handler = old_error_handler_lookup(self, exception)
+            old_error_handler = old_error_handler_lookup(self, exception, *args, **kwargs)
 
             if old_error_handler is None:
                 return None
