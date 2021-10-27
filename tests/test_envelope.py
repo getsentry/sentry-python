@@ -139,11 +139,13 @@ def test_envelope_with_sized_items():
     Tests that it successfully parses envelopes with
     the item size specified in the header
     """
-    envelope_raw = ('{"event_id":"9ec79c33ec9942ab8353589fcb2e04dc"}\n' +
-                    '{"type":"type1","length":4 }\n1234\n' +
-                    '{"type":"type2","length":4 }\nabcd\n' +
-                    '{"type":"type3","length":0}\n\n' +
-                    '{"type":"type4","length":4 }\nab12')
+    envelope_raw = (
+        '{"event_id":"9ec79c33ec9942ab8353589fcb2e04dc"}\n'
+        + '{"type":"type1","length":4 }\n1234\n'
+        + '{"type":"type2","length":4 }\nabcd\n'
+        + '{"type":"type3","length":0}\n\n'
+        + '{"type":"type4","length":4 }\nab12'
+    )
 
     actual = Envelope.deserialize(envelope_raw.encode("utf-8"))
 
@@ -152,16 +154,16 @@ def test_envelope_with_sized_items():
     assert len(items) == 4
 
     assert items[0].type == "type1"
-    assert items[0].get_bytes() == b'1234'
+    assert items[0].get_bytes() == b"1234"
 
     assert items[1].type == "type2"
-    assert items[1].get_bytes() == b'abcd'
+    assert items[1].get_bytes() == b"abcd"
 
     assert items[2].type == "type3"
-    assert items[2].get_bytes() == b''
+    assert items[2].get_bytes() == b""
 
     assert items[3].type == "type4"
-    assert items[3].get_bytes() == b'ab12'
+    assert items[3].get_bytes() == b"ab12"
 
     assert actual.headers["event_id"] == "9ec79c33ec9942ab8353589fcb2e04dc"
 
@@ -171,11 +173,13 @@ def test_envelope_with_implicitly_sized_items():
     Tests that it successfully parses envelopes with
     the item size not specified in the header
     """
-    envelope_raw = ('{"event_id":"9ec79c33ec9942ab8353589fcb2e04dc"}\n' +
-                    '{"type":"type1"}\n1234\n' +
-                    '{"type":"type2"}\nabcd\n' +
-                    '{"type":"type3"}\n\n' +
-                    '{"type":"type4"}\nab12\n')
+    envelope_raw = (
+        '{"event_id":"9ec79c33ec9942ab8353589fcb2e04dc"}\n'
+        + '{"type":"type1"}\n1234\n'
+        + '{"type":"type2"}\nabcd\n'
+        + '{"type":"type3"}\n\n'
+        + '{"type":"type4"}\nab12\n'
+    )
 
     actual = Envelope.deserialize(envelope_raw.encode("utf-8"))
     assert actual.headers["event_id"] == "9ec79c33ec9942ab8353589fcb2e04dc"
@@ -185,14 +189,13 @@ def test_envelope_with_implicitly_sized_items():
     assert len(items) == 4
 
     assert items[0].type == "type1"
-    assert items[0].get_bytes() == b'1234'
+    assert items[0].get_bytes() == b"1234"
 
     assert items[1].type == "type2"
-    assert items[1].get_bytes() == b'abcd'
+    assert items[1].get_bytes() == b"abcd"
 
     assert items[2].type == "type3"
-    assert items[2].get_bytes() == b''
+    assert items[2].get_bytes() == b""
 
     assert items[3].type == "type4"
-    assert items[3].get_bytes() == b'ab12'
-
+    assert items[3].get_bytes() == b"ab12"
