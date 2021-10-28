@@ -294,7 +294,7 @@ class Item(object):
         line = f.readline().rstrip()
         if not line:
             return None
-        headers = json.loads(line)
+        headers = parse_json(line)
         length = headers.get("length")
         if length is not None:
             payload = f.read(length)
@@ -303,7 +303,7 @@ class Item(object):
             # if no length was specified we need to read up to the end of line
             payload = f.readline().rstrip()
         if headers.get("type") in ("event", "transaction", "metric_buckets"):
-            rv = cls(headers=headers, payload=PayloadRef(json=json.loads(payload)))
+            rv = cls(headers=headers, payload=PayloadRef(json=parse_json(payload)))
         else:
             rv = cls(headers=headers, payload=payload)
         return rv
