@@ -301,7 +301,8 @@ class Item(object):
             f.readline()
         else:
             # if no length was specified we need to read up to the end of line
-            payload = f.readline().rstrip()
+            # and remove it (if it is present, i.e. not the very last char in an eof terminated envelope)
+            payload = f.readline().rstrip(b"\n")
         if headers.get("type") in ("event", "transaction", "metric_buckets"):
             rv = cls(headers=headers, payload=PayloadRef(json=parse_json(payload)))
         else:
