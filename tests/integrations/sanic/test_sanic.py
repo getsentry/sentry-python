@@ -200,7 +200,7 @@ def test_concurrency(sentry_init, app):
 
             if SANIC_VERSION >= (21, 9):
                 await app.dispatch(
-                    "http.lifecycle.request", context={"request": patched_request}
+                    "http.lifecycle.request", context={"request": patched_request}, inline=True,
                 )
 
             await app.handle_request(
@@ -226,7 +226,7 @@ def test_concurrency(sentry_init, app):
                     app.router.finalize()
                 except AttributeError:
                     ...
-        await asyncio.gather(*(task(i) for i in range(10)))
+        await asyncio.gather(*(task(i) for i in range(1000)))
 
     if sys.version_info < (3, 7):
         loop = asyncio.new_event_loop()
