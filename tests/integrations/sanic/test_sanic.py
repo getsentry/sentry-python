@@ -6,7 +6,7 @@ import asyncio
 import pytest
 
 from sentry_sdk import capture_message, configure_scope
-from sentry_sdk.integrations.sanic import SanicIntegration, _hub_enter
+from sentry_sdk.integrations.sanic import SanicIntegration
 
 from sanic import Sanic, request, response, __version__ as SANIC_VERSION_RAW
 from sanic.response import HTTPResponse
@@ -200,7 +200,9 @@ def test_concurrency(sentry_init, app):
 
             if SANIC_VERSION >= (21, 9):
                 await app.dispatch(
-                    "http.lifecycle.request", context={"request": patched_request}, inline=True,
+                    "http.lifecycle.request",
+                    context={"request": patched_request},
+                    inline=True,
                 )
 
             await app.handle_request(

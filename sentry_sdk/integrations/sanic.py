@@ -27,6 +27,7 @@ if MYPY:
     from sanic.request import Request, RequestParameters
 
     from sentry_sdk._types import Event, EventProcessor, Hint
+    from sanic.router import Route
 
 try:
     from sanic import Sanic, __version__ as SANIC_VERSION
@@ -48,8 +49,10 @@ class SanicIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        global version
         # type: () -> None
+
+        global version
+
         try:
             version = tuple(map(int, SANIC_VERSION.split(".")))
         except (TypeError, ValueError):
@@ -122,17 +125,20 @@ class SanicRequestExtractor(RequestExtractor):
 
 
 def _setup_sanic():
+    # type: () -> None
     Sanic._startup = _startup
     ErrorHandler.lookup = _sentry_error_handler_lookup
 
 
 def _setup_legacy_sanic():
+    # type: () -> None
     Sanic.handle_request = _legacy_handle_request
     Router.get = _legacy_router_get
     ErrorHandler.lookup = _sentry_error_handler_lookup
 
 
 async def _startup(self):
+    # type: (Sanic) -> None
     # This happens about as early in the lifecycle as possible, just after the
     # Request object is created. The body has not yet been consumed.
     self.signal("http.lifecycle.request")(_hub_enter)
@@ -147,10 +153,12 @@ async def _startup(self):
     # has been identified by the router.
     self.signal("http.routing.after")(_set_transaction)
 
+    # The above signals need to be declared before this can be called.
     await old_startup(self)
 
 
 async def _hub_enter(request):
+    # type: (Request) -> None
     hub = Hub.current
     request.ctx._sentry_do_integration = (
         hub.get_integration(SanicIntegration) is not None
@@ -169,10 +177,12 @@ async def _hub_enter(request):
 
 
 async def _hub_exit(request, **_):
+    # type: (Request, **Any) -> None
     request.ctx._sentry_hub.__exit__(None, None, None)
 
 
 async def _set_transaction(request, route, **kwargs):
+    # type: (Request, Route, **Any) -> None
     hub = Hub.current
     if hub.get_integration(SanicIntegration) is not None:
         with capture_internal_exceptions():
