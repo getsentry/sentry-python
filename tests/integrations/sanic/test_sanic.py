@@ -173,6 +173,7 @@ def test_concurrency(sentry_init, app):
             kwargs["app"] = app
 
         if SANIC_VERSION >= (21, 3):
+
             class MockAsyncStreamer:
                 def __init__(self, request_body):
                     self.request_body = request_body
@@ -198,7 +199,9 @@ def test_concurrency(sentry_init, app):
             patched_request.stream = MockAsyncStreamer([b"hello", b"foo"])
 
             if SANIC_VERSION >= (21, 9):
-                await app.dispatch("http.lifecycle.request", context={"request": patched_request})
+                await app.dispatch(
+                    "http.lifecycle.request", context={"request": patched_request}
+                )
 
             await app.handle_request(
                 patched_request,

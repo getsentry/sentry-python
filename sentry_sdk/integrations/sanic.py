@@ -42,6 +42,7 @@ old_handle_request = Sanic.handle_request
 old_router_get = Router.get
 old_startup = Sanic._startup
 
+
 class SanicIntegration(Integration):
     identifier = "sanic"
 
@@ -83,6 +84,7 @@ class SanicIntegration(Integration):
 
         _setup_sanic()
 
+
 class SanicRequestExtractor(RequestExtractor):
     def content_length(self):
         # type: () -> int
@@ -118,14 +120,17 @@ class SanicRequestExtractor(RequestExtractor):
         # type: (Any) -> int
         return len(file.body or ())
 
+
 def _setup_sanic():
     Sanic._startup = _startup
     ErrorHandler.lookup = _sentry_error_handler_lookup
+
 
 def _setup_legacy_sanic():
     Sanic.handle_request = _legacy_handle_request
     Router.get = _legacy_router_get
     ErrorHandler.lookup = _sentry_error_handler_lookup
+
 
 async def _startup(self):
     # This happens about as early in the lifecycle as possible, just after the
@@ -147,7 +152,9 @@ async def _startup(self):
 
 async def _hub_enter(request):
     hub = Hub.current
-    request.ctx._sentry_do_integration = hub.get_integration(SanicIntegration) is not None
+    request.ctx._sentry_do_integration = (
+        hub.get_integration(SanicIntegration) is not None
+    )
 
     if not request.ctx._sentry_do_integration:
         return
@@ -172,6 +179,7 @@ async def _set_transaction(request, route, **kwargs):
             with hub.configure_scope() as scope:
                 route_name = route.name.replace(request.app.name, "").strip(".")
                 scope.transaction = route_name
+
 
 def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
     # type: (Any, Exception, *Any, **Any) -> Optional[object]
@@ -206,6 +214,7 @@ def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
 
     return sentry_wrapped_error_handler
 
+
 async def _legacy_handle_request(self, request, *args, **kwargs):
     # type: (Any, Request, *Any, **Any) -> Any
     hub = Hub.current
@@ -224,6 +233,7 @@ async def _legacy_handle_request(self, request, *args, **kwargs):
             response = await response
 
         return response
+
 
 def _legacy_router_get(self, *args):
     # type: (Any, Union[Any, Request]) -> Any
