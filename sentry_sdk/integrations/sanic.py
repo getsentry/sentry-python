@@ -41,7 +41,12 @@ version = None
 old_error_handler_lookup = ErrorHandler.lookup
 old_handle_request = Sanic.handle_request
 old_router_get = Router.get
-old_startup = Sanic._startup
+
+try:
+    # This method was introduced in Sanic v21.9
+    old_startup = Sanic._startup
+except AttributeError:
+    ...
 
 
 class SanicIntegration(Integration):
@@ -252,7 +257,22 @@ def _legacy_router_get(self, *args):
     if hub.get_integration(SanicIntegration) is not None:
         with capture_internal_exceptions():
             with hub.configure_scope() as scope:
-                scope.transaction = rv[0].__name__
+                if version and version >= (21, 3):
+                    # Sanic versions above and including 21.3 append the app name to the
+                    # route name, and so we need to remove it from Route name so the
+                    # transaction name is consistent across all versions
+                    sanic_app_name = self.ctx.app.name
+                    sanic_route = rv[0].name
+
+                    if sanic_route.startswith("%s." % sanic_app_name):
+                        # We add a 1 to the len of the sanic_app_name because there is a dot
+                        # that joins app name and the route name
+                        # Format: app_name.route_name
+                        sanic_route = sanic_route[len(sanic_app_name) + 1 :]
+
+                    scope.transaction = sanic_route
+                else:
+                    scope.transaction = rv[0].__name__
     return rv
 
 
