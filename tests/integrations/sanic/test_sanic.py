@@ -6,7 +6,7 @@ import asyncio
 import pytest
 
 from sentry_sdk import capture_message, configure_scope
-from sentry_sdk.integrations.sanic import SanicIntegration
+from sentry_sdk.integrations.sanic import SanicIntegration, _hub_enter
 
 from sanic import Sanic, request, response, __version__ as SANIC_VERSION_RAW
 from sanic.response import HTTPResponse
@@ -173,12 +173,6 @@ def test_concurrency(sentry_init, app):
             kwargs["app"] = app
 
         if SANIC_VERSION >= (21, 3):
-            try:
-                app.router.reset()
-                app.router.finalize()
-            except AttributeError:
-                ...
-
             class MockAsyncStreamer:
                 def __init__(self, request_body):
                     self.request_body = request_body
@@ -203,6 +197,9 @@ def test_concurrency(sentry_init, app):
             patched_request = request.Request(**kwargs)
             patched_request.stream = MockAsyncStreamer([b"hello", b"foo"])
 
+            if SANIC_VERSION >= (21, 9):
+                await app.dispatch("http.lifecycle.request", context={"request": patched_request})
+
             await app.handle_request(
                 patched_request,
             )
@@ -217,7 +214,16 @@ def test_concurrency(sentry_init, app):
         assert r.status == 200
 
     async def runner():
-        await asyncio.gather(*(task(i) for i in range(1000)))
+        if SANIC_VERSION >= (21, 3):
+            if SANIC_VERSION >= (21, 9):
+                await app._startup()
+            else:
+                try:
+                    app.router.reset()
+                    app.router.finalize()
+                except AttributeError:
+                    ...
+        await asyncio.gather(*(task(i) for i in range(10)))
 
     if sys.version_info < (3, 7):
         loop = asyncio.new_event_loop()
