@@ -46,7 +46,7 @@ try:
     # This method was introduced in Sanic v21.9
     old_startup = Sanic._startup
 except AttributeError:
-    ...
+    pass
 
 
 class SanicIntegration(Integration):
