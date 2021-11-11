@@ -37,7 +37,6 @@ try:
 except ImportError:
     raise DidNotEnable("Sanic not installed")
 
-version = None
 old_error_handler_lookup = ErrorHandler.lookup
 old_handle_request = Sanic.handle_request
 old_router_get = Router.get
@@ -51,19 +50,18 @@ except AttributeError:
 
 class SanicIntegration(Integration):
     identifier = "sanic"
+    version: Tuple[int, ...] = (0, 0)
 
     @staticmethod
     def setup_once():
         # type: () -> None
 
-        global version
-
         try:
-            version = tuple(map(int, SANIC_VERSION.split(".")))
+            SanicIntegration.version = tuple(map(int, SANIC_VERSION.split(".")))
         except (TypeError, ValueError):
             raise DidNotEnable("Unparsable Sanic version: {}".format(SANIC_VERSION))
 
-        if version < (0, 8):
+        if SanicIntegration.version < (0, 8):
             raise DidNotEnable("Sanic 0.8 or newer required.")
 
         if not HAS_REAL_CONTEXTVARS:
@@ -86,7 +84,7 @@ class SanicIntegration(Integration):
             # https://github.com/huge-success/sanic/issues/1332
             ignore_logger("root")
 
-        if version < (21, 9):
+        if SanicIntegration.version < (21, 9):
             _setup_legacy_sanic()
             return
 
@@ -224,7 +222,7 @@ def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
         finally:
             # As mentioned in previous comment in _startup, this can be removed
             # after https://github.com/sanic-org/sanic/issues/2297 is resolved
-            if version and version >= (21, 9):
+            if SanicIntegration.version >= (21, 9):
                 await _hub_exit(request)
 
     return sentry_wrapped_error_handler
@@ -257,7 +255,7 @@ def _legacy_router_get(self, *args):
     if hub.get_integration(SanicIntegration) is not None:
         with capture_internal_exceptions():
             with hub.configure_scope() as scope:
-                if version and version >= (21, 3):
+                if SanicIntegration.version and SanicIntegration.version >= (21, 3):
                     # Sanic versions above and including 21.3 append the app name to the
                     # route name, and so we need to remove it from Route name so the
                     # transaction name is consistent across all versions
