@@ -50,7 +50,7 @@ except AttributeError:
 
 class SanicIntegration(Integration):
     identifier = "sanic"
-    version: Tuple[int, ...] = (0, 0)
+    version = (0, 0)  # type: Tuple[int, ...]
 
     @staticmethod
     def setup_once():
