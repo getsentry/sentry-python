@@ -1,7 +1,5 @@
 from __future__ import absolute_import
 
-from django.shortcuts import render
-
 import pytest
 import pytest_django
 import json
