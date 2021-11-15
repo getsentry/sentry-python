@@ -481,9 +481,12 @@ def install_sql_hook():
     except ImportError:
         from django.db.backends.util import CursorWrapper
 
+    from django.db.backends.base.base import BaseDatabaseWrapper
+
     try:
         real_execute = CursorWrapper.execute
         real_executemany = CursorWrapper.executemany
+        real_connect = BaseDatabaseWrapper.connect
     except AttributeError:
         # This won't work on Django versions < 1.6
         return
@@ -510,6 +513,19 @@ def install_sql_hook():
         ):
             return real_executemany(self, sql, param_list)
 
+    def connect(self):
+        # type: (BaseDatabaseWrapper) -> None
+        hub = Hub.current
+        if hub.get_integration(DjangoIntegration) is None:
+            return real_connect(self)
+
+        with capture_internal_exceptions():
+            hub.add_breadcrumb(message="connect", category="query")
+
+        with hub.start_span(op="db", description="connect"):
+            return real_connect(self)
+
     CursorWrapper.execute = execute
     CursorWrapper.executemany = executemany
+    BaseDatabaseWrapper.connect = connect
     ignore_logger("django.db.backends")
