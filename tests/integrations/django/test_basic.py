@@ -402,6 +402,7 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     ]
 
 
+@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 def test_django_connect_trace(sentry_init, client, capture_events, render_span_tree):
     """
@@ -429,6 +430,7 @@ def test_django_connect_trace(sentry_init, client, capture_events, render_span_t
     assert '- op="db": description="connect"' in render_span_tree(events[0])
 
 
+@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 def test_django_connect_breadcrumbs(
     sentry_init, client, capture_events, render_span_tree
