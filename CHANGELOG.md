@@ -22,7 +22,17 @@ A major release `N` implies the previous release `N-1` will no longer receive up
 
 ## Unreleased
 
-- Also record client outcomes for before send.
+## 1.5.0
+
+- Also record client outcomes for before send #1211
+- Add support for implicitly sized envelope items #1229
+- Fix integration with Apache Beam 2.32, 2.33 #1233
+- Remove Python 2.7 support for AWS Lambda layers in craft config #1241
+- Refactor Sanic integration for v21.9 support #1212
+- AWS Lambda Python 3.9 runtime support #1239
+- Fix "shutdown_timeout" typing #1256
+
+Work in this release contributed by @galuszkak, @kianmeng, @ahopkins, @razumeiko, @tomscytale, and @seedofjoy. Thank you for your contribution!
 
 ## 1.4.3
 
