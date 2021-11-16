@@ -105,7 +105,9 @@ def lambda_client():
     return get_boto_client()
 
 
-@pytest.fixture(params=["python3.6", "python3.7", "python3.8", "python2.7"])
+@pytest.fixture(
+    params=["python3.6", "python3.7", "python3.8", "python3.9", "python2.7"]
+)
 def lambda_runtime(request):
     return request.param
 

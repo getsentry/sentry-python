@@ -617,7 +617,7 @@ class Transaction(Span):
 
         1. If a sampling decision is passed to `start_transaction`
         (`start_transaction(name: "my transaction", sampled: True)`), that
-        decision will be used, regardlesss of anything else
+        decision will be used, regardless of anything else
 
         2. If `traces_sampler` is defined, its decision will be used. It can
         choose to keep or ignore any parent sampling decision, or use the
