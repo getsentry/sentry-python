@@ -54,7 +54,7 @@ A major release `N` implies the previous release `N-1` will no longer receive up
 ## 1.2.0
 
 - Fix for `AWSLambda` Integration to handle other path formats for function initial handler #1139
-- Fix for worker to set deamon attribute instead of deprecated setDaemon method #1093
+- Fix for worker to set daemon attribute instead of deprecated setDaemon method #1093
 - Fix for `bottle` Integration that discards `-dev` for version extraction #1085
 - Fix for transport that adds a unified hook for capturing metrics about dropped events #1100
 - Add `Httpx` Integration #1119
