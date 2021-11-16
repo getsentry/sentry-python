@@ -425,7 +425,7 @@ def test_django_connect_trace(sentry_init, client, capture_events, render_span_t
     events = capture_events()
 
     content, status, headers = client.get(reverse("postgres_select"))
-    assert status == '200 OK'
+    assert status == "200 OK"
 
     assert '- op="db": description="connect"' in render_span_tree(events[0])
 
