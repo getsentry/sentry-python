@@ -481,7 +481,12 @@ def install_sql_hook():
     except ImportError:
         from django.db.backends.util import CursorWrapper
 
-    from django.db.backends.base.base import BaseDatabaseWrapper
+    try:
+        # django 1.6 and 1.7 compatability
+        from django.db.backends import BaseDatabaseWrapper
+    except ImportError:
+        # django 1.8 or later
+        from django.db.backends.base.base import BaseDatabaseWrapper
 
     try:
         real_execute = CursorWrapper.execute
