@@ -22,7 +22,17 @@ A major release `N` implies the previous release `N-1` will no longer receive up
 
 ## Unreleased
 
-- Also record client outcomes for before send.
+## 1.5.0
+
+- Also record client outcomes for before send #1211
+- Add support for implicitly sized envelope items #1229
+- Fix integration with Apache Beam 2.32, 2.33 #1233
+- Remove Python 2.7 support for AWS Lambda layers in craft config #1241
+- Refactor Sanic integration for v21.9 support #1212
+- AWS Lambda Python 3.9 runtime support #1239
+- Fix "shutdown_timeout" typing #1256
+
+Work in this release contributed by @galuszkak, @kianmeng, @ahopkins, @razumeiko, @tomscytale, and @seedofjoy. Thank you for your contribution!
 
 ## 1.4.3
 
@@ -54,7 +64,7 @@ A major release `N` implies the previous release `N-1` will no longer receive up
 ## 1.2.0
 
 - Fix for `AWSLambda` Integration to handle other path formats for function initial handler #1139
-- Fix for worker to set deamon attribute instead of deprecated setDaemon method #1093
+- Fix for worker to set daemon attribute instead of deprecated setDaemon method #1093
 - Fix for `bottle` Integration that discards `-dev` for version extraction #1085
 - Fix for transport that adds a unified hook for capturing metrics about dropped events #1100
 - Add `Httpx` Integration #1119

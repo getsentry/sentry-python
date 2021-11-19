@@ -65,7 +65,7 @@ TRACESTATE_ENTRIES_REGEX = re.compile(
 # of the form `sentry=xxxx`
 SENTRY_TRACESTATE_ENTRY_REGEX = re.compile(
     # either sentry is the first entry or there's stuff immediately before it,
-    # ending in a commma (this prevents matching something like `coolsentry=xxx`)
+    # ending in a comma (this prevents matching something like `coolsentry=xxx`)
     "(?:^|.+,)"
     # sentry's part, not including the potential comma
     "(sentry=[^,]*)"

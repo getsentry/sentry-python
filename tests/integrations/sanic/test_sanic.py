@@ -173,11 +173,6 @@ def test_concurrency(sentry_init, app):
             kwargs["app"] = app
 
         if SANIC_VERSION >= (21, 3):
-            try:
-                app.router.reset()
-                app.router.finalize()
-            except AttributeError:
-                ...
 
             class MockAsyncStreamer:
                 def __init__(self, request_body):
@@ -203,6 +198,13 @@ def test_concurrency(sentry_init, app):
             patched_request = request.Request(**kwargs)
             patched_request.stream = MockAsyncStreamer([b"hello", b"foo"])
 
+            if SANIC_VERSION >= (21, 9):
+                await app.dispatch(
+                    "http.lifecycle.request",
+                    context={"request": patched_request},
+                    inline=True,
+                )
+
             await app.handle_request(
                 patched_request,
             )
@@ -217,6 +219,15 @@ def test_concurrency(sentry_init, app):
         assert r.status == 200
 
     async def runner():
+        if SANIC_VERSION >= (21, 3):
+            if SANIC_VERSION >= (21, 9):
+                await app._startup()
+            else:
+                try:
+                    app.router.reset()
+                    app.router.finalize()
+                except AttributeError:
+                    ...
         await asyncio.gather(*(task(i) for i in range(1000)))
 
     if sys.version_info < (3, 7):

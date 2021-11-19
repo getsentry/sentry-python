@@ -52,7 +52,7 @@ class ClientConstructor(object):
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
         server_name=None,  # type: Optional[str]
-        shutdown_timeout=2,  # type: int
+        shutdown_timeout=2,  # type: float
         integrations=[],  # type: Sequence[Integration]  # noqa: B006
         in_app_include=[],  # type: List[str]  # noqa: B006
         in_app_exclude=[],  # type: List[str]  # noqa: B006
@@ -101,7 +101,7 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.4.3"
+VERSION = "1.5.0"
 SDK_INFO = {
     "name": "sentry.python",
     "version": VERSION,
