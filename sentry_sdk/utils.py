@@ -1201,6 +1201,7 @@ def _get_contextvars():
                 pass
 
     # Fall back to basic thread-local usage.
+
     from threading import local
 
     return False, _make_threadlocal_contextvars(local)
