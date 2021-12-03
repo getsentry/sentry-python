@@ -543,6 +543,10 @@ class Transaction(Span):
         hub = hub or self.hub or sentry_sdk.Hub.current
         client = hub.client
 
+        if client is None:
+            # We have no client and therefore nowhere to send this transaction.
+            return None
+
         # This is a de facto proxy for checking if sampled = False
         if self._span_recorder is None:
             logger.debug("Discarding transaction because sampled = False")
@@ -550,15 +554,11 @@ class Transaction(Span):
             # This is not entirely accurate because discards here are not
             # exclusively based on sample rate but also traces sampler, but
             # we handle this the same here.
-            if client and client.transport:
+            if client.transport and has_tracing_enabled(client.options):
                 client.transport.record_lost_event(
                     "sample_rate", data_category="transaction"
                 )
 
-            return None
-
-        if client is None:
-            # We have no client and therefore nowhere to send this transaction.
             return None
 
         if not self.name:
