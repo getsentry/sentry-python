@@ -284,3 +284,27 @@ def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value(
         transaction = start_transaction(name="dogpark")
         logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))
         assert transaction.sampled is False
+
+@pytest.mark.parametrize("traces_sample_rate", [None, 0.0, 1.0])
+def test_records_lost_event_only_if_tracing_enabled(sentry_init, traces_sample_rate, monkeypatch):
+    reports = []
+    sampled = traces_sample_rate == 1.0
+    dropped = traces_sample_rate == 0.0
+
+    def record_lost_event(reason, data_category=None, item=None):
+        reports.append((reason, data_category))
+
+    sentry_init(traces_sample_rate=traces_sample_rate)
+
+    monkeypatch.setattr(
+        Hub.current.client.transport, "record_lost_event", record_lost_event
+    )
+
+    transaction = start_transaction(name="dogpark")
+    assert transaction.sampled == sampled
+    transaction.finish()
+
+    if dropped:
+        assert reports == [("sample_rate", "transaction")]
+    else:
+        assert not reports
