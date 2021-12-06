@@ -287,12 +287,12 @@ def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value(
 
 
 @pytest.mark.parametrize(
-        "traces_sample_rate,sampled_output,reports_output",
-        [
-            (None, False, []),
-            (0.0, False, [("sample_rate", "transaction")]),
-            (1.0, True, []),
-        ],
+    "traces_sample_rate,sampled_output,reports_output",
+    [
+        (None, False, []),
+        (0.0, False, [("sample_rate", "transaction")]),
+        (1.0, True, []),
+    ],
 )
 def test_records_lost_event_only_if_traces_sample_rate_enabled(
     sentry_init, traces_sample_rate, sampled_output, reports_output, monkeypatch
@@ -316,12 +316,12 @@ def test_records_lost_event_only_if_traces_sample_rate_enabled(
 
 
 @pytest.mark.parametrize(
-        "traces_sampler,sampled_output,reports_output",
-        [
-            (None, False, []),
-            (lambda _x: 0.0, False, [("sample_rate", "transaction")]),
-            (lambda _x: 1.0, True, []),
-        ],
+    "traces_sampler,sampled_output,reports_output",
+    [
+        (None, False, []),
+        (lambda _x: 0.0, False, [("sample_rate", "transaction")]),
+        (lambda _x: 1.0, True, []),
+    ],
 )
 def test_records_lost_event_only_if_traces_sampler_enabled(
     sentry_init, traces_sampler, sampled_output, reports_output, monkeypatch
