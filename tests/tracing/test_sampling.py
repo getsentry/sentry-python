@@ -309,7 +309,7 @@ def test_records_lost_event_only_if_traces_sample_rate_enabled(
     )
 
     transaction = start_transaction(name="dogpark")
-    assert transaction.sampled == sampled_output
+    assert transaction.sampled is sampled_output
     transaction.finish()
 
     assert reports == reports_output
@@ -338,7 +338,7 @@ def test_records_lost_event_only_if_traces_sampler_enabled(
     )
 
     transaction = start_transaction(name="dogpark")
-    assert transaction.sampled == sampled_output
+    assert transaction.sampled is sampled_output
     transaction.finish()
 
     assert reports == reports_output
