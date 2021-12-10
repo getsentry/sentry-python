@@ -109,7 +109,7 @@ def has_tracing_enabled(options):
     # type: (Dict[str, Any]) -> bool
     """
     Returns True if either traces_sample_rate or traces_sampler is
-    non-zero/defined, False otherwise.
+    defined, False otherwise.
     """
 
     return bool(

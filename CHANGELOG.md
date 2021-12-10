@@ -23,6 +23,7 @@ A major release `N` implies the previous release `N-1` will no longer receive up
 ## Unreleased
 
 - Fix django legacy url resolver regex substitution due to upstream CVE-2021-44420 fix #1272
+- Record lost `sample_rate` events only if tracing is enabled
 
 ## 1.5.0
 
