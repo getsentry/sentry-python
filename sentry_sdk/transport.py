@@ -8,6 +8,7 @@ import time
 
 from datetime import datetime, timedelta
 from collections import defaultdict
+from requests import Session
 
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions, json_dumps
 from sentry_sdk.worker import BackgroundWorker
@@ -26,8 +27,10 @@ if MYPY:
     from typing import Union
     from typing import DefaultDict
 
+    from requests import Response
     from urllib3.poolmanager import PoolManager  # type: ignore
     from urllib3.poolmanager import ProxyManager
+    from urllib3.response import HTTPResponse
 
     from sentry_sdk._types import Event, EndpointType
 
@@ -42,7 +45,7 @@ except ImportError:
 class Transport(object):
     """Baseclass for all transports.
 
-    A transport is used to send an event to sentry.
+    Transport is used to send an event to sentry.
     """
 
     parsed_dsn = None  # type: Optional[Dsn]
@@ -107,10 +110,12 @@ class Transport(object):
         """
         return None
 
+    # noinspection PyBroadException
     def __del__(self):
         # type: () -> None
         try:
             self.kill()
+
         except Exception:
             pass
 
@@ -203,6 +208,20 @@ class HttpTransport(Transport):
                 seconds=self._retry.get_retry_after(response) or 60
             )
 
+    def _transport_send_request(
+        self,
+        body,  # type: bytes
+        headers,  # type: Dict[str, str]
+        endpoint_type,  # type: EndpointType
+    ):
+        # type: (...) -> HTTPResponse
+        return self._pool.request(
+            "POST",
+            str(self._auth.get_api_url(endpoint_type)),
+            body=body,
+            headers=headers,
+        )
+
     def _send_request(
         self,
         body,  # type: bytes
@@ -227,12 +246,8 @@ class HttpTransport(Transport):
             }
         )
         try:
-            response = self._pool.request(
-                "POST",
-                str(self._auth.get_api_url(endpoint_type)),
-                body=body,
-                headers=headers,
-            )
+            response = self._transport_send_request(body, headers, endpoint_type)
+
         except Exception:
             self.on_dropped_event("network")
             record_loss("network_error")
@@ -242,8 +257,8 @@ class HttpTransport(Transport):
             self._update_rate_limits(response)
 
             if response.status == 429:
-                # if we hit a 429.  Something was rate limited but we already
-                # acted on this in `self._update_rate_limits`.  Note that we
+                # if we hit a 429. Something was rate limited,but we already
+                # acted on this in `self._update_rate_limits`. Note that we
                 # do not want to record event loss here as we will have recorded
                 # an outcome in relay already.
                 self.on_dropped_event("status_429")
@@ -257,10 +272,12 @@ class HttpTransport(Transport):
                 )
                 self.on_dropped_event("status_{}".format(response.status))
                 record_loss("network_error")
+
         finally:
             response.close()
 
-    def on_dropped_event(self, reason):
+    @staticmethod
+    def on_dropped_event(reason):
         # type: (str) -> None
         return None
 
@@ -356,15 +373,15 @@ class HttpTransport(Transport):
             else:
                 new_items.append(item)
 
-        # Since we're modifying the envelope here make a copy so that others
-        # that hold references do not see their envelope modified.
+        # Since we're modifying the envelope here make a copy so, that others
+        # that hold references, do not see their envelope modified.
         envelope = Envelope(headers=envelope.headers, items=new_items)
 
         if not envelope.items:
             return None
 
         # since we're already in the business of sending out an envelope here
-        # check if we have one pending for the stats session envelopes so we
+        # check if we have one pending for the stats' session envelopes, so we
         # can attach it to this enveloped scheduled for sending.  This will
         # currently typically attach the client report to the most recent
         # session update.
@@ -395,7 +412,8 @@ class HttpTransport(Transport):
         )
         return None
 
-    def _get_pool_options(self, ca_certs):
+    @staticmethod
+    def _get_pool_options(ca_certs):
         # type: (Optional[Any]) -> Dict[str, Any]
         return {
             "num_pools": 2,
@@ -403,7 +421,8 @@ class HttpTransport(Transport):
             "ca_certs": ca_certs or certifi.where(),
         }
 
-    def _in_no_proxy(self, parsed_dsn):
+    @staticmethod
+    def _in_no_proxy(parsed_dsn):
         # type: (Dsn) -> bool
         no_proxy = getproxies().get("no")
         if not no_proxy:
@@ -508,9 +527,121 @@ class _FunctionTransport(Transport):
         self._func(event)
         return None
 
+    def capture_envelope(
+        self, envelope  # type: Envelope
+    ):
+        # type: (...) -> None
+        return None
+
+
+class _WrappedSession(Session):
+    def __init__(self, read_timeout, connect_timeout):
+        super().__init__()
+        self.timeout = (read_timeout, connect_timeout)
+
+    def request(self, *args, **kwargs):
+        kwargs.setdefault("timeout", self.timeout)
+        return super().request(*args, **kwargs)
+
+
+class NoThreadHttpTransport(HttpTransport):
+    """HTTP without background queue (for hosting providers like www.pythonanywhere.com)"""
+
+    def __init__(
+        self, options  # type: Dict[str, Any]
+    ):
+        # type: (...) -> None
+        from sentry_sdk.consts import VERSION
+
+        Transport.__init__(self, options)
+        assert self.parsed_dsn is not None
+        self.options = options
+        self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
+        self._disabled_until = {}  # type: Dict[DataCategory, datetime]
+        self._retry = urllib3.util.Retry()
+
+        self._session = _WrappedSession(
+            connect_timeout=options.get("transport_connect_timeout", 4),
+            read_timeout=options.get("transport_read_timeout", 60),
+        )
+        self._session.headers.update(
+            {
+                "User-Agent": str(self._auth.client),
+                "X-Sentry-Auth": str(self._auth.to_header()),
+            }
+        )
+        self._configure_session(
+            self.parsed_dsn,
+            http_proxy=options["http_proxy"],
+            https_proxy=options["https_proxy"],
+        )
+
+        from sentry_sdk import Hub
+
+        self.hub_cls = Hub
+
+    def _configure_session(
+        self,
+        parsed_dsn,  # type: Dsn
+        http_proxy,  # type: Optional[str]
+        https_proxy,  # type: Optional[str]
+    ):
+        # type: (...) -> None
+        no_proxy = self._in_no_proxy(parsed_dsn)
+        proxy = {
+            "https": https_proxy or (not no_proxy and getproxies().get("https")),
+            "http": http_proxy or (not no_proxy and getproxies().get("http")),
+        }
+        self._session.proxies.update(proxy)
+
+    def _transport_send_request(
+        self,
+        body,  # type: bytes
+        headers,  # type: Dict[str, str]
+        endpoint_type,  # type: EndpointType
+    ):
+        # type: (...) -> Response
+        return self._session.request(
+            "POST",
+            str(self._auth.get_api_url(endpoint_type)),
+            body=body,
+            headers=headers,
+        )
+
+    def capture_event(
+        self, event  # type: Event
+    ):
+        # type: (...) -> None
+        hub = self.hub_cls.current
+        with hub:
+            with capture_internal_exceptions():
+                self._send_event(event)
+                self._flush_client_reports()
+
+    def capture_envelope(
+        self, envelope  # type: Envelope
+    ):
+        # type: (...) -> None
+        hub = self.hub_cls.current
+        with hub:
+            with capture_internal_exceptions():
+                self._send_envelope(envelope)
+                self._flush_client_reports()
+
+    def flush(
+        self,
+        timeout,  # type: float
+        callback=None,  # type: Optional[Any]
+    ):
+        logger.debug("Flush requested: not needed")
+
+    def kill(self):
+        logger.debug("Kill requested: not needed")
+
 
 def make_transport(options):
     # type: (Dict[str, Any]) -> Optional[Transport]
+    transport_cls = None  # type: Optional[Type[Transport]]
     ref_transport = options["transport"]
 
     # If no transport is given, we use the http transport class
