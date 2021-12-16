@@ -1,5 +1,6 @@
 import os
 import sys
+import copy
 import logging
 
 import pytest
@@ -18,9 +19,9 @@ from sentry_sdk import (
 )
 
 from sentry_sdk._compat import reraise
-from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.integrations import _AUTO_ENABLING_INTEGRATIONS
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.scope import add_global_event_processor, global_event_processors
 
 
 def test_processors(sentry_init, capture_events):
@@ -413,6 +414,8 @@ def test_event_processor_drop_records_client_report(
     events = capture_events()
     reports = capture_client_reports()
 
+    global global_event_processors
+
     @add_global_event_processor
     def foo(event, hint):
         return None
@@ -424,3 +427,5 @@ def test_event_processor_drop_records_client_report(
 
     assert len(events) == 0
     assert reports == [("event_processor", "error"), ("event_processor", "transaction")]
+
+    global_event_processors.pop()
