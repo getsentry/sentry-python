@@ -39,7 +39,6 @@ except ImportError:
     def benchmark():
         return lambda x: x()
 
-
 else:
     del pytest_benchmark
 
@@ -239,6 +238,26 @@ def capture_envelopes(monkeypatch):
         monkeypatch.setattr(test_client.transport, "capture_event", append_event)
         monkeypatch.setattr(test_client.transport, "capture_envelope", append_envelope)
         return envelopes
+
+    return inner
+
+
+@pytest.fixture
+def capture_client_reports(monkeypatch):
+    def inner():
+        reports = []
+        test_client = sentry_sdk.Hub.current.client
+        old_record_lost_event = test_client.transport.record_lost_event
+
+        def record_lost_event(reason, data_category=None, item=None):
+            if data_category is None:
+                data_category = item.data_category
+            return reports.append((reason, data_category))
+
+        monkeypatch.setattr(
+            test_client.transport, "record_lost_event", record_lost_event
+        )
+        return reports
 
     return inner
 
