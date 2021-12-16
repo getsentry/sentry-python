@@ -81,6 +81,9 @@ def init_sdk(timeout_warning=False, **extra_init_args):
         transport=TestTransport,
         integrations=[GcpIntegration(timeout_warning=timeout_warning)],
         shutdown_timeout=10,
+        # excepthook -> dedupe -> event_processor client report gets added
+        # which we don't really care about for these tests
+        send_client_reports=False,
         **extra_init_args
     )
 
