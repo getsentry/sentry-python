@@ -1,6 +1,5 @@
 import os
 import sys
-import copy
 import logging
 
 import pytest
@@ -21,7 +20,7 @@ from sentry_sdk import (
 from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import _AUTO_ENABLING_INTEGRATIONS
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.scope import add_global_event_processor, global_event_processors
+from sentry_sdk.scope import add_global_event_processor, global_event_processors # noqa: F401
 
 
 def test_processors(sentry_init, capture_events):
@@ -396,7 +395,7 @@ def test_dedupe_event_processor_drop_records_client_report(
         try:
             capture_exception()
             reraise(*sys.exc_info())
-        except:
+        except Exception:
             capture_exception()
 
     (event,) = events
@@ -422,7 +421,7 @@ def test_event_processor_drop_records_client_report(
 
     capture_message("dropped")
 
-    with start_transaction(name="dropped") as transaction:
+    with start_transaction(name="dropped") as _transaction:
         pass
 
     assert len(events) == 0

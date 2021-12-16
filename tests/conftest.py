@@ -248,7 +248,6 @@ def capture_client_reports(monkeypatch):
     def inner():
         reports = []
         test_client = sentry_sdk.Hub.current.client
-        old_record_lost_event = test_client.transport.record_lost_event
 
         def record_lost_event(reason, data_category=None, item=None):
             if data_category is None:
