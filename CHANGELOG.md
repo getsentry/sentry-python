@@ -20,10 +20,12 @@ sentry-sdk==1.5.0
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
-## Unreleased
+## 1.5.1
 
 - Fix django legacy url resolver regex substitution due to upstream CVE-2021-44420 fix #1272
-- Record lost `sample_rate` events only if tracing is enabled
+- Record lost `sample_rate` events only if tracing is enabled #1268
+- Fix gevent version parsing for non-numeric parts #1243
+- Record span and breadcrumb when Django opens db connection #1250
 
 ## 1.5.0
 
