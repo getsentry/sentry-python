@@ -145,9 +145,18 @@ class _Client(object):
             event["timestamp"] = datetime.utcnow()
 
         if scope is not None:
+            is_transaction = event.get("type") == "transaction"
             event_ = scope.apply_to_event(event, hint)
+
+            # one of the event/error processors returned None
             if event_ is None:
+                if self.transport:
+                    self.transport.record_lost_event(
+                        "event_processor",
+                        data_category=("transaction" if is_transaction else "error"),
+                    )
                 return None
+
             event = event_
 
         if (

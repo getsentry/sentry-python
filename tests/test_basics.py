@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 
 import pytest
@@ -10,13 +11,19 @@ from sentry_sdk import (
     capture_event,
     capture_exception,
     capture_message,
+    start_transaction,
     add_breadcrumb,
     last_event_id,
     Hub,
 )
 
+from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import _AUTO_ENABLING_INTEGRATIONS
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.scope import (  # noqa: F401
+    add_global_event_processor,
+    global_event_processors,
+)
 
 
 def test_processors(sentry_init, capture_events):
@@ -371,3 +378,56 @@ def test_capture_event_with_scope_kwargs(sentry_init, capture_events):
     (event,) = events
     assert event["level"] == "info"
     assert event["extra"]["foo"] == "bar"
+
+
+def test_dedupe_event_processor_drop_records_client_report(
+    sentry_init, capture_events, capture_client_reports
+):
+    """
+    DedupeIntegration internally has an event_processor that filters duplicate exceptions.
+    We want a duplicate exception to be captured only once and the drop being recorded as
+    a client report.
+    """
+    sentry_init()
+    events = capture_events()
+    reports = capture_client_reports()
+
+    try:
+        raise ValueError("aha!")
+    except Exception:
+        try:
+            capture_exception()
+            reraise(*sys.exc_info())
+        except Exception:
+            capture_exception()
+
+    (event,) = events
+    (report,) = reports
+
+    assert event["level"] == "error"
+    assert "exception" in event
+    assert report == ("event_processor", "error")
+
+
+def test_event_processor_drop_records_client_report(
+    sentry_init, capture_events, capture_client_reports
+):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+    reports = capture_client_reports()
+
+    global global_event_processors
+
+    @add_global_event_processor
+    def foo(event, hint):
+        return None
+
+    capture_message("dropped")
+
+    with start_transaction(name="dropped"):
+        pass
+
+    assert len(events) == 0
+    assert reports == [("event_processor", "error"), ("event_processor", "transaction")]
+
+    global_event_processors.pop()
