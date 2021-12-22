@@ -407,3 +407,25 @@ def test_traces_sampler_gets_task_info_in_sampling_context(
         # passed as args or as kwargs, so make this generic
         DictionaryContaining({"celery_job": dict(task="dog_walk", **args_kwargs)})
     )
+
+
+def test_abstract_task(capture_events, celery, celery_invocation):
+    events = capture_events()
+
+    class AbstractTask(celery.Task):
+        abstract = True
+
+        def __call__(self, *args, **kwargs):
+            try:
+                return self.run(*args, **kwargs)
+            except ZeroDivisionError:
+                return None
+
+    @celery.task(name="dummy_task", base=AbstractTask)
+    def dummy_task(x, y):
+        return x / y
+
+    with start_transaction() as transaction:
+        celery_invocation(dummy_task, 1, 0)
+
+    assert not events
