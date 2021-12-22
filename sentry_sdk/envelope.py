@@ -295,13 +295,18 @@ class Item(object):
         if not line:
             return None
         headers = parse_json(line)
-        length = headers["length"]
-        payload = f.read(length)
-        if headers.get("type") in ("event", "transaction"):
+        length = headers.get("length")
+        if length is not None:
+            payload = f.read(length)
+            f.readline()
+        else:
+            # if no length was specified we need to read up to the end of line
+            # and remove it (if it is present, i.e. not the very last char in an eof terminated envelope)
+            payload = f.readline().rstrip(b"\n")
+        if headers.get("type") in ("event", "transaction", "metric_buckets"):
             rv = cls(headers=headers, payload=PayloadRef(json=parse_json(payload)))
         else:
             rv = cls(headers=headers, payload=payload)
-        f.readline()
         return rv
 
     @classmethod

@@ -171,7 +171,7 @@ class SentryAsgiMiddleware:
 
         client = asgi_scope.get("client")
         if client and _should_send_default_pii():
-            request_info["env"] = {"REMOTE_ADDR": client[0]}
+            request_info["env"] = {"REMOTE_ADDR": self._get_ip(asgi_scope)}
 
         if (
             event.get("transaction", _DEFAULT_TRANSACTION_NAME)
@@ -224,6 +224,24 @@ class SentryAsgiMiddleware:
         if not qs:
             return None
         return urllib.parse.unquote(qs.decode("latin-1"))
+
+    def _get_ip(self, scope):
+        # type: (Any) -> str
+        """
+        Extract IP Address from the ASGI scope based on request headers with fallback to scope client.
+        """
+        headers = self._get_headers(scope)
+        try:
+            return headers["x-forwarded-for"].split(",")[0].strip()
+        except (KeyError, IndexError):
+            pass
+
+        try:
+            return headers["x-real-ip"]
+        except KeyError:
+            pass
+
+        return scope.get("client")[0]
 
     def _get_headers(self, scope):
         # type: (Any) -> Dict[str, str]

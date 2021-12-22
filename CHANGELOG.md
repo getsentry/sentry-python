@@ -14,21 +14,49 @@ We recommend to pin your version requirements against `1.x.*` or `1.x.y`.
 Either one of the following is fine:
 
 ```
-sentry-sdk>=0.10.0,<0.11.0
-sentry-sdk==0.10.1
+sentry-sdk>=1.0.0,<2.0.0
+sentry-sdk==1.5.0
 ```
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
-## Unreleased
+## 1.5.1
 
-- TBA
+- Fix django legacy url resolver regex substitution due to upstream CVE-2021-44420 fix #1272
+- Record lost `sample_rate` events only if tracing is enabled #1268
+- Fix gevent version parsing for non-numeric parts #1243
+- Record span and breadcrumb when Django opens db connection #1250
+
+## 1.5.0
+
+- Also record client outcomes for before send #1211
+- Add support for implicitly sized envelope items #1229
+- Fix integration with Apache Beam 2.32, 2.33 #1233
+- Remove Python 2.7 support for AWS Lambda layers in craft config #1241
+- Refactor Sanic integration for v21.9 support #1212
+- AWS Lambda Python 3.9 runtime support #1239
+- Fix "shutdown_timeout" typing #1256
+
+Work in this release contributed by @galuszkak, @kianmeng, @ahopkins, @razumeiko, @tomscytale, and @seedofjoy. Thank you for your contribution!
+
+## 1.4.3
+
+- Turned client reports on by default.
+
+## 1.4.2
+
+- Made envelope modifications in the HTTP transport non observable #1206
+
+## 1.4.1
+
+- Fix race condition between `finish` and `start_child` in tracing #1203
 
 ## 1.4.0
 
 - No longer set the last event id for transactions #1186
 - Added support for client reports (disabled by default for now) #1181
 - Added `tracestate` header handling #1179
+- Added real ip detection to asgi integration #1199
 
 ## 1.3.1
 
@@ -41,7 +69,7 @@ A major release `N` implies the previous release `N-1` will no longer receive up
 ## 1.2.0
 
 - Fix for `AWSLambda` Integration to handle other path formats for function initial handler #1139
-- Fix for worker to set deamon attribute instead of deprecated setDaemon method #1093
+- Fix for worker to set daemon attribute instead of deprecated setDaemon method #1093
 - Fix for `bottle` Integration that discards `-dev` for version extraction #1085
 - Fix for transport that adds a unified hook for capturing metrics about dropped events #1100
 - Add `Httpx` Integration #1119

@@ -251,3 +251,44 @@ def test_traces_sampler_gets_scope_in_sampling_context(
             }
         )
     )
+
+
+def test_x_forwarded_for(sentry_init, app, capture_events):
+    sentry_init(send_default_pii=True)
+    events = capture_events()
+
+    client = TestClient(app)
+    response = client.get("/sync-message", headers={"X-Forwarded-For": "testproxy"})
+
+    assert response.status_code == 200
+
+    (event,) = events
+    assert event["request"]["env"] == {"REMOTE_ADDR": "testproxy"}
+
+
+def test_x_forwarded_for_multiple_entries(sentry_init, app, capture_events):
+    sentry_init(send_default_pii=True)
+    events = capture_events()
+
+    client = TestClient(app)
+    response = client.get(
+        "/sync-message", headers={"X-Forwarded-For": "testproxy1,testproxy2,testproxy3"}
+    )
+
+    assert response.status_code == 200
+
+    (event,) = events
+    assert event["request"]["env"] == {"REMOTE_ADDR": "testproxy1"}
+
+
+def test_x_real_ip(sentry_init, app, capture_events):
+    sentry_init(send_default_pii=True)
+    events = capture_events()
+
+    client = TestClient(app)
+    response = client.get("/sync-message", headers={"X-Real-IP": "1.2.3.4"})
+
+    assert response.status_code == 200
+
+    (event,) = events
+    assert event["request"]["env"] == {"REMOTE_ADDR": "1.2.3.4"}

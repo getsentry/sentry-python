@@ -10,6 +10,7 @@ from sentry_sdk import (
     start_span,
     start_transaction,
 )
+from sentry_sdk.transport import Transport
 from sentry_sdk.tracing import Transaction
 
 
@@ -145,5 +146,24 @@ def test_transactions_do_not_go_through_before_send(sentry_init, capture_events)
 
     with start_transaction(name="/"):
         pass
+
+    assert len(events) == 1
+
+
+def test_start_span_after_finish(sentry_init, capture_events):
+    class CustomTransport(Transport):
+        def capture_envelope(self, envelope):
+            pass
+
+        def capture_event(self, event):
+            start_span(op="toolate", description="justdont")
+            pass
+
+    sentry_init(traces_sample_rate=1, transport=CustomTransport())
+    events = capture_events()
+
+    with start_transaction(name="hi"):
+        with start_span(op="bar", description="bardesc"):
+            pass
 
     assert len(events) == 1

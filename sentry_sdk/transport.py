@@ -356,7 +356,10 @@ class HttpTransport(Transport):
             else:
                 new_items.append(item)
 
-        envelope.items[:] = new_items
+        # Since we're modifying the envelope here make a copy so that others
+        # that hold references do not see their envelope modified.
+        envelope = Envelope(headers=envelope.headers, items=new_items)
+
         if not envelope.items:
             return None
 

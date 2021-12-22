@@ -7,16 +7,6 @@ from datetime import datetime, timedelta
 import sentry_sdk
 
 from sentry_sdk.utils import logger
-from sentry_sdk.tracing_utils import (
-    EnvironHeaders,
-    compute_tracestate_entry,
-    extract_sentrytrace_data,
-    extract_tracestate_data,
-    has_tracestate_enabled,
-    has_tracing_enabled,
-    is_valid_sample_rate,
-    maybe_create_breadcrumbs_from_span,
-)
 from sentry_sdk._types import MYPY
 
 
@@ -553,6 +543,10 @@ class Transaction(Span):
         hub = hub or self.hub or sentry_sdk.Hub.current
         client = hub.client
 
+        if client is None:
+            # We have no client and therefore nowhere to send this transaction.
+            return None
+
         # This is a de facto proxy for checking if sampled = False
         if self._span_recorder is None:
             logger.debug("Discarding transaction because sampled = False")
@@ -560,15 +554,11 @@ class Transaction(Span):
             # This is not entirely accurate because discards here are not
             # exclusively based on sample rate but also traces sampler, but
             # we handle this the same here.
-            if client and client.transport:
+            if client.transport and has_tracing_enabled(client.options):
                 client.transport.record_lost_event(
                     "sample_rate", data_category="transaction"
                 )
 
-            return None
-
-        if client is None:
-            # We have no client and therefore nowhere to send this transaction.
             return None
 
         if not self.name:
@@ -596,7 +586,7 @@ class Transaction(Span):
         # recorder -> span -> containing transaction (which is where we started)
         # before either the spans or the transaction goes out of scope and has
         # to be garbage collected
-        del self._span_recorder
+        self._span_recorder = None
 
         return hub.capture_event(
             {
@@ -627,7 +617,7 @@ class Transaction(Span):
 
         1. If a sampling decision is passed to `start_transaction`
         (`start_transaction(name: "my transaction", sampled: True)`), that
-        decision will be used, regardlesss of anything else
+        decision will be used, regardless of anything else
 
         2. If `traces_sampler` is defined, its decision will be used. It can
         choose to keep or ignore any parent sampling decision, or use the
@@ -718,3 +708,17 @@ class Transaction(Span):
                     sample_rate=float(sample_rate),
                 )
             )
+
+
+# Circular imports
+
+from sentry_sdk.tracing_utils import (
+    EnvironHeaders,
+    compute_tracestate_entry,
+    extract_sentrytrace_data,
+    extract_tracestate_data,
+    has_tracestate_enabled,
+    has_tracing_enabled,
+    is_valid_sample_rate,
+    maybe_create_breadcrumbs_from_span,
+)

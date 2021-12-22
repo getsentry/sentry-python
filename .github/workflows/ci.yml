@@ -37,8 +37,6 @@ jobs:
     name: build documentation
     runs-on: ubuntu-latest
 
-    if: "startsWith(github.ref, 'refs/heads/release/')"
-
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v1

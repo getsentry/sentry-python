@@ -32,8 +32,6 @@ if MYPY:
     from typing import Dict
     from typing import Union
 
-    from sentry_sdk.tracing import Span
-
 
 SENTRY_TRACE_REGEX = re.compile(
     "^[ \t]*"  # whitespace
@@ -67,7 +65,7 @@ TRACESTATE_ENTRIES_REGEX = re.compile(
 # of the form `sentry=xxxx`
 SENTRY_TRACESTATE_ENTRY_REGEX = re.compile(
     # either sentry is the first entry or there's stuff immediately before it,
-    # ending in a commma (this prevents matching something like `coolsentry=xxx`)
+    # ending in a comma (this prevents matching something like `coolsentry=xxx`)
     "(?:^|.+,)"
     # sentry's part, not including the potential comma
     "(sentry=[^,]*)"
@@ -111,7 +109,7 @@ def has_tracing_enabled(options):
     # type: (Dict[str, Any]) -> bool
     """
     Returns True if either traces_sample_rate or traces_sampler is
-    non-zero/defined, False otherwise.
+    defined, False otherwise.
     """
 
     return bool(
@@ -405,3 +403,9 @@ def has_tracestate_enabled(span=None):
     options = client and client.options
 
     return bool(options and options["_experiments"].get("propagate_tracestate"))
+
+
+# Circular imports
+
+if MYPY:
+    from sentry_sdk.tracing import Span
