@@ -425,7 +425,7 @@ def test_abstract_task(capture_events, celery, celery_invocation):
     def dummy_task(x, y):
         return x / y
 
-    with start_transaction() as transaction:
+    with start_transaction():
         celery_invocation(dummy_task, 1, 0)
 
     assert not events
