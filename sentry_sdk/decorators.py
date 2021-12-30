@@ -37,7 +37,7 @@ def sentry_traced(
     async def my_async_function():
         ...
 
-    @sentry_trace(op="child_name")
+    @sentry_traced(op="child_name")
     def my_function():
        ...
     """
