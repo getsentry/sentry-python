@@ -38,11 +38,9 @@ async def app():
     return app
 
 
-@pytest.fixture(params=("auto", "manual"))
+@pytest.fixture(params=("manual"))
 def integration_enabled_params(request):
-    if request.param == "auto":
-        return {"auto_enabling_integrations": True}
-    elif request.param == "manual":
+    if request.param == "manual":
         return {"integrations": [quart_sentry.QuartIntegration()]}
     else:
         raise ValueError(request.param)
