@@ -2,6 +2,7 @@ import sys
 
 import random
 import asyncio
+from unittest.mock import Mock
 
 import pytest
 
@@ -10,7 +11,7 @@ from sentry_sdk.integrations.sanic import SanicIntegration
 
 from sanic import Sanic, request, response, __version__ as SANIC_VERSION_RAW
 from sanic.response import HTTPResponse
-from sanic.exceptions import abort
+from sanic.exceptions import SanicException
 
 SANIC_VERSION = tuple(map(int, SANIC_VERSION_RAW.split(".")))
 
@@ -20,9 +21,9 @@ def app():
     if SANIC_VERSION >= (20, 12):
         # Build (20.12.0) adds a feature where the instance is stored in an internal class
         # registry for later retrieval, and so add register=False to disable that
-        app = Sanic(__name__, register=False)
+        app = Sanic("Test", register=False)
     else:
-        app = Sanic(__name__)
+        app = Sanic("Test")
 
     @app.route("/message")
     def hi(request):
@@ -90,7 +91,7 @@ def test_bad_request_not_captured(sentry_init, app, capture_events):
 
     @app.route("/")
     def index(request):
-        abort(400)
+        raise SanicException(status_code=400)
 
     request, response = app.test_client.get("/")
     assert response.status == 400
@@ -178,7 +179,12 @@ def test_concurrency(sentry_init, app):
                 def __init__(self, request_body):
                     self.request_body = request_body
                     self.iter = iter(self.request_body)
-                    self.response = b"success"
+
+                    if SANIC_VERSION >= (21, 12):
+                        self.response = None
+                        self.stage = Mock()
+                    else:
+                        self.response = b"success"
 
                 def respond(self, response):
                     responses.append(response)
