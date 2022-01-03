@@ -91,7 +91,7 @@ def test_bad_request_not_captured(sentry_init, app, capture_events):
 
     @app.route("/")
     def index(request):
-        raise SanicException(status_code=400)
+        raise SanicException("...", status_code=400)
 
     request, response = app.test_client.get("/")
     assert response.status == 400
