@@ -222,7 +222,7 @@ def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
         finally:
             # As mentioned in previous comment in _startup, this can be removed
             # after https://github.com/sanic-org/sanic/issues/2297 is resolved
-            if SanicIntegration.version >= (21, 9):
+            if SanicIntegration.version == (21, 9):
                 await _hub_exit(request)
 
     return sentry_wrapped_error_handler
