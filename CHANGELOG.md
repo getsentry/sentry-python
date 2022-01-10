@@ -20,6 +20,15 @@ sentry-sdk==1.5.0
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 1.5.2
+
+- Record event_processor client reports #1281
+- Add a Quart integration #1248
+- Sanic v21.12 support #1292
+- Support Celery abstract tasks #1287
+
+Work in this release contributed by @johnzeringue, @pgjones and @ahopkins. Thank you for your contribution!
+
 ## 1.5.1
 
 - Fix django legacy url resolver regex substitution due to upstream CVE-2021-44420 fix #1272
