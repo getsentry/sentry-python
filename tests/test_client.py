@@ -646,7 +646,8 @@ def test_chained_exceptions(sentry_init, capture_events):
 
 
 @pytest.mark.tests_internal_exceptions
-def test_broken_mapping(sentry_init, capture_events):
+@pytest.mark.parametrize("with_custom_repr", [False, True])
+def test_broken_mapping(sentry_init, capture_events, with_custom_repr):
     sentry_init()
     events = capture_events()
 
@@ -660,8 +661,10 @@ def test_broken_mapping(sentry_init, capture_events):
         __iter__ = broken
         __len__ = broken
 
-        def __repr__(self):
-            return "broken"
+        if with_custom_repr:
+
+            def __repr__(self):
+                return "still works"
 
     try:
         a = C()  # noqa
@@ -670,9 +673,13 @@ def test_broken_mapping(sentry_init, capture_events):
         capture_exception()
 
     (event,) = events
+    if with_custom_repr:
+        valid_repr = "still works"
+    else:
+        valid_repr = "<failed to serialize, use init(debug=True) to see error logs>"
     assert (
         event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"]
-        == "<failed to serialize, use init(debug=True) to see error logs>"
+        == valid_repr
     )
 
 

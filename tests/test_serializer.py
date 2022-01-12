@@ -64,3 +64,12 @@ def test_bytes_serialization_repr(message_normalizer):
 def test_serialize_sets(extra_normalizer):
     result = extra_normalizer({1, 2, 3})
     assert result == [1, 2, 3]
+
+
+def test_serialize_custom_mapping(extra_normalizer):
+    class CustomReprDict(dict):
+        def __repr__(self):
+            return "custom!"
+
+    result = extra_normalizer(CustomReprDict(one=1, two=2))
+    assert result == "custom!"

@@ -288,7 +288,10 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
                 else safe_repr(obj)
             )
 
-        elif isinstance(obj, Mapping):
+        elif isinstance(obj, Mapping) and type(obj).__repr__ in (
+            object.__repr__,
+            dict.__repr__,
+        ):
             # Create temporary copy here to avoid calling too much code that
             # might mutate our dictionary while we're still iterating over it.
             obj = dict(iteritems(obj))
