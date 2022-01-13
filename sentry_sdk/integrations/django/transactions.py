@@ -14,6 +14,7 @@ if MYPY:
     from typing import Dict
     from typing import List
     from typing import Optional
+    from typing import Callable
     from django.urls.resolvers import URLPattern
     from typing import Tuple
     from typing import Union
@@ -125,10 +126,11 @@ class RavenResolver(object):
     def resolve(
         self,
         path,  # type: str
-        urlconf=None,  # type: Union[None, Tuple[URLPattern, URLPattern, URLResolver], Tuple[URLPattern]]
+        urlconf=None,  # type: Union[None, str, Tuple[URLPattern, URLPattern, URLResolver], Tuple[URLPattern], Callable[[], str]]
     ):
         # type: (...) -> str
-        resolver = get_resolver(urlconf)
+        resolver_urlconf = urlconf() if callable(urlconf) else urlconf
+        resolver = get_resolver(resolver_urlconf)
         match = self._resolve(resolver, path)
         return match or path
 

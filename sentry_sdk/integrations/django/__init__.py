@@ -85,7 +85,12 @@ class DjangoIntegration(Integration):
     transaction_style = None
     middleware_spans = None
 
-    def __init__(self, transaction_style="url", middleware_spans=True):
+    # a custom urlconf can be a string pointing to a module
+    # or a callback returning a string pointing to a module
+    # or a list of url_patterns themselves
+    urlconf = None
+
+    def __init__(self, transaction_style="url", middleware_spans=True, urlconf=None):
         # type: (str, bool) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
@@ -94,6 +99,7 @@ class DjangoIntegration(Integration):
             )
         self.transaction_style = transaction_style
         self.middleware_spans = middleware_spans
+        self.urlconf = urlconf
 
     @staticmethod
     def setup_once():
@@ -337,7 +343,7 @@ def _before_get_response(request):
                     getattr(fn, "view_class", fn)
                 )
             elif integration.transaction_style == "url":
-                scope.transaction = LEGACY_RESOLVER.resolve(request.path_info)
+                scope.transaction = LEGACY_RESOLVER.resolve(request.path_info, integration.url_conf)
         except Exception:
             pass
 
