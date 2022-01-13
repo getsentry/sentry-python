@@ -61,3 +61,19 @@ def test_legacy_resolver_newstyle_django20_urlconf():
     resolver = RavenResolver()
     result = resolver.resolve("/api/v2/1234/store/", url_conf)
     assert result == "/api/v2/{project_id}/store/"
+
+
+def test_legacy_resolver_custom_urlconf_module_name():
+    resolver = RavenResolver()
+    custom_urlconf_module = "tests.integrations.django.myapp.custom_urls"
+    result = resolver.resolve("/foo/bar/baz/1234", custom_urlconf_module)
+    assert result == "/foo/bar/baz/{param}"
+
+
+def test_legacy_resolver_custom_urlconf_callback():
+    def custom_urlconf_callback():
+        return "tests.integrations.django.myapp.custom_urls"
+
+    resolver = RavenResolver()
+    result = resolver.resolve("/foo/bar/baz/1234", custom_urlconf_callback)
+    assert result == "/foo/bar/baz/{param}"
