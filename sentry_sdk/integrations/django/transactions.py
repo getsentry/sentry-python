@@ -14,9 +14,7 @@ if MYPY:
     from typing import Dict
     from typing import List
     from typing import Optional
-    from typing import Callable
     from django.urls.resolvers import URLPattern
-    from typing import Tuple
     from typing import Union
     from re import Pattern
     from sentry_sdk.integrations.django._types import CustomUrlconf
