@@ -12,5 +12,9 @@ except ImportError:
 from . import views
 
 urlpatterns = [
-    path("foo/bar/baz/<int:param>/", views.postgres_select_custom, name="postgres_select_custom"),
+    path(
+        "foo/bar/baz/<int:param>/",
+        views.postgres_select_custom,
+        name="postgres_select_custom",
+    ),
 ]
