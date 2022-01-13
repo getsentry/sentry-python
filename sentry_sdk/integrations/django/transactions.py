@@ -19,6 +19,7 @@ if MYPY:
     from typing import Tuple
     from typing import Union
     from re import Pattern
+    from sentry_sdk.integrations.django._types import CustomUrlconf
 
 try:
     from django.urls import get_resolver
@@ -126,7 +127,7 @@ class RavenResolver(object):
     def resolve(
         self,
         path,  # type: str
-        urlconf=None,  # type: Union[None, str, Tuple[URLPattern, URLPattern, URLResolver], Tuple[URLPattern], Callable[[], str]]
+        urlconf=None,  # type: Optional[CustomUrlconf]
     ):
         # type: (...) -> str
         resolver_urlconf = urlconf() if callable(urlconf) else urlconf

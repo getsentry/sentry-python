@@ -60,6 +60,7 @@ if MYPY:
 
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from sentry_sdk._types import Event, Hint, EventProcessor, NotImplementedType
+    from sentry_sdk.integrations.django._types import CustomUrlconf
 
 
 if DJANGO_VERSION < (1, 10):
@@ -91,7 +92,7 @@ class DjangoIntegration(Integration):
     urlconf = None
 
     def __init__(self, transaction_style="url", middleware_spans=True, urlconf=None):
-        # type: (str, bool) -> None
+        # type: (str, bool, Optional[CustomUrlconf]) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
