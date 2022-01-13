@@ -4,4 +4,9 @@ if MYPY:
     from typing import Callable, Union, Tuple
     from django.urls.resolvers import URLPattern, URLResolver
 
-    CustomUrlconf = Union[str, Callable[[], str], Tuple[URLPattern, URLPattern, URLResolver], Tuple[URLPattern]]
+    CustomUrlconf = Union[
+        str,
+        Callable[[], str],
+        Tuple[URLPattern, URLPattern, URLResolver],
+        Tuple[URLPattern],
+    ]
