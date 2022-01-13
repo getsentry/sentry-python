@@ -66,14 +66,15 @@ def test_legacy_resolver_newstyle_django20_urlconf():
 def test_legacy_resolver_custom_urlconf_module_name():
     resolver = RavenResolver()
     custom_urlconf_module = "tests.integrations.django.myapp.custom_urls"
-    result = resolver.resolve("/foo/bar/baz/1234", custom_urlconf_module)
-    assert result == "/foo/bar/baz/{param}"
+    result = resolver.resolve("/foo/bar/baz/1234/", custom_urlconf_module)
+    assert result == "/foo/bar/baz/{param}/"
 
 
+@pytest.mark.only
 def test_legacy_resolver_custom_urlconf_callback():
     def custom_urlconf_callback():
         return "tests.integrations.django.myapp.custom_urls"
 
     resolver = RavenResolver()
-    result = resolver.resolve("/foo/bar/baz/1234", custom_urlconf_callback)
-    assert result == "/foo/bar/baz/{param}"
+    result = resolver.resolve("/foo/bar/baz/1234/", custom_urlconf_callback)
+    assert result == "/foo/bar/baz/{param}/"
