@@ -137,15 +137,6 @@ def postgres_select(request, *args, **kwargs):
 
 
 @csrf_exempt
-def postgres_select_custom(request, *args, **kwargs):
-    from django.db import connections
-
-    cursor = connections["postgres"].cursor()
-    cursor.execute("SELECT 1;")
-    return HttpResponse("ok")
-
-
-@csrf_exempt
 def permission_denied_exc(*args, **kwargs):
     raise PermissionDenied("bye")
 
