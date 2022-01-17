@@ -338,7 +338,8 @@ def _before_get_response(request):
                 )
             elif integration.transaction_style == "url":
                 scope.transaction = LEGACY_RESOLVER.resolve(
-                    request.path_info, getattr(request, "urlconf", None)
+                    request.path_info,
+                    urlconf=getattr(request, "urlconf", None),
                 )
         except Exception:
             pass
