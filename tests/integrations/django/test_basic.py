@@ -755,3 +755,27 @@ def test_csrf(sentry_init, client):
     content, status, _headers = client.post(reverse("message"))
     assert status.lower() == "200 ok"
     assert b"".join(content) == b"ok"
+
+
+def test_custom_urlconf_middleware(
+    settings, sentry_init, client, capture_events, render_span_tree
+):
+    """
+    Some middlewares (for instance in django-tenants) overwrite request.urlconf.
+    Test that the resolver picks up the correct urlconf for transaction naming.
+    """
+    urlconf = "tests.integrations.django.myapp.middleware.custom_urlconf_middleware"
+    settings.ROOT_URLCONF = ""
+    settings.MIDDLEWARE.insert(0, urlconf)
+    client.application.load_middleware()
+
+    sentry_init(integrations=[DjangoIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    content, status, _headers = client.get("/custom/ok")
+    assert status.lower() == "200 ok"
+    assert b"".join(content) == b"custom ok"
+
+    (event,) = events
+    assert event["transaction"] == "/custom/ok"
+    assert "custom_urlconf_middleware" in render_span_tree(events[0])

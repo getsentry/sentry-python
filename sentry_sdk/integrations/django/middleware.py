@@ -3,6 +3,7 @@ Create spans from Django middleware invocations
 """
 
 from django import VERSION as DJANGO_VERSION
+from django.core.handlers.wsgi import WSGIRequest
 
 from sentry_sdk import Hub
 from sentry_sdk._functools import wraps
@@ -72,6 +73,7 @@ def patch_django_middlewares():
 def _wrap_middleware(middleware, middleware_name):
     # type: (Any, str) -> Any
     from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
 
     def _check_middleware_span(old_method):
         # type: (Callable[..., Any]) -> Optional[Span]
@@ -171,8 +173,17 @@ def _wrap_middleware(middleware, middleware_name):
             if middleware_span is None:
                 return f(*args, **kwargs)
 
-            with middleware_span:
-                return f(*args, **kwargs)
+            with middleware_span as span:
+                rv = f(*args, **kwargs)
+
+                request = args[0]
+                if isinstance(request, WSGIRequest) and hasattr(request, "urlconf"):
+                    span.containing_transaction.name = LEGACY_RESOLVER.resolve(
+                        request.path_info,
+                        request.urlconf
+                    )
+
+                return rv
 
     if hasattr(middleware, "__name__"):
         SentryWrappingMiddleware.__name__ = middleware.__name__
