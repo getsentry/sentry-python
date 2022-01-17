@@ -4,7 +4,6 @@ if django.VERSION >= (3, 0):
     import asyncio
     from django.utils.decorators import sync_and_async_middleware
 
-
     @sync_and_async_middleware
     def simple_middleware(get_response):
         if asyncio.iscoroutinefunction(get_response):

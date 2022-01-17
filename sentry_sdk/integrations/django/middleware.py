@@ -179,8 +179,7 @@ def _wrap_middleware(middleware, middleware_name):
                 request = args[0]
                 if isinstance(request, WSGIRequest) and hasattr(request, "urlconf"):
                     span.containing_transaction.name = LEGACY_RESOLVER.resolve(
-                        request.path_info,
-                        request.urlconf
+                        request.path_info, request.urlconf
                     )
 
                 return rv
