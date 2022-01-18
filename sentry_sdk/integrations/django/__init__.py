@@ -346,6 +346,31 @@ def _before_get_response(request):
         )
 
 
+def _after_get_response(request):
+    # type: (WSGIRequest) -> None
+    """
+    Some django middlewares overwrite request.urlconf
+    so we need to respect that contract,
+    so we try to resolve the url again.
+    """
+    if not hasattr(request, "urlconf"):
+        return
+
+    hub = Hub.current
+    integration = hub.get_integration(DjangoIntegration)
+    if integration is None or integration.transaction_style != "url":
+        return
+
+    with hub.configure_scope() as scope:
+        try:
+            scope.transaction = LEGACY_RESOLVER.resolve(
+                request.path_info,
+                urlconf=request.urlconf,
+            )
+        except Exception:
+            pass
+
+
 def _patch_get_response():
     # type: () -> None
     """
@@ -358,7 +383,9 @@ def _patch_get_response():
     def sentry_patched_get_response(self, request):
         # type: (Any, WSGIRequest) -> Union[HttpResponse, BaseException]
         _before_get_response(request)
-        return old_get_response(self, request)
+        rv = old_get_response(self, request)
+        _after_get_response(request)
+        return rv
 
     BaseHandler.get_response = sentry_patched_get_response
 
