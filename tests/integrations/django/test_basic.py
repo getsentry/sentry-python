@@ -780,3 +780,5 @@ def test_custom_urlconf_middleware(
     (event,) = events
     assert event["transaction"] == "/custom/ok"
     assert "custom_urlconf_middleware" in render_span_tree(event)
+
+    settings.MIDDLEWARE.pop(0)
