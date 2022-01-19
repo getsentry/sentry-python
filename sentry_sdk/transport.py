@@ -56,7 +56,9 @@ class Transport(object):
             self.parsed_dsn = Dsn(options["dsn"])
         else:
             self.parsed_dsn = None
-        assert isinstance(options.get("environment"), (str,type(None))), "Environment name should be a string"
+        assert isinstance(
+            options.get("environment"), (str, type(None))
+        ), "Environment name should be a string"
 
     def capture_event(
         self, event  # type: Event
