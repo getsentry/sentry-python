@@ -121,6 +121,11 @@ def template_test(request, *args, **kwargs):
 
 
 @csrf_exempt
+def custom_ok(request, *args, **kwargs):
+    return HttpResponse("custom ok")
+
+
+@csrf_exempt
 def template_test2(request, *args, **kwargs):
     return TemplateResponse(
         request, ("user_name.html", "another_template.html"), {"user_age": 25}
