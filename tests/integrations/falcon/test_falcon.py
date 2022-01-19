@@ -96,7 +96,7 @@ def test_unhandled_errors(sentry_init, capture_exceptions, capture_events):
 
     (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "falcon"
-    assert event["exception"]["values"][0]['value'] == 'division by zero'
+    assert event["exception"]["values"][0]["value"] == "division by zero"
 
 
 def test_raised_5xx_errors(sentry_init, capture_exceptions, capture_events):
@@ -120,7 +120,7 @@ def test_raised_5xx_errors(sentry_init, capture_exceptions, capture_events):
 
     (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "falcon"
-    assert event["exception"]["values"][0]['value'] == '502 Bad Gateway'
+    assert event["exception"]["values"][0]["value"] == "502 Bad Gateway"
 
 
 def test_raised_4xx_errors(sentry_init, capture_exceptions, capture_events):
