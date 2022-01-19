@@ -188,8 +188,12 @@ def _patch_prepare_middleware():
 
 def _exception_leads_to_http_5xx(ex):
     # type: (BaseException) -> bool
-    server_error = isinstance(ex, falcon.HTTPError) and (ex.status or '').startswith('5')
-    unhandled_error = not isinstance(ex, (falcon.HTTPError, falcon.http_status.HTTPStatus))
+    server_error = isinstance(ex, falcon.HTTPError) and (ex.status or "").startswith(
+        "5"
+    )
+    unhandled_error = not isinstance(
+        ex, (falcon.HTTPError, falcon.http_status.HTTPStatus)
+    )
     return server_error or unhandled_error
 
 
