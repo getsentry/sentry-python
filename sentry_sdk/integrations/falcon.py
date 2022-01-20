@@ -194,7 +194,7 @@ def _exception_leads_to_http_5xx(ex):
     except:
         pass
 
-    is_server_error = isinstance(ex, falcon.HTTPError) and status.startswith('5')
+    is_server_error = isinstance(ex, falcon.HTTPError) and status.startswith("5")
     is_unhandled_error = not isinstance(
         ex, (falcon.HTTPError, falcon.http_status.HTTPStatus)
     )
