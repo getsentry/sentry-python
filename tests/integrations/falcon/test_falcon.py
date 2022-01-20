@@ -96,7 +96,7 @@ def test_unhandled_errors(sentry_init, capture_exceptions, capture_events):
 
     (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "falcon"
-    assert " by zero" in event["exception"]["values"][0]['value']
+    assert " by zero" in event["exception"]["values"][0]["value"]
 
 
 def test_raised_5xx_errors(sentry_init, capture_exceptions, capture_events):
