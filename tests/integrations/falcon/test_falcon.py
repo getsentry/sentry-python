@@ -96,7 +96,11 @@ def test_unhandled_errors(sentry_init, capture_exceptions, capture_events):
 
     (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "falcon"
+<<<<<<< HEAD
     assert " by zero" in event["exception"]["values"][0]['value']
+=======
+    assert event["exception"]["values"][0]["value"] == "division by zero"
+>>>>>>> 3a62c5bc8a2516c94f689fbde64bb0663a39db08
 
 
 def test_raised_5xx_errors(sentry_init, capture_exceptions, capture_events):
@@ -120,9 +124,15 @@ def test_raised_5xx_errors(sentry_init, capture_exceptions, capture_events):
 
     (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "falcon"
+<<<<<<< HEAD
     assert event["exception"]["values"][0]["type"] == "HTTPError"
     
     
+=======
+    assert event["exception"]["values"][0]["value"] == "502 Bad Gateway"
+
+
+>>>>>>> 3a62c5bc8a2516c94f689fbde64bb0663a39db08
 def test_raised_4xx_errors(sentry_init, capture_exceptions, capture_events):
     sentry_init(integrations=[FalconIntegration()], debug=True)
 
