@@ -187,11 +187,11 @@ def _patch_prepare_middleware():
 
 
 def _exception_leads_to_http_5xx(ex):
-    # type: (Exception) -> bool
+    # type: (BaseException) -> bool
     status = ""
     try:
         status = ex.status
-    except:
+    except BaseException:
         pass
 
     is_server_error = isinstance(ex, falcon.HTTPError) and status.startswith("5")
