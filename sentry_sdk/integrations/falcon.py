@@ -12,6 +12,7 @@ if MYPY:
     from typing import Any
     from typing import Dict
     from typing import Optional
+    from typing import Union
 
     from sentry_sdk._types import EventProcessor
 
@@ -187,14 +188,8 @@ def _patch_prepare_middleware():
 
 
 def _exception_leads_to_http_5xx(ex):
-    # type: (BaseException) -> bool
-    status = ""
-    try:
-        status = ex.status
-    except BaseException:
-        pass
-
-    is_server_error = isinstance(ex, falcon.HTTPError) and status.startswith("5")
+    # type: (Union[Exception, falcon.HTTPError, falcon.http_status.HTTPStatus]) -> bool
+    is_server_error = isinstance(ex, falcon.HTTPError) and (ex.status or "").startswith("5")
     is_unhandled_error = not isinstance(
         ex, (falcon.HTTPError, falcon.http_status.HTTPStatus)
     )
