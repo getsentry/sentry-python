@@ -188,7 +188,7 @@ def _patch_prepare_middleware():
 
 
 def _exception_leads_to_http_5xx(ex):
-    # type: (Union[Exception, falcon.HTTPError, falcon.http_status.HTTPStatus]) -> bool
+    # type: (Exception) -> bool
     is_server_error = isinstance(ex, falcon.HTTPError) and (ex.status or "").startswith(
         "5"
     )
