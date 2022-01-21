@@ -12,7 +12,6 @@ if MYPY:
     from typing import Any
     from typing import Dict
     from typing import Optional
-    from typing import Union
 
     from sentry_sdk._types import EventProcessor
 
