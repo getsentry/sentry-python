@@ -11,6 +11,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     Dsn,
     logger,
+    safe_str,
     to_base64,
     to_string,
     from_base64,
@@ -288,7 +289,7 @@ def compute_tracestate_value(data):
     tracestate entry.
     """
 
-    tracestate_json = json.dumps(data)
+    tracestate_json = json.dumps(data, default=safe_str)
 
     # Base64-encoded strings always come out with a length which is a multiple
     # of 4. In order to achieve this, the end is padded with one or more `=`
