@@ -2,7 +2,7 @@ pytest
 pytest-forked
 tox==3.7.0
 Werkzeug
-pytest-localserver==0.5.0
+pytest-localserver==0.5.1.post0
 pytest-cov==2.8.1
 jsonschema==3.2.0
 pyrsistent==0.16.0 # TODO(py3): 0.17.0 requires python3, see https://github.com/tobgu/pyrsistent/issues/205
