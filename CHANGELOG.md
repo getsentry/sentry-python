@@ -22,7 +22,7 @@ A major release `N` implies the previous release `N-1` will no longer receive up
 
 ## 1.5.4
 
-- Add Python 3.10 to text suite (#1309)
+- Add Python 3.10 to test suite (#1309)
 - Capture only 5xx HTTP errors in Falcon Integration (#1314)
 - Attempt custom urlconf resolve in `got_request_exception` as well (#1317)
 
