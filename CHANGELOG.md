@@ -20,6 +20,12 @@ sentry-sdk==1.5.0
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
+## 1.5.4
+
+- Add Python 3.10 to text suite (#1309)
+- Capture only 5xx HTTP errors in Falcon Integration (#1314)
+- Attempt custom urlconf resolve in `got_request_exception` as well (#1317)
+
 ## 1.5.3
 
 - Pick up custom urlconf set by Django middlewares from request if any (#1308)
