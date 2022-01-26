@@ -2,9 +2,11 @@ from __future__ import print_function
 
 import io
 import urllib3  # type: ignore
+from urllib3.connection import HTTPConnection
 import certifi
 import gzip
 import time
+import socket
 
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -397,10 +399,21 @@ class HttpTransport(Transport):
 
     def _get_pool_options(self, ca_certs):
         # type: (Optional[Any]) -> Dict[str, Any]
+        extra_socket_options = []
+        if hasattr(socket, "SO_KEEPALIVE"):
+            extra_socket_options.append((socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1))
+        if hasattr(socket, "TCP_KEEPIDLE"):
+            extra_socket_options.append((socket.SOL_TCP, socket.TCP_KEEPIDLE, 45))
+        if hasattr(socket, "TCP_KEEPINTVL"):
+            extra_socket_options.append((socket.SOL_TCP, socket.TCP_KEEPINTVL, 10))
+        if hasattr(socket, "TCP_KEEPCNT"):
+            extra_socket_options.append((socket.SOL_TCP, socket.TCP_KEEPCNT, 6))
         return {
             "num_pools": 2,
             "cert_reqs": "CERT_REQUIRED",
             "ca_certs": ca_certs or certifi.where(),
+            "socket_options": HTTPConnection.default_socket_options
+            + extra_socket_options,
         }
 
     def _in_no_proxy(self, parsed_dsn):
