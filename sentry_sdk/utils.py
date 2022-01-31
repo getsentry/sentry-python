@@ -162,7 +162,7 @@ class Dsn(object):
             return
         parts = urlparse.urlsplit(text_type(value))
 
-        if parts.scheme not in (u"http", u"https"):
+        if parts.scheme not in ("http", "https"):
             raise BadDsn("Unsupported scheme %r" % parts.scheme)
         self.scheme = parts.scheme
 
@@ -281,7 +281,7 @@ class Auth(object):
             rv.append(("sentry_client", self.client))
         if self.secret_key is not None:
             rv.append(("sentry_secret", self.secret_key))
-        return u"Sentry " + u", ".join("%s=%s" % (key, value) for key, value in rv)
+        return "Sentry " + ", ".join("%s=%s" % (key, value) for key, value in rv)
 
 
 class AnnotatedValue(object):
@@ -441,8 +441,7 @@ if PY2:
                 return rv
         except Exception:
             # If e.g. the call to `repr` already fails
-            return u"<broken repr>"
-
+            return "<broken repr>"
 
 else:
 
@@ -606,7 +605,6 @@ if HAS_CHAINED_EXCEPTIONS:
             exc_type = type(cause)
             exc_value = cause
             tb = getattr(cause, "__traceback__", None)
-
 
 else:
 
@@ -773,7 +771,7 @@ def strip_string(value, max_length=None):
 
     if length > max_length:
         return AnnotatedValue(
-            value=value[: max_length - 3] + u"...",
+            value=value[: max_length - 3] + "...",
             metadata={
                 "len": length,
                 "rem": [["!limit", "x", max_length - 3, max_length]],

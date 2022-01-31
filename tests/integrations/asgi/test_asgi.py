@@ -39,7 +39,7 @@ def test_sync_request_data(sentry_init, app, capture_events):
     events = capture_events()
 
     client = TestClient(app)
-    response = client.get("/sync-message?foo=bar", headers={"Foo": u"ä"})
+    response = client.get("/sync-message?foo=bar", headers={"Foo": "ä"})
 
     assert response.status_code == 200
 

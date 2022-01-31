@@ -37,7 +37,6 @@ if getattr(Request, "authenticated_userid", None):
         # type: (Request) -> Optional[Any]
         return request.authenticated_userid
 
-
 else:
     # bw-compat for pyramid < 1.5
     from pyramid.security import authenticated_userid  # type: ignore
