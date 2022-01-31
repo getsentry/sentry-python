@@ -6,6 +6,7 @@ ignore =
   W503,  // Handled by black (Line break occured before a binary operator)
   E402,  // Sometimes not possible due to execution order (Module level import is not at top of file)
   E731,  // I don't care (Do not assign a lambda expression, use a def)
+  B904,  // Ignore for now (new in new version of flake8-bugbear)
   B950,  // Handled by black (Line too long by flake8-bugbear)
   B011,  // I don't care (Do not call assert False)
   B014,  // does not apply to Python 2 (redundant exception types by flake8-bugbear)
