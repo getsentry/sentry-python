@@ -84,7 +84,7 @@ raise ValueError()  # Will also create an event in Sentry.
 
 ## Contributing to the SDK
 
-Please refer to [CONTRIBUTING.md](https://github.com/getsentry/sentry-python/blob/master/CONTRIBUTING.md).
+Please refer to [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Getting help/support
 
@@ -100,4 +100,4 @@ If you need help setting up or configuring the Python SDK (or anything else in t
 
 ## License
 
-Licensed under the BSD license, see [`LICENSE`](https://github.com/getsentry/sentry-python/blob/master/LICENSE)
+Licensed under the BSD license, see [`LICENSE`](LICENSE)
