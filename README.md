@@ -18,7 +18,7 @@ This is the official Python SDK for [Sentry](http://sentry.io/)
 
 ## Migrate From sentry-raven
 
-The old `raven-python` client has entered maintenance mode and was moved to [here](https://github.com/getsentry/raven-python).
+The old `raven-python` client has entered maintenance mode and was moved [here](https://github.com/getsentry/raven-python).
 
 If you're using `raven-python`, we recommend you to migrate to this new SDK. You can find the benefits of migrating and how to do it in our [migration guide](https://docs.sentry.io/platforms/python/migration/).
 
