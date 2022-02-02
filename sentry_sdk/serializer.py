@@ -281,6 +281,9 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
             else:
                 return obj
 
+        elif callable(getattr(obj, "sentry_repr", None)):
+            return obj.sentry_repr()
+
         elif isinstance(obj, datetime):
             return (
                 text_type(format_timestamp(obj))
