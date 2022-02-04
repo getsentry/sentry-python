@@ -3,6 +3,7 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from collections import Counter
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -219,7 +220,6 @@ def test_session_mode_defaults_to_request_mode_in_wsgi_handler(
 
     traces_sampler = mock.Mock(return_value=True)
     sentry_init(send_default_pii=True, traces_sampler=traces_sampler)
-
     app = SentryWsgiMiddleware(app)
     envelopes = capture_envelopes()
 
@@ -236,3 +236,47 @@ def test_session_mode_defaults_to_request_mode_in_wsgi_handler(
     aggregates = sess_event["aggregates"]
     assert len(aggregates) == 1
     assert aggregates[0]["exited"] == 1
+
+
+def test_auto_session_tracking_with_aggregates(sentry_init, capture_envelopes):
+    """
+    Test for correct session aggregates in auto session tracking in WSGI
+    """
+
+    def sample_app(environ, start_response):
+        if environ["werkzeug.request"].path != "/dogs/are/great/":
+            some_var = 1 / 0
+
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    traces_sampler = mock.Mock(return_value=True)
+    sentry_init(send_default_pii=True, traces_sampler=traces_sampler)
+    app = SentryWsgiMiddleware(sample_app)
+    envelopes = capture_envelopes()
+    assert len(envelopes) == 0
+
+    client = Client(app)
+    client.get("/dogs/are/great/")
+    client.get("/dogs/are/great/")
+    try:
+        client.get("/trigger/an/error/")
+    except ZeroDivisionError:
+        pass
+
+    sentry_sdk.flush()
+
+    assert len(envelopes) == 5
+
+    count_item_types = Counter()
+    for envelope in envelopes:
+        count_item_types[envelope.items[0].type] += 1
+
+    assert count_item_types["transaction"] == 3
+    assert count_item_types["event"] == 1
+    assert count_item_types["sessions"] == 1
+
+    session_aggregates = envelopes[-1].items[0].payload.json["aggregates"]
+    assert len(session_aggregates) == 1
+    assert session_aggregates[0]["exited"] == 2
+    assert session_aggregates[0]["crashed"] == 1
