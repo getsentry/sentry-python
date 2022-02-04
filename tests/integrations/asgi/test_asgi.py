@@ -1,3 +1,4 @@
+from collections import Counter
 import sys
 
 import pytest
@@ -39,7 +40,7 @@ def test_sync_request_data(sentry_init, app, capture_events):
     events = capture_events()
 
     client = TestClient(app)
-    response = client.get("/sync-message?foo=bar", headers={"Foo": u"ä"})
+    response = client.get("/sync-message?foo=bar", headers={"Foo": "ä"})
 
     assert response.status_code == 200
 
@@ -292,3 +293,39 @@ def test_x_real_ip(sentry_init, app, capture_events):
 
     (event,) = events
     assert event["request"]["env"] == {"REMOTE_ADDR": "1.2.3.4"}
+
+
+def test_auto_session_tracking_with_aggregates(app, sentry_init, capture_envelopes):
+    """
+    Test for correct session aggregates in auto session tracking.
+    """
+
+    @app.route("/dogs/are/great/")
+    @app.route("/trigger/an/error/")
+    def great_dogs_handler(request):
+        if request["path"] != "/dogs/are/great/":
+            some_var = 1 / 0
+        return PlainTextResponse("dogs are great")
+
+    sentry_init(traces_sample_rate=1.0)
+    envelopes = capture_envelopes()
+
+    app = SentryAsgiMiddleware(app)
+    client = TestClient(app, raise_server_exceptions=False)
+    client.get("/dogs/are/great/")
+    client.get("/dogs/are/great/")
+    client.get("/trigger/an/error/")
+
+    count_item_types = Counter()
+    for envelope in envelopes:
+        count_item_types[envelope.items[0].type] += 1
+
+    assert count_item_types["transaction"] == 3
+    assert count_item_types["event"] == 1
+    assert count_item_types["sessions"] == 1
+    assert len(envelopes) == 5
+
+    session_aggregates = envelopes[-1].items[0].payload.json["aggregates"]
+    assert session_aggregates[0]["exited"] == 2
+    assert session_aggregates[0]["crashed"] == 1
+    assert len(session_aggregates) == 1
