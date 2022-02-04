@@ -3,6 +3,7 @@ import sys
 
 import pytest
 from sentry_sdk import Hub, capture_message, last_event_id
+import sentry_sdk
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
@@ -315,6 +316,8 @@ def test_auto_session_tracking_with_aggregates(app, sentry_init, capture_envelop
     client.get("/dogs/are/great/")
     client.get("/dogs/are/great/")
     client.get("/trigger/an/error/")
+
+    sentry_sdk.flush()
 
     count_item_types = Counter()
     for envelope in envelopes:

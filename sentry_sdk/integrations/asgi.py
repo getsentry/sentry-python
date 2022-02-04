@@ -12,6 +12,7 @@ from sentry_sdk._functools import partial
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.utils import (
     ContextVar,
     event_from_exception,
@@ -119,37 +120,38 @@ class SentryAsgiMiddleware:
         _asgi_middleware_applied.set(True)
         try:
             hub = Hub(Hub.current)
-            with hub:
-                with hub.configure_scope() as sentry_scope:
-                    sentry_scope.clear_breadcrumbs()
-                    sentry_scope._name = "asgi"
-                    processor = partial(self.event_processor, asgi_scope=scope)
-                    sentry_scope.add_event_processor(processor)
+            with auto_session_tracking(hub, session_mode="request"):
+                with hub:
+                    with hub.configure_scope() as sentry_scope:
+                        sentry_scope.clear_breadcrumbs()
+                        sentry_scope._name = "asgi"
+                        processor = partial(self.event_processor, asgi_scope=scope)
+                        sentry_scope.add_event_processor(processor)
 
-                ty = scope["type"]
+                    ty = scope["type"]
 
-                if ty in ("http", "websocket"):
-                    transaction = Transaction.continue_from_headers(
-                        self._get_headers(scope),
-                        op="{}.server".format(ty),
-                    )
-                else:
-                    transaction = Transaction(op="asgi.server")
+                    if ty in ("http", "websocket"):
+                        transaction = Transaction.continue_from_headers(
+                            self._get_headers(scope),
+                            op="{}.server".format(ty),
+                        )
+                    else:
+                        transaction = Transaction(op="asgi.server")
 
-                transaction.name = _DEFAULT_TRANSACTION_NAME
-                transaction.set_tag("asgi.type", ty)
+                    transaction.name = _DEFAULT_TRANSACTION_NAME
+                    transaction.set_tag("asgi.type", ty)
 
-                with hub.start_transaction(
-                    transaction, custom_sampling_context={"asgi_scope": scope}
-                ):
-                    # XXX: Would be cool to have correct span status, but we
-                    # would have to wrap send(). That is a bit hard to do with
-                    # the current abstraction over ASGI 2/3.
-                    try:
-                        return await callback()
-                    except Exception as exc:
-                        _capture_exception(hub, exc)
-                        raise exc from None
+                    with hub.start_transaction(
+                        transaction, custom_sampling_context={"asgi_scope": scope}
+                    ):
+                        # XXX: Would be cool to have correct span status, but we
+                        # would have to wrap send(). That is a bit hard to do with
+                        # the current abstraction over ASGI 2/3.
+                        try:
+                            return await callback()
+                        except Exception as exc:
+                            _capture_exception(hub, exc)
+                            raise exc from None
         finally:
             _asgi_middleware_applied.set(False)
 
