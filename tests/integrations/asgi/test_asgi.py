@@ -305,7 +305,7 @@ def test_auto_session_tracking_with_aggregates(app, sentry_init, capture_envelop
     @app.route("/trigger/an/error/")
     def great_dogs_handler(request):
         if request["path"] != "/dogs/are/great/":
-            some_var = 1 / 0
+            1 / 0
         return PlainTextResponse("dogs are great")
 
     sentry_init(traces_sample_rate=1.0)
@@ -387,11 +387,9 @@ def test_websocket_auto_session_tracking_with_aggregates(
     session_aggregates = envelopes[-1].items[0].payload.json["aggregates"]
 
     # 1 auto_session_tracking block
-    # 1 websocket.connect()
     # 1 websocket.accept()
     # 2 successful message sends
-    # 1 ???
-    assert session_aggregates[0]["exited"] == 6
+    assert session_aggregates[0]["exited"] == 4
 
     # 1 trying to send failing message
     assert session_aggregates[0]["crashed"] == 1

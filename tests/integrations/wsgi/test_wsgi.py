@@ -244,8 +244,8 @@ def test_auto_session_tracking_with_aggregates(sentry_init, capture_envelopes):
     """
 
     def sample_app(environ, start_response):
-        if environ["werkzeug.request"].path != "/dogs/are/great/":
-            some_var = 1 / 0
+        if environ["REQUEST_URI"] != "/dogs/are/great/":
+            1 / 0
 
         start_response("200 OK", [])
         return ["Go get the ball! Good dog!"]
