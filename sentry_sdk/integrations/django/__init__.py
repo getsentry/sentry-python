@@ -58,6 +58,7 @@ if MYPY:
     from django.http.request import QueryDict
     from django.utils.datastructures import MultiValueDict
 
+    from sentry_sdk.scope import Scope
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from sentry_sdk._types import Event, Hint, EventProcessor, NotImplementedType
 
@@ -346,8 +347,8 @@ def _before_get_response(request):
         )
 
 
-def _after_get_response(request):
-    # type: (WSGIRequest) -> None
+def _attempt_resolve_again(request, scope):
+    # type: (WSGIRequest, Scope) -> None
     """
     Some django middlewares overwrite request.urlconf
     so we need to respect that contract,
@@ -356,19 +357,24 @@ def _after_get_response(request):
     if not hasattr(request, "urlconf"):
         return
 
+    try:
+        scope.transaction = LEGACY_RESOLVER.resolve(
+            request.path_info,
+            urlconf=request.urlconf,
+        )
+    except Exception:
+        pass
+
+
+def _after_get_response(request):
+    # type: (WSGIRequest) -> None
     hub = Hub.current
     integration = hub.get_integration(DjangoIntegration)
     if integration is None or integration.transaction_style != "url":
         return
 
     with hub.configure_scope() as scope:
-        try:
-            scope.transaction = LEGACY_RESOLVER.resolve(
-                request.path_info,
-                urlconf=request.urlconf,
-            )
-        except Exception:
-            pass
+        _attempt_resolve_again(request, scope)
 
 
 def _patch_get_response():
@@ -430,6 +436,10 @@ def _got_request_exception(request=None, **kwargs):
     hub = Hub.current
     integration = hub.get_integration(DjangoIntegration)
     if integration is not None:
+
+        if request is not None and integration.transaction_style == "url":
+            with hub.configure_scope() as scope:
+                _attempt_resolve_again(request, scope)
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
