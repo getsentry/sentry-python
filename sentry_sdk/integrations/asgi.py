@@ -98,13 +98,26 @@ class SentryAsgiMiddleware:
         # type: (Any) -> Any
         async def inner(receive, send):
             # type: (Any, Any) -> Any
-            return await self._run_app(scope, lambda: self.app(scope)(receive, send))
+            return await self._run_app(
+                scope,
+                lambda: self.app(scope)(
+                    self._instrument(receive),
+                    self._instrument(send),
+                ),
+            )
 
         return inner
 
     async def _run_asgi3(self, scope, receive, send):
         # type: (Any, Any, Any) -> Any
-        return await self._run_app(scope, lambda: self.app(scope, receive, send))
+        return await self._run_app(
+            scope,
+            lambda: self.app(
+                scope,
+                self._instrument(receive),
+                self._instrument(send),
+            ),
+        )
 
     async def _run_app(self, scope, callback):
         # type: (Any, Any) -> Any
@@ -195,6 +208,21 @@ class SentryAsgiMiddleware:
     # Note: Those functions are not public API. If you want to mutate request
     # data to your liking it's recommended to use the `before_send` callback
     # for that.
+
+    def _instrument(self, orig_function, session_mode="request"):
+        # type: (Callable, str) -> Callable
+        """
+        Wrap orig_function to send meta data to Sentry
+        """
+        hub = Hub(Hub.current)
+
+        async def inner(*args, **kwargs):
+            hub.start_session(session_mode=session_mode)
+            orig_return_value = await orig_function(*args, **kwargs)
+            hub.end_session()
+            return orig_return_value
+
+        return inner
 
     def _get_url(self, scope, default_scheme, host):
         # type: (Dict[str, Any], Literal["ws", "http"], Optional[str]) -> str
