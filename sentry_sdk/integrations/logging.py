@@ -224,7 +224,9 @@ class EventHandler(logging.Handler, object):
         event["logger"] = record.name
 
         # Log records from `warnings` module as separate issues
-        record_caputured_from_warnings_module = record.name == "py.warnings" and record.msg == "%s"
+        record_caputured_from_warnings_module = (
+            record.name == "py.warnings" and record.msg == "%s"
+        )
         if record_caputured_from_warnings_module:
             # use the actual message and not "%s" as the message
             # this prevents grouping all warnings under one "%s" issue
