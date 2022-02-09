@@ -229,12 +229,12 @@ class EventHandler(logging.Handler, object):
             # use the actual message and not "%s" as the message
             # this prevents grouping all warnings under one "%s" issue
             msg = record.args[0]
-            
+
             event["logentry"] = {
-                "message": msg, 
+                "message": msg,
                 "params": (),
             }  # type: ignore
-            
+
         else:
             event["logentry"] = {
                 "message": to_string(record.msg),
