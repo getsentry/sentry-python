@@ -223,14 +223,18 @@ class EventHandler(logging.Handler, object):
         event["level"] = _logging_to_event_level(record.levelname)
         event["logger"] = record.name
 
-        # Log records from `warnings` module as separate issues (logging.captureWarnings(True))
-        # Some versions of Python log these warnings with logger.warning("%s", s)
+        # Log records from `warnings` module as separate issues
         record_caputured_from_warnings_module = record.name == "py.warnings" and record.msg == "%s"
         if record_caputured_from_warnings_module:
+            # use the actual message and not "%s" as the message
+            # this prevents grouping all warnings under one "%s" issue
+            msg = record.args[0]
+            
             event["logentry"] = {
-                "message": record.args[0], 
-                "params": tuple()
+                "message": msg, 
+                "params": (),
             }  # type: ignore
+            
         else:
             event["logentry"] = {
                 "message": to_string(record.msg),
