@@ -230,12 +230,12 @@ class EventHandler(logging.Handler, object):
         if record_caputured_from_warnings_module:
             # use the actual message and not "%s" as the message
             # this prevents grouping all warnings under one "%s" issue
-            msg = record.args[0]
+            msg = record.args[0]  # type: ignore
 
             event["logentry"] = {
                 "message": msg,
                 "params": (),
-            }  # type: ignore
+            }
 
         else:
             event["logentry"] = {
