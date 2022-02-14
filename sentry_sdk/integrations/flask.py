@@ -101,8 +101,8 @@ class FlaskIntegration(Integration):
             if Hub.current.get_integration(FlaskIntegration) is None:
                 return old_app(self, environ, start_response)
 
-            def app_factory(self, *a, **kw):
-                # type: (Flask, Dict[str, str], (...) -> Any) -> Flask
+            def app_factory(*a, **kw):
+                # type: (Dict[str, str], (...) -> Any) -> Flask
 
                 patched_app = old_app(self, *a, **kw)
                 patched_app.add_template_global(
