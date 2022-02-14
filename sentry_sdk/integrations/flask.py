@@ -65,6 +65,8 @@ class FlaskIntegration(Integration):
 
     @staticmethod
     def _get_sentry_trace():
+        # type: () -> str
+
         sentry_span = Hub.current.scope.span
         if sentry_span:
             return Markup(
@@ -99,15 +101,14 @@ class FlaskIntegration(Integration):
             if Hub.current.get_integration(FlaskIntegration) is None:
                 return old_app(self, environ, start_response)
 
-            patched_app = SentryWsgiMiddleware(
-                lambda *a, **kw: old_app(self, *a, **kw)
-            )(environ, start_response)
+            def app_factory(self, *a, **kw):
+                patched_app = old_app(self, *a, **kw)
+                patched_app.add_template_global(
+                    FlaskIntegration._get_sentry_trace, "sentry_trace"
+                )
+                return patched_app
 
-            patched_app.add_template_global(
-                FlaskIntegration._get_sentry_trace, "sentry_trace"
-            )
-
-            return patched_app
+            return SentryWsgiMiddleware(app_factory)(environ, start_response)
 
         Flask.__call__ = sentry_patched_wsgi_app  # type: ignore
 
