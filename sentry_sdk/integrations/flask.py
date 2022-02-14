@@ -35,6 +35,7 @@ try:
         __version__ as FLASK_VERSION,
     )
     from flask.signals import (
+        before_render_template,
         got_request_exception,
         request_started,
     )
@@ -64,19 +65,6 @@ class FlaskIntegration(Integration):
         self.transaction_style = transaction_style
 
     @staticmethod
-    def _get_sentry_trace():
-        # type: () -> str
-
-        sentry_span = Hub.current.scope.span
-        if sentry_span:
-            return Markup(
-                '<meta name="sentry-trace" content="%s" />'
-                % (sentry_span.to_traceparent(),)
-            )
-
-        return ""
-
-    @staticmethod
     def setup_once():
         # type: () -> None
 
@@ -91,6 +79,7 @@ class FlaskIntegration(Integration):
             if version < (0, 10):
                 raise DidNotEnable("Flask 0.10 or newer is required.")
 
+        before_render_template(_add_sentry_trace)
         request_started.connect(_request_started)
         got_request_exception.connect(_capture_exception)
 
@@ -101,18 +90,28 @@ class FlaskIntegration(Integration):
             if Hub.current.get_integration(FlaskIntegration) is None:
                 return old_app(self, environ, start_response)
 
-            def app_factory(_environ, _start_response):
-                # type: (Dict[str, str], Callable[..., Any]) -> Any
-
-                patched_app = old_app(self, _environ, _start_response)
-                patched_app.add_template_global(
-                    FlaskIntegration._get_sentry_trace, "sentry_trace"
-                )
-                return patched_app
-
-            return SentryWsgiMiddleware(app_factory)(environ, start_response)
+            return SentryWsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))(
+                environ, start_response
+            )
 
         Flask.__call__ = sentry_patched_wsgi_app  # type: ignore
+
+
+def _add_sentry_trace(sender, template, context, **extra):
+    # type: (Flask, Any, Dict[str, any], ...) -> None
+
+    if "sentry_trace" in context:
+        return
+
+    sentry_span = Hub.current.scope.span
+    context["sentry_trace"] = (
+        Markup(
+            '<meta name="sentry-trace" content="%s" />'
+            % (sentry_span.to_traceparent(),)
+        )
+        if sentry_span
+        else ""
+    )
 
 
 def _request_started(sender, **kwargs):
