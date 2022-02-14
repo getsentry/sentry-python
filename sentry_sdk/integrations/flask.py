@@ -27,6 +27,7 @@ except ImportError:
 
 try:
     from flask import (  # type: ignore
+        Markup,
         Request,
         Flask,
         _request_ctx_stack,
@@ -63,6 +64,14 @@ class FlaskIntegration(Integration):
         self.transaction_style = transaction_style
 
     @staticmethod
+    def _get_sentry_trace():
+        sentry_span = Hub.current.scope.span
+        if sentry_span:
+            return Markup(f'<meta name="sentry-trace" content="{ sentry_span.to_traceparent() }" />')
+    
+        return ''
+
+    @staticmethod
     def setup_once():
         # type: () -> None
 
@@ -87,9 +96,13 @@ class FlaskIntegration(Integration):
             if Hub.current.get_integration(FlaskIntegration) is None:
                 return old_app(self, environ, start_response)
 
-            return SentryWsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))(
+            patched_app = SentryWsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))(
                 environ, start_response
             )
+
+            patched_app.jinja_env.globals['sentry_trace'] = self._get_sentry_trace
+
+            return patched_app
 
         Flask.__call__ = sentry_patched_wsgi_app  # type: ignore
 
