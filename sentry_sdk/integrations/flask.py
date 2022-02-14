@@ -100,7 +100,7 @@ class FlaskIntegration(Integration):
                 environ, start_response
             )
 
-            patched_app.jinja_env.globals['sentry_trace'] = self._get_sentry_trace
+            patched_app.add_template_global(self._get_sentry_trace, 'sentry_trace')
 
             return patched_app
 
