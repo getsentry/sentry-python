@@ -98,7 +98,7 @@ class FlaskIntegration(Integration):
 
 
 def _add_sentry_trace(sender, template, context, **extra):
-    # type: (Flask, Any, Dict[str, any], ...) -> None
+    # type: (Flask, Any, Dict[str, any], **Any) -> None
 
     if "sentry_trace" in context:
         return
