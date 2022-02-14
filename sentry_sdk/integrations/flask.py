@@ -27,6 +27,7 @@ except ImportError:
 
 try:
     from flask import (  # type: ignore
+        Markup,
         Request,
         Flask,
         _request_ctx_stack,
@@ -34,6 +35,7 @@ try:
         __version__ as FLASK_VERSION,
     )
     from flask.signals import (
+        before_render_template,
         got_request_exception,
         request_started,
     )
@@ -77,6 +79,7 @@ class FlaskIntegration(Integration):
             if version < (0, 10):
                 raise DidNotEnable("Flask 0.10 or newer is required.")
 
+        before_render_template.connect(_add_sentry_trace)
         request_started.connect(_request_started)
         got_request_exception.connect(_capture_exception)
 
@@ -92,6 +95,23 @@ class FlaskIntegration(Integration):
             )
 
         Flask.__call__ = sentry_patched_wsgi_app  # type: ignore
+
+
+def _add_sentry_trace(sender, template, context, **extra):
+    # type: (Flask, Any, Dict[str, Any], **Any) -> None
+
+    if "sentry_trace" in context:
+        return
+
+    sentry_span = Hub.current.scope.span
+    context["sentry_trace"] = (
+        Markup(
+            '<meta name="sentry-trace" content="%s" />'
+            % (sentry_span.to_traceparent(),)
+        )
+        if sentry_span
+        else ""
+    )
 
 
 def _request_started(sender, **kwargs):
