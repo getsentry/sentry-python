@@ -69,6 +69,7 @@ if DJANGO_VERSION < (1, 10):
         # type: (Any) -> bool
         return request_user.is_authenticated()
 
+
 else:
 
     def is_authenticated(request_user):
