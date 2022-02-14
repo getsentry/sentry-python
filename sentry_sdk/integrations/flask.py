@@ -102,7 +102,7 @@ class FlaskIntegration(Integration):
                 return old_app(self, environ, start_response)
 
             def app_factory(*a, **kw):
-                # type: (Dict[str, str], (...) -> Any) -> Flask
+                # type: (Dict[str, str], Callable[..., Any]) -> Flask
 
                 patched_app = old_app(self, *a, **kw)
                 patched_app.add_template_global(
