@@ -68,7 +68,7 @@ class FlaskIntegration(Integration):
         sentry_span = Hub.current.scope.span
         if sentry_span:
             return Markup(f'<meta name="sentry-trace" content="{ sentry_span.to_traceparent() }" />')
-    
+
         return ''
 
     @staticmethod
