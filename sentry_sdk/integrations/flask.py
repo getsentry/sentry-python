@@ -79,7 +79,7 @@ class FlaskIntegration(Integration):
             if version < (0, 10):
                 raise DidNotEnable("Flask 0.10 or newer is required.")
 
-        before_render_template(_add_sentry_trace)
+        before_render_template.connect(_add_sentry_trace)
         request_started.connect(_request_started)
         got_request_exception.connect(_capture_exception)
 
