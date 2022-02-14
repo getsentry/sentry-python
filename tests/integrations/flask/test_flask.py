@@ -769,7 +769,7 @@ def test_dont_override_sentry_trace_context(sentry_init, app):
 
     @app.route("/")
     def index():
-        return render_template_string("{{ sentry_trace }}", dict(sentry_trace="hi"))
+        return render_template_string("{{ sentry_trace }}", sentry_trace="hi")
 
     with app.test_client() as client:
         response = client.get("/")
