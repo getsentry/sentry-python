@@ -6,7 +6,14 @@ from io import BytesIO
 
 flask = pytest.importorskip("flask")
 
-from flask import Flask, Response, request, abort, stream_with_context
+from flask import (
+    Flask,
+    Response,
+    request,
+    abort,
+    stream_with_context,
+    render_template_string,
+)
 from flask.views import View
 
 from flask_login import LoginManager, login_user
@@ -747,7 +754,7 @@ def test_sentry_trace_context(sentry_init, app, capture_events):
     def index():
         sentry_span = Hub.current.scope.span
         capture_message(sentry_span.to_traceparent())
-        return app.render_template_string("{{ sentry_trace }}")
+        return render_template_string("{{ sentry_trace }}")
 
     with app.test_client() as client:
         response = client.get("/")
@@ -762,7 +769,7 @@ def test_dont_override_sentry_trace_context(sentry_init, app):
 
     @app.route("/")
     def index():
-        return app.render_template_string("{{ sentry_trace }}", dict(sentry_trace="hi"))
+        return render_template_string("{{ sentry_trace }}", dict(sentry_trace="hi"))
 
     with app.test_client() as client:
         response = client.get("/")
