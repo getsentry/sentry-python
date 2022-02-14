@@ -6,7 +6,14 @@ from io import BytesIO
 
 flask = pytest.importorskip("flask")
 
-from flask import Flask, Response, request, abort, stream_with_context
+from flask import (
+    Flask,
+    Response,
+    request,
+    abort,
+    stream_with_context,
+    render_template_string,
+)
 from flask.views import View
 
 from flask_login import LoginManager, login_user
@@ -365,7 +372,7 @@ def test_flask_formdata_request_appear_transaction_body(
     assert transaction_event["request"]["data"] == data
 
 
-@pytest.mark.parametrize("input_char", [u"a", b"a"])
+@pytest.mark.parametrize("input_char", ["a", b"a"])
 def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="small")
 
@@ -737,3 +744,34 @@ def test_class_based_views(sentry_init, app, capture_events):
 
     assert event["message"] == "hi"
     assert event["transaction"] == "hello_class"
+
+
+def test_sentry_trace_context(sentry_init, app, capture_events):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    events = capture_events()
+
+    @app.route("/")
+    def index():
+        sentry_span = Hub.current.scope.span
+        capture_message(sentry_span.to_traceparent())
+        return render_template_string("{{ sentry_trace }}")
+
+    with app.test_client() as client:
+        response = client.get("/")
+        assert response.status_code == 200
+        assert response.data.decode(
+            "utf-8"
+        ) == '<meta name="sentry-trace" content="%s" />' % (events[0]["message"],)
+
+
+def test_dont_override_sentry_trace_context(sentry_init, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
+    @app.route("/")
+    def index():
+        return render_template_string("{{ sentry_trace }}", sentry_trace="hi")
+
+    with app.test_client() as client:
+        response = client.get("/")
+        assert response.status_code == 200
+        assert response.data == b"hi"
