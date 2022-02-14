@@ -759,9 +759,9 @@ def test_sentry_trace_context(sentry_init, app, capture_events):
     with app.test_client() as client:
         response = client.get("/")
         assert response.status_code == 200
-        assert response.data == '<meta name="sentry-trace" content="%s" />' % (
-            events[0]["message"],
-        )
+        assert response.data.decode(
+            "utf-8"
+        ) == '<meta name="sentry-trace" content="%s" />' % (events[0]["message"],)
 
 
 def test_dont_override_sentry_trace_context(sentry_init, app):
@@ -774,4 +774,4 @@ def test_dont_override_sentry_trace_context(sentry_init, app):
     with app.test_client() as client:
         response = client.get("/")
         assert response.status_code == 200
-        assert response.data == "hi"
+        assert response.data == b"hi"
