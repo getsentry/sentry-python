@@ -23,10 +23,13 @@ def is_auto_session_tracking_enabled(hub=None):
     """Utility function to find out if session tracking is enabled."""
     if hub is None:
         hub = sentry_sdk.Hub.current
+
     should_track = hub.scope._force_auto_session_tracking
+
     if should_track is None:
         client_options = hub.client.options if hub.client else {}
-        should_track = client_options["auto_session_tracking"]
+        should_track = client_options.get("auto_session_tracking", None)
+
     return should_track
 
 
