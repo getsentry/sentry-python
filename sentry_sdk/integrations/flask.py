@@ -103,7 +103,9 @@ class FlaskIntegration(Integration):
                 lambda *a, **kw: old_app(self, *a, **kw)
             )(environ, start_response)
 
-            patched_app.add_template_global(self._get_sentry_trace, "sentry_trace")
+            patched_app.add_template_global(
+                FlaskIntegration._get_sentry_trace, "sentry_trace"
+            )
 
             return patched_app
 
