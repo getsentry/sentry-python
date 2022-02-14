@@ -112,7 +112,7 @@ class AioHttpIntegration(Integration):
                     except HTTPException as e:
                         transaction.set_http_status(e.status_code)
                         raise
-                    except asyncio.CancelledError:
+                    except (asyncio.CancelledError, ConnectionResetError):
                         transaction.set_status("cancelled")
                         raise
                     except Exception:
