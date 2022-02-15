@@ -28,7 +28,7 @@ def is_auto_session_tracking_enabled(hub=None):
 
     if should_track is None:
         client_options = hub.client.options if hub.client else {}
-        should_track = client_options.get("auto_session_tracking", None)
+        should_track = client_options.get("auto_session_tracking", False)
 
     return should_track
 
