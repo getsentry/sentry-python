@@ -16,12 +16,6 @@ This is the official Python SDK for [Sentry](http://sentry.io/)
 
 ---
 
-## Migrate From sentry-raven
-
-The old `raven-python` client has entered maintenance mode and was moved [here](https://github.com/getsentry/raven-python).
-
-If you're using `raven-python`, we recommend you to migrate to this new SDK. You can find the benefits of migrating and how to do it in our [migration guide](https://docs.sentry.io/platforms/python/migration/).
-
 ## Getting Started
 
 ### Install
@@ -60,6 +54,8 @@ raise ValueError()  # Will also create an event in Sentry.
 
 ## Integrations
 
+(If you want to create a new integration have a look at the [Adding a new integration checklist](CONTRIBUTING.md#adding-a-new-integration-checklist).)
+
 - [Django](https://docs.sentry.io/platforms/python/guides/django/)
 - [Flask](https://docs.sentry.io/platforms/python/guides/flask/)
 - [Bottle](https://docs.sentry.io/platforms/python/guides/bottle/)
@@ -81,6 +77,12 @@ raise ValueError()  # Will also create an event in Sentry.
 - [Apache Airflow](https://docs.sentry.io/platforms/python/guides/airflow/)
 - [Apache Beam](https://docs.sentry.io/platforms/python/guides/beam/)
 - [Apache Spark](https://docs.sentry.io/platforms/python/guides/pyspark/)
+
+## Migrate From sentry-raven
+
+The old `raven-python` client has entered maintenance mode and was moved [here](https://github.com/getsentry/raven-python).
+
+If you're using `raven-python`, we recommend you to migrate to this new SDK. You can find the benefits of migrating and how to do it in our [migration guide](https://docs.sentry.io/platforms/python/migration/).
 
 ## Contributing to the SDK
 
