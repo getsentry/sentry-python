@@ -90,26 +90,6 @@ Please refer to [CONTRIBUTING.md](CONTRIBUTING.md).
 
 If you need help setting up or configuring the Python SDK (or anything else in the Sentry universe) please head over to the [Sentry Community on Discord](https://discord.com/invite/Ww9hbqr). There is a ton of great people in our Discord community ready to help you!
 
-## Versioning Policy
-
-This project follows [semver](https://semver.org/), with three additions:
-
-- Semver says that major version `0` can include breaking changes at any time. Still, it is common practice to assume that only `0.x` releases (minor versions) can contain breaking changes while `0.x.y` releases (patch versions) are used for backwards-compatible changes (bugfixes and features). This project also follows that practice.
-
-- All undocumented APIs are considered internal. They are not part of this contract.
-
-- Certain features (e.g. integrations) may be explicitly called out as "experimental" or "unstable" in the documentation. They come with their own versioning policy described in the documentation.
-
-We recommend to pin your version requirements against `1.x.*` or `1.x.y`.
-Either one of the following is fine:
-
-```
-sentry-sdk>=1.0.0,<2.0.0
-sentry-sdk==1.5.0
-```
-
-A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
-
 ## Resources
 
 - [![Documentation](https://img.shields.io/badge/documentation-sentry.io-green.svg)](https://docs.sentry.io/quickstart/)
