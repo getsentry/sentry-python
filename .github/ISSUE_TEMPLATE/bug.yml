@@ -9,6 +9,7 @@ body:
       options:
         - Sentry Saas (sentry.io)
         - Self-hosted/on-premise
+      value: Sentry Saas (sentry.io)
     validations:
       required: true
   - type: input
