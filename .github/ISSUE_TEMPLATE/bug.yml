@@ -6,10 +6,10 @@ body:
     attributes:
       label: Type
       description: How do you use Sentry?
+      value: "Sentry Saas (sentry.io)"
       options:
         - Sentry Saas (sentry.io)
         - Self-hosted/on-premise
-      value: Sentry Saas (sentry.io)
     validations:
       required: true
   - type: input
