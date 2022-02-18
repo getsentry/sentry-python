@@ -1,24 +1,13 @@
-# Changelog and versioning
+# Changelog
 
-## Versioning Policy
+## 1.5.5
 
-This project follows [semver](https://semver.org/), with three additions:
+- Add session tracking to ASGI integration (#1329)
+- Pinning test requirements versions (#1330)
+- Allow classes to short circuit serializer with `sentry_repr` (#1322)
+- Set default on json.dumps in compute_tracestate_value to ensure string conversion (#1318)
 
-- Semver says that major version `0` can include breaking changes at any time. Still, it is common practice to assume that only `0.x` releases (minor versions) can contain breaking changes while `0.x.y` releases (patch versions) are used for backwards-compatible changes (bugfixes and features). This project also follows that practice.
-
-- All undocumented APIs are considered internal. They are not part of this contract.
-
-- Certain features (e.g. integrations) may be explicitly called out as "experimental" or "unstable" in the documentation. They come with their own versioning policy described in the documentation.
-
-We recommend to pin your version requirements against `1.x.*` or `1.x.y`.
-Either one of the following is fine:
-
-```
-sentry-sdk>=1.0.0,<2.0.0
-sentry-sdk==1.5.0
-```
-
-A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
+Work in this release contributed by @tomchuk. Thank you for your contribution!
 
 ## 1.5.4
 
@@ -107,7 +96,7 @@ Work in this release contributed by @galuszkak, @kianmeng, @ahopkins, @razumeiko
 This release contains a breaking change
 
 - **BREAKING CHANGE**: Feat: Moved `auto_session_tracking` experimental flag to a proper option and removed explicitly setting experimental `session_mode` in favor of auto detecting its value, hence enabling release health by default #994
-- Fixed Django transaction name by setting the name to  `request.path_info` rather than `request.path`
+- Fixed Django transaction name by setting the name to `request.path_info` rather than `request.path`
 - Fix for tracing by getting HTTP headers from span rather than transaction when possible #1035
 - Fix for Flask transactions missing request body in non errored transactions #1034
 - Fix for honoring the `X-Forwarded-For` header #1037
@@ -128,7 +117,7 @@ This release contains a breaking change
 ## 0.20.0
 
 - Fix for header extraction for AWS lambda/API extraction
-- Fix multiple **kwargs type hints # 967
+- Fix multiple \*\*kwargs type hints # 967
 - Fix that corrects AWS lambda integration failure to detect the aws-lambda-ric 1.0 bootstrap #976
 - Fix AWSLambda integration: variable "timeout_thread" referenced before assignment #977
 - Use full git sha as release name #960

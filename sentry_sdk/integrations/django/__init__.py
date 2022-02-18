@@ -100,8 +100,8 @@ class DjangoIntegration(Integration):
     def setup_once():
         # type: () -> None
 
-        if DJANGO_VERSION < (1, 6):
-            raise DidNotEnable("Django 1.6 or newer is required.")
+        if DJANGO_VERSION < (1, 8):
+            raise DidNotEnable("Django 1.8 or newer is required.")
 
         install_sql_hook()
         # Patch in our custom middleware.
