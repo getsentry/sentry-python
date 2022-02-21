@@ -37,13 +37,19 @@ cd sentry-python
 python -m venv .env
 
 source .env/bin/activate
+```
 
+### Install `sentry-python` in editable mode
+
+```bash
 pip install -e .
 ```
 
-**Hint:** Sometimes you need a sample project to run your new changes to sentry-python. In this case install the sample project in the same virtualenv and you should be good to go because the ` pip install -e .` from above installed your local sentry-python in editable mode. So you can just hack away!
+**Hint:** Sometimes you need a sample project to run your new changes to sentry-python. In this case install the sample project in the same virtualenv and you should be good to go because the ` pip install -e .` from above installed your local sentry-python in editable mode.
 
 ### Install coding style pre-commit hooks:
+
+This will make sure that your commits will have the correct coding style.
 
 ```bash
 cd sentry-python
@@ -107,15 +113,52 @@ pytest -rs tests/integrations/flask/
 
 ## Releasing a new version
 
-We use [craft](https://github.com/getsentry/craft#python-package-index-pypi) to
-release new versions. You need credentials for the `getsentry` PyPI user, and
-must have `twine` installed globally.
+(only relevant for Sentry employees)
 
-The usual release process goes like this:
+Prerequisites:
 
-1. Go through git log and write new entry into `CHANGELOG.md`, commit to master
-2. `craft p a.b.c`
-3. `craft pp a.b.c`
+- All the changes that should be release must be in `master` branch.
+- Every commit should follow the [Commit Message Format](https://develop.sentry.dev/commit-messages/#commit-message-format) convention.
+- CHANGELOG.md is updated automatically. No human intervention necessary.
+
+Manual Process:
+
+- On GitHub in the `sentry-python` repository go to "Actions" select the "Release" workflow.
+- Click on "Run workflow" on the right side, make sure the `master` branch is selected.
+- Set "Version to release" input field. Here you decide if it is a major, minor or patch release. (See "Versioning Policy" below)
+- Click "Run Workflow"
+
+This will trigger [Craft](https://github.com/getsentry/craft) to prepare everything needed for a release. (For more information see [craft prepare](https://github.com/getsentry/craft#craft-prepare-preparing-a-new-release)) At the end of this process a release issue is created in the [Publish](https://github.com/getsentry/publish) repository. (Example release issue: https://github.com/getsentry/publish/issues/815)
+
+Now one of the persons with release privileges (most probably your engineering manager) will review this Issue and then add the `accepted` label to the issue.
+
+There are always two persons involved in a release.
+
+If you are in a hurry and the release should be out immediatly there is a Slack channel called `#proj-release-approval` where you can see your release issue and where you can ping people to please have a look immediatly.
+
+When the release issue is labeled `accepted` [Craft](https://github.com/getsentry/craft) is triggered again to publish the release to all the right platforms. (See [craft publish](https://github.com/getsentry/craft#craft-publish-publishing-the-release) for more information). At the end of this process the release issue on GitHub will be closed and the release is completed! Congratulations!
+
+There is a sequence diagram visualizing all this in the [README.md](https://github.com/getsentry/publish) of the `Publish` repository.
+
+### Versioning Policy
+
+This project follows [semver](https://semver.org/), with three additions:
+
+- Semver says that major version `0` can include breaking changes at any time. Still, it is common practice to assume that only `0.x` releases (minor versions) can contain breaking changes while `0.x.y` releases (patch versions) are used for backwards-compatible changes (bugfixes and features). This project also follows that practice.
+
+- All undocumented APIs are considered internal. They are not part of this contract.
+
+- Certain features (e.g. integrations) may be explicitly called out as "experimental" or "unstable" in the documentation. They come with their own versioning policy described in the documentation.
+
+We recommend to pin your version requirements against `1.x.*` or `1.x.y`.
+Either one of the following is fine:
+
+```
+sentry-sdk>=1.0.0,<2.0.0
+sentry-sdk==1.5.0
+```
+
+A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
 
 ## Adding a new integration (checklist)
 
