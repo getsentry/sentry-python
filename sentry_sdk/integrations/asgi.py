@@ -37,6 +37,8 @@ _asgi_middleware_applied = ContextVar("sentry_asgi_middleware_applied")
 
 _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
 
+TRANSACTION_STYLE_VALUES = ("endpoint", "url")
+
 
 def _capture_exception(hub, exc):
     # type: (Hub, Any) -> None
@@ -68,10 +70,10 @@ def _looks_like_asgi3(app):
 
 
 class SentryAsgiMiddleware:
-    __slots__ = ("app", "__call__")
+    __slots__ = ("app", "__call__", "transaction_style")
 
-    def __init__(self, app, unsafe_context_data=False):
-        # type: (Any, bool) -> None
+    def __init__(self, app, unsafe_context_data=False, transaction_style="endpoint"):
+        # type: (Any, bool, str) -> None
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
         data to sent events and basic handling for exceptions bubbling up
@@ -87,6 +89,12 @@ class SentryAsgiMiddleware:
                 "The ASGI middleware for Sentry requires Python 3.7+ "
                 "or the aiocontextvars package." + CONTEXTVARS_ERROR_MESSAGE
             )
+        if transaction_style not in TRANSACTION_STYLE_VALUES:
+            raise ValueError(
+                "Invalid value for transaction_style: %s (must be in %s)"
+                % (transaction_style, TRANSACTION_STYLE_VALUES)
+            )
+        self.transaction_style = transaction_style
         self.app = app
 
         if _looks_like_asgi3(app):
@@ -185,6 +193,14 @@ class SentryAsgiMiddleware:
             # an endpoint, overwrite our generic transaction name.
             if endpoint:
                 event["transaction"] = transaction_from_function(endpoint)
+            # FastAPI includes the route object in the scope to let Sentry extract the
+            # path from it for the transaction name
+            if self.transaction_style == "url":
+                route = asgi_scope.get("route")
+                if route:
+                    path = getattr(route, "path", None)
+                    if path is not None:
+                        event["transaction"] = path
 
         event["request"] = request_info
 
