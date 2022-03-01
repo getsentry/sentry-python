@@ -98,14 +98,9 @@ class FalconIntegration(Integration):
             )
         self.transaction_style = transaction_style
 
-    @staticmethod
-    def setup_once():
+    def setup_once(self):
         # type: () -> None
-        try:
-            version = tuple(map(int, FALCON_VERSION.split(".")))
-        except (ValueError, TypeError):
-            raise DidNotEnable("Unparsable Falcon version: {}".format(FALCON_VERSION))
-
+        version = self.parse_version(FALCON_VERSION)
         if version < (1, 4):
             raise DidNotEnable("Falcon 1.4 or newer required.")
 

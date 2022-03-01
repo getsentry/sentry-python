@@ -1,6 +1,7 @@
 """This package"""
 from __future__ import absolute_import
 
+from re import compile, VERBOSE, IGNORECASE
 from threading import Lock
 
 from sentry_sdk._compat import iteritems
@@ -20,6 +21,39 @@ if MYPY:
 
 _installer_lock = Lock()
 _installed_integrations = set()  # type: Set[str]
+
+
+# Version Pattern as defined in PEP 440
+VERSION_PATTERN = r"""
+    v?
+    (?:
+        (?:(?P<epoch>[0-9]+)!)?                           # epoch
+        (?P<release>[0-9]+(?:\.[0-9]+)*)                  # release segment
+        (?P<pre>                                          # pre-release
+            [-_\.]?
+            (?P<pre_l>(a|b|c|rc|alpha|beta|pre|preview))
+            [-_\.]?
+            (?P<pre_n>[0-9]+)?
+        )?
+        (?P<post>                                         # post release
+            (?:-(?P<post_n1>[0-9]+))
+            |
+            (?:
+                [-_\.]?
+                (?P<post_l>post|rev|r)
+                [-_\.]?
+                (?P<post_n2>[0-9]+)?
+            )
+        )?
+        (?P<dev>                                          # dev release
+            [-_\.]?
+            (?P<dev_l>dev)
+            [-_\.]?
+            (?P<dev_n>[0-9]+)?
+        )?
+    )
+    (?:\+(?P<local>[a-z0-9]+(?:[-_\.][a-z0-9]+)*))?       # local version
+"""
 
 
 def _generate_default_integrations_iterator(integrations, auto_enabling_integrations):
@@ -117,7 +151,7 @@ def setup_integrations(
                     "Setting up previously not enabled integration %s", identifier
                 )
                 try:
-                    type(integration).setup_once()
+                    integration.setup_once()
                 except NotImplementedError:
                     if getattr(integration, "install", None) is not None:
                         logger.warning(
@@ -166,6 +200,18 @@ class Integration(object):
 
     identifier = None  # type: str
     """String unique ID of integration type"""
+
+    @staticmethod
+    def parse_version(version):
+        # type: (str) -> Tuple[int, ...]
+        """
+        Utility to parse project version according to PEP 440.
+        """
+        _regex = compile(r"^\s*" + VERSION_PATTERN + r"\s*$", VERBOSE | IGNORECASE)
+        match = _regex.search(version)
+        if not match:
+            raise DidNotEnable("Invalid version detected: %s", version)
+        return tuple(map(int, match.group("release").split(".")))
 
     @staticmethod
     def setup_once():

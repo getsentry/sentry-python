@@ -245,3 +245,14 @@ def test_concurrency(sentry_init, app):
 
     with configure_scope() as scope:
         assert not scope._tags
+
+
+def test_version_parsing():
+    integration = SanicIntegration()
+    # Testing version parser with various versions of Sanic
+    versions = [
+        ("21.12.1", (21, 12, 1)),
+        ("0.8.2", (0, 8, 2)),
+    ]
+    for _input, expected in versions:
+        assert integration.parse_version(_input) == expected

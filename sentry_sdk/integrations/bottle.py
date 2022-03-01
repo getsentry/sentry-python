@@ -52,15 +52,10 @@ class BottleIntegration(Integration):
             )
         self.transaction_style = transaction_style
 
-    @staticmethod
-    def setup_once():
+    def setup_once(self):
         # type: () -> None
 
-        try:
-            version = tuple(map(int, BOTTLE_VERSION.replace("-dev", "").split(".")))
-        except (TypeError, ValueError):
-            raise DidNotEnable("Unparsable Bottle version: {}".format(version))
-
+        version = self.parse_version(BOTTLE_VERSION)
         if version < (0, 12):
             raise DidNotEnable("Bottle 0.12 or newer required.")
 

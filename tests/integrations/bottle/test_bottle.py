@@ -196,7 +196,7 @@ def test_medium_formdata_request(sentry_init, capture_events, app, get_client):
     assert len(event["request"]["data"]["foo"]) == 512
 
 
-@pytest.mark.parametrize("input_char", [u"a", b"a"])
+@pytest.mark.parametrize("input_char", ["a", b"a"])
 def test_too_large_raw_request(
     sentry_init, input_char, capture_events, app, get_client
 ):
@@ -441,3 +441,14 @@ def test_no_exception_on_redirect(sentry_init, capture_events, app, get_client):
     client.get("/")
 
     assert not events
+
+
+def test_version_parsing():
+    integration = bottle_sentry.BottleIntegration()
+    # Testing version parser with various versions of bottle
+    versions = [
+        ("0.12.19", (0, 12, 19)),
+        ("0.10.11", (0, 10, 11)),
+    ]
+    for _input, expected in versions:
+        assert integration.parse_version(_input) == expected

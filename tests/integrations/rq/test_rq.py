@@ -192,3 +192,14 @@ def test_job_with_retries(sentry_init, capture_events):
     worker.work(burst=True)
 
     assert len(events) == 1
+
+
+def test_version_parsing():
+    integration = RqIntegration()
+    # Testing version parser with various versions of Rq
+    versions = [
+        ("1.10.1", (1, 10, 1)),
+        ("0.3.13", (0, 3, 13)),
+    ]
+    for _input, expected in versions:
+        assert integration.parse_version(_input) == expected

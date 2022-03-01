@@ -64,20 +64,12 @@ class FlaskIntegration(Integration):
             )
         self.transaction_style = transaction_style
 
-    @staticmethod
-    def setup_once():
+    def setup_once(self):
         # type: () -> None
 
-        # This version parsing is absolutely naive but the alternative is to
-        # import pkg_resources which slows down the SDK a lot.
-        try:
-            version = tuple(map(int, FLASK_VERSION.split(".")[:3]))
-        except (ValueError, TypeError):
-            # It's probably a release candidate, we assume it's fine.
-            pass
-        else:
-            if version < (0, 10):
-                raise DidNotEnable("Flask 0.10 or newer is required.")
+        version = self.parse_version(FLASK_VERSION)
+        if version < (0, 10):
+            raise DidNotEnable("Flask 0.10 or newer is required.")
 
         before_render_template.connect(_add_sentry_trace)
         request_started.connect(_request_started)

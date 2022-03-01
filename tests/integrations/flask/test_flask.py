@@ -775,3 +775,17 @@ def test_dont_override_sentry_trace_context(sentry_init, app):
         response = client.get("/")
         assert response.status_code == 200
         assert response.data == b"hi"
+
+
+def test_version_parsing():
+    integration = flask_sentry.FlaskIntegration()
+    # Testing version parser with recent versions of Flask
+    versions = [
+        ("0.12.5", (0, 12, 5)),
+        ("1.0", (1, 0)),
+        ("1.1.4", (1, 1, 4)),
+        ("2.0.0rc1", (2, 0, 0)),
+        ("2.0.3", (2, 0, 3)),
+    ]
+    for _input, expected in versions:
+        assert integration.parse_version(_input) == expected

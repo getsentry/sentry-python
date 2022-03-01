@@ -94,13 +94,9 @@ def _get_view_function_response(app, view_function, function_args):
 class ChaliceIntegration(Integration):
     identifier = "chalice"
 
-    @staticmethod
-    def setup_once():
+    def setup_once(self):
         # type: () -> None
-        try:
-            version = tuple(map(int, CHALICE_VERSION.split(".")[:3]))
-        except (ValueError, TypeError):
-            raise DidNotEnable("Unparsable Chalice version: {}".format(CHALICE_VERSION))
+        version = self.parse_version(CHALICE_VERSION)
         if version < (1, 20):
             old_get_view_function_response = Chalice._get_view_function_response
         else:

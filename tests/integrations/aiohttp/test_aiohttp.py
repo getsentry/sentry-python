@@ -261,3 +261,17 @@ async def test_traces_sampler_gets_request_object_in_sampling_context(
             }
         )
     )
+
+
+def test_version_parsing():
+    integration = AioHttpIntegration()
+    # Testing version parser with various versions of Aiohttp
+    versions = [
+        ("3.8.1", (3, 8, 1)),
+        ("3.8.0a7", (3, 8, 0)),
+        ("3.7.4.post0", (3, 7, 4)),
+        ("3.6.1b4", (3, 6, 1)),
+        ("3.6.0", (3, 6, 0)),
+    ]
+    for _input, expected in versions:
+        assert integration.parse_version(_input) == expected

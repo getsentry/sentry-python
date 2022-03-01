@@ -25,15 +25,9 @@ except ImportError:
 class Boto3Integration(Integration):
     identifier = "boto3"
 
-    @staticmethod
-    def setup_once():
+    def setup_once(self):
         # type: () -> None
-        try:
-            version = tuple(map(int, BOTOCORE_VERSION.split(".")[:3]))
-        except (ValueError, TypeError):
-            raise DidNotEnable(
-                "Unparsable botocore version: {}".format(BOTOCORE_VERSION)
-            )
+        version = self.parse_version(BOTOCORE_VERSION)
         if version < (1, 12):
             raise DidNotEnable("Botocore 1.12 or newer is required.")
         orig_init = BaseClient.__init__

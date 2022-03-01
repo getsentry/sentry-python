@@ -224,3 +224,11 @@ def test_too_large_event_truncated(sentry_init, capture_events):
     assert event["_meta"]["message"] == {
         "": {"len": 522, "rem": [["!limit", "x", 509, 512]]}
     }
+
+
+def test_version_parsing():
+    integration = SqlalchemyIntegration()
+    # Testing version parser with various versions of SqlAlchemy
+    versions = [("1.4.31", (1, 4, 31)), ("1.4.0b1", (1, 4, 0))]
+    for _input, expected in versions:
+        assert integration.parse_version(_input) == expected

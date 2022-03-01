@@ -52,16 +52,10 @@ class SanicIntegration(Integration):
     identifier = "sanic"
     version = (0, 0)  # type: Tuple[int, ...]
 
-    @staticmethod
-    def setup_once():
+    def setup_once(self):
         # type: () -> None
-
-        try:
-            SanicIntegration.version = tuple(map(int, SANIC_VERSION.split(".")))
-        except (TypeError, ValueError):
-            raise DidNotEnable("Unparsable Sanic version: {}".format(SANIC_VERSION))
-
-        if SanicIntegration.version < (0, 8):
+        self.version = self.parse_version(SANIC_VERSION)
+        if self.version < (0, 8):
             raise DidNotEnable("Sanic 0.8 or newer required.")
 
         if not HAS_REAL_CONTEXTVARS:
@@ -84,7 +78,7 @@ class SanicIntegration(Integration):
             # https://github.com/huge-success/sanic/issues/1332
             ignore_logger("root")
 
-        if SanicIntegration.version < (21, 9):
+        if self.version < (21, 9):
             _setup_legacy_sanic()
             return
 

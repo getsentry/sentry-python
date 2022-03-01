@@ -23,17 +23,10 @@ if MYPY:
 class SqlalchemyIntegration(Integration):
     identifier = "sqlalchemy"
 
-    @staticmethod
-    def setup_once():
+    def setup_once(self):
         # type: () -> None
 
-        try:
-            version = tuple(map(int, SQLALCHEMY_VERSION.split("b")[0].split(".")))
-        except (TypeError, ValueError):
-            raise DidNotEnable(
-                "Unparsable SQLAlchemy version: {}".format(SQLALCHEMY_VERSION)
-            )
-
+        version = self.parse_version(SQLALCHEMY_VERSION)
         if version < (1, 2):
             raise DidNotEnable("SQLAlchemy 1.2 or newer required.")
 

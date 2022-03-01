@@ -109,3 +109,14 @@ def test_bad_reques(client: RequestHandler) -> None:
             ("Message", "BadRequestError: bad-request"),
         ]
     )
+
+
+def test_version_parsing():
+    integration = ChaliceIntegration()
+    # Testing version parser with various versions of chalice
+    versions = [
+        ("1.26.6", (1, 26, 6)),
+        ("1.0.0b2", (1, 0, 0)),
+    ]
+    for _input, expected in versions:
+        assert integration.parse_version(_input) == expected

@@ -83,3 +83,14 @@ def test_streaming_close(sentry_init, capture_events):
     assert span1["op"] == "aws.request"
     span2 = event["spans"][1]
     assert span2["op"] == "aws.request.stream"
+
+
+def test_version_parsing():
+    integration = Boto3Integration()
+    # Testing version parser with various versions of Boto3
+    versions = [
+        ("1.21.8", (1, 21, 8)),
+        ("1.19.12", (1, 19, 12)),
+    ]
+    for _input, expected in versions:
+        assert integration.parse_version(_input) == expected

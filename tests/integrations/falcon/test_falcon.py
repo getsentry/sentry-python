@@ -373,3 +373,11 @@ def test_does_not_leak_scope(sentry_init, capture_events):
 
     with sentry_sdk.configure_scope() as scope:
         assert not scope._tags["request_data"]
+
+
+def test_version_parsing():
+    integration = FalconIntegration()
+    # Testing version parser with various versions of falcon
+    versions = [("3.0.0", (3, 0, 0)), ("3.0.0rc3", (3, 0, 0)), ("2.0.0a2", (2, 0, 0))]
+    for _input, expected in versions:
+        assert integration.parse_version(_input) == expected
