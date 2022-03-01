@@ -18,11 +18,11 @@ from sentry_sdk._types import MYPY
 
 if MYPY:
     from typing import Any
-    from typing import Callable
     from typing import Optional
     from typing import Union
     from typing import Tuple
     from typing import Dict
+    from weakref import ReferenceType
 
     from sanic.request import Request, RequestParameters
 
@@ -123,15 +123,15 @@ class SanicRequestExtractor(RequestExtractor):
 
 def _setup_sanic():
     # type: () -> None
-    Sanic._startup = _startup
-    ErrorHandler.lookup = _sentry_error_handler_lookup
+    Sanic._startup = _startup  # type: ignore
+    ErrorHandler.lookup = _sentry_error_handler_lookup  # type: ignore
 
 
 def _setup_legacy_sanic():
     # type: () -> None
-    Sanic.handle_request = _legacy_handle_request
-    Router.get = _legacy_router_get
-    ErrorHandler.lookup = _sentry_error_handler_lookup
+    Sanic.handle_request = _legacy_handle_request  # type: ignore
+    Router.get = _legacy_router_get  # type: ignore
+    ErrorHandler.lookup = _sentry_error_handler_lookup  # type: ignore
 
 
 async def _startup(self):
@@ -226,7 +226,7 @@ async def _legacy_handle_request(self, request, *args, **kwargs):
     # type: (Any, Request, *Any, **Any) -> Any
     hub = Hub.current
     if hub.get_integration(SanicIntegration) is None:
-        return old_handle_request(self, request, *args, **kwargs)
+        return old_handle_request(self, request, *args, **kwargs)  # type: ignore
 
     weak_request = weakref.ref(request)
 
@@ -235,7 +235,7 @@ async def _legacy_handle_request(self, request, *args, **kwargs):
             scope.clear_breadcrumbs()
             scope.add_event_processor(_make_request_processor(weak_request))
 
-        response = old_handle_request(self, request, *args, **kwargs)
+        response = old_handle_request(self, request, *args, **kwargs)  # type: ignore
         if isawaitable(response):
             response = await response
 
@@ -288,7 +288,7 @@ def _capture_exception(exception):
 
 
 def _make_request_processor(weak_request):
-    # type: (Callable[[], Request]) -> EventProcessor
+    # type: (ReferenceType[Request]) -> EventProcessor
     def sanic_processor(event, hint):
         # type: (Event, Optional[Hint]) -> Optional[Event]
 

@@ -26,7 +26,7 @@ except ImportError:
     flask_login = None
 
 try:
-    from flask import (  # type: ignore
+    from flask import (
         Markup,
         Request,
         Flask,

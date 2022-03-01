@@ -36,8 +36,8 @@ if MYPY:
     from typing import Dict
     from typing import Optional
     from typing import Tuple
-    from typing import Callable
     from typing import Union
+    from weakref import ReferenceType
 
     from sentry_sdk.utils import ExcInfo
     from sentry_sdk._types import EventProcessor
@@ -81,7 +81,7 @@ class AioHttpIntegration(Integration):
             # type: (Any, Request, *Any, **Any) -> Any
             hub = Hub.current
             if hub.get_integration(AioHttpIntegration) is None:
-                return await old_handle(self, request, *args, **kwargs)
+                return await old_handle(self, request, *args, **kwargs)  # type: ignore
 
             weak_request = weakref.ref(request)
 
@@ -118,7 +118,7 @@ class AioHttpIntegration(Integration):
                     transaction.set_http_status(response.status)
                     return response
 
-        Application._handle = sentry_app_handle
+        Application._handle = sentry_app_handle  # type: ignore
 
         old_urldispatcher_resolve = UrlDispatcher.resolve
 
@@ -147,11 +147,11 @@ class AioHttpIntegration(Integration):
 
             return rv
 
-        UrlDispatcher.resolve = sentry_urldispatcher_resolve
+        UrlDispatcher.resolve = sentry_urldispatcher_resolve  # type: ignore
 
 
 def _make_request_processor(weak_request):
-    # type: (Callable[[], Request]) -> EventProcessor
+    # type: (ReferenceType[Request]) -> EventProcessor
     def aiohttp_processor(
         event,  # type: Dict[str, Any]
         hint,  # type: Dict[str, Tuple[type, BaseException, Any]]

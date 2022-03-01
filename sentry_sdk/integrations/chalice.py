@@ -11,9 +11,9 @@ from sentry_sdk.utils import (
 from sentry_sdk._types import MYPY
 from sentry_sdk._functools import wraps
 
-import chalice  # type: ignore
+import chalice
 from chalice import Chalice, ChaliceViewError
-from chalice.app import EventSourceHandler as ChaliceEventSourceHandler  # type: ignore
+from chalice.app import EventSourceHandler as ChaliceEventSourceHandler
 
 if MYPY:
     from typing import Any
@@ -29,7 +29,7 @@ except ImportError:
     raise DidNotEnable("Chalice is not installed")
 
 
-class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
+class EventSourceHandler(ChaliceEventSourceHandler):
     def __call__(self, event, context):
         # type: (Any, Any) -> Any
         hub = Hub.current
@@ -98,7 +98,7 @@ class ChaliceIntegration(Integration):
         # type: () -> None
         version = self.parse_version(CHALICE_VERSION)
         if version < (1, 20):
-            old_get_view_function_response = Chalice._get_view_function_response
+            old_get_view_function_response = Chalice._get_view_function_response  # type: ignore
         else:
             from chalice.app import RestAPIEventHandler
 
@@ -117,8 +117,8 @@ class ChaliceIntegration(Integration):
             )
 
         if version < (1, 20):
-            Chalice._get_view_function_response = sentry_event_response
+            Chalice._get_view_function_response = sentry_event_response  # type: ignore
         else:
-            RestAPIEventHandler._get_view_function_response = sentry_event_response
+            RestAPIEventHandler._get_view_function_response = sentry_event_response  # type: ignore
         # for everything else (like events)
-        chalice.app.EventSourceHandler = EventSourceHandler
+        chalice.app.EventSourceHandler = EventSourceHandler  # type: ignore

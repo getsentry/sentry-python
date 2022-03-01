@@ -213,8 +213,7 @@ class Integration(object):
             raise DidNotEnable("Invalid version detected: %s", version)
         return tuple(map(int, match.group("release").split(".")))
 
-    @staticmethod
-    def setup_once():
+    def setup_once(self):
         # type: () -> None
         """
         Initialize the integration.
