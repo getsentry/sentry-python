@@ -99,7 +99,7 @@ def test_scheduled_event(app, lambda_context_args):
     assert str(exc_info.value) == "schedule event!"
 
 
-def test_bad_reques(client: RequestHandler) -> None:
+def test_bad_request(client: RequestHandler) -> None:
     response = client.get("/badrequest")
 
     assert response.status_code == 400
