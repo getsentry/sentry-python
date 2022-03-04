@@ -517,7 +517,7 @@ class Transaction(Span):
         # first time an event needs it for inclusion in the captured data
         self._sentry_tracestate = sentry_tracestate
         self._third_party_tracestate = third_party_tracestate
-        self._measurements = {}
+        self._measurements = {} # type: Dict[str, Any]
 
     def __repr__(self):
         # type: () -> str
