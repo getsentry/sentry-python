@@ -8,7 +8,6 @@ import sentry_sdk
 
 from sentry_sdk.utils import logger
 from sentry_sdk._types import MYPY
-from sentry_sdk.tracing_utils import has_custom_measurements_enabled
 
 
 if MYPY:
@@ -747,4 +746,5 @@ from sentry_sdk.tracing_utils import (
     has_tracing_enabled,
     is_valid_sample_rate,
     maybe_create_breadcrumbs_from_span,
+    has_custom_measurements_enabled,
 )
