@@ -259,5 +259,5 @@ def test_set_meaurement(sentry_init, capture_events):
     transaction.finish()
 
     (event,) = events
-    assert event["measurements"]["metric.foo"] == { "value": 123, "unit": "ms" }
-    assert event["measurements"]["metric.bar"] == { "value": 456, "unit": "s" }
+    assert event["measurements"]["metric.foo"] == {"value": 123, "unit": "ms"}
+    assert event["measurements"]["metric.bar"] == {"value": 456, "unit": "s"}
