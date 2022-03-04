@@ -48,3 +48,4 @@ if MYPY:
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
     EndpointType = Literal["store", "envelope"]
+    MeasurementUnit = Literal["ns", "ms", "s"]

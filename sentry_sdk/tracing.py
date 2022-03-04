@@ -8,6 +8,7 @@ import sentry_sdk
 
 from sentry_sdk.utils import logger
 from sentry_sdk._types import MYPY
+from sentry_sdk.tracing_utils import has_custom_measurements_enabled
 
 
 if MYPY:
@@ -20,7 +21,7 @@ if MYPY:
     from typing import Tuple
     from typing import Iterator
 
-    from sentry_sdk._types import SamplingContext
+    from sentry_sdk._types import SamplingContext, MeasurementUnit
 
 
 class _SpanRecorder(object):
@@ -487,6 +488,7 @@ class Transaction(Span):
         "_sentry_tracestate",
         # tracestate data from other vendors, of the form `dogs=yes,cats=maybe`
         "_third_party_tracestate",
+        "_measurements",
     )
 
     def __init__(
@@ -515,6 +517,7 @@ class Transaction(Span):
         # first time an event needs it for inclusion in the captured data
         self._sentry_tracestate = sentry_tracestate
         self._third_party_tracestate = third_party_tracestate
+        self._measurements = {}
 
     def __repr__(self):
         # type: () -> str
@@ -594,17 +597,35 @@ class Transaction(Span):
         # to be garbage collected
         self._span_recorder = None
 
-        return hub.capture_event(
-            {
-                "type": "transaction",
-                "transaction": self.name,
-                "contexts": {"trace": self.get_trace_context()},
-                "tags": self._tags,
-                "timestamp": self.timestamp,
-                "start_timestamp": self.start_timestamp,
-                "spans": finished_spans,
-            }
-        )
+        event = {
+            "type": "transaction",
+            "transaction": self.name,
+            "contexts": {"trace": self.get_trace_context()},
+            "tags": self._tags,
+            "timestamp": self.timestamp,
+            "start_timestamp": self.start_timestamp,
+            "spans": finished_spans,
+        }
+
+
+        if has_custom_measurements_enabled():
+            event["measurements"] = self._measurements
+
+        return hub.capture_event(event)
+
+
+    def set_measurement(self, name, value, unit="ms"):
+        # type: (str, float, MeasurementUnit) -> None
+        if not has_custom_measurements_enabled():
+            logger.debug("[Tracing] Experimental custom_measurements feature is disabled")
+            return
+
+        if unit not in ("ns", "ms", "s"):
+            logger.debug("[Tracing] Discarding measurement due to invalid unit")
+            return
+
+        self._measurements[name] = { "value": value, "unit": unit }
+
 
     def to_json(self):
         # type: () -> Dict[str, Any]

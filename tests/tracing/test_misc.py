@@ -246,3 +246,18 @@ def test_has_tracestate_enabled(sentry_init, tracestate_enabled):
         assert has_tracestate_enabled() is True
     else:
         assert has_tracestate_enabled() is False
+
+
+def test_set_meaurement(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0, _experiments={"custom_measurements": True})
+
+    events = capture_events()
+
+    transaction = start_transaction(name="measuring stuff")
+    transaction.set_measurement("metric.foo", 123)
+    transaction.set_measurement("metric.bar", 456, unit="s")
+    transaction.finish()
+
+    (event,) = events
+    assert event["measurements"]["metric.foo"] == { "value": 123, "unit": "ms" }
+    assert event["measurements"]["metric.bar"] == { "value": 456, "unit": "s" }
