@@ -48,6 +48,9 @@ def _get_options(*args, **kwargs):
     else:
         dsn = None
 
+    if len(args) > 1:
+        raise TypeError("Only single positional argument is expected")
+
     rv = dict(DEFAULT_OPTIONS)
     options = dict(*args, **kwargs)
     if dsn is not None and options.get("dsn") is None:
@@ -450,7 +453,6 @@ if MYPY:
 
     class Client(ClientConstructor, _Client):
         pass
-
 
 else:
     # Alias `get_options` for actual usage. Go through the lambda indirection
