@@ -274,8 +274,6 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
                     return _flatten_annotated(result)
 
         sentry_repr = getattr(type(obj), "__sentry_repr__", None)
-        if callable(sentry_repr):
-            return sentry_repr(obj)
 
         if obj is None or isinstance(obj, (bool, number_types)):
             if should_repr_strings or (
@@ -284,6 +282,9 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
                 return safe_repr(obj)
             else:
                 return obj
+
+        elif callable(sentry_repr):
+            return sentry_repr(obj)
 
         elif isinstance(obj, datetime):
             return (
