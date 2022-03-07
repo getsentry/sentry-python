@@ -85,6 +85,7 @@ def add_global_repr_processor(processor):
 class SentryReprMixin(ABC):
     @abstractmethod
     def sentry_repr(self):
+        # type: () -> str
         pass
 
 
