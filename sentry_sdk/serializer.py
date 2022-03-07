@@ -67,7 +67,7 @@ else:
 # Can be overwritten if wanting to send more bytes, e.g. with a custom server.
 # When changing this, keep in mind that events may be a little bit larger than
 # this value due to attached metadata, so keep the number conservative.
-MAX_EVENT_BYTES = 10**6
+MAX_EVENT_BYTES = 10 ** 6
 
 MAX_DATABAG_DEPTH = 5
 MAX_DATABAG_BREADTH = 10
