@@ -1,6 +1,7 @@
 import sys
 
 import pytest
+from unittest import mock
 
 from sentry_sdk.serializer import serialize
 
@@ -68,8 +69,19 @@ def test_serialize_sets(extra_normalizer):
 
 def test_serialize_custom_mapping(extra_normalizer):
     class CustomReprDict(dict):
-        def sentry_repr(self):
+        def __sentry_repr__(self):
             return "custom!"
 
     result = extra_normalizer(CustomReprDict(one=1, two=2))
     assert result == "custom!"
+
+
+def test_custom_mapping_doesnt_mess_with_mock(extra_normalizer):
+    """
+    Adding the __sentry_repr__ magic method check in the serializer
+    shouldn't mess with how mock works. This broke some stuff when we added
+    sentry_repr without the dunders.
+    """
+    m = mock.Mock()
+    result = extra_normalizer(m)
+    assert len(m.mock_calls) == 0
