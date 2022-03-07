@@ -83,5 +83,5 @@ def test_custom_mapping_doesnt_mess_with_mock(extra_normalizer):
     sentry_repr without the dunders.
     """
     m = mock.Mock()
-    result = extra_normalizer(m)
+    extra_normalizer(m)
     assert len(m.mock_calls) == 0
