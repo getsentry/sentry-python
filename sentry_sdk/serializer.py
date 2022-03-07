@@ -2,6 +2,7 @@ import sys
 import math
 
 from datetime import datetime
+from abc import ABC, abstractmethod
 
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -66,11 +67,11 @@ else:
 # Can be overwritten if wanting to send more bytes, e.g. with a custom server.
 # When changing this, keep in mind that events may be a little bit larger than
 # this value due to attached metadata, so keep the number conservative.
-MAX_EVENT_BYTES = 10 ** 6
+MAX_EVENT_BYTES = 10**6
 
 MAX_DATABAG_DEPTH = 5
 MAX_DATABAG_BREADTH = 10
-CYCLE_MARKER = u"<cyclic>"
+CYCLE_MARKER = "<cyclic>"
 
 
 global_repr_processors = []  # type: List[ReprProcessor]
@@ -79,6 +80,12 @@ global_repr_processors = []  # type: List[ReprProcessor]
 def add_global_repr_processor(processor):
     # type: (ReprProcessor) -> None
     global_repr_processors.append(processor)
+
+
+class SentryReprMixin(ABC):
+    @abstractmethod
+    def sentry_repr(self):
+        pass
 
 
 class Memo(object):
@@ -228,7 +235,7 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
             capture_internal_exception(sys.exc_info())
 
             if is_databag:
-                return u"<failed to serialize, use init(debug=True) to see error logs>"
+                return "<failed to serialize, use init(debug=True) to see error logs>"
 
             return None
         finally:
@@ -281,7 +288,7 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
             else:
                 return obj
 
-        elif callable(getattr(obj, "sentry_repr", None)):
+        elif isinstance(obj, SentryReprMixin):
             return obj.sentry_repr()
 
         elif isinstance(obj, datetime):
