@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.7
+
+### Various fixes & improvements
+
+- fix(serializer): Make sentry_repr dunder method to avoid mock problems (#1364) by @sl0thentr0py
+
 ## 1.5.6
 
 ### Various fixes & improvements
