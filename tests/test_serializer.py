@@ -74,18 +74,13 @@ def test_serialize_custom_mapping(extra_normalizer):
     assert result == "custom!"
 
 
-try:
-    from unittest import mock
-except ImportError:
-    pass
-else:
-
-    def test_custom_mapping_doesnt_mess_with_mock(extra_normalizer):
-        """
-        Adding the __sentry_repr__ magic method check in the serializer
-        shouldn't mess with how mock works. This broke some stuff when we added
-        sentry_repr without the dunders.
-        """
-        m = mock.Mock()
-        extra_normalizer(m)
-        assert len(m.mock_calls) == 0
+def test_custom_mapping_doesnt_mess_with_mock(extra_normalizer):
+    """
+    Adding the __sentry_repr__ magic method check in the serializer
+    shouldn't mess with how mock works. This broke some stuff when we added
+    sentry_repr without the dunders.
+    """
+    mock = pytest.importorskip("unittest.mock")
+    m = mock.Mock()
+    extra_normalizer(m)
+    assert len(m.mock_calls) == 0
