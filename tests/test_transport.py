@@ -279,7 +279,7 @@ def test_data_category_limits_reporting(
     client.flush()
 
     # this goes out with an extra envelope because it's flushed after the last item
-    # that is normally in the queue.  This is quite funny in a way beacuse it means
+    # that is normally in the queue.  This is quite funny in a way because it means
     # that the envelope that caused its own over quota report (an error with an
     # attachment) will include its outcome since it's pending.
     assert len(capturing_server.captured) == 1
