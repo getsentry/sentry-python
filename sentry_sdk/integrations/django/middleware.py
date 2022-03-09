@@ -174,7 +174,13 @@ def _wrap_middleware(middleware, middleware_name):
             with middleware_span:
                 return f(*args, **kwargs)
 
-    for attr in ('__name__', '__module__', '__qualname__', '__doc__', '__annotations__'):
+    for attr in (
+        "__name__",
+        "__module__",
+        "__qualname__",
+        "__doc__",
+        "__annotations__",
+    ):
         if hasattr(middleware, attr):
             setattr(SentryWrappingMiddleware, attr, getattr(middleware, attr))
 
