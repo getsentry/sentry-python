@@ -114,7 +114,8 @@ class RecordSqlQueries:
         params_list,  # type:  Any
         paramstyle,  # type: Optional[str]
         executemany,  # type: bool
-    ) -> None:
+    ):
+        # type: (...) -> None
         # TODO: Bring back capturing of params by default
         self._hub = hub
         if self._hub.client and self._hub.client.options["_experiments"].get(
