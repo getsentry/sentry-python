@@ -150,6 +150,7 @@ class RecordSqlQueries:
             return span
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        # type: (Any, Any, Any) -> None
         pass
 
 
