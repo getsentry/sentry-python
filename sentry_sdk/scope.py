@@ -173,9 +173,8 @@ class Scope(object):
         # transaction name or transaction (self._span) depending on the type of
         # the value argument.
         self._transaction = value
-        span = self._span
-        if span and isinstance(span, Transaction):
-            span.name = value
+        if self._span and self._span.containing_transaction:
+            self._span.containing_transaction.name = value
 
     @_attr_setter
     def user(self, value):
