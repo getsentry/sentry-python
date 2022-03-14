@@ -140,11 +140,12 @@ class RecordSqlQueries:
         if executemany:
             self._data["db.executemany"] = True
 
-        with capture_internal_exceptions():
-            hub.add_breadcrumb(message=self._query, category="query", data=self._data)
 
     def __enter__(self):
         # type: () -> Span
+        with capture_internal_exceptions():
+            self._hub.add_breadcrumb(message=self._query, category="query", data=self._data)
+
         with self._hub.start_span(op="db", description=self._query) as span:
             for k, v in self._data.items():
                 span.set_data(k, v)
