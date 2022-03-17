@@ -187,15 +187,16 @@ class SentryAsgiMiddleware:
             event.get("transaction", _DEFAULT_TRANSACTION_NAME)
             == _DEFAULT_TRANSACTION_NAME
         ):
-            endpoint = asgi_scope.get("endpoint")
-            # Webframeworks like Starlette mutate the ASGI env once routing is
-            # done, which is sometime after the request has started. If we have
-            # an endpoint, overwrite our generic transaction name.
-            if endpoint:
-                event["transaction"] = transaction_from_function(endpoint)
-            # FastAPI includes the route object in the scope to let Sentry extract the
-            # path from it for the transaction name
-            if self.transaction_style == "url":
+            if self.transaction_style == "endpoint":
+                endpoint = asgi_scope.get("endpoint")
+                # Webframeworks like Starlette mutate the ASGI env once routing is
+                # done, which is sometime after the request has started. If we have
+                # an endpoint, overwrite our generic transaction name.
+                if endpoint:
+                    event["transaction"] = transaction_from_function(endpoint)
+            elif self.transaction_style == "url":
+                # FastAPI includes the route object in the scope to let Sentry extract the
+                # path from it for the transaction name
                 route = asgi_scope.get("route")
                 if route:
                     path = getattr(route, "path", None)
