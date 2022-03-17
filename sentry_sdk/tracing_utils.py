@@ -1,5 +1,4 @@
 import re
-import contextlib
 import json
 import math
 
@@ -106,6 +105,58 @@ class EnvironHeaders(Mapping):  # type: ignore
             yield k[len(self.prefix) :]
 
 
+class RecordSqlQueries:
+    def __init__(
+        self,
+        hub,  # type: sentry_sdk.Hub
+        cursor,  # type: Any
+        query,  # type: Any
+        params_list,  # type:  Any
+        paramstyle,  # type: Optional[str]
+        executemany,  # type: bool
+    ):
+        # type: (...) -> None
+        # TODO: Bring back capturing of params by default
+        self._hub = hub
+        if self._hub.client and self._hub.client.options["_experiments"].get(
+            "record_sql_params", False
+        ):
+            if not params_list or params_list == [None]:
+                params_list = None
+
+            if paramstyle == "pyformat":
+                paramstyle = "format"
+        else:
+            params_list = None
+            paramstyle = None
+
+        self._query = _format_sql(cursor, query)
+
+        self._data = {}
+        if params_list is not None:
+            self._data["db.params"] = params_list
+        if paramstyle is not None:
+            self._data["db.paramstyle"] = paramstyle
+        if executemany:
+            self._data["db.executemany"] = True
+
+    def __enter__(self):
+        # type: () -> Span
+        with capture_internal_exceptions():
+            self._hub.add_breadcrumb(
+                message=self._query, category="query", data=self._data
+            )
+
+        with self._hub.start_span(op="db", description=self._query) as span:
+            for k, v in self._data.items():
+                span.set_data(k, v)
+            return span
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # type: (Any, Any, Any) -> None
+        pass
+
+
 def has_tracing_enabled(options):
     # type: (Dict[str, Any]) -> bool
     """
@@ -148,49 +199,6 @@ def is_valid_sample_rate(rate):
         return False
 
     return True
-
-
-@contextlib.contextmanager
-def record_sql_queries(
-    hub,  # type: sentry_sdk.Hub
-    cursor,  # type: Any
-    query,  # type: Any
-    params_list,  # type:  Any
-    paramstyle,  # type: Optional[str]
-    executemany,  # type: bool
-):
-    # type: (...) -> Generator[Span, None, None]
-
-    # TODO: Bring back capturing of params by default
-    if hub.client and hub.client.options["_experiments"].get(
-        "record_sql_params", False
-    ):
-        if not params_list or params_list == [None]:
-            params_list = None
-
-        if paramstyle == "pyformat":
-            paramstyle = "format"
-    else:
-        params_list = None
-        paramstyle = None
-
-    query = _format_sql(cursor, query)
-
-    data = {}
-    if params_list is not None:
-        data["db.params"] = params_list
-    if paramstyle is not None:
-        data["db.paramstyle"] = paramstyle
-    if executemany:
-        data["db.executemany"] = True
-
-    with capture_internal_exceptions():
-        hub.add_breadcrumb(message=query, category="query", data=data)
-
-    with hub.start_span(op="db", description=query) as span:
-        for k, v in data.items():
-            span.set_data(k, v)
-        yield span
 
 
 def maybe_create_breadcrumbs_from_span(hub, span):

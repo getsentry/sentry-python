@@ -9,7 +9,7 @@ from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
-from sentry_sdk.tracing_utils import record_sql_queries
+from sentry_sdk.tracing_utils import RecordSqlQueries
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
@@ -539,7 +539,7 @@ def install_sql_hook():
         if hub.get_integration(DjangoIntegration) is None:
             return real_execute(self, sql, params)
 
-        with record_sql_queries(
+        with RecordSqlQueries(
             hub, self.cursor, sql, params, paramstyle="format", executemany=False
         ):
             return real_execute(self, sql, params)
@@ -550,7 +550,7 @@ def install_sql_hook():
         if hub.get_integration(DjangoIntegration) is None:
             return real_executemany(self, sql, param_list)
 
-        with record_sql_queries(
+        with RecordSqlQueries(
             hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
         ):
             return real_executemany(self, sql, param_list)

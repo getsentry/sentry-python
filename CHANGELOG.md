@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.5.7
+
+### Various fixes & improvements
+
+- fix(serializer): Make sentry_repr dunder method to avoid mock problems (#1364) by @sl0thentr0py
+
+## 1.5.6
+
+### Various fixes & improvements
+
+- Create feature.yml (#1350) by @vladanpaunovic
+- Update contribution guide (#1346) by @antonpirker
+- chore: add bug issue template (#1345) by @vladanpaunovic
+- Added default value for auto_session_tracking (#1337) by @antonpirker
+- docs(readme): reordered content (#1343) by @antonpirker
+- fix(tests): Removed unsupported Django 1.6 from tests to avoid confusion (#1338) by @antonpirker
+- Group captured warnings under separate issues (#1324) by @mnito
+- build(changelogs): Use automated changelogs from Craft (#1340) by @BYK
+- fix(aiohttp): AioHttpIntegration sentry_app_handle() now ignores ConnectionResetError (#1331) by @cmalek
+- meta: Remove black GH action (#1339) by @sl0thentr0py
+- feat(flask): Add `sentry_trace()` template helper (#1336) by @BYK
+
 ## 1.5.5
 
 - Add session tracking to ASGI integration (#1329)
