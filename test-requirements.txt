@@ -4,7 +4,7 @@ tox==3.7.0
 Werkzeug
 pytest-localserver==0.5.0
 pytest-cov==2.8.1
-jsonschema==3.2.0
+jsonschema==4.4.0
 pyrsistent==0.16.0 # TODO(py3): 0.17.0 requires python3, see https://github.com/tobgu/pyrsistent/issues/205
 mock # for testing under python < 3.3
 
