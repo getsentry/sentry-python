@@ -7,5 +7,7 @@ relay:
   tls_port: ~
   tls_identity_path: ~
   tls_identity_password: ~
+limits:
+  shutdown_timeout: 2
 logging:
   level: debug
