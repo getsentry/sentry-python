@@ -59,6 +59,7 @@ def process_events(ext_id):
         print(f"[{LAMBDA_EXTENSION_NAME}] Received event!", flush=True)
         event = json.loads(response.text)
         if event["eventType"] == "SHUTDOWN":
+            # TODO: send SIGTERM to running relay
             print(
                 f"[{LAMBDA_EXTENSION_NAME}] Event is SHUTDOWN event. Exiting.",
                 flush=True,
