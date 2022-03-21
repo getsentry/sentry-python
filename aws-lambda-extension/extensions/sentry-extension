@@ -1,0 +1,6 @@
+#!/bin/bash
+# This is the script the Lambda environment finds and executes.
+
+set -e
+
+exec "/opt/sentry-extension/extension.py"

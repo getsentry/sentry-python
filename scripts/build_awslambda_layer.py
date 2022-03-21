@@ -10,6 +10,9 @@ if MYPY:
     from typing import Union
 
 
+EXTENSION_NAME = "sentry-extension"
+
+
 class PackageBuilder:
     def __init__(
         self,
@@ -60,6 +63,38 @@ class PackageBuilder:
             "scripts/init_serverless_sdk.py", f"{serverless_sdk_path}/__init__.py"
         )
 
+    def add_sentry_extension(self):
+        # type: (...) -> None
+        """
+        Adds the Sentry Lambda extension to the layer
+        """
+        shutil.copy("aws-lambda-extension/relay/relay", f"{self.base_dir}/")
+        shutil.copytree(
+            "aws-lambda-extension/relay/.relay/", f"{self.base_dir}/.relay/"
+        )
+
+        shutil.copytree(
+            "aws-lambda-extension/extensions/", f"{self.base_dir}/extensions/"
+        )
+
+        extension_dir = f"{self.base_dir}/{EXTENSION_NAME}/"
+        shutil.copytree(f"aws-lambda-extension/{EXTENSION_NAME}", f"{extension_dir}")
+
+        # Add requiremenents of extension
+        subprocess.run(
+            [
+                "pip",
+                "install",
+                "--no-cache-dir",  # Disables the cache -> always accesses PyPI
+                "-q",  # Quiet
+                "-r",
+                "aws-lambda-extension/requirements.txt",
+                "-t",  # Target directory flag
+                extension_dir,
+            ],
+            check=True,
+        )
+
     def zip(
         self, filename  # type: str
     ):
@@ -72,7 +107,7 @@ class PackageBuilder:
                 "**/__pycache__/*",  # Files to be excluded
                 "-r",  # Recurse paths
                 filename,  # Output filename
-                self.pkg_parent_dir,  # Files to be zipped
+                "./",  # Files to be zipped
             ],
             cwd=self.base_dir,
             check=True,  # Raises CalledProcessError if exit status is non-zero
@@ -105,6 +140,7 @@ def build_packaged_zip(
         package_builder.make_directories()
         package_builder.install_python_binaries()
         package_builder.create_init_serverless_sdk_package()
+        package_builder.add_sentry_extension()
         package_builder.zip(dest_zip_filename)
         if not os.path.exists(dist_rel_path):
             os.makedirs(dist_rel_path)
