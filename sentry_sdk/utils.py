@@ -40,7 +40,6 @@ epoch = datetime(1970, 1, 1)
 logger = logging.getLogger("sentry_sdk.errors")
 
 MAX_STRING_LENGTH = 512
-MAX_FORMAT_PARAM_LENGTH = 128
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
 
