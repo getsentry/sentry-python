@@ -1,5 +1,4 @@
 import re
-import contextlib
 import json
 import math
 
@@ -11,6 +10,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     Dsn,
     logger,
+    safe_str,
     to_base64,
     to_string,
     from_base64,
@@ -65,7 +65,7 @@ TRACESTATE_ENTRIES_REGEX = re.compile(
 # of the form `sentry=xxxx`
 SENTRY_TRACESTATE_ENTRY_REGEX = re.compile(
     # either sentry is the first entry or there's stuff immediately before it,
-    # ending in a commma (this prevents matching something like `coolsentry=xxx`)
+    # ending in a comma (this prevents matching something like `coolsentry=xxx`)
     "(?:^|.+,)"
     # sentry's part, not including the potential comma
     "(sentry=[^,]*)"
@@ -105,11 +105,63 @@ class EnvironHeaders(Mapping):  # type: ignore
             yield k[len(self.prefix) :]
 
 
+class RecordSqlQueries:
+    def __init__(
+        self,
+        hub,  # type: sentry_sdk.Hub
+        cursor,  # type: Any
+        query,  # type: Any
+        params_list,  # type:  Any
+        paramstyle,  # type: Optional[str]
+        executemany,  # type: bool
+    ):
+        # type: (...) -> None
+        # TODO: Bring back capturing of params by default
+        self._hub = hub
+        if self._hub.client and self._hub.client.options["_experiments"].get(
+            "record_sql_params", False
+        ):
+            if not params_list or params_list == [None]:
+                params_list = None
+
+            if paramstyle == "pyformat":
+                paramstyle = "format"
+        else:
+            params_list = None
+            paramstyle = None
+
+        self._query = _format_sql(cursor, query)
+
+        self._data = {}
+        if params_list is not None:
+            self._data["db.params"] = params_list
+        if paramstyle is not None:
+            self._data["db.paramstyle"] = paramstyle
+        if executemany:
+            self._data["db.executemany"] = True
+
+    def __enter__(self):
+        # type: () -> Span
+        with capture_internal_exceptions():
+            self._hub.add_breadcrumb(
+                message=self._query, category="query", data=self._data
+            )
+
+        with self._hub.start_span(op="db", description=self._query) as span:
+            for k, v in self._data.items():
+                span.set_data(k, v)
+            return span
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # type: (Any, Any, Any) -> None
+        pass
+
+
 def has_tracing_enabled(options):
     # type: (Dict[str, Any]) -> bool
     """
     Returns True if either traces_sample_rate or traces_sampler is
-    non-zero/defined, False otherwise.
+    defined, False otherwise.
     """
 
     return bool(
@@ -147,49 +199,6 @@ def is_valid_sample_rate(rate):
         return False
 
     return True
-
-
-@contextlib.contextmanager
-def record_sql_queries(
-    hub,  # type: sentry_sdk.Hub
-    cursor,  # type: Any
-    query,  # type: Any
-    params_list,  # type:  Any
-    paramstyle,  # type: Optional[str]
-    executemany,  # type: bool
-):
-    # type: (...) -> Generator[Span, None, None]
-
-    # TODO: Bring back capturing of params by default
-    if hub.client and hub.client.options["_experiments"].get(
-        "record_sql_params", False
-    ):
-        if not params_list or params_list == [None]:
-            params_list = None
-
-        if paramstyle == "pyformat":
-            paramstyle = "format"
-    else:
-        params_list = None
-        paramstyle = None
-
-    query = _format_sql(cursor, query)
-
-    data = {}
-    if params_list is not None:
-        data["db.params"] = params_list
-    if paramstyle is not None:
-        data["db.paramstyle"] = paramstyle
-    if executemany:
-        data["db.executemany"] = True
-
-    with capture_internal_exceptions():
-        hub.add_breadcrumb(message=query, category="query", data=data)
-
-    with hub.start_span(op="db", description=query) as span:
-        for k, v in data.items():
-            span.set_data(k, v)
-        yield span
 
 
 def maybe_create_breadcrumbs_from_span(hub, span):
@@ -288,7 +297,7 @@ def compute_tracestate_value(data):
     tracestate entry.
     """
 
-    tracestate_json = json.dumps(data)
+    tracestate_json = json.dumps(data, default=safe_str)
 
     # Base64-encoded strings always come out with a length which is a multiple
     # of 4. In order to achieve this, the end is padded with one or more `=`

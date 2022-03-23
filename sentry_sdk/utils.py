@@ -40,7 +40,6 @@ epoch = datetime(1970, 1, 1)
 logger = logging.getLogger("sentry_sdk.errors")
 
 MAX_STRING_LENGTH = 512
-MAX_FORMAT_PARAM_LENGTH = 128
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
 
@@ -792,7 +791,9 @@ def _is_contextvars_broken():
         from gevent.monkey import is_object_patched  # type: ignore
 
         # Get the MAJOR and MINOR version numbers of Gevent
-        version_tuple = tuple([int(part) for part in gevent.__version__.split(".")[:2]])
+        version_tuple = tuple(
+            [int(part) for part in re.split(r"a|b|rc|\.", gevent.__version__)[:2]]
+        )
         if is_object_patched("threading", "local"):
             # Gevent 20.9.0 depends on Greenlet 0.4.17 which natively handles switching
             # context vars when greenlets are switched, so, Gevent 20.9.0+ is all fine.

@@ -12,6 +12,7 @@ from sentry_sdk._functools import partial
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.utils import (
     ContextVar,
     event_from_exception,
@@ -35,6 +36,8 @@ if MYPY:
 _asgi_middleware_applied = ContextVar("sentry_asgi_middleware_applied")
 
 _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
+
+TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 
 def _capture_exception(hub, exc):
@@ -67,10 +70,10 @@ def _looks_like_asgi3(app):
 
 
 class SentryAsgiMiddleware:
-    __slots__ = ("app", "__call__")
+    __slots__ = ("app", "__call__", "transaction_style")
 
-    def __init__(self, app, unsafe_context_data=False):
-        # type: (Any, bool) -> None
+    def __init__(self, app, unsafe_context_data=False, transaction_style="endpoint"):
+        # type: (Any, bool, str) -> None
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
         data to sent events and basic handling for exceptions bubbling up
@@ -86,6 +89,12 @@ class SentryAsgiMiddleware:
                 "The ASGI middleware for Sentry requires Python 3.7+ "
                 "or the aiocontextvars package." + CONTEXTVARS_ERROR_MESSAGE
             )
+        if transaction_style not in TRANSACTION_STYLE_VALUES:
+            raise ValueError(
+                "Invalid value for transaction_style: %s (must be in %s)"
+                % (transaction_style, TRANSACTION_STYLE_VALUES)
+            )
+        self.transaction_style = transaction_style
         self.app = app
 
         if _looks_like_asgi3(app):
@@ -119,37 +128,38 @@ class SentryAsgiMiddleware:
         _asgi_middleware_applied.set(True)
         try:
             hub = Hub(Hub.current)
-            with hub:
-                with hub.configure_scope() as sentry_scope:
-                    sentry_scope.clear_breadcrumbs()
-                    sentry_scope._name = "asgi"
-                    processor = partial(self.event_processor, asgi_scope=scope)
-                    sentry_scope.add_event_processor(processor)
+            with auto_session_tracking(hub, session_mode="request"):
+                with hub:
+                    with hub.configure_scope() as sentry_scope:
+                        sentry_scope.clear_breadcrumbs()
+                        sentry_scope._name = "asgi"
+                        processor = partial(self.event_processor, asgi_scope=scope)
+                        sentry_scope.add_event_processor(processor)
 
-                ty = scope["type"]
+                    ty = scope["type"]
 
-                if ty in ("http", "websocket"):
-                    transaction = Transaction.continue_from_headers(
-                        self._get_headers(scope),
-                        op="{}.server".format(ty),
-                    )
-                else:
-                    transaction = Transaction(op="asgi.server")
+                    if ty in ("http", "websocket"):
+                        transaction = Transaction.continue_from_headers(
+                            self._get_headers(scope),
+                            op="{}.server".format(ty),
+                        )
+                    else:
+                        transaction = Transaction(op="asgi.server")
 
-                transaction.name = _DEFAULT_TRANSACTION_NAME
-                transaction.set_tag("asgi.type", ty)
+                    transaction.name = _DEFAULT_TRANSACTION_NAME
+                    transaction.set_tag("asgi.type", ty)
 
-                with hub.start_transaction(
-                    transaction, custom_sampling_context={"asgi_scope": scope}
-                ):
-                    # XXX: Would be cool to have correct span status, but we
-                    # would have to wrap send(). That is a bit hard to do with
-                    # the current abstraction over ASGI 2/3.
-                    try:
-                        return await callback()
-                    except Exception as exc:
-                        _capture_exception(hub, exc)
-                        raise exc from None
+                    with hub.start_transaction(
+                        transaction, custom_sampling_context={"asgi_scope": scope}
+                    ):
+                        # XXX: Would be cool to have correct span status, but we
+                        # would have to wrap send(). That is a bit hard to do with
+                        # the current abstraction over ASGI 2/3.
+                        try:
+                            return await callback()
+                        except Exception as exc:
+                            _capture_exception(hub, exc)
+                            raise exc from None
         finally:
             _asgi_middleware_applied.set(False)
 
@@ -177,12 +187,21 @@ class SentryAsgiMiddleware:
             event.get("transaction", _DEFAULT_TRANSACTION_NAME)
             == _DEFAULT_TRANSACTION_NAME
         ):
-            endpoint = asgi_scope.get("endpoint")
-            # Webframeworks like Starlette mutate the ASGI env once routing is
-            # done, which is sometime after the request has started. If we have
-            # an endpoint, overwrite our generic transaction name.
-            if endpoint:
-                event["transaction"] = transaction_from_function(endpoint)
+            if self.transaction_style == "endpoint":
+                endpoint = asgi_scope.get("endpoint")
+                # Webframeworks like Starlette mutate the ASGI env once routing is
+                # done, which is sometime after the request has started. If we have
+                # an endpoint, overwrite our generic transaction name.
+                if endpoint:
+                    event["transaction"] = transaction_from_function(endpoint)
+            elif self.transaction_style == "url":
+                # FastAPI includes the route object in the scope to let Sentry extract the
+                # path from it for the transaction name
+                route = asgi_scope.get("route")
+                if route:
+                    path = getattr(route, "path", None)
+                    if path is not None:
+                        event["transaction"] = path
 
         event["request"] = request_info
 

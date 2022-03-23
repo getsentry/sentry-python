@@ -19,19 +19,24 @@ except ImportError:
 
 from sentry_sdk import capture_message, capture_exception, configure_scope
 from sentry_sdk.integrations.django import DjangoIntegration
+from functools import partial
 
 from tests.integrations.django.myapp.wsgi import application
 
 # Hack to prevent from experimental feature introduced in version `4.3.0` in `pytest-django` that
 # requires explicit database allow from failing the test
-pytest_mark_django_db_decorator = pytest.mark.django_db
+pytest_mark_django_db_decorator = partial(pytest.mark.django_db)
 try:
     pytest_version = tuple(map(int, pytest_django.__version__.split(".")))
     if pytest_version > (4, 2, 0):
-        pytest_mark_django_db_decorator = pytest.mark.django_db(databases="__all__")
+        pytest_mark_django_db_decorator = partial(
+            pytest.mark.django_db, databases="__all__"
+        )
 except ValueError:
     if "dev" in pytest_django.__version__:
-        pytest_mark_django_db_decorator = pytest.mark.django_db(databases="__all__")
+        pytest_mark_django_db_decorator = partial(
+            pytest.mark.django_db, databases="__all__"
+        )
 except AttributeError:
     pass
 
@@ -259,7 +264,7 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
 
 
 @pytest.mark.forked
-@pytest_mark_django_db_decorator
+@pytest_mark_django_db_decorator()
 def test_sql_dict_query_params(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -304,7 +309,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     ],
 )
 @pytest.mark.forked
-@pytest_mark_django_db_decorator
+@pytest_mark_django_db_decorator()
 def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -337,7 +342,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
 
 
 @pytest.mark.forked
-@pytest_mark_django_db_decorator
+@pytest_mark_django_db_decorator()
 def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -394,6 +399,72 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
             "%(second_var)s)",
             "type": "default",
         },
+    ]
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_django_connect_trace(sentry_init, client, capture_events, render_span_tree):
+    """
+    Verify we record a span when opening a new database.
+    """
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+    )
+
+    from django.db import connections
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    content, status, headers = client.get(reverse("postgres_select"))
+    assert status == "200 OK"
+
+    assert '- op="db": description="connect"' in render_span_tree(events[0])
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_django_connect_breadcrumbs(
+    sentry_init, client, capture_events, render_span_tree
+):
+    """
+    Verify we record a breadcrumb when opening a new database.
+    """
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+    )
+
+    from django.db import connections
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    cursor = connections["postgres"].cursor()
+    cursor.execute("select 1")
+
+    # trigger recording of event.
+    capture_message("HI")
+    (event,) = events
+    for crumb in event["breadcrumbs"]["values"]:
+        del crumb["timestamp"]
+
+    assert event["breadcrumbs"]["values"][-2:] == [
+        {"message": "connect", "category": "query", "type": "default"},
+        {"message": "select 1", "category": "query", "data": {}, "type": "default"},
     ]
 
 
@@ -684,3 +755,39 @@ def test_csrf(sentry_init, client):
     content, status, _headers = client.post(reverse("message"))
     assert status.lower() == "200 ok"
     assert b"".join(content) == b"ok"
+
+
+@pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Requires Django > 2.0")
+def test_custom_urlconf_middleware(
+    settings, sentry_init, client, capture_events, render_span_tree
+):
+    """
+    Some middlewares (for instance in django-tenants) overwrite request.urlconf.
+    Test that the resolver picks up the correct urlconf for transaction naming.
+    """
+    urlconf = "tests.integrations.django.myapp.middleware.custom_urlconf_middleware"
+    settings.ROOT_URLCONF = ""
+    settings.MIDDLEWARE.insert(0, urlconf)
+    client.application.load_middleware()
+
+    sentry_init(integrations=[DjangoIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    content, status, _headers = client.get("/custom/ok")
+    assert status.lower() == "200 ok"
+    assert b"".join(content) == b"custom ok"
+
+    event = events.pop(0)
+    assert event["transaction"] == "/custom/ok"
+    assert "custom_urlconf_middleware" in render_span_tree(event)
+
+    _content, status, _headers = client.get("/custom/exc")
+    assert status.lower() == "500 internal server error"
+
+    error_event, transaction_event = events
+    assert error_event["transaction"] == "/custom/exc"
+    assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "django"
+    assert transaction_event["transaction"] == "/custom/exc"
+    assert "custom_urlconf_middleware" in render_span_tree(transaction_event)
+
+    settings.MIDDLEWARE.pop(0)
