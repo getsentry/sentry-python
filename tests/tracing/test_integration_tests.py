@@ -10,6 +10,7 @@ from sentry_sdk import (
     start_span,
     start_transaction,
 )
+from sentry_sdk.transport import Transport
 from sentry_sdk.tracing import Transaction
 
 
@@ -47,44 +48,47 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
 
 @pytest.mark.parametrize("sampled", [True, False, None])
-def test_continue_from_headers(sentry_init, capture_events, sampled):
-    sentry_init(traces_sample_rate=1.0)
+@pytest.mark.parametrize("sample_rate", [0.0, 1.0])
+def test_continue_from_headers(sentry_init, capture_events, sampled, sample_rate):
+    """
+    Ensure data is actually passed along via headers, and that they are read
+    correctly.
+    """
+    sentry_init(traces_sample_rate=sample_rate)
     events = capture_events()
 
     # make a parent transaction (normally this would be in a different service)
-    with start_transaction(name="hi"):
+    with start_transaction(
+        name="hi", sampled=True if sample_rate == 0 else None
+    ) as parent_transaction:
         with start_span() as old_span:
             old_span.sampled = sampled
-            headers = dict(Hub.current.iter_trace_propagation_headers())
+            headers = dict(Hub.current.iter_trace_propagation_headers(old_span))
+            tracestate = parent_transaction._sentry_tracestate
 
-    # test that the sampling decision is getting encoded in the header correctly
-    header = headers["sentry-trace"]
-    if sampled is True:
-        assert header.endswith("-1")
-    if sampled is False:
-        assert header.endswith("-0")
-    if sampled is None:
-        assert header.endswith("-")
-
-    # child transaction, to prove that we can read 'sentry-trace' header data
-    # correctly
-    transaction = Transaction.continue_from_headers(headers, name="WRONG")
-    assert transaction is not None
-    assert transaction.parent_sampled == sampled
-    assert transaction.trace_id == old_span.trace_id
-    assert transaction.same_process_as_parent is False
-    assert transaction.parent_span_id == old_span.span_id
-    assert transaction.span_id != old_span.span_id
+    # child transaction, to prove that we can read 'sentry-trace' and
+    # `tracestate` header data correctly
+    child_transaction = Transaction.continue_from_headers(headers, name="WRONG")
+    assert child_transaction is not None
+    assert child_transaction.parent_sampled == sampled
+    assert child_transaction.trace_id == old_span.trace_id
+    assert child_transaction.same_process_as_parent is False
+    assert child_transaction.parent_span_id == old_span.span_id
+    assert child_transaction.span_id != old_span.span_id
+    assert child_transaction._sentry_tracestate == tracestate
 
     # add child transaction to the scope, to show that the captured message will
     # be tagged with the trace id (since it happens while the transaction is
     # open)
-    with start_transaction(transaction):
+    with start_transaction(child_transaction):
         with configure_scope() as scope:
+            # change the transaction name from "WRONG" to make sure the change
+            # is reflected in the final data
             scope.transaction = "ho"
         capture_message("hello")
 
-    if sampled is False:
+    # in this case the child transaction won't be captured
+    if sampled is False or (sample_rate == 0 and sampled is None):
         trace1, message = events
 
         assert trace1["transaction"] == "hi"
@@ -97,7 +101,7 @@ def test_continue_from_headers(sentry_init, capture_events, sampled):
         assert (
             trace1["contexts"]["trace"]["trace_id"]
             == trace2["contexts"]["trace"]["trace_id"]
-            == transaction.trace_id
+            == child_transaction.trace_id
             == message["contexts"]["trace"]["trace_id"]
         )
 
@@ -142,5 +146,24 @@ def test_transactions_do_not_go_through_before_send(sentry_init, capture_events)
 
     with start_transaction(name="/"):
         pass
+
+    assert len(events) == 1
+
+
+def test_start_span_after_finish(sentry_init, capture_events):
+    class CustomTransport(Transport):
+        def capture_envelope(self, envelope):
+            pass
+
+        def capture_event(self, event):
+            start_span(op="toolate", description="justdont")
+            pass
+
+    sentry_init(traces_sample_rate=1, transport=CustomTransport())
+    events = capture_events()
+
+    with start_transaction(name="hi"):
+        with start_span(op="bar", description="bardesc"):
+            pass
 
     assert len(events) == 1

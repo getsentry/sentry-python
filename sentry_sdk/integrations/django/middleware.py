@@ -16,7 +16,10 @@ from sentry_sdk.utils import (
 if MYPY:
     from typing import Any
     from typing import Callable
+    from typing import Optional
     from typing import TypeVar
+
+    from sentry_sdk.tracing import Span
 
     F = TypeVar("F", bound=Callable[..., Any])
 
@@ -28,6 +31,12 @@ if DJANGO_VERSION < (1, 7):
     import_string_name = "import_by_path"
 else:
     import_string_name = "import_string"
+
+
+if DJANGO_VERSION < (3, 1):
+    _asgi_middleware_mixin_factory = lambda _: object
+else:
+    from .asgi import _asgi_middleware_mixin_factory
 
 
 def patch_django_middlewares():
@@ -64,29 +73,40 @@ def _wrap_middleware(middleware, middleware_name):
     # type: (Any, str) -> Any
     from sentry_sdk.integrations.django import DjangoIntegration
 
+    def _check_middleware_span(old_method):
+        # type: (Callable[..., Any]) -> Optional[Span]
+        hub = Hub.current
+        integration = hub.get_integration(DjangoIntegration)
+        if integration is None or not integration.middleware_spans:
+            return None
+
+        function_name = transaction_from_function(old_method)
+
+        description = middleware_name
+        function_basename = getattr(old_method, "__name__", None)
+        if function_basename:
+            description = "{}.{}".format(description, function_basename)
+
+        middleware_span = hub.start_span(
+            op="django.middleware", description=description
+        )
+        middleware_span.set_tag("django.function_name", function_name)
+        middleware_span.set_tag("django.middleware_name", middleware_name)
+
+        return middleware_span
+
     def _get_wrapped_method(old_method):
         # type: (F) -> F
         with capture_internal_exceptions():
 
             def sentry_wrapped_method(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
-                hub = Hub.current
-                integration = hub.get_integration(DjangoIntegration)
-                if integration is None or not integration.middleware_spans:
+                middleware_span = _check_middleware_span(old_method)
+
+                if middleware_span is None:
                     return old_method(*args, **kwargs)
 
-                function_name = transaction_from_function(old_method)
-
-                description = middleware_name
-                function_basename = getattr(old_method, "__name__", None)
-                if function_basename:
-                    description = "{}.{}".format(description, function_basename)
-
-                with hub.start_span(
-                    op="django.middleware", description=description
-                ) as span:
-                    span.set_tag("django.function_name", function_name)
-                    span.set_tag("django.middleware_name", middleware_name)
+                with middleware_span:
                     return old_method(*args, **kwargs)
 
             try:
@@ -102,11 +122,22 @@ def _wrap_middleware(middleware, middleware_name):
 
         return old_method
 
-    class SentryWrappingMiddleware(object):
-        def __init__(self, *args, **kwargs):
-            # type: (*Any, **Any) -> None
-            self._inner = middleware(*args, **kwargs)
+    class SentryWrappingMiddleware(
+        _asgi_middleware_mixin_factory(_check_middleware_span)  # type: ignore
+    ):
+
+        async_capable = getattr(middleware, "async_capable", False)
+
+        def __init__(self, get_response=None, *args, **kwargs):
+            # type: (Optional[Callable[..., Any]], *Any, **Any) -> None
+            if get_response:
+                self._inner = middleware(get_response, *args, **kwargs)
+            else:
+                self._inner = middleware(*args, **kwargs)
+            self.get_response = get_response
             self._call_method = None
+            if self.async_capable:
+                super(SentryWrappingMiddleware, self).__init__(get_response)
 
         # We need correct behavior for `hasattr()`, which we can only determine
         # when we have an instance of the middleware we're wrapping.
@@ -128,12 +159,27 @@ def _wrap_middleware(middleware, middleware_name):
 
         def __call__(self, *args, **kwargs):
             # type: (*Any, **Any) -> Any
+            if hasattr(self, "async_route_check") and self.async_route_check():
+                return self.__acall__(*args, **kwargs)
+
             f = self._call_method
             if f is None:
-                self._call_method = f = _get_wrapped_method(self._inner.__call__)
-            return f(*args, **kwargs)
+                self._call_method = f = self._inner.__call__
 
-    if hasattr(middleware, "__name__"):
-        SentryWrappingMiddleware.__name__ = middleware.__name__
+            middleware_span = _check_middleware_span(old_method=f)
+
+            if middleware_span is None:
+                return f(*args, **kwargs)
+
+            with middleware_span:
+                return f(*args, **kwargs)
+
+    for attr in (
+        "__name__",
+        "__module__",
+        "__qualname__",
+    ):
+        if hasattr(middleware, attr):
+            setattr(SentryWrappingMiddleware, attr, getattr(middleware, attr))
 
     return SentryWrappingMiddleware

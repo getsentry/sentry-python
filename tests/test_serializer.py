@@ -1,5 +1,4 @@
 import sys
-
 import pytest
 
 from sentry_sdk.serializer import serialize
@@ -11,15 +10,21 @@ except ImportError:
     pass
 else:
 
-    @given(binary=st.binary(min_size=1))
-    def test_bytes_serialization_decode_many(binary, message_normalizer):
-        result = message_normalizer(binary, should_repr_strings=False)
-        assert result == binary.decode("utf-8", "replace")
+    def test_bytes_serialization_decode_many(message_normalizer):
+        @given(binary=st.binary(min_size=1))
+        def inner(binary):
+            result = message_normalizer(binary, should_repr_strings=False)
+            assert result == binary.decode("utf-8", "replace")
 
-    @given(binary=st.binary(min_size=1))
-    def test_bytes_serialization_repr_many(binary, message_normalizer):
-        result = message_normalizer(binary, should_repr_strings=True)
-        assert result == repr(binary)
+        inner()
+
+    def test_bytes_serialization_repr_many(message_normalizer):
+        @given(binary=st.binary(min_size=1))
+        def inner(binary):
+            result = message_normalizer(binary, should_repr_strings=True)
+            assert result == repr(binary)
+
+        inner()
 
 
 @pytest.fixture
@@ -58,3 +63,24 @@ def test_bytes_serialization_repr(message_normalizer):
 def test_serialize_sets(extra_normalizer):
     result = extra_normalizer({1, 2, 3})
     assert result == [1, 2, 3]
+
+
+def test_serialize_custom_mapping(extra_normalizer):
+    class CustomReprDict(dict):
+        def __sentry_repr__(self):
+            return "custom!"
+
+    result = extra_normalizer(CustomReprDict(one=1, two=2))
+    assert result == "custom!"
+
+
+def test_custom_mapping_doesnt_mess_with_mock(extra_normalizer):
+    """
+    Adding the __sentry_repr__ magic method check in the serializer
+    shouldn't mess with how mock works. This broke some stuff when we added
+    sentry_repr without the dunders.
+    """
+    mock = pytest.importorskip("unittest.mock")
+    m = mock.Mock()
+    extra_normalizer(m)
+    assert len(m.mock_calls) == 0

@@ -1,6 +1,8 @@
 from sentry_sdk._types import MYPY
 
 if MYPY:
+    import sentry_sdk
+
     from typing import Optional
     from typing import Callable
     from typing import Union
@@ -11,7 +13,6 @@ if MYPY:
     from typing import Sequence
     from typing_extensions import TypedDict
 
-    from sentry_sdk.transport import Transport
     from sentry_sdk.integrations import Integration
 
     from sentry_sdk._types import (
@@ -30,12 +31,13 @@ if MYPY:
         {
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
-            "auto_session_tracking": Optional[bool],
             "smart_transaction_trimming": Optional[bool],
+            "propagate_tracestate": Optional[bool],
         },
         total=False,
     )
 
+DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
 
 
@@ -50,13 +52,14 @@ class ClientConstructor(object):
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
         server_name=None,  # type: Optional[str]
-        shutdown_timeout=2,  # type: int
+        shutdown_timeout=2,  # type: float
         integrations=[],  # type: Sequence[Integration]  # noqa: B006
         in_app_include=[],  # type: List[str]  # noqa: B006
         in_app_exclude=[],  # type: List[str]  # noqa: B006
         default_integrations=True,  # type: bool
         dist=None,  # type: Optional[str]
-        transport=None,  # type: Optional[Union[Transport, Type[Transport], Callable[[Event], None]]]
+        transport=None,  # type: Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]
+        transport_queue_size=DEFAULT_QUEUE_SIZE,  # type: int
         sample_rate=1.0,  # type: float
         send_default_pii=False,  # type: bool
         http_proxy=None,  # type: Optional[str]
@@ -72,6 +75,8 @@ class ClientConstructor(object):
         traces_sample_rate=None,  # type: Optional[float]
         traces_sampler=None,  # type: Optional[TracesSampler]
         auto_enabling_integrations=True,  # type: bool
+        auto_session_tracking=True,  # type: bool
+        send_client_reports=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
     ):
         # type: (...) -> None
@@ -96,7 +101,7 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "0.19.1"
+VERSION = "1.5.8"
 SDK_INFO = {
     "name": "sentry.python",
     "version": VERSION,

@@ -1,7 +1,9 @@
 import weakref
+import contextlib
 from inspect import iscoroutinefunction
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
+from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
@@ -32,6 +34,7 @@ if MYPY:
     from typing import Optional
     from typing import Dict
     from typing import Callable
+    from typing import Generator
 
     from sentry_sdk._types import EventProcessor
 
@@ -63,38 +66,16 @@ class TornadoIntegration(Integration):
             # Starting Tornado 6 RequestHandler._execute method is a standard Python coroutine (async/await)
             # In that case our method should be a coroutine function too
             async def sentry_execute_request_handler(self, *args, **kwargs):
-                # type: (Any, *Any, **Any) -> Any
-                hub = Hub.current
-                integration = hub.get_integration(TornadoIntegration)
-                if integration is None:
-                    return await old_execute(self, *args, **kwargs)
-
-                weak_handler = weakref.ref(self)
-
-                with Hub(hub) as hub:
-                    with hub.configure_scope() as scope:
-                        scope.clear_breadcrumbs()
-                        processor = _make_event_processor(weak_handler)  # type: ignore
-                        scope.add_event_processor(processor)
+                # type: (RequestHandler, *Any, **Any) -> Any
+                with _handle_request_impl(self):
                     return await old_execute(self, *args, **kwargs)
 
         else:
 
             @coroutine  # type: ignore
-            def sentry_execute_request_handler(self, *args, **kwargs):
+            def sentry_execute_request_handler(self, *args, **kwargs):  # type: ignore
                 # type: (RequestHandler, *Any, **Any) -> Any
-                hub = Hub.current
-                integration = hub.get_integration(TornadoIntegration)
-                if integration is None:
-                    return old_execute(self, *args, **kwargs)
-
-                weak_handler = weakref.ref(self)
-
-                with Hub(hub) as hub:
-                    with hub.configure_scope() as scope:
-                        scope.clear_breadcrumbs()
-                        processor = _make_event_processor(weak_handler)  # type: ignore
-                        scope.add_event_processor(processor)
+                with _handle_request_impl(self):
                     result = yield from old_execute(self, *args, **kwargs)
                     return result
 
@@ -108,6 +89,39 @@ class TornadoIntegration(Integration):
             return old_log_exception(self, ty, value, tb, *args, **kwargs)  # type: ignore
 
         RequestHandler.log_exception = sentry_log_exception  # type: ignore
+
+
+@contextlib.contextmanager
+def _handle_request_impl(self):
+    # type: (RequestHandler) -> Generator[None, None, None]
+    hub = Hub.current
+    integration = hub.get_integration(TornadoIntegration)
+
+    if integration is None:
+        yield
+
+    weak_handler = weakref.ref(self)
+
+    with Hub(hub) as hub:
+        with hub.configure_scope() as scope:
+            scope.clear_breadcrumbs()
+            processor = _make_event_processor(weak_handler)  # type: ignore
+            scope.add_event_processor(processor)
+
+        transaction = Transaction.continue_from_headers(
+            self.request.headers,
+            op="http.server",
+            # Like with all other integrations, this is our
+            # fallback transaction in case there is no route.
+            # sentry_urldispatcher_resolve is responsible for
+            # setting a transaction name later.
+            name="generic Tornado request",
+        )
+
+        with hub.start_transaction(
+            transaction, custom_sampling_context={"tornado_request": self.request}
+        ):
+            yield
 
 
 def _capture_exception(ty, value, tb):

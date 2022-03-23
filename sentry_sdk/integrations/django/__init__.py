@@ -9,7 +9,7 @@ from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
-from sentry_sdk.tracing import record_sql_queries
+from sentry_sdk.tracing_utils import RecordSqlQueries
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
@@ -37,7 +37,10 @@ except ImportError:
 
 
 from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
-from sentry_sdk.integrations.django.templates import get_template_frame_from_exception
+from sentry_sdk.integrations.django.templates import (
+    get_template_frame_from_exception,
+    patch_templates,
+)
 from sentry_sdk.integrations.django.middleware import patch_django_middlewares
 from sentry_sdk.integrations.django.views import patch_views
 
@@ -55,6 +58,7 @@ if MYPY:
     from django.http.request import QueryDict
     from django.utils.datastructures import MultiValueDict
 
+    from sentry_sdk.scope import Scope
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from sentry_sdk._types import Event, Hint, EventProcessor, NotImplementedType
 
@@ -96,8 +100,8 @@ class DjangoIntegration(Integration):
     def setup_once():
         # type: () -> None
 
-        if DJANGO_VERSION < (1, 6):
-            raise DidNotEnable("Django 1.6 or newer is required.")
+        if DJANGO_VERSION < (1, 8):
+            raise DidNotEnable("Django 1.8 or newer is required.")
 
         install_sql_hook()
         # Patch in our custom middleware.
@@ -117,7 +121,13 @@ class DjangoIntegration(Integration):
 
             bound_old_app = old_app.__get__(self, WSGIHandler)
 
-            return SentryWsgiMiddleware(bound_old_app)(environ, start_response)
+            from django.conf import settings
+
+            use_x_forwarded_for = settings.USE_X_FORWARDED_HOST
+
+            return SentryWsgiMiddleware(bound_old_app, use_x_forwarded_for)(
+                environ, start_response
+            )
 
         WSGIHandler.__call__ = sentry_patched_wsgi_handler
 
@@ -201,6 +211,7 @@ class DjangoIntegration(Integration):
         _patch_channels()
         patch_django_middlewares()
         patch_views()
+        patch_templates()
 
 
 _DRF_PATCHED = False
@@ -322,17 +333,48 @@ def _before_get_response(request):
         # Rely on WSGI middleware to start a trace
         try:
             if integration.transaction_style == "function_name":
+                fn = resolve(request.path).func
                 scope.transaction = transaction_from_function(
-                    resolve(request.path).func
+                    getattr(fn, "view_class", fn)
                 )
             elif integration.transaction_style == "url":
-                scope.transaction = LEGACY_RESOLVER.resolve(request.path)
+                scope.transaction = LEGACY_RESOLVER.resolve(request.path_info)
         except Exception:
             pass
 
         scope.add_event_processor(
             _make_event_processor(weakref.ref(request), integration)
         )
+
+
+def _attempt_resolve_again(request, scope):
+    # type: (WSGIRequest, Scope) -> None
+    """
+    Some django middlewares overwrite request.urlconf
+    so we need to respect that contract,
+    so we try to resolve the url again.
+    """
+    if not hasattr(request, "urlconf"):
+        return
+
+    try:
+        scope.transaction = LEGACY_RESOLVER.resolve(
+            request.path_info,
+            urlconf=request.urlconf,
+        )
+    except Exception:
+        pass
+
+
+def _after_get_response(request):
+    # type: (WSGIRequest) -> None
+    hub = Hub.current
+    integration = hub.get_integration(DjangoIntegration)
+    if integration is None or integration.transaction_style != "url":
+        return
+
+    with hub.configure_scope() as scope:
+        _attempt_resolve_again(request, scope)
 
 
 def _patch_get_response():
@@ -347,7 +389,9 @@ def _patch_get_response():
     def sentry_patched_get_response(self, request):
         # type: (Any, WSGIRequest) -> Union[HttpResponse, BaseException]
         _before_get_response(request)
-        return old_get_response(self, request)
+        rv = old_get_response(self, request)
+        _after_get_response(request)
+        return rv
 
     BaseHandler.get_response = sentry_patched_get_response
 
@@ -392,6 +436,10 @@ def _got_request_exception(request=None, **kwargs):
     hub = Hub.current
     integration = hub.get_integration(DjangoIntegration)
     if integration is not None:
+
+        if request is not None and integration.transaction_style == "url":
+            with hub.configure_scope() as scope:
+                _attempt_resolve_again(request, scope)
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
@@ -471,8 +519,16 @@ def install_sql_hook():
         from django.db.backends.util import CursorWrapper
 
     try:
+        # django 1.6 and 1.7 compatability
+        from django.db.backends import BaseDatabaseWrapper
+    except ImportError:
+        # django 1.8 or later
+        from django.db.backends.base.base import BaseDatabaseWrapper
+
+    try:
         real_execute = CursorWrapper.execute
         real_executemany = CursorWrapper.executemany
+        real_connect = BaseDatabaseWrapper.connect
     except AttributeError:
         # This won't work on Django versions < 1.6
         return
@@ -483,7 +539,7 @@ def install_sql_hook():
         if hub.get_integration(DjangoIntegration) is None:
             return real_execute(self, sql, params)
 
-        with record_sql_queries(
+        with RecordSqlQueries(
             hub, self.cursor, sql, params, paramstyle="format", executemany=False
         ):
             return real_execute(self, sql, params)
@@ -494,11 +550,24 @@ def install_sql_hook():
         if hub.get_integration(DjangoIntegration) is None:
             return real_executemany(self, sql, param_list)
 
-        with record_sql_queries(
+        with RecordSqlQueries(
             hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
         ):
             return real_executemany(self, sql, param_list)
 
+    def connect(self):
+        # type: (BaseDatabaseWrapper) -> None
+        hub = Hub.current
+        if hub.get_integration(DjangoIntegration) is None:
+            return real_connect(self)
+
+        with capture_internal_exceptions():
+            hub.add_breadcrumb(message="connect", category="query")
+
+        with hub.start_span(op="db", description="connect"):
+            return real_connect(self)
+
     CursorWrapper.execute = execute
     CursorWrapper.executemany = executemany
+    BaseDatabaseWrapper.connect = connect
     ignore_logger("django.db.backends")

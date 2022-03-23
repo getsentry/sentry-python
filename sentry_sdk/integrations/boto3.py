@@ -14,6 +14,7 @@ if MYPY:
     from typing import Type
 
 try:
+    from botocore import __version__ as BOTOCORE_VERSION  # type: ignore
     from botocore.client import BaseClient  # type: ignore
     from botocore.response import StreamingBody  # type: ignore
     from botocore.awsrequest import AWSRequest  # type: ignore
@@ -27,6 +28,14 @@ class Boto3Integration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+        try:
+            version = tuple(map(int, BOTOCORE_VERSION.split(".")[:3]))
+        except (ValueError, TypeError):
+            raise DidNotEnable(
+                "Unparsable botocore version: {}".format(BOTOCORE_VERSION)
+            )
+        if version < (1, 12):
+            raise DidNotEnable("Botocore 1.12 or newer is required.")
         orig_init = BaseClient.__init__
 
         def sentry_patched_init(self, *args, **kwargs):

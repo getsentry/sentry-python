@@ -70,7 +70,7 @@ def capture_event(
     event,  # type: Event
     hint=None,  # type: Optional[Hint]
     scope=None,  # type: Optional[Any]
-    **scope_args  # type: Dict[str, Any]
+    **scope_args  # type: Any
 ):
     # type: (...) -> Optional[str]
     return Hub.current.capture_event(event, hint, scope=scope, **scope_args)
@@ -81,7 +81,7 @@ def capture_message(
     message,  # type: str
     level=None,  # type: Optional[str]
     scope=None,  # type: Optional[Any]
-    **scope_args  # type: Dict[str, Any]
+    **scope_args  # type: Any
 ):
     # type: (...) -> Optional[str]
     return Hub.current.capture_message(message, level, scope=scope, **scope_args)
@@ -91,7 +91,7 @@ def capture_message(
 def capture_exception(
     error=None,  # type: Optional[Union[BaseException, ExcInfo]]
     scope=None,  # type: Optional[Any]
-    **scope_args  # type: Dict[str, Any]
+    **scope_args  # type: Any
 ):
     # type: (...) -> Optional[str]
     return Hub.current.capture_exception(error, scope=scope, **scope_args)
@@ -159,7 +159,7 @@ def set_tag(key, value):
 
 @scopemethod  # noqa
 def set_context(key, value):
-    # type: (str, Any) -> None
+    # type: (str, Dict[str, Any]) -> None
     return Hub.current.scope.set_context(key, value)
 
 
@@ -171,7 +171,7 @@ def set_extra(key, value):
 
 @scopemethod  # noqa
 def set_user(value):
-    # type: (Dict[str, Any]) -> None
+    # type: (Optional[Dict[str, Any]]) -> None
     return Hub.current.scope.set_user(value)
 
 

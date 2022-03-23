@@ -4,8 +4,15 @@ import json
 import pytest
 import jsonschema
 
-import gevent
-import eventlet
+try:
+    import gevent
+except ImportError:
+    gevent = None
+
+try:
+    import eventlet
+except ImportError:
+    eventlet = None
 
 import sentry_sdk
 from sentry_sdk._compat import reraise, string_types, iteritems
@@ -237,6 +244,25 @@ def capture_envelopes(monkeypatch):
 
 
 @pytest.fixture
+def capture_client_reports(monkeypatch):
+    def inner():
+        reports = []
+        test_client = sentry_sdk.Hub.current.client
+
+        def record_lost_event(reason, data_category=None, item=None):
+            if data_category is None:
+                data_category = item.data_category
+            return reports.append((reason, data_category))
+
+        monkeypatch.setattr(
+            test_client.transport, "record_lost_event", record_lost_event
+        )
+        return reports
+
+    return inner
+
+
+@pytest.fixture
 def capture_events_forksafe(monkeypatch, capture_events, request):
     def inner():
         capture_events()
@@ -284,6 +310,9 @@ class EventStreamReader(object):
 )
 def maybe_monkeypatched_threading(request):
     if request.param == "eventlet":
+        if eventlet is None:
+            pytest.skip("no eventlet installed")
+
         try:
             eventlet.monkey_patch()
         except AttributeError as e:
@@ -293,6 +322,8 @@ def maybe_monkeypatched_threading(request):
             else:
                 raise
     elif request.param == "gevent":
+        if gevent is None:
+            pytest.skip("no gevent installed")
         try:
             gevent.monkey.patch_all()
         except Exception as e:
@@ -355,16 +386,64 @@ def string_containing_matcher():
         def __init__(self, substring):
             self.substring = substring
 
+            try:
+                # the `unicode` type only exists in python 2, so if this blows up,
+                # we must be in py3 and have the `bytes` type
+                self.valid_types = (str, unicode)  # noqa
+            except NameError:
+                self.valid_types = (str, bytes)
+
         def __eq__(self, test_string):
-            if not isinstance(test_string, str):
+            if not isinstance(test_string, self.valid_types):
                 return False
+
+            # this is safe even in py2 because as of 2.6, `bytes` exists in py2
+            # as an alias for `str`
+            if isinstance(test_string, bytes):
+                test_string = test_string.decode()
 
             if len(self.substring) > len(test_string):
                 return False
 
             return self.substring in test_string
 
+        def __ne__(self, test_string):
+            return not self.__eq__(test_string)
+
     return StringContaining
+
+
+def _safe_is_equal(x, y):
+    """
+    Compares two values, preferring to use the first's __eq__ method if it
+    exists and is implemented.
+
+    Accounts for py2/py3 differences (like ints in py2 not having a __eq__
+    method), as well as the incomparability of certain types exposed by using
+    raw __eq__ () rather than ==.
+    """
+
+    # Prefer using __eq__ directly to ensure that examples like
+    #
+    #   maisey = Dog()
+    #   maisey.name = "Maisey the Dog"
+    #   maisey == ObjectDescribedBy(attrs={"name": StringContaining("Maisey")})
+    #
+    # evaluate to True (in other words, examples where the values in self.attrs
+    # might also have custom __eq__ methods; this makes sure those methods get
+    # used if possible)
+    try:
+        is_equal = x.__eq__(y)
+    except AttributeError:
+        is_equal = NotImplemented
+
+    # this can happen on its own, too (i.e. without an AttributeError being
+    # thrown), which is why this is separate from the except block above
+    if is_equal == NotImplemented:
+        # using == smoothes out weird variations exposed by raw __eq__
+        return x == y
+
+    return is_equal
 
 
 @pytest.fixture(name="DictionaryContaining")
@@ -397,13 +476,19 @@ def dictionary_containing_matcher():
             if len(self.subdict) > len(test_dict):
                 return False
 
-            # Have to test self == other (rather than vice-versa) in case
-            # any of the values in self.subdict is another matcher with a custom
-            # __eq__ method (in LHS == RHS, LHS's __eq__ is tried before RHS's).
-            # In other words, this order is important so that examples like
-            # {"dogs": "are great"} == DictionaryContaining({"dogs": StringContaining("great")})
-            # evaluate to True
-            return all(self.subdict[key] == test_dict.get(key) for key in self.subdict)
+            for key, value in self.subdict.items():
+                try:
+                    test_value = test_dict[key]
+                except KeyError:  # missing key
+                    return False
+
+                if not _safe_is_equal(value, test_value):
+                    return False
+
+            return True
+
+        def __ne__(self, test_dict):
+            return not self.__eq__(test_dict)
 
     return DictionaryContaining
 
@@ -442,19 +527,19 @@ def object_described_by_matcher():
                 if not isinstance(test_obj, self.type):
                     return False
 
-            # all checks here done with getattr rather than comparing to
-            # __dict__ because __dict__ isn't guaranteed to exist
             if self.attrs:
-                # attributes must exist AND values must match
-                try:
-                    if any(
-                        getattr(test_obj, attr_name) != attr_value
-                        for attr_name, attr_value in self.attrs.items()
-                    ):
-                        return False  # wrong attribute value
-                except AttributeError:  # missing attribute
-                    return False
+                for attr_name, attr_value in self.attrs.items():
+                    try:
+                        test_value = getattr(test_obj, attr_name)
+                    except AttributeError:  # missing attribute
+                        return False
+
+                    if not _safe_is_equal(attr_value, test_value):
+                        return False
 
             return True
+
+        def __ne__(self, test_obj):
+            return not self.__eq__(test_obj)
 
     return ObjectDescribedBy

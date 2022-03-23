@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import logging
 import datetime
+from fnmatch import fnmatch
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import (
@@ -98,13 +99,17 @@ class LoggingIntegration(Integration):
 
 def _can_record(record):
     # type: (LogRecord) -> bool
-    return record.name not in _IGNORED_LOGGERS
+    """Prevents ignored loggers from recording"""
+    for logger in _IGNORED_LOGGERS:
+        if fnmatch(record.name, logger):
+            return False
+    return True
 
 
 def _breadcrumb_from_record(record):
     # type: (LogRecord) -> Dict[str, Any]
     return {
-        "ty": "log",
+        "type": "log",
         "level": _logging_to_event_level(record.levelname),
         "category": record.name,
         "message": record.message,
@@ -183,7 +188,12 @@ class EventHandler(logging.Handler, object):
         client_options = hub.client.options
 
         # exc_info might be None or (None, None, None)
-        if record.exc_info is not None and record.exc_info[0] is not None:
+        #
+        # exc_info may also be any falsy value due to Python stdlib being
+        # liberal with what it receives and Celery's billiard being "liberal"
+        # with what it sends. See
+        # https://github.com/getsentry/sentry-python/issues/904
+        if record.exc_info and record.exc_info[0] is not None:
             event, hint = event_from_exception(
                 record.exc_info,
                 client_options=client_options,
@@ -212,7 +222,27 @@ class EventHandler(logging.Handler, object):
 
         event["level"] = _logging_to_event_level(record.levelname)
         event["logger"] = record.name
-        event["logentry"] = {"message": to_string(record.msg), "params": record.args}
+
+        # Log records from `warnings` module as separate issues
+        record_caputured_from_warnings_module = (
+            record.name == "py.warnings" and record.msg == "%s"
+        )
+        if record_caputured_from_warnings_module:
+            # use the actual message and not "%s" as the message
+            # this prevents grouping all warnings under one "%s" issue
+            msg = record.args[0]  # type: ignore
+
+            event["logentry"] = {
+                "message": msg,
+                "params": (),
+            }
+
+        else:
+            event["logentry"] = {
+                "message": to_string(record.msg),
+                "params": record.args,
+            }
+
         event["extra"] = _extra_from_record(record)
 
         hub.capture_event(event, hint=hint)

@@ -1,0 +1,43 @@
+version: 2
+updates:
+- package-ecosystem: pip
+  directory: "/"
+  schedule:
+    interval: weekly
+  open-pull-requests-limit: 10
+  allow:
+  - dependency-type: direct
+  - dependency-type: indirect
+  ignore:
+  - dependency-name: pytest
+    versions:
+    - "> 3.7.3"
+  - dependency-name: pytest-cov
+    versions:
+    - "> 2.8.1"
+  - dependency-name: pytest-forked
+    versions:
+    - "> 1.1.3"
+  - dependency-name: sphinx
+    versions:
+    - ">= 2.4.a, < 2.5"
+  - dependency-name: tox
+    versions:
+    - "> 3.7.0"
+  - dependency-name: werkzeug
+    versions:
+    - "> 0.15.5, < 1"
+  - dependency-name: werkzeug
+    versions:
+    - ">= 1.0.a, < 1.1"
+  - dependency-name: mypy
+    versions:
+    - "0.800"
+  - dependency-name: sphinx
+    versions:
+    - 3.4.3
+- package-ecosystem: gitsubmodule
+  directory: "/"
+  schedule:
+    interval: weekly
+  open-pull-requests-limit: 10

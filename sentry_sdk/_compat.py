@@ -7,7 +7,6 @@ if MYPY:
     from typing import Tuple
     from typing import Any
     from typing import Type
-
     from typing import TypeVar
 
     T = TypeVar("T")

@@ -27,7 +27,7 @@ boto3 = pytest.importorskip("boto3")
 LAMBDA_PRELUDE = """
 from __future__ import print_function
 
-from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
+from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration, get_lambda_bootstrap
 import sentry_sdk
 import json
 import time
@@ -35,23 +35,40 @@ import time
 from sentry_sdk.transport import HttpTransport
 
 def event_processor(event):
-    # AWS Lambda truncates the log output to 4kb. If you only need a
-    # subsection of the event, override this function in your test
-    # to print less to logs.
-    return event
+    # AWS Lambda truncates the log output to 4kb, which is small enough to miss
+    # parts of even a single error-event/transaction-envelope pair if considered
+    # in full, so only grab the data we need.
+
+    event_data = {}
+    event_data["contexts"] = {}
+    event_data["contexts"]["trace"] = event.get("contexts", {}).get("trace")
+    event_data["exception"] = event.get("exception")
+    event_data["extra"] = event.get("extra")
+    event_data["level"] = event.get("level")
+    event_data["request"] = event.get("request")
+    event_data["tags"] = event.get("tags")
+    event_data["transaction"] = event.get("transaction")
+
+    return event_data
 
 def envelope_processor(envelope):
+    # AWS Lambda truncates the log output to 4kb, which is small enough to miss
+    # parts of even a single error-event/transaction-envelope pair if considered
+    # in full, so only grab the data we need.
+
     (item,) = envelope.items
     envelope_json = json.loads(item.get_bytes())
 
     envelope_data = {}
-    envelope_data[\"contexts\"] = {}
-    envelope_data[\"type\"] = envelope_json[\"type\"]
-    envelope_data[\"transaction\"] = envelope_json[\"transaction\"]
-    envelope_data[\"contexts\"][\"trace\"] = envelope_json[\"contexts\"][\"trace\"]
-    envelope_data[\"request\"] = envelope_json[\"request\"]
+    envelope_data["contexts"] = {}
+    envelope_data["type"] = envelope_json["type"]
+    envelope_data["transaction"] = envelope_json["transaction"]
+    envelope_data["contexts"]["trace"] = envelope_json["contexts"]["trace"]
+    envelope_data["request"] = envelope_json["request"]
+    envelope_data["tags"] = envelope_json["tags"]
 
     return envelope_data
+
 
 class TestTransport(HttpTransport):
     def _send_event(self, event):
@@ -65,6 +82,7 @@ class TestTransport(HttpTransport):
     def _send_envelope(self, envelope):
         envelope = envelope_processor(envelope)
         print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
+
 
 def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
@@ -87,14 +105,18 @@ def lambda_client():
     return get_boto_client()
 
 
-@pytest.fixture(params=["python3.6", "python3.7", "python3.8", "python2.7"])
+@pytest.fixture(
+    params=["python3.6", "python3.7", "python3.8", "python3.9", "python2.7"]
+)
 def lambda_runtime(request):
     return request.param
 
 
 @pytest.fixture
 def run_lambda_function(request, lambda_client, lambda_runtime):
-    def inner(code, payload, timeout=30, syntax_check=True):
+    def inner(
+        code, payload, timeout=30, syntax_check=True, layer=None, initial_handler=None
+    ):
         from tests.integrations.aws_lambda.client import run_lambda_function
 
         response = run_lambda_function(
@@ -105,12 +127,19 @@ def run_lambda_function(request, lambda_client, lambda_runtime):
             add_finalizer=request.addfinalizer,
             timeout=timeout,
             syntax_check=syntax_check,
+            layer=layer,
+            initial_handler=initial_handler,
         )
+
+        # for better debugging
+        response["LogResult"] = base64.b64decode(response["LogResult"]).splitlines()
+        response["Payload"] = json.loads(response["Payload"].read().decode("utf-8"))
+        del response["ResponseMetadata"]
 
         events = []
         envelopes = []
 
-        for line in base64.b64decode(response["LogResult"]).splitlines():
+        for line in response["LogResult"]:
             print("AWS:", line)
             if line.startswith(b"EVENT: "):
                 line = line[len(b"EVENT: ") :]
@@ -362,3 +391,274 @@ def test_performance_error(run_lambda_function):
     assert envelope["contexts"]["trace"]["op"] == "serverless.function"
     assert envelope["transaction"].startswith("test_function_")
     assert envelope["transaction"] in envelope["request"]["url"]
+
+
+@pytest.mark.parametrize(
+    "aws_event, has_request_data, batch_size",
+    [
+        (b"1231", False, 1),
+        (b"11.21", False, 1),
+        (b'"Good dog!"', False, 1),
+        (b"true", False, 1),
+        (
+            b"""
+            [
+                {"good dog": "Maisey"},
+                {"good dog": "Charlie"},
+                {"good dog": "Cory"},
+                {"good dog": "Bodhi"}
+            ]
+            """,
+            False,
+            4,
+        ),
+        (
+            b"""
+            [
+                {
+                    "headers": {
+                        "Host": "dogs.are.great",
+                        "X-Forwarded-Proto": "http"
+                    },
+                    "httpMethod": "GET",
+                    "path": "/tricks/kangaroo",
+                    "queryStringParameters": {
+                        "completed_successfully": "true",
+                        "treat_provided": "true",
+                        "treat_type": "cheese"
+                    },
+                    "dog": "Maisey"
+                },
+                {
+                    "headers": {
+                        "Host": "dogs.are.great",
+                        "X-Forwarded-Proto": "http"
+                    },
+                    "httpMethod": "GET",
+                    "path": "/tricks/kangaroo",
+                    "queryStringParameters": {
+                        "completed_successfully": "true",
+                        "treat_provided": "true",
+                        "treat_type": "cheese"
+                    },
+                    "dog": "Charlie"
+                }
+            ]
+            """,
+            True,
+            2,
+        ),
+    ],
+)
+def test_non_dict_event(
+    run_lambda_function,
+    aws_event,
+    has_request_data,
+    batch_size,
+    DictionaryContaining,  # noqa:N803
+):
+    envelopes, events, response = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0)
+
+        def test_handler(event, context):
+            raise Exception("More treats, please!")
+        """
+        ),
+        aws_event,
+    )
+
+    assert response["FunctionError"] == "Unhandled"
+
+    error_event = events[0]
+    assert error_event["level"] == "error"
+    assert error_event["contexts"]["trace"]["op"] == "serverless.function"
+
+    function_name = error_event["extra"]["lambda"]["function_name"]
+    assert function_name.startswith("test_function_")
+    assert error_event["transaction"] == function_name
+
+    exception = error_event["exception"]["values"][0]
+    assert exception["type"] == "Exception"
+    assert exception["value"] == "More treats, please!"
+    assert exception["mechanism"]["type"] == "aws_lambda"
+
+    envelope = envelopes[0]
+    assert envelope["type"] == "transaction"
+    assert envelope["contexts"]["trace"] == DictionaryContaining(
+        error_event["contexts"]["trace"]
+    )
+    assert envelope["contexts"]["trace"]["status"] == "internal_error"
+    assert envelope["transaction"] == error_event["transaction"]
+    assert envelope["request"]["url"] == error_event["request"]["url"]
+
+    if has_request_data:
+        request_data = {
+            "headers": {"Host": "dogs.are.great", "X-Forwarded-Proto": "http"},
+            "method": "GET",
+            "url": "http://dogs.are.great/tricks/kangaroo",
+            "query_string": {
+                "completed_successfully": "true",
+                "treat_provided": "true",
+                "treat_type": "cheese",
+            },
+        }
+    else:
+        request_data = {"url": "awslambda:///{}".format(function_name)}
+
+    assert error_event["request"] == request_data
+    assert envelope["request"] == request_data
+
+    if batch_size > 1:
+        assert error_event["tags"]["batch_size"] == batch_size
+        assert error_event["tags"]["batch_request"] is True
+        assert envelope["tags"]["batch_size"] == batch_size
+        assert envelope["tags"]["batch_request"] is True
+
+
+def test_traces_sampler_gets_correct_values_in_sampling_context(
+    run_lambda_function,
+    DictionaryContaining,  # noqa:N803
+    ObjectDescribedBy,  # noqa:N803
+    StringContaining,  # noqa:N803
+):
+    # TODO: This whole thing is a little hacky, specifically around the need to
+    # get `conftest.py` code into the AWS runtime, which is why there's both
+    # `inspect.getsource` and a copy of `_safe_is_equal` included directly in
+    # the code below. Ideas which have been discussed to fix this:
+
+    # - Include the test suite as a module installed in the package which is
+    #   shot up to AWS
+    # - In client.py, copy `conftest.py` (or wherever the necessary code lives)
+    #   from the test suite into the main SDK directory so it gets included as
+    #   "part of the SDK"
+
+    # It's also worth noting why it's necessary to run the assertions in the AWS
+    # runtime rather than asserting on side effects the way we do with events
+    # and envelopes. The reasons are two-fold:
+
+    # - We're testing against the `LambdaContext` class, which only exists in
+    #   the AWS runtime
+    # - If we were to transmit call args data they way we transmit event and
+    #   envelope data (through JSON), we'd quickly run into the problem that all
+    #   sorts of stuff isn't serializable by `json.dumps` out of the box, up to
+    #   and including `datetime` objects (so anything with a timestamp is
+    #   automatically out)
+
+    # Perhaps these challenges can be solved in a cleaner and more systematic
+    # way if we ever decide to refactor the entire AWS testing apparatus.
+
+    import inspect
+
+    envelopes, events, response = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(inspect.getsource(StringContaining))
+        + dedent(inspect.getsource(DictionaryContaining))
+        + dedent(inspect.getsource(ObjectDescribedBy))
+        + dedent(
+            """
+            try:
+                from unittest import mock  # python 3.3 and above
+            except ImportError:
+                import mock  # python < 3.3
+
+            def _safe_is_equal(x, y):
+                # copied from conftest.py - see docstring and comments there
+                try:
+                    is_equal = x.__eq__(y)
+                except AttributeError:
+                    is_equal = NotImplemented
+
+                if is_equal == NotImplemented:
+                    # using == smoothes out weird variations exposed by raw __eq__
+                    return x == y
+
+                return is_equal
+
+            def test_handler(event, context):
+                # this runs after the transaction has started, which means we
+                # can make assertions about traces_sampler
+                try:
+                    traces_sampler.assert_any_call(
+                        DictionaryContaining(
+                            {
+                                "aws_event": DictionaryContaining({
+                                    "httpMethod": "GET",
+                                    "path": "/sit/stay/rollover",
+                                    "headers": {"Host": "dogs.are.great", "X-Forwarded-Proto": "http"},
+                                }),
+                                "aws_context": ObjectDescribedBy(
+                                    type=get_lambda_bootstrap().LambdaContext,
+                                    attrs={
+                                        'function_name': StringContaining("test_function"),
+                                        'function_version': '$LATEST',
+                                    }
+                                )
+                            }
+                        )
+                    )
+                except AssertionError:
+                    # catch the error and return it because the error itself will
+                    # get swallowed by the SDK as an "internal exception"
+                    return {"AssertionError raised": True,}
+
+                return {"AssertionError raised": False,}
+
+
+            traces_sampler = mock.Mock(return_value=True)
+
+            init_sdk(
+                traces_sampler=traces_sampler,
+            )
+        """
+        ),
+        b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "headers": {"Host": "dogs.are.great", "X-Forwarded-Proto": "http"}}',
+    )
+
+    assert response["Payload"]["AssertionError raised"] is False
+
+
+def test_serverless_no_code_instrumentation(run_lambda_function):
+    """
+    Test that ensures that just by adding a lambda layer containing the
+    python sdk, with no code changes sentry is able to capture errors
+    """
+
+    for initial_handler in [
+        None,
+        "test_dir/test_lambda.test_handler",
+        "test_dir.test_lambda.test_handler",
+    ]:
+        print("Testing Initial Handler ", initial_handler)
+        _, _, response = run_lambda_function(
+            dedent(
+                """
+            import sentry_sdk
+
+            def test_handler(event, context):
+                current_client = sentry_sdk.Hub.current.client
+
+                assert current_client is not None
+
+                assert len(current_client.options['integrations']) == 1
+                assert isinstance(current_client.options['integrations'][0],
+                                  sentry_sdk.integrations.aws_lambda.AwsLambdaIntegration)
+
+                raise Exception("something went wrong")
+            """
+            ),
+            b'{"foo": "bar"}',
+            layer=True,
+            initial_handler=initial_handler,
+        )
+        assert response["FunctionError"] == "Unhandled"
+        assert response["StatusCode"] == 200
+
+        assert response["Payload"]["errorType"] != "AssertionError"
+
+        assert response["Payload"]["errorType"] == "Exception"
+        assert response["Payload"]["errorMessage"] == "something went wrong"
+
+        assert "sentry_handler" in response["LogResult"][3].decode("utf-8")

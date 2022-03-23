@@ -5,6 +5,7 @@ from time import sleep, time
 from sentry_sdk._compat import check_thread_support
 from sentry_sdk._queue import Queue, Full
 from sentry_sdk.utils import logger
+from sentry_sdk.consts import DEFAULT_QUEUE_SIZE
 
 from sentry_sdk._types import MYPY
 
@@ -18,7 +19,7 @@ _TERMINATOR = object()
 
 
 class BackgroundWorker(object):
-    def __init__(self, queue_size=30):
+    def __init__(self, queue_size=DEFAULT_QUEUE_SIZE):
         # type: (int) -> None
         check_thread_support()
         self._queue = Queue(queue_size)  # type: Queue
@@ -65,7 +66,7 @@ class BackgroundWorker(object):
                 self._thread = threading.Thread(
                     target=self._target, name="raven-sentry.BackgroundWorker"
                 )
-                self._thread.setDaemon(True)
+                self._thread.daemon = True
                 self._thread.start()
                 self._thread_for_pid = os.getpid()
 
@@ -98,19 +99,23 @@ class BackgroundWorker(object):
         # type: (float, Optional[Any]) -> None
         initial_timeout = min(0.1, timeout)
         if not self._timed_queue_join(initial_timeout):
-            pending = self._queue.qsize()
+            pending = self._queue.qsize() + 1
             logger.debug("%d event(s) pending on flush", pending)
             if callback is not None:
                 callback(pending, timeout)
-            self._timed_queue_join(timeout - initial_timeout)
+
+            if not self._timed_queue_join(timeout - initial_timeout):
+                pending = self._queue.qsize() + 1
+                logger.error("flush timed out, dropped %s events", pending)
 
     def submit(self, callback):
-        # type: (Callable[[], None]) -> None
+        # type: (Callable[[], None]) -> bool
         self._ensure_thread()
         try:
             self._queue.put_nowait(callback)
+            return True
         except Full:
-            logger.debug("background worker queue full, dropping event")
+            return False
 
     def _target(self):
         # type: () -> None

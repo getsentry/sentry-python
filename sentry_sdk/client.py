@@ -2,7 +2,6 @@ import os
 import uuid
 import random
 from datetime import datetime
-from itertools import islice
 import socket
 
 from sentry_sdk._compat import string_types, text_type, iteritems
@@ -13,7 +12,6 @@ from sentry_sdk.utils import (
     format_timestamp,
     get_type_name,
     get_default_release,
-    get_default_environment,
     handle_in_app,
     logger,
 )
@@ -24,6 +22,7 @@ from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
+from sentry_sdk.tracing_utils import has_tracestate_enabled, reinflate_tracestate
 
 from sentry_sdk._types import MYPY
 
@@ -31,12 +30,11 @@ if MYPY:
     from typing import Any
     from typing import Callable
     from typing import Dict
-    from typing import List
     from typing import Optional
 
     from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
-    from sentry_sdk.sessions import Session
+    from sentry_sdk.session import Session
 
 
 _client_init_debug = ContextVar("client_init_debug")
@@ -67,7 +65,7 @@ def _get_options(*args, **kwargs):
         rv["release"] = get_default_release()
 
     if rv["environment"] is None:
-        rv["environment"] = get_default_environment(rv["release"])
+        rv["environment"] = os.environ.get("SENTRY_ENVIRONMENT") or "production"
 
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
@@ -100,24 +98,16 @@ class _Client(object):
         # type: () -> None
         old_debug = _client_init_debug.get(False)
 
-        def _send_sessions(sessions):
-            # type: (List[Any]) -> None
-            transport = self.transport
-            if not transport or not sessions:
-                return
-            sessions_iter = iter(sessions)
-            while True:
-                envelope = Envelope()
-                for session in islice(sessions_iter, 100):
-                    envelope.add_session(session)
-                if not envelope.items:
-                    break
-                transport.capture_envelope(envelope)
+        def _capture_envelope(envelope):
+            # type: (Envelope) -> None
+            if self.transport is not None:
+                self.transport.capture_envelope(envelope)
 
         try:
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
-            self.session_flusher = SessionFlusher(flush_func=_send_sessions)
+
+            self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
             request_bodies = ("always", "never", "small", "medium")
             if self.options["request_bodies"] not in request_bodies:
@@ -155,9 +145,18 @@ class _Client(object):
             event["timestamp"] = datetime.utcnow()
 
         if scope is not None:
+            is_transaction = event.get("type") == "transaction"
             event_ = scope.apply_to_event(event, hint)
+
+            # one of the event/error processors returned None
             if event_ is None:
+                if self.transport:
+                    self.transport.record_lost_event(
+                        "event_processor",
+                        data_category=("transaction" if is_transaction else "error"),
+                    )
                 return None
+
             event = event_
 
         if (
@@ -211,6 +210,10 @@ class _Client(object):
                 new_event = before_send(event, hint or {})
             if new_event is None:
                 logger.info("before send dropped event (%s)", event)
+                if self.transport:
+                    self.transport.record_lost_event(
+                        "before_send", data_category="error"
+                    )
             event = new_event  # type: ignore
 
         return event
@@ -254,6 +257,9 @@ class _Client(object):
             self.options["sample_rate"] < 1.0
             and random.random() >= self.options["sample_rate"]
         ):
+            # record a lost event if we did not sample this.
+            if self.transport:
+                self.transport.record_lost_event("sample_rate", data_category="error")
             return False
 
         if self._is_ignored_error(event, hint):
@@ -340,15 +346,29 @@ class _Client(object):
         attachments = hint.get("attachments")
         is_transaction = event_opt.get("type") == "transaction"
 
+        # this is outside of the `if` immediately below because even if we don't
+        # use the value, we want to make sure we remove it before the event is
+        # sent
+        raw_tracestate = (
+            event_opt.get("contexts", {}).get("trace", {}).pop("tracestate", "")
+        )
+
+        # Transactions or events with attachments should go to the /envelope/
+        # endpoint.
         if is_transaction or attachments:
-            # Transactions or events with attachments should go to the
-            # /envelope/ endpoint.
-            envelope = Envelope(
-                headers={
-                    "event_id": event_opt["event_id"],
-                    "sent_at": format_timestamp(datetime.utcnow()),
-                }
+
+            headers = {
+                "event_id": event_opt["event_id"],
+                "sent_at": format_timestamp(datetime.utcnow()),
+            }
+
+            tracestate_data = raw_tracestate and reinflate_tracestate(
+                raw_tracestate.replace("sentry=", "")
             )
+            if tracestate_data and has_tracestate_enabled():
+                headers["trace"] = tracestate_data
+
+            envelope = Envelope(headers=headers)
 
             if is_transaction:
                 envelope.add_transaction(event_opt)

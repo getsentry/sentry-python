@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import pytest
+import pytest_django
 import json
 
 from werkzeug.test import Client
@@ -18,8 +19,26 @@ except ImportError:
 
 from sentry_sdk import capture_message, capture_exception, configure_scope
 from sentry_sdk.integrations.django import DjangoIntegration
+from functools import partial
 
 from tests.integrations.django.myapp.wsgi import application
+
+# Hack to prevent from experimental feature introduced in version `4.3.0` in `pytest-django` that
+# requires explicit database allow from failing the test
+pytest_mark_django_db_decorator = partial(pytest.mark.django_db)
+try:
+    pytest_version = tuple(map(int, pytest_django.__version__.split(".")))
+    if pytest_version > (4, 2, 0):
+        pytest_mark_django_db_decorator = partial(
+            pytest.mark.django_db, databases="__all__"
+        )
+except ValueError:
+    if "dev" in pytest_django.__version__:
+        pytest_mark_django_db_decorator = partial(
+            pytest.mark.django_db, databases="__all__"
+        )
+except AttributeError:
+    pass
 
 
 @pytest.fixture
@@ -38,6 +57,46 @@ def test_view_exceptions(sentry_init, client, capture_exceptions, capture_events
 
     (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "django"
+
+
+def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
+    sentry_init, client, capture_exceptions, capture_events, settings
+):
+    """
+    Test that ensures if django settings.USE_X_FORWARDED_HOST is set to True
+    then the SDK sets the request url to the `HTTP_X_FORWARDED_FOR`
+    """
+    settings.USE_X_FORWARDED_HOST = True
+
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    exceptions = capture_exceptions()
+    events = capture_events()
+    client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
+
+    (error,) = exceptions
+    assert isinstance(error, ZeroDivisionError)
+
+    (event,) = events
+    assert event["request"]["url"] == "http://example.com/view-exc"
+
+
+def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
+    sentry_init, client, capture_exceptions, capture_events
+):
+    """
+    Test that ensures if django settings.USE_X_FORWARDED_HOST is set to False
+    then the SDK sets the request url to the `HTTP_POST`
+    """
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    exceptions = capture_exceptions()
+    events = capture_events()
+    client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
+
+    (error,) = exceptions
+    assert isinstance(error, ZeroDivisionError)
+
+    (event,) = events
+    assert event["request"]["url"] == "http://localhost/view-exc"
 
 
 def test_middleware_exceptions(sentry_init, client, capture_exceptions):
@@ -205,7 +264,7 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
 
 
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest_mark_django_db_decorator()
 def test_sql_dict_query_params(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -250,7 +309,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     ],
 )
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest_mark_django_db_decorator()
 def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -283,7 +342,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
 
 
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest_mark_django_db_decorator()
 def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -340,6 +399,72 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
             "%(second_var)s)",
             "type": "default",
         },
+    ]
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_django_connect_trace(sentry_init, client, capture_events, render_span_tree):
+    """
+    Verify we record a span when opening a new database.
+    """
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+    )
+
+    from django.db import connections
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    content, status, headers = client.get(reverse("postgres_select"))
+    assert status == "200 OK"
+
+    assert '- op="db": description="connect"' in render_span_tree(events[0])
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_django_connect_breadcrumbs(
+    sentry_init, client, capture_events, render_span_tree
+):
+    """
+    Verify we record a breadcrumb when opening a new database.
+    """
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+    )
+
+    from django.db import connections
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    cursor = connections["postgres"].cursor()
+    cursor.execute("select 1")
+
+    # trigger recording of event.
+    capture_message("HI")
+    (event,) = events
+    for crumb in event["breadcrumbs"]["values"]:
+        del crumb["timestamp"]
+
+    assert event["breadcrumbs"]["values"][-2:] == [
+        {"message": "connect", "category": "query", "type": "default"},
+        {"message": "select 1", "category": "query", "data": {}, "type": "default"},
     ]
 
 
@@ -518,6 +643,32 @@ def test_does_not_capture_403(sentry_init, client, capture_events, endpoint):
     assert not events
 
 
+def test_render_spans(sentry_init, client, capture_events, render_span_tree):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+    )
+    views_tests = [
+        (
+            reverse("template_test2"),
+            '- op="django.template.render": description="[user_name.html, ...]"',
+        ),
+    ]
+    if DJANGO_VERSION >= (1, 7):
+        views_tests.append(
+            (
+                reverse("template_test"),
+                '- op="django.template.render": description="user_name.html"',
+            ),
+        )
+
+    for url, expected_line in views_tests:
+        events = capture_events()
+        _content, status, _headers = client.get(url)
+        transaction = events[0]
+        assert expected_line in render_span_tree(transaction)
+
+
 def test_middleware_spans(sentry_init, client, capture_events, render_span_tree):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -604,3 +755,39 @@ def test_csrf(sentry_init, client):
     content, status, _headers = client.post(reverse("message"))
     assert status.lower() == "200 ok"
     assert b"".join(content) == b"ok"
+
+
+@pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Requires Django > 2.0")
+def test_custom_urlconf_middleware(
+    settings, sentry_init, client, capture_events, render_span_tree
+):
+    """
+    Some middlewares (for instance in django-tenants) overwrite request.urlconf.
+    Test that the resolver picks up the correct urlconf for transaction naming.
+    """
+    urlconf = "tests.integrations.django.myapp.middleware.custom_urlconf_middleware"
+    settings.ROOT_URLCONF = ""
+    settings.MIDDLEWARE.insert(0, urlconf)
+    client.application.load_middleware()
+
+    sentry_init(integrations=[DjangoIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    content, status, _headers = client.get("/custom/ok")
+    assert status.lower() == "200 ok"
+    assert b"".join(content) == b"custom ok"
+
+    event = events.pop(0)
+    assert event["transaction"] == "/custom/ok"
+    assert "custom_urlconf_middleware" in render_span_tree(event)
+
+    _content, status, _headers = client.get("/custom/exc")
+    assert status.lower() == "500 internal server error"
+
+    error_event, transaction_event = events
+    assert error_event["transaction"] == "/custom/exc"
+    assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "django"
+    assert transaction_event["transaction"] == "/custom/exc"
+    assert "custom_urlconf_middleware" in render_span_tree(transaction_event)
+
+    settings.MIDDLEWARE.pop(0)
