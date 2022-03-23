@@ -4,7 +4,7 @@ import sys
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
-from sentry_sdk.tracing import Span
+from sentry_sdk.tracing import Transaction
 from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
@@ -30,6 +30,7 @@ try:
         Ignore,
         Reject,
     )
+    from celery.app.trace import task_has_custom
 except ImportError:
     raise DidNotEnable("Celery not installed")
 
@@ -57,11 +58,12 @@ class CeleryIntegration(Integration):
         def sentry_build_tracer(name, task, *args, **kwargs):
             # type: (Any, Any, *Any, **Any) -> Any
             if not getattr(task, "_sentry_is_patched", False):
-                # Need to patch both methods because older celery sometimes
-                # short-circuits to task.run if it thinks it's safe.
-                task.__call__ = _wrap_task_call(task, task.__call__)
-                task.run = _wrap_task_call(task, task.run)
-                task.apply_async = _wrap_apply_async(task, task.apply_async)
+                # determine whether Celery will use __call__ or run and patch
+                # accordingly
+                if task_has_custom(task, "__call__"):
+                    type(task).__call__ = _wrap_task_call(task, type(task).__call__)
+                else:
+                    task.run = _wrap_task_call(task, task.run)
 
                 # `build_tracer` is apparently called for every task
                 # invocation. Can't wrap every celery task for every invocation
@@ -71,6 +73,10 @@ class CeleryIntegration(Integration):
             return _wrap_tracer(task, old_build_tracer(name, task, *args, **kwargs))
 
         trace.build_tracer = sentry_build_tracer
+
+        from celery.app.task import Task  # type: ignore
+
+        Task.apply_async = _wrap_apply_async(Task.apply_async)
 
         _patch_worker_exit()
 
@@ -85,23 +91,32 @@ class CeleryIntegration(Integration):
         ignore_logger("celery.redirected")
 
 
-def _wrap_apply_async(task, f):
-    # type: (Any, F) -> F
+def _wrap_apply_async(f):
+    # type: (F) -> F
     @wraps(f)
     def apply_async(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         hub = Hub.current
         integration = hub.get_integration(CeleryIntegration)
         if integration is not None and integration.propagate_traces:
-            headers = None
-            for key, value in hub.iter_trace_propagation_headers():
-                if headers is None:
-                    headers = dict(kwargs.get("headers") or {})
-                headers[key] = value
-            if headers is not None:
-                kwargs["headers"] = headers
+            with hub.start_span(op="celery.submit", description=args[0].name) as span:
+                with capture_internal_exceptions():
+                    headers = dict(hub.iter_trace_propagation_headers(span))
 
-            with hub.start_span(op="celery.submit", description=task.name):
+                    if headers:
+                        # Note: kwargs can contain headers=None, so no setdefault!
+                        # Unsure which backend though.
+                        kwarg_headers = kwargs.get("headers") or {}
+                        kwarg_headers.update(headers)
+
+                        # https://github.com/celery/celery/issues/4875
+                        #
+                        # Need to setdefault the inner headers too since other
+                        # tracing tools (dd-trace-py) also employ this exact
+                        # workaround and we don't want to break them.
+                        kwarg_headers.setdefault("headers", {}).update(headers)
+                        kwargs["headers"] = kwarg_headers
+
                 return f(*args, **kwargs)
         else:
             return f(*args, **kwargs)
@@ -130,19 +145,35 @@ def _wrap_tracer(task, f):
             scope.clear_breadcrumbs()
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
 
-            span = Span.continue_from_headers(args[3].get("headers") or {})
-            span.op = "celery.task"
-            span.transaction = "unknown celery task"
+            transaction = None
 
-            # Could possibly use a better hook than this one
-            span.set_status("ok")
-
+            # Celery task objects are not a thing to be trusted. Even
+            # something such as attribute access can fail.
             with capture_internal_exceptions():
-                # Celery task objects are not a thing to be trusted. Even
-                # something such as attribute access can fail.
-                span.transaction = task.name
+                transaction = Transaction.continue_from_headers(
+                    args[3].get("headers") or {},
+                    op="celery.task",
+                    name="unknown celery task",
+                )
 
-            with hub.start_span(span):
+                transaction.name = task.name
+                transaction.set_status("ok")
+
+            if transaction is None:
+                return f(*args, **kwargs)
+
+            with hub.start_transaction(
+                transaction,
+                custom_sampling_context={
+                    "celery_job": {
+                        "task": task.name,
+                        # for some reason, args[1] is a list if non-empty but a
+                        # tuple if empty
+                        "args": list(args[1]),
+                        "kwargs": args[2],
+                    }
+                },
+            ):
                 return f(*args, **kwargs)
 
     return _inner  # type: ignore

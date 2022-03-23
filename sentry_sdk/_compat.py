@@ -7,7 +7,6 @@ if MYPY:
     from typing import Tuple
     from typing import Any
     from typing import Type
-
     from typing import TypeVar
 
     T = TypeVar("T")
@@ -19,7 +18,6 @@ if PY2:
     import urlparse  # noqa
 
     text_type = unicode  # noqa
-    import Queue as queue  # noqa
 
     string_types = (str, text_type)
     number_types = (int, long, float)  # noqa
@@ -37,7 +35,6 @@ if PY2:
 
 else:
     import urllib.parse as urlparse  # noqa
-    import queue  # noqa
 
     text_type = str
     string_types = (text_type,)  # type: Tuple[type]

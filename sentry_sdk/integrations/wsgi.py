@@ -8,7 +8,7 @@ from sentry_sdk.utils import (
     event_from_exception,
 )
 from sentry_sdk._compat import PY2, reraise, iteritems
-from sentry_sdk.tracing import Span
+from sentry_sdk.tracing import Transaction
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
@@ -54,10 +54,16 @@ else:
         return s.encode("latin1").decode(charset, errors)
 
 
-def get_host(environ):
-    # type: (Dict[str, str]) -> str
+def get_host(environ, use_x_forwarded_for=False):
+    # type: (Dict[str, str], bool) -> str
     """Return the host for the given WSGI environment. Yanked from Werkzeug."""
-    if environ.get("HTTP_HOST"):
+    if use_x_forwarded_for and "HTTP_X_FORWARDED_HOST" in environ:
+        rv = environ["HTTP_X_FORWARDED_HOST"]
+        if environ["wsgi.url_scheme"] == "http" and rv.endswith(":80"):
+            rv = rv[:-3]
+        elif environ["wsgi.url_scheme"] == "https" and rv.endswith(":443"):
+            rv = rv[:-4]
+    elif environ.get("HTTP_HOST"):
         rv = environ["HTTP_HOST"]
         if environ["wsgi.url_scheme"] == "http" and rv.endswith(":80"):
             rv = rv[:-3]
@@ -77,23 +83,24 @@ def get_host(environ):
     return rv
 
 
-def get_request_url(environ):
-    # type: (Dict[str, str]) -> str
+def get_request_url(environ, use_x_forwarded_for=False):
+    # type: (Dict[str, str], bool) -> str
     """Return the absolute URL without query string for the given WSGI
     environment."""
     return "%s://%s/%s" % (
         environ.get("wsgi.url_scheme"),
-        get_host(environ),
+        get_host(environ, use_x_forwarded_for),
         wsgi_decoding_dance(environ.get("PATH_INFO") or "").lstrip("/"),
     )
 
 
 class SentryWsgiMiddleware(object):
-    __slots__ = ("app",)
+    __slots__ = ("app", "use_x_forwarded_for")
 
-    def __init__(self, app):
-        # type: (Callable[[Dict[str, str], Callable[..., Any]], Any]) -> None
+    def __init__(self, app, use_x_forwarded_for=False):
+        # type: (Callable[[Dict[str, str], Callable[..., Any]], Any], bool) -> None
         self.app = app
+        self.use_x_forwarded_for = use_x_forwarded_for
 
     def __call__(self, environ, start_response):
         # type: (Dict[str, str], Callable[..., Any]) -> _ScopedResponse
@@ -103,25 +110,31 @@ class SentryWsgiMiddleware(object):
         _wsgi_middleware_applied.set(True)
         try:
             hub = Hub(Hub.current)
-            with auto_session_tracking(hub):
+            with auto_session_tracking(hub, session_mode="request"):
                 with hub:
                     with capture_internal_exceptions():
                         with hub.configure_scope() as scope:
                             scope.clear_breadcrumbs()
                             scope._name = "wsgi"
                             scope.add_event_processor(
-                                _make_wsgi_event_processor(environ)
+                                _make_wsgi_event_processor(
+                                    environ, self.use_x_forwarded_for
+                                )
                             )
 
-                    span = Span.continue_from_environ(environ)
-                    span.op = "http.server"
-                    span.transaction = "generic WSGI request"
+                    transaction = Transaction.continue_from_environ(
+                        environ, op="http.server", name="generic WSGI request"
+                    )
 
-                    with hub.start_span(span) as span:
+                    with hub.start_transaction(
+                        transaction, custom_sampling_context={"wsgi_environ": environ}
+                    ):
                         try:
                             rv = self.app(
                                 environ,
-                                partial(_sentry_start_response, start_response, span),
+                                partial(
+                                    _sentry_start_response, start_response, transaction
+                                ),
                             )
                         except BaseException:
                             reraise(*_capture_exception(hub))
@@ -133,7 +146,7 @@ class SentryWsgiMiddleware(object):
 
 def _sentry_start_response(
     old_start_response,  # type: StartResponse
-    span,  # type: Span
+    transaction,  # type: Transaction
     status,  # type: str
     response_headers,  # type: WsgiResponseHeaders
     exc_info=None,  # type: Optional[WsgiExcInfo]
@@ -141,7 +154,7 @@ def _sentry_start_response(
     # type: (...) -> WsgiResponseIter
     with capture_internal_exceptions():
         status_int = int(status.split(" ", 1)[0])
-        span.set_http_status(status_int)
+        transaction.set_http_status(status_int)
 
     if exc_info is None:
         # The Django Rest Framework WSGI test client, and likely other
@@ -265,8 +278,8 @@ class _ScopedResponse(object):
                 reraise(*_capture_exception(self._hub))
 
 
-def _make_wsgi_event_processor(environ):
-    # type: (Dict[str, str]) -> EventProcessor
+def _make_wsgi_event_processor(environ, use_x_forwarded_for):
+    # type: (Dict[str, str], bool) -> EventProcessor
     # It's a bit unfortunate that we have to extract and parse the request data
     # from the environ so eagerly, but there are a few good reasons for this.
     #
@@ -280,7 +293,7 @@ def _make_wsgi_event_processor(environ):
     # https://github.com/unbit/uwsgi/issues/1950
 
     client_ip = get_client_ip(environ)
-    request_url = get_request_url(environ)
+    request_url = get_request_url(environ, use_x_forwarded_for)
     query_string = environ.get("QUERY_STRING")
     method = environ.get("REQUEST_METHOD")
     env = dict(_get_environ(environ))

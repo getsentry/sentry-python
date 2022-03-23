@@ -7,10 +7,23 @@ import sys
 import time
 
 from textwrap import dedent
-from sentry_sdk import Hub, Client, configure_scope, capture_message, capture_exception
+from sentry_sdk import (
+    Hub,
+    Client,
+    add_breadcrumb,
+    configure_scope,
+    capture_message,
+    capture_exception,
+    capture_event,
+    start_transaction,
+    set_tag,
+)
+from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
 from sentry_sdk._compat import reraise, text_type, PY2
 from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
+from sentry_sdk.serializer import MAX_DATABAG_BREADTH
+from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS
 
 if PY2:
     # Importing ABCs from collections is deprecated, and will stop working in 3.8
@@ -46,144 +59,230 @@ def test_transport_option(monkeypatch):
     assert str(Client(transport=transport).dsn) == dsn
 
 
-def test_proxy_http_use(monkeypatch):
-    client = Client("http://foo@sentry.io/123", http_proxy="http://localhost/123")
-    assert client.transport._pool.proxy.scheme == "http"
+@pytest.mark.parametrize(
+    "testcase",
+    [
+        {
+            "dsn": "http://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": None,
+            "arg_http_proxy": "http://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "http",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": None,
+            "arg_http_proxy": "https://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "https",
+        },
+        {
+            "dsn": "http://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": None,
+            "arg_http_proxy": "http://localhost/123",
+            "arg_https_proxy": "https://localhost/123",
+            "expected_proxy_scheme": "http",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": None,
+            "arg_http_proxy": "http://localhost/123",
+            "arg_https_proxy": "https://localhost/123",
+            "expected_proxy_scheme": "https",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": None,
+            "arg_http_proxy": "http://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "http",
+        },
+        {
+            "dsn": "http://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": None,
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": None,
+        },
+        {
+            "dsn": "http://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": None,
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "http",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": "https://localhost/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "https",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": None,
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "http",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": "https://localhost/123",
+            "arg_http_proxy": "",
+            "arg_https_proxy": "",
+            "expected_proxy_scheme": None,
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": "https://localhost/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "https",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": None,
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "http",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": "https://localhost/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "",
+            "expected_proxy_scheme": "http",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": "https://localhost/123",
+            "arg_http_proxy": "",
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "https",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": "https://localhost/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "",
+            "expected_proxy_scheme": None,
+        },
+        {
+            "dsn": "http://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": "https://localhost/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "http",
+        },
+        # NO_PROXY testcases
+        {
+            "dsn": "http://foo@sentry.io/123",
+            "env_http_proxy": "http://localhost/123",
+            "env_https_proxy": None,
+            "env_no_proxy": "sentry.io,example.com",
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": None,
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": "https://localhost/123",
+            "env_no_proxy": "example.com,sentry.io",
+            "arg_http_proxy": None,
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": None,
+        },
+        {
+            "dsn": "http://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": None,
+            "env_no_proxy": "sentry.io,example.com",
+            "arg_http_proxy": "http://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_scheme": "http",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": None,
+            "env_no_proxy": "sentry.io,example.com",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "https://localhost/123",
+            "expected_proxy_scheme": "https",
+        },
+    ],
+)
+def test_proxy(monkeypatch, testcase):
+    if testcase["env_http_proxy"] is not None:
+        monkeypatch.setenv("HTTP_PROXY", testcase["env_http_proxy"])
+    if testcase["env_https_proxy"] is not None:
+        monkeypatch.setenv("HTTPS_PROXY", testcase["env_https_proxy"])
+    if testcase.get("env_no_proxy") is not None:
+        monkeypatch.setenv("NO_PROXY", testcase["env_no_proxy"])
+    kwargs = {}
+    if testcase["arg_http_proxy"] is not None:
+        kwargs["http_proxy"] = testcase["arg_http_proxy"]
+    if testcase["arg_https_proxy"] is not None:
+        kwargs["https_proxy"] = testcase["arg_https_proxy"]
+    client = Client(testcase["dsn"], **kwargs)
+    if testcase["expected_proxy_scheme"] is None:
+        assert client.transport._pool.proxy is None
+    else:
+        assert client.transport._pool.proxy.scheme == testcase["expected_proxy_scheme"]
 
 
-def test_proxy_https_use(monkeypatch):
-    client = Client("https://foo@sentry.io/123", http_proxy="https://localhost/123")
-    assert client.transport._pool.proxy.scheme == "https"
-
-
-def test_proxy_both_select_http(monkeypatch):
-    client = Client(
-        "http://foo@sentry.io/123",
-        https_proxy="https://localhost/123",
-        http_proxy="http://localhost/123",
-    )
-    assert client.transport._pool.proxy.scheme == "http"
-
-
-def test_proxy_both_select_https(monkeypatch):
-    client = Client(
-        "https://foo@sentry.io/123",
-        https_proxy="https://localhost/123",
-        http_proxy="http://localhost/123",
-    )
-    assert client.transport._pool.proxy.scheme == "https"
-
-
-def test_proxy_http_fallback_http(monkeypatch):
-    client = Client("https://foo@sentry.io/123", http_proxy="http://localhost/123")
-    assert client.transport._pool.proxy.scheme == "http"
-
-
-def test_proxy_none_noenv(monkeypatch):
-    client = Client("http://foo@sentry.io/123")
-    assert client.transport._pool.proxy is None
-
-
-def test_proxy_none_httpenv_select(monkeypatch):
-    monkeypatch.setenv("HTTP_PROXY", "http://localhost/123")
-    client = Client("http://foo@sentry.io/123")
-    assert client.transport._pool.proxy.scheme == "http"
-
-
-def test_proxy_none_httpsenv_select(monkeypatch):
-    monkeypatch.setenv("HTTPS_PROXY", "https://localhost/123")
-    client = Client("https://foo@sentry.io/123")
-    assert client.transport._pool.proxy.scheme == "https"
-
-
-def test_proxy_none_httpenv_fallback(monkeypatch):
-    monkeypatch.setenv("HTTP_PROXY", "http://localhost/123")
-    client = Client("https://foo@sentry.io/123")
-    assert client.transport._pool.proxy.scheme == "http"
-
-
-def test_proxy_bothselect_bothen(monkeypatch):
-    monkeypatch.setenv("HTTP_PROXY", "http://localhost/123")
-    monkeypatch.setenv("HTTPS_PROXY", "https://localhost/123")
-    client = Client("https://foo@sentry.io/123", http_proxy="", https_proxy="")
-    assert client.transport._pool.proxy is None
-
-
-def test_proxy_bothavoid_bothenv(monkeypatch):
-    monkeypatch.setenv("HTTP_PROXY", "http://localhost/123")
-    monkeypatch.setenv("HTTPS_PROXY", "https://localhost/123")
-    client = Client("https://foo@sentry.io/123", http_proxy=None, https_proxy=None)
-    assert client.transport._pool.proxy.scheme == "https"
-
-
-def test_proxy_bothselect_httpenv(monkeypatch):
-    monkeypatch.setenv("HTTP_PROXY", "http://localhost/123")
-    client = Client("https://foo@sentry.io/123", http_proxy=None, https_proxy=None)
-    assert client.transport._pool.proxy.scheme == "http"
-
-
-def test_proxy_httpselect_bothenv(monkeypatch):
-    monkeypatch.setenv("HTTP_PROXY", "http://localhost/123")
-    monkeypatch.setenv("HTTPS_PROXY", "https://localhost/123")
-    client = Client("https://foo@sentry.io/123", http_proxy=None, https_proxy="")
-    assert client.transport._pool.proxy.scheme == "http"
-
-
-def test_proxy_httpsselect_bothenv(monkeypatch):
-    monkeypatch.setenv("HTTP_PROXY", "http://localhost/123")
-    monkeypatch.setenv("HTTPS_PROXY", "https://localhost/123")
-    client = Client("https://foo@sentry.io/123", http_proxy="", https_proxy=None)
-    assert client.transport._pool.proxy.scheme == "https"
-
-
-def test_proxy_httpselect_httpsenv(monkeypatch):
-    monkeypatch.setenv("HTTPS_PROXY", "https://localhost/123")
-    client = Client("https://foo@sentry.io/123", http_proxy=None, https_proxy="")
-    assert client.transport._pool.proxy is None
-
-
-def test_proxy_httpsselect_bothenv_http(monkeypatch):
-    monkeypatch.setenv("HTTP_PROXY", "http://localhost/123")
-    monkeypatch.setenv("HTTPS_PROXY", "https://localhost/123")
-    client = Client("http://foo@sentry.io/123", http_proxy=None, https_proxy=None)
-    assert client.transport._pool.proxy.scheme == "http"
-
-
-def test_simple_transport():
+def test_simple_transport(sentry_init):
     events = []
-    with Hub(Client(transport=events.append)):
-        capture_message("Hello World!")
+    sentry_init(transport=events.append)
+    capture_message("Hello World!")
     assert events[0]["message"] == "Hello World!"
 
 
-def test_ignore_errors():
+def test_ignore_errors(sentry_init, capture_events):
     class MyDivisionError(ZeroDivisionError):
         pass
 
     def raise_it(exc_info):
         reraise(*exc_info)
 
-    hub = Hub(Client(ignore_errors=[ZeroDivisionError], transport=_TestTransport()))
-    hub._capture_internal_exception = raise_it
+    sentry_init(ignore_errors=[ZeroDivisionError], transport=_TestTransport())
+    Hub.current._capture_internal_exception = raise_it
 
     def e(exc):
         try:
             raise exc
         except Exception:
-            hub.capture_exception()
+            capture_exception()
 
     e(ZeroDivisionError())
     e(MyDivisionError())
     pytest.raises(EventCaptured, lambda: e(ValueError()))
 
 
-def test_with_locals_enabled():
-    events = []
-    hub = Hub(Client(with_locals=True, transport=events.append))
+def test_with_locals_enabled(sentry_init, capture_events):
+    sentry_init(with_locals=True)
+    events = capture_events()
     try:
         1 / 0
     except Exception:
-        hub.capture_exception()
+        capture_exception()
 
     (event,) = events
 
@@ -193,13 +292,13 @@ def test_with_locals_enabled():
     )
 
 
-def test_with_locals_disabled():
-    events = []
-    hub = Hub(Client(with_locals=False, transport=events.append))
+def test_with_locals_disabled(sentry_init, capture_events):
+    sentry_init(with_locals=False)
+    events = capture_events()
     try:
         1 / 0
     except Exception:
-        hub.capture_exception()
+        capture_exception()
 
     (event,) = events
 
@@ -209,35 +308,63 @@ def test_with_locals_disabled():
     )
 
 
-def test_attach_stacktrace_enabled():
-    events = []
-    hub = Hub(Client(attach_stacktrace=True, transport=events.append))
+@pytest.mark.parametrize("integrations", [[], [ExecutingIntegration()]])
+def test_function_names(sentry_init, capture_events, integrations):
+    sentry_init(integrations=integrations)
+    events = capture_events()
+
+    def foo():
+        try:
+            bar()
+        except Exception:
+            capture_exception()
+
+    def bar():
+        1 / 0
+
+    foo()
+
+    (event,) = events
+    (thread,) = event["exception"]["values"]
+    functions = [x["function"] for x in thread["stacktrace"]["frames"]]
+
+    if integrations:
+        assert functions == [
+            "test_function_names.<locals>.foo",
+            "test_function_names.<locals>.bar",
+        ]
+    else:
+        assert functions == ["foo", "bar"]
+
+
+def test_attach_stacktrace_enabled(sentry_init, capture_events):
+    sentry_init(attach_stacktrace=True)
+    events = capture_events()
 
     def foo():
         bar()
 
     def bar():
-        hub.capture_message("HI")
+        capture_message("HI")
 
     foo()
 
     (event,) = events
     (thread,) = event["threads"]["values"]
     functions = [x["function"] for x in thread["stacktrace"]["frames"]]
+
     assert functions[-2:] == ["foo", "bar"]
 
 
-def test_attach_stacktrace_enabled_no_locals():
-    events = []
-    hub = Hub(
-        Client(attach_stacktrace=True, with_locals=False, transport=events.append)
-    )
+def test_attach_stacktrace_enabled_no_locals(sentry_init, capture_events):
+    sentry_init(attach_stacktrace=True, with_locals=False)
+    events = capture_events()
 
     def foo():
         bar()
 
     def bar():
-        hub.capture_message("HI")
+        capture_message("HI")
 
     foo()
 
@@ -262,19 +389,19 @@ def test_attach_stacktrace_in_app(sentry_init, capture_events):
     assert any(f["in_app"] for f in frames)
 
 
-def test_attach_stacktrace_disabled():
-    events = []
-    hub = Hub(Client(attach_stacktrace=False, transport=events.append))
-    hub.capture_message("HI")
+def test_attach_stacktrace_disabled(sentry_init, capture_events):
+    sentry_init(attach_stacktrace=False)
+    events = capture_events()
+    capture_message("HI")
 
     (event,) = events
     assert "threads" not in event
 
 
-def test_capture_event_works():
-    c = Client(transport=_TestTransport())
-    pytest.raises(EventCaptured, lambda: c.capture_event({}))
-    pytest.raises(EventCaptured, lambda: c.capture_event({}))
+def test_capture_event_works(sentry_init):
+    sentry_init(transport=_TestTransport())
+    pytest.raises(EventCaptured, lambda: capture_event({}))
+    pytest.raises(EventCaptured, lambda: capture_event({}))
 
 
 @pytest.mark.parametrize("num_messages", [10, 20])
@@ -316,7 +443,7 @@ def test_configure_scope_available(sentry_init, request, monkeypatch):
     sentry_init()
 
     with configure_scope() as scope:
-        assert scope is Hub.current._stack[-1][1]
+        assert scope is Hub.current.scope
         scope.set_tag("foo", "bar")
 
     calls = []
@@ -327,7 +454,7 @@ def test_configure_scope_available(sentry_init, request, monkeypatch):
 
     assert configure_scope(callback) is None
     assert len(calls) == 1
-    assert calls[0] is Hub.current._stack[-1][1]
+    assert calls[0] is Hub.current.scope
 
 
 @pytest.mark.tests_internal_exceptions
@@ -379,6 +506,10 @@ def test_nan(sentry_init, capture_events):
     events = capture_events()
 
     try:
+        # should_repr_strings=False
+        set_tag("mynan", float("nan"))
+
+        # should_repr_strings=True
         nan = float("nan")  # noqa
         1 / 0
     except Exception:
@@ -388,6 +519,7 @@ def test_nan(sentry_init, capture_events):
     frames = event["exception"]["values"][0]["stacktrace"]["frames"]
     (frame,) = frames
     assert frame["vars"]["nan"] == "nan"
+    assert event["tags"]["mynan"] == "nan"
 
 
 def test_cyclic_frame_vars(sentry_init, capture_events):
@@ -482,6 +614,10 @@ def test_databag_breadth_stripping(sentry_init, capture_events, benchmark):
 
         (event,) = events
 
+        assert (
+            len(event["exception"]["values"][0]["stacktrace"]["frames"][0]["vars"]["a"])
+            == MAX_DATABAG_BREADTH
+        )
         assert len(json.dumps(event)) < 10000
 
 
@@ -690,3 +826,62 @@ def test_init_string_types(dsn, sentry_init):
         Hub.current.client.dsn
         == "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2"
     )
+
+
+def test_envelope_types():
+    """
+    Tests for calling the right transport method (capture_event vs
+    capture_envelope) from the SDK client for different data types.
+    """
+
+    envelopes = []
+    events = []
+
+    class CustomTransport(Transport):
+        def capture_envelope(self, envelope):
+            envelopes.append(envelope)
+
+        def capture_event(self, event):
+            events.append(event)
+
+    with Hub(Client(traces_sample_rate=1.0, transport=CustomTransport())):
+        event_id = capture_message("hello")
+
+        # Assert error events get passed in via capture_event
+        assert not envelopes
+        event = events.pop()
+
+        assert event["event_id"] == event_id
+        assert "type" not in event
+
+        with start_transaction(name="foo"):
+            pass
+
+        # Assert transactions get passed in via capture_envelope
+        assert not events
+        envelope = envelopes.pop()
+
+        (item,) = envelope.items
+        assert item.data_category == "transaction"
+        assert item.headers.get("type") == "transaction"
+
+    assert not envelopes
+    assert not events
+
+
+@pytest.mark.parametrize(
+    "sdk_options, expected_breadcrumbs",
+    [({}, DEFAULT_MAX_BREADCRUMBS), ({"max_breadcrumbs": 50}, 50)],
+)
+def test_max_breadcrumbs_option(
+    sentry_init, capture_events, sdk_options, expected_breadcrumbs
+):
+    sentry_init(sdk_options)
+    events = capture_events()
+
+    for _ in range(1231):
+        add_breadcrumb({"type": "sourdough"})
+
+    capture_message("dogs are great")
+
+    assert len(events[0]["breadcrumbs"]["values"]) == expected_breadcrumbs

@@ -104,7 +104,7 @@ class FalconIntegration(Integration):
         try:
             version = tuple(map(int, FALCON_VERSION.split(".")))
         except (ValueError, TypeError):
-            raise DidNotEnable("Unparseable Falcon version: {}".format(FALCON_VERSION))
+            raise DidNotEnable("Unparsable Falcon version: {}".format(FALCON_VERSION))
 
         if version < (1, 4):
             raise DidNotEnable("Falcon 1.4 or newer required.")
@@ -153,7 +153,7 @@ def _patch_handle_exception():
         hub = Hub.current
         integration = hub.get_integration(FalconIntegration)
 
-        if integration is not None and not _is_falcon_http_error(ex):
+        if integration is not None and _exception_leads_to_http_5xx(ex):
             # If an integration is there, a client has to be there.
             client = hub.client  # type: Any
 
@@ -186,9 +186,15 @@ def _patch_prepare_middleware():
     falcon.api_helpers.prepare_middleware = sentry_patched_prepare_middleware
 
 
-def _is_falcon_http_error(ex):
-    # type: (BaseException) -> bool
-    return isinstance(ex, (falcon.HTTPError, falcon.http_status.HTTPStatus))
+def _exception_leads_to_http_5xx(ex):
+    # type: (Exception) -> bool
+    is_server_error = isinstance(ex, falcon.HTTPError) and (ex.status or "").startswith(
+        "5"
+    )
+    is_unhandled_error = not isinstance(
+        ex, (falcon.HTTPError, falcon.http_status.HTTPStatus)
+    )
+    return is_server_error or is_unhandled_error
 
 
 def _make_request_event_processor(req, integration):

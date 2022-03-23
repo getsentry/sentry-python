@@ -59,6 +59,11 @@ INSTALLED_APPS = [
 
 class TestMiddleware(MiddlewareMixin):
     def process_request(self, request):
+        # https://github.com/getsentry/sentry-python/issues/837 -- We should
+        # not touch the resolver_match because apparently people rely on it.
+        if request.resolver_match:
+            assert not getattr(request.resolver_match.callback, "__wrapped__", None)
+
         if "middleware-exc" in request.path:
             1 / 0
 
@@ -76,6 +81,7 @@ def TestFunctionMiddleware(get_response):  # noqa: N802
 MIDDLEWARE_CLASSES = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
     "tests.integrations.django.myapp.settings.TestMiddleware",
 ]
 
@@ -119,6 +125,7 @@ try:
         "ENGINE": "django.db.backends.postgresql_psycopg2",
         "NAME": os.environ["SENTRY_PYTHON_TEST_POSTGRES_NAME"],
         "USER": os.environ["SENTRY_PYTHON_TEST_POSTGRES_USER"],
+        "PASSWORD": os.environ["SENTRY_PYTHON_TEST_POSTGRES_PASSWORD"],
         "HOST": "localhost",
         "PORT": 5432,
     }
@@ -150,7 +157,7 @@ USE_I18N = True
 
 USE_L10N = True
 
-USE_TZ = True
+USE_TZ = False
 
 TEMPLATE_DEBUG = True
 

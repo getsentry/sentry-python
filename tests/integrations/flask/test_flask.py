@@ -6,12 +6,20 @@ from io import BytesIO
 
 flask = pytest.importorskip("flask")
 
-from flask import Flask, Response, request, abort, stream_with_context
+from flask import (
+    Flask,
+    Response,
+    request,
+    abort,
+    stream_with_context,
+    render_template_string,
+)
 from flask.views import View
 
 from flask_login import LoginManager, login_user
 
 from sentry_sdk import (
+    set_tag,
     configure_scope,
     capture_message,
     capture_exception,
@@ -44,7 +52,7 @@ def app():
 @pytest.fixture(params=("auto", "manual"))
 def integration_enabled_params(request):
     if request.param == "auto":
-        return {"_experiments": {"auto_enabling_integrations": True}}
+        return {"auto_enabling_integrations": True}
     elif request.param == "manual":
         return {"integrations": [flask_sentry.FlaskIntegration()]}
     else:
@@ -246,13 +254,12 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         release="demo-release",
-        _experiments=dict(auto_session_tracking=True,),
     )
 
     @app.route("/")
     def index():
         with configure_scope() as scope:
-            scope.set_user({"ip_address": "1.2.3.4", "id": 42})
+            scope.set_user({"ip_address": "1.2.3.4", "id": "42"})
         try:
             raise ValueError("stuff")
         except Exception:
@@ -273,16 +280,15 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     first_event = first_event.get_event()
     error_event = error_event.get_event()
     session = session.items[0].payload.json
+    aggregates = session["aggregates"]
 
     assert first_event["exception"]["values"][0]["type"] == "ValueError"
     assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
-    assert session["status"] == "crashed"
-    assert session["did"] == "42"
-    assert session["errors"] == 2
-    assert session["init"]
+
+    assert len(aggregates) == 1
+    assert aggregates[0]["crashed"] == 1
+    assert aggregates[0]["started"]
     assert session["attrs"]["release"] == "demo-release"
-    assert session["attrs"]["ip_address"] == "1.2.3.4"
-    assert session["attrs"]["user_agent"] == "blafasel/1.0"
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
@@ -333,7 +339,40 @@ def test_flask_medium_formdata_request(sentry_init, capture_events, app):
     assert len(event["request"]["data"]["foo"]) == 512
 
 
-@pytest.mark.parametrize("input_char", [u"a", b"a"])
+def test_flask_formdata_request_appear_transaction_body(
+    sentry_init, capture_events, app
+):
+    """
+    Test that ensures that transaction request data contains body, even if no exception was raised
+    """
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], traces_sample_rate=1.0)
+
+    data = {"username": "sentry-user", "age": "26"}
+
+    @app.route("/", methods=["POST"])
+    def index():
+        assert request.form["username"] == data["username"]
+        assert request.form["age"] == data["age"]
+        assert not request.get_data()
+        assert not request.get_json()
+        set_tag("view", "yes")
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.post("/", data=data)
+    assert response.status_code == 200
+
+    event, transaction_event = events
+
+    assert "request" in transaction_event
+    assert "data" in transaction_event["request"]
+    assert transaction_event["request"]["data"] == data
+
+
+@pytest.mark.parametrize("input_char", ["a", b"a"])
 def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="small")
 
@@ -630,20 +669,34 @@ def test_errorhandler_for_exception_swallows_exception(
 def test_tracing_success(sentry_init, capture_events, app):
     sentry_init(traces_sample_rate=1.0, integrations=[flask_sentry.FlaskIntegration()])
 
+    @app.before_request
+    def _():
+        set_tag("before_request", "yes")
+
+    @app.route("/message_tx")
+    def hi_tx():
+        set_tag("view", "yes")
+        capture_message("hi")
+        return "ok"
+
     events = capture_events()
 
     with app.test_client() as client:
-        response = client.get("/message")
+        response = client.get("/message_tx")
         assert response.status_code == 200
 
     message_event, transaction_event = events
 
     assert transaction_event["type"] == "transaction"
-    assert transaction_event["transaction"] == "hi"
+    assert transaction_event["transaction"] == "hi_tx"
     assert transaction_event["contexts"]["trace"]["status"] == "ok"
+    assert transaction_event["tags"]["view"] == "yes"
+    assert transaction_event["tags"]["before_request"] == "yes"
 
     assert message_event["message"] == "hi"
-    assert message_event["transaction"] == "hi"
+    assert message_event["transaction"] == "hi_tx"
+    assert message_event["tags"]["view"] == "yes"
+    assert message_event["tags"]["before_request"] == "yes"
 
 
 def test_tracing_error(sentry_init, capture_events, app):
@@ -691,3 +744,34 @@ def test_class_based_views(sentry_init, app, capture_events):
 
     assert event["message"] == "hi"
     assert event["transaction"] == "hello_class"
+
+
+def test_sentry_trace_context(sentry_init, app, capture_events):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    events = capture_events()
+
+    @app.route("/")
+    def index():
+        sentry_span = Hub.current.scope.span
+        capture_message(sentry_span.to_traceparent())
+        return render_template_string("{{ sentry_trace }}")
+
+    with app.test_client() as client:
+        response = client.get("/")
+        assert response.status_code == 200
+        assert response.data.decode(
+            "utf-8"
+        ) == '<meta name="sentry-trace" content="%s" />' % (events[0]["message"],)
+
+
+def test_dont_override_sentry_trace_context(sentry_init, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
+    @app.route("/")
+    def index():
+        return render_template_string("{{ sentry_trace }}", sentry_trace="hi")
+
+    with app.test_client() as client:
+        response = client.get("/")
+        assert response.status_code == 200
+        assert response.data == b"hi"

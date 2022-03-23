@@ -1,5 +1,4 @@
 import inspect
-from contextlib import contextmanager
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
@@ -17,7 +16,7 @@ if MYPY:
     from typing import Union
 
     from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint, ExcInfo
-    from sentry_sdk.tracing import Span
+    from sentry_sdk.tracing import Span, Transaction
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
@@ -28,6 +27,7 @@ else:
         return x
 
 
+# When changing this, update __all__ in __init__.py too
 __all__ = [
     "capture_event",
     "capture_message",
@@ -38,6 +38,7 @@ __all__ = [
     "flush",
     "last_event_id",
     "start_span",
+    "start_transaction",
     "set_tag",
     "set_context",
     "set_extra",
@@ -69,13 +70,10 @@ def capture_event(
     event,  # type: Event
     hint=None,  # type: Optional[Hint]
     scope=None,  # type: Optional[Any]
-    **scope_args  # type: Dict[str, Any]
+    **scope_args  # type: Any
 ):
     # type: (...) -> Optional[str]
-    hub = Hub.current
-    if hub is not None:
-        return hub.capture_event(event, hint, scope=scope, **scope_args)
-    return None
+    return Hub.current.capture_event(event, hint, scope=scope, **scope_args)
 
 
 @hubmethod
@@ -83,26 +81,20 @@ def capture_message(
     message,  # type: str
     level=None,  # type: Optional[str]
     scope=None,  # type: Optional[Any]
-    **scope_args  # type: Dict[str, Any]
+    **scope_args  # type: Any
 ):
     # type: (...) -> Optional[str]
-    hub = Hub.current
-    if hub is not None:
-        return hub.capture_message(message, level, scope=scope, **scope_args)
-    return None
+    return Hub.current.capture_message(message, level, scope=scope, **scope_args)
 
 
 @hubmethod
 def capture_exception(
     error=None,  # type: Optional[Union[BaseException, ExcInfo]]
     scope=None,  # type: Optional[Any]
-    **scope_args  # type: Dict[str, Any]
+    **scope_args  # type: Any
 ):
     # type: (...) -> Optional[str]
-    hub = Hub.current
-    if hub is not None:
-        return hub.capture_exception(error, scope=scope, **scope_args)
-    return None
+    return Hub.current.capture_exception(error, scope=scope, **scope_args)
 
 
 @hubmethod
@@ -112,117 +104,81 @@ def add_breadcrumb(
     **kwargs  # type: Any
 ):
     # type: (...) -> None
-    hub = Hub.current
-    if hub is not None:
-        return hub.add_breadcrumb(crumb, hint, **kwargs)
+    return Hub.current.add_breadcrumb(crumb, hint, **kwargs)
 
 
-@overload  # noqa
-def configure_scope():
+@overload
+def configure_scope():  # noqa: F811
     # type: () -> ContextManager[Scope]
     pass
 
 
-@overload  # noqa
-def configure_scope(
+@overload
+def configure_scope(  # noqa: F811
     callback,  # type: Callable[[Scope], None]
 ):
     # type: (...) -> None
     pass
 
 
-@hubmethod  # noqa
-def configure_scope(
+@hubmethod
+def configure_scope(  # noqa: F811
     callback=None,  # type: Optional[Callable[[Scope], None]]
 ):
     # type: (...) -> Optional[ContextManager[Scope]]
-    hub = Hub.current
-    if hub is not None:
-        return hub.configure_scope(callback)
-    elif callback is None:
-
-        @contextmanager
-        def inner():
-            yield Scope()
-
-        return inner()
-    else:
-        # returned if user provided callback
-        return None
+    return Hub.current.configure_scope(callback)
 
 
-@overload  # noqa
-def push_scope():
+@overload
+def push_scope():  # noqa: F811
     # type: () -> ContextManager[Scope]
     pass
 
 
-@overload  # noqa
-def push_scope(
+@overload
+def push_scope(  # noqa: F811
     callback,  # type: Callable[[Scope], None]
 ):
     # type: (...) -> None
     pass
 
 
-@hubmethod  # noqa
-def push_scope(
+@hubmethod
+def push_scope(  # noqa: F811
     callback=None,  # type: Optional[Callable[[Scope], None]]
 ):
     # type: (...) -> Optional[ContextManager[Scope]]
-    hub = Hub.current
-    if hub is not None:
-        return hub.push_scope(callback)
-    elif callback is None:
-
-        @contextmanager
-        def inner():
-            yield Scope()
-
-        return inner()
-    else:
-        # returned if user provided callback
-        return None
+    return Hub.current.push_scope(callback)
 
 
 @scopemethod  # noqa
 def set_tag(key, value):
     # type: (str, Any) -> None
-    hub = Hub.current
-    if hub is not None:
-        hub.scope.set_tag(key, value)
+    return Hub.current.scope.set_tag(key, value)
 
 
 @scopemethod  # noqa
 def set_context(key, value):
-    # type: (str, Any) -> None
-    hub = Hub.current
-    if hub is not None:
-        hub.scope.set_context(key, value)
+    # type: (str, Dict[str, Any]) -> None
+    return Hub.current.scope.set_context(key, value)
 
 
 @scopemethod  # noqa
 def set_extra(key, value):
     # type: (str, Any) -> None
-    hub = Hub.current
-    if hub is not None:
-        hub.scope.set_extra(key, value)
+    return Hub.current.scope.set_extra(key, value)
 
 
 @scopemethod  # noqa
 def set_user(value):
-    # type: (Dict[str, Any]) -> None
-    hub = Hub.current
-    if hub is not None:
-        hub.scope.set_user(value)
+    # type: (Optional[Dict[str, Any]]) -> None
+    return Hub.current.scope.set_user(value)
 
 
 @scopemethod  # noqa
 def set_level(value):
     # type: (str) -> None
-    hub = Hub.current
-    if hub is not None:
-        hub.scope.set_level(value)
+    return Hub.current.scope.set_level(value)
 
 
 @hubmethod
@@ -231,18 +187,13 @@ def flush(
     callback=None,  # type: Optional[Callable[[int, float], None]]
 ):
     # type: (...) -> None
-    hub = Hub.current
-    if hub is not None:
-        return hub.flush(timeout=timeout, callback=callback)
+    return Hub.current.flush(timeout=timeout, callback=callback)
 
 
 @hubmethod
 def last_event_id():
     # type: () -> Optional[str]
-    hub = Hub.current
-    if hub is not None:
-        return hub.last_event_id()
-    return None
+    return Hub.current.last_event_id()
 
 
 @hubmethod
@@ -251,7 +202,13 @@ def start_span(
     **kwargs  # type: Any
 ):
     # type: (...) -> Span
-
-    # TODO: All other functions in this module check for
-    # `Hub.current is None`. That actually should never happen?
     return Hub.current.start_span(span=span, **kwargs)
+
+
+@hubmethod
+def start_transaction(
+    transaction=None,  # type: Optional[Transaction]
+    **kwargs  # type: Any
+):
+    # type: (...) -> Transaction
+    return Hub.current.start_transaction(transaction, **kwargs)

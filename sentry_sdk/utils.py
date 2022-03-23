@@ -1,7 +1,12 @@
-import os
-import sys
+import base64
+import json
 import linecache
 import logging
+import os
+import sys
+import threading
+import subprocess
+import re
 
 from datetime import datetime
 
@@ -25,7 +30,8 @@ if MYPY:
     from typing import Union
     from typing import Type
 
-    from sentry_sdk._types import ExcInfo
+    from sentry_sdk._types import ExcInfo, EndpointType
+
 
 epoch = datetime(1970, 1, 1)
 
@@ -34,13 +40,58 @@ epoch = datetime(1970, 1, 1)
 logger = logging.getLogger("sentry_sdk.errors")
 
 MAX_STRING_LENGTH = 512
-MAX_FORMAT_PARAM_LENGTH = 128
+BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
+
+
+def json_dumps(data):
+    # type: (Any) -> bytes
+    """Serialize data into a compact JSON representation encoded as UTF-8."""
+    return json.dumps(data, allow_nan=False, separators=(",", ":")).encode("utf-8")
 
 
 def _get_debug_hub():
     # type: () -> Optional[sentry_sdk.Hub]
     # This function is replaced by debug.py
     pass
+
+
+def get_default_release():
+    # type: () -> Optional[str]
+    """Try to guess a default release."""
+    release = os.environ.get("SENTRY_RELEASE")
+    if release:
+        return release
+
+    with open(os.path.devnull, "w+") as null:
+        try:
+            release = (
+                subprocess.Popen(
+                    ["git", "rev-parse", "HEAD"],
+                    stdout=subprocess.PIPE,
+                    stderr=null,
+                    stdin=null,
+                )
+                .communicate()[0]
+                .strip()
+                .decode("utf-8")
+            )
+        except (OSError, IOError):
+            pass
+
+        if release:
+            return release
+
+    for var in (
+        "HEROKU_SLUG_COMMIT",
+        "SOURCE_VERSION",
+        "CODEBUILD_RESOLVED_SOURCE_VERSION",
+        "CIRCLE_SHA1",
+        "GAE_DEPLOYMENT_ID",
+    ):
+        release = os.environ.get(var)
+        if release:
+            return release
+    return None
 
 
 class CaptureInternalException(object):
@@ -200,12 +251,23 @@ class Auth(object):
     @property
     def store_api_url(self):
         # type: () -> str
+        """Returns the API url for storing events.
+
+        Deprecated: use get_api_url instead.
+        """
+        return self.get_api_url(type="store")
+
+    def get_api_url(
+        self, type="store"  # type: EndpointType
+    ):
+        # type: (...) -> str
         """Returns the API url for storing events."""
-        return "%s://%s%sapi/%s/store/" % (
+        return "%s://%s%sapi/%s/%s/" % (
             self.scheme,
             self.host,
             self.path,
             self.project_id,
+            type,
         )
 
     def to_header(self, timestamp=None):
@@ -447,18 +509,6 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
     return rv
 
 
-def stacktrace_from_traceback(tb=None, with_locals=True):
-    # type: (Optional[TracebackType], bool) -> Dict[str, List[Dict[str, Any]]]
-    return {
-        "frames": [
-            serialize_frame(
-                tb.tb_frame, tb_lineno=tb.tb_lineno, with_locals=with_locals
-            )
-            for tb in iter_stacks(tb)
-        ]
-    }
-
-
 def current_stacktrace(with_locals=True):
     # type: (bool) -> Any
     __tracebackhide__ = True
@@ -494,7 +544,7 @@ def single_exception_from_error_tuple(
         errno = None
 
     if errno is not None:
-        mechanism = mechanism or {}
+        mechanism = mechanism or {"type": "generic"}
         mechanism.setdefault("meta", {}).setdefault("errno", {}).setdefault(
             "number", errno
         )
@@ -504,13 +554,22 @@ def single_exception_from_error_tuple(
     else:
         with_locals = client_options["with_locals"]
 
-    return {
+    frames = [
+        serialize_frame(tb.tb_frame, tb_lineno=tb.tb_lineno, with_locals=with_locals)
+        for tb in iter_stacks(tb)
+    ]
+
+    rv = {
         "module": get_type_module(exc_type),
         "type": get_type_name(exc_type),
         "value": safe_str(exc_value),
         "mechanism": mechanism,
-        "stacktrace": stacktrace_from_traceback(tb, with_locals),
     }
+
+    if frames:
+        rv["stacktrace"] = {"frames": frames}
+
+    return rv
 
 
 HAS_CHAINED_EXCEPTIONS = hasattr(Exception, "__suppress_context__")
@@ -728,12 +787,26 @@ def _is_contextvars_broken():
     Returns whether gevent/eventlet have patched the stdlib in a way where thread locals are now more "correct" than contextvars.
     """
     try:
+        import gevent  # type: ignore
         from gevent.monkey import is_object_patched  # type: ignore
 
+        # Get the MAJOR and MINOR version numbers of Gevent
+        version_tuple = tuple(
+            [int(part) for part in re.split(r"a|b|rc|\.", gevent.__version__)[:2]]
+        )
         if is_object_patched("threading", "local"):
-            # Gevent 20.5 is able to patch both thread locals and contextvars,
-            # in that case all is good.
-            if is_object_patched("contextvars", "ContextVar"):
+            # Gevent 20.9.0 depends on Greenlet 0.4.17 which natively handles switching
+            # context vars when greenlets are switched, so, Gevent 20.9.0+ is all fine.
+            # Ref: https://github.com/gevent/gevent/blob/83c9e2ae5b0834b8f84233760aabe82c3ba065b4/src/gevent/monkey.py#L604-L609
+            # Gevent 20.5, that doesn't depend on Greenlet 0.4.17 with native support
+            # for contextvars, is able to patch both thread locals and contextvars, in
+            # that case, check if contextvars are effectively patched.
+            if (
+                # Gevent 20.9.0+
+                (sys.version_info >= (3, 7) and version_tuple >= (20, 9))
+                # Gevent 20.5.0+ or Python < 3.7
+                or (is_object_patched("contextvars", "ContextVar"))
+            ):
                 return False
 
             return True
@@ -855,3 +928,86 @@ def transaction_from_function(func):
 
 
 disable_capture_event = ContextVar("disable_capture_event")
+
+
+class ServerlessTimeoutWarning(Exception):
+    """Raised when a serverless method is about to reach its timeout."""
+
+    pass
+
+
+class TimeoutThread(threading.Thread):
+    """Creates a Thread which runs (sleeps) for a time duration equal to
+    waiting_time and raises a custom ServerlessTimeout exception.
+    """
+
+    def __init__(self, waiting_time, configured_timeout):
+        # type: (float, int) -> None
+        threading.Thread.__init__(self)
+        self.waiting_time = waiting_time
+        self.configured_timeout = configured_timeout
+        self._stop_event = threading.Event()
+
+    def stop(self):
+        # type: () -> None
+        self._stop_event.set()
+
+    def run(self):
+        # type: () -> None
+
+        self._stop_event.wait(self.waiting_time)
+
+        if self._stop_event.is_set():
+            return
+
+        integer_configured_timeout = int(self.configured_timeout)
+
+        # Setting up the exact integer value of configured time(in seconds)
+        if integer_configured_timeout < self.configured_timeout:
+            integer_configured_timeout = integer_configured_timeout + 1
+
+        # Raising Exception after timeout duration is reached
+        raise ServerlessTimeoutWarning(
+            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
+                integer_configured_timeout
+            )
+        )
+
+
+def to_base64(original):
+    # type: (str) -> Optional[str]
+    """
+    Convert a string to base64, via UTF-8. Returns None on invalid input.
+    """
+    base64_string = None
+
+    try:
+        utf8_bytes = original.encode("UTF-8")
+        base64_bytes = base64.b64encode(utf8_bytes)
+        base64_string = base64_bytes.decode("UTF-8")
+    except Exception as err:
+        logger.warning("Unable to encode {orig} to base64:".format(orig=original), err)
+
+    return base64_string
+
+
+def from_base64(base64_string):
+    # type: (str) -> Optional[str]
+    """
+    Convert a string from base64, via UTF-8. Returns None on invalid input.
+    """
+    utf8_string = None
+
+    try:
+        only_valid_chars = BASE64_ALPHABET.match(base64_string)
+        assert only_valid_chars
+
+        base64_bytes = base64_string.encode("UTF-8")
+        utf8_bytes = base64.b64decode(base64_bytes)
+        utf8_string = utf8_bytes.decode("UTF-8")
+    except Exception as err:
+        logger.warning(
+            "Unable to decode {b64} from base64:".format(b64=base64_string), err
+        )
+
+    return utf8_string

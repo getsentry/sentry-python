@@ -27,8 +27,7 @@ def _generate_default_integrations_iterator(integrations, auto_enabling_integrat
 
     def iter_default_integrations(with_auto_enabling_integrations):
         # type: (bool) -> Iterator[Type[Integration]]
-        """Returns an iterator of the default integration classes:
-        """
+        """Returns an iterator of the default integration classes:"""
         from importlib import import_module
 
         if with_auto_enabling_integrations:
@@ -65,6 +64,7 @@ _AUTO_ENABLING_INTEGRATIONS = (
     "sentry_sdk.integrations.sqlalchemy.SqlalchemyIntegration",
     "sentry_sdk.integrations.redis.RedisIntegration",
     "sentry_sdk.integrations.pyramid.PyramidIntegration",
+    "sentry_sdk.integrations.boto3.Boto3Integration",
 )
 
 

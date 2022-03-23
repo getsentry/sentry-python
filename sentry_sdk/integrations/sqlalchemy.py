@@ -3,7 +3,7 @@ from __future__ import absolute_import
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.tracing import record_sql_queries
+from sentry_sdk.tracing_utils import RecordSqlQueries
 
 try:
     from sqlalchemy.engine import Engine  # type: ignore
@@ -31,7 +31,7 @@ class SqlalchemyIntegration(Integration):
             version = tuple(map(int, SQLALCHEMY_VERSION.split("b")[0].split(".")))
         except (TypeError, ValueError):
             raise DidNotEnable(
-                "Unparseable SQLAlchemy version: {}".format(SQLALCHEMY_VERSION)
+                "Unparsable SQLAlchemy version: {}".format(SQLALCHEMY_VERSION)
             )
 
         if version < (1, 2):
@@ -50,7 +50,7 @@ def _before_cursor_execute(
     if hub.get_integration(SqlalchemyIntegration) is None:
         return
 
-    ctx_mgr = record_sql_queries(
+    ctx_mgr = RecordSqlQueries(
         hub,
         cursor,
         statement,

@@ -1,7 +1,5 @@
 from __future__ import absolute_import
 
-import weakref
-
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -14,7 +12,6 @@ if MYPY:
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from typing import Any
     from typing import Dict
-    from werkzeug.datastructures import ImmutableTypeConversionDict
     from werkzeug.datastructures import ImmutableMultiDict
     from werkzeug.datastructures import FileStorage
     from typing import Union
@@ -30,6 +27,7 @@ except ImportError:
 
 try:
     from flask import (  # type: ignore
+        Markup,
         Request,
         Flask,
         _request_ctx_stack,
@@ -37,14 +35,17 @@ try:
         __version__ as FLASK_VERSION,
     )
     from flask.signals import (
-        appcontext_pushed,
-        appcontext_tearing_down,
+        before_render_template,
         got_request_exception,
         request_started,
     )
 except ImportError:
     raise DidNotEnable("Flask is not installed")
 
+try:
+    import blinker  # noqa
+except ImportError:
+    raise DidNotEnable("blinker is not installed")
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
@@ -66,16 +67,19 @@ class FlaskIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+
+        # This version parsing is absolutely naive but the alternative is to
+        # import pkg_resources which slows down the SDK a lot.
         try:
             version = tuple(map(int, FLASK_VERSION.split(".")[:3]))
         except (ValueError, TypeError):
-            raise DidNotEnable("Unparseable Flask version: {}".format(FLASK_VERSION))
+            # It's probably a release candidate, we assume it's fine.
+            pass
+        else:
+            if version < (0, 10):
+                raise DidNotEnable("Flask 0.10 or newer is required.")
 
-        if version < (0, 11):
-            raise DidNotEnable("Flask 0.11 or newer is required.")
-
-        appcontext_pushed.connect(_push_appctx)
-        appcontext_tearing_down.connect(_pop_appctx)
+        before_render_template.connect(_add_sentry_trace)
         request_started.connect(_request_started)
         got_request_exception.connect(_capture_exception)
 
@@ -93,24 +97,21 @@ class FlaskIntegration(Integration):
         Flask.__call__ = sentry_patched_wsgi_app  # type: ignore
 
 
-def _push_appctx(*args, **kwargs):
-    # type: (*Flask, **Any) -> None
-    hub = Hub.current
-    if hub.get_integration(FlaskIntegration) is not None:
-        # always want to push scope regardless of whether WSGI app might already
-        # have (not the case for CLI for example)
-        scope_manager = hub.push_scope()
-        scope_manager.__enter__()
-        _app_ctx_stack.top.sentry_sdk_scope_manager = scope_manager
-        with hub.configure_scope() as scope:
-            scope._name = "flask"
+def _add_sentry_trace(sender, template, context, **extra):
+    # type: (Flask, Any, Dict[str, Any], **Any) -> None
 
+    if "sentry_trace" in context:
+        return
 
-def _pop_appctx(*args, **kwargs):
-    # type: (*Flask, **Any) -> None
-    scope_manager = getattr(_app_ctx_stack.top, "sentry_sdk_scope_manager", None)
-    if scope_manager is not None:
-        scope_manager.__exit__(None, None, None)
+    sentry_span = Hub.current.scope.span
+    context["sentry_trace"] = (
+        Markup(
+            '<meta name="sentry-trace" content="%s" />'
+            % (sentry_span.to_traceparent(),)
+        )
+        if sentry_span
+        else ""
+    )
 
 
 def _request_started(sender, **kwargs):
@@ -124,7 +125,8 @@ def _request_started(sender, **kwargs):
     with hub.configure_scope() as scope:
         request = _request_ctx_stack.top.request
 
-        # Rely on WSGI middleware to start a trace
+        # Set the transaction name here, but rely on WSGI middleware to actually
+        # start the transaction
         try:
             if integration.transaction_style == "endpoint":
                 scope.transaction = request.url_rule.endpoint
@@ -133,10 +135,7 @@ def _request_started(sender, **kwargs):
         except Exception:
             pass
 
-        weak_request = weakref.ref(request)
-        evt_processor = _make_request_event_processor(
-            app, weak_request, integration  # type: ignore
-        )
+        evt_processor = _make_request_event_processor(app, request, integration)
         scope.add_event_processor(evt_processor)
 
 
@@ -146,8 +145,11 @@ class FlaskRequestExtractor(RequestExtractor):
         return self.request.environ
 
     def cookies(self):
-        # type: () -> ImmutableTypeConversionDict[Any, Any]
-        return self.request.cookies
+        # type: () -> Dict[Any, Any]
+        return {
+            k: v[0] if isinstance(v, list) and len(v) == 1 else v
+            for k, v in self.request.cookies.items()
+        }
 
     def raw_data(self):
         # type: () -> bytes
@@ -174,11 +176,11 @@ class FlaskRequestExtractor(RequestExtractor):
         return file.content_length
 
 
-def _make_request_event_processor(app, weak_request, integration):
+def _make_request_event_processor(app, request, integration):
     # type: (Flask, Callable[[], Request], FlaskIntegration) -> EventProcessor
+
     def inner(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-        request = weak_request()
 
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to

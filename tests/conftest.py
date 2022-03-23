@@ -1,12 +1,18 @@
 import os
-import subprocess
 import json
-import uuid
 
 import pytest
+import jsonschema
 
-import gevent
-import eventlet
+try:
+    import gevent
+except ImportError:
+    gevent = None
+
+try:
+    import eventlet
+except ImportError:
+    eventlet = None
 
 import sentry_sdk
 from sentry_sdk._compat import reraise, string_types, iteritems
@@ -16,11 +22,14 @@ from sentry_sdk.utils import capture_internal_exceptions
 
 from tests import _warning_recorder, _warning_recorder_mgr
 
-SENTRY_RELAY = "./relay"
 
-if not os.path.isfile(SENTRY_RELAY):
-    SENTRY_RELAY = None
+SENTRY_EVENT_SCHEMA = "./checkouts/data-schemas/relay/event.schema.json"
 
+if not os.path.isfile(SENTRY_EVENT_SCHEMA):
+    SENTRY_EVENT_SCHEMA = None
+else:
+    with open(SENTRY_EVENT_SCHEMA) as f:
+        SENTRY_EVENT_SCHEMA = json.load(f)
 
 try:
     import pytest_benchmark
@@ -46,6 +55,8 @@ def internal_exceptions(request, monkeypatch):
 
     @request.addfinalizer
     def _():
+        # rerasise the errors so that this just acts as a pass-through (that
+        # happens to keep track of the errors which pass through it)
         for e in errors:
             reraise(*e)
 
@@ -118,7 +129,7 @@ def _capture_internal_warnings():
 
 
 @pytest.fixture
-def monkeypatch_test_transport(monkeypatch, relay_normalize):
+def monkeypatch_test_transport(monkeypatch, validate_event_schema):
     def check_event(event):
         def check_string_keys(map):
             for key, value in iteritems(map):
@@ -128,54 +139,29 @@ def monkeypatch_test_transport(monkeypatch, relay_normalize):
 
         with capture_internal_exceptions():
             check_string_keys(event)
-            relay_normalize(event)
+            validate_event_schema(event)
+
+    def check_envelope(envelope):
+        with capture_internal_exceptions():
+            # Assert error events are sent without envelope to server, for compat.
+            # This does not apply if any item in the envelope is an attachment.
+            if not any(x.type == "attachment" for x in envelope.items):
+                assert not any(item.data_category == "error" for item in envelope.items)
+                assert not any(item.get_event() is not None for item in envelope.items)
 
     def inner(client):
-        monkeypatch.setattr(client, "transport", TestTransport(check_event))
+        monkeypatch.setattr(
+            client, "transport", TestTransport(check_event, check_envelope)
+        )
 
     return inner
 
 
-def _no_errors_in_relay_response(obj):
-    """Assert that relay didn't throw any errors when processing the
-    event."""
-
-    def inner(obj):
-        if not isinstance(obj, dict):
-            return
-
-        assert "err" not in obj
-
-        for value in obj.values():
-            inner(value)
-
-    try:
-        inner(obj.get("_meta"))
-        inner(obj.get(""))
-    except AssertionError:
-        raise AssertionError(obj)
-
-
 @pytest.fixture
-def relay_normalize(tmpdir):
+def validate_event_schema(tmpdir):
     def inner(event):
-        if not SENTRY_RELAY:
-            return
-
-        # Disable subprocess integration
-        with sentry_sdk.Hub(None):
-            # not dealing with the subprocess API right now
-            file = tmpdir.join("event-{}".format(uuid.uuid4().hex))
-            file.write(json.dumps(dict(event)))
-            with file.open() as f:
-                output = json.loads(
-                    subprocess.check_output(
-                        [SENTRY_RELAY, "process-event"], stdin=f
-                    ).decode("utf-8")
-                )
-            _no_errors_in_relay_response(output)
-            output.pop("_meta", None)
-            return output
+        if SENTRY_EVENT_SCHEMA:
+            jsonschema.validate(instance=event, schema=SENTRY_EVENT_SCHEMA)
 
     return inner
 
@@ -186,7 +172,8 @@ def sentry_init(monkeypatch_test_transport, request):
         hub = sentry_sdk.Hub.current
         client = sentry_sdk.Client(*a, **kw)
         hub.bind_client(client)
-        monkeypatch_test_transport(sentry_sdk.Hub.current.client)
+        if "transport" not in kw:
+            monkeypatch_test_transport(sentry_sdk.Hub.current.client)
 
     if request.node.get_closest_marker("forked"):
         # Do not run isolation if the test is already running in
@@ -199,9 +186,10 @@ def sentry_init(monkeypatch_test_transport, request):
 
 
 class TestTransport(Transport):
-    def __init__(self, capture_event_callback):
+    def __init__(self, capture_event_callback, capture_envelope_callback):
         Transport.__init__(self)
         self.capture_event = capture_event_callback
+        self.capture_envelope = capture_envelope_callback
         self._queue = None
 
 
@@ -211,12 +199,20 @@ def capture_events(monkeypatch):
         events = []
         test_client = sentry_sdk.Hub.current.client
         old_capture_event = test_client.transport.capture_event
+        old_capture_envelope = test_client.transport.capture_envelope
 
-        def append(event):
+        def append_event(event):
             events.append(event)
             return old_capture_event(event)
 
-        monkeypatch.setattr(test_client.transport, "capture_event", append)
+        def append_envelope(envelope):
+            for item in envelope:
+                if item.headers.get("type") in ("event", "transaction"):
+                    test_client.transport.capture_event(item.payload.json)
+            return old_capture_envelope(envelope)
+
+        monkeypatch.setattr(test_client.transport, "capture_event", append_event)
+        monkeypatch.setattr(test_client.transport, "capture_envelope", append_envelope)
         return events
 
     return inner
@@ -248,8 +244,29 @@ def capture_envelopes(monkeypatch):
 
 
 @pytest.fixture
-def capture_events_forksafe(monkeypatch):
+def capture_client_reports(monkeypatch):
     def inner():
+        reports = []
+        test_client = sentry_sdk.Hub.current.client
+
+        def record_lost_event(reason, data_category=None, item=None):
+            if data_category is None:
+                data_category = item.data_category
+            return reports.append((reason, data_category))
+
+        monkeypatch.setattr(
+            test_client.transport, "record_lost_event", record_lost_event
+        )
+        return reports
+
+    return inner
+
+
+@pytest.fixture
+def capture_events_forksafe(monkeypatch, capture_events, request):
+    def inner():
+        capture_events()
+
         events_r, events_w = os.pipe()
         events_r = os.fdopen(events_r, "rb", 0)
         events_w = os.fdopen(events_w, "wb", 0)
@@ -293,6 +310,9 @@ class EventStreamReader(object):
 )
 def maybe_monkeypatched_threading(request):
     if request.param == "eventlet":
+        if eventlet is None:
+            pytest.skip("no eventlet installed")
+
         try:
             eventlet.monkey_patch()
         except AttributeError as e:
@@ -302,6 +322,8 @@ def maybe_monkeypatched_threading(request):
             else:
                 raise
     elif request.param == "gevent":
+        if gevent is None:
+            pytest.skip("no gevent installed")
         try:
             gevent.monkey.patch_all()
         except Exception as e:
@@ -325,8 +347,8 @@ def render_span_tree():
             by_parent.setdefault(span["parent_span_id"], []).append(span)
 
         def render_span(span):
-            yield "- op={!r}: description={!r}".format(
-                span.get("op"), span.get("description")
+            yield "- op={}: description={}".format(
+                json.dumps(span.get("op")), json.dumps(span.get("description"))
             )
             for subspan in by_parent.get(span["span_id"]) or ():
                 for line in render_span(subspan):
@@ -338,3 +360,186 @@ def render_span_tree():
         return "\n".join(render_span(root_span))
 
     return inner
+
+
+@pytest.fixture(name="StringContaining")
+def string_containing_matcher():
+    """
+    An object which matches any string containing the substring passed to the
+    object at instantiation time.
+
+    Useful for assert_called_with, assert_any_call, etc.
+
+    Used like this:
+
+    >>> f = mock.Mock()
+    >>> f("dogs are great")
+    >>> f.assert_any_call("dogs") # will raise AssertionError
+    Traceback (most recent call last):
+        ...
+    AssertionError: mock('dogs') call not found
+    >>> f.assert_any_call(StringContaining("dogs")) # no AssertionError
+
+    """
+
+    class StringContaining(object):
+        def __init__(self, substring):
+            self.substring = substring
+
+            try:
+                # the `unicode` type only exists in python 2, so if this blows up,
+                # we must be in py3 and have the `bytes` type
+                self.valid_types = (str, unicode)  # noqa
+            except NameError:
+                self.valid_types = (str, bytes)
+
+        def __eq__(self, test_string):
+            if not isinstance(test_string, self.valid_types):
+                return False
+
+            # this is safe even in py2 because as of 2.6, `bytes` exists in py2
+            # as an alias for `str`
+            if isinstance(test_string, bytes):
+                test_string = test_string.decode()
+
+            if len(self.substring) > len(test_string):
+                return False
+
+            return self.substring in test_string
+
+        def __ne__(self, test_string):
+            return not self.__eq__(test_string)
+
+    return StringContaining
+
+
+def _safe_is_equal(x, y):
+    """
+    Compares two values, preferring to use the first's __eq__ method if it
+    exists and is implemented.
+
+    Accounts for py2/py3 differences (like ints in py2 not having a __eq__
+    method), as well as the incomparability of certain types exposed by using
+    raw __eq__ () rather than ==.
+    """
+
+    # Prefer using __eq__ directly to ensure that examples like
+    #
+    #   maisey = Dog()
+    #   maisey.name = "Maisey the Dog"
+    #   maisey == ObjectDescribedBy(attrs={"name": StringContaining("Maisey")})
+    #
+    # evaluate to True (in other words, examples where the values in self.attrs
+    # might also have custom __eq__ methods; this makes sure those methods get
+    # used if possible)
+    try:
+        is_equal = x.__eq__(y)
+    except AttributeError:
+        is_equal = NotImplemented
+
+    # this can happen on its own, too (i.e. without an AttributeError being
+    # thrown), which is why this is separate from the except block above
+    if is_equal == NotImplemented:
+        # using == smoothes out weird variations exposed by raw __eq__
+        return x == y
+
+    return is_equal
+
+
+@pytest.fixture(name="DictionaryContaining")
+def dictionary_containing_matcher():
+    """
+    An object which matches any dictionary containing all key-value pairs from
+    the dictionary passed to the object at instantiation time.
+
+    Useful for assert_called_with, assert_any_call, etc.
+
+    Used like this:
+
+    >>> f = mock.Mock()
+    >>> f({"dogs": "yes", "cats": "maybe"})
+    >>> f.assert_any_call({"dogs": "yes"}) # will raise AssertionError
+    Traceback (most recent call last):
+        ...
+    AssertionError: mock({'dogs': 'yes'}) call not found
+    >>> f.assert_any_call(DictionaryContaining({"dogs": "yes"})) # no AssertionError
+    """
+
+    class DictionaryContaining(object):
+        def __init__(self, subdict):
+            self.subdict = subdict
+
+        def __eq__(self, test_dict):
+            if not isinstance(test_dict, dict):
+                return False
+
+            if len(self.subdict) > len(test_dict):
+                return False
+
+            for key, value in self.subdict.items():
+                try:
+                    test_value = test_dict[key]
+                except KeyError:  # missing key
+                    return False
+
+                if not _safe_is_equal(value, test_value):
+                    return False
+
+            return True
+
+        def __ne__(self, test_dict):
+            return not self.__eq__(test_dict)
+
+    return DictionaryContaining
+
+
+@pytest.fixture(name="ObjectDescribedBy")
+def object_described_by_matcher():
+    """
+    An object which matches any other object with the given properties.
+
+    Available properties currently are "type" (a type object) and "attrs" (a
+    dictionary).
+
+    Useful for assert_called_with, assert_any_call, etc.
+
+    Used like this:
+
+    >>> class Dog(object):
+    ...     pass
+    ...
+    >>> maisey = Dog()
+    >>> maisey.name = "Maisey"
+    >>> maisey.age = 7
+    >>> f = mock.Mock()
+    >>> f(maisey)
+    >>> f.assert_any_call(ObjectDescribedBy(type=Dog)) # no AssertionError
+    >>> f.assert_any_call(ObjectDescribedBy(attrs={"name": "Maisey"})) # no AssertionError
+    """
+
+    class ObjectDescribedBy(object):
+        def __init__(self, type=None, attrs=None):
+            self.type = type
+            self.attrs = attrs
+
+        def __eq__(self, test_obj):
+            if self.type:
+                if not isinstance(test_obj, self.type):
+                    return False
+
+            if self.attrs:
+                for attr_name, attr_value in self.attrs.items():
+                    try:
+                        test_value = getattr(test_obj, attr_name)
+                    except AttributeError:  # missing attribute
+                        return False
+
+                    if not _safe_is_equal(attr_value, test_value):
+                        return False
+
+            return True
+
+        def __ne__(self, test_obj):
+            return not self.__eq__(test_obj)
+
+    return ObjectDescribedBy

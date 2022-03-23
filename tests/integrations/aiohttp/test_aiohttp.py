@@ -2,10 +2,17 @@ import asyncio
 import json
 from contextlib import suppress
 
+import pytest
 from aiohttp import web
 from aiohttp.client import ServerDisconnectedError
+from aiohttp.web_request import Request
 
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 
 async def test_basic(sentry_init, aiohttp_client, loop, capture_events):
@@ -185,4 +192,72 @@ async def test_tracing(sentry_init, aiohttp_client, loop, capture_events):
     assert (
         event["transaction"]
         == "tests.integrations.aiohttp.test_aiohttp.test_tracing.<locals>.hello"
+    )
+
+
+@pytest.mark.parametrize(
+    "transaction_style,expected_transaction",
+    [
+        (
+            "handler_name",
+            "tests.integrations.aiohttp.test_aiohttp.test_transaction_style.<locals>.hello",
+        ),
+        ("method_and_path_pattern", "GET /{var}"),
+    ],
+)
+async def test_transaction_style(
+    sentry_init, aiohttp_client, capture_events, transaction_style, expected_transaction
+):
+    sentry_init(
+        integrations=[AioHttpIntegration(transaction_style=transaction_style)],
+        traces_sample_rate=1.0,
+    )
+
+    async def hello(request):
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get(r"/{var}", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/1")
+    assert resp.status == 200
+
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert event["transaction"] == expected_transaction
+
+
+async def test_traces_sampler_gets_request_object_in_sampling_context(
+    sentry_init,
+    aiohttp_client,
+    DictionaryContaining,  # noqa:N803
+    ObjectDescribedBy,  # noqa:N803
+):
+    traces_sampler = mock.Mock()
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sampler=traces_sampler,
+    )
+
+    async def kangaroo_handler(request):
+        return web.Response(text="dogs are great")
+
+    app = web.Application()
+    app.router.add_get("/tricks/kangaroo", kangaroo_handler)
+
+    client = await aiohttp_client(app)
+    await client.get("/tricks/kangaroo")
+
+    traces_sampler.assert_any_call(
+        DictionaryContaining(
+            {
+                "aiohttp_request": ObjectDescribedBy(
+                    type=Request, attrs={"method": "GET", "path": "/tricks/kangaroo"}
+                )
+            }
+        )
     )

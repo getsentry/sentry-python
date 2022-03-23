@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from sentry_sdk import Hub, capture_message
+from sentry_sdk import capture_message, start_transaction
 from sentry_sdk._compat import PY2
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 
@@ -63,7 +63,7 @@ def test_subprocess_basic(
     sentry_init(integrations=[StdlibIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
-    with Hub.current.start_span(transaction="foo", op="foo") as span:
+    with start_transaction(name="foo") as transaction:
         args = [
             sys.executable,
             "-c",
@@ -114,17 +114,20 @@ def test_subprocess_basic(
 
     assert os.environ == old_environ
 
-    assert span.trace_id in str(output)
+    assert transaction.trace_id in str(output)
 
     capture_message("hi")
 
-    transaction_event, message_event, = events
+    (
+        transaction_event,
+        message_event,
+    ) = events
 
     assert message_event["message"] == "hi"
 
     data = {"subprocess.cwd": os.getcwd()} if with_cwd else {}
 
-    (crumb,) = message_event["breadcrumbs"]
+    (crumb,) = message_event["breadcrumbs"]["values"]
     assert crumb == {
         "category": "subprocess",
         "data": data,
@@ -140,13 +143,15 @@ def test_subprocess_basic(
 
     (
         subprocess_init_span,
-        subprocess_wait_span,
         subprocess_communicate_span,
+        subprocess_wait_span,
     ) = transaction_event["spans"]
 
-    assert subprocess_init_span["op"] == "subprocess"
-    assert subprocess_communicate_span["op"] == "subprocess.communicate"
-    assert subprocess_wait_span["op"] == "subprocess.wait"
+    assert (
+        subprocess_init_span["op"],
+        subprocess_communicate_span["op"],
+        subprocess_wait_span["op"],
+    ) == ("subprocess", "subprocess.communicate", "subprocess.wait")
 
     # span hierarchy
     assert (
@@ -178,9 +183,6 @@ def test_subprocess_invalid_args(sentry_init):
     sentry_init(integrations=[StdlibIntegration()])
 
     with pytest.raises(TypeError) as excinfo:
-        subprocess.Popen()
+        subprocess.Popen(1)
 
-    if PY2:
-        assert "__init__() takes at least 2 arguments (1 given)" in str(excinfo.value)
-    else:
-        assert "missing 1 required positional argument: 'args" in str(excinfo.value)
+    assert "'int' object is not iterable" in str(excinfo.value)
