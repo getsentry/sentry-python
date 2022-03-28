@@ -2,8 +2,9 @@ import sys
 
 import pytest
 import logging
+import warnings
 
-from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 
 other_logger = logging.getLogger("testfoo")
 logger = logging.getLogger(__name__)
@@ -131,6 +132,63 @@ def test_logging_filters(sentry_init, capture_events):
 
     should_log = True
     logger.error("hi")
+
+    (event,) = events
+    assert event["logentry"]["message"] == "hi"
+
+
+def test_logging_captured_warnings(sentry_init, capture_events, recwarn):
+    sentry_init(
+        integrations=[LoggingIntegration(event_level="WARNING")],
+        default_integrations=False,
+    )
+    events = capture_events()
+
+    logging.captureWarnings(True)
+    warnings.warn("first")
+    warnings.warn("second")
+    logging.captureWarnings(False)
+
+    warnings.warn("third")
+
+    assert len(events) == 2
+
+    assert events[0]["level"] == "warning"
+    # Captured warnings start with the path where the warning was raised
+    assert "UserWarning: first" in events[0]["logentry"]["message"]
+    assert events[0]["logentry"]["params"] == []
+
+    assert events[1]["level"] == "warning"
+    assert "UserWarning: second" in events[1]["logentry"]["message"]
+    assert events[1]["logentry"]["params"] == []
+
+    # Using recwarn suppresses the "third" warning in the test output
+    assert len(recwarn) == 1
+    assert str(recwarn[0].message) == "third"
+
+
+def test_ignore_logger(sentry_init, capture_events):
+    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    events = capture_events()
+
+    ignore_logger("testfoo")
+
+    other_logger.error("hi")
+
+    assert not events
+
+
+def test_ignore_logger_wildcard(sentry_init, capture_events):
+    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    events = capture_events()
+
+    ignore_logger("testfoo.*")
+
+    nested_logger = logging.getLogger("testfoo.submodule")
+
+    logger.error("hi")
+
+    nested_logger.error("bye")
 
     (event,) = events
     assert event["logentry"]["message"] == "hi"

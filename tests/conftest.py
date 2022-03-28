@@ -244,6 +244,25 @@ def capture_envelopes(monkeypatch):
 
 
 @pytest.fixture
+def capture_client_reports(monkeypatch):
+    def inner():
+        reports = []
+        test_client = sentry_sdk.Hub.current.client
+
+        def record_lost_event(reason, data_category=None, item=None):
+            if data_category is None:
+                data_category = item.data_category
+            return reports.append((reason, data_category))
+
+        monkeypatch.setattr(
+            test_client.transport, "record_lost_event", record_lost_event
+        )
+        return reports
+
+    return inner
+
+
+@pytest.fixture
 def capture_events_forksafe(monkeypatch, capture_events, request):
     def inner():
         capture_events()
