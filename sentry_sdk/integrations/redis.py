@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 from sentry_sdk import Hub
 from sentry_sdk.utils import capture_internal_exceptions, logger
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import Integration, DidNotEnable
 
 from sentry_sdk._types import MYPY
 
@@ -40,7 +40,10 @@ class RedisIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        import redis
+        try:
+            import redis
+        except ImportError:
+            raise DidNotEnable("Redis client not installed")
 
         patch_redis_client(redis.StrictRedis)
 
