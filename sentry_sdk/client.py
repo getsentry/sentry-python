@@ -22,6 +22,7 @@ from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
+from sentry_sdk.tracing_utils import has_tracestate_enabled, reinflate_tracestate
 
 from sentry_sdk._types import MYPY
 
@@ -144,9 +145,18 @@ class _Client(object):
             event["timestamp"] = datetime.utcnow()
 
         if scope is not None:
+            is_transaction = event.get("type") == "transaction"
             event_ = scope.apply_to_event(event, hint)
+
+            # one of the event/error processors returned None
             if event_ is None:
+                if self.transport:
+                    self.transport.record_lost_event(
+                        "event_processor",
+                        data_category=("transaction" if is_transaction else "error"),
+                    )
                 return None
+
             event = event_
 
         if (
@@ -200,6 +210,10 @@ class _Client(object):
                 new_event = before_send(event, hint or {})
             if new_event is None:
                 logger.info("before send dropped event (%s)", event)
+                if self.transport:
+                    self.transport.record_lost_event(
+                        "before_send", data_category="error"
+                    )
             event = new_event  # type: ignore
 
         return event
@@ -243,6 +257,9 @@ class _Client(object):
             self.options["sample_rate"] < 1.0
             and random.random() >= self.options["sample_rate"]
         ):
+            # record a lost event if we did not sample this.
+            if self.transport:
+                self.transport.record_lost_event("sample_rate", data_category="error")
             return False
 
         if self._is_ignored_error(event, hint):
@@ -329,15 +346,29 @@ class _Client(object):
         attachments = hint.get("attachments")
         is_transaction = event_opt.get("type") == "transaction"
 
+        # this is outside of the `if` immediately below because even if we don't
+        # use the value, we want to make sure we remove it before the event is
+        # sent
+        raw_tracestate = (
+            event_opt.get("contexts", {}).get("trace", {}).pop("tracestate", "")
+        )
+
+        # Transactions or events with attachments should go to the /envelope/
+        # endpoint.
         if is_transaction or attachments:
-            # Transactions or events with attachments should go to the
-            # /envelope/ endpoint.
-            envelope = Envelope(
-                headers={
-                    "event_id": event_opt["event_id"],
-                    "sent_at": format_timestamp(datetime.utcnow()),
-                }
+
+            headers = {
+                "event_id": event_opt["event_id"],
+                "sent_at": format_timestamp(datetime.utcnow()),
+            }
+
+            tracestate_data = raw_tracestate and reinflate_tracestate(
+                raw_tracestate.replace("sentry=", "")
             )
+            if tracestate_data and has_tracestate_enabled():
+                headers["trace"] = tracestate_data
+
+            envelope = Envelope(headers=headers)
 
             if is_transaction:
                 envelope.add_transaction(event_opt)

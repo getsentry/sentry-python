@@ -150,19 +150,13 @@ class Scope(object):
         if self._span is None:
             return None
 
-        # the span on the scope is itself a transaction
-        if isinstance(self._span, Transaction):
-            return self._span
+        # there is an orphan span on the scope
+        if self._span.containing_transaction is None:
+            return None
 
-        # the span on the scope isn't a transaction but belongs to one
-        if self._span._containing_transaction:
-            return self._span._containing_transaction
-
-        # there's a span (not a transaction) on the scope, but it was started on
-        # its own, not as the descendant of a transaction (this is deprecated
-        # behavior, but as long as the start_span function exists, it can still
-        # happen)
-        return None
+        # there is either a transaction (which is its own containing
+        # transaction) or a non-orphan span on the scope
+        return self._span.containing_transaction
 
     @transaction.setter
     def transaction(self, value):
@@ -174,23 +168,22 @@ class Scope(object):
         # anything set in the scope.
         # XXX: note that with the introduction of the Scope.transaction getter,
         # there is a semantic and type mismatch between getter and setter. The
-        # getter returns a transaction, the setter sets a transaction name.
+        # getter returns a Transaction, the setter sets a transaction name.
         # Without breaking version compatibility, we could make the setter set a
         # transaction name or transaction (self._span) depending on the type of
         # the value argument.
         self._transaction = value
-        span = self._span
-        if span and isinstance(span, Transaction):
-            span.name = value
+        if self._span and self._span.containing_transaction:
+            self._span.containing_transaction.name = value
 
     @_attr_setter
     def user(self, value):
-        # type: (Dict[str, Any]) -> None
+        # type: (Optional[Dict[str, Any]]) -> None
         """When set a specific user is bound to the scope. Deprecated in favor of set_user."""
         self.set_user(value)
 
     def set_user(self, value):
-        # type: (Dict[str, Any]) -> None
+        # type: (Optional[Dict[str, Any]]) -> None
         """Sets a user for the scope."""
         self._user = value
         if self._session is not None:

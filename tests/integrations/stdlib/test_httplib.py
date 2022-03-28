@@ -76,7 +76,7 @@ def test_crumb_capture_hint(sentry_init, capture_events):
         assert sys.getrefcount(response) == 2
 
 
-def test_httplib_misuse(sentry_init, capture_events):
+def test_httplib_misuse(sentry_init, capture_events, request):
     """HTTPConnection.getresponse must be called after every call to
     HTTPConnection.request. However, if somebody does not abide by
     this contract, we still should handle this gracefully and not
@@ -90,6 +90,10 @@ def test_httplib_misuse(sentry_init, capture_events):
     events = capture_events()
 
     conn = HTTPSConnection("httpbin.org", 443)
+
+    # make sure we release the resource, even if the test fails
+    request.addfinalizer(conn.close)
+
     conn.request("GET", "/anything/foo")
 
     with pytest.raises(Exception):
