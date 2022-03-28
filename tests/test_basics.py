@@ -50,10 +50,16 @@ def test_processors(sentry_init, capture_events):
 
 def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
     caplog.set_level(logging.DEBUG)
+    REDIS = 10  # noqa: N806
 
     sentry_init(auto_enabling_integrations=True, debug=True)
 
     for import_string in _AUTO_ENABLING_INTEGRATIONS:
+        # Ignore redis in the test case, because it is installed as a
+        # dependency for running tests, and therefore always enabled.
+        if _AUTO_ENABLING_INTEGRATIONS[REDIS] == import_string:
+            continue
+
         assert any(
             record.message.startswith(
                 "Did not import default integration {}:".format(import_string)
