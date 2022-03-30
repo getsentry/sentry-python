@@ -21,13 +21,13 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="0.19.5",
+    version="1.5.8",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
     project_urls={
         "Documentation": "https://docs.sentry.io/platforms/python/",
-        "Changelog": "https://github.com/getsentry/sentry-python/blob/master/CHANGES.md",
+        "Changelog": "https://github.com/getsentry/sentry-python/blob/master/CHANGELOG.md",
     },
     description="Python client for Sentry (https://sentry.io)",
     long_description=get_file_text("README.md"),
@@ -40,6 +40,7 @@ setup(
     install_requires=["urllib3>=1.10.0", "certifi"],
     extras_require={
         "flask": ["flask>=0.11", "blinker>=1.1"],
+        "quart": ["quart>=0.16.1", "blinker>=1.1"],
         "bottle": ["bottle>=0.12.13"],
         "falcon": ["falcon>=1.4"],
         "django": ["django>=1.8"],
@@ -53,6 +54,7 @@ setup(
         "pyspark": ["pyspark>=2.4.4"],
         "pure_eval": ["pure_eval", "executing", "asttokens"],
         "chalice": ["chalice>=1.16.0"],
+        "httpx": ["httpx>=0.16.0"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
@@ -69,6 +71,9 @@ setup(
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
+    options={"bdist_wheel": {"universal": "1"}},
 )

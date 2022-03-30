@@ -1,7 +1,5 @@
 from __future__ import absolute_import
 
-import weakref
-
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -14,7 +12,6 @@ if MYPY:
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from typing import Any
     from typing import Dict
-    from werkzeug.datastructures import ImmutableTypeConversionDict
     from werkzeug.datastructures import ImmutableMultiDict
     from werkzeug.datastructures import FileStorage
     from typing import Union
@@ -30,6 +27,7 @@ except ImportError:
 
 try:
     from flask import (  # type: ignore
+        Markup,
         Request,
         Flask,
         _request_ctx_stack,
@@ -37,6 +35,7 @@ try:
         __version__ as FLASK_VERSION,
     )
     from flask.signals import (
+        before_render_template,
         got_request_exception,
         request_started,
     )
@@ -68,14 +67,19 @@ class FlaskIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+
+        # This version parsing is absolutely naive but the alternative is to
+        # import pkg_resources which slows down the SDK a lot.
         try:
             version = tuple(map(int, FLASK_VERSION.split(".")[:3]))
         except (ValueError, TypeError):
-            raise DidNotEnable("Unparsable Flask version: {}".format(FLASK_VERSION))
+            # It's probably a release candidate, we assume it's fine.
+            pass
+        else:
+            if version < (0, 10):
+                raise DidNotEnable("Flask 0.10 or newer is required.")
 
-        if version < (0, 10):
-            raise DidNotEnable("Flask 0.10 or newer is required.")
-
+        before_render_template.connect(_add_sentry_trace)
         request_started.connect(_request_started)
         got_request_exception.connect(_capture_exception)
 
@@ -91,6 +95,23 @@ class FlaskIntegration(Integration):
             )
 
         Flask.__call__ = sentry_patched_wsgi_app  # type: ignore
+
+
+def _add_sentry_trace(sender, template, context, **extra):
+    # type: (Flask, Any, Dict[str, Any], **Any) -> None
+
+    if "sentry_trace" in context:
+        return
+
+    sentry_span = Hub.current.scope.span
+    context["sentry_trace"] = (
+        Markup(
+            '<meta name="sentry-trace" content="%s" />'
+            % (sentry_span.to_traceparent(),)
+        )
+        if sentry_span
+        else ""
+    )
 
 
 def _request_started(sender, **kwargs):
@@ -114,10 +135,7 @@ def _request_started(sender, **kwargs):
         except Exception:
             pass
 
-        weak_request = weakref.ref(request)
-        evt_processor = _make_request_event_processor(
-            app, weak_request, integration  # type: ignore
-        )
+        evt_processor = _make_request_event_processor(app, request, integration)
         scope.add_event_processor(evt_processor)
 
 
@@ -127,8 +145,11 @@ class FlaskRequestExtractor(RequestExtractor):
         return self.request.environ
 
     def cookies(self):
-        # type: () -> ImmutableTypeConversionDict[Any, Any]
-        return self.request.cookies
+        # type: () -> Dict[Any, Any]
+        return {
+            k: v[0] if isinstance(v, list) and len(v) == 1 else v
+            for k, v in self.request.cookies.items()
+        }
 
     def raw_data(self):
         # type: () -> bytes
@@ -155,11 +176,11 @@ class FlaskRequestExtractor(RequestExtractor):
         return file.content_length
 
 
-def _make_request_event_processor(app, weak_request, integration):
+def _make_request_event_processor(app, request, integration):
     # type: (Flask, Callable[[], Request], FlaskIntegration) -> EventProcessor
+
     def inner(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-        request = weak_request()
 
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to

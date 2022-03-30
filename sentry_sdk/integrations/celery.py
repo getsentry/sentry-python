@@ -30,6 +30,7 @@ try:
         Ignore,
         Reject,
     )
+    from celery.app.trace import task_has_custom
 except ImportError:
     raise DidNotEnable("Celery not installed")
 
@@ -57,10 +58,12 @@ class CeleryIntegration(Integration):
         def sentry_build_tracer(name, task, *args, **kwargs):
             # type: (Any, Any, *Any, **Any) -> Any
             if not getattr(task, "_sentry_is_patched", False):
-                # Need to patch both methods because older celery sometimes
-                # short-circuits to task.run if it thinks it's safe.
-                task.__call__ = _wrap_task_call(task, task.__call__)
-                task.run = _wrap_task_call(task, task.run)
+                # determine whether Celery will use __call__ or run and patch
+                # accordingly
+                if task_has_custom(task, "__call__"):
+                    type(task).__call__ = _wrap_task_call(task, type(task).__call__)
+                else:
+                    task.run = _wrap_task_call(task, task.run)
 
                 # `build_tracer` is apparently called for every task
                 # invocation. Can't wrap every celery task for every invocation
@@ -96,9 +99,9 @@ def _wrap_apply_async(f):
         hub = Hub.current
         integration = hub.get_integration(CeleryIntegration)
         if integration is not None and integration.propagate_traces:
-            with hub.start_span(op="celery.submit", description=args[0].name):
+            with hub.start_span(op="celery.submit", description=args[0].name) as span:
                 with capture_internal_exceptions():
-                    headers = dict(hub.iter_trace_propagation_headers())
+                    headers = dict(hub.iter_trace_propagation_headers(span))
 
                     if headers:
                         # Note: kwargs can contain headers=None, so no setdefault!

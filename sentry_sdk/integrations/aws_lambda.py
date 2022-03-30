@@ -101,6 +101,7 @@ def _wrap_handler(handler):
         configured_time = aws_context.get_remaining_time_in_millis()
 
         with hub.push_scope() as scope:
+            timeout_thread = None
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(
@@ -115,7 +116,6 @@ def _wrap_handler(handler):
                     scope.set_tag("batch_request", True)
                     scope.set_tag("batch_size", batch_size)
 
-                timeout_thread = None
                 # Starting the Timeout thread only if the configured time is greater than Timeout warning
                 # buffer and timeout_warning parameter is set True.
                 if (
@@ -134,7 +134,10 @@ def _wrap_handler(handler):
                     # Starting the thread to raise timeout warning exception
                     timeout_thread.start()
 
-            headers = request_data.get("headers", {})
+            headers = request_data.get("headers")
+            # AWS Service may set an explicit `{headers: None}`, we can't rely on `.get()`'s default.
+            if headers is None:
+                headers = {}
             transaction = Transaction.continue_from_headers(
                 headers, op="serverless.function", name=aws_context.function_name
             )
@@ -281,17 +284,33 @@ def get_lambda_bootstrap():
     # Python 3.7: If the bootstrap module is *already imported*, it is the
     # one we actually want to use (no idea what's in __main__)
     #
-    # On Python 3.8 bootstrap is also importable, but will be the same file
+    # Python 3.8: bootstrap is also importable, but will be the same file
     # as __main__ imported under a different name:
     #
     #     sys.modules['__main__'].__file__ == sys.modules['bootstrap'].__file__
     #     sys.modules['__main__'] is not sys.modules['bootstrap']
     #
+    # Python 3.9: bootstrap is in __main__.awslambdaricmain
+    #
+    # On container builds using the `aws-lambda-python-runtime-interface-client`
+    # (awslamdaric) module, bootstrap is located in sys.modules['__main__'].bootstrap
+    #
     # Such a setup would then make all monkeypatches useless.
     if "bootstrap" in sys.modules:
         return sys.modules["bootstrap"]
     elif "__main__" in sys.modules:
-        return sys.modules["__main__"]
+        module = sys.modules["__main__"]
+        # python3.9 runtime
+        if hasattr(module, "awslambdaricmain") and hasattr(
+            module.awslambdaricmain, "bootstrap"  # type: ignore
+        ):
+            return module.awslambdaricmain.bootstrap  # type: ignore
+        elif hasattr(module, "bootstrap"):
+            # awslambdaric python module in container builds
+            return module.bootstrap  # type: ignore
+
+        # python3.8 runtime
+        return module
     else:
         return None
 
@@ -337,11 +356,15 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
         if _should_send_default_pii():
             user_info = sentry_event.setdefault("user", {})
 
-            id = aws_event.get("identity", {}).get("userArn")
+            identity = aws_event.get("identity")
+            if identity is None:
+                identity = {}
+
+            id = identity.get("userArn")
             if id is not None:
                 user_info.setdefault("id", id)
 
-            ip = aws_event.get("identity", {}).get("sourceIp")
+            ip = identity.get("sourceIp")
             if ip is not None:
                 user_info.setdefault("ip_address", ip)
 
@@ -363,7 +386,11 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
 def _get_url(aws_event, aws_context):
     # type: (Any, Any) -> str
     path = aws_event.get("path", None)
-    headers = aws_event.get("headers", {})
+
+    headers = aws_event.get("headers")
+    if headers is None:
+        headers = {}
+
     host = headers.get("Host", None)
     proto = headers.get("X-Forwarded-Proto", None)
     if proto and host and path:
@@ -383,13 +410,15 @@ def _get_cloudwatch_logs_url(aws_context, start_time):
         str -- AWS Console URL to logs.
     """
     formatstring = "%Y-%m-%dT%H:%M:%SZ"
+    region = environ.get("AWS_REGION", "")
 
     url = (
-        "https://console.aws.amazon.com/cloudwatch/home?region={region}"
+        "https://console.{domain}/cloudwatch/home?region={region}"
         "#logEventViewer:group={log_group};stream={log_stream}"
         ";start={start_time};end={end_time}"
     ).format(
-        region=environ.get("AWS_REGION"),
+        domain="amazonaws.cn" if region.startswith("cn-") else "aws.amazon.com",
+        region=region,
         log_group=aws_context.log_group_name,
         log_stream=aws_context.log_stream_name,
         start_time=(start_time - timedelta(seconds=1)).strftime(formatstring),

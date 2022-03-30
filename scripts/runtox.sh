@@ -14,8 +14,11 @@ fi
 
 if [ -n "$1" ]; then
     searchstring="$1"
-elif [ -n "$TRAVIS_PYTHON_VERSION" ]; then
-    searchstring="$(echo py$TRAVIS_PYTHON_VERSION | sed -e 's/pypypy/pypy/g' -e 's/-dev//g')"
+elif [ -n "$CI_PYTHON_VERSION" ]; then
+    searchstring="$(echo py$CI_PYTHON_VERSION | sed -e 's/pypypy/pypy/g' -e 's/-dev//g')"
+    if [ "$searchstring" = "pypy-2.7" ]; then
+        searchstring=pypy
+    fi
 elif [ -n "$AZURE_PYTHON_VERSION" ]; then
     searchstring="$(echo py$AZURE_PYTHON_VERSION | sed -e 's/pypypy/pypy/g' -e 's/-dev//g')"
     if [ "$searchstring" = pypy2 ]; then

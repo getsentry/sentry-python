@@ -125,6 +125,7 @@ try:
         "ENGINE": "django.db.backends.postgresql_psycopg2",
         "NAME": os.environ["SENTRY_PYTHON_TEST_POSTGRES_NAME"],
         "USER": os.environ["SENTRY_PYTHON_TEST_POSTGRES_USER"],
+        "PASSWORD": os.environ["SENTRY_PYTHON_TEST_POSTGRES_PASSWORD"],
         "HOST": "localhost",
         "PORT": 5432,
     }
@@ -156,7 +157,7 @@ USE_I18N = True
 
 USE_L10N = True
 
-USE_TZ = True
+USE_TZ = False
 
 TEMPLATE_DEBUG = True
 

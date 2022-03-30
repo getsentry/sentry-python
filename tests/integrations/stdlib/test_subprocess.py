@@ -183,9 +183,6 @@ def test_subprocess_invalid_args(sentry_init):
     sentry_init(integrations=[StdlibIntegration()])
 
     with pytest.raises(TypeError) as excinfo:
-        subprocess.Popen()
+        subprocess.Popen(1)
 
-    if PY2:
-        assert "__init__() takes at least 2 arguments (1 given)" in str(excinfo.value)
-    else:
-        assert "missing 1 required positional argument: 'args" in str(excinfo.value)
+    assert "'int' object is not iterable" in str(excinfo.value)

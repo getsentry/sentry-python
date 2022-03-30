@@ -17,6 +17,7 @@ from chalice.app import EventSourceHandler as ChaliceEventSourceHandler  # type:
 
 if MYPY:
     from typing import Any
+    from typing import Dict
     from typing import TypeVar
     from typing import Callable
 
@@ -110,7 +111,7 @@ class ChaliceIntegration(Integration):
             )
 
         def sentry_event_response(app, view_function, function_args):
-            # type: (Any, F, **Any) -> Any
+            # type: (Any, F, Dict[str, Any]) -> Any
             wrapped_view_function = _get_view_function_response(
                 app, view_function, function_args
             )

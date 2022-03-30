@@ -4,8 +4,15 @@ import json
 import pytest
 import jsonschema
 
-import gevent
-import eventlet
+try:
+    import gevent
+except ImportError:
+    gevent = None
+
+try:
+    import eventlet
+except ImportError:
+    eventlet = None
 
 import sentry_sdk
 from sentry_sdk._compat import reraise, string_types, iteritems
@@ -237,6 +244,25 @@ def capture_envelopes(monkeypatch):
 
 
 @pytest.fixture
+def capture_client_reports(monkeypatch):
+    def inner():
+        reports = []
+        test_client = sentry_sdk.Hub.current.client
+
+        def record_lost_event(reason, data_category=None, item=None):
+            if data_category is None:
+                data_category = item.data_category
+            return reports.append((reason, data_category))
+
+        monkeypatch.setattr(
+            test_client.transport, "record_lost_event", record_lost_event
+        )
+        return reports
+
+    return inner
+
+
+@pytest.fixture
 def capture_events_forksafe(monkeypatch, capture_events, request):
     def inner():
         capture_events()
@@ -284,6 +310,9 @@ class EventStreamReader(object):
 )
 def maybe_monkeypatched_threading(request):
     if request.param == "eventlet":
+        if eventlet is None:
+            pytest.skip("no eventlet installed")
+
         try:
             eventlet.monkey_patch()
         except AttributeError as e:
@@ -293,6 +322,8 @@ def maybe_monkeypatched_threading(request):
             else:
                 raise
     elif request.param == "gevent":
+        if gevent is None:
+            pytest.skip("no gevent installed")
         try:
             gevent.monkey.patch_all()
         except Exception as e:
@@ -356,14 +387,20 @@ def string_containing_matcher():
             self.substring = substring
 
             try:
-                # unicode only exists in python 2
+                # the `unicode` type only exists in python 2, so if this blows up,
+                # we must be in py3 and have the `bytes` type
                 self.valid_types = (str, unicode)  # noqa
             except NameError:
-                self.valid_types = (str,)
+                self.valid_types = (str, bytes)
 
         def __eq__(self, test_string):
             if not isinstance(test_string, self.valid_types):
                 return False
+
+            # this is safe even in py2 because as of 2.6, `bytes` exists in py2
+            # as an alias for `str`
+            if isinstance(test_string, bytes):
+                test_string = test_string.decode()
 
             if len(self.substring) > len(test_string):
                 return False
