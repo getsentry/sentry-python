@@ -31,19 +31,19 @@ else:
     def test_safe_repr_never_broken_for_strings(x):
         r = safe_repr(x)
         assert isinstance(r, text_type)
-        assert u"broken repr" not in r
+        assert "broken repr" not in r
 
 
 def test_safe_repr_regressions():
-    assert u"лошадь" in safe_repr(u"лошадь")
+    assert "лошадь" in safe_repr("лошадь")
 
 
 @pytest.mark.xfail(
     sys.version_info < (3,),
     reason="Fixing this in Python 2 would break other behaviors",
 )
-@pytest.mark.parametrize("prefix", (u"", u"abcd", u"лошадь"))
-@pytest.mark.parametrize("character", u"\x00\x07\x1b\n")
+@pytest.mark.parametrize("prefix", ("", "abcd", "лошадь"))
+@pytest.mark.parametrize("character", "\x00\x07\x1b\n")
 def test_safe_repr_non_printable(prefix, character):
     """Check that non-printable characters are escaped"""
     string = prefix + character
@@ -129,47 +129,35 @@ def test_parse_invalid_dsn(dsn):
 
 @pytest.mark.parametrize("empty", [None, []])
 def test_in_app(empty):
-    assert (
-        handle_in_app_impl(
-            [{"module": "foo"}, {"module": "bar"}],
-            in_app_include=["foo"],
-            in_app_exclude=empty,
-        )
-        == [{"module": "foo", "in_app": True}, {"module": "bar"}]
-    )
+    assert handle_in_app_impl(
+        [{"module": "foo"}, {"module": "bar"}],
+        in_app_include=["foo"],
+        in_app_exclude=empty,
+    ) == [{"module": "foo", "in_app": True}, {"module": "bar"}]
 
-    assert (
-        handle_in_app_impl(
-            [{"module": "foo"}, {"module": "bar"}],
-            in_app_include=["foo"],
-            in_app_exclude=["foo"],
-        )
-        == [{"module": "foo", "in_app": True}, {"module": "bar"}]
-    )
+    assert handle_in_app_impl(
+        [{"module": "foo"}, {"module": "bar"}],
+        in_app_include=["foo"],
+        in_app_exclude=["foo"],
+    ) == [{"module": "foo", "in_app": True}, {"module": "bar"}]
 
-    assert (
-        handle_in_app_impl(
-            [{"module": "foo"}, {"module": "bar"}],
-            in_app_include=empty,
-            in_app_exclude=["foo"],
-        )
-        == [{"module": "foo", "in_app": False}, {"module": "bar", "in_app": True}]
-    )
+    assert handle_in_app_impl(
+        [{"module": "foo"}, {"module": "bar"}],
+        in_app_include=empty,
+        in_app_exclude=["foo"],
+    ) == [{"module": "foo", "in_app": False}, {"module": "bar", "in_app": True}]
 
 
 def test_iter_stacktraces():
-    assert (
-        set(
-            iter_event_stacktraces(
-                {
-                    "threads": {"values": [{"stacktrace": 1}]},
-                    "stacktrace": 2,
-                    "exception": {"values": [{"stacktrace": 3}]},
-                }
-            )
+    assert set(
+        iter_event_stacktraces(
+            {
+                "threads": {"values": [{"stacktrace": 1}]},
+                "stacktrace": 2,
+                "exception": {"values": [{"stacktrace": 3}]},
+            }
         )
-        == {1, 2, 3}
-    )
+    ) == {1, 2, 3}
 
 
 @pytest.mark.parametrize(
@@ -178,15 +166,15 @@ def test_iter_stacktraces():
         # ascii only
         ("Dogs are great!", "RG9ncyBhcmUgZ3JlYXQh"),
         # emoji
-        (u"🐶", "8J+Qtg=="),
+        ("🐶", "8J+Qtg=="),
         # non-ascii
         (
-            u"Καλό κορίτσι, Μάιζεϊ!",
+            "Καλό κορίτσι, Μάιζεϊ!",
             "zprOsc67z4wgzrrOv8+Bzq/PhM+DzrksIM6czqzOuc62zrXPiiE=",
         ),
         # mix of ascii and non-ascii
         (
-            u"Of margir hundar! Ég geri ráð fyrir að ég þurfi stærra rúm.",
+            "Of margir hundar! Ég geri ráð fyrir að ég þurfi stærra rúm.",
             "T2YgbWFyZ2lyIGh1bmRhciEgw4lnIGdlcmkgcsOhw7AgZnlyaXIgYcOwIMOpZyDDvnVyZmkgc3TDpnJyYSByw7ptLg==",
         ),
     ],

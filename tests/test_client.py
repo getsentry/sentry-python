@@ -496,7 +496,7 @@ def test_scope_initialized_before_client(sentry_init, capture_events):
 def test_weird_chars(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
-    capture_message(u"föö".encode("latin1"))
+    capture_message("föö".encode("latin1"))
     (event,) = events
     assert json.loads(json.dumps(event)) == event
 
@@ -812,7 +812,7 @@ def test_dict_changed_during_iteration(sentry_init, capture_events):
     "dsn",
     [
         "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2",
-        u"http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2",
+        "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2",
     ],
 )
 def test_init_string_types(dsn, sentry_init):
