@@ -39,8 +39,8 @@ def request_body_within_bounds(client, content_length):
     bodies = client.options["request_bodies"]
     return not (
         bodies == "never"
-        or (bodies == "small" and content_length > 10**3)
-        or (bodies == "medium" and content_length > 10**4)
+        or (bodies == "small" and content_length > 10 ** 3)
+        or (bodies == "medium" and content_length > 10 ** 4)
     )
 
 

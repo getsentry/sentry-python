@@ -196,7 +196,7 @@ def test_medium_formdata_request(sentry_init, capture_events, app, get_client):
     assert len(event["request"]["data"]["foo"]) == 512
 
 
-@pytest.mark.parametrize("input_char", ["a", b"a"])
+@pytest.mark.parametrize("input_char", [u"a", b"a"])
 def test_too_large_raw_request(
     sentry_init, input_char, capture_events, app, get_client
 ):

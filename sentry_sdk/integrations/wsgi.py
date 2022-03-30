@@ -46,6 +46,7 @@ if PY2:
         # type: (str, str, str) -> str
         return s.decode(charset, errors)
 
+
 else:
 
     def wsgi_decoding_dance(s, charset="utf-8", errors="replace"):

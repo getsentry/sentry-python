@@ -39,6 +39,7 @@ except ImportError:
     def benchmark():
         return lambda x: x()
 
+
 else:
     del pytest_benchmark
 

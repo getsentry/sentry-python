@@ -50,7 +50,7 @@ def extra_normalizer(validate_event_schema):
 def test_bytes_serialization_decode(message_normalizer):
     binary = b"abc123\x80\xf0\x9f\x8d\x95"
     result = message_normalizer(binary, should_repr_strings=False)
-    assert result == "abc123\ufffd\U0001f355"
+    assert result == u"abc123\ufffd\U0001f355"
 
 
 @pytest.mark.xfail(sys.version_info < (3,), reason="Known safe_repr bugs in Py2.7")

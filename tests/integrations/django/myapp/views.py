@@ -29,6 +29,7 @@ try:
     def rest_permission_denied_exc(request):
         raise PermissionDenied("bye")
 
+
 except ImportError:
     pass
 
