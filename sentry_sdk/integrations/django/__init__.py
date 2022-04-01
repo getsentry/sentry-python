@@ -69,7 +69,6 @@ if DJANGO_VERSION < (1, 10):
         # type: (Any) -> bool
         return request_user.is_authenticated()
 
-
 else:
 
     def is_authenticated(request_user):
@@ -202,7 +201,7 @@ class DjangoIntegration(Integration):
             # querysets. This might be surprising to the user but it's likely
             # less annoying.
 
-            return u"<%s from %s at 0x%x>" % (
+            return "<%s from %s at 0x%x>" % (
                 value.__class__.__name__,
                 value.__module__,
                 id(value),

@@ -451,7 +451,6 @@ if MYPY:
     class Client(ClientConstructor, _Client):
         pass
 
-
 else:
     # Alias `get_options` for actual usage. Go through the lambda indirection
     # to throw PyCharm off of the weakly typed signature (it would otherwise

@@ -120,7 +120,6 @@ if MYPY:
     class init(ClientConstructor, ContextManager[Any]):  # noqa: N801
         pass
 
-
 else:
     # Alias `init` for actual usage. Go through the lambda indirection to throw
     # PyCharm off of the weakly typed signature (it would otherwise discover
