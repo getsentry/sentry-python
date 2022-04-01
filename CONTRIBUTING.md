@@ -74,7 +74,7 @@ So the simplest way to run tests is:
 ```bash
 cd sentry-python
 
-make tests
+make test
 ```
 
 This will use [Tox](https://tox.wiki/en/latest/) to run our whole test suite
