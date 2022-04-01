@@ -576,15 +576,15 @@ def test_template_exception(
 
     if with_executing_integration:
         assert filenames[-3:] == [
-            (u"Parser.parse", u"django.template.base"),
+            ("Parser.parse", "django.template.base"),
             (None, None),
-            (u"Parser.invalid_block_tag", u"django.template.base"),
+            ("Parser.invalid_block_tag", "django.template.base"),
         ]
     else:
         assert filenames[-3:] == [
-            (u"parse", u"django.template.base"),
+            ("parse", "django.template.base"),
             (None, None),
-            (u"invalid_block_tag", u"django.template.base"),
+            ("invalid_block_tag", "django.template.base"),
         ]
 
 
