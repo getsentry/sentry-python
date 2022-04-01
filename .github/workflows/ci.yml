@@ -118,12 +118,22 @@ jobs:
           pip install virtualenv
           make aws-lambda-layer-build
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
-          name: ${{ github.sha }}
+          name: prepared-lambda-layer-${{ github.sha }}
           path: |
             dist/*
-            dist-serverless/*
+
+      - uses: getsentry/action-build-aws-lambda-extension@v1
+        with:
+          artifact_name: prepared-lambda-layer-${{ github.sha }}
+          zip_file_name: sentry-python-serverless-X.X.X.zip
+
+      - name: Upload Zip
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.sha }}
+          path: sentry-python-serverless-X.X.X.zip
 
   docs:
     name: Build SDK API Doc
