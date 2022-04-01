@@ -171,14 +171,14 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     assert execution_event["spans"] == []
     assert submission_event["spans"] == [
         {
-            u"description": u"dummy_task",
-            u"op": "celery.submit",
-            u"parent_span_id": submission_event["contexts"]["trace"]["span_id"],
-            u"same_process_as_parent": True,
-            u"span_id": submission_event["spans"][0]["span_id"],
-            u"start_timestamp": submission_event["spans"][0]["start_timestamp"],
-            u"timestamp": submission_event["spans"][0]["timestamp"],
-            u"trace_id": text_type(transaction.trace_id),
+            "description": "dummy_task",
+            "op": "celery.submit",
+            "parent_span_id": submission_event["contexts"]["trace"]["span_id"],
+            "same_process_as_parent": True,
+            "span_id": submission_event["spans"][0]["span_id"],
+            "start_timestamp": submission_event["spans"][0]["start_timestamp"],
+            "timestamp": submission_event["spans"][0]["timestamp"],
+            "trace_id": text_type(transaction.trace_id),
         }
     ]
 
@@ -338,7 +338,11 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe, t
     submit_transaction = events.read_event()
     assert submit_transaction["type"] == "transaction"
     assert submit_transaction["transaction"] == "submit_celery"
-    (span,) = submit_transaction["spans"]
+
+    assert len(
+        submit_transaction["spans"]
+    ), 4  # Because redis integration was auto enabled
+    span = submit_transaction["spans"][0]
     assert span["op"] == "celery.submit"
     assert span["description"] == "dummy_task"
 

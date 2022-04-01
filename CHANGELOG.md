@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.5.8
+
+### Various fixes & improvements
+
+- feat(asgi): Add support for setting transaction name to path in FastAPI (#1349) by @tiangolo
+- fix(sqlalchemy): Change context manager type to avoid race in threads (#1368) by @Fofanko
+- fix(perf): Fix transaction setter on scope to use containing_transaction to match with getter (#1366) by @sl0thentr0py
+- chore(ci): Change stale GitHub workflow to run once a day (#1367) by @kamilogorek
+- feat(django): Make django middleware expose more wrapped attributes (#1202) by @MattFisher
+
+## 1.5.7
+
+### Various fixes & improvements
+
+- fix(serializer): Make sentry_repr dunder method to avoid mock problems (#1364) by @sl0thentr0py
+
 ## 1.5.6
 
 ### Various fixes & improvements

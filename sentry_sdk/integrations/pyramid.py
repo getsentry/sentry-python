@@ -4,16 +4,19 @@ import os
 import sys
 import weakref
 
-from pyramid.httpexceptions import HTTPException
-from pyramid.request import Request
-
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 from sentry_sdk._compat import reraise, iteritems
 
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+
+try:
+    from pyramid.httpexceptions import HTTPException
+    from pyramid.request import Request
+except ImportError:
+    raise DidNotEnable("Pyramid not installed")
 
 from sentry_sdk._types import MYPY
 
@@ -64,7 +67,6 @@ class PyramidIntegration(Integration):
     def setup_once():
         # type: () -> None
         from pyramid import router
-        from pyramid.request import Request
 
         old_call_view = router._call_view
 
