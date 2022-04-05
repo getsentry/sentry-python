@@ -60,24 +60,6 @@ class PackageBuilder:
             "scripts/init_serverless_sdk.py", f"{serverless_sdk_path}/__init__.py"
         )
 
-    def zip(
-        self, filename  # type: str
-    ):
-        # type: (...) -> None
-        subprocess.run(
-            [
-                "zip",
-                "-q",  # Quiet
-                "-x",  # Exclude files
-                "**/__pycache__/*",  # Files to be excluded
-                "-r",  # Recurse paths
-                filename,  # Output filename
-                self.pkg_parent_dir,  # Files to be zipped
-            ],
-            cwd=self.base_dir,
-            check=True,  # Raises CalledProcessError if exit status is non-zero
-        )
-
     def get_relative_path_of(
         self, subfile  # type: str
     ):
@@ -105,7 +87,6 @@ def build_layer_dir(
         package_builder.make_directories()
         package_builder.install_python_binaries()
         package_builder.create_init_serverless_sdk_package()
-        package_builder.zip(dest_zip_filename)
         if not os.path.exists(dist_rel_path):
             os.makedirs(dist_rel_path)
         shutil.copy(
