@@ -89,7 +89,7 @@ class PackageBuilder:
 # Placing the Sentry package in `/python` avoids
 # creating a directory for a specific version. For more information, see
 #  https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-path
-def build_packaged_zip(
+def build_layer_dir(
     dist_rel_path="dist",  # type: str
     dest_zip_filename=f"sentry-python-serverless-{SDK_VERSION}.zip",  # type: str
     pkg_parent_dir="python",  # type: str
@@ -114,4 +114,4 @@ def build_packaged_zip(
 
 
 if __name__ == "__main__":
-    build_packaged_zip()
+    build_layer_dir()
