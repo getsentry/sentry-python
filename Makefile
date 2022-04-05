@@ -21,7 +21,6 @@ help:
 dist: .venv
 	rm -rf dist build
 	$(VENV_PATH)/bin/python setup.py sdist bdist_wheel
-
 .PHONY: dist
 
 format: .venv
@@ -46,7 +45,6 @@ lint: .venv
 		echo "Bad formatting? Run: make format"; \
 		echo "================================"; \
 		false)
-
 .PHONY: lint
 
 apidocs: .venv
