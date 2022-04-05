@@ -73,7 +73,6 @@ class PackageBuilder:
 #  https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-path
 def build_layer_dir(
     dist_rel_path="dist",  # type: str
-    dest_zip_filename=f"sentry-python-serverless-{SDK_VERSION}.zip",  # type: str
     pkg_parent_dir="python",  # type: str
     dest_abs_path=None,  # type: Union[str, None]
 ):
@@ -89,9 +88,6 @@ def build_layer_dir(
         package_builder.create_init_serverless_sdk_package()
         if not os.path.exists(dist_rel_path):
             os.makedirs(dist_rel_path)
-        shutil.copy(
-            package_builder.get_relative_path_of(dest_zip_filename), dest_abs_path
-        )
 
 
 if __name__ == "__main__":
