@@ -120,13 +120,13 @@ jobs:
 
       - uses: actions/upload-artifact@v3
         with:
-          name: prepared-lambda-layer-${{ github.sha }}
+          name: ${{ github.sha }}
           path: |
             dist-serverless/*
 
       - uses: getsentry/action-build-aws-lambda-extension@v1
         with:
-          artifact_name: prepared-lambda-layer-${{ github.sha }}
+          artifact_name: ${{ github.sha }}
           zip_file_name: sentry-python-serverless-X.X.X.zip
 
       - name: Upload Zip
