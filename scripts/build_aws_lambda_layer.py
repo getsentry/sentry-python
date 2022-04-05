@@ -5,9 +5,7 @@ import tempfile
 
 from sentry_sdk.consts import VERSION as SDK_VERSION
 
-DIST_PATH = (
-    "dist"  # created by "make dist, that is called by make aws-lambda-layer-build"
-)
+DIST_PATH = "dist"  # created by "make dist" that is called by "make aws-lambda-layer"
 PYTHON_SITE_PACKAGES = "python"  # see https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-path
 
 
@@ -68,7 +66,6 @@ def build_layer_dir():
         layer_builder.create_init_serverless_sdk_package()
 
     # TODO: move whole directory to a dist folder somewhere.
-    # TODO: rename file to build_aws_lambda_layer.py
 
 
 if __name__ == "__main__":

@@ -116,15 +116,14 @@ jobs:
 
       - run: |
           pip install virtualenv
-          make aws-lambda-layer-build
-          # TODO: xxx !!! rename to make aws-lambda-layer
+          make aws-lambda-layer
 
       - uses: actions/upload-artifact@v3
         with:
           name: prepared-lambda-layer-${{ github.sha }}
           path: |
             dist/*
-            # TODO: xxx !!! MAKE SURE TO PICK UP DIST FOLDER FROM make aws-lambda-layer-build
+            # TODO: xxx !!! MAKE SURE TO PICK UP DIST FOLDER FROM make aws-lambda-layer
 
       - uses: getsentry/action-build-aws-lambda-extension@v1
         with:
