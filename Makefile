@@ -19,7 +19,7 @@ help:
 	$(VENV_PATH)/bin/pip install tox
 
 dist: .venv
-	rm -rf dist build
+	rm -rf dist dist-serverless build
 	$(VENV_PATH)/bin/python setup.py sdist bdist_wheel
 .PHONY: dist
 

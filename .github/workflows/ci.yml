@@ -122,8 +122,7 @@ jobs:
         with:
           name: prepared-lambda-layer-${{ github.sha }}
           path: |
-            dist/*
-            # TODO: xxx !!! MAKE SURE TO PICK UP DIST FOLDER FROM make aws-lambda-layer
+            dist-serverless/*
 
       - uses: getsentry/action-build-aws-lambda-extension@v1
         with:

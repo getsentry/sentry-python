@@ -65,7 +65,7 @@ def build_layer_dir():
         layer_builder.install_python_packages()
         layer_builder.create_init_serverless_sdk_package()
 
-    # TODO: move whole directory to a dist folder somewhere.
+        shutil.copytree(base_dir, "dist-serverless")
 
 
 if __name__ == "__main__":
