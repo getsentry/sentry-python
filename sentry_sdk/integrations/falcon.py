@@ -24,6 +24,21 @@ except ImportError:
     raise DidNotEnable("Falcon not installed")
 
 
+# In Falcon 3.0 `falcon.api_helpers` is renamed to `falcon.app_helpers`
+# and `falcon.API` to `falcon.App`
+try:
+    import falcon.app  # type: ignore
+    import falcon.app_helpers  # type: ignore
+
+    falcon_helpers = falcon.app_helpers
+    falcon_app_class = falcon.App
+    FALCON3 = True
+except ImportError:
+    falcon_helpers = falcon.api_helpers
+    falcon_app_class = falcon.API
+    FALCON3 = False
+
+
 class FalconRequestExtractor(RequestExtractor):
     def env(self):
         # type: () -> Dict[str, Any]
@@ -54,16 +69,27 @@ class FalconRequestExtractor(RequestExtractor):
         else:
             return None
 
-    def json(self):
-        # type: () -> Optional[Dict[str, Any]]
-        try:
-            return self.request.media
-        except falcon.errors.HTTPBadRequest:
-            # NOTE(jmagnusson): We return `falcon.Request._media` here because
-            # falcon 1.4 doesn't do proper type checking in
-            # `falcon.Request.media`. This has been fixed in 2.0.
-            # Relevant code: https://github.com/falconry/falcon/blob/1.4.1/falcon/request.py#L953
-            return self.request._media
+    if FALCON3:
+
+        def json(self):
+            # type: () -> Optional[Dict[str, Any]]
+            try:
+                return self.request.media
+            except falcon.errors.HTTPBadRequest:
+                return None
+
+    else:
+
+        def json(self):
+            # type: () -> Optional[Dict[str, Any]]
+            try:
+                return self.request.media
+            except falcon.errors.HTTPBadRequest:
+                # NOTE(jmagnusson): We return `falcon.Request._media` here because
+                # falcon 1.4 doesn't do proper type checking in
+                # `falcon.Request.media`. This has been fixed in 2.0.
+                # Relevant code: https://github.com/falconry/falcon/blob/1.4.1/falcon/request.py#L953
+                return self.request._media
 
 
 class SentryFalconMiddleware(object):
@@ -116,7 +142,7 @@ class FalconIntegration(Integration):
 
 def _patch_wsgi_app():
     # type: () -> None
-    original_wsgi_app = falcon.API.__call__
+    original_wsgi_app = falcon_app_class.__call__
 
     def sentry_patched_wsgi_app(self, env, start_response):
         # type: (falcon.API, Any, Any) -> Any
@@ -131,12 +157,12 @@ def _patch_wsgi_app():
 
         return sentry_wrapped(env, start_response)
 
-    falcon.API.__call__ = sentry_patched_wsgi_app
+    falcon_app_class.__call__ = sentry_patched_wsgi_app
 
 
 def _patch_handle_exception():
     # type: () -> None
-    original_handle_exception = falcon.API._handle_exception
+    original_handle_exception = falcon_app_class._handle_exception
 
     def sentry_patched_handle_exception(self, *args):
         # type: (falcon.API, *Any) -> Any
@@ -166,12 +192,12 @@ def _patch_handle_exception():
 
         return was_handled
 
-    falcon.API._handle_exception = sentry_patched_handle_exception
+    falcon_app_class._handle_exception = sentry_patched_handle_exception
 
 
 def _patch_prepare_middleware():
     # type: () -> None
-    original_prepare_middleware = falcon.api_helpers.prepare_middleware
+    original_prepare_middleware = falcon_helpers.prepare_middleware
 
     def sentry_patched_prepare_middleware(
         middleware=None, independent_middleware=False
@@ -183,7 +209,7 @@ def _patch_prepare_middleware():
             middleware = [SentryFalconMiddleware()] + (middleware or [])
         return original_prepare_middleware(middleware, independent_middleware)
 
-    falcon.api_helpers.prepare_middleware = sentry_patched_prepare_middleware
+    falcon_helpers.prepare_middleware = sentry_patched_prepare_middleware
 
 
 def _exception_leads_to_http_5xx(ex):
