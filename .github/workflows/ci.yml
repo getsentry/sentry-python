@@ -115,8 +115,14 @@ jobs:
           python-version: 3.9
 
       - run: |
+          echo "Creating directory containing Python SDK Lambda Layer"
           pip install virtualenv
           make aws-lambda-layer
+
+          echo "Saving SDK_VERSION for later"
+          export SDK_VERSION=$(grep "VERSION = " sentry_sdk/consts.py | cut -f3 -d' ' | tr -d '"')
+          echo "SDK_VERSION=$SDK_VERSION"
+          echo "SDK_VERSION=$SDK_VERSION" >> $GITHUB_ENV
 
       - uses: actions/upload-artifact@v3
         with:
@@ -127,13 +133,13 @@ jobs:
       - uses: getsentry/action-build-aws-lambda-extension@v1
         with:
           artifact_name: ${{ github.sha }}
-          zip_file_name: sentry-python-serverless-X.X.X.zip
+          zip_file_name: sentry-python-serverless-${{ env.SDK_VERSION }}.zip
 
       - name: Upload Zip
         uses: actions/upload-artifact@v3
         with:
           name: ${{ github.sha }}
-          path: sentry-python-serverless-X.X.X.zip
+          path: sentry-python-serverless-${{ env.SDK_VERSION }}.zip
 
   docs:
     name: Build SDK API Doc
