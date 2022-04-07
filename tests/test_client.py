@@ -496,7 +496,9 @@ def test_scope_initialized_before_client(sentry_init, capture_events):
 def test_weird_chars(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
-    capture_message("föö".encode("latin1"))
+    # fmt: off
+    capture_message(u"föö".encode("latin1"))
+    # fmt: on
     (event,) = events
     assert json.loads(json.dumps(event)) == event
 
