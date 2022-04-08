@@ -67,7 +67,7 @@ def _before_cursor_execute(
 
 
 def _after_cursor_execute(conn, cursor, statement, parameters, context, *args):
-    # type: (Any, Any, Any, *Any) -> None
+    # type: (Any, Any, Any, Any, Any, *Any) -> None
     ctx_mgr = getattr(
         context, "_sentry_sql_span_manager", None
     )  # type: ContextManager[Any]
