@@ -58,29 +58,32 @@ def _before_cursor_execute(
         paramstyle=context and context.dialect and context.dialect.paramstyle or None,
         executemany=executemany,
     )
-    conn._sentry_sql_span_manager = ctx_mgr
+    context._sentry_sql_span_manager = ctx_mgr
 
     span = ctx_mgr.__enter__()
 
     if span is not None:
-        conn._sentry_sql_span = span
+        context._sentry_sql_span = span
 
 
-def _after_cursor_execute(conn, cursor, statement, *args):
+def _after_cursor_execute(conn, cursor, statement, parameters, context, *args):
     # type: (Any, Any, Any, *Any) -> None
     ctx_mgr = getattr(
-        conn, "_sentry_sql_span_manager", None
+        context, "_sentry_sql_span_manager", None
     )  # type: ContextManager[Any]
 
     if ctx_mgr is not None:
-        conn._sentry_sql_span_manager = None
+        context._sentry_sql_span_manager = None
         ctx_mgr.__exit__(None, None, None)
 
 
 def _handle_error(context, *args):
     # type: (Any, *Any) -> None
-    conn = context.connection
-    span = getattr(conn, "_sentry_sql_span", None)  # type: Optional[Span]
+    execution_context = context.execution_context
+    if execution_context is None:
+        return
+
+    span = getattr(execution_context, "_sentry_sql_span", None)  # type: Optional[Span]
 
     if span is not None:
         span.set_status("internal_error")
@@ -89,9 +92,9 @@ def _handle_error(context, *args):
     # from SQLAlchemy codebase it does seem like any error coming into this
     # handler is going to be fatal.
     ctx_mgr = getattr(
-        conn, "_sentry_sql_span_manager", None
+        execution_context, "_sentry_sql_span_manager", None
     )  # type: ContextManager[Any]
 
     if ctx_mgr is not None:
-        conn._sentry_sql_span_manager = None
+        execution_context._sentry_sql_span_manager = None
         ctx_mgr.__exit__(None, None, None)
