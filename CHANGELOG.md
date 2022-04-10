@@ -1,24 +1,119 @@
-# Changelog and versioning
+# Changelog
 
-## Versioning Policy
+## 1.5.8
 
-This project follows [semver](https://semver.org/), with three additions:
+### Various fixes & improvements
 
-- Semver says that major version `0` can include breaking changes at any time. Still, it is common practice to assume that only `0.x` releases (minor versions) can contain breaking changes while `0.x.y` releases (patch versions) are used for backwards-compatible changes (bugfixes and features). This project also follows that practice.
+- feat(asgi): Add support for setting transaction name to path in FastAPI (#1349) by @tiangolo
+- fix(sqlalchemy): Change context manager type to avoid race in threads (#1368) by @Fofanko
+- fix(perf): Fix transaction setter on scope to use containing_transaction to match with getter (#1366) by @sl0thentr0py
+- chore(ci): Change stale GitHub workflow to run once a day (#1367) by @kamilogorek
+- feat(django): Make django middleware expose more wrapped attributes (#1202) by @MattFisher
 
-- All undocumented APIs are considered internal. They are not part of this contract.
+## 1.5.7
 
-- Certain features (e.g. integrations) may be explicitly called out as "experimental" or "unstable" in the documentation. They come with their own versioning policy described in the documentation.
+### Various fixes & improvements
 
-We recommend to pin your version requirements against `1.x.*` or `1.x.y`.
-Either one of the following is fine:
+- fix(serializer): Make sentry_repr dunder method to avoid mock problems (#1364) by @sl0thentr0py
 
-```
-sentry-sdk>=0.10.0,<0.11.0
-sentry-sdk==0.10.1
-```
+## 1.5.6
 
-A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
+### Various fixes & improvements
+
+- Create feature.yml (#1350) by @vladanpaunovic
+- Update contribution guide (#1346) by @antonpirker
+- chore: add bug issue template (#1345) by @vladanpaunovic
+- Added default value for auto_session_tracking (#1337) by @antonpirker
+- docs(readme): reordered content (#1343) by @antonpirker
+- fix(tests): Removed unsupported Django 1.6 from tests to avoid confusion (#1338) by @antonpirker
+- Group captured warnings under separate issues (#1324) by @mnito
+- build(changelogs): Use automated changelogs from Craft (#1340) by @BYK
+- fix(aiohttp): AioHttpIntegration sentry_app_handle() now ignores ConnectionResetError (#1331) by @cmalek
+- meta: Remove black GH action (#1339) by @sl0thentr0py
+- feat(flask): Add `sentry_trace()` template helper (#1336) by @BYK
+
+## 1.5.5
+
+- Add session tracking to ASGI integration (#1329)
+- Pinning test requirements versions (#1330)
+- Allow classes to short circuit serializer with `sentry_repr` (#1322)
+- Set default on json.dumps in compute_tracestate_value to ensure string conversion (#1318)
+
+Work in this release contributed by @tomchuk. Thank you for your contribution!
+
+## 1.5.4
+
+- Add Python 3.10 to test suite (#1309)
+- Capture only 5xx HTTP errors in Falcon Integration (#1314)
+- Attempt custom urlconf resolve in `got_request_exception` as well (#1317)
+
+## 1.5.3
+
+- Pick up custom urlconf set by Django middlewares from request if any (#1308)
+
+## 1.5.2
+
+- Record event_processor client reports #1281
+- Add a Quart integration #1248
+- Sanic v21.12 support #1292
+- Support Celery abstract tasks #1287
+
+Work in this release contributed by @johnzeringue, @pgjones and @ahopkins. Thank you for your contribution!
+
+## 1.5.1
+
+- Fix django legacy url resolver regex substitution due to upstream CVE-2021-44420 fix #1272
+- Record lost `sample_rate` events only if tracing is enabled #1268
+- Fix gevent version parsing for non-numeric parts #1243
+- Record span and breadcrumb when Django opens db connection #1250
+
+## 1.5.0
+
+- Also record client outcomes for before send #1211
+- Add support for implicitly sized envelope items #1229
+- Fix integration with Apache Beam 2.32, 2.33 #1233
+- Remove Python 2.7 support for AWS Lambda layers in craft config #1241
+- Refactor Sanic integration for v21.9 support #1212
+- AWS Lambda Python 3.9 runtime support #1239
+- Fix "shutdown_timeout" typing #1256
+
+Work in this release contributed by @galuszkak, @kianmeng, @ahopkins, @razumeiko, @tomscytale, and @seedofjoy. Thank you for your contribution!
+
+## 1.4.3
+
+- Turned client reports on by default.
+
+## 1.4.2
+
+- Made envelope modifications in the HTTP transport non observable #1206
+
+## 1.4.1
+
+- Fix race condition between `finish` and `start_child` in tracing #1203
+
+## 1.4.0
+
+- No longer set the last event id for transactions #1186
+- Added support for client reports (disabled by default for now) #1181
+- Added `tracestate` header handling #1179
+- Added real ip detection to asgi integration #1199
+
+## 1.3.1
+
+- Fix detection of contextvars compatibility with Gevent versions >=20.9.0 #1157
+
+## 1.3.0
+
+- Add support for Sanic versions 20 and 21 #1146
+
+## 1.2.0
+
+- Fix for `AWSLambda` Integration to handle other path formats for function initial handler #1139
+- Fix for worker to set daemon attribute instead of deprecated setDaemon method #1093
+- Fix for `bottle` Integration that discards `-dev` for version extraction #1085
+- Fix for transport that adds a unified hook for capturing metrics about dropped events #1100
+- Add `Httpx` Integration #1119
+- Add support for china domains in `AWSLambda` Integration #1051
 
 ## 1.1.0
 
@@ -33,7 +128,7 @@ A major release `N` implies the previous release `N-1` will no longer receive up
 This release contains a breaking change
 
 - **BREAKING CHANGE**: Feat: Moved `auto_session_tracking` experimental flag to a proper option and removed explicitly setting experimental `session_mode` in favor of auto detecting its value, hence enabling release health by default #994
-- Fixed Django transaction name by setting the name to  `request.path_info` rather than `request.path`
+- Fixed Django transaction name by setting the name to `request.path_info` rather than `request.path`
 - Fix for tracing by getting HTTP headers from span rather than transaction when possible #1035
 - Fix for Flask transactions missing request body in non errored transactions #1034
 - Fix for honoring the `X-Forwarded-For` header #1037
@@ -54,7 +149,7 @@ This release contains a breaking change
 ## 0.20.0
 
 - Fix for header extraction for AWS lambda/API extraction
-- Fix multiple **kwargs type hints # 967
+- Fix multiple \*\*kwargs type hints # 967
 - Fix that corrects AWS lambda integration failure to detect the aws-lambda-ric 1.0 bootstrap #976
 - Fix AWSLambda integration: variable "timeout_thread" referenced before assignment #977
 - Use full git sha as release name #960

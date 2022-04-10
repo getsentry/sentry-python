@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 
 import pytest
@@ -10,13 +11,19 @@ from sentry_sdk import (
     capture_event,
     capture_exception,
     capture_message,
+    start_transaction,
     add_breadcrumb,
     last_event_id,
     Hub,
 )
 
+from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import _AUTO_ENABLING_INTEGRATIONS
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.scope import (  # noqa: F401
+    add_global_event_processor,
+    global_event_processors,
+)
 
 
 def test_processors(sentry_init, capture_events):
@@ -43,10 +50,16 @@ def test_processors(sentry_init, capture_events):
 
 def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
     caplog.set_level(logging.DEBUG)
+    REDIS = 10  # noqa: N806
 
     sentry_init(auto_enabling_integrations=True, debug=True)
 
     for import_string in _AUTO_ENABLING_INTEGRATIONS:
+        # Ignore redis in the test case, because it is installed as a
+        # dependency for running tests, and therefore always enabled.
+        if _AUTO_ENABLING_INTEGRATIONS[REDIS] == import_string:
+            continue
+
         assert any(
             record.message.startswith(
                 "Did not import default integration {}:".format(import_string)
@@ -71,10 +84,19 @@ def test_event_id(sentry_init, capture_events):
     assert last_event_id() == event_id
     assert Hub.current.last_event_id() == event_id
 
+    new_event_id = Hub.current.capture_event({"type": "transaction"})
+    assert new_event_id is not None
+    assert new_event_id != event_id
+    assert Hub.current.last_event_id() == event_id
 
-def test_option_callback(sentry_init, capture_events):
+
+def test_option_callback(sentry_init, capture_events, monkeypatch):
     drop_events = False
     drop_breadcrumbs = False
+    reports = []
+
+    def record_lost_event(reason, data_category=None, item=None):
+        reports.append((reason, data_category))
 
     def before_send(event, hint):
         assert isinstance(hint["exc_info"][1], ValueError)
@@ -91,6 +113,10 @@ def test_option_callback(sentry_init, capture_events):
     sentry_init(before_send=before_send, before_breadcrumb=before_breadcrumb)
     events = capture_events()
 
+    monkeypatch.setattr(
+        Hub.current.client.transport, "record_lost_event", record_lost_event
+    )
+
     def do_this():
         add_breadcrumb(message="Hello", hint={"foo": 42})
         try:
@@ -101,8 +127,10 @@ def test_option_callback(sentry_init, capture_events):
     do_this()
     drop_breadcrumbs = True
     do_this()
+    assert not reports
     drop_events = True
     do_this()
+    assert reports == [("before_send", "error")]
 
     normal, no_crumbs = events
 
@@ -356,3 +384,56 @@ def test_capture_event_with_scope_kwargs(sentry_init, capture_events):
     (event,) = events
     assert event["level"] == "info"
     assert event["extra"]["foo"] == "bar"
+
+
+def test_dedupe_event_processor_drop_records_client_report(
+    sentry_init, capture_events, capture_client_reports
+):
+    """
+    DedupeIntegration internally has an event_processor that filters duplicate exceptions.
+    We want a duplicate exception to be captured only once and the drop being recorded as
+    a client report.
+    """
+    sentry_init()
+    events = capture_events()
+    reports = capture_client_reports()
+
+    try:
+        raise ValueError("aha!")
+    except Exception:
+        try:
+            capture_exception()
+            reraise(*sys.exc_info())
+        except Exception:
+            capture_exception()
+
+    (event,) = events
+    (report,) = reports
+
+    assert event["level"] == "error"
+    assert "exception" in event
+    assert report == ("event_processor", "error")
+
+
+def test_event_processor_drop_records_client_report(
+    sentry_init, capture_events, capture_client_reports
+):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+    reports = capture_client_reports()
+
+    global global_event_processors
+
+    @add_global_event_processor
+    def foo(event, hint):
+        return None
+
+    capture_message("dropped")
+
+    with start_transaction(name="dropped"):
+        pass
+
+    assert len(events) == 0
+    assert reports == [("event_processor", "error"), ("event_processor", "transaction")]
+
+    global_event_processors.pop()

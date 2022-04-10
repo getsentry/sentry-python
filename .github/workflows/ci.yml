@@ -12,7 +12,7 @@ jobs:
   dist:
     name: distribution packages
     timeout-minutes: 10
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
@@ -35,9 +35,7 @@ jobs:
   docs:
     timeout-minutes: 10
     name: build documentation
-    runs-on: ubuntu-16.04
-
-    if: "startsWith(github.ref, 'refs/heads/release/')"
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
@@ -58,7 +56,7 @@ jobs:
 
   lint:
     timeout-minutes: 10
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
@@ -73,11 +71,18 @@ jobs:
   test:
     continue-on-error: true
     timeout-minutes: 45
-    runs-on: ubuntu-18.04
+    runs-on: ${{ matrix.linux-version }}
     strategy:
       matrix:
-        python-version:
-          ["2.7", "3.4", "3.5", "3.6", "3.7", "3.8", "3.9"]
+        linux-version: [ubuntu-latest]
+        python-version: ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
+        include:
+          # GHA doesn't host the combo of python 3.4 and ubuntu-latest (which is
+          # currently 20.04), so run just that one under 18.04. (See
+          # https://raw.githubusercontent.com/actions/python-versions/main/versions-manifest.json
+          # for a listing of supported python/os combos.)
+          - linux-version: ubuntu-18.04
+            python-version: "3.4"
 
     services:
       # Label used to access the service container

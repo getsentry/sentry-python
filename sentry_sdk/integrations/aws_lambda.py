@@ -284,11 +284,13 @@ def get_lambda_bootstrap():
     # Python 3.7: If the bootstrap module is *already imported*, it is the
     # one we actually want to use (no idea what's in __main__)
     #
-    # On Python 3.8 bootstrap is also importable, but will be the same file
+    # Python 3.8: bootstrap is also importable, but will be the same file
     # as __main__ imported under a different name:
     #
     #     sys.modules['__main__'].__file__ == sys.modules['bootstrap'].__file__
     #     sys.modules['__main__'] is not sys.modules['bootstrap']
+    #
+    # Python 3.9: bootstrap is in __main__.awslambdaricmain
     #
     # On container builds using the `aws-lambda-python-runtime-interface-client`
     # (awslamdaric) module, bootstrap is located in sys.modules['__main__'].bootstrap
@@ -297,10 +299,18 @@ def get_lambda_bootstrap():
     if "bootstrap" in sys.modules:
         return sys.modules["bootstrap"]
     elif "__main__" in sys.modules:
-        if hasattr(sys.modules["__main__"], "bootstrap"):
+        module = sys.modules["__main__"]
+        # python3.9 runtime
+        if hasattr(module, "awslambdaricmain") and hasattr(
+            module.awslambdaricmain, "bootstrap"  # type: ignore
+        ):
+            return module.awslambdaricmain.bootstrap  # type: ignore
+        elif hasattr(module, "bootstrap"):
             # awslambdaric python module in container builds
-            return sys.modules["__main__"].bootstrap  # type: ignore
-        return sys.modules["__main__"]
+            return module.bootstrap  # type: ignore
+
+        # python3.8 runtime
+        return module
     else:
         return None
 
@@ -400,13 +410,15 @@ def _get_cloudwatch_logs_url(aws_context, start_time):
         str -- AWS Console URL to logs.
     """
     formatstring = "%Y-%m-%dT%H:%M:%SZ"
+    region = environ.get("AWS_REGION", "")
 
     url = (
-        "https://console.aws.amazon.com/cloudwatch/home?region={region}"
+        "https://console.{domain}/cloudwatch/home?region={region}"
         "#logEventViewer:group={log_group};stream={log_stream}"
         ";start={start_time};end={end_time}"
     ).format(
-        region=environ.get("AWS_REGION"),
+        domain="amazonaws.cn" if region.startswith("cn-") else "aws.amazon.com",
+        region=region,
         log_group=aws_context.log_group_name,
         log_stream=aws_context.log_stream_name,
         start_time=(start_time - timedelta(seconds=1)).strftime(formatstring),

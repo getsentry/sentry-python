@@ -1,78 +1,26 @@
-import re
 import uuid
-import contextlib
-import math
 import random
 import time
 
 from datetime import datetime, timedelta
-from numbers import Real
 
 import sentry_sdk
 
-from sentry_sdk.utils import (
-    capture_internal_exceptions,
-    logger,
-    to_string,
-)
-from sentry_sdk._compat import PY2
+from sentry_sdk.utils import logger
 from sentry_sdk._types import MYPY
 
-if PY2:
-    from collections import Mapping
-else:
-    from collections.abc import Mapping
 
 if MYPY:
     import typing
 
-    from typing import Generator
     from typing import Optional
     from typing import Any
     from typing import Dict
     from typing import List
     from typing import Tuple
+    from typing import Iterator
 
     from sentry_sdk._types import SamplingContext
-
-_traceparent_header_format_re = re.compile(
-    "^[ \t]*"  # whitespace
-    "([0-9a-f]{32})?"  # trace_id
-    "-?([0-9a-f]{16})?"  # span_id
-    "-?([01])?"  # sampled
-    "[ \t]*$"  # whitespace
-)
-
-
-class EnvironHeaders(Mapping):  # type: ignore
-    def __init__(
-        self,
-        environ,  # type: typing.Mapping[str, str]
-        prefix="HTTP_",  # type: str
-    ):
-        # type: (...) -> None
-        self.environ = environ
-        self.prefix = prefix
-
-    def __getitem__(self, key):
-        # type: (str) -> Optional[Any]
-        return self.environ[self.prefix + key.replace("-", "_").upper()]
-
-    def __len__(self):
-        # type: () -> int
-        return sum(1 for _ in iter(self))
-
-    def __iter__(self):
-        # type: () -> Generator[str, None, None]
-        for k in self.environ:
-            if not isinstance(k, str):
-                continue
-
-            k = k.replace("-", "_").upper()
-            if not k.startswith(self.prefix):
-                continue
-
-            yield k[len(self.prefix) :]
 
 
 class _SpanRecorder(object):
@@ -116,8 +64,6 @@ class Span(object):
         "_span_recorder",
         "hub",
         "_context_manager_state",
-        # TODO: rename this "transaction" once we fully and truly deprecate the
-        # old "transaction" attribute (which was actually the transaction name)?
         "_containing_transaction",
     )
 
@@ -147,6 +93,7 @@ class Span(object):
         hub=None,  # type: Optional[sentry_sdk.Hub]
         status=None,  # type: Optional[str]
         transaction=None,  # type: Optional[str] # deprecated
+        containing_transaction=None,  # type: Optional[Transaction]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -160,6 +107,7 @@ class Span(object):
         self.hub = hub
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
+        self._containing_transaction = containing_transaction
         self.start_timestamp = datetime.utcnow()
         try:
             # TODO: For Python 3.7+, we could use a clock with ns resolution:
@@ -174,24 +122,27 @@ class Span(object):
         self.timestamp = None  # type: Optional[datetime]
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
-        self._containing_transaction = None  # type: Optional[Transaction]
 
+    # TODO this should really live on the Transaction class rather than the Span
+    # class
     def init_span_recorder(self, maxlen):
         # type: (int) -> None
         if self._span_recorder is None:
             self._span_recorder = _SpanRecorder(maxlen)
-        self._span_recorder.add(self)
 
     def __repr__(self):
         # type: () -> str
-        return "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>" % (
-            self.__class__.__name__,
-            self.op,
-            self.description,
-            self.trace_id,
-            self.span_id,
-            self.parent_span_id,
-            self.sampled,
+        return (
+            "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>"
+            % (
+                self.__class__.__name__,
+                self.op,
+                self.description,
+                self.trace_id,
+                self.span_id,
+                self.parent_span_id,
+                self.sampled,
+            )
         )
 
     def __enter__(self):
@@ -215,6 +166,15 @@ class Span(object):
         self.finish(hub)
         scope.span = old_span
 
+    @property
+    def containing_transaction(self):
+        # type: () -> Optional[Transaction]
+
+        # this is a getter rather than a regular attribute so that transactions
+        # can return `self` here instead (as a way to prevent them circularly
+        # referencing themselves)
+        return self._containing_transaction
+
     def start_child(self, **kwargs):
         # type: (**Any) -> Span
         """
@@ -226,19 +186,19 @@ class Span(object):
         """
         kwargs.setdefault("sampled", self.sampled)
 
-        rv = Span(
-            trace_id=self.trace_id, span_id=None, parent_span_id=self.span_id, **kwargs
+        child = Span(
+            trace_id=self.trace_id,
+            parent_span_id=self.span_id,
+            containing_transaction=self.containing_transaction,
+            **kwargs
         )
 
-        if isinstance(self, Transaction):
-            rv._containing_transaction = self
-        else:
-            rv._containing_transaction = self._containing_transaction
-
-        rv._span_recorder = recorder = self._span_recorder
-        if recorder:
-            recorder.add(rv)
-        return rv
+        span_recorder = (
+            self.containing_transaction and self.containing_transaction._span_recorder
+        )
+        if span_recorder:
+            span_recorder.add(child)
+        return child
 
     def new_span(self, **kwargs):
         # type: (**Any) -> Span
@@ -255,11 +215,12 @@ class Span(object):
         # type: (...) -> Transaction
         """
         Create a Transaction with the given params, then add in data pulled from
-        the 'sentry-trace' header in the environ (if any) before returning the
-        Transaction.
+        the 'sentry-trace' and 'tracestate' headers from the environ (if any)
+        before returning the Transaction.
 
-        If the 'sentry-trace' header is malformed or missing, just create and
-        return a Transaction instance with the given params.
+        This is different from `continue_from_headers` in that it assumes header
+        names in the form "HTTP_HEADER_NAME" - such as you would get from a wsgi
+        environ - rather than the form "header-name".
         """
         if cls is Span:
             logger.warning(
@@ -276,28 +237,42 @@ class Span(object):
     ):
         # type: (...) -> Transaction
         """
-        Create a Transaction with the given params, then add in data pulled from
-        the 'sentry-trace' header (if any) before returning the Transaction.
-
-        If the 'sentry-trace' header is malformed or missing, just create and
-        return a Transaction instance with the given params.
+        Create a transaction with the given params (including any data pulled from
+        the 'sentry-trace' and 'tracestate' headers).
         """
+        # TODO move this to the Transaction class
         if cls is Span:
             logger.warning(
                 "Deprecated: use Transaction.continue_from_headers "
                 "instead of Span.continue_from_headers."
             )
-        transaction = Transaction.from_traceparent(
-            headers.get("sentry-trace"), **kwargs
-        )
-        if transaction is None:
-            transaction = Transaction(**kwargs)
+
+        kwargs.update(extract_sentrytrace_data(headers.get("sentry-trace")))
+        kwargs.update(extract_tracestate_data(headers.get("tracestate")))
+
+        transaction = Transaction(**kwargs)
         transaction.same_process_as_parent = False
+
         return transaction
 
     def iter_headers(self):
-        # type: () -> Generator[Tuple[str, str], None, None]
+        # type: () -> Iterator[Tuple[str, str]]
+        """
+        Creates a generator which returns the span's `sentry-trace` and
+        `tracestate` headers.
+
+        If the span's containing transaction doesn't yet have a
+        `sentry_tracestate` value, this will cause one to be generated and
+        stored.
+        """
         yield "sentry-trace", self.to_traceparent()
+
+        tracestate = self.to_tracestate() if has_tracestate_enabled(self) else None
+        # `tracestate` will only be `None` if there's no client or no DSN
+        # TODO (kmclb) the above will be true once the feature is no longer
+        # behind a flag
+        if tracestate:
+            yield "tracestate", tracestate
 
     @classmethod
     def from_traceparent(
@@ -307,46 +282,21 @@ class Span(object):
     ):
         # type: (...) -> Optional[Transaction]
         """
+        DEPRECATED: Use Transaction.continue_from_headers(headers, **kwargs)
+
         Create a Transaction with the given params, then add in data pulled from
         the given 'sentry-trace' header value before returning the Transaction.
 
-        If the header value is malformed or missing, just create and return a
-        Transaction instance with the given params.
         """
-        if cls is Span:
-            logger.warning(
-                "Deprecated: use Transaction.from_traceparent "
-                "instead of Span.from_traceparent."
-            )
+        logger.warning(
+            "Deprecated: Use Transaction.continue_from_headers(headers, **kwargs) "
+            "instead of from_traceparent(traceparent, **kwargs)"
+        )
 
         if not traceparent:
             return None
 
-        if traceparent.startswith("00-") and traceparent.endswith("-00"):
-            traceparent = traceparent[3:-3]
-
-        match = _traceparent_header_format_re.match(str(traceparent))
-        if match is None:
-            return None
-
-        trace_id, parent_span_id, sampled_str = match.groups()
-
-        if trace_id is not None:
-            trace_id = "{:032x}".format(int(trace_id, 16))
-        if parent_span_id is not None:
-            parent_span_id = "{:016x}".format(int(parent_span_id, 16))
-
-        if sampled_str:
-            parent_sampled = sampled_str != "0"  # type: Optional[bool]
-        else:
-            parent_sampled = None
-
-        return Transaction(
-            trace_id=trace_id,
-            parent_span_id=parent_span_id,
-            parent_sampled=parent_sampled,
-            **kwargs
-        )
+        return cls.continue_from_headers({"sentry-trace": traceparent}, **kwargs)
 
     def to_traceparent(self):
         # type: () -> str
@@ -356,6 +306,57 @@ class Span(object):
         if self.sampled is False:
             sampled = "0"
         return "%s-%s-%s" % (self.trace_id, self.span_id, sampled)
+
+    def to_tracestate(self):
+        # type: () -> Optional[str]
+        """
+        Computes the `tracestate` header value using data from the containing
+        transaction.
+
+        If the containing transaction doesn't yet have a `sentry_tracestate`
+        value, this will cause one to be generated and stored.
+
+        If there is no containing transaction, a value will be generated but not
+        stored.
+
+        Returns None if there's no client and/or no DSN.
+        """
+
+        sentry_tracestate = self.get_or_set_sentry_tracestate()
+        third_party_tracestate = (
+            self.containing_transaction._third_party_tracestate
+            if self.containing_transaction
+            else None
+        )
+
+        if not sentry_tracestate:
+            return None
+
+        header_value = sentry_tracestate
+
+        if third_party_tracestate:
+            header_value = header_value + "," + third_party_tracestate
+
+        return header_value
+
+    def get_or_set_sentry_tracestate(self):
+        # type: (Span) -> Optional[str]
+        """
+        Read sentry tracestate off of the span's containing transaction.
+
+        If the transaction doesn't yet have a `_sentry_tracestate` value,
+        compute one and store it.
+        """
+        transaction = self.containing_transaction
+
+        if transaction:
+            if not transaction._sentry_tracestate:
+                transaction._sentry_tracestate = compute_tracestate_entry(self)
+
+            return transaction._sentry_tracestate
+
+        # orphan span - nowhere to store the value, so just return it
+        return compute_tracestate_entry(self)
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
@@ -422,7 +423,7 @@ class Span(object):
         except AttributeError:
             self.timestamp = datetime.utcnow()
 
-        _maybe_create_breadcrumbs_from_span(hub, self)
+        maybe_create_breadcrumbs_from_span(hub, self)
         return None
 
     def to_json(self):
@@ -463,16 +464,37 @@ class Span(object):
         if self.status:
             rv["status"] = self.status
 
+        # if the transaction didn't inherit a tracestate value, and no outgoing
+        # requests - whose need for headers would have caused a tracestate value
+        # to be created - were made as part of the transaction, the transaction
+        # still won't have a tracestate value, so compute one now
+        sentry_tracestate = self.get_or_set_sentry_tracestate()
+
+        if sentry_tracestate:
+            rv["tracestate"] = sentry_tracestate
+
         return rv
 
 
 class Transaction(Span):
-    __slots__ = ("name", "parent_sampled")
+    __slots__ = (
+        "name",
+        "parent_sampled",
+        # the sentry portion of the `tracestate` header used to transmit
+        # correlation context for server-side dynamic sampling, of the form
+        # `sentry=xxxxx`, where `xxxxx` is the base64-encoded json of the
+        # correlation context data, missing trailing any =
+        "_sentry_tracestate",
+        # tracestate data from other vendors, of the form `dogs=yes,cats=maybe`
+        "_third_party_tracestate",
+    )
 
     def __init__(
         self,
         name="",  # type: str
         parent_sampled=None,  # type: Optional[bool]
+        sentry_tracestate=None,  # type: Optional[str]
+        third_party_tracestate=None,  # type: Optional[str]
         **kwargs  # type: Any
     ):
         # type: (...) -> None
@@ -488,18 +510,35 @@ class Transaction(Span):
         Span.__init__(self, **kwargs)
         self.name = name
         self.parent_sampled = parent_sampled
+        # if tracestate isn't inherited and set here, it will get set lazily,
+        # either the first time an outgoing request needs it for a header or the
+        # first time an event needs it for inclusion in the captured data
+        self._sentry_tracestate = sentry_tracestate
+        self._third_party_tracestate = third_party_tracestate
 
     def __repr__(self):
         # type: () -> str
-        return "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>" % (
-            self.__class__.__name__,
-            self.name,
-            self.op,
-            self.trace_id,
-            self.span_id,
-            self.parent_span_id,
-            self.sampled,
+        return (
+            "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>"
+            % (
+                self.__class__.__name__,
+                self.name,
+                self.op,
+                self.trace_id,
+                self.span_id,
+                self.parent_span_id,
+                self.sampled,
+            )
         )
+
+    @property
+    def containing_transaction(self):
+        # type: () -> Transaction
+
+        # Transactions (as spans) belong to themselves (as transactions). This
+        # is a getter rather than a regular attribute to avoid having a circular
+        # reference.
+        return self
 
     def finish(self, hub=None):
         # type: (Optional[sentry_sdk.Hub]) -> Optional[str]
@@ -507,16 +546,25 @@ class Transaction(Span):
             # This transaction is already finished, ignore.
             return None
 
-        # This is a de facto proxy for checking if sampled = False
-        if self._span_recorder is None:
-            logger.debug("Discarding transaction because sampled = False")
-            return None
-
         hub = hub or self.hub or sentry_sdk.Hub.current
         client = hub.client
 
         if client is None:
             # We have no client and therefore nowhere to send this transaction.
+            return None
+
+        # This is a de facto proxy for checking if sampled = False
+        if self._span_recorder is None:
+            logger.debug("Discarding transaction because sampled = False")
+
+            # This is not entirely accurate because discards here are not
+            # exclusively based on sample rate but also traces sampler, but
+            # we handle this the same here.
+            if client.transport and has_tracing_enabled(client.options):
+                client.transport.record_lost_event(
+                    "sample_rate", data_category="transaction"
+                )
+
             return None
 
         if not self.name:
@@ -537,8 +585,14 @@ class Transaction(Span):
         finished_spans = [
             span.to_json()
             for span in self._span_recorder.spans
-            if span is not self and span.timestamp is not None
+            if span.timestamp is not None
         ]
+
+        # we do this to break the circular reference of transaction -> span
+        # recorder -> span -> containing transaction (which is where we started)
+        # before either the spans or the transaction goes out of scope and has
+        # to be garbage collected
+        self._span_recorder = None
 
         return hub.capture_event(
             {
@@ -569,7 +623,7 @@ class Transaction(Span):
 
         1. If a sampling decision is passed to `start_transaction`
         (`start_transaction(name: "my transaction", sampled: True)`), that
-        decision will be used, regardlesss of anything else
+        decision will be used, regardless of anything else
 
         2. If `traces_sampler` is defined, its decision will be used. It can
         choose to keep or ignore any parent sampling decision, or use the
@@ -617,7 +671,7 @@ class Transaction(Span):
         # Since this is coming from the user (or from a function provided by the
         # user), who knows what we might get. (The only valid values are
         # booleans or numbers between 0 and 1.)
-        if not _is_valid_sample_rate(sample_rate):
+        if not is_valid_sample_rate(sample_rate):
             logger.warning(
                 "[Tracing] Discarding {transaction_description} because of invalid sample rate.".format(
                     transaction_description=transaction_description,
@@ -662,125 +716,15 @@ class Transaction(Span):
             )
 
 
-def has_tracing_enabled(options):
-    # type: (Dict[str, Any]) -> bool
-    """
-    Returns True if either traces_sample_rate or traces_sampler is
-    non-zero/defined, False otherwise.
-    """
+# Circular imports
 
-    return bool(
-        options.get("traces_sample_rate") is not None
-        or options.get("traces_sampler") is not None
-    )
-
-
-def _is_valid_sample_rate(rate):
-    # type: (Any) -> bool
-    """
-    Checks the given sample rate to make sure it is valid type and value (a
-    boolean or a number between 0 and 1, inclusive).
-    """
-
-    # both booleans and NaN are instances of Real, so a) checking for Real
-    # checks for the possibility of a boolean also, and b) we have to check
-    # separately for NaN
-    if not isinstance(rate, Real) or math.isnan(rate):
-        logger.warning(
-            "[Tracing] Given sample rate is invalid. Sample rate must be a boolean or a number between 0 and 1. Got {rate} of type {type}.".format(
-                rate=rate, type=type(rate)
-            )
-        )
-        return False
-
-    # in case rate is a boolean, it will get cast to 1 if it's True and 0 if it's False
-    rate = float(rate)
-    if rate < 0 or rate > 1:
-        logger.warning(
-            "[Tracing] Given sample rate is invalid. Sample rate must be between 0 and 1. Got {rate}.".format(
-                rate=rate
-            )
-        )
-        return False
-
-    return True
-
-
-def _format_sql(cursor, sql):
-    # type: (Any, str) -> Optional[str]
-
-    real_sql = None
-
-    # If we're using psycopg2, it could be that we're
-    # looking at a query that uses Composed objects. Use psycopg2's mogrify
-    # function to format the query. We lose per-parameter trimming but gain
-    # accuracy in formatting.
-    try:
-        if hasattr(cursor, "mogrify"):
-            real_sql = cursor.mogrify(sql)
-            if isinstance(real_sql, bytes):
-                real_sql = real_sql.decode(cursor.connection.encoding)
-    except Exception:
-        real_sql = None
-
-    return real_sql or to_string(sql)
-
-
-@contextlib.contextmanager
-def record_sql_queries(
-    hub,  # type: sentry_sdk.Hub
-    cursor,  # type: Any
-    query,  # type: Any
-    params_list,  # type:  Any
-    paramstyle,  # type: Optional[str]
-    executemany,  # type: bool
-):
-    # type: (...) -> Generator[Span, None, None]
-
-    # TODO: Bring back capturing of params by default
-    if hub.client and hub.client.options["_experiments"].get(
-        "record_sql_params", False
-    ):
-        if not params_list or params_list == [None]:
-            params_list = None
-
-        if paramstyle == "pyformat":
-            paramstyle = "format"
-    else:
-        params_list = None
-        paramstyle = None
-
-    query = _format_sql(cursor, query)
-
-    data = {}
-    if params_list is not None:
-        data["db.params"] = params_list
-    if paramstyle is not None:
-        data["db.paramstyle"] = paramstyle
-    if executemany:
-        data["db.executemany"] = True
-
-    with capture_internal_exceptions():
-        hub.add_breadcrumb(message=query, category="query", data=data)
-
-    with hub.start_span(op="db", description=query) as span:
-        for k, v in data.items():
-            span.set_data(k, v)
-        yield span
-
-
-def _maybe_create_breadcrumbs_from_span(hub, span):
-    # type: (sentry_sdk.Hub, Span) -> None
-    if span.op == "redis":
-        hub.add_breadcrumb(
-            message=span.description, type="redis", category="redis", data=span._tags
-        )
-    elif span.op == "http":
-        hub.add_breadcrumb(type="http", category="httplib", data=span._data)
-    elif span.op == "subprocess":
-        hub.add_breadcrumb(
-            type="subprocess",
-            category="subprocess",
-            message=span.description,
-            data=span._data,
-        )
+from sentry_sdk.tracing_utils import (
+    EnvironHeaders,
+    compute_tracestate_entry,
+    extract_sentrytrace_data,
+    extract_tracestate_data,
+    has_tracestate_enabled,
+    has_tracing_enabled,
+    is_valid_sample_rate,
+    maybe_create_breadcrumbs_from_span,
+)
