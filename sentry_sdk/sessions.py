@@ -10,23 +10,27 @@ from sentry_sdk._types import MYPY
 from sentry_sdk.utils import format_timestamp
 
 if MYPY:
-    from typing import Callable
-    from typing import Optional
     from typing import Any
+    from typing import Callable
     from typing import Dict
-    from typing import List
     from typing import Generator
+    from typing import List
+    from typing import Optional
+    from typing import Union
 
 
 def is_auto_session_tracking_enabled(hub=None):
-    # type: (Optional[sentry_sdk.Hub]) -> bool
+    # type: (Optional[sentry_sdk.Hub]) -> Union[Any, bool, None]
     """Utility function to find out if session tracking is enabled."""
     if hub is None:
         hub = sentry_sdk.Hub.current
+
     should_track = hub.scope._force_auto_session_tracking
+
     if should_track is None:
         client_options = hub.client.options if hub.client else {}
-        should_track = client_options["auto_session_tracking"]
+        should_track = client_options.get("auto_session_tracking", False)
+
     return should_track
 
 

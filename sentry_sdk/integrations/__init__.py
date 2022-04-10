@@ -62,6 +62,8 @@ _AUTO_ENABLING_INTEGRATIONS = (
     "sentry_sdk.integrations.aiohttp.AioHttpIntegration",
     "sentry_sdk.integrations.tornado.TornadoIntegration",
     "sentry_sdk.integrations.sqlalchemy.SqlalchemyIntegration",
+    "sentry_sdk.integrations.redis.RedisIntegration",
+    "sentry_sdk.integrations.pyramid.PyramidIntegration",
     "sentry_sdk.integrations.boto3.Boto3Integration",
 )
 

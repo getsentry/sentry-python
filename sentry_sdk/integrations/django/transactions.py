@@ -76,6 +76,8 @@ class RavenResolver(object):
             result.replace("^", "")
             .replace("$", "")
             .replace("?", "")
+            .replace("\\A", "")
+            .replace("\\Z", "")
             .replace("//", "/")
             .replace("\\", "")
         )

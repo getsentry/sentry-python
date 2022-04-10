@@ -13,8 +13,10 @@ from sentry_sdk.utils import (
     filename_for_module,
     handle_in_app_impl,
     iter_event_stacktraces,
+    to_base64,
+    from_base64,
 )
-from sentry_sdk._compat import text_type
+from sentry_sdk._compat import text_type, string_types
 
 
 try:
@@ -29,19 +31,23 @@ else:
     def test_safe_repr_never_broken_for_strings(x):
         r = safe_repr(x)
         assert isinstance(r, text_type)
-        assert u"broken repr" not in r
+        assert "broken repr" not in r
 
 
 def test_safe_repr_regressions():
+    # fmt: off
     assert u"лошадь" in safe_repr(u"лошадь")
+    # fmt: on
 
 
 @pytest.mark.xfail(
     sys.version_info < (3,),
     reason="Fixing this in Python 2 would break other behaviors",
 )
-@pytest.mark.parametrize("prefix", (u"", u"abcd", u"лошадь"))
+# fmt: off
+@pytest.mark.parametrize("prefix", ("", "abcd", u"лошадь"))
 @pytest.mark.parametrize("character", u"\x00\x07\x1b\n")
+# fmt: on
 def test_safe_repr_non_printable(prefix, character):
     """Check that non-printable characters are escaped"""
     string = prefix + character
@@ -127,44 +133,87 @@ def test_parse_invalid_dsn(dsn):
 
 @pytest.mark.parametrize("empty", [None, []])
 def test_in_app(empty):
-    assert (
-        handle_in_app_impl(
-            [{"module": "foo"}, {"module": "bar"}],
-            in_app_include=["foo"],
-            in_app_exclude=empty,
-        )
-        == [{"module": "foo", "in_app": True}, {"module": "bar"}]
-    )
+    assert handle_in_app_impl(
+        [{"module": "foo"}, {"module": "bar"}],
+        in_app_include=["foo"],
+        in_app_exclude=empty,
+    ) == [{"module": "foo", "in_app": True}, {"module": "bar"}]
 
-    assert (
-        handle_in_app_impl(
-            [{"module": "foo"}, {"module": "bar"}],
-            in_app_include=["foo"],
-            in_app_exclude=["foo"],
-        )
-        == [{"module": "foo", "in_app": True}, {"module": "bar"}]
-    )
+    assert handle_in_app_impl(
+        [{"module": "foo"}, {"module": "bar"}],
+        in_app_include=["foo"],
+        in_app_exclude=["foo"],
+    ) == [{"module": "foo", "in_app": True}, {"module": "bar"}]
 
-    assert (
-        handle_in_app_impl(
-            [{"module": "foo"}, {"module": "bar"}],
-            in_app_include=empty,
-            in_app_exclude=["foo"],
-        )
-        == [{"module": "foo", "in_app": False}, {"module": "bar", "in_app": True}]
-    )
+    assert handle_in_app_impl(
+        [{"module": "foo"}, {"module": "bar"}],
+        in_app_include=empty,
+        in_app_exclude=["foo"],
+    ) == [{"module": "foo", "in_app": False}, {"module": "bar", "in_app": True}]
 
 
 def test_iter_stacktraces():
-    assert (
-        set(
-            iter_event_stacktraces(
-                {
-                    "threads": {"values": [{"stacktrace": 1}]},
-                    "stacktrace": 2,
-                    "exception": {"values": [{"stacktrace": 3}]},
-                }
-            )
+    assert set(
+        iter_event_stacktraces(
+            {
+                "threads": {"values": [{"stacktrace": 1}]},
+                "stacktrace": 2,
+                "exception": {"values": [{"stacktrace": 3}]},
+            }
         )
-        == {1, 2, 3}
-    )
+    ) == {1, 2, 3}
+
+
+# fmt: off
+@pytest.mark.parametrize(
+    ("original", "base64_encoded"),
+    [
+        # ascii only
+        ("Dogs are great!", "RG9ncyBhcmUgZ3JlYXQh"),
+        # emoji
+        (u"🐶", "8J+Qtg=="),
+        # non-ascii
+        (
+            u"Καλό κορίτσι, Μάιζεϊ!",
+            "zprOsc67z4wgzrrOv8+Bzq/PhM+DzrksIM6czqzOuc62zrXPiiE=",
+        ),
+        # mix of ascii and non-ascii
+        (
+            u"Of margir hundar! Ég geri ráð fyrir að ég þurfi stærra rúm.",
+            "T2YgbWFyZ2lyIGh1bmRhciEgw4lnIGdlcmkgcsOhw7AgZnlyaXIgYcOwIMOpZyDDvnVyZmkgc3TDpnJyYSByw7ptLg==",
+        ),
+    ],
+)
+# fmt: on
+def test_successful_base64_conversion(original, base64_encoded):
+    # all unicode characters should be handled correctly
+    assert to_base64(original) == base64_encoded
+    assert from_base64(base64_encoded) == original
+
+    # "to" and "from" should be inverses
+    assert from_base64(to_base64(original)) == original
+    assert to_base64(from_base64(base64_encoded)) == base64_encoded
+
+
+@pytest.mark.parametrize(
+    "input",
+    [
+        1231,  # incorrect type
+        True,  # incorrect type
+        [],  # incorrect type
+        {},  # incorrect type
+        None,  # incorrect type
+        "yayfordogs",  # wrong length
+        "#dog",  # invalid ascii character
+        "🐶",  # non-ascii character
+    ],
+)
+def test_failed_base64_conversion(input):
+    # conversion from base64 should fail if given input of the wrong type or
+    # input which isn't a valid base64 string
+    assert from_base64(input) is None
+
+    # any string can be converted to base64, so only type errors will cause
+    # failures
+    if type(input) not in string_types:
+        assert to_base64(input) is None

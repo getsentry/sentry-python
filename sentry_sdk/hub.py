@@ -120,7 +120,6 @@ if MYPY:
     class init(ClientConstructor, ContextManager[Any]):  # noqa: N801
         pass
 
-
 else:
     # Alias `init` for actual usage. Go through the lambda indirection to throw
     # PyCharm off of the weakly typed signature (it would otherwise discover
@@ -318,8 +317,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         client, top_scope = self._stack[-1]
         scope = _update_scope(top_scope, scope, scope_args)
         if client is not None:
+            is_transaction = event.get("type") == "transaction"
             rv = client.capture_event(event, hint, scope)
-            if rv is not None:
+            if rv is not None and not is_transaction:
                 self._last_event_id = rv
             return rv
         return None
@@ -699,7 +699,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if not propagate_traces:
             return
 
-        yield "sentry-trace", span.to_traceparent()
+        for header in span.iter_headers():
+            yield header
 
 
 GLOBAL_HUB = Hub()

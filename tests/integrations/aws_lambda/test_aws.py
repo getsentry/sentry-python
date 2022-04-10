@@ -105,14 +105,18 @@ def lambda_client():
     return get_boto_client()
 
 
-@pytest.fixture(params=["python3.6", "python3.7", "python3.8", "python2.7"])
+@pytest.fixture(
+    params=["python3.6", "python3.7", "python3.8", "python3.9", "python2.7"]
+)
 def lambda_runtime(request):
     return request.param
 
 
 @pytest.fixture
 def run_lambda_function(request, lambda_client, lambda_runtime):
-    def inner(code, payload, timeout=30, syntax_check=True, layer=None):
+    def inner(
+        code, payload, timeout=30, syntax_check=True, layer=None, initial_handler=None
+    ):
         from tests.integrations.aws_lambda.client import run_lambda_function
 
         response = run_lambda_function(
@@ -124,6 +128,7 @@ def run_lambda_function(request, lambda_client, lambda_runtime):
             timeout=timeout,
             syntax_check=syntax_check,
             layer=layer,
+            initial_handler=initial_handler,
         )
 
         # for better debugging
@@ -621,32 +626,39 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
     python sdk, with no code changes sentry is able to capture errors
     """
 
-    _, _, response = run_lambda_function(
-        dedent(
+    for initial_handler in [
+        None,
+        "test_dir/test_lambda.test_handler",
+        "test_dir.test_lambda.test_handler",
+    ]:
+        print("Testing Initial Handler ", initial_handler)
+        _, _, response = run_lambda_function(
+            dedent(
+                """
+            import sentry_sdk
+
+            def test_handler(event, context):
+                current_client = sentry_sdk.Hub.current.client
+
+                assert current_client is not None
+
+                assert len(current_client.options['integrations']) == 1
+                assert isinstance(current_client.options['integrations'][0],
+                                  sentry_sdk.integrations.aws_lambda.AwsLambdaIntegration)
+
+                raise Exception("something went wrong")
             """
-        import sentry_sdk
+            ),
+            b'{"foo": "bar"}',
+            layer=True,
+            initial_handler=initial_handler,
+        )
+        assert response["FunctionError"] == "Unhandled"
+        assert response["StatusCode"] == 200
 
-        def test_handler(event, context):
-            current_client = sentry_sdk.Hub.current.client
+        assert response["Payload"]["errorType"] != "AssertionError"
 
-            assert current_client is not None
+        assert response["Payload"]["errorType"] == "Exception"
+        assert response["Payload"]["errorMessage"] == "something went wrong"
 
-            assert len(current_client.options['integrations']) == 1
-            assert isinstance(current_client.options['integrations'][0],
-                              sentry_sdk.integrations.aws_lambda.AwsLambdaIntegration)
-
-            raise Exception("something went wrong")
-        """
-        ),
-        b'{"foo": "bar"}',
-        layer=True,
-    )
-    assert response["FunctionError"] == "Unhandled"
-    assert response["StatusCode"] == 200
-
-    assert response["Payload"]["errorType"] != "AssertionError"
-
-    assert response["Payload"]["errorType"] == "Exception"
-    assert response["Payload"]["errorMessage"] == "something went wrong"
-
-    assert "sentry_handler" in response["LogResult"][3].decode("utf-8")
+        assert "sentry_handler" in response["LogResult"][3].decode("utf-8")

@@ -37,7 +37,14 @@ if MYPY:
     NotImplementedType = Any
 
     EventDataCategory = Literal[
-        "default", "error", "crash", "transaction", "security", "attachment", "session"
+        "default",
+        "error",
+        "crash",
+        "transaction",
+        "security",
+        "attachment",
+        "session",
+        "internal",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
     EndpointType = Literal["store", "envelope"]

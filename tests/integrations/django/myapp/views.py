@@ -29,7 +29,6 @@ try:
     def rest_permission_denied_exc(request):
         raise PermissionDenied("bye")
 
-
 except ImportError:
     pass
 
@@ -121,10 +120,29 @@ def template_test(request, *args, **kwargs):
 
 
 @csrf_exempt
+def custom_ok(request, *args, **kwargs):
+    return HttpResponse("custom ok")
+
+
+@csrf_exempt
+def custom_exc(request, *args, **kwargs):
+    1 / 0
+
+
+@csrf_exempt
 def template_test2(request, *args, **kwargs):
     return TemplateResponse(
         request, ("user_name.html", "another_template.html"), {"user_age": 25}
     )
+
+
+@csrf_exempt
+def postgres_select(request, *args, **kwargs):
+    from django.db import connections
+
+    cursor = connections["postgres"].cursor()
+    cursor.execute("SELECT 1;")
+    return HttpResponse("ok")
 
 
 @csrf_exempt
