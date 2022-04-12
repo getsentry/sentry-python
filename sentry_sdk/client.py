@@ -253,6 +253,9 @@ class _Client(object):
         if scope is not None and not scope._should_capture:
             return False
 
+        if self._is_ignored_error(event, hint):
+            return False
+
         if (
             self.options["sample_rate"] < 1.0
             and random.random() >= self.options["sample_rate"]
@@ -260,9 +263,6 @@ class _Client(object):
             # record a lost event if we did not sample this.
             if self.transport:
                 self.transport.record_lost_event("sample_rate", data_category="error")
-            return False
-
-        if self._is_ignored_error(event, hint):
             return False
 
         return True
