@@ -246,23 +246,28 @@ class _Client(object):
         scope=None,  # type: Optional[Scope]
     ):
         # type: (...) -> bool
-        if event.get("type") == "transaction":
-            # Transactions are sampled independent of error events.
+        # Transactions are sampled independent of error events.
+        is_transaction = event.get("type") == "transaction"
+        if is_transaction:
             return True
 
-        if scope is not None and not scope._should_capture:
+        ignoring_prevents_recursion = scope is not None and not scope._should_capture
+        if ignoring_prevents_recursion:
             return False
 
-        if self._is_ignored_error(event, hint):
+        ignored_by_config_option = self._is_ignored_error(event, hint)
+        if ignored_by_config_option:
             return False
 
-        if (
+        not_in_sample_rate = (
             self.options["sample_rate"] < 1.0
             and random.random() >= self.options["sample_rate"]
-        ):
-            # record a lost event if we did not sample this.
+        )
+        if not_in_sample_rate:
+            # because we will not sample this event, record a "lost event".
             if self.transport:
                 self.transport.record_lost_event("sample_rate", data_category="error")
+
             return False
 
         return True
