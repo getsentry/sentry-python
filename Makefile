@@ -9,7 +9,7 @@ help:
 	@echo "make test: Run basic tests (not testing most integrations)"
 	@echo "make test-all: Run ALL tests (slow, closest to CI)"
 	@echo "make format: Run code formatters (destructive)"
-	@echo "make aws-lambda-layer: Build AWS Lambda layer directorzy for serverless integration"
+	@echo "make aws-lambda-layer: Build AWS Lambda layer directory for serverless integration"
 	@echo
 	@echo "Also make sure to read ./CONTRIBUTING.md"
 	@false
