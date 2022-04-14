@@ -266,6 +266,7 @@ class _Client(object):
         self,
         event,  # type: Event
     ):
+        # type: (...) -> bool
         not_in_sample_rate = (
             self.options["sample_rate"] < 1.0
             and random.random() >= self.options["sample_rate"]
