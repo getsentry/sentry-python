@@ -1,4 +1,4 @@
-name: ci
+name: CI
 
 on:
   push:
@@ -9,54 +9,10 @@ on:
   pull_request:
 
 jobs:
-  dist:
-    name: distribution packages
-    timeout-minutes: 10
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v1
-      - uses: actions/setup-python@v2
-        with:
-          python-version: 3.9
-
-      - run: |
-          pip install virtualenv
-          make aws-lambda-layer-build
-
-      - uses: actions/upload-artifact@v2
-        with:
-          name: ${{ github.sha }}
-          path: |
-            dist/*
-            dist-serverless/*
-
-  docs:
-    timeout-minutes: 10
-    name: build documentation
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v1
-      - uses: actions/setup-python@v2
-        with:
-          python-version: 3.9
-
-      - run: |
-          pip install virtualenv
-          make apidocs
-          cd docs/_build && zip -r gh-pages ./
-
-      - uses: actions/upload-artifact@v2
-        with:
-          name: ${{ github.sha }}
-          path: docs/_build/gh-pages.zip
-
   lint:
-    timeout-minutes: 10
+    name: Lint Sources
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v2
@@ -69,9 +25,10 @@ jobs:
           tox -e linters
 
   test:
-    continue-on-error: true
-    timeout-minutes: 45
+    name: Run Tests
     runs-on: ${{ matrix.linux-version }}
+    timeout-minutes: 45
+    continue-on-error: true
     strategy:
       matrix:
         linux-version: [ubuntu-latest]
@@ -125,7 +82,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: setup
+      - name: Setup Test Env
         env:
           PGHOST: localhost
           PGPASSWORD: sentry
@@ -134,7 +91,7 @@ jobs:
           psql -c 'create database test_travis_ci_test;' -U postgres
           pip install codecov tox
 
-      - name: run tests
+      - name: Run Tests
         env:
           CI_PYTHON_VERSION: ${{ matrix.python-version }}
         timeout-minutes: 45
@@ -144,3 +101,64 @@ jobs:
           coverage combine .coverage*
           coverage xml -i
           codecov --file coverage.xml
+
+  dist:
+    name: Build AWS Lambda Layer
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - run: |
+          echo "Creating directory containing Python SDK Lambda Layer"
+          pip install virtualenv
+          make aws-lambda-layer
+
+          echo "Saving SDK_VERSION for later"
+          export SDK_VERSION=$(grep "VERSION = " sentry_sdk/consts.py | cut -f3 -d' ' | tr -d '"')
+          echo "SDK_VERSION=$SDK_VERSION"
+          echo "SDK_VERSION=$SDK_VERSION" >> $GITHUB_ENV
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.sha }}
+          path: |
+            dist-serverless/*
+
+      - uses: getsentry/action-build-aws-lambda-extension@v1
+        with:
+          artifact_name: ${{ github.sha }}
+          zip_file_name: sentry-python-serverless-${{ env.SDK_VERSION }}.zip
+
+      - name: Upload Zip
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.sha }}
+          path: sentry-python-serverless-${{ env.SDK_VERSION }}.zip
+
+  docs:
+    name: Build SDK API Doc
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - run: |
+          pip install virtualenv
+          make apidocs
+          cd docs/_build && zip -r gh-pages ./
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ github.sha }}
+          path: docs/_build/gh-pages.zip
