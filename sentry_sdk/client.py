@@ -261,7 +261,7 @@ class _Client(object):
             return False
 
         return True
-    
+
     def _should_sample(
         self,
         event,  # type: Event
@@ -276,7 +276,7 @@ class _Client(object):
                 self.transport.record_lost_event("sample_rate", data_category="error")
 
             return False
-        
+
         return True
 
     def _update_session_from_event(
@@ -354,7 +354,7 @@ class _Client(object):
         session = scope._session if scope else None
         if session:
             self._update_session_from_event(session, event)
-        
+
         if not self._should_sample(event):
             return None
 
