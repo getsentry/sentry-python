@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.10
+
+### Various fixes & improvements
+
+- WIP: try to remove Flask version contraint (#1395) by @antonpirker
+- Change ordering of event drop mechanisms (#1390) by @adinauer
+
 ## 1.5.9
 
 ### Various fixes & improvements
