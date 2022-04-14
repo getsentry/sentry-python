@@ -260,6 +260,12 @@ class _Client(object):
         if ignored_by_config_option:
             return False
 
+        return True
+    
+    def _should_sample(
+        self,
+        event,  # type: Event
+    ):
         not_in_sample_rate = (
             self.options["sample_rate"] < 1.0
             and random.random() >= self.options["sample_rate"]
@@ -270,7 +276,7 @@ class _Client(object):
                 self.transport.record_lost_event("sample_rate", data_category="error")
 
             return False
-
+        
         return True
 
     def _update_session_from_event(
@@ -348,6 +354,9 @@ class _Client(object):
         session = scope._session if scope else None
         if session:
             self._update_session_from_event(session, event)
+        
+        if not self._should_sample(event):
+            return None
 
         attachments = hint.get("attachments")
         is_transaction = event_opt.get("type") == "transaction"
