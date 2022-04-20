@@ -262,7 +262,7 @@ class _Client(object):
 
         return True
 
-    def _should_sample(
+    def _should_sample_error(
         self,
         event,  # type: Event
     ):
