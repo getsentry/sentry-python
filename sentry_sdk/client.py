@@ -356,11 +356,12 @@ class _Client(object):
         if session:
             self._update_session_from_event(session, event)
 
-        if not self._should_sample(event):
+        is_transaction = event_opt.get("type") == "transaction"
+
+        if not is_transaction and not self._should_sample_error(event):
             return None
 
         attachments = hint.get("attachments")
-        is_transaction = event_opt.get("type") == "transaction"
 
         # this is outside of the `if` immediately below because even if we don't
         # use the value, we want to make sure we remove it before the event is
