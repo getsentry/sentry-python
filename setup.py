@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="1.5.9",
+    version="1.5.10",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -39,7 +39,7 @@ setup(
     license="BSD",
     install_requires=["urllib3>=1.10.0", "certifi"],
     extras_require={
-        "flask": ["flask>=0.11,<2.1.0", "blinker>=1.1"],
+        "flask": ["flask>=0.11", "blinker>=1.1"],
         "quart": ["quart>=0.16.1", "blinker>=1.1"],
         "bottle": ["bottle>=0.12.13"],
         "falcon": ["falcon>=1.4"],
