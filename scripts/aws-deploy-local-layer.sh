@@ -9,6 +9,11 @@ make aws-lambda-layer
 echo "Done creating Lambda layer in ./dist-serverless."
 
 
+# IMPORTANT:
+# Please make sure that this does the same as the GitHub action that
+# is building the Lambda layer in production!
+# see: https://github.com/getsentry/action-build-aws-lambda-extension/blob/main/action.yml#L23-L40
+
 # Adding Sentry Lambda extension to Lambda layer
 echo "Adding Sentry Lambda extension to Lambda layer in ./dist-serverless ..."
 mkdir -p dist-serverless/extensions
@@ -25,6 +30,8 @@ relay:
 	upstream: "https://sentry.io"
 	host: 127.0.0.1
 	port: 3000
+limits:
+    shutdown_timeout: 2
 EOT
 echo "Done setting configuration for extension in in ./dist-serverless/extensions ..."
 
