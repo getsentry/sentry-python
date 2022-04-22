@@ -137,13 +137,6 @@ jobs:
           extension_port: 3000
           extension_upstream: https://sentry.io/
 
-
-      - name: Upload Zip
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ github.sha }}
-          path: sentry-python-serverless-${{ env.SDK_VERSION }}.zip
-
   docs:
     name: Build SDK API Doc
     runs-on: ubuntu-latest
