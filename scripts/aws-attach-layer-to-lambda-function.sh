@@ -2,6 +2,17 @@
 
 set -euo pipefail
 
+# Check for argument
+if [ $# -eq 0 ]
+  then
+    SCRIPT_NAME=$(basename "$0")
+    echo "ERROR: No argument supplied. Please give the name of a Lambda function!"
+    echo ""
+    echo "Usage: $SCRIPT_NAME <lambda-function-name>"
+    echo ""
+    exit 1
+fi
+
 FUNCTION_NAME=$1
 
 echo "Getting ARN of newest Sentry lambda layer..."
