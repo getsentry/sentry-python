@@ -11,15 +11,25 @@ import re
 
 import sentry_sdk
 from sentry_sdk._types import MYPY
+from sentry_sdk.utils import Dsn
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 
 if MYPY:
     from typing import Any
 
 
+# TODO(neel) maybe conditional on extension presence/layer version?
+# not sure best way to check
+def extension_relay_dsn(original_dsn):
+    dsn = Dsn(original_dsn)
+    dsn.host = "localhost"
+    dsn.port = 3000
+    dsn.scheme = "http"
+    return str(dsn)
+
 # Configure Sentry SDK
 sentry_sdk.init(
-    dsn=os.environ["SENTRY_DSN"],
+    dsn=extension_relay_dsn(os.environ["SENTRY_DSN"]),
     integrations=[AwsLambdaIntegration(timeout_warning=True)],
     traces_sample_rate=float(os.environ["SENTRY_TRACES_SAMPLE_RATE"]),
 )
