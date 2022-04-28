@@ -48,6 +48,9 @@ def _get_options(*args, **kwargs):
     else:
         dsn = None
 
+    if len(args) > 1:
+        raise TypeError("Only single positional argument is expected")
+
     rv = dict(DEFAULT_OPTIONS)
     options = dict(*args, **kwargs)
     if dsn is not None and options.get("dsn") is None:
@@ -260,6 +263,13 @@ class _Client(object):
         if ignored_by_config_option:
             return False
 
+        return True
+
+    def _should_sample_error(
+        self,
+        event,  # type: Event
+    ):
+        # type: (...) -> bool
         not_in_sample_rate = (
             self.options["sample_rate"] < 1.0
             and random.random() >= self.options["sample_rate"]
@@ -349,8 +359,12 @@ class _Client(object):
         if session:
             self._update_session_from_event(session, event)
 
-        attachments = hint.get("attachments")
         is_transaction = event_opt.get("type") == "transaction"
+
+        if not is_transaction and not self._should_sample_error(event):
+            return None
+
+        attachments = hint.get("attachments")
 
         # this is outside of the `if` immediately below because even if we don't
         # use the value, we want to make sure we remove it before the event is

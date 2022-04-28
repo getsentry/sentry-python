@@ -887,3 +887,9 @@ def test_max_breadcrumbs_option(
     capture_message("dogs are great")
 
     assert len(events[0]["breadcrumbs"]["values"]) == expected_breadcrumbs
+
+
+def test_multiple_positional_args(sentry_init):
+    with pytest.raises(TypeError) as exinfo:
+        sentry_init(1, None)
+    assert "Only single positional argument is expected" in str(exinfo.value)
