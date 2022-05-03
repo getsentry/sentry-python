@@ -21,7 +21,7 @@ from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk._compat import iteritems
 
 try:
-    from tornado import version_info as TORNADO_VERSION  # type: ignore
+    from tornado import version_info as TORNADO_VERSION
     from tornado.web import RequestHandler, HTTPError
     from tornado.gen import coroutine
 except ImportError:
@@ -58,7 +58,7 @@ class TornadoIntegration(Integration):
 
         ignore_logger("tornado.access")
 
-        old_execute = RequestHandler._execute  # type: ignore
+        old_execute = RequestHandler._execute
 
         awaitable = iscoroutinefunction(old_execute)
 
@@ -79,16 +79,16 @@ class TornadoIntegration(Integration):
                     result = yield from old_execute(self, *args, **kwargs)
                     return result
 
-        RequestHandler._execute = sentry_execute_request_handler  # type: ignore
+        RequestHandler._execute = sentry_execute_request_handler
 
         old_log_exception = RequestHandler.log_exception
 
         def sentry_log_exception(self, ty, value, tb, *args, **kwargs):
             # type: (Any, type, BaseException, Any, *Any, **Any) -> Optional[Any]
             _capture_exception(ty, value, tb)
-            return old_log_exception(self, ty, value, tb, *args, **kwargs)  # type: ignore
+            return old_log_exception(self, ty, value, tb, *args, **kwargs)
 
-        RequestHandler.log_exception = sentry_log_exception  # type: ignore
+        RequestHandler.log_exception = sentry_log_exception
 
 
 @contextlib.contextmanager
@@ -105,7 +105,7 @@ def _handle_request_impl(self):
     with Hub(hub) as hub:
         with hub.configure_scope() as scope:
             scope.clear_breadcrumbs()
-            processor = _make_event_processor(weak_handler)  # type: ignore
+            processor = _make_event_processor(weak_handler)
             scope.add_event_processor(processor)
 
         transaction = Transaction.continue_from_headers(
@@ -155,7 +155,7 @@ def _make_event_processor(weak_handler):
         request = handler.request
 
         with capture_internal_exceptions():
-            method = getattr(handler, handler.request.method.lower())  # type: ignore
+            method = getattr(handler, handler.request.method.lower())
             event["transaction"] = transaction_from_function(method)
 
         with capture_internal_exceptions():
