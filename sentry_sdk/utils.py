@@ -171,7 +171,7 @@ class Dsn(object):
         self.host = parts.hostname
 
         if parts.port is None:
-            self.port = self.scheme == "https" and 443 or 80
+            self.port = self.scheme == "https" and 443 or 80  # type: int
         else:
             self.port = parts.port
 
@@ -466,6 +466,9 @@ def filename_for_module(module, abs_path):
             return os.path.basename(abs_path)
 
         base_module_path = sys.modules[base_module].__file__
+        if not base_module_path:
+            return abs_path
+
         return abs_path.split(base_module_path.rsplit(os.sep, 2)[0], 1)[-1].lstrip(
             os.sep
         )

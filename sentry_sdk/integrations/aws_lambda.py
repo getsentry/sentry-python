@@ -302,12 +302,12 @@ def get_lambda_bootstrap():
         module = sys.modules["__main__"]
         # python3.9 runtime
         if hasattr(module, "awslambdaricmain") and hasattr(
-            module.awslambdaricmain, "bootstrap"  # type: ignore
+            module.awslambdaricmain, "bootstrap"
         ):
-            return module.awslambdaricmain.bootstrap  # type: ignore
+            return module.awslambdaricmain.bootstrap
         elif hasattr(module, "bootstrap"):
             # awslambdaric python module in container builds
-            return module.bootstrap  # type: ignore
+            return module.bootstrap
 
         # python3.8 runtime
         return module

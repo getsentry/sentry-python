@@ -23,7 +23,7 @@ if MYPY:
 
 
 try:
-    from celery import VERSION as CELERY_VERSION  # type: ignore
+    from celery import VERSION as CELERY_VERSION
     from celery.exceptions import (  # type: ignore
         SoftTimeLimitExceeded,
         Retry,
