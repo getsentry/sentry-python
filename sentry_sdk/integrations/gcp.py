@@ -126,7 +126,7 @@ class GcpIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        import __main__ as gcp_functions  # type: ignore
+        import __main__ as gcp_functions
 
         if not hasattr(gcp_functions, "worker_v1"):
             logger.warning(

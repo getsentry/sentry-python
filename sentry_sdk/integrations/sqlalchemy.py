@@ -70,7 +70,7 @@ def _after_cursor_execute(conn, cursor, statement, parameters, context, *args):
     # type: (Any, Any, Any, Any, Any, *Any) -> None
     ctx_mgr = getattr(
         context, "_sentry_sql_span_manager", None
-    )  # type: ContextManager[Any]
+    )  # type: Optional[ContextManager[Any]]
 
     if ctx_mgr is not None:
         context._sentry_sql_span_manager = None
@@ -93,7 +93,7 @@ def _handle_error(context, *args):
     # handler is going to be fatal.
     ctx_mgr = getattr(
         execution_context, "_sentry_sql_span_manager", None
-    )  # type: ContextManager[Any]
+    )  # type: Optional[ContextManager[Any]]
 
     if ctx_mgr is not None:
         execution_context._sentry_sql_span_manager = None
