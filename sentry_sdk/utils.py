@@ -171,7 +171,7 @@ class Dsn(object):
         self.host = parts.hostname
 
         if parts.port is None:
-            self.port = self.scheme == "https" and 443 or 80 # type: int
+            self.port = self.scheme == "https" and 443 or 80  # type: int
         else:
             self.port = parts.port
 
