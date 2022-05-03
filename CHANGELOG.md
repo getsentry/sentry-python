@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.11
+
+### Various fixes & improvements
+
+- chore: Bump mypy and fix abstract ContextManager typing (#1421) by @sl0thentr0py
+- chore(issues): add link to Sentry support (#1420) by @vladanpaunovic
+- fix: replace git.io links with redirect targets (#1412) by @asottile-sentry
+- ref: Update error verbose for sentry init (#1361) by @targhs
+- fix(sessions): Update session also for non sampled events and change filter order (#1394) by @adinauer
+
 ## 1.5.10
 
 ### Various fixes & improvements
