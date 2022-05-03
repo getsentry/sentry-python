@@ -15,7 +15,7 @@ help:
 	@false
 
 .venv:
-	virtualenv -ppython3 $(VENV_PATH)
+	python3 -m venv $(VENV_PATH)
 	$(VENV_PATH)/bin/pip install tox
 
 dist: .venv
