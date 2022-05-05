@@ -605,16 +605,12 @@ class Transaction(Span):
 
         return hub.capture_event(event)
 
-    def set_measurement(self, name, value, unit="ms"):
+    def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
         if not has_custom_measurements_enabled():
             logger.debug(
                 "[Tracing] Experimental custom_measurements feature is disabled"
             )
-            return
-
-        if unit not in ("ns", "ms", "s"):
-            logger.debug("[Tracing] Discarding measurement due to invalid unit")
             return
 
         self._measurements[name] = {"value": value, "unit": unit}
