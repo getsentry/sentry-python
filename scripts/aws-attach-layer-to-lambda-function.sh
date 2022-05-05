@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+#
+# Attaches the layer `SentryPythonServerlessSDK-local-dev` to a given lambda function.
+#
 
 set -euo pipefail
 
@@ -16,7 +19,7 @@ fi
 FUNCTION_NAME=$1
 
 echo "Getting ARN of newest Sentry lambda layer..."
-LAYER_ARN=$(aws lambda list-layer-versions --layer-name SentryPythonServerlessSDKLocalDev --query "LayerVersions[0].LayerVersionArn" | tr -d '"')
+LAYER_ARN=$(aws lambda list-layer-versions --layer-name SentryPythonServerlessSDK-local-dev --query "LayerVersions[0].LayerVersionArn" | tr -d '"')
 echo "Done getting ARN of newest Sentry lambda layer $LAYER_ARN."
 
 echo "Attaching Lamba layer to function $FUNCTION_NAME..."

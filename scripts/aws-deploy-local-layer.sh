@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+#
+# Builds and deploys the Sentry AWS Lambda layer (including the Sentry SDK and the Sentry Lambda Extension)
+#
+# The currently checked out version of the SDK in your local directory is used.
+# The latest version of the Lambda Extension is fetched from the Sentry Release Registry.
+#
 
 set -euo pipefail
 
@@ -6,7 +12,6 @@ set -euo pipefail
 echo "Creating Lambda layer in ./dist-serverless ..."
 make aws-lambda-layer
 echo "Done creating Lambda layer in ./dist-serverless."
-
 
 # IMPORTANT:
 # Please make sure that this does the same as the GitHub action that
@@ -47,12 +52,12 @@ echo "Done Zipping Lambda layer and included Lambda extension to ./sentry-python
 echo "Deploying zipped Lambda layer to AWS..."
 
 aws lambda publish-layer-version \
-    --layer-name "SentryPythonServerlessSDKLocalDev" \
+    --layer-name "SentryPythonServerlessSDK-local-dev" \
     --region "eu-central-1" \
     --zip-file "fileb://sentry-python-serverless-x.x.x-dev.zip" \
     --description "Local test build of SentryPythonServerlessSDK (can be deleted)" \
     --no-cli-pager
 
-echo "Done deploying zipped Lambda layer to AWS as 'SentryPythonServerlessSDKLocalDev'."
+echo "Done deploying zipped Lambda layer to AWS as 'SentryPythonServerlessSDK-local-dev'."
 
 echo "All done. Have a nice day!"
