@@ -18,14 +18,13 @@ if MYPY:
     from typing import Any
 
 
-# TODO(neel) maybe conditional on extension presence/layer version?
-# not sure best way to check
 def extension_relay_dsn(original_dsn):
     dsn = Dsn(original_dsn)
     dsn.host = "localhost"
     dsn.port = 3000
     dsn.scheme = "http"
     return str(dsn)
+
 
 # Configure Sentry SDK
 sentry_sdk.init(
