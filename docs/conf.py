@@ -89,7 +89,7 @@ on_rtd = os.environ.get("READTHEDOCS", None) == "True"
 html_theme = "alabaster"
 
 # Theme options are theme-specific and customize the look and feel of a theme
-# further.  For a list of options available for each theme, see the
+# further. For a list of options available for each theme, see the
 # documentation.
 #
 # html_theme_options = {}
@@ -103,7 +103,7 @@ html_static_path = ["_static"]
 # to template names.
 #
 # The default sidebars (for documents that don't match any pattern) are
-# defined by theme itself.  Builtin themes are using these templates by
+# defined by theme itself. Builtin themes are using these templates by
 # default: ``['localtoc.html', 'relations.html', 'sourcelink.html',
 # 'searchbox.html']``.
 #
