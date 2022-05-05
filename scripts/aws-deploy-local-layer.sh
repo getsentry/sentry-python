@@ -2,7 +2,6 @@
 
 set -euo pipefail
 
-
 # Creating Lambda layer
 echo "Creating Lambda layer in ./dist-serverless ..."
 make aws-lambda-layer
