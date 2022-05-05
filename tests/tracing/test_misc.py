@@ -254,12 +254,23 @@ def test_set_meaurement(sentry_init, capture_events):
     events = capture_events()
 
     transaction = start_transaction(name="measuring stuff")
+
+    with pytest.raises(TypeError):
+        transaction.set_measurement()
+
+    with pytest.raises(TypeError):
+        transaction.set_measurement("metric.foo")
+
     transaction.set_measurement("metric.foo", 123)
     transaction.set_measurement("metric.bar", 456, unit="second")
     transaction.set_measurement("metric.baz", 420.69, unit="custom")
+    transaction.set_measurement("metric.foobar", 12, unit="percent")
+    transaction.set_measurement("metric.foobar", 17.99, unit="percent")
+
     transaction.finish()
 
     (event,) = events
     assert event["measurements"]["metric.foo"] == {"value": 123, "unit": ""}
     assert event["measurements"]["metric.bar"] == {"value": 456, "unit": "second"}
     assert event["measurements"]["metric.baz"] == {"value": 420.69, "unit": "custom"}
+    assert event["measurements"]["metric.foobar"] == {"value": 17.99, "unit": "percent"}
