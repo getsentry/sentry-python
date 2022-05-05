@@ -12,7 +12,7 @@ We put together two helper functions that can help you with development:
 
   This script [scripts/aws-deploy-local-layer.sh](scripts/aws-deploy-local-layer.sh) will take the code you have checked out locally, create a Lambda layer out of it and deploy it to the `eu-central-1` region of your configured AWS account using `aws` CLI.
 
-  The Lambda layer will have the name `SentryPythonServerlessSDKLocalDev`
+  The Lambda layer will have the name `SentryPythonServerlessSDK-local-dev`
 
 - `./scripts/aws-attach-layer-to-lambda-function.sh`
 
