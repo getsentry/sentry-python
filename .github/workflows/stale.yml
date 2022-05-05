@@ -13,7 +13,7 @@ jobs:
       pull-requests: write  # for actions/stale to close stale PRs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/stale@87c2b794b9b47a9bec68ae03c01aeb572ffebdb1
+      - uses: actions/stale@3cc123766321e9f15a6676375c154ccffb12a358
         with:
           repo-token: ${{ github.token }}
           days-before-stale: 21
