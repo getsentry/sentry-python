@@ -13,7 +13,7 @@ jobs:
       pull-requests: write  # for actions/stale to close stale PRs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/stale@3cc123766321e9f15a6676375c154ccffb12a358
+      - uses: actions/stale@v5
         with:
           repo-token: ${{ github.token }}
           days-before-stale: 21
@@ -34,7 +34,6 @@ jobs:
             ----
 
             "A weed is but an unloved flower." ― _Ella Wheeler Wilcox_ 🥀
-          skip-stale-issue-message: false
           close-issue-label: ""
           close-issue-message: ""
 
@@ -48,6 +47,5 @@ jobs:
             ----
 
             "A weed is but an unloved flower." ― _Ella Wheeler Wilcox_ 🥀
-          skip-stale-pr-message: false
           close-pr-label:
           close-pr-message: ""
