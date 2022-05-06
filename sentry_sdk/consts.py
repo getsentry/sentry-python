@@ -33,6 +33,7 @@ if MYPY:
             "record_sql_params": Optional[bool],
             "smart_transaction_trimming": Optional[bool],
             "propagate_tracestate": Optional[bool],
+            "custom_measurements": Optional[bool],
         },
         total=False,
     )
