@@ -9,7 +9,7 @@ from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
-from sentry_sdk.tracing_utils import RecordSqlQueries
+from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
@@ -68,7 +68,6 @@ if DJANGO_VERSION < (1, 10):
     def is_authenticated(request_user):
         # type: (Any) -> bool
         return request_user.is_authenticated()
-
 
 else:
 
@@ -202,7 +201,7 @@ class DjangoIntegration(Integration):
             # querysets. This might be surprising to the user but it's likely
             # less annoying.
 
-            return u"<%s from %s at 0x%x>" % (
+            return "<%s from %s at 0x%x>" % (
                 value.__class__.__name__,
                 value.__module__,
                 id(value),
@@ -539,7 +538,7 @@ def install_sql_hook():
         if hub.get_integration(DjangoIntegration) is None:
             return real_execute(self, sql, params)
 
-        with RecordSqlQueries(
+        with record_sql_queries(
             hub, self.cursor, sql, params, paramstyle="format", executemany=False
         ):
             return real_execute(self, sql, params)
@@ -550,7 +549,7 @@ def install_sql_hook():
         if hub.get_integration(DjangoIntegration) is None:
             return real_executemany(self, sql, param_list)
 
-        with RecordSqlQueries(
+        with record_sql_queries(
             hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
         ):
             return real_executemany(self, sql, param_list)

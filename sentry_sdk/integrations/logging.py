@@ -78,7 +78,7 @@ class LoggingIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        old_callhandlers = logging.Logger.callHandlers  # type: ignore
+        old_callhandlers = logging.Logger.callHandlers
 
         def sentry_patched_callhandlers(self, record):
             # type: (Any, LogRecord) -> Any

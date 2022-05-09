@@ -86,7 +86,7 @@ class FlaskIntegration(Integration):
                 environ, start_response
             )
 
-        Flask.__call__ = sentry_patched_wsgi_app  # type: ignore
+        Flask.__call__ = sentry_patched_wsgi_app
 
 
 def _add_sentry_trace(sender, template, context, **extra):

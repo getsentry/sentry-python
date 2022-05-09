@@ -157,7 +157,7 @@ def _install_subprocess():
 
         hub = Hub.current
         if hub.get_integration(StdlibIntegration) is None:
-            return old_popen_init(self, *a, **kw)  # type: ignore
+            return old_popen_init(self, *a, **kw)
 
         # Convert from tuple to list to be able to set values.
         a = list(a)
@@ -195,7 +195,7 @@ def _install_subprocess():
             if cwd:
                 span.set_data("subprocess.cwd", cwd)
 
-            rv = old_popen_init(self, *a, **kw)  # type: ignore
+            rv = old_popen_init(self, *a, **kw)
 
             span.set_tag("subprocess.pid", self.pid)
             return rv
