@@ -4,17 +4,8 @@
 
 ### Various fixes & improvements
 
-- build(deps): bump actions/upload-artifact from 2 to 3 (#1428) by @dependabot
-- build(deps): bump actions/setup-node from 1 to 3 (#1430) by @dependabot
-- build(deps): bump actions/stale from 3.0.14 to 5 (#1431) by @dependabot
 - feat(measurements): Add experimental set_measurement api on transaction (#1359) by @sl0thentr0py
-- build(deps): bump actions/checkout from 2 to 3 (#1429) by @dependabot
-- build(deps): bump actions/setup-python from 2 to 3 (#1432) by @dependabot
-- build(deps): bump github/codeql-action from 1 to 2 (#1433) by @dependabot
 - fix: Remove incorrect usage from flask helper example (#1434) by @BYK
-- chore: Included githubactions in the dependabot config (#1427) by @naveensrinivasan
-- chore: Set permissions for GitHub actions (#1422) by @naveensrinivasan
-- chore: conf.py removed double-spaces after period (#1425) by @marcelpetrick
 
 ## 1.5.11
 
