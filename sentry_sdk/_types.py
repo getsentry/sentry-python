@@ -48,3 +48,34 @@ if MYPY:
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
     EndpointType = Literal["store", "envelope"]
+
+    DurationUnit = Literal[
+        "nanosecond",
+        "microsecond",
+        "millisecond",
+        "second",
+        "minute",
+        "hour",
+        "day",
+        "week",
+    ]
+
+    InformationUnit = Literal[
+        "bit",
+        "byte",
+        "kilobyte",
+        "kibibyte",
+        "megabyte",
+        "mebibyte",
+        "gigabyte",
+        "gibibyte",
+        "terabyte",
+        "tebibyte",
+        "petabyte",
+        "pebibyte",
+        "exabyte",
+        "exbibyte",
+    ]
+
+    FractionUnit = Literal["ratio", "percent"]
+    MeasurementUnit = Union[DurationUnit, InformationUnit, FractionUnit, str]
