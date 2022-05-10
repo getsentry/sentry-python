@@ -25,20 +25,6 @@ curl -0 --silent --output dist-serverless/extensions/sentry-lambda-extension `cu
 chmod +x dist-serverless/extensions/sentry-lambda-extension
 echo "Done adding Sentry Lambda extension to Lambda layer in ./dist-serverless."
 
-echo "Setting configuration for extension in in ./dist-serverless/extensions ..."
-mkdir -p dist-serverless/extensions/.relay/
-cat << EOT >> dist-serverless/extensions/.relay/config.yml
----
-relay:
-	mode: proxy
-	upstream: "https://sentry.io"
-	host: 127.0.0.1
-	port: 3000
-limits:
-    shutdown_timeout: 2
-EOT
-echo "Done setting configuration for extension in in ./dist-serverless/extensions ..."
-
 
 # Zip Lambda layer and included Lambda extension
 echo "Zipping Lambda layer and included Lambda extension..."
