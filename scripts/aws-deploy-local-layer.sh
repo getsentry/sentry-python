@@ -45,7 +45,7 @@ echo "Zipping Lambda layer and included Lambda extension..."
 cd dist-serverless/
 zip -r ../sentry-python-serverless-x.x.x-dev.zip \
     . \
-    --exclude \*__pycache__\* -x \*.yml
+    --exclude \*__pycache__\* --exclude \*.yml
 cd ..
 echo "Done Zipping Lambda layer and included Lambda extension to ./sentry-python-serverless-x.x.x-dev.zip."
 
