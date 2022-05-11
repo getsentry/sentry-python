@@ -137,8 +137,6 @@ jobs:
         with:
           artifact_name: ${{ github.sha }}
           zip_file_name: sentry-python-serverless-${{ env.SDK_VERSION }}.zip
-          extension_port: 3000
-          extension_upstream: https://sentry.io/
 
   docs:
     name: Build SDK API Doc
