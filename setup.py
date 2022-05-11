@@ -55,6 +55,7 @@ setup(
         "pure_eval": ["pure_eval", "executing", "asttokens"],
         "chalice": ["chalice>=1.16.0"],
         "httpx": ["httpx>=0.16.0"],
+        "starlette": ["starlette>=0.20.0"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",

@@ -44,8 +44,8 @@ class StarletteIntegration(Integration):
                 return await old_app(self, scope, receive, send)
 
             middleware = SentryAsgiMiddleware(
-                    lambda *a, **kw: old_app(self, *a, **kw),
-                    mechanism_type=identifier,
+                lambda *a, **kw: old_app(self, *a, **kw),
+                mechanism_type=StarletteIntegration.identifier,
             )
             middleware.__call__ = middleware._run_asgi3
             return await middleware(scope, receive, send)

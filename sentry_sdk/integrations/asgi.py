@@ -70,9 +70,15 @@ def _looks_like_asgi3(app):
 
 
 class SentryAsgiMiddleware:
-    __slots__ = ("app", "__call__", "transaction_style")
+    __slots__ = ("app", "__call__", "transaction_style", "mechanism_type")
 
-    def __init__(self, app, unsafe_context_data=False, transaction_style="endpoint", mechanism_type="asgi"):
+    def __init__(
+        self,
+        app,
+        unsafe_context_data=False,
+        transaction_style="endpoint",
+        mechanism_type="asgi",
+    ):
         # type: (Any, bool, str, str) -> None
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
@@ -95,6 +101,7 @@ class SentryAsgiMiddleware:
                 % (transaction_style, TRANSACTION_STYLE_VALUES)
             )
         self.transaction_style = transaction_style
+        self.mechanism_type = mechanism_type
         self.app = app
 
         if _looks_like_asgi3(app):
@@ -122,7 +129,7 @@ class SentryAsgiMiddleware:
             try:
                 return await callback()
             except Exception as exc:
-                _capture_exception(Hub.current, exc, mechanism_type=mechanism_type)
+                _capture_exception(Hub.current, exc, mechanism_type=self.mechanism_type)
                 raise exc from None
 
         _asgi_middleware_applied.set(True)
@@ -158,7 +165,9 @@ class SentryAsgiMiddleware:
                         try:
                             return await callback()
                         except Exception as exc:
-                            _capture_exception(hub, exc, mechanism_type=mechanism_type)
+                            _capture_exception(
+                                hub, exc, mechanism_type=self.mechanism_type
+                            )
                             raise exc from None
         finally:
             _asgi_middleware_applied.set(False)
