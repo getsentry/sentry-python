@@ -40,15 +40,15 @@ _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 
-def _capture_exception(hub, exc):
-    # type: (Hub, Any) -> None
+def _capture_exception(hub, exc, mechanism_type="asgi"):
+    # type: (Hub, Any, str) -> None
 
     # Check client here as it might have been unset while streaming response
     if hub.client is not None:
         event, hint = event_from_exception(
             exc,
             client_options=hub.client.options,
-            mechanism={"type": "asgi", "handled": False},
+            mechanism={"type": mechanism_type, "handled": False},
         )
         hub.capture_event(event, hint=hint)
 
@@ -72,8 +72,8 @@ def _looks_like_asgi3(app):
 class SentryAsgiMiddleware:
     __slots__ = ("app", "__call__", "transaction_style")
 
-    def __init__(self, app, unsafe_context_data=False, transaction_style="endpoint"):
-        # type: (Any, bool, str) -> None
+    def __init__(self, app, unsafe_context_data=False, transaction_style="endpoint", mechanism_type="asgi"):
+        # type: (Any, bool, str, str) -> None
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
         data to sent events and basic handling for exceptions bubbling up
@@ -122,7 +122,7 @@ class SentryAsgiMiddleware:
             try:
                 return await callback()
             except Exception as exc:
-                _capture_exception(Hub.current, exc)
+                _capture_exception(Hub.current, exc, mechanism_type=mechanism_type)
                 raise exc from None
 
         _asgi_middleware_applied.set(True)
@@ -158,7 +158,7 @@ class SentryAsgiMiddleware:
                         try:
                             return await callback()
                         except Exception as exc:
-                            _capture_exception(hub, exc)
+                            _capture_exception(hub, exc, mechanism_type=mechanism_type)
                             raise exc from None
         finally:
             _asgi_middleware_applied.set(False)

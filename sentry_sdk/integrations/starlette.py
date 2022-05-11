@@ -6,7 +6,8 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk._types import MYPY
 
 if MYPY:
-    pass
+    from typing import Any
+
 
 try:
     from starlette.applications import Starlette
@@ -42,7 +43,10 @@ class StarletteIntegration(Integration):
             if Hub.current.get_integration(StarletteIntegration) is None:
                 return await old_app(self, scope, receive, send)
 
-            middleware = SentryAsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))
+            middleware = SentryAsgiMiddleware(
+                    lambda *a, **kw: old_app(self, *a, **kw),
+                    mechanism_type=identifier,
+            )
             middleware.__call__ = middleware._run_asgi3
             return await middleware(scope, receive, send)
 
