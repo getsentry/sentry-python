@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.12
+
+### Various fixes & improvements
+
+- feat(measurements): Add experimental set_measurement api on transaction (#1359) by @sl0thentr0py
+- fix: Remove incorrect usage from flask helper example (#1434) by @BYK
+
 ## 1.5.11
 
 ### Various fixes & improvements
