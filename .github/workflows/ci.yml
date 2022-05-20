@@ -105,7 +105,7 @@ jobs:
           coverage xml -i
           codecov --file coverage.xml
 
-  dist:
+  build_lambda_layer:
     name: Build AWS Lambda Layer
     runs-on: ubuntu-latest
     timeout-minutes: 10
