@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+env:
+  BUILD_CACHE_KEY: ${{ github.sha }}
+  CACHED_BUILD_PATHS: |
+    ${{ github.workspace }}/dist-serverless
+
 jobs:
   lint:
     name: Lint Sources
@@ -116,7 +121,12 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           python-version: 3.9
-
+      - name: Setup build cache
+        uses: actions/cache@v2
+        id: build_cache
+        with:
+          path: ${{ env.CACHED_BUILD_PATHS }}
+          key: ${{ env.BUILD_CACHE_KEY }}
       - run: |
           echo "Creating directory containing Python SDK Lambda Layer"
           pip install virtualenv
@@ -126,13 +136,6 @@ jobs:
           export SDK_VERSION=$(grep "VERSION = " sentry_sdk/consts.py | cut -f3 -d' ' | tr -d '"')
           echo "SDK_VERSION=$SDK_VERSION"
           echo "SDK_VERSION=$SDK_VERSION" >> $GITHUB_ENV
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: ${{ github.sha }}
-          path: |
-            dist-serverless/*
-
       - uses: getsentry/action-build-aws-lambda-extension@v1
         with:
           artifact_name: ${{ github.sha }}
