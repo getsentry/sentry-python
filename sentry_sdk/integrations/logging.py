@@ -110,7 +110,7 @@ def _breadcrumb_from_record(record):
     # type: (LogRecord) -> Dict[str, Any]
     return {
         "type": "log",
-        "level": _logging_to_event_level(record.levelname),
+        "level": _logging_to_event_level(record),
         "category": record.name,
         "message": record.message,
         "timestamp": datetime.datetime.utcfromtimestamp(record.created),
@@ -118,9 +118,19 @@ def _breadcrumb_from_record(record):
     }
 
 
-def _logging_to_event_level(levelname):
-    # type: (str) -> str
-    return {"critical": "fatal"}.get(levelname.lower(), levelname.lower())
+def _logging_to_event_level(record):
+    # type: (LogRecord) -> str
+    default = 'error'
+    return {
+        logging.NOTSET: 'notset',
+        logging.DEBUG: 'debug',
+        logging.INFO: 'info',
+        logging.WARN: 'warning',  # WARN is same a WARNING
+        logging.WARNING: 'warning',
+        logging.ERROR: 'error',
+        logging.FATAL: 'fatal',
+        logging.CRITICAL: 'fatal',  # CRITICAL is same as FATAL
+    }.get(record.levelno, default)
 
 
 COMMON_RECORD_ATTRS = frozenset(
@@ -220,7 +230,7 @@ class EventHandler(logging.Handler, object):
 
         hint["log_record"] = record
 
-        event["level"] = _logging_to_event_level(record.levelname)
+        event["level"] = _logging_to_event_level(record)
         event["logger"] = record.name
 
         # Log records from `warnings` module as separate issues

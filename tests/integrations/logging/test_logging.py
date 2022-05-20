@@ -115,6 +115,35 @@ def test_logging_level(sentry_init, capture_events):
     assert not events
 
 
+def test_all_logging_levels(sentry_init, capture_events):
+
+    levels = {
+        # logging.NOTSET: 'notset',
+        logging.DEBUG: 'debug',
+        logging.INFO: 'info',
+        logging.WARN: 'warning',
+        logging.WARNING: 'warning',
+        logging.ERROR: 'error',
+        logging.CRITICAL: 'fatal',
+        logging.FATAL: 'fatal',
+        }
+
+    for logging_level, sentry_level in levels.items():
+
+        logger.setLevel(logging_level)
+        sentry_init(integrations=[LoggingIntegration(event_level=logging_level)],
+                    default_integrations=False)
+        events = capture_events()
+
+        logger.log(logging_level, "Trying level %s", logging_level)
+        assert events
+        assert events[0]['level'] == sentry_level
+        assert events[0]['logentry']['message'] == "Trying level %s"
+        assert events[0]['logentry']['params'] == [logging_level]
+
+        del events[:]
+
+
 def test_logging_filters(sentry_init, capture_events):
     sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
     events = capture_events()
