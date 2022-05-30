@@ -196,6 +196,7 @@ class SentryAsgiMiddleware:
             event.get("transaction", _DEFAULT_TRANSACTION_NAME)
             == _DEFAULT_TRANSACTION_NAME
         ):
+            # TODO(neel) move this out into starlette/fastapi
             if self.transaction_style == "endpoint":
                 endpoint = asgi_scope.get("endpoint")
                 # Webframeworks like Starlette mutate the ASGI env once routing is

@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 from sentry_sdk.hub import Hub
+from sentry_sdk.utils import event_from_exception
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk._types import MYPY
@@ -51,3 +52,30 @@ class StarletteIntegration(Integration):
             return await middleware(scope, receive, send)
 
         Starlette.__call__ = sentry_patched_asgi_app
+        _patch_exception_middleware()
+
+
+def _capture_exception(exception, handled=False):
+    # type: (BaseException, **Any) -> None
+    hub = Hub.current
+    if hub.get_integration(StarletteIntegration) is None:
+        return
+
+    event, hint = event_from_exception(
+        exception,
+        client_options=hub.client.options,
+        mechanism={"type": StarletteIntegration.identifier, "handled": handled},
+    )
+
+    hub.capture_event(event, hint=hint)
+
+
+def _patch_exception_middleware():
+    from starlette.exceptions import ExceptionMiddleware
+    old_http_exception = ExceptionMiddleware.http_exception
+
+    def sentry_patched_http_exception(self, request, exc):
+        _capture_exception(exc, handled=True)
+        return old_http_exception(self, request, exc)
+
+    ExceptionMiddleware.http_exception = sentry_patched_http_exception
