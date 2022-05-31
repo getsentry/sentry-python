@@ -24,6 +24,16 @@ if MYPY:
 
 DEFAULT_LEVEL = logging.INFO
 DEFAULT_EVENT_LEVEL = logging.ERROR
+LOGGING_TO_EVENT_LEVEL = {
+    logging.NOTSET: "notset",
+    logging.DEBUG: "debug",
+    logging.INFO: "info",
+    logging.WARN: "warning",  # WARN is same a WARNING
+    logging.WARNING: "warning",
+    logging.ERROR: "error",
+    logging.FATAL: "fatal",
+    logging.CRITICAL: "fatal",  # CRITICAL is same as FATAL
+}
 
 # Capturing events from those loggers causes recursion errors. We cannot allow
 # the user to unconditionally create events from those loggers under any
@@ -120,22 +130,7 @@ def _breadcrumb_from_record(record):
 
 def _logging_to_event_level(record):
     # type: (LogRecord) -> str
-    to_event_level = {
-        logging.NOTSET: "notset",
-        logging.DEBUG: "debug",
-        logging.INFO: "info",
-        logging.WARN: "warning",  # WARN is same a WARNING
-        logging.WARNING: "warning",
-        logging.ERROR: "error",
-        logging.FATAL: "fatal",
-        logging.CRITICAL: "fatal",  # CRITICAL is same as FATAL
-    }
-
-    event_level = to_event_level.get(record.levelno) or to_event_level.get(
-        DEFAULT_EVENT_LEVEL
-    )
-
-    return event_level
+    return LOGGING_TO_EVENT_LEVEL.get(record.levelno, record.levelname.lower())
 
 
 COMMON_RECORD_ATTRS = frozenset(
