@@ -120,17 +120,16 @@ def _breadcrumb_from_record(record):
 
 def _logging_to_event_level(record):
     # type: (LogRecord) -> str
-    default = 'error'
     return {
-        logging.NOTSET: 'notset',
-        logging.DEBUG: 'debug',
-        logging.INFO: 'info',
-        logging.WARN: 'warning',  # WARN is same a WARNING
-        logging.WARNING: 'warning',
-        logging.ERROR: 'error',
-        logging.FATAL: 'fatal',
-        logging.CRITICAL: 'fatal',  # CRITICAL is same as FATAL
-    }.get(record.levelno, default)
+        logging.NOTSET: "notset",
+        logging.DEBUG: "debug",
+        logging.INFO: "info",
+        logging.WARN: "warning",  # WARN is same a WARNING
+        logging.WARNING: "warning",
+        logging.ERROR: "error",
+        logging.FATAL: "fatal",
+        logging.CRITICAL: "fatal",  # CRITICAL is same as FATAL
+    }.get(record.levelno, DEFAULT_EVENT_LEVEL)
 
 
 COMMON_RECORD_ATTRS = frozenset(
