@@ -130,7 +130,9 @@ def _breadcrumb_from_record(record):
 
 def _logging_to_event_level(record):
     # type: (LogRecord) -> str
-    return LOGGING_TO_EVENT_LEVEL.get(record.levelno, record.levelname.lower())
+    return LOGGING_TO_EVENT_LEVEL.get(
+        record.levelno, record.levelname.lower() if record.levelname else ""
+    )
 
 
 COMMON_RECORD_ATTRS = frozenset(
