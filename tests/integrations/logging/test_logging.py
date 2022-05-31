@@ -115,31 +115,39 @@ def test_logging_level(sentry_init, capture_events):
     assert not events
 
 
-def test_all_logging_levels(sentry_init, capture_events):
-
+def test_custom_log_level_names(sentry_init, capture_events):
     levels = {
-        # logging.NOTSET: 'notset',
-        logging.DEBUG: 'debug',
-        logging.INFO: 'info',
-        logging.WARN: 'warning',
-        logging.WARNING: 'warning',
-        logging.ERROR: 'error',
-        logging.CRITICAL: 'fatal',
-        logging.FATAL: 'fatal',
-        }
+        logging.DEBUG: "debug",
+        logging.INFO: "info",
+        logging.WARN: "warning",
+        logging.WARNING: "warning",
+        logging.ERROR: "error",
+        logging.CRITICAL: "fatal",
+        logging.FATAL: "fatal",
+    }
+
+    # set custom log level names
+    logging.addLevelName(logging.DEBUG, "custom level debüg: ")
+    logging.addLevelName(logging.INFO, "")
+    logging.addLevelName(logging.WARN, "custom level warn: ")
+    logging.addLevelName(logging.WARNING, "custom level warning: ")
+    logging.addLevelName(logging.ERROR, None)
+    logging.addLevelName(logging.CRITICAL, "custom level critical: ")
+    logging.addLevelName(logging.FATAL, "custom level 🔥: ")
 
     for logging_level, sentry_level in levels.items():
-
         logger.setLevel(logging_level)
-        sentry_init(integrations=[LoggingIntegration(event_level=logging_level)],
-                    default_integrations=False)
+        sentry_init(
+            integrations=[LoggingIntegration(event_level=logging_level)],
+            default_integrations=False,
+        )
         events = capture_events()
 
         logger.log(logging_level, "Trying level %s", logging_level)
         assert events
-        assert events[0]['level'] == sentry_level
-        assert events[0]['logentry']['message'] == "Trying level %s"
-        assert events[0]['logentry']['params'] == [logging_level]
+        assert events[0]["level"] == sentry_level
+        assert events[0]["logentry"]["message"] == "Trying level %s"
+        assert events[0]["logentry"]["params"] == [logging_level]
 
         del events[:]
 
