@@ -20,10 +20,9 @@ echo "Done creating Lambda layer in ./dist-serverless."
 
 echo "Downloading relay..."
 mkdir -p dist-serverless/relay
-# curl -0 --silent \
-#     --output dist-serverless/relay/relay \
-#     "$(curl -s https://release-registry.services.sentry.io/apps/relay/latest | jq -r .files.\"relay-Linux-x86_64\".url)"
-cp /Users/antonpirker/code/relay/target/x86_64-unknown-linux-gnu/release/relay dist-serverless/relay/ # REMOVE THIS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+curl -0 --silent \
+    --output dist-serverless/relay/relay \
+    "$(curl -s https://release-registry.services.sentry.io/apps/relay/latest | jq -r .files.\"relay-Linux-x86_64\".url)"
 chmod +x dist-serverless/relay/relay
 echo "Done downloading relay."
 
