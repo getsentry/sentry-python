@@ -1,11 +1,15 @@
 from __future__ import absolute_import
 
+from sentry_sdk._compat import iteritems
 from sentry_sdk._types import MYPY
-from sentry_sdk.hub import Hub
+from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations._wsgi_common import (
+    _is_json_content_type,
+    request_body_within_bounds,
+)
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.utils import event_from_exception
-
+from sentry_sdk.utils import AnnotatedValue, event_from_exception
 
 if MYPY:
     from typing import Any, Dict
@@ -13,6 +17,7 @@ if MYPY:
 
 try:
     from starlette.applications import Starlette
+    from starlette.datastructures import UploadFile
     from starlette.middleware import Middleware
     from starlette.requests import Request
 except ImportError:
@@ -106,7 +111,7 @@ def _patch_exception_middleware():
 def _make_request_event_processor(req, integration):
     # TODO: add types
 
-    async def inner(event, hint):
+    def inner(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         from starlette.routing import Match
 
@@ -120,10 +125,104 @@ def _make_request_event_processor(req, integration):
                 elif integration.transaction_style == "url":  # url low cardinality
                     event["transaction"] = route.path
 
-        # TODO(anton) put request extractor here.
         return event
 
     return inner
+
+
+# TODO: derive from wsgi common request extractor?
+class StarletteRequestExtractor:
+    def __init__(self, request):
+        # type: (Any) -> None
+        self.request = request
+
+    async def extract_request_info(self):
+        # type: (Dict[str, Any]) -> Any
+        client = Hub.current.client
+        if client is None:
+            return
+
+        # TODO: create nice dictonary with all data liek in _wsgi_common extract_into_event()
+        # TODO: merge _make_request_event_processor into _make_request_event_processor_xx
+        # TODO: clean up _make_request_event_processor_xx to get verything from bla variable (rename it of course)
+
+        data = None
+
+        content_length = await self.content_length()
+        request_info = {}
+
+        if _should_send_default_pii():
+            request_info["cookies"] = self.cookies()
+
+        if not request_body_within_bounds(client, content_length):
+            data = AnnotatedValue(
+                "",
+                {"rem": [["!config", "x", 0, content_length]], "len": content_length},
+            )
+        else:
+            parsed_body = await self.parsed_body()
+            if parsed_body is not None:
+                data = parsed_body
+            elif await self.raw_data():
+                data = AnnotatedValue(
+                    "",
+                    {"rem": [["!raw", "x", 0, content_length]], "len": content_length},
+                )
+            else:
+                data = None
+
+        if data is not None:
+            request_info["data"] = data
+
+        return request_info
+
+    async def content_length(self):
+        raw_data = await self.raw_data()
+        if raw_data is None:
+            return 0
+        return len(raw_data)
+
+    def cookies(self):
+        return self.request.cookies
+
+    async def raw_data(self):
+        return await self.request.body()
+
+    async def form(self):
+        """
+        curl -X POST http://localhost:8000/upload/somethign -H "Content-Type: application/x-www-form-urlencoded" -d "username=kevin&password=welcome123"
+        curl -X POST http://localhost:8000/upload/somethign  -F username=Julian -F password=hello123
+        """
+        return await self.request.form()
+
+    def is_json(self):
+        return _is_json_content_type(self.request.headers.get("content-type"))
+
+    async def json(self):
+        """
+        curl -X POST localhost:8000/upload/something -H 'Content-Type: application/json' -d '{"login":"my_login","password":"my_password"}'
+        """
+        return await self.request.json()
+
+    async def parsed_body(self):
+        """
+        curl -X POST http://localhost:8000/upload/somethign  -F username=Julian -F password=hello123 -F photo=@photo.jpg
+        """
+        form = await self.form()
+        if form:
+            data = {}
+            for key, val in iteritems(form):
+                if isinstance(val, UploadFile):
+                    size = len(await val.read())
+                    data[key] = AnnotatedValue(
+                        "", {"len": size, "rem": [["!raw", "x", 0, size]]}
+                    )
+                else:
+                    data[key] = val
+
+            return data
+
+        return await self.json()
 
 
 class SentryStarletteMiddleware(SentryAsgiMiddleware):
@@ -131,6 +230,7 @@ class SentryStarletteMiddleware(SentryAsgiMiddleware):
         self.app = app
 
     async def __call__(self, scope, receive, send):
+        print("~~~ running SentryStarletteMiddleware")
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -143,9 +243,24 @@ class SentryStarletteMiddleware(SentryAsgiMiddleware):
         with hub.configure_scope() as sentry_scope:
             request = Request(scope, receive=receive, send=send)
 
+            extractor = StarletteRequestExtractor(request)
+            info = await extractor.extract_request_info()
+
+            def _make_request_event_processor_xx(req, integration):
+                def inner(event, hint):
+                    # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+                    request_info = event.get("request", {})
+                    request_info["cookies"] = info["cookies"]
+                    request_info["data"] = info["data"]
+                    event["request"] = request_info
+
+                    return event
+
+                return inner
+
             sentry_scope._name = StarletteIntegration.identifier
             sentry_scope.add_event_processor(
-                _make_request_event_processor(request, integration)
+                _make_request_event_processor_xx(request, integration)
             )
 
             await self.app(scope, receive, send)
