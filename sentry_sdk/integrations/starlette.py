@@ -20,6 +20,7 @@ try:
     from starlette.datastructures import UploadFile
     from starlette.middleware import Middleware
     from starlette.requests import Request
+    from starlette.routing import Match
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
 
@@ -108,28 +109,6 @@ def _patch_exception_middleware():
     ExceptionMiddleware.http_exception = sentry_patched_http_exception
 
 
-def _make_request_event_processor(req, integration):
-    # TODO: add types
-
-    def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-        from starlette.routing import Match
-
-        router = req.scope["router"]
-
-        for route in router.routes:
-            match = route.matches(req.scope)
-            if match[0] == Match.FULL:
-                if integration.transaction_style == "endpoint":  # function name
-                    event["transaction"] = match[1]["endpoint"].__name__
-                elif integration.transaction_style == "url":  # url low cardinality
-                    event["transaction"] = route.path
-
-        return event
-
-    return inner
-
-
 # TODO: derive from wsgi common request extractor?
 class StarletteRequestExtractor:
     def __init__(self, request):
@@ -141,10 +120,6 @@ class StarletteRequestExtractor:
         client = Hub.current.client
         if client is None:
             return
-
-        # TODO: create nice dictonary with all data liek in _wsgi_common extract_into_event()
-        # TODO: merge _make_request_event_processor into _make_request_event_processor_xx
-        # TODO: clean up _make_request_event_processor_xx to get verything from bla variable (rename it of course)
 
         data = None
 
@@ -202,6 +177,9 @@ class StarletteRequestExtractor:
         """
         curl -X POST localhost:8000/upload/something -H 'Content-Type: application/json' -d '{"login":"my_login","password":"my_password"}'
         """
+        if not self.is_json():
+            return None
+
         return await self.request.json()
 
     async def parsed_body(self):
@@ -246,13 +224,28 @@ class SentryStarletteMiddleware(SentryAsgiMiddleware):
             extractor = StarletteRequestExtractor(request)
             info = await extractor.extract_request_info()
 
-            def _make_request_event_processor_xx(req, integration):
+            def _make_request_event_processor(req, integration):
                 def inner(event, hint):
                     # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+
+                    # Extract information from request
                     request_info = event.get("request", {})
-                    request_info["cookies"] = info["cookies"]
-                    request_info["data"] = info["data"]
+                    if info:
+                        if "cookies" in info:
+                            request_info["cookies"] = info["cookies"]
+                        if "data" in info:
+                            request_info["data"] = info["data"]
                     event["request"] = request_info
+
+                    # Set transaction name
+                    router = req.scope["router"]
+                    for route in router.routes:
+                        match = route.matches(req.scope)
+                        if match[0] == Match.FULL:
+                            if integration.transaction_style == "endpoint":
+                                event["transaction"] = match[1]["endpoint"].__name__
+                            elif integration.transaction_style == "url":
+                                event["transaction"] = route.path
 
                     return event
 
@@ -260,7 +253,7 @@ class SentryStarletteMiddleware(SentryAsgiMiddleware):
 
             sentry_scope._name = StarletteIntegration.identifier
             sentry_scope.add_event_processor(
-                _make_request_event_processor_xx(request, integration)
+                _make_request_event_processor(request, integration)
             )
 
             await self.app(scope, receive, send)
