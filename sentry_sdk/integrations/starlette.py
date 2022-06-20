@@ -44,42 +44,77 @@ class StarletteIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-
-        old_app = Starlette.__call__
-
-        async def sentry_patched_asgi_app(self, scope, receive, send):
-            # type: (Any, Any, Any, Any) -> Any
-            # TODO(neel): cleanup types
-            if Hub.current.get_integration(StarletteIntegration) is None:
-                return await old_app(self, scope, receive, send)
-
-            # TODO(anton): make only call to SentryStarletteMiddleware and ditch the _sentry_build_middleware_stack patching.
-            middleware = SentryAsgiMiddleware(
-                lambda *a, **kw: old_app(self, *a, **kw),
-                mechanism_type=StarletteIntegration.identifier,
-            )
-            middleware.__call__ = middleware._run_asgi3
-            return await middleware(scope, receive, send)
-
-        Starlette.__call__ = sentry_patched_asgi_app
+        _patch_middlewares()
+        _patch_asgi_app()
         _patch_exception_middleware()
 
-        original_build_middleware_stack = Starlette.build_middleware_stack
 
-        def _sentry_build_middleware_stack(self):
-            app = original_build_middleware_stack(self)
+def _patch_onle_middleware(cls):
+    original_call = cls.__call__
 
-            middleware = [
-                Middleware(
-                    SentryStarletteMiddleware,
-                )
-            ]
-            for cls, options in reversed(middleware):
-                app = cls(app=app, **options)
+    async def _sentry_call(self, *args, **kwargs):
+        hub = Hub.current
+        integration = hub.get_integration(StarletteIntegration)
+        if integration is not None:
+            middleware_name = self.__class__.__name__
+            with hub.start_span(
+                op="starlette.middleware", description=middleware_name
+            ) as middleware_span:
+                middleware_span.set_tag("starlette.middleware_name", middleware_name)
+                await original_call(self, *args, **kwargs)
 
-            return app
+        else:
+            await original_call(self, *args, **kwargs)
 
-        Starlette.build_middleware_stack = _sentry_build_middleware_stack
+    cls.__call__ = _sentry_call
+
+    return cls
+
+
+def _patch_middlewares():
+    original_middleware_init = Middleware.__init__
+
+    def _sentry_middleware_init(self, cls, **options):
+        patched_cls = _patch_onle_middleware(cls)
+        original_middleware_init(self, patched_cls, **options)
+
+    Middleware.__init__ = _sentry_middleware_init
+
+    original_build_middleware_stack = Starlette.build_middleware_stack
+
+    def _sentry_build_middleware_stack(self):
+        app = original_build_middleware_stack(self)
+
+        middleware = [
+            Middleware(
+                SentryStarletteMiddleware,
+            )
+        ]
+        for cls, options in reversed(middleware):
+            app = cls(app=app, **options)
+
+        return app
+
+    Starlette.build_middleware_stack = _sentry_build_middleware_stack
+
+
+def _patch_asgi_app():
+    old_app = Starlette.__call__
+
+    async def _sentry_patched_asgi_app(self, scope, receive, send):
+        # type: (Any, Any, Any, Any) -> Any
+        # TODO(neel): cleanup types
+        if Hub.current.get_integration(StarletteIntegration) is None:
+            return await old_app(self, scope, receive, send)
+
+        middleware = SentryAsgiMiddleware(
+            lambda *a, **kw: old_app(self, *a, **kw),
+            mechanism_type=StarletteIntegration.identifier,
+        )
+        middleware.__call__ = middleware._run_asgi3
+        return await middleware(scope, receive, send)
+
+    Starlette.__call__ = _sentry_patched_asgi_app
 
 
 def _capture_exception(exception, handled=False):
@@ -109,7 +144,6 @@ def _patch_exception_middleware():
     ExceptionMiddleware.http_exception = sentry_patched_http_exception
 
 
-# TODO: derive from wsgi common request extractor?
 class StarletteRequestExtractor:
     def __init__(self, request):
         # type: (Any) -> None
@@ -208,7 +242,6 @@ class SentryStarletteMiddleware(SentryAsgiMiddleware):
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        print("~~~ running SentryStarletteMiddleware")
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
