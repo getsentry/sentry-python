@@ -48,11 +48,14 @@ class StarletteIntegration(Integration):
         _patch_asgi_app()
         _patch_exception_middleware()
 
+        # TODO: patch out middleware
+        # TODO: check if transaction naming is working for errors and traces for both naming types (url and function)
 
-def _patch_onle_middleware(cls):
-    original_call = cls.__call__
 
-    async def _sentry_call(self, *args, **kwargs):
+def _enable_span_for_middleware(cls):
+    old_call = cls.__call__
+
+    async def create_span_call(self, *args, **kwargs):
         hub = Hub.current
         integration = hub.get_integration(StarletteIntegration)
         if integration is not None:
@@ -61,29 +64,38 @@ def _patch_onle_middleware(cls):
                 op="starlette.middleware", description=middleware_name
             ) as middleware_span:
                 middleware_span.set_tag("starlette.middleware_name", middleware_name)
-                await original_call(self, *args, **kwargs)
+
+                await old_call(self, *args, **kwargs)
 
         else:
-            await original_call(self, *args, **kwargs)
+            await old_call(self, *args, **kwargs)
 
-    cls.__call__ = _sentry_call
+    cls.__call__ = create_span_call
 
     return cls
 
 
 def _patch_middlewares():
-    original_middleware_init = Middleware.__init__
+    """
+    Patches Starlettes `Middleware` class to record
+    spans for every middleware invoked.
+    """
+    old_middleware_init = Middleware.__init__
 
     def _sentry_middleware_init(self, cls, **options):
-        patched_cls = _patch_onle_middleware(cls)
-        original_middleware_init(self, patched_cls, **options)
+        span_enabled_cls = _enable_span_for_middleware(cls)
+        old_middleware_init(self, span_enabled_cls, **options)
 
     Middleware.__init__ = _sentry_middleware_init
 
-    original_build_middleware_stack = Starlette.build_middleware_stack
+    old_build_middleware_stack = Starlette.build_middleware_stack
 
     def _sentry_build_middleware_stack(self):
-        app = original_build_middleware_stack(self)
+        """
+        Adds `SentryStarletteMiddleware` to the
+        middleware stack of the Starlette application.
+        """
+        app = old_build_middleware_stack(self)
 
         middleware = [
             Middleware(
@@ -99,6 +111,9 @@ def _patch_middlewares():
 
 
 def _patch_asgi_app():
+    """
+    Instrument Starlette ASGI app using the SentryAsgiMiddleware.
+    """
     old_app = Starlette.__call__
 
     async def _sentry_patched_asgi_app(self, scope, receive, send):
@@ -133,6 +148,9 @@ def _capture_exception(exception, handled=False):
 
 
 def _patch_exception_middleware():
+    """
+    Patches `ExceptionMiddleware` to capture all exceptions in Starlette app.
+    """
     from starlette.exceptions import ExceptionMiddleware
 
     old_http_exception = ExceptionMiddleware.http_exception
@@ -145,6 +163,11 @@ def _patch_exception_middleware():
 
 
 class StarletteRequestExtractor:
+    """
+    Extracts useful information from the Starlette request
+    (like form data or cookies) and adds it to the Sentry event.
+    """
+
     def __init__(self, request):
         # type: (Any) -> None
         self.request = request
