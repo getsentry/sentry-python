@@ -147,6 +147,33 @@ def _capture_exception(exception, handled=False):
     hub.capture_event(event, hint=hint)
 
 
+def _add_user_to_sentry_scope(scope):
+    if "user" not in scope:
+        return
+
+    hub = Hub.current
+    if hub.get_integration(StarletteIntegration) is None:
+        return
+
+    with hub.configure_scope() as sentry_scope:
+        user_info = {}
+        starlette_user = scope["user"]
+
+        username = getattr(starlette_user, "username", None)
+        if username:
+            user_info.setdefault("username", starlette_user.username)
+
+        user_id = getattr(starlette_user, "id", None)
+        if user_id:
+            user_info.setdefault("id", starlette_user.id)
+
+        email = getattr(starlette_user, "email", None)
+        if email:
+            user_info.setdefault("email", starlette_user.email)
+
+        sentry_scope.user = user_info
+
+
 def _patch_exception_middleware():
     """
     Patches `ExceptionMiddleware` to capture all exceptions in Starlette app.
@@ -160,6 +187,14 @@ def _patch_exception_middleware():
         return old_http_exception(self, request, exc)
 
     ExceptionMiddleware.http_exception = sentry_patched_http_exception
+
+    old_call = ExceptionMiddleware.__call__
+
+    async def sentry_exceptionmiddleware_call(self, *args, **kwargs):
+        _add_user_to_sentry_scope(args[0])
+        await old_call(self, *args, **kwargs)
+
+    ExceptionMiddleware.__call__ = sentry_exceptionmiddleware_call
 
 
 class StarletteRequestExtractor:
@@ -294,14 +329,15 @@ class SentryStarletteMiddleware(SentryAsgiMiddleware):
                     event["request"] = request_info
 
                     # Set transaction name
-                    router = req.scope["router"]
-                    for route in router.routes:
-                        match = route.matches(req.scope)
-                        if match[0] == Match.FULL:
-                            if integration.transaction_style == "endpoint":
-                                event["transaction"] = match[1]["endpoint"].__name__
-                            elif integration.transaction_style == "url":
-                                event["transaction"] = route.path
+                    if "router" in req.scope:
+                        router = req.scope["router"]
+                        for route in router.routes:
+                            match = route.matches(req.scope)
+                            if match[0] == Match.FULL:
+                                if integration.transaction_style == "endpoint":
+                                    event["transaction"] = match[1]["endpoint"].__name__
+                                elif integration.transaction_style == "url":
+                                    event["transaction"] = route.path
 
                     return event
 
