@@ -111,7 +111,7 @@ jobs:
           codecov --file coverage.xml
 
   build_lambda_layer:
-    name: Build AWS Lambda Layer
+    name: Build AWS Lambda Layer and Python Package
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -142,6 +142,11 @@ jobs:
           zip_file_name: sentry-python-serverless-${{ env.SDK_VERSION }}.zip
           build_cache_paths: ${{ env.CACHED_BUILD_PATHS }}
           build_cache_key: ${{ env.BUILD_CACHE_KEY }}
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.sha }}
+          path: |
+            dist/*
 
   docs:
     name: Build SDK API Doc
