@@ -12,7 +12,7 @@ from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.utils import AnnotatedValue, event_from_exception
 
 if MYPY:
-    from typing import Any, Dict
+    from typing import Any, Awaitable, Callable, Dict, Optional
 
 
 try:
@@ -44,18 +44,20 @@ class StarletteIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        _patch_middlewares()
-        _patch_asgi_app()
-        _patch_exception_middleware()
+        patch_middlewares()
+        patch_asgi_app()
+        patch_exception_middleware()
 
         # TODO: patch out middleware
         # TODO: check if transaction naming is working for errors and traces for both naming types (url and function)
 
 
 def _enable_span_for_middleware(cls):
+    # type: (type) -> type
     old_call = cls.__call__
 
-    async def create_span_call(self, *args, **kwargs):
+    async def create_span_call(self, scope, receive, send):
+        # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
         hub = Hub.current
         integration = hub.get_integration(StarletteIntegration)
         if integration is not None:
@@ -65,17 +67,18 @@ def _enable_span_for_middleware(cls):
             ) as middleware_span:
                 middleware_span.set_tag("starlette.middleware_name", middleware_name)
 
-                await old_call(self, *args, **kwargs)
+                await old_call(self, scope, receive, send)
 
         else:
-            await old_call(self, *args, **kwargs)
+            await old_call(self, scope, receive, send)
 
     cls.__call__ = create_span_call
 
     return cls
 
 
-def _patch_middlewares():
+def patch_middlewares():
+    # type: () -> None
     """
     Patches Starlettes `Middleware` class to record
     spans for every middleware invoked.
@@ -83,6 +86,7 @@ def _patch_middlewares():
     old_middleware_init = Middleware.__init__
 
     def _sentry_middleware_init(self, cls, **options):
+        # type: (Any, Any, Any) -> None
         span_enabled_cls = _enable_span_for_middleware(cls)
         old_middleware_init(self, span_enabled_cls, **options)
 
@@ -91,34 +95,27 @@ def _patch_middlewares():
     old_build_middleware_stack = Starlette.build_middleware_stack
 
     def _sentry_build_middleware_stack(self):
+        # type: (Callable[..., Any]) -> Callable[..., Any]
         """
         Adds `SentryStarletteMiddleware` to the
         middleware stack of the Starlette application.
         """
         app = old_build_middleware_stack(self)
-
-        middleware = [
-            Middleware(
-                SentryStarletteMiddleware,
-            )
-        ]
-        for cls, options in reversed(middleware):
-            app = cls(app=app, **options)
-
+        app = SentryStarletteMiddleware(app=app)
         return app
 
     Starlette.build_middleware_stack = _sentry_build_middleware_stack
 
 
-def _patch_asgi_app():
+def patch_asgi_app():
+    # type: () -> None
     """
     Instrument Starlette ASGI app using the SentryAsgiMiddleware.
     """
     old_app = Starlette.__call__
 
     async def _sentry_patched_asgi_app(self, scope, receive, send):
-        # type: (Any, Any, Any, Any) -> Any
-        # TODO(neel): cleanup types
+        # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
         if Hub.current.get_integration(StarletteIntegration) is None:
             return await old_app(self, scope, receive, send)
 
@@ -140,7 +137,7 @@ def _capture_exception(exception, handled=False):
 
     event, hint = event_from_exception(
         exception,
-        client_options=hub.client.options,
+        client_options=hub.client.options if hub.client else None,
         mechanism={"type": StarletteIntegration.identifier, "handled": handled},
     )
 
@@ -148,6 +145,11 @@ def _capture_exception(exception, handled=False):
 
 
 def _add_user_to_sentry_scope(scope):
+    # type: (Dict[str, Any]) -> None
+    """
+    Extracts user information from the ASGI scope and
+    adds it to Sentry's scope.
+    """
     if "user" not in scope:
         return
 
@@ -156,7 +158,7 @@ def _add_user_to_sentry_scope(scope):
         return
 
     with hub.configure_scope() as sentry_scope:
-        user_info = {}
+        user_info = {}  # type: Dict[str, Any]
         starlette_user = scope["user"]
 
         username = getattr(starlette_user, "username", None)
@@ -174,15 +176,18 @@ def _add_user_to_sentry_scope(scope):
         sentry_scope.user = user_info
 
 
-def _patch_exception_middleware():
+def patch_exception_middleware():
+    # type: () -> None
     """
-    Patches `ExceptionMiddleware` to capture all exceptions in Starlette app.
+    Capture all exceptions in Starlette app and
+    also extract user information.
     """
     from starlette.exceptions import ExceptionMiddleware
 
     old_http_exception = ExceptionMiddleware.http_exception
 
     def sentry_patched_http_exception(self, request, exc):
+        # type: (Any, Any, Any) -> None
         _capture_exception(exc, handled=True)
         return old_http_exception(self, request, exc)
 
@@ -190,9 +195,10 @@ def _patch_exception_middleware():
 
     old_call = ExceptionMiddleware.__call__
 
-    async def sentry_exceptionmiddleware_call(self, *args, **kwargs):
-        _add_user_to_sentry_scope(args[0])
-        await old_call(self, *args, **kwargs)
+    async def sentry_exceptionmiddleware_call(self, scope, receive, send):
+        # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
+        _add_user_to_sentry_scope(scope)
+        await old_call(self, scope, receive, send)
 
     ExceptionMiddleware.__call__ = sentry_exceptionmiddleware_call
 
@@ -203,15 +209,17 @@ class StarletteRequestExtractor:
     (like form data or cookies) and adds it to the Sentry event.
     """
 
+    request = None  # type: Request
+
     def __init__(self, request):
-        # type: (Any) -> None
+        # type: (StarletteRequestExtractor, Request) -> None
         self.request = request
 
     async def extract_request_info(self):
-        # type: (Dict[str, Any]) -> Any
+        # type: (StarletteRequestExtractor) -> Optional[Dict[str, Any]]
         client = Hub.current.client
         if client is None:
-            return
+            return None
 
         data = None
 
@@ -244,18 +252,22 @@ class StarletteRequestExtractor:
         return request_info
 
     async def content_length(self):
+        # type: (StarletteRequestExtractor) -> int
         raw_data = await self.raw_data()
         if raw_data is None:
             return 0
         return len(raw_data)
 
     def cookies(self):
+        # type: (StarletteRequestExtractor) -> Dict[str, Any]
         return self.request.cookies
 
     async def raw_data(self):
+        # type: (StarletteRequestExtractor) -> Any
         return await self.request.body()
 
     async def form(self):
+        # type: (StarletteRequestExtractor) -> Any
         """
         curl -X POST http://localhost:8000/upload/somethign -H "Content-Type: application/x-www-form-urlencoded" -d "username=kevin&password=welcome123"
         curl -X POST http://localhost:8000/upload/somethign  -F username=Julian -F password=hello123
@@ -263,9 +275,11 @@ class StarletteRequestExtractor:
         return await self.request.form()
 
     def is_json(self):
+        # type: (StarletteRequestExtractor) -> bool
         return _is_json_content_type(self.request.headers.get("content-type"))
 
     async def json(self):
+        # type: (StarletteRequestExtractor) -> Optional[Dict[str, Any]]
         """
         curl -X POST localhost:8000/upload/something -H 'Content-Type: application/json' -d '{"login":"my_login","password":"my_password"}'
         """
@@ -275,6 +289,7 @@ class StarletteRequestExtractor:
         return await self.request.json()
 
     async def parsed_body(self):
+        # type: (StarletteRequestExtractor) -> Any
         """
         curl -X POST http://localhost:8000/upload/somethign  -F username=Julian -F password=hello123 -F photo=@photo.jpg
         """
@@ -297,9 +312,11 @@ class StarletteRequestExtractor:
 
 class SentryStarletteMiddleware(SentryAsgiMiddleware):
     def __init__(self, app, dispatch=None):
+        # type: (SentryStarletteMiddleware, Any) -> None
         self.app = app
 
     async def __call__(self, scope, receive, send):
+        # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> Any
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -316,6 +333,7 @@ class SentryStarletteMiddleware(SentryAsgiMiddleware):
             info = await extractor.extract_request_info()
 
             def _make_request_event_processor(req, integration):
+                # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
                 def inner(event, hint):
                     # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
 
