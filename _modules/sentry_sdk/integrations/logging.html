@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>sentry_sdk.integrations.logging &#8212; sentry-python 1.5.12 documentation</title>
+    <title>sentry_sdk.integrations.logging &#8212; sentry-python 1.6.0 documentation</title>
     <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css" />
     <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
@@ -57,6 +57,16 @@
 
 <span class="n">DEFAULT_LEVEL</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span>
 <span class="n">DEFAULT_EVENT_LEVEL</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">ERROR</span>
+<span class="n">LOGGING_TO_EVENT_LEVEL</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">NOTSET</span><span class="p">:</span> <span class="s2">&quot;notset&quot;</span><span class="p">,</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">:</span> <span class="s2">&quot;debug&quot;</span><span class="p">,</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">:</span> <span class="s2">&quot;info&quot;</span><span class="p">,</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">WARN</span><span class="p">:</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>  <span class="c1"># WARN is same a WARNING</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">:</span> <span class="s2">&quot;warning&quot;</span><span class="p">,</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">ERROR</span><span class="p">:</span> <span class="s2">&quot;error&quot;</span><span class="p">,</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">FATAL</span><span class="p">:</span> <span class="s2">&quot;fatal&quot;</span><span class="p">,</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">CRITICAL</span><span class="p">:</span> <span class="s2">&quot;fatal&quot;</span><span class="p">,</span>  <span class="c1"># CRITICAL is same as FATAL</span>
+<span class="p">}</span>
 
 <span class="c1"># Capturing events from those loggers causes recursion errors. We cannot allow</span>
 <span class="c1"># the user to unconditionally create events from those loggers under any</span>
@@ -143,7 +153,7 @@
     <span class="c1"># type: (LogRecord) -&gt; Dict[str, Any]</span>
     <span class="k">return</span> <span class="p">{</span>
         <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;log&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">),</span>
+        <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="p">),</span>
         <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
         <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">message</span><span class="p">,</span>
         <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcfromtimestamp</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">created</span><span class="p">),</span>
@@ -151,9 +161,11 @@
     <span class="p">}</span>
 
 
-<span class="k">def</span> <span class="nf">_logging_to_event_level</span><span class="p">(</span><span class="n">levelname</span><span class="p">):</span>
-    <span class="c1"># type: (str) -&gt; str</span>
-    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;critical&quot;</span><span class="p">:</span> <span class="s2">&quot;fatal&quot;</span><span class="p">}</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">levelname</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="n">levelname</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
+<span class="k">def</span> <span class="nf">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+    <span class="c1"># type: (LogRecord) -&gt; str</span>
+    <span class="k">return</span> <span class="n">LOGGING_TO_EVENT_LEVEL</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+        <span class="n">record</span><span class="o">.</span><span class="n">levelno</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">levelname</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+    <span class="p">)</span>
 
 
 <span class="n">COMMON_RECORD_ATTRS</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
@@ -253,7 +265,7 @@
 
         <span class="n">hint</span><span class="p">[</span><span class="s2">&quot;log_record&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span>
 
-        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="p">)</span>
+        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
         <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
 
         <span class="c1"># Log records from `warnings` module as separate issues</span>
