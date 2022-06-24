@@ -21,6 +21,7 @@ try:
     from starlette.middleware import Middleware
     from starlette.requests import Request
     from starlette.routing import Match
+    from starlette.middleware.authentication import AuthenticationMiddleware
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
 
@@ -89,6 +90,16 @@ def patch_middlewares():
         # type: (Any, Any, Any) -> None
         span_enabled_cls = _enable_span_for_middleware(cls)
         old_middleware_init(self, span_enabled_cls, **options)
+
+        if cls == AuthenticationMiddleware:
+            old_call = cls.__call__
+
+            async def sentry_authenticationmiddleware_call(self, scope, receive, send):
+                # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
+                await old_call(self, scope, receive, send)
+                _add_user_to_sentry_scope(scope)
+
+            cls.__call__ = sentry_authenticationmiddleware_call
 
     Middleware.__init__ = _sentry_middleware_init
 
@@ -192,15 +203,6 @@ def patch_exception_middleware():
         return old_http_exception(self, request, exc)
 
     ExceptionMiddleware.http_exception = sentry_patched_http_exception
-
-    old_call = ExceptionMiddleware.__call__
-
-    async def sentry_exceptionmiddleware_call(self, scope, receive, send):
-        # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
-        _add_user_to_sentry_scope(scope)
-        await old_call(self, scope, receive, send)
-
-    ExceptionMiddleware.__call__ = sentry_exceptionmiddleware_call
 
 
 class StarletteRequestExtractor:
