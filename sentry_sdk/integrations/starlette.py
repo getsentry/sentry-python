@@ -18,10 +18,11 @@ if MYPY:
 try:
     from starlette.applications import Starlette
     from starlette.datastructures import UploadFile
+    from starlette.exceptions import ExceptionMiddleware
     from starlette.middleware import Middleware
+    from starlette.middleware.authentication import AuthenticationMiddleware
     from starlette.requests import Request
     from starlette.routing import Match
-    from starlette.middleware.authentication import AuthenticationMiddleware
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
 
@@ -47,35 +48,109 @@ class StarletteIntegration(Integration):
         # type: () -> None
         patch_middlewares()
         patch_asgi_app()
-        patch_exception_middleware()
-
-        # TODO: patch out middleware
-        # TODO: check if transaction naming is working for errors and traces for both naming types (url and function)
 
 
-def _enable_span_for_middleware(cls):
+def _enable_span_for_middleware(middleware_class):
     # type: (type) -> type
-    old_call = cls.__call__
+    old_call = middleware_class.__call__
 
-    async def create_span_call(self, scope, receive, send):
-        # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
+    async def create_span_call(*args, **kwargs):
+        # type: (Any, Any) -> None
         hub = Hub.current
         integration = hub.get_integration(StarletteIntegration)
         if integration is not None:
-            middleware_name = self.__class__.__name__
+            middleware_name = args[0].__class__.__name__
             with hub.start_span(
                 op="starlette.middleware", description=middleware_name
             ) as middleware_span:
                 middleware_span.set_tag("starlette.middleware_name", middleware_name)
 
-                await old_call(self, scope, receive, send)
+                await old_call(*args, **kwargs)
 
         else:
-            await old_call(self, scope, receive, send)
+            await old_call(*args, **kwargs)
 
-    cls.__call__ = create_span_call
+    middleware_class.__call__ = create_span_call
 
-    return cls
+    return middleware_class
+
+
+def _capture_exception(exception, handled=False):
+    # type: (BaseException, **Any) -> None
+    hub = Hub.current
+    if hub.get_integration(StarletteIntegration) is None:
+        return
+
+    event, hint = event_from_exception(
+        exception,
+        client_options=hub.client.options if hub.client else None,
+        mechanism={"type": StarletteIntegration.identifier, "handled": handled},
+    )
+
+    hub.capture_event(event, hint=hint)
+
+
+def patch_exception_middleware(middleware_class):
+    # type: (Any) -> None
+    """
+    Capture all exceptions in Starlette app and
+    also extract user information.
+    """
+    old_http_exception = middleware_class.http_exception
+
+    def sentry_patched_http_exception(self, request, exc):
+        # type: (Any, Any, Any) -> None
+        _capture_exception(exc, handled=True)
+        return old_http_exception(self, request, exc)
+
+    middleware_class.http_exception = sentry_patched_http_exception
+
+
+def _add_user_to_sentry_scope(scope):
+    # type: (Dict[str, Any]) -> None
+    """
+    Extracts user information from the ASGI scope and
+    adds it to Sentry's scope.
+    """
+    if "user" not in scope:
+        return
+
+    hub = Hub.current
+    if hub.get_integration(StarletteIntegration) is None:
+        return
+
+    with hub.configure_scope() as sentry_scope:
+        user_info = {}  # type: Dict[str, Any]
+        starlette_user = scope["user"]
+
+        username = getattr(starlette_user, "username", None)
+        if username:
+            user_info.setdefault("username", starlette_user.username)
+
+        user_id = getattr(starlette_user, "id", None)
+        if user_id:
+            user_info.setdefault("id", starlette_user.id)
+
+        email = getattr(starlette_user, "email", None)
+        if email:
+            user_info.setdefault("email", starlette_user.email)
+
+        sentry_scope.user = user_info
+
+
+def patch_authentication_middleware(middleware_class):
+    # type: (Any) -> None
+    """
+    Add user information to Sentry scope.
+    """
+    old_call = middleware_class.__call__
+
+    async def sentry_authenticationmiddleware_call(self, scope, receive, send):
+        # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
+        await old_call(self, scope, receive, send)
+        _add_user_to_sentry_scope(scope)
+
+    middleware_class.__call__ = sentry_authenticationmiddleware_call
 
 
 def patch_middlewares():
@@ -92,14 +167,10 @@ def patch_middlewares():
         old_middleware_init(self, span_enabled_cls, **options)
 
         if cls == AuthenticationMiddleware:
-            old_call = cls.__call__
+            patch_authentication_middleware(cls)
 
-            async def sentry_authenticationmiddleware_call(self, scope, receive, send):
-                # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
-                await old_call(self, scope, receive, send)
-                _add_user_to_sentry_scope(scope)
-
-            cls.__call__ = sentry_authenticationmiddleware_call
+        if cls == ExceptionMiddleware:
+            patch_exception_middleware(cls)
 
     Middleware.__init__ = _sentry_middleware_init
 
@@ -138,71 +209,6 @@ def patch_asgi_app():
         return await middleware(scope, receive, send)
 
     Starlette.__call__ = _sentry_patched_asgi_app
-
-
-def _capture_exception(exception, handled=False):
-    # type: (BaseException, **Any) -> None
-    hub = Hub.current
-    if hub.get_integration(StarletteIntegration) is None:
-        return
-
-    event, hint = event_from_exception(
-        exception,
-        client_options=hub.client.options if hub.client else None,
-        mechanism={"type": StarletteIntegration.identifier, "handled": handled},
-    )
-
-    hub.capture_event(event, hint=hint)
-
-
-def _add_user_to_sentry_scope(scope):
-    # type: (Dict[str, Any]) -> None
-    """
-    Extracts user information from the ASGI scope and
-    adds it to Sentry's scope.
-    """
-    if "user" not in scope:
-        return
-
-    hub = Hub.current
-    if hub.get_integration(StarletteIntegration) is None:
-        return
-
-    with hub.configure_scope() as sentry_scope:
-        user_info = {}  # type: Dict[str, Any]
-        starlette_user = scope["user"]
-
-        username = getattr(starlette_user, "username", None)
-        if username:
-            user_info.setdefault("username", starlette_user.username)
-
-        user_id = getattr(starlette_user, "id", None)
-        if user_id:
-            user_info.setdefault("id", starlette_user.id)
-
-        email = getattr(starlette_user, "email", None)
-        if email:
-            user_info.setdefault("email", starlette_user.email)
-
-        sentry_scope.user = user_info
-
-
-def patch_exception_middleware():
-    # type: () -> None
-    """
-    Capture all exceptions in Starlette app and
-    also extract user information.
-    """
-    from starlette.exceptions import ExceptionMiddleware
-
-    old_http_exception = ExceptionMiddleware.http_exception
-
-    def sentry_patched_http_exception(self, request, exc):
-        # type: (Any, Any, Any) -> None
-        _capture_exception(exc, handled=True)
-        return old_http_exception(self, request, exc)
-
-    ExceptionMiddleware.http_exception = sentry_patched_http_exception
 
 
 class StarletteRequestExtractor:
@@ -318,7 +324,7 @@ class SentryStarletteMiddleware(SentryAsgiMiddleware):
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> Any
+        # type: (SentryStarletteMiddleware, Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> Any
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
