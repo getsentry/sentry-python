@@ -12,7 +12,7 @@ from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.utils import AnnotatedValue, event_from_exception
 
 if MYPY:
-    from typing import Any, Awaitable, Callable, Dict, Optional
+    from typing import Any, Awaitable, Callable, Dict, Optional, Union
 
 
 try:
@@ -51,10 +51,10 @@ class StarletteIntegration(Integration):
 
 
 def _enable_span_for_middleware(middleware_class):
-    # type: (type) -> type
+    # type: (Any) -> type
     old_call = middleware_class.__call__
 
-    async def create_span_call(*args, **kwargs):
+    async def _create_span_call(*args, **kwargs):
         # type: (Any, Any) -> None
         hub = Hub.current
         integration = hub.get_integration(StarletteIntegration)
@@ -70,7 +70,7 @@ def _enable_span_for_middleware(middleware_class):
         else:
             await old_call(*args, **kwargs)
 
-    middleware_class.__call__ = create_span_call
+    middleware_class.__call__ = _create_span_call
 
     return middleware_class
 
@@ -145,12 +145,12 @@ def patch_authentication_middleware(middleware_class):
     """
     old_call = middleware_class.__call__
 
-    async def sentry_authenticationmiddleware_call(self, scope, receive, send):
+    async def _sentry_authenticationmiddleware_call(self, scope, receive, send):
         # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
         await old_call(self, scope, receive, send)
         _add_user_to_sentry_scope(scope)
 
-    middleware_class.__call__ = sentry_authenticationmiddleware_call
+    middleware_class.__call__ = _sentry_authenticationmiddleware_call
 
 
 def patch_middlewares():
@@ -229,10 +229,10 @@ class StarletteRequestExtractor:
         if client is None:
             return None
 
-        data = None
+        data = None  # type: Union[Dict[str, Any], AnnotatedValue, None]
 
         content_length = await self.content_length()
-        request_info = {}
+        request_info = {}  # type: Dict[str, Any]
 
         if _should_send_default_pii():
             request_info["cookies"] = self.cookies()
