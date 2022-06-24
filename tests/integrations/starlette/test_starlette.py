@@ -91,7 +91,7 @@ class AsyncIterator:
 
 
 @pytest.mark.asyncio
-async def test_StarlettRequestExtractor_content_length(sentry_init):
+async def test_starlettrequestextractor_content_length(sentry_init):
     with mock.patch(
         "starlette.requests.Request.stream",
         return_value=AsyncIterator(json.dumps(BODY_JSON)),
@@ -103,7 +103,7 @@ async def test_StarlettRequestExtractor_content_length(sentry_init):
 
 
 @pytest.mark.asyncio
-async def test_StarlettRequestExtractor_cookies(sentry_init):
+async def test_starlettrequestextractor_cookies(sentry_init):
     starlette_request = starlette.requests.Request(SCOPE)
     extractor = StarletteRequestExtractor(starlette_request)
 
@@ -114,7 +114,7 @@ async def test_StarlettRequestExtractor_cookies(sentry_init):
 
 
 @pytest.mark.asyncio
-async def test_StarlettRequestExtractor_json(sentry_init):
+async def test_starlettrequestextractor_json(sentry_init):
     with mock.patch(
         "starlette.requests.Request.stream",
         return_value=AsyncIterator(json.dumps(BODY_JSON)),
@@ -127,7 +127,7 @@ async def test_StarlettRequestExtractor_json(sentry_init):
 
 
 @pytest.mark.asyncio
-async def test_StarlettRequestExtractor_parsed_body_json(sentry_init):
+async def test_starlettrequestextractor_parsed_body_json(sentry_init):
     with mock.patch(
         "starlette.requests.Request.stream",
         return_value=AsyncIterator(json.dumps(BODY_JSON)),
@@ -140,7 +140,7 @@ async def test_StarlettRequestExtractor_parsed_body_json(sentry_init):
 
 
 @pytest.mark.asyncio
-async def test_StarlettRequestExtractor_parsed_body_form(sentry_init):
+async def test_starlettrequestextractor_parsed_body_form(sentry_init):
     scope = SCOPE.copy()
     scope["headers"] = [
         [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
@@ -160,7 +160,7 @@ async def test_StarlettRequestExtractor_parsed_body_form(sentry_init):
 
 
 @pytest.mark.asyncio
-async def test_StarlettRequestExtractor_form(sentry_init):
+async def test_starlettrequestextractor_form(sentry_init):
     scope = SCOPE.copy()
     scope["headers"] = [
         [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
@@ -182,7 +182,7 @@ async def test_StarlettRequestExtractor_form(sentry_init):
 
 
 @pytest.mark.asyncio
-async def test_StarlettRequestExtractor_raw_data(sentry_init):
+async def test_starlettrequestextractor_raw_data(sentry_init):
     with mock.patch(
         "starlette.requests.Request.stream",
         return_value=AsyncIterator(json.dumps(BODY_JSON)),
@@ -194,7 +194,7 @@ async def test_StarlettRequestExtractor_raw_data(sentry_init):
 
 
 @pytest.mark.asyncio
-async def test_StarlettRequestExtractor_extract_request_info_too_big(sentry_init):
+async def test_starlettrequestextractor_extract_request_info_too_big(sentry_init):
     sentry_init(
         send_default_pii=True,
         integrations=[StarletteIntegration()],
@@ -226,7 +226,7 @@ async def test_StarlettRequestExtractor_extract_request_info_too_big(sentry_init
 
 
 @pytest.mark.asyncio
-async def test_StarlettRequestExtractor_extract_request_info(sentry_init):
+async def test_starlettrequestextractor_extract_request_info(sentry_init):
     sentry_init(
         send_default_pii=True,
         integrations=[StarletteIntegration()],
