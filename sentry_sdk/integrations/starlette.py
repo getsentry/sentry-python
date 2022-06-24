@@ -98,12 +98,12 @@ def patch_exception_middleware(middleware_class):
     """
     old_http_exception = middleware_class.http_exception
 
-    def sentry_patched_http_exception(self, request, exc):
+    def _sentry_patched_http_exception(self, request, exc):
         # type: (Any, Any, Any) -> None
         _capture_exception(exc, handled=True)
         return old_http_exception(self, request, exc)
 
-    middleware_class.http_exception = sentry_patched_http_exception
+    middleware_class.http_exception = _sentry_patched_http_exception
 
 
 def _add_user_to_sentry_scope(scope):
