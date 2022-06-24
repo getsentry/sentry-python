@@ -252,3 +252,43 @@ async def test_starlettrequestextractor_extract_request_info(sentry_init):
             "yummy_cookie": "choco",
         }
         assert request_info["data"] == BODY_JSON
+
+
+def test_enable_span_for_middleware(sentry_init):
+    # call _enable_span_for_middleware and then call the middleware and check if hub.start_span() was called with description=middleware_name
+    raise NotImplementedError()
+
+
+def test_capture_exception(sentry_init):
+    # make sure hub.capture_event() was called
+    raise NotImplementedError()
+
+
+def test_patch_exception_middleware(sentry_init):
+    # patch exception middleware and call it and check if _capture_exception() was called
+    raise NotImplementedError()
+
+
+def test_add_user_to_sentry_scope(sentry_init):
+    # test if all property can be extracted from asgi scope.
+    raise NotImplementedError()
+
+
+def test_patch_authentication_middleware(sentry_init):
+    # patch auth middleware and call it and make sure _add_user_to_sentry_scope() was called
+    raise NotImplementedError()
+
+
+def test_patch_middlewares(sentry_init):
+    # this is probably cumbersome to test... (which tells us, that the architecture is not the best...)
+    raise NotImplementedError()
+
+
+def test_patch_asgi_app(sentry_init):
+    # patch starlette app and make sure the app is of type SentryAsgiMiddleware now
+    raise NotImplementedError()
+
+
+def test_sentrystarlettemiddleware(sentry_init):
+    # think about how to test this.
+    raise NotImplementedError()
