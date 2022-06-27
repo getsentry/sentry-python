@@ -18,9 +18,9 @@ if MYPY:
 try:
     from starlette.applications import Starlette
     from starlette.datastructures import UploadFile
-    from starlette.exceptions import ExceptionMiddleware
     from starlette.middleware import Middleware
     from starlette.middleware.authentication import AuthenticationMiddleware
+    from starlette.middleware.exceptions import ExceptionMiddleware
     from starlette.requests import Request
     from starlette.routing import Match
 except ImportError:
