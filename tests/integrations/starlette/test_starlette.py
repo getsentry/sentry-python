@@ -257,18 +257,17 @@ async def test_starlettrequestextractor_extract_request_info(sentry_init):
 
 def starlette_app_factory():
     async def _homepage(request):
-        boom = 1 / 0
-        return starlette.responses.JSONResponse(
-            {
-                "status": "ok",
-                "value": boom,
-            }
-        )
+        1 / 0
+        return starlette.responses.JSONResponse({"status": "ok"})
+
+    async def _custom_error(request):
+        raise Exception("Too Hot")
 
     app = starlette.applications.Starlette(
         debug=True,
         routes=[
             starlette.routing.Route("/some_url", _homepage),
+            starlette.routing.Route("/custom_error", _custom_error),
         ],
     )
 
@@ -301,7 +300,38 @@ def test_transaction_naming(
     assert event["transaction"] == expected_transaction
 
 
-# Test Catch all exceptions from exceptions middleware
+@pytest.mark.parametrize(
+    "test_url,expected_error,expected_message",
+    [
+        ("/some_url", ZeroDivisionError, "division by zero"),
+        ("/custom_error", Exception, "Too Hot"),
+    ],
+)
+def test_catch_exceptions(
+    sentry_init,
+    capture_exceptions,
+    capture_events,
+    test_url,
+    expected_error,
+    expected_message,
+):
+    sentry_init(integrations=[StarletteIntegration()])
+    starlette_app = starlette_app_factory()
+    exceptions = capture_exceptions()
+    events = capture_events()
+
+    client = TestClient(starlette_app)
+    try:
+        client.get(test_url)
+    except Exception:
+        pass
+
+    (exc,) = exceptions
+    assert isinstance(exc, expected_error)
+    assert str(exc) == expected_message
+
+    (event,) = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "starlette"
 
 
 # Test Get user information from auth middleware
