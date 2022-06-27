@@ -359,6 +359,7 @@ class SentryStarletteMiddleware(SentryAsgiMiddleware):
                         router = req.scope["router"]
                         for route in router.routes:
                             match = route.matches(req.scope)
+
                             if match[0] == Match.FULL:
                                 if integration.transaction_style == "endpoint":
                                     event["transaction"] = match[1]["endpoint"].__name__

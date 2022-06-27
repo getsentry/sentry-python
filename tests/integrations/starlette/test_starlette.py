@@ -1,7 +1,7 @@
 import asyncio
+import base64
 import json
 import os
-import base64
 
 import pytest
 
@@ -17,6 +17,7 @@ from sentry_sdk.integrations.starlette import (
 from sentry_sdk.utils import AnnotatedValue
 
 starlette = pytest.importorskip("starlette")
+from starlette.testclient import TestClient
 
 PICTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "photo.jpg")
 
@@ -254,11 +255,96 @@ async def test_starlettrequestextractor_extract_request_info(sentry_init):
         assert request_info["data"] == BODY_JSON
 
 
-def test_enable_span_for_middleware(sentry_init):
+def starlette_app_factory():
+    async def _homepage(request):
+        boom = 1 / 0
+        return starlette.responses.JSONResponse(
+            {
+                "status": "ok",
+                "value": boom,
+            }
+        )
+
+    app = starlette.applications.Starlette(
+        debug=True,
+        routes=[
+            starlette.routing.Route("/some_url", _homepage),
+        ],
+    )
+
+    return app
+
+
+@pytest.mark.parametrize(
+    "transaction_style,expected_transaction",
+    [
+        ("url", "/some_url"),
+        ("endpoint", "_homepage"),
+    ],
+)
+def test_transaction_naming(
+    sentry_init, capture_events, transaction_style, expected_transaction
+):
+    sentry_init(
+        integrations=[StarletteIntegration(transaction_style=transaction_style)]
+    )
+    starlette_app = starlette_app_factory()
+    events = capture_events()
+
+    client = TestClient(starlette_app)
+    try:
+        client.get("/some_url")
+    except ZeroDivisionError:
+        pass
+
+    (event,) = events
+    assert event["transaction"] == expected_transaction
+
+
+# Test Catch all exceptions from exceptions middleware
+
+
+# Test Get user information from auth middleware
+# Test Middleware Spans for cool waterfall charts in performance
+
+
+"""
+@pytest.mark.asyncio
+async def test_enable_span_for_middleware(sentry_init):
     # call _enable_span_for_middleware and then call the middleware and check if hub.start_span() was called with description=middleware_name
+
+    from sentry_sdk.integrations.starlette import _enable_span_for_middleware
+
+    app = starlette.applications.Starlette()
+
+    async def receive():
+        pass
+
+    async def send(event):
+        pass
+
+    old_app = starlette.applications.Starlette.__call__
+
+    import ipdb
+
+    ipdb.set_trace()
+    middleware = starlette.middleware.errors.ServerErrorMiddleware(
+        lambda *a, **kw: old_app(app, *a, **kw),
+    )
+    _enable_span_for_middleware(middleware)
+
+    with mock.patch("sentry_sdk.hub.Hub.start_span") as mocked_start_span:
+        await middleware(SCOPE, receive, send)
+
+        mocked_start_span.assert_called_once_with(
+            "starlette.middleware_name", "ServerErrorMiddleware"
+        )
+
     raise NotImplementedError()
+"""
 
 
+"""
 def test_capture_exception(sentry_init):
     # make sure hub.capture_event() was called
     raise NotImplementedError()
@@ -292,3 +378,4 @@ def test_patch_asgi_app(sentry_init):
 def test_sentrystarlettemiddleware(sentry_init):
     # think about how to test this.
     raise NotImplementedError()
+"""
