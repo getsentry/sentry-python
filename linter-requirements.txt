@@ -1,7 +1,7 @@
 black==22.3.0
 flake8==3.9.2
 flake8-import-order==0.18.1
-mypy==0.950
+mypy==0.961
 types-certifi
 types-redis
 types-setuptools
