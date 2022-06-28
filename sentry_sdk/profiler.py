@@ -83,10 +83,6 @@ class Sampler(object):
         #print('j')
         signal.setitimer(signal.ITIMER_VIRTUAL, self.interval)
 
-    def _format_frame(self, frame):
-        return '{}({})'.format(frame.f_code.co_name,
-                               frame.f_globals.get('__name__'))
-
     def samples(self):
         return len(self._stack_samples)
 
