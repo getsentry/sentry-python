@@ -146,7 +146,7 @@ def setup_integrations(
     return integrations
 
 
-class DidNotEnable(Exception):
+class DidNotEnable(Exception):  # noqa: N818
     """
     The integration could not be enabled due to a trivial user error like
     `flask` not being installed for the `FlaskIntegration`.
