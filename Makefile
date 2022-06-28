@@ -9,7 +9,7 @@ help:
 	@echo "make test: Run basic tests (not testing most integrations)"
 	@echo "make test-all: Run ALL tests (slow, closest to CI)"
 	@echo "make format: Run code formatters (destructive)"
-	@echo "make aws-lambda-layer-build: Build serverless ZIP dist package"
+	@echo "make aws-lambda-layer: Build AWS Lambda layer directory for serverless integration"
 	@echo
 	@echo "Also make sure to read ./CONTRIBUTING.md"
 	@false
@@ -19,9 +19,8 @@ help:
 	$(VENV_PATH)/bin/pip install tox
 
 dist: .venv
-	rm -rf dist build
+	rm -rf dist dist-serverless build
 	$(VENV_PATH)/bin/python setup.py sdist bdist_wheel
-
 .PHONY: dist
 
 format: .venv
@@ -46,7 +45,6 @@ lint: .venv
 		echo "Bad formatting? Run: make format"; \
 		echo "================================"; \
 		false)
-
 .PHONY: lint
 
 apidocs: .venv
@@ -60,8 +58,8 @@ apidocs-hotfix: apidocs
 	@$(VENV_PATH)/bin/ghp-import -pf docs/_build
 .PHONY: apidocs-hotfix
 
-aws-lambda-layer-build: dist
+aws-lambda-layer: dist
 	$(VENV_PATH)/bin/pip install urllib3
 	$(VENV_PATH)/bin/pip install certifi
-	$(VENV_PATH)/bin/python -m scripts.build_awslambda_layer
-.PHONY: aws-lambda-layer-build
+	$(VENV_PATH)/bin/python -m scripts.build_aws_lambda_layer
+.PHONY: aws-lambda-layer
