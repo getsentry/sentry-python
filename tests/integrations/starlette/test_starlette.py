@@ -1,7 +1,6 @@
 import asyncio
 import base64
 import json
-import logging
 import os
 
 import pytest
@@ -11,12 +10,12 @@ try:
 except ImportError:
     import mock  # python < 3.3
 
+from sentry_sdk import capture_message
 from sentry_sdk.integrations.starlette import (
     StarletteIntegration,
     StarletteRequestExtractor,
 )
 from sentry_sdk.utils import AnnotatedValue
-from sentry_sdk import capture_message
 
 starlette = pytest.importorskip("starlette")
 from starlette.authentication import (
@@ -81,10 +80,56 @@ SCOPE = {
 }
 
 
+def starlette_app_factory(middleware=[]):
+    async def _homepage(request):
+        1 / 0
+        return starlette.responses.JSONResponse({"status": "ok"})
+
+    async def _custom_error(request):
+        raise Exception("Too Hot")
+
+    async def _message(request):
+        capture_message("hi")
+        return starlette.responses.JSONResponse({"status": "ok"})
+
+    app = starlette.applications.Starlette(
+        debug=True,
+        routes=[
+            starlette.routing.Route("/some_url", _homepage),
+            starlette.routing.Route("/custom_error", _custom_error),
+            starlette.routing.Route("/message", _message),
+        ],
+        middleware=middleware,
+    )
+
+    return app
+
+
 def async_return(result):
     f = asyncio.Future()
     f.set_result(result)
     return f
+
+
+class BasicAuthBackend(AuthenticationBackend):
+    async def authenticate(self, conn):
+        if "Authorization" not in conn.headers:
+            return
+
+        auth = conn.headers["Authorization"]
+        try:
+            scheme, credentials = auth.split()
+            if scheme.lower() != "basic":
+                return
+            decoded = base64.b64decode(credentials).decode("ascii")
+        except (ValueError, UnicodeDecodeError):
+            raise AuthenticationError("Invalid basic auth credentials")
+
+        username, _, password = decoded.partition(":")
+
+        # TODO: You'd want to verify the username and password here.
+
+        return AuthCredentials(["authenticated"]), SimpleUser(username)
 
 
 class AsyncIterator:
@@ -265,60 +310,6 @@ async def test_starlettrequestextractor_extract_request_info(sentry_init):
         assert request_info["data"] == BODY_JSON
 
 
-def starlette_app_factory(middleware=[]):
-    async def _homepage(request):
-        1 / 0
-        return starlette.responses.JSONResponse({"status": "ok"})
-
-    async def _other_endpoint(request):
-        try:
-            raise ValueError("stuff")
-        except Exception:
-            logging.exception("stuff happened")
-        1 / 0
-
-    async def _custom_error(request):
-        raise Exception("Too Hot")
-
-    async def _message(request):
-        capture_message("hi")
-        return starlette.responses.JSONResponse({"status": "ok"})
-
-    app = starlette.applications.Starlette(
-        debug=True,
-        routes=[
-            starlette.routing.Route("/some_url", _homepage),
-            starlette.routing.Route("/other_url", _other_endpoint),
-            starlette.routing.Route("/custom_error", _custom_error),
-            starlette.routing.Route("/message", _message),
-        ],
-        middleware=middleware,
-    )
-
-    return app
-
-
-class BasicAuthBackend(AuthenticationBackend):
-    async def authenticate(self, conn):
-        if "Authorization" not in conn.headers:
-            return
-
-        auth = conn.headers["Authorization"]
-        try:
-            scheme, credentials = auth.split()
-            if scheme.lower() != "basic":
-                return
-            decoded = base64.b64decode(credentials).decode("ascii")
-        except (ValueError, UnicodeDecodeError):
-            raise AuthenticationError("Invalid basic auth credentials")
-
-        username, _, password = decoded.partition(":")
-
-        # TODO: You'd want to verify the username and password here.
-
-        return AuthCredentials(["authenticated"]), SimpleUser(username)
-
-
 @pytest.mark.parametrize(
     "transaction_style,expected_transaction",
     [
@@ -400,4 +391,33 @@ def test_user_information(sentry_init, capture_events, capture_envelopes):
     assert 1 == 0
 
 
-# Test Middleware Spans for cool waterfall charts in performance
+def test_middleware_spans(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        client.get("/message", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
+
+    (_, transaction_event) = events
+
+    expected = [
+        "ServerErrorMiddleware",
+        "AuthenticationMiddleware",
+        "ExceptionMiddleware",
+    ]
+
+    idx = 0
+    for span in transaction_event["spans"]:
+        if span["op"] == "starlette.middleware":
+            span["description"] == expected[idx]
+            span["tags"]["starlette.middleware_name"] == expected[idx]
+            idx = +1
