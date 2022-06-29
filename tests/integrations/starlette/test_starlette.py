@@ -437,6 +437,6 @@ def test_middleware_spans(sentry_init, capture_events):
     idx = 0
     for span in transaction_event["spans"]:
         if span["op"] == "starlette.middleware":
-            span["description"] == expected[idx]
-            span["tags"]["starlette.middleware_name"] == expected[idx]
+            assert span["description"] == expected[idx]
+            assert span["tags"]["starlette.middleware_name"] == expected[idx]
             idx = +1
