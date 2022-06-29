@@ -20,11 +20,16 @@ try:
     from starlette.datastructures import UploadFile
     from starlette.middleware import Middleware
     from starlette.middleware.authentication import AuthenticationMiddleware
-    from starlette.middleware.exceptions import ExceptionMiddleware
     from starlette.requests import Request
     from starlette.routing import Match
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
+
+try:
+    from starlette.middle.exceptions import ExceptionMiddleware  # Starlette 0.20
+except ImportError:
+    from starlette.exceptions import ExceptionMiddleware  # Startlette 0.19.1
+
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
