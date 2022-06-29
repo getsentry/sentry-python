@@ -390,8 +390,24 @@ def test_user_information_error(sentry_init, capture_events):
     assert user["username"] == "Gabriela"
 
 
-def test_user_information_trace(sentry_init, capture_events, capture_envelopes):
-    raise NotImplementedError()
+def test_user_information_transaction(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    client.get("/message", auth=("Gabriela", "hello123"))
+
+    (_, transaction_event) = events
+    user = transaction_event.get("user", None)
+    assert user
+    assert "username" in user
+    assert user["username"] == "Gabriela"
 
 
 def test_middleware_spans(sentry_init, capture_events):
