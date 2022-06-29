@@ -1,10 +1,12 @@
 import sys
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+
+fastapi = pytest.importorskip("fastapi")
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture
