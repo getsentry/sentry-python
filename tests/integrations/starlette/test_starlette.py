@@ -370,25 +370,28 @@ def test_catch_exceptions(
     assert event["exception"]["values"][0]["mechanism"]["type"] == "starlette"
 
 
-def test_user_information(sentry_init, capture_events, capture_envelopes):
+def test_user_information_error(sentry_init, capture_events):
     sentry_init(integrations=[StarletteIntegration()])
     starlette_app = starlette_app_factory(
         middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
     )
     events = capture_events()
-    envelopes = capture_envelopes()
 
     client = TestClient(starlette_app, raise_server_exceptions=False)
     try:
-        client.get("/message", auth=("Gabriela", "hello123"))
+        client.get("/custom_error", auth=("Gabriela", "hello123"))
     except Exception:
         pass
 
-    (first_event,) = events
-    assert first_event.get("user", None)
+    (event,) = events
+    user = event.get("user", None)
+    assert user
+    assert "username" in user
+    assert user["username"] == "Gabriela"
 
-    (first_envelope, second_envelope) = envelopes
-    assert 1 == 0
+
+def test_user_information_trace(sentry_init, capture_events, capture_envelopes):
+    raise NotImplementedError()
 
 
 def test_middleware_spans(sentry_init, capture_events):
