@@ -178,12 +178,7 @@ def patch_authentication_middleware(middleware_class):
 
     async def _sentry_authenticationmiddleware_call(self, scope, receive, send):
         # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
-        try:
-            await old_call(self, scope, receive, send)
-        except Exception as exc:
-            _add_user_to_sentry_scope(scope)
-            raise exc
-
+        await old_call(self, scope, receive, send)
         _add_user_to_sentry_scope(scope)
 
     middleware_class.__call__ = _sentry_authenticationmiddleware_call
@@ -354,7 +349,7 @@ class StarletteRequestExtractor:
         return await self.json()
 
 
-class SentryStarletteMiddleware(SentryAsgiMiddleware):
+class SentryStarletteMiddleware:
     def __init__(self, app, dispatch=None):
         # type: (SentryStarletteMiddleware, Any) -> None
         self.app = app
