@@ -80,7 +80,7 @@ SCOPE = {
 }
 
 
-def starlette_app_factory(middleware=[]):
+def starlette_app_factory(middleware=None):
     async def _homepage(request):
         1 / 0
         return starlette.responses.JSONResponse({"status": "ok"})
