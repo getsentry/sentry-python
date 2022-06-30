@@ -439,4 +439,4 @@ def test_middleware_spans(sentry_init, capture_events):
         if span["op"] == "starlette.middleware":
             assert span["description"] == expected[idx]
             assert span["tags"]["starlette.middleware_name"] == expected[idx]
-            idx = +1
+            idx += 1
