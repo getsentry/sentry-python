@@ -29,16 +29,13 @@ class FrameData:
         self.module = frame.f_globals['__name__']
 
         # Depending on Python version, frame.f_code.co_filename either stores just the file name or the entire absolute path.
-        self.file_name = os.path.basename(frame.f_code.co_filename)
-        self.abs_path = os.path.abspath(frame.f_code.co_filename) # TODO: Must verify this will give us correct absolute paths in all cases!
+        self.file_name = frame.f_code.co_filename
         self.line_number = frame.f_code.co_firstlineno
     
     @property
     def _attribute_tuple(self):
         """Returns a tuple of the attributes used in comparison"""
-
-        # Do not need to include self.file_name because it depends on self.abs_path
-        return (self.function_name, self.module, self.abs_path, self.line_number)
+        return (self.function_name, self.module, self.file_name, self.line_number)
 
     def __eq__(self, other):
         if isinstance(other, FrameData):
@@ -190,7 +187,7 @@ class Sampler(object):
                     'shared': {
                         'frames': [{
                             'name': frame.function_name,
-                            'file': frame.abs_path,
+                            'file': frame.file_name,
                             'line': frame.line_number
                         } for frame in frames] # TODO: Add all elements
                         # 'frames': [{
