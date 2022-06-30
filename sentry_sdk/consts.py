@@ -78,6 +78,7 @@ class ClientConstructor(object):
         auto_enabling_integrations=True,  # type: bool
         auto_session_tracking=True,  # type: bool
         send_client_reports=True,  # type: bool
+        enable_profiling=False, # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
     ):
         # type: (...) -> None

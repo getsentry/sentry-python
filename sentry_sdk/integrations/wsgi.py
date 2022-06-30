@@ -1,6 +1,7 @@
 import sys
 import sentry_sdk.profiler as profiler
 
+from contextlib import contextmanager
 from sentry_sdk._functools import partial
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import (
@@ -93,6 +94,16 @@ def get_request_url(environ, use_x_forwarded_for=False):
         wsgi_decoding_dance(environ.get("PATH_INFO") or "").lstrip("/"),
     )
 
+@contextmanager
+def conditional_context_manager(manager, condition):
+    """
+    Conditionally calls a given context manager if condition met; otherwise, acts as a no-op context manager.
+    """
+    if condition:
+        with manager:
+            yield
+    else:
+        yield
 
 class SentryWsgiMiddleware(object):
     __slots__ = ("app", "use_x_forwarded_for")
@@ -110,35 +121,34 @@ class SentryWsgiMiddleware(object):
         _wsgi_middleware_applied.set(True)
         try:
             hub = Hub(Hub.current)
-            with profiler.Sampler(): # TODO: Check if profiling flag is set to True
-                with auto_session_tracking(hub, session_mode="request"):
-                    with hub:
-                        with capture_internal_exceptions():
-                            with hub.configure_scope() as scope:
-                                scope.clear_breadcrumbs()
-                                scope._name = "wsgi"
-                                scope.add_event_processor(
-                                    _make_wsgi_event_processor(
-                                        environ, self.use_x_forwarded_for
-                                    )
+            with auto_session_tracking(hub, session_mode="request"):
+                with hub:
+                    with capture_internal_exceptions():
+                        with hub.configure_scope() as scope:
+                            scope.clear_breadcrumbs()
+                            scope._name = "wsgi"
+                            scope.add_event_processor(
+                                _make_wsgi_event_processor(
+                                    environ, self.use_x_forwarded_for
                                 )
+                            )
 
-                        transaction = Transaction.continue_from_environ(
-                            environ, op="http.server", name="generic WSGI request"
-                        )
+                    transaction = Transaction.continue_from_environ(
+                        environ, op="http.server", name="generic WSGI request"
+                    )
 
-                        with hub.start_transaction(
-                            transaction, custom_sampling_context={"wsgi_environ": environ}
-                        ):
-                            try:
-                                rv = self.app(
-                                    environ,
-                                    partial(
-                                        _sentry_start_response, start_response, transaction
-                                    ),
-                                )
-                            except BaseException:
-                                reraise(*_capture_exception(hub))
+                    with hub.start_transaction(
+                        transaction, custom_sampling_context={"wsgi_environ": environ}
+                    ), conditional_context_manager(profiler.Sampler(), hub.client.options['enable_profiling']):
+                        try:
+                            rv = self.app(
+                                environ,
+                                partial(
+                                    _sentry_start_response, start_response, transaction
+                                ),
+                            )
+                        except BaseException:
+                            reraise(*_capture_exception(hub))
         finally:
             _wsgi_middleware_applied.set(False)
 
