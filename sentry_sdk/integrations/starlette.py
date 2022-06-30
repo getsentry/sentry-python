@@ -75,7 +75,14 @@ def _enable_span_for_middleware(middleware_class):
         else:
             await old_call(*args, **kwargs)
 
-    middleware_class.__call__ = _create_span_call
+    not_yet_patched = old_call.__name__ not in [
+        "_create_span_call",
+        "_sentry_authenticationmiddleware_call",
+        "_sentry_exceptionmiddleware_call",
+    ]
+
+    if not_yet_patched:
+        middleware_class.__call__ = _create_span_call
 
     return middleware_class
 
