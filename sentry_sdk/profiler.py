@@ -178,7 +178,7 @@ class Sampler(object):
                         'type': 'sampled',
                         'endValue': o.stack_samples[-1].sample_time, # end ts
                         'startValue': 0, # start ts
-                        'name': 'Python profile', # TODO: What should the name be?
+                        'name': 'main',
                         'unit': 'nanoseconds',
                         'threadID': threading.get_ident()
                     }],
