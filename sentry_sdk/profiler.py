@@ -87,9 +87,10 @@ class Sampler(object):
     stack every `interval` seconds and keeps track of counts by frame. Because
     this uses signals, it only works on the main thread.
     """
-    def __init__(self, interval=0.01):
+    def __init__(self, transaction, interval=0.01):
         self.interval = interval
         self.stack_samples = []
+        self._transaction = transaction
     
     def __enter__(self):
         self.start()
@@ -166,12 +167,16 @@ class Sampler(object):
     def __del__(self):
         self.stop()
     
+    @property
+    def transaction_name(self):
+        return self._transaction.name
+    
     class JSONEncoder(json.JSONEncoder):
         def default(self, o):
             if isinstance(o, Sampler):
                 samples, frames = o.samples_numeric_representation()
                 return {
-                    'transactionName': 'test', # TODO: What should this be?
+                    'transactionName': o.transaction_name,
                     'profiles': [{
                         'weights': o.sample_weights(),
                         'samples': samples,

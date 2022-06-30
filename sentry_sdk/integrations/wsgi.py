@@ -139,7 +139,7 @@ class SentryWsgiMiddleware(object):
 
                     with hub.start_transaction(
                         transaction, custom_sampling_context={"wsgi_environ": environ}
-                    ), conditional_context_manager(profiler.Sampler(), hub.client.options['enable_profiling']):
+                    ), conditional_context_manager(profiler.Sampler(transaction), hub.client.options['enable_profiling']):
                         try:
                             rv = self.app(
                                 environ,
