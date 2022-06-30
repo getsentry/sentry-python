@@ -358,7 +358,8 @@ class StarletteRequestExtractor:
 
             return data
 
-        return await self.json()
+        json_data = await self.json()
+        return json_data
 
 
 class SentryStarletteMiddleware:

@@ -289,7 +289,7 @@ async def test_starlettrequestextractor_extract_request_info(sentry_init):
     )
     scope = SCOPE.copy()
     scope["headers"] = [
-        [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
+        [b"content-type", b"application/json"],
         [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
     ]
 
