@@ -373,6 +373,8 @@ class _Client(object):
             event_opt.get("contexts", {}).get("trace", {}).pop("tracestate", "")
         )
 
+        baggage = event_opt.get("contexts", {}).get("trace", {}).pop("baggage", None)
+
         # Transactions or events with attachments should go to the /envelope/
         # endpoint.
         if is_transaction or attachments:
@@ -382,11 +384,15 @@ class _Client(object):
                 "sent_at": format_timestamp(datetime.utcnow()),
             }
 
-            tracestate_data = raw_tracestate and reinflate_tracestate(
-                raw_tracestate.replace("sentry=", "")
-            )
-            if tracestate_data and has_tracestate_enabled():
-                headers["trace"] = tracestate_data
+            if has_tracestate_enabled():
+                tracestate_data = raw_tracestate and reinflate_tracestate(
+                    raw_tracestate.replace("sentry=", "")
+                )
+
+                if tracestate_data:
+                    headers["trace"] = tracestate_data
+            elif baggage is not None:
+                headers["trace"] = baggage.trace_envelope_header()
 
             envelope = Envelope(headers=headers)
 

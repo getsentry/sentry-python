@@ -424,6 +424,18 @@ class Baggage(object):
     SENTRY_PREFIX = "sentry-"
     SENTRY_PREFIX_REGEX = re.compile("^sentry-")
 
+    # DynamicSamplingContext
+    DSC_KEYS = [
+        "trace_id",
+        "public_key",
+        "sample_rate",
+        "release",
+        "environment",
+        "transaction",
+        "user_id",
+        "user_segment",
+    ]
+
     def __init__(
         self,
         sentry_items={},  # type: Dict[str, str]
@@ -458,6 +470,18 @@ class Baggage(object):
 
     def freeze(self):
         self.mutable = False
+
+    def trace_envelope_header(self):
+        header = {}
+
+        for key in Baggage.DSC_KEYS:
+            if self.sentry_items[key] is not None:
+                header[key] = self.sentry_items[key]
+
+        return header
+
+    def serialize(self):
+        pass
 
 
 # Circular imports
