@@ -474,7 +474,7 @@ class Span(object):
             "parent_span_id": self.parent_span_id,
             "op": self.op,
             "description": self.description,
-        }
+        }  # type: Dict[str, Any]
         if self.status:
             rv["status"] = self.status
 
@@ -489,7 +489,9 @@ class Span(object):
 
         # TODO-neel populate fresh if head SDK
         if self.containing_transaction and self.containing_transaction._baggage:
-            rv["bagage"] = self.containing_transaction._baggage
+            rv[
+                "dynamic_sampling_context"
+            ] = self.containing_transaction._baggage.dynamic_sampling_context()
 
         return rv
 

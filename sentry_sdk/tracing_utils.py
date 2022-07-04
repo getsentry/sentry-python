@@ -16,7 +16,7 @@ from sentry_sdk.utils import (
     to_string,
     from_base64,
 )
-from sentry_sdk._compat import PY2
+from sentry_sdk._compat import PY2, iteritems
 from sentry_sdk._types import MYPY
 
 if PY2:
@@ -438,7 +438,7 @@ class Baggage(object):
 
     def __init__(
         self,
-        sentry_items={},  # type: Dict[str, str]
+        sentry_items,  # type: Dict[str, str]
         third_party_items="",  # type: str
         mutable=True,  # type: bool
     ):
@@ -448,6 +448,7 @@ class Baggage(object):
 
     @classmethod
     def from_incoming_header(cls, header):
+        # type: (Optional[str]) -> Baggage
         """
         freeze if incoming header already has sentry baggage
         """
@@ -469,9 +470,11 @@ class Baggage(object):
         return Baggage(sentry_items, third_party_items, mutable)
 
     def freeze(self):
+        # type: () -> None
         self.mutable = False
 
-    def trace_envelope_header(self):
+    def dynamic_sampling_context(self):
+        # type: () -> Dict[str, str]
         header = {}
 
         for key in Baggage.DSC_KEYS:
@@ -484,7 +487,7 @@ class Baggage(object):
         # type: (bool) -> str
         items = []
 
-        for key, val in self.sentry_items:
+        for key, val in iteritems(self.sentry_items):
             item = Baggage.SENTRY_PREFIX + quote(key) + "=" + quote(val)
             items.append(item)
 

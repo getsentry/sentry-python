@@ -373,7 +373,11 @@ class _Client(object):
             event_opt.get("contexts", {}).get("trace", {}).pop("tracestate", "")
         )
 
-        baggage = event_opt.get("contexts", {}).get("trace", {}).pop("baggage", None)
+        dynamic_sampling_context = (
+            event_opt.get("contexts", {})
+            .get("trace", {})
+            .pop("dynamic_sampling_context", {})
+        )
 
         # Transactions or events with attachments should go to the /envelope/
         # endpoint.
@@ -391,8 +395,8 @@ class _Client(object):
 
                 if tracestate_data:
                     headers["trace"] = tracestate_data
-            elif baggage is not None:
-                headers["trace"] = baggage.trace_envelope_header()
+            elif dynamic_sampling_context:
+                headers["trace"] = dynamic_sampling_context
 
             envelope = Envelope(headers=headers)
 
