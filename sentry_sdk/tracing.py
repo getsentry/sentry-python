@@ -466,6 +466,33 @@ class Span(object):
 
         return rv
 
+    def get_trace_context(self):
+        # type: () -> Any
+        rv = {
+            "trace_id": self.trace_id,
+            "span_id": self.span_id,
+            "parent_span_id": self.parent_span_id,
+            "op": self.op,
+            "description": self.description,
+        }
+        if self.status:
+            rv["status"] = self.status
+
+        # if the transaction didn't inherit a tracestate value, and no outgoing
+        # requests - whose need for headers would have caused a tracestate value
+        # to be created - were made as part of the transaction, the transaction
+        # still won't have a tracestate value, so compute one now
+        sentry_tracestate = self.get_or_set_sentry_tracestate()
+
+        if sentry_tracestate:
+            rv["tracestate"] = sentry_tracestate
+
+        # TODO-neel populate fresh if head SDK
+        if self.containing_transaction and self.containing_transaction._baggage:
+            rv["bagage"] = self.containing_transaction._baggage
+
+        return rv
+
 
 class Transaction(Span):
     __slots__ = (
@@ -621,33 +648,6 @@ class Transaction(Span):
 
         rv["name"] = self.name
         rv["sampled"] = self.sampled
-
-        return rv
-
-    def get_trace_context(self):
-        # type: () -> Any
-        rv = {
-            "trace_id": self.trace_id,
-            "span_id": self.span_id,
-            "parent_span_id": self.parent_span_id,
-            "op": self.op,
-            "description": self.description,
-        }
-        if self.status:
-            rv["status"] = self.status
-
-        # if the transaction didn't inherit a tracestate value, and no outgoing
-        # requests - whose need for headers would have caused a tracestate value
-        # to be created - were made as part of the transaction, the transaction
-        # still won't have a tracestate value, so compute one now
-        sentry_tracestate = self.get_or_set_sentry_tracestate()
-
-        if sentry_tracestate:
-            rv["tracestate"] = sentry_tracestate
-
-        # TODO-neel populate fresh if head SDK
-        if self._baggage:
-            rv["bagage"] = self._baggage
 
         return rv
 
