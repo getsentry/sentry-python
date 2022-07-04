@@ -480,8 +480,18 @@ class Baggage(object):
 
         return header
 
-    def serialize(self):
-        pass
+    def serialize(self, include_third_party=False):
+        # type: (bool) -> str
+        items = []
+
+        for key, val in self.sentry_items:
+            item = Baggage.SENTRY_PREFIX + quote(key) + "=" + quote(val)
+            items.append(item)
+
+        if include_third_party:
+            items.append(self.third_party_items)
+
+        return ",".join(items)
 
 
 # Circular imports

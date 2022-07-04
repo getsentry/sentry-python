@@ -285,6 +285,9 @@ class Span(object):
         if tracestate:
             yield "tracestate", tracestate
 
+        if self.containing_transaction and self.containing_transaction._baggage:
+            yield "baggage", self.containing_transaction._baggage.serialize()
+
     @classmethod
     def from_traceparent(
         cls,
