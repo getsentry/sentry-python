@@ -21,8 +21,10 @@ from sentry_sdk._types import MYPY
 
 if PY2:
     from collections import Mapping
+    from urllib import quote, unquote
 else:
     from collections.abc import Mapping
+    from urllib.parse import quote, unquote
 
 if MYPY:
     import typing
@@ -425,7 +427,7 @@ class Baggage(object):
     def __init__(
         self,
         sentry_items={},  # type: Dict[str, str]
-        third_party_items={},  # type: Dict[str, str]
+        third_party_items="",  # type: str
         mutable=True,  # type: bool
     ):
         self.sentry_items = sentry_items
@@ -438,18 +440,19 @@ class Baggage(object):
         freeze if incoming header already has sentry baggage
         """
         sentry_items = {}
-        third_party_items = {}
+        third_party_items = ""
         mutable = True
 
         if header is not None:
             for item in header.split(","):
-                key, val = item.strip().split("=")
+                item = item.strip()
+                key, val = item.split("=")
                 if Baggage.SENTRY_PREFIX_REGEX.match(key):
-                    # TODO-neel decodeURI?
-                    sentry_items[key] = val
+                    baggage_key = unquote(key.split("-")[1])
+                    sentry_items[baggage_key] = unquote(val)
                     mutable = False
                 else:
-                    third_party_items[key] = val
+                    third_party_items += val
 
         return Baggage(sentry_items, third_party_items, mutable)
 
