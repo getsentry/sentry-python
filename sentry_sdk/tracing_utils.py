@@ -456,7 +456,7 @@ class Baggage(object):
         third_party_items = ""
         mutable = True
 
-        if header is not None:
+        if header:
             for item in header.split(","):
                 item = item.strip()
                 key, val = item.split("=")
@@ -478,7 +478,7 @@ class Baggage(object):
         header = {}
 
         for key in Baggage.DSC_KEYS:
-            if self.sentry_items[key] is not None:
+            if self.sentry_items.get(key):
                 header[key] = self.sentry_items[key]
 
         return header
