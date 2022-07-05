@@ -227,7 +227,6 @@ class Span(object):
                 "Deprecated: use Transaction.continue_from_environ "
                 "instead of Span.continue_from_environ."
             )
-        # TODO-neel not sure if baggage has HTTP_ prefix
         return Transaction.continue_from_headers(EnvironHeaders(environ), **kwargs)
 
     @classmethod
