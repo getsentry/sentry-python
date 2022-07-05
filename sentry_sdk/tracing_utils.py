@@ -220,8 +220,6 @@ def extract_sentrytrace_data(header):
     if not header:
         return None
 
-    trace_id = parent_span_id = parent_sampled = None
-
     if header.startswith("00-") and header.endswith("-00"):
         header = header[3:-3]
 
@@ -230,6 +228,7 @@ def extract_sentrytrace_data(header):
         return None
 
     trace_id, parent_span_id, sampled_str = match.groups()
+    parent_sampled = None
 
     if trace_id:
         trace_id = "{:032x}".format(int(trace_id, 16))

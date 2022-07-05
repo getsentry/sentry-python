@@ -132,17 +132,14 @@ class Span(object):
 
     def __repr__(self):
         # type: () -> str
-        return (
-            "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>"
-            % (
-                self.__class__.__name__,
-                self.op,
-                self.description,
-                self.trace_id,
-                self.span_id,
-                self.parent_span_id,
-                self.sampled,
-            )
+        return "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>" % (
+            self.__class__.__name__,
+            self.op,
+            self.description,
+            self.trace_id,
+            self.span_id,
+            self.parent_span_id,
+            self.sampled,
         )
 
     def __enter__(self):
@@ -249,10 +246,10 @@ class Span(object):
 
         # TODO-neel move away from this kwargs stuff, it's confusing and opaque
         # make more explicit
-        sentrytrace_kwargs = extract_sentrytrace_data(headers.get("sentry-trace"))
-
         baggage = Baggage.from_incoming_header(headers.get("baggage"))
         kwargs.update({"baggage": baggage})
+
+        sentrytrace_kwargs = extract_sentrytrace_data(headers.get("sentry-trace"))
 
         if sentrytrace_kwargs is not None:
             kwargs.update(sentrytrace_kwargs)
@@ -268,7 +265,7 @@ class Span(object):
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
         """
-        Creates a generator which returns the span's `sentry-trace` and
+        Creates a generator which returns the span's `sentry-trace`, `baggage` and
         `tracestate` headers.
 
         If the span's containing transaction doesn't yet have a
@@ -542,17 +539,14 @@ class Transaction(Span):
 
     def __repr__(self):
         # type: () -> str
-        return (
-            "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>"
-            % (
-                self.__class__.__name__,
-                self.name,
-                self.op,
-                self.trace_id,
-                self.span_id,
-                self.parent_span_id,
-                self.sampled,
-            )
+        return "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>" % (
+            self.__class__.__name__,
+            self.name,
+            self.op,
+            self.trace_id,
+            self.span_id,
+            self.parent_span_id,
+            self.sampled,
         )
 
     @property
