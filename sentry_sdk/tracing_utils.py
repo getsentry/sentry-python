@@ -477,8 +477,9 @@ class Baggage(object):
         header = {}
 
         for key in Baggage.DSC_KEYS:
-            if self.sentry_items.get(key):
-                header[key] = self.sentry_items[key]
+            item = self.sentry_items.get(key)
+            if item:
+                header[key] = item
 
         return header
 
