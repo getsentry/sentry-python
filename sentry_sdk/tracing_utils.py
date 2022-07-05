@@ -464,7 +464,7 @@ class Baggage(object):
                     sentry_items[baggage_key] = unquote(val)
                     mutable = False
                 else:
-                    third_party_items += val
+                    third_party_items += ("," if third_party_items else "") + item
 
         return Baggage(sentry_items, third_party_items, mutable)
 
