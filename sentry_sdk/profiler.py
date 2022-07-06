@@ -13,12 +13,15 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 """
 
 import atexit
-import os
+from datetime import datetime
 import signal
 import time
 import threading
 import json
 from sentry_sdk.utils import logger
+
+# TODO: temp import to output file
+import os
 
 def nanosecond_time():
     return int(time.perf_counter() * 1e9)
@@ -49,34 +52,23 @@ class FrameData:
         return f'{self.function_name}({self.module}) in {self.file_name}:{self.line_number}'
 
 class StackSample:
-    def __init__(self, top_frame, profiler_start_time):
+    def __init__(self, top_frame, profiler_start_time, frame_indices):
         self.sample_time = nanosecond_time() - profiler_start_time
-        self._stack = []
-        self._add_all_frames(top_frame)
+        self.stack = []
+        self._add_all_frames(top_frame, frame_indices)
 
-    def _add_all_frames(self, top_frame):
+    def _add_all_frames(self, top_frame, frame_indices):
         frame = top_frame
         while frame is not None:
-            self._stack.append(FrameData(frame))
+            frame_data = FrameData(frame)
+            if frame_data not in frame_indices:
+                frame_indices[frame_data] = len(frame_indices)
+            self.stack.append(frame_indices[frame_data])
             frame = frame.f_back
-        self._stack = list(reversed(self._stack))
-    
-    def numeric_representation(self, frame_indices):
-        """
-        Returns a list of numbers representing this stack. The numbers correspond to the value stored in frame_indices
-        corresponding to the frame. If a given frame does not exist in frame_indices, it will be added with a value equal
-        to the current size of the frame_indices dictionary.
-        """
-        representation = []
-        for frame in self._stack:
-            if frame not in frame_indices:
-                frame_indices[frame] = len(frame_indices)
-            representation.append(frame_indices[frame])
-        
-        return representation
+        self.stack = list(reversed(self.stack))
 
     def __str__(self):
-        return f'Time: {self.sample_time}; Stack: {[str(frame) for frame in reversed(self._stack)]}'
+        return f'Time: {self.sample_time}; Stack: {[str(frame) for frame in reversed(self.stack)]}'
 
 class Sampler(object):
     """
@@ -94,14 +86,16 @@ class Sampler(object):
     
     def __exit__(self, *_):
         self.stop()
-        print(self)
         if len(self.stack_samples) > 0:
-            with open('test_profile.json', 'w') as f:
+            if not os.path.exists('./profiles'):
+                os.makedirs('./profiles')
+            with open(f'./profiles/{datetime.utcnow().isoformat()}Z.json', 'w') as f:
                 f.write(self.to_json())
 
     def start(self):
         self._start_time = nanosecond_time()
         self.stack_samples = []
+        self._frame_indices = dict()
         try:
             signal.signal(signal.SIGVTALRM, self._sample)
         except ValueError:
@@ -121,8 +115,7 @@ class Sampler(object):
         return [self.stack_samples[0].sample_time, *(sample.sample_time - prev_sample.sample_time for sample, prev_sample in zip(self.stack_samples[1:], self.stack_samples))]
 
     def _sample(self, _, frame):
-        self.stack_samples.append(StackSample(frame, self._start_time))
-        #print('j')
+        self.stack_samples.append(StackSample(frame, self._start_time, self._frame_indices))
         signal.setitimer(signal.ITIMER_VIRTUAL, self.interval)
 
     def to_json(self):
@@ -130,27 +123,13 @@ class Sampler(object):
         Exports this object to a JSON format compatible with Sentry's profiling visualizer
         """
         return json.dumps(self, cls=self.JSONEncoder)
-    
-    def samples_numeric_representation(self):
-        """
-        Returns the samples with a numeric representation. There are two return values.
-        The first return value actually contains the samples. It is a list of lists of numbers.
-        Each list of numbers in the list represents a stack sample. The numbers correspond
-        to a frame; specifically, the numbers are indices of the list returned as the second 
-        return value. This second return value contains a list of each unique frame that was
-        observed. The samples array (first return value) is interpreted by looking up the
-        indexes in the frames array (second return value).
-        """
-        frame_indices = dict() # Stores eventual index of each frame in the frame array
-        numeric_representation = [sample.numeric_representation(frame_indices) for sample in self.stack_samples]
 
-        # Build frame array from the frame indices
-        frames = [None] * len(frame_indices)
-        for frame, index in frame_indices.items():
+    def frame_list(self):
+         # Build frame array from the frame indices
+        frames = [None] * len(self._frame_indices)
+        for frame, index in self._frame_indices.items():
             frames[index] = frame
-        
-        return numeric_representation, frames
-
+        return frames
 
     def samples(self):
         return len(self.stack_samples)
@@ -171,12 +150,11 @@ class Sampler(object):
     class JSONEncoder(json.JSONEncoder):
         def default(self, o):
             if isinstance(o, Sampler):
-                samples, frames = o.samples_numeric_representation()
                 return {
                     'transactionName': o.transaction_name,
                     'profiles': [{
                         'weights': o.sample_weights(),
-                        'samples': samples,
+                        'samples': [sample.stack for sample in o.stack_samples],
                         'type': 'sampled',
                         'endValue': o.stack_samples[-1].sample_time, # end ts
                         'startValue': 0, # start ts
@@ -189,7 +167,7 @@ class Sampler(object):
                             'name': frame.function_name,
                             'file': frame.file_name,
                             'line': frame.line_number
-                        } for frame in frames] # TODO: Add all elements
+                        } for frame in o.frame_list()] # TODO: Add all elements
                         # 'frames': [{
                         #     'key': string | number,
                         #     'name': string,
