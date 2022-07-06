@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.0
+
+### Various fixes & improvements
+
+- Fix Deployment (#1474) by @antonpirker
+- Serverless V2 (#1450) by @antonpirker
+- Use logging levelno instead of levelname.  Levelnames can be overridden (#1449) by @rrauenza
+
 ## 1.5.12
 
 ### Various fixes & improvements
