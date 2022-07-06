@@ -931,7 +931,7 @@ def transaction_from_function(func):
 disable_capture_event = ContextVar("disable_capture_event")
 
 
-class ServerlessTimeoutWarning(Exception):
+class ServerlessTimeoutWarning(Exception):  # noqa: N818
     """Raised when a serverless method is about to reach its timeout."""
 
     pass

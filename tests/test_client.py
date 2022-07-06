@@ -35,13 +35,13 @@ else:
     from collections.abc import Mapping
 
 
-class EventCaptured(Exception):
+class EventCapturedError(Exception):
     pass
 
 
 class _TestTransport(Transport):
     def capture_event(self, event):
-        raise EventCaptured(event)
+        raise EventCapturedError(event)
 
 
 def test_transport_option(monkeypatch):
@@ -273,7 +273,7 @@ def test_ignore_errors(sentry_init, capture_events):
 
     e(ZeroDivisionError())
     e(MyDivisionError())
-    pytest.raises(EventCaptured, lambda: e(ValueError()))
+    pytest.raises(EventCapturedError, lambda: e(ValueError()))
 
 
 def test_with_locals_enabled(sentry_init, capture_events):
@@ -400,8 +400,8 @@ def test_attach_stacktrace_disabled(sentry_init, capture_events):
 
 def test_capture_event_works(sentry_init):
     sentry_init(transport=_TestTransport())
-    pytest.raises(EventCaptured, lambda: capture_event({}))
-    pytest.raises(EventCaptured, lambda: capture_event({}))
+    pytest.raises(EventCapturedError, lambda: capture_event({}))
+    pytest.raises(EventCapturedError, lambda: capture_event({}))
 
 
 @pytest.mark.parametrize("num_messages", [10, 20])
@@ -744,10 +744,10 @@ def test_errno_errors(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    class Foo(Exception):
+    class FooError(Exception):
         errno = 69
 
-    capture_exception(Foo())
+    capture_exception(FooError())
 
     (event,) = events
 
