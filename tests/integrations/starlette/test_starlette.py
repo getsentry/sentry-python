@@ -310,6 +310,32 @@ async def test_starlettrequestextractor_extract_request_info(sentry_init):
         assert request_info["data"] == BODY_JSON
 
 
+@pytest.mark.asyncio
+async def test_starlettrequestextractor_extract_request_info_no_pii(sentry_init):
+    sentry_init(
+        send_default_pii=False,
+        integrations=[StarletteIntegration()],
+    )
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-type", b"application/json"],
+        [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
+    ]
+
+    with mock.patch(
+        "starlette.requests.Request.stream",
+        return_value=AsyncIterator(json.dumps(BODY_JSON)),
+    ):
+        starlette_request = starlette.requests.Request(scope)
+        extractor = StarletteRequestExtractor(starlette_request)
+
+        request_info = await extractor.extract_request_info()
+
+        assert request_info
+        assert "cookies" not in request_info
+        assert request_info["data"] == BODY_JSON
+
+
 @pytest.mark.parametrize(
     "transaction_style,expected_transaction",
     [
@@ -371,7 +397,10 @@ def test_catch_exceptions(
 
 
 def test_user_information_error(sentry_init, capture_events):
-    sentry_init(integrations=[StarletteIntegration()])
+    sentry_init(
+        send_default_pii=True,
+        integrations=[StarletteIntegration()],
+    )
     starlette_app = starlette_app_factory(
         middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
     )
@@ -390,9 +419,30 @@ def test_user_information_error(sentry_init, capture_events):
     assert user["username"] == "Gabriela"
 
 
+def test_user_information_error_no_pii(sentry_init, capture_events):
+    sentry_init(
+        send_default_pii=False,
+        integrations=[StarletteIntegration()],
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        client.get("/custom_error", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
+
+    (event,) = events
+    assert "user" not in event
+
+
 def test_user_information_transaction(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
+        send_default_pii=True,
         integrations=[StarletteIntegration()],
     )
     starlette_app = starlette_app_factory(
@@ -408,6 +458,24 @@ def test_user_information_transaction(sentry_init, capture_events):
     assert user
     assert "username" in user
     assert user["username"] == "Gabriela"
+
+
+def test_user_information_transaction_no_pii(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+        integrations=[StarletteIntegration()],
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    client.get("/message", auth=("Gabriela", "hello123"))
+
+    (_, transaction_event) = events
+    assert "user" not in transaction_event
 
 
 def test_middleware_spans(sentry_init, capture_events):

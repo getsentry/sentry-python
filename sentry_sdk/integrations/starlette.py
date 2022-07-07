@@ -134,13 +134,13 @@ def patch_exception_middleware(middleware_class):
         # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
         # Also add the user (that was eventually set by be Authentication middle
         # that was called before this middleware). This is done because the authentication
-        # midlleware sets the user in the scope and then (in the same function)
+        # middleware sets the user in the scope and then (in the same function)
         # calls this exception middelware. In case there is no exception (or no handler
-        # for the exception type occuring) then the exception bubbles up and setting the
+        # for the type of exception occuring) then the exception bubbles up and setting the
         # user information into the sentry scope is done in auth middleware and the
         # ASGI middleware will then send everything to Sentry and this is fine.
         # But if there is an exception happening that the exception middleware here
-        # has a handler for it will send the exception directly to Sentry, so we need
+        # has a handler for, it will send the exception directly to Sentry, so we need
         # the user information right now.
         # This is why we do it here.
         _add_user_to_sentry_scope(scope)
@@ -156,6 +156,9 @@ def _add_user_to_sentry_scope(scope):
     adds it to Sentry's scope.
     """
     if "user" not in scope:
+        return
+
+    if not _should_send_default_pii():
         return
 
     hub = Hub.current
@@ -392,7 +395,7 @@ class SentryStarletteMiddleware:
                     # Extract information from request
                     request_info = event.get("request", {})
                     if info:
-                        if "cookies" in info:
+                        if "cookies" in info and _should_send_default_pii():
                             request_info["cookies"] = info["cookies"]
                         if "data" in info:
                             request_info["data"] = info["data"]
