@@ -8,16 +8,14 @@ def test_third_party_baggage():
 
     assert baggage.mutable
     assert baggage.sentry_items == {}
-    assert (
-        sorted(baggage.third_party_items.split(","))
-        == sorted("other-vendor-value-1=foo;bar;baz,other-vendor-value-2=foo;bar;".split(","))
+    assert sorted(baggage.third_party_items.split(",")) == sorted(
+        "other-vendor-value-1=foo;bar;baz,other-vendor-value-2=foo;bar;".split(",")
     )
 
     assert baggage.dynamic_sampling_context() == {}
     assert baggage.serialize() == ""
-    assert (
-        sorted(baggage.serialize(include_third_party=True).split(","))
-        == sorted("other-vendor-value-1=foo;bar;baz,other-vendor-value-2=foo;bar;".split(","))
+    assert sorted(baggage.serialize(include_third_party=True).split(",")) == sorted(
+        "other-vendor-value-1=foo;bar;baz,other-vendor-value-2=foo;bar;".split(",")
     )
 
 
@@ -51,15 +49,19 @@ def test_mixed_baggage():
         "sample_rate": "0.01337",
     }
 
-    assert sorted(baggage.serialize().split(",")) == sorted((
-        "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
-        "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
-        "sentry-sample_rate=0.01337,sentry-user_id=Am%C3%A9lie"
-    ).split(","))
+    assert sorted(baggage.serialize().split(",")) == sorted(
+        (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+            "sentry-sample_rate=0.01337,sentry-user_id=Am%C3%A9lie"
+        ).split(",")
+    )
 
-    assert sorted(baggage.serialize(include_third_party=True).split(",")) == sorted((
-        "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
-        "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
-        "sentry-sample_rate=0.01337,sentry-user_id=Am%C3%A9lie,"
-        "other-vendor-value-1=foo;bar;baz,other-vendor-value-2=foo;bar;"
-    ).split(","))
+    assert sorted(baggage.serialize(include_third_party=True).split(",")) == sorted(
+        (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+            "sentry-sample_rate=0.01337,sentry-user_id=Am%C3%A9lie,"
+            "other-vendor-value-1=foo;bar;baz,other-vendor-value-2=foo;bar;"
+        ).split(",")
+    )
