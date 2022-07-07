@@ -1,0 +1,65 @@
+import pytest
+from sentry_sdk.tracing_utils import Baggage
+
+
+def test_third_party_baggage():
+    header = "other-vendor-value-1=foo;bar;baz, other-vendor-value-2=foo;bar;"
+    baggage = Baggage.from_incoming_header(header)
+
+    assert baggage.mutable
+    assert baggage.sentry_items == {}
+    assert (
+        baggage.third_party_items
+        == "other-vendor-value-1=foo;bar;baz,other-vendor-value-2=foo;bar;"
+    )
+
+    assert baggage.dynamic_sampling_context() == {}
+    assert baggage.serialize() == ""
+    assert (
+        baggage.serialize(include_third_party=True)
+        == "other-vendor-value-1=foo;bar;baz,other-vendor-value-2=foo;bar;"
+    )
+
+
+def test_mixed_baggage():
+    header = (
+        "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
+        "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
+        "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
+    )
+
+    baggage = Baggage.from_incoming_header(header)
+
+    assert not baggage.mutable
+
+    assert baggage.sentry_items == {
+        "public_key": "49d0f7386ad645858ae85020e393bef3",
+        "trace_id": "771a43a4192642f0b136d5159a501700",
+        "user_id": "Amélie",
+        "sample_rate": "0.01337",
+    }
+
+    assert (
+        baggage.third_party_items
+        == "other-vendor-value-1=foo;bar;baz,other-vendor-value-2=foo;bar;"
+    )
+
+    assert baggage.dynamic_sampling_context() == {
+        "public_key": "49d0f7386ad645858ae85020e393bef3",
+        "trace_id": "771a43a4192642f0b136d5159a501700",
+        "user_id": "Amélie",
+        "sample_rate": "0.01337",
+    }
+
+    assert baggage.serialize() == (
+        "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+        "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+        "sentry-sample_rate=0.01337,sentry-user_id=Am%C3%A9lie"
+    )
+
+    assert baggage.serialize(include_third_party=True) == (
+        "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+        "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+        "sentry-sample_rate=0.01337,sentry-user_id=Am%C3%A9lie,"
+        "other-vendor-value-1=foo;bar;baz,other-vendor-value-2=foo;bar;"
+    )
