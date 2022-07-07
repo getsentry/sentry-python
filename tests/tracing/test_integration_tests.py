@@ -1,6 +1,6 @@
+# coding: utf-8
 import weakref
 import gc
-
 import pytest
 
 from sentry_sdk import (
@@ -70,7 +70,7 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
                 "other-vendor-value-1=foo;bar;baz, "
                 "sentry-trace_id=771a43a4192642f0b136d5159a501700, "
                 "sentry-public_key=49d0f7386ad645858ae85020e393bef3, "
-                "sentry-sample_rate=0.01337, sentry-user_id=Am%C3%A9lie, "
+                "sentry-sample_rate=0.01337, sentry-user_id=Amelie, "
                 "other-vendor-value-2=foo;bar;"
             )
 
@@ -91,7 +91,7 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
     assert baggage.sentry_items == {
         "public_key": "49d0f7386ad645858ae85020e393bef3",
         "trace_id": "771a43a4192642f0b136d5159a501700",
-        "user_id": "Amélie",
+        "user_id": "Amelie",
         "sample_rate": "0.01337",
     }
 
@@ -132,7 +132,7 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
         assert trace2.headers["trace"] == {
             "public_key": "49d0f7386ad645858ae85020e393bef3",
             "trace_id": "771a43a4192642f0b136d5159a501700",
-            "user_id": "Amélie",
+            "user_id": "Amelie",
             "sample_rate": "0.01337",
         }
 
