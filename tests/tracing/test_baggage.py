@@ -1,4 +1,3 @@
-import pytest
 from sentry_sdk.tracing_utils import Baggage
 
 
