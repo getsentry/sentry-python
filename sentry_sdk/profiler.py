@@ -150,36 +150,18 @@ class Sampler(object):
     class JSONEncoder(json.JSONEncoder):
         def default(self, o):
             if isinstance(o, Sampler):
+                thread_id = threading.get_ident()
                 return {
-                    'transactionName': o.transaction_name,
-                    'profiles': [{
-                        'weights': o.sample_weights(),
-                        'samples': [sample.stack for sample in o.stack_samples],
-                        'type': 'sampled',
-                        'endValue': o.stack_samples[-1].sample_time, # end ts
-                        'startValue': 0, # start ts
-                        'name': 'main',
-                        'unit': 'nanoseconds',
-                        'threadID': threading.get_ident()
-                    }],
-                    'shared': {
-                        'frames': [{
-                            'name': frame.function_name,
-                            'file': frame.file_name,
-                            'line': frame.line_number
-                        } for frame in o.frame_list()] # TODO: Add all elements
-                        # 'frames': [{
-                        #     'key': string | number,
-                        #     'name': string,
-                        #     'file': string,
-                        #     'line': number,
-                        #     'column': number,
-                        #     'is_application': boolean,
-                        #     'image': string,
-                        #     'resource': string,
-                        #     'threadId': number
-                        # }] # TODO: Add all elements
-                    }
+                    'samples': [{
+                        'frames': sample.stack,
+                        'relative_timestamp_ns': sample.sample_time,
+                        'thread_id': thread_id
+                    } for sample in o.stack_samples],
+                    'frames': [{
+                        'name': frame.function_name,
+                        'file': frame.file_name,
+                        'line': frame.line_number
+                    } for frame in o.frame_list()]
                 }
             
             else:
