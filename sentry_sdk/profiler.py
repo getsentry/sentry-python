@@ -87,11 +87,6 @@ class Sampler(object):
     
     def __exit__(self, *_):
         self.stop()
-        if len(self.stack_samples) > 0:
-            if not os.path.exists('./profiles'):
-                os.makedirs('./profiles')
-            with open(f'./profiles/{datetime.utcnow().isoformat()}Z.json', 'w') as f:
-                f.write(self.to_json())
 
     def start(self):
         self._start_time = nanosecond_time()
