@@ -488,6 +488,7 @@ class Transaction(Span):
         # tracestate data from other vendors, of the form `dogs=yes,cats=maybe`
         "_third_party_tracestate",
         "_measurements",
+        "_profile",
     )
 
     def __init__(
@@ -604,6 +605,7 @@ class Transaction(Span):
             "timestamp": self.timestamp,
             "start_timestamp": self.start_timestamp,
             "spans": finished_spans,
+            "profile": self._profile.to_json()
         }
 
         if has_custom_measurements_enabled():

@@ -80,6 +80,7 @@ class Sampler(object):
         self.interval = interval
         self.stack_samples = []
         self._transaction = transaction
+        transaction._profile = self
     
     def __enter__(self):
         self.start()
