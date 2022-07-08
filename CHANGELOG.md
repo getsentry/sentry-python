@@ -5,11 +5,11 @@
 ### Various fixes & improvements
 
 - feat(tracing): Dynamic Sampling Context / Baggage continuation (#1485) by @sl0thentr0py
-- build(deps): bump sphinx from 4.5.0 to 5.0.2 (#1470) by @dependabot
-- build(deps): bump pep8-naming from 0.11.1 to 0.13.0 (#1457) by @dependabot
-- build(deps): bump actions/setup-python from 3 to 4 (#1465) by @dependabot
-- build(deps): bump mypy from 0.950 to 0.961 (#1464) by @dependabot
-- build(deps): bump actions/cache from 2 to 3 (#1478) by @dependabot
+
+  The SDK now propagates the [W3C Baggage Header](https://www.w3.org/TR/baggage/) from
+  incoming transactions to outgoing requests. It also extracts
+  Sentry specific [sampling information](https://develop.sentry.dev/sdk/performance/dynamic-sampling-context/)
+  and adds it to the transaction headers to enable Dynamic Sampling in the product.
 
 ## 1.6.0
 
