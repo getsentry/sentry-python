@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.7.0
+
+### Various fixes & improvements
+
+- feat(tracing): Dynamic Sampling Context / Baggage continuation (#1485) by @sl0thentr0py
+- build(deps): bump sphinx from 4.5.0 to 5.0.2 (#1470) by @dependabot
+- build(deps): bump pep8-naming from 0.11.1 to 0.13.0 (#1457) by @dependabot
+- build(deps): bump actions/setup-python from 3 to 4 (#1465) by @dependabot
+- build(deps): bump mypy from 0.950 to 0.961 (#1464) by @dependabot
+- build(deps): bump actions/cache from 2 to 3 (#1478) by @dependabot
+
 ## 1.6.0
 
 ### Various fixes & improvements
