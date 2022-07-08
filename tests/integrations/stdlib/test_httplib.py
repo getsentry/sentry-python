@@ -151,7 +151,7 @@ def test_outgoing_trace_headers(
 
         HTTPSConnection("www.squirrelchasers.com").request("GET", "/top-chasers")
 
-        (request_str,) = mock_send.call_args.args
+        (request_str,) = mock_send.call_args[0]
         request_headers = {}
         for line in request_str.decode("utf-8").split("\r\n")[1:]:
             if line:
