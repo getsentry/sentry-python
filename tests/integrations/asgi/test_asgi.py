@@ -230,6 +230,45 @@ def test_transaction(app, sentry_init, capture_events):
     )
 
 
+@pytest.mark.parametrize(
+    "transaction_style,expected_name,expected_source",
+    [
+        (
+            "endpoint",
+            "tests.integrations.asgi.test_asgi.test_transaction_name_and_source.<locals>.hi_with_id",
+            "component",
+        ),
+        (
+            "url",
+            "generic ASGI request",  # the AsgiMiddleware can not extract routes from the Starlette framework used here for testing.
+            "unknown",
+        ),
+    ],
+)
+def test_transaction_name_and_source(
+    sentry_init, app, capture_events, transaction_style, expected_name, expected_source
+):
+    sentry_init(send_default_pii=True)
+
+    custom_app = Starlette()
+
+    @custom_app.route("/sync-message-with-id/{user_id:int}")
+    def hi_with_id(request):
+        capture_message("hi", level="error")
+        return PlainTextResponse("ok")
+
+    custom_app = SentryAsgiMiddleware(custom_app, transaction_style=transaction_style)
+
+    events = capture_events()
+
+    client = TestClient(custom_app)
+    client.get("/sync-message-with-id/123")
+
+    (event,) = events
+    assert event["transaction"] == expected_name
+    assert event["transaction_info"] == {"source": expected_source}
+
+
 def test_traces_sampler_gets_scope_in_sampling_context(
     app, sentry_init, DictionaryContaining  # noqa: N803
 ):

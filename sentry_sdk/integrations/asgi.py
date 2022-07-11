@@ -16,6 +16,7 @@ from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.utils import (
     TRANSACTION_SOURCE_COMPONENT,
     TRANSACTION_SOURCE_ROUTE,
+    TRANSACTION_SOURCE_UNKNOWN,
     ContextVar,
     event_from_exception,
     transaction_from_function,
@@ -38,6 +39,7 @@ if MYPY:
 _asgi_middleware_applied = ContextVar("sentry_asgi_middleware_applied")
 
 _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
+_DEFAULT_TRANSACTION_SOURCE = TRANSACTION_SOURCE_UNKNOWN
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
@@ -185,14 +187,9 @@ class SentryAsgiMiddleware:
         if client and _should_send_default_pii():
             request_info["env"] = {"REMOTE_ADDR": self._get_ip(asgi_scope)}
 
-        has_default_transaction_name = (
-            event.get("transaction", _DEFAULT_TRANSACTION_NAME)
-            == _DEFAULT_TRANSACTION_NAME
+        event = self._set_transaction_name_and_source(
+            event, self.transaction_style, asgi_scope
         )
-        if has_default_transaction_name:
-            event = self._set_transaction_name_and_source(
-                event, self.transaction_style, asgi_scope
-            )
 
         event["request"] = request_info
 
@@ -204,8 +201,15 @@ class SentryAsgiMiddleware:
     # data to your liking it's recommended to use the `before_send` callback
     # for that.
 
-    def _set_transaction_name_and_source(event, transaction_style, asgi_scope):
+    def _set_transaction_name_and_source(self, event, transaction_style, asgi_scope):
         # type: (Event, str, Any) -> Event
+
+        transaction_name_already_set = (
+            event.get("transaction", _DEFAULT_TRANSACTION_NAME)
+            != _DEFAULT_TRANSACTION_NAME
+        )
+        if transaction_name_already_set:
+            return
 
         if transaction_style == "endpoint":
             endpoint = asgi_scope.get("endpoint")
@@ -230,6 +234,17 @@ class SentryAsgiMiddleware:
             "endpoint": TRANSACTION_SOURCE_COMPONENT,
         }
         event["transaction_info"] = {"source": source_for_style[transaction_style]}
+
+        transaction_name_not_set = (
+            event.get("transaction", _DEFAULT_TRANSACTION_NAME)
+            == _DEFAULT_TRANSACTION_NAME
+        )
+
+        if transaction_name_not_set:
+            # If the setting of the transaction name did not work
+            # then set an unknown source. This can happen when ASGI frameworks
+            # that are not yet supported well are used.
+            event["transaction_info"] = {"source": TRANSACTION_SOURCE_UNKNOWN}
 
         return event
 
