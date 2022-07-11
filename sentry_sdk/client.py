@@ -391,6 +391,9 @@ class _Client(object):
             envelope = Envelope(headers=headers)
 
             if is_transaction:
+                if "profile" in event_opt:
+                    envelope.add_profile(event_opt["profile"])
+                    del event_opt["profile"]
                 envelope.add_transaction(event_opt)
             else:
                 envelope.add_event(event_opt)

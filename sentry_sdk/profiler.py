@@ -116,9 +116,22 @@ class Sampler(object):
 
     def to_json(self):
         """
-        Exports this object to a JSON format compatible with Sentry's profiling visualizer
+        Exports this object to a JSON format compatible with Sentry's profiling visualizer.
+        Returns dictionary which can be serialized to JSON.
         """
-        return json.dumps(self, cls=self.JSONEncoder)
+        thread_id = threading.get_ident()
+        return {
+            'samples': [{
+                'frames': sample.stack,
+                'relative_timestamp_ns': sample.sample_time,
+                'thread_id': thread_id
+            } for sample in self.stack_samples],
+            'frames': [{
+                'name': frame.function_name,
+                'file': frame.file_name,
+                'line': frame.line_number
+            } for frame in self.frame_list()]
+        }
 
     def frame_list(self):
          # Build frame array from the frame indices
@@ -142,23 +155,3 @@ class Sampler(object):
     @property
     def transaction_name(self):
         return self._transaction.name
-    
-    class JSONEncoder(json.JSONEncoder):
-        def default(self, o):
-            if isinstance(o, Sampler):
-                thread_id = threading.get_ident()
-                return {
-                    'samples': [{
-                        'frames': sample.stack,
-                        'relative_timestamp_ns': sample.sample_time,
-                        'thread_id': thread_id
-                    } for sample in o.stack_samples],
-                    'frames': [{
-                        'name': frame.function_name,
-                        'file': frame.file_name,
-                        'line': frame.line_number
-                    } for frame in o.frame_list()]
-                }
-            
-            else:
-                return json.JSONEncoder.default(self, o)
