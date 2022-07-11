@@ -27,9 +27,9 @@ except ImportError:
     flask_login = None
 
 try:
-    from flask import Flask, Markup, Request
+    from flask import Flask, Markup, Request  # type: ignore
     from flask import __version__ as FLASK_VERSION  # type: ignore
-    from flask import _app_ctx_stack, _request_ctx_stack
+    from flask import _app_ctx_stack, _request_ctx_stack  # type: ignore
     from flask.signals import (
         before_render_template,
         got_request_exception,
