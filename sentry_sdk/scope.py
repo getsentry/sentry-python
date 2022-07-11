@@ -164,7 +164,10 @@ class Scope(object):
     def transaction(self, value):
         # type: (Any) -> None
         # would be type: (Optional[str]) -> None, see https://github.com/python/mypy/issues/3004
-        """When set this forces a specific transaction name to be set."""
+        """When set this forces a specific transaction name to be set.
+
+        Deprecated: use set_transaction_name instead."""
+
         # XXX: the docstring above is misleading. The implementation of
         # apply_to_event prefers an existing value of event.transaction over
         # anything set in the scope.
@@ -174,6 +177,10 @@ class Scope(object):
         # Without breaking version compatibility, we could make the setter set a
         # transaction name or transaction (self._span) depending on the type of
         # the value argument.
+
+        logger.warning(
+            "Assigning to scope.transaction directly is deprecated: use scope.set_transaction_name() instead."
+        )
         self._transaction = value
         if self._span and self._span.containing_transaction:
             self._span.containing_transaction.name = value
