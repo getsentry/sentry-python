@@ -605,8 +605,10 @@ class Transaction(Span):
             "timestamp": self.timestamp,
             "start_timestamp": self.start_timestamp,
             "spans": finished_spans,
-            "profile": self._profile.to_json()
         }
+
+        if hub.client.options["enable_profiling"]:
+            event["profile"] = self._profile.to_json()
 
         if has_custom_measurements_enabled():
             event["measurements"] = self._measurements
