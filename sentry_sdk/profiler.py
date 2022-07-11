@@ -13,7 +13,6 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 """
 
 import atexit
-from datetime import datetime
 import signal
 import time
 import threading
@@ -79,6 +78,7 @@ class Sampler(object):
     def __init__(self, transaction, interval=0.01):
         self.interval = interval
         self.stack_samples = []
+        self._frame_indices = dict()
         self._transaction = transaction
         transaction._profile = self
     
