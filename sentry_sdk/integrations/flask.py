@@ -110,7 +110,7 @@ def _add_sentry_trace(sender, template, context, **extra):
     )
 
 
-def _add_transaction(scope, style, request):
+def _set_transaction_name_and_source(scope, style, request):
     # type: (Scope, str, Request) -> Scope
     name_for_style = {
         "url": request.url_rule.rule,
@@ -142,7 +142,9 @@ def _request_started(sender, **kwargs):
         # Set the transaction name and source here,
         # but rely on WSGI middleware to actually start the transaction
         try:
-            scope = _add_transaction(scope, integration.transaction_style, request)
+            scope = _set_transaction_name_and_source(
+                scope, integration.transaction_style, request
+            )
         except Exception:
             pass
 
