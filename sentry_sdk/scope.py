@@ -81,6 +81,7 @@ class Scope(object):
         # note that for legacy reasons, _transaction is the transaction *name*,
         # not a Transaction object (the object is stored in _span)
         "_transaction",
+        "_transaction_info",
         "_user",
         "_tags",
         "_contexts",
@@ -109,6 +110,7 @@ class Scope(object):
         self._level = None  # type: Optional[str]
         self._fingerprint = None  # type: Optional[List[str]]
         self._transaction = None  # type: Optional[str]
+        self._transaction_info = {}  # type: Dict[str, str]
         self._user = None  # type: Optional[Dict[str, Any]]
 
         self._tags = {}  # type: Dict[str, Any]
@@ -175,6 +177,17 @@ class Scope(object):
         self._transaction = value
         if self._span and self._span.containing_transaction:
             self._span.containing_transaction.name = value
+
+    def set_transaction_name(self, name, source=None):
+        # type: (str, Optional[str]) -> None
+        """Set the transaction name and optionally the transaction source."""
+        self._transaction = name
+
+        if self._span and self._span.containing_transaction:
+            self._span.containing_transaction.name = name
+
+        if source:
+            self._transaction_info["source"] = source
 
     @_attr_setter
     def user(self, value):
@@ -363,6 +376,9 @@ class Scope(object):
         if event.get("transaction") is None and self._transaction is not None:
             event["transaction"] = self._transaction
 
+        if event.get("transaction_info") is None and self._transaction_info is not None:
+            event["transaction_info"] = self._transaction_info
+
         if event.get("fingerprint") is None and self._fingerprint is not None:
             event["fingerprint"] = self._fingerprint
 
@@ -406,6 +422,8 @@ class Scope(object):
             self._fingerprint = scope._fingerprint
         if scope._transaction is not None:
             self._transaction = scope._transaction
+        if scope._transaction_info is not None:
+            self._transaction_info.update(scope._transaction_info)
         if scope._user is not None:
             self._user = scope._user
         if scope._tags:
@@ -452,6 +470,7 @@ class Scope(object):
         rv._name = self._name
         rv._fingerprint = self._fingerprint
         rv._transaction = self._transaction
+        rv._transaction_info = dict(self._transaction_info)
         rv._user = self._user
 
         rv._tags = dict(self._tags)

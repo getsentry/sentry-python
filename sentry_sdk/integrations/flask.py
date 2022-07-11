@@ -5,6 +5,7 @@ from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     TRANSACTION_SOURCE_COMPONENT,
     TRANSACTION_SOURCE_ROUTE,
@@ -110,6 +111,7 @@ def _add_sentry_trace(sender, template, context, **extra):
 
 
 def _add_transaction(scope, style, request):
+    # type: (Scope, str, Request) -> Scope
     name_for_style = {
         "url": request.url_rule.rule,
         "endpoint": request.url_rule.endpoint,
@@ -119,8 +121,9 @@ def _add_transaction(scope, style, request):
         "endpoint": TRANSACTION_SOURCE_COMPONENT,
     }
 
-    scope.transaction = name_for_style[style]
-    scope.transaction_info = {"source": source_for_style[style]}
+    scope.set_transaction_name(
+        name_for_style.get(style), source=source_for_style.get(style)
+    )
 
     return scope
 
