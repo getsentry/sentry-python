@@ -24,6 +24,11 @@ def app(sentry_init):
         capture_message("hi")
         return "ok"
 
+    @app.route("/message/<message_id>")
+    def hi_with_id(message_id):
+        capture_message("hi")
+        return "ok"
+
     @app.route("/message-named-route", name="hi")
     def named_hi():
         capture_message("hi")
@@ -55,20 +60,21 @@ def test_has_context(sentry_init, app, capture_events, get_client):
 
 
 @pytest.mark.parametrize(
-    "url,transaction_style,expected_transaction",
+    "url,transaction_style,expected_transaction,expected_source",
     [
-        ("/message", "endpoint", "hi"),
-        ("/message", "url", "/message"),
-        ("/message-named-route", "endpoint", "hi"),
+        ("/message", "endpoint", "test_bottle.app.<locals>.hi", "component"),
+        ("/message", "url", "/message", "route"),
+        ("/message/123456", "url", "/message/<message_id>", "route"),
+        ("/message-named-route", "endpoint", "hi", "component"),
     ],
 )
 def test_transaction_style(
     sentry_init,
-    app,
-    capture_events,
+    url,
     transaction_style,
     expected_transaction,
-    url,
+    expected_source,
+    capture_events,
     get_client,
 ):
     sentry_init(
@@ -79,11 +85,12 @@ def test_transaction_style(
     events = capture_events()
 
     client = get_client()
-    response = client.get("/message")
+    response = client.get(url)
     assert response[1] == "200 OK"
 
     (event,) = events
-    assert event["transaction"].endswith(expected_transaction)
+    assert event["transaction"] == expected_transaction
+    assert event["transaction_info"] == {"source": expected_source}
 
 
 @pytest.mark.parametrize("debug", (True, False), ids=["debug", "nodebug"])
