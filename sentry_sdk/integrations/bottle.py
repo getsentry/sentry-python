@@ -2,6 +2,8 @@ from __future__ import absolute_import
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import (
+    TRANSACTION_SOURCE_COMPONENT,
+    TRANSACTION_SOURCE_ROUTE,
     capture_internal_exceptions,
     event_from_exception,
     transaction_from_function,
@@ -20,7 +22,7 @@ if MYPY:
     from typing import Optional
     from bottle import FileUpload, FormsDict, LocalRequest  # type: ignore
 
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import EventProcessor, Event
 
 try:
     from bottle import (
@@ -176,24 +178,37 @@ class BottleRequestExtractor(RequestExtractor):
         return file.content_length
 
 
+def _set_transaction_name_and_source(event, transaction_style, request):
+    # type: (Event, str, Any) -> Event
+
+    name_for_style = {
+        "url": request.route.rule,
+        "endpoint": request.route.name
+        or transaction_from_function(request.route.callback),
+    }
+    source_for_style = {
+        "url": TRANSACTION_SOURCE_ROUTE,
+        "endpoint": TRANSACTION_SOURCE_COMPONENT,
+    }
+
+    event["transaction"] = name_for_style[transaction_style]
+    event["transaction_info"] = {"source": source_for_style[transaction_style]}
+
+    return event
+
+
 def _make_request_event_processor(app, request, integration):
     # type: (Bottle, LocalRequest, BottleIntegration) -> EventProcessor
-    def inner(event, hint):
+    def event_processor(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
 
-        try:
-            if integration.transaction_style == "endpoint":
-                event["transaction"] = request.route.name or transaction_from_function(
-                    request.route.callback
-                )
-            elif integration.transaction_style == "url":
-                event["transaction"] = request.route.rule
-        except Exception:
-            pass
+        event = _set_transaction_name_and_source(
+            event, integration.transaction_style, request
+        )
 
         with capture_internal_exceptions():
             BottleRequestExtractor(request).extract_into_event(event)
 
         return event
 
-    return inner
+    return event_processor
