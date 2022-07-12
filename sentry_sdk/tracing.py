@@ -608,7 +608,10 @@ class Transaction(Span):
         }
 
         if hub.client.options["enable_profiling"]:
-            event["profile"] = self._profile.to_json()
+            try:
+                event["profile"] = self._profile.to_json()
+            except AttributeError:
+                pass # self._profile will not exist if a profile is not collected (e.g. on non-WSGI)
 
         if has_custom_measurements_enabled():
             event["measurements"] = self._measurements
