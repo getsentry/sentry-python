@@ -330,7 +330,12 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
             transaction_name = transaction_from_function(getattr(fn, "view_class", fn))
 
         elif transaction_style == "url":
-            transaction_name = LEGACY_RESOLVER.resolve(request.path_info)
+            if hasattr(request, "urlconf"):
+                transaction_name = LEGACY_RESOLVER.resolve(
+                    request.path_info, urlconf=request.urlconf
+                )
+            else:
+                transaction_name = LEGACY_RESOLVER.resolve(request.path_info)
 
         source_for_style = {
             "function_name": TRANSACTION_SOURCE_COMPONENT,
