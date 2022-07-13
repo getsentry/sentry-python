@@ -4,7 +4,12 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
+from sentry_sdk.utils import (
+    TRANSACTION_SOURCE_COMPONENT,
+    TRANSACTION_SOURCE_ROUTE,
+    capture_internal_exceptions,
+    event_from_exception,
+)
 
 from sentry_sdk._types import MYPY
 
@@ -197,15 +202,32 @@ def _exception_leads_to_http_5xx(ex):
     return is_server_error or is_unhandled_error
 
 
+def _set_transaction_name_and_source(event, transaction_style, request):
+    # type: (Dict[str, Any], str, Any) -> Dict[str, Any]
+
+    name_for_style = {
+        "uri_template": request.uri_template,
+        "path": request.path,
+    }
+    source_for_style = {
+        "uri_template": TRANSACTION_SOURCE_ROUTE,
+        "path": TRANSACTION_SOURCE_COMPONENT,
+    }
+
+    event["transaction"] = name_for_style[transaction_style]
+    event["transaction_info"] = {"source": source_for_style[transaction_style]}
+
+    return event
+
+
 def _make_request_event_processor(req, integration):
     # type: (falcon.Request, FalconIntegration) -> EventProcessor
 
     def event_processor(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-        if integration.transaction_style == "uri_template":
-            event["transaction"] = req.uri_template
-        elif integration.transaction_style == "path":
-            event["transaction"] = req.path
+        event = _set_transaction_name_and_source(
+            event, integration.transaction_style, req
+        )
 
         with capture_internal_exceptions():
             FalconRequestExtractor(req).extract_into_event(event)
