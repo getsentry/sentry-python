@@ -208,7 +208,7 @@ class SentryAsgiMiddleware:
             != _DEFAULT_TRANSACTION_NAME
         )
         if transaction_name_already_set:
-            return
+            return event
 
         if transaction_style == "endpoint":
             endpoint = asgi_scope.get("endpoint")
