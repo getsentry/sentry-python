@@ -92,12 +92,17 @@ def starlette_app_factory(middleware=None):
         capture_message("hi")
         return starlette.responses.JSONResponse({"status": "ok"})
 
+    async def _message_with_id(request):
+        capture_message("hi")
+        return starlette.responses.JSONResponse({"status": "ok"})
+
     app = starlette.applications.Starlette(
         debug=True,
         routes=[
             starlette.routing.Route("/some_url", _homepage),
             starlette.routing.Route("/custom_error", _custom_error),
             starlette.routing.Route("/message", _message),
+            starlette.routing.Route("/message/{message_id}", _message_with_id),
         ],
         middleware=middleware,
     )
@@ -337,14 +342,31 @@ async def test_starlettrequestextractor_extract_request_info_no_pii(sentry_init)
 
 
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction",
+    "url,transaction_style,expected_transaction,expected_source",
     [
-        ("url", "/some_url"),
-        ("endpoint", "_homepage"),
+        ("/message", "url", "/message", "route"),
+        (
+            "/message",
+            "endpoint",
+            "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message",
+            "component",
+        ),
+        ("/message/123456", "url", "/message/{message_id}", "route"),
+        (
+            "/message/123456",
+            "endpoint",
+            "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message_with_id",
+            "component",
+        ),
     ],
 )
-def test_transaction_naming(
-    sentry_init, capture_events, transaction_style, expected_transaction
+def test_transaction_style(
+    sentry_init,
+    capture_events,
+    url,
+    transaction_style,
+    expected_transaction,
+    expected_source,
 ):
     sentry_init(
         integrations=[StarletteIntegration(transaction_style=transaction_style)]
@@ -353,13 +375,11 @@ def test_transaction_naming(
     events = capture_events()
 
     client = TestClient(starlette_app)
-    try:
-        client.get("/some_url")
-    except ZeroDivisionError:
-        pass
+    client.get(url)
 
     (event,) = events
     assert event["transaction"] == expected_transaction
+    assert event["transaction_info"] == {"source": expected_source}
 
 
 @pytest.mark.parametrize(

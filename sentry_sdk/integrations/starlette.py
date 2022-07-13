@@ -9,9 +9,17 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.utils import AnnotatedValue, event_from_exception
+from sentry_sdk.utils import (
+    TRANSACTION_SOURCE_COMPONENT,
+    TRANSACTION_SOURCE_ROUTE,
+    TRANSACTION_SOURCE_UNKNOWN,
+    AnnotatedValue,
+    event_from_exception,
+    transaction_from_function,
+)
 
 if MYPY:
+    from sentry_sdk._types import Event
     from typing import Any, Awaitable, Callable, Dict, Optional, Union
 
 
@@ -365,6 +373,39 @@ class StarletteRequestExtractor:
         return json_data
 
 
+def _set_transaction_name_and_source(event, transaction_style, request):
+    # type: (Event, str, Any) -> Event
+    if "router" not in request.scope:
+        return event
+
+    name = ""
+
+    router = request.scope["router"]
+    for route in router.routes:
+        match = route.matches(request.scope)
+
+        if match[0] == Match.FULL:
+            if transaction_style == "endpoint":
+                name = transaction_from_function(match[1]["endpoint"]) or ""
+            elif transaction_style == "url":
+                name = route.path
+
+    if not name:
+        event["transaction"] = "generic Starlette request"
+        event["transaction_info"] = {"source": TRANSACTION_SOURCE_UNKNOWN}
+        return event
+
+    source_for_style = {
+        "url": TRANSACTION_SOURCE_ROUTE,
+        "endpoint": TRANSACTION_SOURCE_COMPONENT,
+    }
+
+    event["transaction"] = name
+    event["transaction_info"] = {"source": source_for_style[transaction_style]}
+
+    return event
+
+
 class SentryStarletteMiddleware:
     def __init__(self, app, dispatch=None):
         # type: (SentryStarletteMiddleware, Any) -> None
@@ -389,7 +430,7 @@ class SentryStarletteMiddleware:
 
             def _make_request_event_processor(req, integration):
                 # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
-                def inner(event, hint):
+                def event_processor(event, hint):
                     # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
 
                     # Extract information from request
@@ -401,21 +442,13 @@ class SentryStarletteMiddleware:
                             request_info["data"] = info["data"]
                     event["request"] = request_info
 
-                    # Set transaction name
-                    if "router" in req.scope:
-                        router = req.scope["router"]
-                        for route in router.routes:
-                            match = route.matches(req.scope)
-
-                            if match[0] == Match.FULL:
-                                if integration.transaction_style == "endpoint":
-                                    event["transaction"] = match[1]["endpoint"].__name__
-                                elif integration.transaction_style == "url":
-                                    event["transaction"] = route.path
+                    event = _set_transaction_name_and_source(
+                        event, integration.transaction_style, req
+                    )
 
                     return event
 
-                return inner
+                return event_processor
 
             sentry_scope._name = StarletteIntegration.identifier
             sentry_scope.add_event_processor(
