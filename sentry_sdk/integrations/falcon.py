@@ -5,8 +5,7 @@ from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.utils import (
-    TRANSACTION_SOURCE_ROUTE,
-    TRANSACTION_SOURCE_URL,
+    SOURCE_FOR_STYLE,
     capture_internal_exceptions,
     event_from_exception,
 )
@@ -208,13 +207,8 @@ def _set_transaction_name_and_source(event, transaction_style, request):
         "uri_template": request.uri_template,
         "path": request.path,
     }
-    source_for_style = {
-        "uri_template": TRANSACTION_SOURCE_ROUTE,
-        "path": TRANSACTION_SOURCE_URL,
-    }
-
     event["transaction"] = name_for_style[transaction_style]
-    event["transaction_info"] = {"source": source_for_style[transaction_style]}
+    event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
 
     return event
 

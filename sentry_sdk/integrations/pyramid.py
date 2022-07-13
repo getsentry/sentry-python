@@ -7,8 +7,7 @@ import weakref
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
-    TRANSACTION_SOURCE_COMPONENT,
-    TRANSACTION_SOURCE_ROUTE,
+    SOURCE_FOR_STYLE,
     capture_internal_exceptions,
     event_from_exception,
 )
@@ -164,14 +163,9 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
             "route_name": request.matched_route.name,
             "route_pattern": request.matched_route.pattern,
         }
-        source_for_style = {
-            "route_name": TRANSACTION_SOURCE_COMPONENT,
-            "route_pattern": TRANSACTION_SOURCE_ROUTE,
-        }
-
         scope.set_transaction_name(
             name_for_style[transaction_style],
-            source=source_for_style[transaction_style],
+            source=SOURCE_FOR_STYLE[transaction_style],
         )
     except Exception:
         pass

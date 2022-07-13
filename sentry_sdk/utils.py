@@ -52,6 +52,18 @@ TRANSACTION_SOURCE_COMPONENT = "component"
 TRANSACTION_SOURCE_TASK = "task"
 TRANSACTION_SOURCE_UNKNOWN = "unknown"
 
+SOURCE_FOR_STYLE = {
+    "endpoint": TRANSACTION_SOURCE_COMPONENT,
+    "function_name": TRANSACTION_SOURCE_COMPONENT,
+    "handler_name": TRANSACTION_SOURCE_COMPONENT,
+    "method_and_path_pattern": TRANSACTION_SOURCE_ROUTE,
+    "path": TRANSACTION_SOURCE_URL,
+    "route_name": TRANSACTION_SOURCE_COMPONENT,
+    "route_pattern": TRANSACTION_SOURCE_ROUTE,
+    "uri_template": TRANSACTION_SOURCE_ROUTE,
+    "url": TRANSACTION_SOURCE_ROUTE,
+}
+
 
 def json_dumps(data):
     # type: (Any) -> bytes

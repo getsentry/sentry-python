@@ -7,8 +7,7 @@ from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
-    TRANSACTION_SOURCE_COMPONENT,
-    TRANSACTION_SOURCE_ROUTE,
+    SOURCE_FOR_STYLE,
     capture_internal_exceptions,
     event_from_exception,
 )
@@ -117,14 +116,9 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
             "url": request.url_rule.rule,
             "endpoint": request.url_rule.endpoint,
         }
-        source_for_style = {
-            "url": TRANSACTION_SOURCE_ROUTE,
-            "endpoint": TRANSACTION_SOURCE_COMPONENT,
-        }
-
         scope.set_transaction_name(
             name_for_style[transaction_style],
-            source=source_for_style[transaction_style],
+            source=SOURCE_FOR_STYLE[transaction_style],
         )
     except Exception:
         pass

@@ -13,8 +13,7 @@ from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
-    TRANSACTION_SOURCE_COMPONENT,
-    TRANSACTION_SOURCE_ROUTE,
+    SOURCE_FOR_STYLE,
     logger,
     capture_internal_exceptions,
     event_from_exception,
@@ -339,14 +338,9 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
             else:
                 transaction_name = LEGACY_RESOLVER.resolve(request.path_info)
 
-        source_for_style = {
-            "function_name": TRANSACTION_SOURCE_COMPONENT,
-            "url": TRANSACTION_SOURCE_ROUTE,
-        }
-
         scope.set_transaction_name(
             transaction_name,
-            source=source_for_style[transaction_style],
+            source=SOURCE_FOR_STYLE[transaction_style],
         )
     except Exception:
         pass
