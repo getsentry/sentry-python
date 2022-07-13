@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.1
+
+### Various fixes & improvements
+
+- Skip malformed baggage items (#1491) by @robyoung
+
 ## 1.7.0
 
 ### Various fixes & improvements
