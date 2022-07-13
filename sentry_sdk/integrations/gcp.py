@@ -6,6 +6,7 @@ from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.tracing import Transaction
 from sentry_sdk._compat import reraise
 from sentry_sdk.utils import (
+    TRANSACTION_SOURCE_COMPONENT,
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
@@ -81,7 +82,10 @@ def _wrap_func(func):
             if hasattr(gcp_event, "headers"):
                 headers = gcp_event.headers
             transaction = Transaction.continue_from_headers(
-                headers, op="serverless.function", name=environ.get("FUNCTION_NAME", "")
+                headers,
+                op="serverless.function",
+                name=environ.get("FUNCTION_NAME", ""),
+                source=TRANSACTION_SOURCE_COMPONENT,
             )
             sampling_context = {
                 "gcp_env": {
