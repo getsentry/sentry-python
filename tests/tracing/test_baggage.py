@@ -65,3 +65,13 @@ def test_mixed_baggage():
             "other-vendor-value-1=foo;bar;baz,other-vendor-value-2=foo;bar;"
         ).split(",")
     )
+
+
+def test_malformed_baggage():
+    header = ","
+
+    baggage = Baggage.from_incoming_header(header)
+
+    assert baggage.sentry_items == {}
+    assert baggage.third_party_items == ""
+    assert baggage.mutable
