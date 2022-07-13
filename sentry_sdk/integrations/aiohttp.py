@@ -157,7 +157,7 @@ class AioHttpIntegration(Integration):
 
                     scope.set_transaction_name(
                         name,
-                        source=source_for_style.get(integration.transaction_style),
+                        source=source_for_style[integration.transaction_style],
                     )
 
             return rv

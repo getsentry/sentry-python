@@ -42,7 +42,7 @@ TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 class BottleIntegration(Integration):
     identifier = "bottle"
 
-    transaction_style = None
+    transaction_style = ""
 
     def __init__(self, transaction_style="endpoint"):
         # type: (str) -> None

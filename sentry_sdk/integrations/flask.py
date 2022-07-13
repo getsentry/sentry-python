@@ -28,8 +28,8 @@ except ImportError:
 
 try:
     from flask import Flask, Markup, Request  # type: ignore
-    from flask import __version__ as FLASK_VERSION  # type: ignore
-    from flask import _app_ctx_stack, _request_ctx_stack  # type: ignore
+    from flask import __version__ as FLASK_VERSION
+    from flask import _app_ctx_stack, _request_ctx_stack
     from flask.signals import (
         before_render_template,
         got_request_exception,
@@ -49,7 +49,7 @@ TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 class FlaskIntegration(Integration):
     identifier = "flask"
 
-    transaction_style = None
+    transaction_style = ""
 
     def __init__(self, transaction_style="endpoint"):
         # type: (str) -> None
@@ -123,8 +123,8 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         }
 
         scope.set_transaction_name(
-            name_for_style.get(transaction_style),
-            source=source_for_style.get(transaction_style),
+            name_for_style[transaction_style],
+            source=source_for_style[transaction_style],
         )
     except Exception:
         pass

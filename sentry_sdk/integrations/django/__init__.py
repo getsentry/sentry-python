@@ -84,7 +84,7 @@ TRANSACTION_STYLE_VALUES = ("function_name", "url")
 class DjangoIntegration(Integration):
     identifier = "django"
 
-    transaction_style = None
+    transaction_style = ""
     middleware_spans = None
 
     def __init__(self, transaction_style="url", middleware_spans=True):
@@ -324,10 +324,12 @@ def _patch_django_asgi_handler():
 def _set_transaction_name_and_source(scope, transaction_style, request):
     # type: (Scope, str, WSGIRequest) -> Scope
     try:
-        transaction_name = None
+        transaction_name = ""
         if transaction_style == "function_name":
             fn = resolve(request.path).func
-            transaction_name = transaction_from_function(getattr(fn, "view_class", fn))
+            transaction_name = (
+                transaction_from_function(getattr(fn, "view_class", fn)) or ""
+            )
 
         elif transaction_style == "url":
             if hasattr(request, "urlconf"):
@@ -344,7 +346,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
 
         scope.set_transaction_name(
             transaction_name,
-            source=source_for_style.get(transaction_style),
+            source=source_for_style[transaction_style],
         )
     except Exception:
         pass

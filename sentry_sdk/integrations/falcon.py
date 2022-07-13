@@ -92,7 +92,7 @@ TRANSACTION_STYLE_VALUES = ("uri_template", "path")
 class FalconIntegration(Integration):
     identifier = "falcon"
 
-    transaction_style = None
+    transaction_style = ""
 
     def __init__(self, transaction_style="uri_template"):
         # type: (str) -> None

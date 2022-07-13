@@ -50,7 +50,7 @@ TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 class QuartIntegration(Integration):
     identifier = "quart"
 
-    transaction_style = None
+    transaction_style = ""
 
     def __init__(self, transaction_style="endpoint"):
         # type: (str) -> None
@@ -99,8 +99,8 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         }
 
         scope.set_transaction_name(
-            name_for_style.get(transaction_style),
-            source=source_for_style.get(transaction_style),
+            name_for_style[transaction_style],
+            source=source_for_style[transaction_style],
         )
     except Exception:
         pass

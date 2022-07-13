@@ -57,7 +57,7 @@ TRANSACTION_STYLE_VALUES = ("route_name", "route_pattern")
 class PyramidIntegration(Integration):
     identifier = "pyramid"
 
-    transaction_style = None
+    transaction_style = ""
 
     def __init__(self, transaction_style="route_name"):
         # type: (str) -> None
@@ -170,8 +170,8 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         }
 
         scope.set_transaction_name(
-            name_for_style.get(transaction_style),
-            source=source_for_style.get(transaction_style),
+            name_for_style[transaction_style],
+            source=source_for_style[transaction_style],
         )
     except Exception:
         pass
