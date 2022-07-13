@@ -1,5 +1,5 @@
 """
-This file contains code from https://github.com/nylas/nylas-perftools, which is published under the following license:
+This file is originally based on code from https://github.com/nylas/nylas-perftools, which is published under the following license:
 
 The MIT License (MIT)
 
