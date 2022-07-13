@@ -200,7 +200,7 @@ def _exception_leads_to_http_5xx(ex):
 def _make_request_event_processor(req, integration):
     # type: (falcon.Request, FalconIntegration) -> EventProcessor
 
-    def inner(event, hint):
+    def event_processor(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         if integration.transaction_style == "uri_template":
             event["transaction"] = req.uri_template
@@ -212,4 +212,4 @@ def _make_request_event_processor(req, integration):
 
         return event
 
-    return inner
+    return event_processor
