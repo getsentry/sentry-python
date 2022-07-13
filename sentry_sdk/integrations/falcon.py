@@ -5,8 +5,8 @@ from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.utils import (
-    TRANSACTION_SOURCE_COMPONENT,
     TRANSACTION_SOURCE_ROUTE,
+    TRANSACTION_SOURCE_URL,
     capture_internal_exceptions,
     event_from_exception,
 )
@@ -203,15 +203,14 @@ def _exception_leads_to_http_5xx(ex):
 
 
 def _set_transaction_name_and_source(event, transaction_style, request):
-    # type: (Dict[str, Any], str, Any) -> Dict[str, Any]
-
+    # type: (Dict[str, Any], str, falcon.Request) -> Dict[str, Any]
     name_for_style = {
         "uri_template": request.uri_template,
         "path": request.path,
     }
     source_for_style = {
         "uri_template": TRANSACTION_SOURCE_ROUTE,
-        "path": TRANSACTION_SOURCE_COMPONENT,
+        "path": TRANSACTION_SOURCE_URL,
     }
 
     event["transaction"] = name_for_style[transaction_style]
