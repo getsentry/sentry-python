@@ -158,10 +158,9 @@ def _wrap_tracer(task, f):
                     args[3].get("headers") or {},
                     op="celery.task",
                     name="unknown celery task",
+                    source=TRANSACTION_SOURCE_TASK,
                 )
-
                 transaction.name = task.name
-                transaction.source = TRANSACTION_SOURCE_TASK
                 transaction.set_status("ok")
 
             if transaction is None:

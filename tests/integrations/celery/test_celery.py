@@ -155,9 +155,11 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
         assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
 
     execution_event, submission_event = events
-
     assert execution_event["transaction"] == "dummy_task"
+    assert execution_event["transaction_info"] == {"source": "task"}
+
     assert submission_event["transaction"] == "submission"
+    assert submission_event["transaction_info"] == {"source": "unknown"}
 
     assert execution_event["type"] == submission_event["type"] == "transaction"
     assert execution_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
