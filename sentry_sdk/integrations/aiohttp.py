@@ -11,6 +11,8 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import (
+    TRANSACTION_SOURCE_COMPONENT,
+    TRANSACTION_SOURCE_ROUTE,
     capture_internal_exceptions,
     event_from_exception,
     transaction_from_function,
@@ -148,7 +150,15 @@ class AioHttpIntegration(Integration):
 
             if name is not None:
                 with Hub.current.configure_scope() as scope:
-                    scope.transaction = name
+                    source_for_style = {
+                        "handler_name": TRANSACTION_SOURCE_COMPONENT,
+                        "method_and_path_pattern": TRANSACTION_SOURCE_ROUTE,
+                    }
+
+                    scope.set_transaction_name(
+                        name,
+                        source=source_for_style.get(integration.transaction_style),
+                    )
 
             return rv
 

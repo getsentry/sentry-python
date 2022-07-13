@@ -192,6 +192,8 @@ class Scope(object):
 
         if self._span and self._span.containing_transaction:
             self._span.containing_transaction.name = name
+            if source:
+                self._span.containing_transaction.source = source
 
         if source:
             self._transaction_info["source"] = source
