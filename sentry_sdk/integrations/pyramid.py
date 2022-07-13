@@ -5,7 +5,13 @@ import sys
 import weakref
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
+from sentry_sdk.scope import Scope
+from sentry_sdk.utils import (
+    TRANSACTION_SOURCE_COMPONENT,
+    TRANSACTION_SOURCE_ROUTE,
+    capture_internal_exceptions,
+    event_from_exception,
+)
 from sentry_sdk._compat import reraise, iteritems
 
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -76,14 +82,9 @@ class PyramidIntegration(Integration):
 
             if integration is not None:
                 with hub.configure_scope() as scope:
-                    try:
-                        if integration.transaction_style == "route_name":
-                            scope.transaction = request.matched_route.name
-                        elif integration.transaction_style == "route_pattern":
-                            scope.transaction = request.matched_route.pattern
-                    except Exception:
-                        pass
-
+                    scope = _set_transaction_name_and_source(
+                        scope, integration.transaction_style, request
+                    )
                     scope.add_event_processor(
                         _make_event_processor(weakref.ref(request), integration)
                     )
@@ -154,6 +155,28 @@ def _capture_exception(exc_info):
     )
 
     hub.capture_event(event, hint=hint)
+
+
+def _set_transaction_name_and_source(scope, transaction_style, request):
+    # type: (Scope, str, Request) -> Scope
+    try:
+        name_for_style = {
+            "route_name": request.matched_route.name,
+            "route_pattern": request.matched_route.pattern,
+        }
+        source_for_style = {
+            "route_name": TRANSACTION_SOURCE_COMPONENT,
+            "route_pattern": TRANSACTION_SOURCE_ROUTE,
+        }
+
+        scope.set_transaction_name(
+            name_for_style.get(transaction_style),
+            source=source_for_style.get(transaction_style),
+        )
+    except Exception:
+        pass
+
+    return scope
 
 
 class PyramidRequestExtractor(RequestExtractor):
