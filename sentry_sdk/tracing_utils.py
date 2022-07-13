@@ -457,6 +457,8 @@ class Baggage(object):
 
         if header:
             for item in header.split(","):
+                if "=" not in item:
+                    continue
                 item = item.strip()
                 key, val = item.split("=")
                 if Baggage.SENTRY_PREFIX_REGEX.match(key):
