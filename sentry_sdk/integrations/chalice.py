@@ -12,9 +12,9 @@ from sentry_sdk.utils import (
 from sentry_sdk._types import MYPY
 from sentry_sdk._functools import wraps
 
-import chalice
+import chalice  # type: ignore
 from chalice import Chalice, ChaliceViewError
-from chalice.app import EventSourceHandler as ChaliceEventSourceHandler
+from chalice.app import EventSourceHandler as ChaliceEventSourceHandler  # type: ignore
 
 if MYPY:
     from typing import Any
@@ -30,7 +30,7 @@ except ImportError:
     raise DidNotEnable("Chalice is not installed")
 
 
-class EventSourceHandler(ChaliceEventSourceHandler):
+class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
     def __call__(self, event, context):
         # type: (Any, Any) -> Any
         hub = Hub.current
