@@ -110,20 +110,24 @@ def _add_sentry_trace(sender, template, context, **extra):
     )
 
 
-def _set_transaction_name_and_source(scope, style, request):
+def _set_transaction_name_and_source(scope, transaction_style, request):
     # type: (Scope, str, Request) -> Scope
-    name_for_style = {
-        "url": request.url_rule.rule,
-        "endpoint": request.url_rule.endpoint,
-    }
-    source_for_style = {
-        "url": TRANSACTION_SOURCE_ROUTE,
-        "endpoint": TRANSACTION_SOURCE_COMPONENT,
-    }
+    try:
+        name_for_style = {
+            "url": request.url_rule.rule,
+            "endpoint": request.url_rule.endpoint,
+        }
+        source_for_style = {
+            "url": TRANSACTION_SOURCE_ROUTE,
+            "endpoint": TRANSACTION_SOURCE_COMPONENT,
+        }
 
-    scope.set_transaction_name(
-        name_for_style.get(style), source=source_for_style.get(style)
-    )
+        scope.set_transaction_name(
+            name_for_style.get(transaction_style),
+            source=source_for_style.get(transaction_style),
+        )
+    except Exception:
+        pass
 
     return scope
 
@@ -141,13 +145,9 @@ def _request_started(sender, **kwargs):
 
         # Set the transaction name and source here,
         # but rely on WSGI middleware to actually start the transaction
-        try:
-            scope = _set_transaction_name_and_source(
-                scope, integration.transaction_style, request
-            )
-        except Exception:
-            pass
-
+        scope = _set_transaction_name_and_source(
+            scope, integration.transaction_style, request
+        )
         evt_processor = _make_request_event_processor(app, request, integration)
         scope.add_event_processor(evt_processor)
 
