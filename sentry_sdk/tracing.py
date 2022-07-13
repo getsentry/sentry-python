@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import sentry_sdk
 
-from sentry_sdk.utils import logger
+from sentry_sdk.utils import TRANSACTION_SOURCE_UNKNOWN, logger
 from sentry_sdk._types import MYPY
 
 
@@ -498,6 +498,7 @@ class Span(object):
 class Transaction(Span):
     __slots__ = (
         "name",
+        "source",
         "parent_sampled",
         # the sentry portion of the `tracestate` header used to transmit
         # correlation context for server-side dynamic sampling, of the form
@@ -513,6 +514,7 @@ class Transaction(Span):
     def __init__(
         self,
         name="",  # type: str
+        source=TRANSACTION_SOURCE_UNKNOWN,  # type: str
         parent_sampled=None,  # type: Optional[bool]
         sentry_tracestate=None,  # type: Optional[str]
         third_party_tracestate=None,  # type: Optional[str]
@@ -531,6 +533,7 @@ class Transaction(Span):
             name = kwargs.pop("transaction")
         Span.__init__(self, **kwargs)
         self.name = name
+        self.source = source
         self.parent_sampled = parent_sampled
         # if tracestate isn't inherited and set here, it will get set lazily,
         # either the first time an outgoing request needs it for a header or the
@@ -543,7 +546,7 @@ class Transaction(Span):
     def __repr__(self):
         # type: () -> str
         return (
-            "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>"
+            "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, source=%r)>"
             % (
                 self.__class__.__name__,
                 self.name,
@@ -552,6 +555,7 @@ class Transaction(Span):
                 self.span_id,
                 self.parent_span_id,
                 self.sampled,
+                self.source,
             )
         )
 
@@ -621,6 +625,7 @@ class Transaction(Span):
         event = {
             "type": "transaction",
             "transaction": self.name,
+            "transaction_info": {"source": self.source},
             "contexts": {"trace": self.get_trace_context()},
             "tags": self._tags,
             "timestamp": self.timestamp,
@@ -648,6 +653,7 @@ class Transaction(Span):
         rv = super(Transaction, self).to_json()
 
         rv["name"] = self.name
+        rv["source"] = self.source
         rv["sampled"] = self.sampled
 
         return rv
