@@ -39,7 +39,6 @@ if MYPY:
 _asgi_middleware_applied = ContextVar("sentry_asgi_middleware_applied")
 
 _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
-_DEFAULT_TRANSACTION_SOURCE = TRANSACTION_SOURCE_UNKNOWN
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
