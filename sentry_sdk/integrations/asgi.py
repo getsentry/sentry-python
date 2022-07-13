@@ -149,7 +149,7 @@ class SentryAsgiMiddleware:
                         transaction = Transaction(op="asgi.server")
 
                     transaction.name = _DEFAULT_TRANSACTION_NAME
-                    transaction.source + TRANSACTION_SOURCE_UNKNOWN
+                    transaction.source = TRANSACTION_SOURCE_UNKNOWN
                     transaction.set_tag("asgi.type", ty)
 
                     with hub.start_transaction(
@@ -218,7 +218,7 @@ class SentryAsgiMiddleware:
             # done, which is sometime after the request has started. If we have
             # an endpoint, overwrite our generic transaction name.
             if endpoint:
-                name = transaction_from_function(endpoint)
+                name = transaction_from_function(endpoint) or ""
 
         elif transaction_style == "url":
             # FastAPI includes the route object in the scope to let Sentry extract the
