@@ -4,7 +4,13 @@ from sentry_sdk.hub import _should_send_default_pii, Hub
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
+from sentry_sdk.scope import Scope
+from sentry_sdk.utils import (
+    TRANSACTION_SOURCE_COMPONENT,
+    TRANSACTION_SOURCE_ROUTE,
+    capture_internal_exceptions,
+    event_from_exception,
+)
 
 from sentry_sdk._types import MYPY
 
@@ -79,6 +85,29 @@ class QuartIntegration(Integration):
         Quart.__call__ = sentry_patched_asgi_app
 
 
+def _set_transaction_name_and_source(scope, transaction_style, request):
+    # type: (Scope, str, Request) -> Scope
+
+    try:
+        name_for_style = {
+            "url": request.url_rule.rule,
+            "endpoint": request.url_rule.endpoint,
+        }
+        source_for_style = {
+            "url": TRANSACTION_SOURCE_ROUTE,
+            "endpoint": TRANSACTION_SOURCE_COMPONENT,
+        }
+
+        scope.set_transaction_name(
+            name_for_style.get(transaction_style),
+            source=source_for_style.get(transaction_style),
+        )
+    except Exception:
+        pass
+
+    return scope
+
+
 def _request_websocket_started(sender, **kwargs):
     # type: (Quart, **Any) -> None
     hub = Hub.current
@@ -95,13 +124,9 @@ def _request_websocket_started(sender, **kwargs):
 
         # Set the transaction name here, but rely on ASGI middleware
         # to actually start the transaction
-        try:
-            if integration.transaction_style == "endpoint":
-                scope.transaction = request_websocket.url_rule.endpoint
-            elif integration.transaction_style == "url":
-                scope.transaction = request_websocket.url_rule.rule
-        except Exception:
-            pass
+        scope = _set_transaction_name_and_source(
+            scope, integration.transaction_style, request_websocket
+        )
 
         evt_processor = _make_request_event_processor(
             app, request_websocket, integration
