@@ -25,11 +25,11 @@ sys.path.insert(0, os.path.abspath(".."))
 
 # -- Project information -----------------------------------------------------
 
-project = u"sentry-python"
-copyright = u"2019, Sentry Team and Contributors"
-author = u"Sentry Team and Contributors"
+project = "sentry-python"
+copyright = "2019, Sentry Team and Contributors"
+author = "Sentry Team and Contributors"
 
-release = "1.6.0"
+release = "1.7.1"
 version = ".".join(release.split(".")[:2])  # The short X.Y version.
 
 
@@ -72,7 +72,7 @@ language = "en"
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = [u"_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = None
@@ -140,8 +140,8 @@ latex_documents = [
     (
         master_doc,
         "sentry-python.tex",
-        u"sentry-python Documentation",
-        u"Sentry Team and Contributors",
+        "sentry-python Documentation",
+        "Sentry Team and Contributors",
         "manual",
     )
 ]
@@ -151,7 +151,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, "sentry-python", u"sentry-python Documentation", [author], 1)]
+man_pages = [(master_doc, "sentry-python", "sentry-python Documentation", [author], 1)]
 
 
 # -- Options for Texinfo output ----------------------------------------------
@@ -163,7 +163,7 @@ texinfo_documents = [
     (
         master_doc,
         "sentry-python",
-        u"sentry-python Documentation",
+        "sentry-python Documentation",
         author,
         "sentry-python",
         "One line description of project.",

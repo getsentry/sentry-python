@@ -1,6 +1,6 @@
+# coding: utf-8
 import weakref
 import gc
-
 import pytest
 
 from sentry_sdk import (
@@ -49,13 +49,13 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
 @pytest.mark.parametrize("sampled", [True, False, None])
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
-def test_continue_from_headers(sentry_init, capture_events, sampled, sample_rate):
+def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_rate):
     """
     Ensure data is actually passed along via headers, and that they are read
     correctly.
     """
     sentry_init(traces_sample_rate=sample_rate)
-    events = capture_events()
+    envelopes = capture_envelopes()
 
     # make a parent transaction (normally this would be in a different service)
     with start_transaction(
@@ -63,8 +63,16 @@ def test_continue_from_headers(sentry_init, capture_events, sampled, sample_rate
     ) as parent_transaction:
         with start_span() as old_span:
             old_span.sampled = sampled
-            headers = dict(Hub.current.iter_trace_propagation_headers(old_span))
             tracestate = parent_transaction._sentry_tracestate
+
+            headers = dict(Hub.current.iter_trace_propagation_headers(old_span))
+            headers["baggage"] = (
+                "other-vendor-value-1=foo;bar;baz, "
+                "sentry-trace_id=771a43a4192642f0b136d5159a501700, "
+                "sentry-public_key=49d0f7386ad645858ae85020e393bef3, "
+                "sentry-sample_rate=0.01337, sentry-user_id=Amelie, "
+                "other-vendor-value-2=foo;bar;"
+            )
 
     # child transaction, to prove that we can read 'sentry-trace' and
     # `tracestate` header data correctly
@@ -76,6 +84,16 @@ def test_continue_from_headers(sentry_init, capture_events, sampled, sample_rate
     assert child_transaction.parent_span_id == old_span.span_id
     assert child_transaction.span_id != old_span.span_id
     assert child_transaction._sentry_tracestate == tracestate
+
+    baggage = child_transaction._baggage
+    assert baggage
+    assert not baggage.mutable
+    assert baggage.sentry_items == {
+        "public_key": "49d0f7386ad645858ae85020e393bef3",
+        "trace_id": "771a43a4192642f0b136d5159a501700",
+        "user_id": "Amelie",
+        "sample_rate": "0.01337",
+    }
 
     # add child transaction to the scope, to show that the captured message will
     # be tagged with the trace id (since it happens while the transaction is
@@ -89,23 +107,36 @@ def test_continue_from_headers(sentry_init, capture_events, sampled, sample_rate
 
     # in this case the child transaction won't be captured
     if sampled is False or (sample_rate == 0 and sampled is None):
-        trace1, message = events
+        trace1, message = envelopes
+        message_payload = message.get_event()
+        trace1_payload = trace1.get_transaction_event()
 
-        assert trace1["transaction"] == "hi"
+        assert trace1_payload["transaction"] == "hi"
     else:
-        trace1, message, trace2 = events
+        trace1, message, trace2 = envelopes
+        trace1_payload = trace1.get_transaction_event()
+        message_payload = message.get_event()
+        trace2_payload = trace2.get_transaction_event()
 
-        assert trace1["transaction"] == "hi"
-        assert trace2["transaction"] == "ho"
+        assert trace1_payload["transaction"] == "hi"
+        assert trace2_payload["transaction"] == "ho"
 
         assert (
-            trace1["contexts"]["trace"]["trace_id"]
-            == trace2["contexts"]["trace"]["trace_id"]
+            trace1_payload["contexts"]["trace"]["trace_id"]
+            == trace2_payload["contexts"]["trace"]["trace_id"]
             == child_transaction.trace_id
-            == message["contexts"]["trace"]["trace_id"]
+            == message_payload["contexts"]["trace"]["trace_id"]
         )
 
-    assert message["message"] == "hello"
+        assert trace2.headers["trace"] == baggage.dynamic_sampling_context()
+        assert trace2.headers["trace"] == {
+            "public_key": "49d0f7386ad645858ae85020e393bef3",
+            "trace_id": "771a43a4192642f0b136d5159a501700",
+            "user_id": "Amelie",
+            "sample_rate": "0.01337",
+        }
+
+    assert message_payload["message"] == "hello"
 
 
 @pytest.mark.parametrize(
