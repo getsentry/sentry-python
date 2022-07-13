@@ -13,6 +13,8 @@ from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
+    TRANSACTION_SOURCE_COMPONENT,
+    TRANSACTION_SOURCE_ROUTE,
     logger,
     capture_internal_exceptions,
     event_from_exception,
@@ -319,6 +321,32 @@ def _patch_django_asgi_handler():
     patch_django_asgi_handler_impl(ASGIHandler)
 
 
+def _set_transaction_name_and_source(scope, transaction_style, request):
+    # type: (Scope, str, WSGIRequest) -> Scope
+    try:
+        transaction_name = None
+        if transaction_style == "function_name":
+            fn = resolve(request.path).func
+            transaction_name = transaction_from_function(getattr(fn, "view_class", fn))
+
+        elif transaction_style == "url":
+            transaction_name = LEGACY_RESOLVER.resolve(request.path_info)
+
+        source_for_style = {
+            "function_name": TRANSACTION_SOURCE_COMPONENT,
+            "url": TRANSACTION_SOURCE_ROUTE,
+        }
+
+        scope.set_transaction_name(
+            transaction_name,
+            source=source_for_style.get(transaction_style),
+        )
+    except Exception:
+        pass
+
+    return scope
+
+
 def _before_get_response(request):
     # type: (WSGIRequest) -> None
     hub = Hub.current
@@ -330,24 +358,17 @@ def _before_get_response(request):
 
     with hub.configure_scope() as scope:
         # Rely on WSGI middleware to start a trace
-        try:
-            if integration.transaction_style == "function_name":
-                fn = resolve(request.path).func
-                scope.transaction = transaction_from_function(
-                    getattr(fn, "view_class", fn)
-                )
-            elif integration.transaction_style == "url":
-                scope.transaction = LEGACY_RESOLVER.resolve(request.path_info)
-        except Exception:
-            pass
+        scope = _set_transaction_name_and_source(
+            scope, integration.transaction_style, request
+        )
 
         scope.add_event_processor(
             _make_event_processor(weakref.ref(request), integration)
         )
 
 
-def _attempt_resolve_again(request, scope):
-    # type: (WSGIRequest, Scope) -> None
+def _attempt_resolve_again(request, scope, transaction_style):
+    # type: (WSGIRequest, Scope, str) -> None
     """
     Some django middlewares overwrite request.urlconf
     so we need to respect that contract,
@@ -356,13 +377,7 @@ def _attempt_resolve_again(request, scope):
     if not hasattr(request, "urlconf"):
         return
 
-    try:
-        scope.transaction = LEGACY_RESOLVER.resolve(
-            request.path_info,
-            urlconf=request.urlconf,
-        )
-    except Exception:
-        pass
+    _set_transaction_name_and_source(scope, transaction_style, request)
 
 
 def _after_get_response(request):
@@ -373,7 +388,7 @@ def _after_get_response(request):
         return
 
     with hub.configure_scope() as scope:
-        _attempt_resolve_again(request, scope)
+        _attempt_resolve_again(request, scope, integration.transaction_style)
 
 
 def _patch_get_response():
@@ -438,7 +453,7 @@ def _got_request_exception(request=None, **kwargs):
 
         if request is not None and integration.transaction_style == "url":
             with hub.configure_scope() as scope:
-                _attempt_resolve_again(request, scope)
+                _attempt_resolve_again(request, scope, integration.transaction_style)
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
