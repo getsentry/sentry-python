@@ -7,6 +7,7 @@ from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
+    TRANSACTION_SOURCE_COMPONENT,
     event_from_exception,
     capture_internal_exceptions,
     transaction_from_function,
@@ -157,6 +158,7 @@ def _make_event_processor(weak_handler):
         with capture_internal_exceptions():
             method = getattr(handler, handler.request.method.lower())
             event["transaction"] = transaction_from_function(method)
+            event["transaction_info"] = {"source": TRANSACTION_SOURCE_COMPONENT}
 
         with capture_internal_exceptions():
             extractor = TornadoRequestExtractor(request)
