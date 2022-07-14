@@ -45,9 +45,9 @@ TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 class StarletteIntegration(Integration):
     identifier = "starlette"
 
-    transaction_style = None
+    transaction_style = ""
 
-    def __init__(self, transaction_style="endpoint"):
+    def __init__(self, transaction_style="url"):
         # type: (str) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
