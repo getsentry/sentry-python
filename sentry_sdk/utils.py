@@ -271,7 +271,7 @@ class Auth(object):
         )
 
     def to_header(self):
-        # type: (Optional[datetime]) -> str
+        # type: () -> str
         """Returns the auth header a string."""
         rv = [("sentry_key", self.public_key), ("sentry_version", self.version)]
         if self.client is not None:
