@@ -13,7 +13,11 @@ from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.sessions import auto_session_tracking
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_UNKNOWN
+from sentry_sdk.tracing import (
+    SOURCE_FOR_STYLE,
+    TRANSACTION_SOURCE_ROUTE,
+    TRANSACTION_SOURCE_UNKNOWN,
+)
 from sentry_sdk.utils import (
     ContextVar,
     event_from_exception,
@@ -148,7 +152,7 @@ class SentryAsgiMiddleware:
                         transaction = Transaction(op="asgi.server")
 
                     transaction.name = _DEFAULT_TRANSACTION_NAME
-                    transaction.source = TRANSACTION_SOURCE_UNKNOWN
+                    transaction.source = TRANSACTION_SOURCE_ROUTE
                     transaction.set_tag("asgi.type", ty)
 
                     with hub.start_transaction(
