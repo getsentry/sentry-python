@@ -179,13 +179,15 @@ class BottleRequestExtractor(RequestExtractor):
 
 def _set_transaction_name_and_source(event, transaction_style, request):
     # type: (Event, str, Any) -> None
-    name_for_style = {
-        "url": request.route.rule,
-        "endpoint": request.route.name
-        or transaction_from_function(request.route.callback),
-    }
+    name = ""
 
-    event["transaction"] = name_for_style[transaction_style]
+    if transaction_style == "url":
+        name = request.route.rule
+
+    elif transaction_style == "endpoint":
+        name = request.route.name or transaction_from_function(request.route.callback)
+
+    event["transaction"] = name
     event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
 
 
