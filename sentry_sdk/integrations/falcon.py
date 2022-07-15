@@ -202,7 +202,7 @@ def _exception_leads_to_http_5xx(ex):
 
 
 def _set_transaction_name_and_source(event, transaction_style, request):
-    # type: (Dict[str, Any], str, falcon.Request) -> Dict[str, Any]
+    # type: (Dict[str, Any], str, falcon.Request) -> None
     name_for_style = {
         "uri_template": request.uri_template,
         "path": request.path,
@@ -210,17 +210,13 @@ def _set_transaction_name_and_source(event, transaction_style, request):
     event["transaction"] = name_for_style[transaction_style]
     event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
 
-    return event
-
 
 def _make_request_event_processor(req, integration):
     # type: (falcon.Request, FalconIntegration) -> EventProcessor
 
     def event_processor(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-        event = _set_transaction_name_and_source(
-            event, integration.transaction_style, req
-        )
+        _set_transaction_name_and_source(event, integration.transaction_style, req)
 
         with capture_internal_exceptions():
             FalconRequestExtractor(req).extract_into_event(event)

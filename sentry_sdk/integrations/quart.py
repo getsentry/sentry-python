@@ -85,7 +85,7 @@ class QuartIntegration(Integration):
 
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (Scope, str, Request) -> Scope
+    # type: (Scope, str, Request) -> None
 
     try:
         name_for_style = {
@@ -98,8 +98,6 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         )
     except Exception:
         pass
-
-    return scope
 
 
 def _request_websocket_started(sender, **kwargs):
@@ -118,7 +116,7 @@ def _request_websocket_started(sender, **kwargs):
 
         # Set the transaction name here, but rely on ASGI middleware
         # to actually start the transaction
-        scope = _set_transaction_name_and_source(
+        _set_transaction_name_and_source(
             scope, integration.transaction_style, request_websocket
         )
 

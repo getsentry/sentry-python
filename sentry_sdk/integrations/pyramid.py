@@ -81,7 +81,7 @@ class PyramidIntegration(Integration):
 
             if integration is not None:
                 with hub.configure_scope() as scope:
-                    scope = _set_transaction_name_and_source(
+                    _set_transaction_name_and_source(
                         scope, integration.transaction_style, request
                     )
                     scope.add_event_processor(
@@ -157,7 +157,7 @@ def _capture_exception(exc_info):
 
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (Scope, str, Request) -> Scope
+    # type: (Scope, str, Request) -> None
     try:
         name_for_style = {
             "route_name": request.matched_route.name,
@@ -169,8 +169,6 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         )
     except Exception:
         pass
-
-    return scope
 
 
 class PyramidRequestExtractor(RequestExtractor):

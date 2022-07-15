@@ -189,9 +189,7 @@ class SentryAsgiMiddleware:
         if client and _should_send_default_pii():
             request_info["env"] = {"REMOTE_ADDR": self._get_ip(asgi_scope)}
 
-        event = self._set_transaction_name_and_source(
-            event, self.transaction_style, asgi_scope
-        )
+        self._set_transaction_name_and_source(event, self.transaction_style, asgi_scope)
 
         event["request"] = request_info
 
@@ -204,7 +202,7 @@ class SentryAsgiMiddleware:
     # for that.
 
     def _set_transaction_name_and_source(self, event, transaction_style, asgi_scope):
-        # type: (Event, str, Any) -> Event
+        # type: (Event, str, Any) -> None
 
         transaction_name_already_set = (
             event.get("transaction", _DEFAULT_TRANSACTION_NAME)
@@ -240,8 +238,6 @@ class SentryAsgiMiddleware:
 
         event["transaction"] = name
         event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
-
-        return event
 
     def _get_url(self, scope, default_scheme, host):
         # type: (Dict[str, Any], Literal["ws", "http"], Optional[str]) -> str

@@ -178,7 +178,7 @@ class BottleRequestExtractor(RequestExtractor):
 
 
 def _set_transaction_name_and_source(event, transaction_style, request):
-    # type: (Event, str, Any) -> Event
+    # type: (Event, str, Any) -> None
     name_for_style = {
         "url": request.route.rule,
         "endpoint": request.route.name
@@ -188,17 +188,13 @@ def _set_transaction_name_and_source(event, transaction_style, request):
     event["transaction"] = name_for_style[transaction_style]
     event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
 
-    return event
-
 
 def _make_request_event_processor(app, request, integration):
     # type: (Bottle, LocalRequest, BottleIntegration) -> EventProcessor
+
     def event_processor(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-
-        event = _set_transaction_name_and_source(
-            event, integration.transaction_style, request
-        )
+        _set_transaction_name_and_source(event, integration.transaction_style, request)
 
         with capture_internal_exceptions():
             BottleRequestExtractor(request).extract_into_event(event)

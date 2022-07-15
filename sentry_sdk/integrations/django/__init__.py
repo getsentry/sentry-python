@@ -321,7 +321,7 @@ def _patch_django_asgi_handler():
 
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (Scope, str, WSGIRequest) -> Scope
+    # type: (Scope, str, WSGIRequest) -> None
     try:
         transaction_name = ""
         if transaction_style == "function_name":
@@ -345,8 +345,6 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
     except Exception:
         pass
 
-    return scope
-
 
 def _before_get_response(request):
     # type: (WSGIRequest) -> None
@@ -359,9 +357,7 @@ def _before_get_response(request):
 
     with hub.configure_scope() as scope:
         # Rely on WSGI middleware to start a trace
-        scope = _set_transaction_name_and_source(
-            scope, integration.transaction_style, request
-        )
+        _set_transaction_name_and_source(scope, integration.transaction_style, request)
 
         scope.add_event_processor(
             _make_event_processor(weakref.ref(request), integration)
