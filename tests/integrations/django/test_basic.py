@@ -469,14 +469,19 @@ def test_django_connect_breadcrumbs(
 
 
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction",
+    "transaction_style,expected_transaction,expected_source",
     [
-        ("function_name", "tests.integrations.django.myapp.views.message"),
-        ("url", "/message"),
+        ("function_name", "tests.integrations.django.myapp.views.message", "component"),
+        ("url", "/message", "route"),
     ],
 )
 def test_transaction_style(
-    sentry_init, client, capture_events, transaction_style, expected_transaction
+    sentry_init,
+    client,
+    capture_events,
+    transaction_style,
+    expected_transaction,
+    expected_source,
 ):
     sentry_init(
         integrations=[DjangoIntegration(transaction_style=transaction_style)],
@@ -488,6 +493,7 @@ def test_transaction_style(
 
     (event,) = events
     assert event["transaction"] == expected_transaction
+    assert event["transaction_info"] == {"source": expected_source}
 
 
 def test_request_body(sentry_init, client, capture_events):

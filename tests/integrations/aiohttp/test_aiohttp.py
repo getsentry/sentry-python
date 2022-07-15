@@ -196,17 +196,30 @@ async def test_tracing(sentry_init, aiohttp_client, loop, capture_events):
 
 
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction",
+    "url,transaction_style,expected_transaction,expected_source",
     [
         (
+            "/message",
             "handler_name",
             "tests.integrations.aiohttp.test_aiohttp.test_transaction_style.<locals>.hello",
+            "component",
         ),
-        ("method_and_path_pattern", "GET /{var}"),
+        (
+            "/message",
+            "method_and_path_pattern",
+            "GET /{var}",
+            "route",
+        ),
     ],
 )
 async def test_transaction_style(
-    sentry_init, aiohttp_client, capture_events, transaction_style, expected_transaction
+    sentry_init,
+    aiohttp_client,
+    capture_events,
+    url,
+    transaction_style,
+    expected_transaction,
+    expected_source,
 ):
     sentry_init(
         integrations=[AioHttpIntegration(transaction_style=transaction_style)],
@@ -222,13 +235,14 @@ async def test_transaction_style(
     events = capture_events()
 
     client = await aiohttp_client(app)
-    resp = await client.get("/1")
+    resp = await client.get(url)
     assert resp.status == 200
 
     (event,) = events
 
     assert event["type"] == "transaction"
     assert event["transaction"] == expected_transaction
+    assert event["transaction_info"] == {"source": expected_source}
 
 
 async def test_traces_sampler_gets_request_object_in_sampling_context(

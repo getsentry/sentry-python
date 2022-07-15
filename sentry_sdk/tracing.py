@@ -23,6 +23,29 @@ if MYPY:
     from sentry_sdk._types import SamplingContext, MeasurementUnit
 
 
+# Transaction source
+# see https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
+TRANSACTION_SOURCE_CUSTOM = "custom"
+TRANSACTION_SOURCE_URL = "url"
+TRANSACTION_SOURCE_ROUTE = "route"
+TRANSACTION_SOURCE_VIEW = "view"
+TRANSACTION_SOURCE_COMPONENT = "component"
+TRANSACTION_SOURCE_TASK = "task"
+TRANSACTION_SOURCE_UNKNOWN = "unknown"
+
+SOURCE_FOR_STYLE = {
+    "endpoint": TRANSACTION_SOURCE_COMPONENT,
+    "function_name": TRANSACTION_SOURCE_COMPONENT,
+    "handler_name": TRANSACTION_SOURCE_COMPONENT,
+    "method_and_path_pattern": TRANSACTION_SOURCE_ROUTE,
+    "path": TRANSACTION_SOURCE_URL,
+    "route_name": TRANSACTION_SOURCE_COMPONENT,
+    "route_pattern": TRANSACTION_SOURCE_ROUTE,
+    "uri_template": TRANSACTION_SOURCE_ROUTE,
+    "url": TRANSACTION_SOURCE_ROUTE,
+}
+
+
 class _SpanRecorder(object):
     """Limits the number of spans recorded in a transaction."""
 
@@ -498,6 +521,7 @@ class Span(object):
 class Transaction(Span):
     __slots__ = (
         "name",
+        "source",
         "parent_sampled",
         # the sentry portion of the `tracestate` header used to transmit
         # correlation context for server-side dynamic sampling, of the form
@@ -517,6 +541,7 @@ class Transaction(Span):
         sentry_tracestate=None,  # type: Optional[str]
         third_party_tracestate=None,  # type: Optional[str]
         baggage=None,  # type: Optional[Baggage]
+        source=TRANSACTION_SOURCE_UNKNOWN,  # type: str
         **kwargs  # type: Any
     ):
         # type: (...) -> None
@@ -531,6 +556,7 @@ class Transaction(Span):
             name = kwargs.pop("transaction")
         Span.__init__(self, **kwargs)
         self.name = name
+        self.source = source
         self.parent_sampled = parent_sampled
         # if tracestate isn't inherited and set here, it will get set lazily,
         # either the first time an outgoing request needs it for a header or the
@@ -543,7 +569,7 @@ class Transaction(Span):
     def __repr__(self):
         # type: () -> str
         return (
-            "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>"
+            "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, source=%r)>"
             % (
                 self.__class__.__name__,
                 self.name,
@@ -552,6 +578,7 @@ class Transaction(Span):
                 self.span_id,
                 self.parent_span_id,
                 self.sampled,
+                self.source,
             )
         )
 
@@ -621,6 +648,7 @@ class Transaction(Span):
         event = {
             "type": "transaction",
             "transaction": self.name,
+            "transaction_info": {"source": self.source},
             "contexts": {"trace": self.get_trace_context()},
             "tags": self._tags,
             "timestamp": self.timestamp,
@@ -648,6 +676,7 @@ class Transaction(Span):
         rv = super(Transaction, self).to_json()
 
         rv["name"] = self.name
+        rv["source"] = self.source
         rv["sampled"] = self.sampled
 
         return rv
