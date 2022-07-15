@@ -6,8 +6,8 @@ import weakref
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import Scope
+from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
-    SOURCE_FOR_STYLE,
     capture_internal_exceptions,
     event_from_exception,
 )

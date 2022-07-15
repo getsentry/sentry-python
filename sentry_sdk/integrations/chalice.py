@@ -4,8 +4,8 @@ from sentry_sdk._compat import reraise
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
+from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
 from sentry_sdk.utils import (
-    TRANSACTION_SOURCE_COMPONENT,
     capture_internal_exceptions,
     event_from_exception,
 )

@@ -4,8 +4,8 @@ from inspect import isawaitable
 
 from sentry_sdk._compat import urlparse, reraise
 from sentry_sdk.hub import Hub
+from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
 from sentry_sdk.utils import (
-    TRANSACTION_SOURCE_COMPONENT,
     capture_internal_exceptions,
     event_from_exception,
     HAS_REAL_CONTEXTVARS,

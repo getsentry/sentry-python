@@ -5,8 +5,8 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import Scope
+from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
-    SOURCE_FOR_STYLE,
     capture_internal_exceptions,
     event_from_exception,
 )

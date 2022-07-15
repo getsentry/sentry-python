@@ -3,10 +3,9 @@ from os import environ
 import sys
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
-from sentry_sdk.tracing import Transaction
+from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, Transaction
 from sentry_sdk._compat import reraise
 from sentry_sdk.utils import (
-    TRANSACTION_SOURCE_COMPONENT,
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,

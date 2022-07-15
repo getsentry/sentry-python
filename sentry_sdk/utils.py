@@ -42,28 +42,6 @@ logger = logging.getLogger("sentry_sdk.errors")
 MAX_STRING_LENGTH = 512
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
-# Transaction source
-# see https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
-TRANSACTION_SOURCE_CUSTOM = "custom"
-TRANSACTION_SOURCE_URL = "url"
-TRANSACTION_SOURCE_ROUTE = "route"
-TRANSACTION_SOURCE_VIEW = "view"
-TRANSACTION_SOURCE_COMPONENT = "component"
-TRANSACTION_SOURCE_TASK = "task"
-TRANSACTION_SOURCE_UNKNOWN = "unknown"
-
-SOURCE_FOR_STYLE = {
-    "endpoint": TRANSACTION_SOURCE_COMPONENT,
-    "function_name": TRANSACTION_SOURCE_COMPONENT,
-    "handler_name": TRANSACTION_SOURCE_COMPONENT,
-    "method_and_path_pattern": TRANSACTION_SOURCE_ROUTE,
-    "path": TRANSACTION_SOURCE_URL,
-    "route_name": TRANSACTION_SOURCE_COMPONENT,
-    "route_pattern": TRANSACTION_SOURCE_ROUTE,
-    "uri_template": TRANSACTION_SOURCE_ROUTE,
-    "url": TRANSACTION_SOURCE_ROUTE,
-}
-
 
 def json_dumps(data):
     # type: (Any) -> bytes

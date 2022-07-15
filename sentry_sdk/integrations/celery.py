@@ -3,8 +3,8 @@ from __future__ import absolute_import
 import sys
 
 from sentry_sdk.hub import Hub
+from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import (
-    TRANSACTION_SOURCE_TASK,
     capture_internal_exceptions,
     event_from_exception,
 )

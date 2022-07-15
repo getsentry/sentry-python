@@ -3,11 +3,10 @@ import contextlib
 from inspect import iscoroutinefunction
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
-from sentry_sdk.tracing import Transaction
+from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, Transaction
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
-    TRANSACTION_SOURCE_COMPONENT,
     event_from_exception,
     capture_internal_exceptions,
     transaction_from_function,

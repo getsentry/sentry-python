@@ -9,9 +9,8 @@ from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
 )
-from sentry_sdk.tracing import Transaction
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, Transaction
 from sentry_sdk.utils import (
-    SOURCE_FOR_STYLE,
     capture_internal_exceptions,
     event_from_exception,
     transaction_from_function,
