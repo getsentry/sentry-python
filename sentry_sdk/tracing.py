@@ -537,11 +537,11 @@ class Transaction(Span):
     def __init__(
         self,
         name="",  # type: str
-        source=TRANSACTION_SOURCE_UNKNOWN,  # type: str
         parent_sampled=None,  # type: Optional[bool]
         sentry_tracestate=None,  # type: Optional[str]
         third_party_tracestate=None,  # type: Optional[str]
         baggage=None,  # type: Optional[Baggage]
+        source=TRANSACTION_SOURCE_UNKNOWN,  # type: str
         **kwargs  # type: Any
     ):
         # type: (...) -> None
