@@ -25,6 +25,7 @@ if MYPY:
     from typing import Optional
     from typing import TypeVar
     from typing import Protocol
+    from typing import Generator
 
     from sentry_sdk.utils import ExcInfo
     from sentry_sdk._types import EventProcessor
@@ -95,12 +96,12 @@ def get_request_url(environ, use_x_forwarded_for=False):
     )
 
 @contextmanager
-def conditional_context_manager(manager, condition):
-    """
-    Conditionally calls a given context manager if condition met; otherwise, acts as a no-op context manager.
-    """
-    if condition:
-        with manager:
+def profiling(transaction, hub=None):
+    # type: (Transaction, Optional[Hub]) -> Generator[None, None, None]
+    if hub is None:
+        hub = Hub.current
+    if hub.client.options["enable_profiling"]:
+        with profiler.Sampler(transaction):
             yield
     else:
         yield
@@ -139,7 +140,9 @@ class SentryWsgiMiddleware(object):
 
                     with hub.start_transaction(
                         transaction, custom_sampling_context={"wsgi_environ": environ}
-                    ), conditional_context_manager(profiler.Sampler(transaction), hub.client.options['enable_profiling']):
+                    ), profiling(
+                        transaction, hub
+                    ):
                         try:
                             rv = self.app(
                                 environ,

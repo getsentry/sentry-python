@@ -48,9 +48,6 @@ class FrameData:
     def __hash__(self):
         return hash(self._attribute_tuple)
 
-    def __str__(self):
-        return f'{self.function_name}({self.module}) in {self.file_name}:{self.line_number}'
-
 class StackSample:
     def __init__(self, top_frame, profiler_start_time, frame_indices):
         self.sample_time = nanosecond_time() - profiler_start_time
@@ -66,9 +63,6 @@ class StackSample:
             self.stack.append(frame_indices[frame_data])
             frame = frame.f_back
         self.stack = list(reversed(self.stack))
-
-    def __str__(self):
-        return f'Time: {self.sample_time}; Stack: {[str(frame) for frame in reversed(self.stack)]}'
 
 class Sampler(object):
     """
@@ -89,7 +83,7 @@ class Sampler(object):
         if len(self.stack_samples) > 0:
             if not os.path.exists('./profiles'):
                 os.makedirs('./profiles')
-            with open(f'./profiles/{datetime.utcnow().isoformat()}Z.json', 'w') as f:
+            with open('./profiles/{0}Z.json'.format(datetime.utcnow().isoformat()), 'w') as f:
                 f.write(self.to_json())
 
     def start(self):
@@ -99,7 +93,7 @@ class Sampler(object):
         try:
             signal.signal(signal.SIGVTALRM, self._sample)
         except ValueError:
-            logger.warn('Profiler failed to run because it was started from a non-main thread') # TODO: Does not print anything
+            logger.error('Profiler failed to run because it was started from a non-main thread')
             return 
 
         signal.setitimer(signal.ITIMER_VIRTUAL, self.interval)
@@ -133,9 +127,6 @@ class Sampler(object):
 
     def samples(self):
         return len(self.stack_samples)
-
-    def __str__(self):
-        return '\n'.join([str(sample) for sample in self.stack_samples])
 
     def stop(self):
         signal.setitimer(signal.ITIMER_VIRTUAL, 0)
