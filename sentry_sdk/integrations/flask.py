@@ -1,23 +1,23 @@
 from __future__ import absolute_import
 
-from sentry_sdk.hub import Hub, _should_send_default_pii
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
-from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.integrations._wsgi_common import RequestExtractor
-
 from sentry_sdk._types import MYPY
+from sentry_sdk.hub import Hub, _should_send_default_pii
+from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations._wsgi_common import RequestExtractor
+from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.scope import Scope
+from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+)
 
 if MYPY:
-    from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from typing import Any
-    from typing import Dict
-    from werkzeug.datastructures import ImmutableMultiDict
-    from werkzeug.datastructures import FileStorage
-    from typing import Union
-    from typing import Callable
+    from typing import Any, Callable, Dict, Union
 
     from sentry_sdk._types import EventProcessor
+    from sentry_sdk.integrations.wsgi import _ScopedResponse
+    from werkzeug.datastructures import FileStorage, ImmutableMultiDict
 
 
 try:
@@ -26,14 +26,9 @@ except ImportError:
     flask_login = None
 
 try:
-    from flask import (  # type: ignore
-        Markup,
-        Request,
-        Flask,
-        _request_ctx_stack,
-        _app_ctx_stack,
-        __version__ as FLASK_VERSION,
-    )
+    from flask import Flask, Markup, Request  # type: ignore
+    from flask import __version__ as FLASK_VERSION
+    from flask import _app_ctx_stack, _request_ctx_stack
     from flask.signals import (
         before_render_template,
         got_request_exception,
@@ -53,7 +48,7 @@ TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 class FlaskIntegration(Integration):
     identifier = "flask"
 
-    transaction_style = None
+    transaction_style = ""
 
     def __init__(self, transaction_style="endpoint"):
         # type: (str) -> None
@@ -114,6 +109,21 @@ def _add_sentry_trace(sender, template, context, **extra):
     )
 
 
+def _set_transaction_name_and_source(scope, transaction_style, request):
+    # type: (Scope, str, Request) -> None
+    try:
+        name_for_style = {
+            "url": request.url_rule.rule,
+            "endpoint": request.url_rule.endpoint,
+        }
+        scope.set_transaction_name(
+            name_for_style[transaction_style],
+            source=SOURCE_FOR_STYLE[transaction_style],
+        )
+    except Exception:
+        pass
+
+
 def _request_started(sender, **kwargs):
     # type: (Flask, **Any) -> None
     hub = Hub.current
@@ -125,16 +135,9 @@ def _request_started(sender, **kwargs):
     with hub.configure_scope() as scope:
         request = _request_ctx_stack.top.request
 
-        # Set the transaction name here, but rely on WSGI middleware to actually
-        # start the transaction
-        try:
-            if integration.transaction_style == "endpoint":
-                scope.transaction = request.url_rule.endpoint
-            elif integration.transaction_style == "url":
-                scope.transaction = request.url_rule.rule
-        except Exception:
-            pass
-
+        # Set the transaction name and source here,
+        # but rely on WSGI middleware to actually start the transaction
+        _set_transaction_name_and_source(scope, integration.transaction_style, request)
         evt_processor = _make_request_event_processor(app, request, integration)
         scope.add_event_processor(evt_processor)
 
