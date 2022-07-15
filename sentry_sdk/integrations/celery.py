@@ -3,7 +3,11 @@ from __future__ import absolute_import
 import sys
 
 from sentry_sdk.hub import Hub
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
+from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+)
 from sentry_sdk.tracing import Transaction
 from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -154,8 +158,8 @@ def _wrap_tracer(task, f):
                     args[3].get("headers") or {},
                     op="celery.task",
                     name="unknown celery task",
+                    source=TRANSACTION_SOURCE_TASK,
                 )
-
                 transaction.name = task.name
                 transaction.set_status("ok")
 

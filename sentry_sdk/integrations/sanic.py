@@ -4,6 +4,7 @@ from inspect import isawaitable
 
 from sentry_sdk._compat import urlparse, reraise
 from sentry_sdk.hub import Hub
+from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -191,7 +192,9 @@ async def _set_transaction(request, route, **kwargs):
         with capture_internal_exceptions():
             with hub.configure_scope() as scope:
                 route_name = route.name.replace(request.app.name, "").strip(".")
-                scope.transaction = route_name
+                scope.set_transaction_name(
+                    route_name, source=TRANSACTION_SOURCE_COMPONENT
+                )
 
 
 def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
@@ -268,9 +271,14 @@ def _legacy_router_get(self, *args):
                         # Format: app_name.route_name
                         sanic_route = sanic_route[len(sanic_app_name) + 1 :]
 
-                    scope.transaction = sanic_route
+                    scope.set_transaction_name(
+                        sanic_route, source=TRANSACTION_SOURCE_COMPONENT
+                    )
                 else:
-                    scope.transaction = rv[0].__name__
+                    scope.set_transaction_name(
+                        rv[0].__name__, source=TRANSACTION_SOURCE_COMPONENT
+                    )
+
     return rv
 
 

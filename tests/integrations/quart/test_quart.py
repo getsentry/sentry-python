@@ -36,6 +36,11 @@ async def app():
         capture_message("hi")
         return "ok"
 
+    @app.route("/message/<message_id>")
+    async def hi_with_id(message_id):
+        capture_message("hi with id")
+        return "ok with id"
+
     return app
 
 
@@ -64,10 +69,22 @@ async def test_has_context(sentry_init, app, capture_events):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction", [("endpoint", "hi"), ("url", "/message")]
+    "url,transaction_style,expected_transaction,expected_source",
+    [
+        ("/message", "endpoint", "hi", "component"),
+        ("/message", "url", "/message", "route"),
+        ("/message/123456", "endpoint", "hi_with_id", "component"),
+        ("/message/123456", "url", "/message/<message_id>", "route"),
+    ],
 )
 async def test_transaction_style(
-    sentry_init, app, capture_events, transaction_style, expected_transaction
+    sentry_init,
+    app,
+    capture_events,
+    url,
+    transaction_style,
+    expected_transaction,
+    expected_source,
 ):
     sentry_init(
         integrations=[
@@ -77,7 +94,7 @@ async def test_transaction_style(
     events = capture_events()
 
     client = app.test_client()
-    response = await client.get("/message")
+    response = await client.get(url)
     assert response.status_code == 200
 
     (event,) = events
