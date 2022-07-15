@@ -19,6 +19,7 @@ if MYPY:
     from typing import List
     from typing import Tuple
     from typing import Iterator
+    from sentry_sdk.profiler import Sampler
 
     from sentry_sdk._types import SamplingContext, MeasurementUnit
 
@@ -565,6 +566,7 @@ class Transaction(Span):
         self._sentry_tracestate = sentry_tracestate
         self._third_party_tracestate = third_party_tracestate
         self._measurements = {}  # type: Dict[str, Any]
+        self._profile = None # type: Optional[Sampler]
         self._baggage = baggage
 
     def __repr__(self):
@@ -657,11 +659,8 @@ class Transaction(Span):
             "spans": finished_spans,
         }
 
-        if hub.client.options["enable_profiling"]:
-            try:
-                event["profile"] = self._profile.to_json()
-            except AttributeError:
-                pass # self._profile will not exist if a profile is not collected (e.g. on non-WSGI)
+        if hub.client.options["enable_profiling"] and self._profile is not None:
+            event["profile"] = self._profile.to_json()
 
         if has_custom_measurements_enabled():
             event["measurements"] = self._measurements
