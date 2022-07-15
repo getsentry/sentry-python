@@ -16,13 +16,15 @@ from sentry_sdk.utils import (
     to_string,
     from_base64,
 )
-from sentry_sdk._compat import PY2
+from sentry_sdk._compat import PY2, iteritems
 from sentry_sdk._types import MYPY
 
 if PY2:
     from collections import Mapping
+    from urllib import quote, unquote
 else:
     from collections.abc import Mapping
+    from urllib.parse import quote, unquote
 
 if MYPY:
     import typing
@@ -211,27 +213,29 @@ def maybe_create_breadcrumbs_from_span(hub, span):
 
 
 def extract_sentrytrace_data(header):
-    # type: (Optional[str]) -> typing.Mapping[str, Union[str, bool, None]]
+    # type: (Optional[str]) -> Optional[typing.Mapping[str, Union[str, bool, None]]]
     """
     Given a `sentry-trace` header string, return a dictionary of data.
     """
-    trace_id = parent_span_id = parent_sampled = None
+    if not header:
+        return None
 
-    if header:
-        if header.startswith("00-") and header.endswith("-00"):
-            header = header[3:-3]
+    if header.startswith("00-") and header.endswith("-00"):
+        header = header[3:-3]
 
-        match = SENTRY_TRACE_REGEX.match(header)
+    match = SENTRY_TRACE_REGEX.match(header)
+    if not match:
+        return None
 
-        if match:
-            trace_id, parent_span_id, sampled_str = match.groups()
+    trace_id, parent_span_id, sampled_str = match.groups()
+    parent_sampled = None
 
-            if trace_id:
-                trace_id = "{:032x}".format(int(trace_id, 16))
-            if parent_span_id:
-                parent_span_id = "{:016x}".format(int(parent_span_id, 16))
-            if sampled_str:
-                parent_sampled = sampled_str != "0"
+    if trace_id:
+        trace_id = "{:032x}".format(int(trace_id, 16))
+    if parent_span_id:
+        parent_span_id = "{:016x}".format(int(parent_span_id, 16))
+    if sampled_str:
+        parent_sampled = sampled_str != "0"
 
     return {
         "trace_id": trace_id,
@@ -411,6 +415,88 @@ def has_custom_measurements_enabled():
     client = sentry_sdk.Hub.current.client
     options = client and client.options
     return bool(options and options["_experiments"].get("custom_measurements"))
+
+
+class Baggage(object):
+    __slots__ = ("sentry_items", "third_party_items", "mutable")
+
+    SENTRY_PREFIX = "sentry-"
+    SENTRY_PREFIX_REGEX = re.compile("^sentry-")
+
+    # DynamicSamplingContext
+    DSC_KEYS = [
+        "trace_id",
+        "public_key",
+        "sample_rate",
+        "release",
+        "environment",
+        "transaction",
+        "user_id",
+        "user_segment",
+    ]
+
+    def __init__(
+        self,
+        sentry_items,  # type: Dict[str, str]
+        third_party_items="",  # type: str
+        mutable=True,  # type: bool
+    ):
+        self.sentry_items = sentry_items
+        self.third_party_items = third_party_items
+        self.mutable = mutable
+
+    @classmethod
+    def from_incoming_header(cls, header):
+        # type: (Optional[str]) -> Baggage
+        """
+        freeze if incoming header already has sentry baggage
+        """
+        sentry_items = {}
+        third_party_items = ""
+        mutable = True
+
+        if header:
+            for item in header.split(","):
+                if "=" not in item:
+                    continue
+                item = item.strip()
+                key, val = item.split("=")
+                if Baggage.SENTRY_PREFIX_REGEX.match(key):
+                    baggage_key = unquote(key.split("-")[1])
+                    sentry_items[baggage_key] = unquote(val)
+                    mutable = False
+                else:
+                    third_party_items += ("," if third_party_items else "") + item
+
+        return Baggage(sentry_items, third_party_items, mutable)
+
+    def freeze(self):
+        # type: () -> None
+        self.mutable = False
+
+    def dynamic_sampling_context(self):
+        # type: () -> Dict[str, str]
+        header = {}
+
+        for key in Baggage.DSC_KEYS:
+            item = self.sentry_items.get(key)
+            if item:
+                header[key] = item
+
+        return header
+
+    def serialize(self, include_third_party=False):
+        # type: (bool) -> str
+        items = []
+
+        for key, val in iteritems(self.sentry_items):
+            item = Baggage.SENTRY_PREFIX + quote(key) + "=" + quote(val)
+            items.append(item)
+
+        if include_third_party:
+            items.append(self.third_party_items)
+
+        return ",".join(items)
 
 
 # Circular imports

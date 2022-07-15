@@ -21,8 +21,14 @@ def make_app(sentry_init):
                 sentry_sdk.capture_message("hi")
                 resp.media = "hi"
 
+        class MessageByIdResource:
+            def on_get(self, req, resp, message_id):
+                sentry_sdk.capture_message("hi")
+                resp.media = "hi"
+
         app = falcon.API()
         app.add_route("/message", MessageResource())
+        app.add_route("/message/{message_id:int}", MessageByIdResource())
 
         return app
 
@@ -53,22 +59,34 @@ def test_has_context(sentry_init, capture_events, make_client):
 
 
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction",
-    [("uri_template", "/message"), ("path", "/message")],
+    "url,transaction_style,expected_transaction,expected_source",
+    [
+        ("/message", "uri_template", "/message", "route"),
+        ("/message", "path", "/message", "url"),
+        ("/message/123456", "uri_template", "/message/{message_id:int}", "route"),
+        ("/message/123456", "path", "/message/123456", "url"),
+    ],
 )
 def test_transaction_style(
-    sentry_init, make_client, capture_events, transaction_style, expected_transaction
+    sentry_init,
+    make_client,
+    capture_events,
+    url,
+    transaction_style,
+    expected_transaction,
+    expected_source,
 ):
     integration = FalconIntegration(transaction_style=transaction_style)
     sentry_init(integrations=[integration])
     events = capture_events()
 
     client = make_client()
-    response = client.simulate_get("/message")
+    response = client.simulate_get(url)
     assert response.status == falcon.HTTP_200
 
     (event,) = events
     assert event["transaction"] == expected_transaction
+    assert event["transaction_info"] == {"source": expected_source}
 
 
 def test_unhandled_errors(sentry_init, capture_exceptions, capture_events):
