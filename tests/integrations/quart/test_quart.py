@@ -1,4 +1,5 @@
 import pytest
+import pytest_asyncio
 
 quart = pytest.importorskip("quart")
 
@@ -21,7 +22,7 @@ import sentry_sdk.integrations.quart as quart_sentry
 auth_manager = AuthManager()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def app():
     app = Quart(__name__)
     app.debug = True
