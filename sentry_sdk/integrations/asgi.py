@@ -209,7 +209,7 @@ class SentryAsgiMiddleware:
             != _DEFAULT_TRANSACTION_NAME
         )
         if transaction_name_already_set:
-            return event
+            return
 
         name = ""
 
@@ -234,7 +234,7 @@ class SentryAsgiMiddleware:
             # If no transaction name can be found set an unknown source.
             # This can happen when ASGI frameworks that are not yet supported well are used.
             event["transaction_info"] = {"source": TRANSACTION_SOURCE_UNKNOWN}
-            return event
+            return
 
         event["transaction"] = name
         event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}

@@ -182,10 +182,14 @@ def _set_transaction_name_and_source(event, transaction_style, request):
     name = ""
 
     if transaction_style == "url":
-        name = request.route.rule
+        name = request.route.rule or ""
 
     elif transaction_style == "endpoint":
-        name = request.route.name or transaction_from_function(request.route.callback)
+        name = (
+            request.route.name
+            or transaction_from_function(request.route.callback)
+            or ""
+        )
 
     event["transaction"] = name
     event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
