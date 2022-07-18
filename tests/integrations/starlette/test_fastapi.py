@@ -1,5 +1,4 @@
 import pytest
-
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 
 fastapi = pytest.importorskip("fastapi")
@@ -28,8 +27,9 @@ def fastapi_app_factory():
 
 @pytest.mark.asyncio
 async def test_response(sentry_init, capture_events):
-    # FastAPI is heavily based on Starlette so we just need to
-    # enable StarletteIntegration and we are good to go.
+    # FastAPI is heavily based on Starlette so we also need
+    # to enable StarletteIntegration.
+    # In the future this will be auto enabled.
     sentry_init(
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
@@ -50,6 +50,7 @@ async def test_response(sentry_init, capture_events):
 
     (message_event, transaction_event) = events
     assert message_event["message"] == "Hi"
+    assert transaction_event["transaction"] == "/message"
 
 
 @pytest.mark.parametrize(
