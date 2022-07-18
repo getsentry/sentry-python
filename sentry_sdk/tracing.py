@@ -279,7 +279,7 @@ class Span(object):
 
         if sentrytrace_kwargs is not None:
             kwargs.update(sentrytrace_kwargs)
-            baggage.freeze
+            baggage.freeze()
 
         kwargs.update(extract_tracestate_data(headers.get("tracestate")))
 
