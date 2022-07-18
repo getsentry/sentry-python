@@ -344,14 +344,24 @@ async def test_starlettrequestextractor_extract_request_info_no_pii(sentry_init)
 @pytest.mark.parametrize(
     "url,transaction_style,expected_transaction,expected_source",
     [
-        ("/message", "url", "/message", "route"),
+        (
+            "/message",
+            "url",
+            "/message",
+            "route",
+        ),
         (
             "/message",
             "endpoint",
             "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message",
             "component",
         ),
-        ("/message/123456", "url", "/message/{message_id}", "route"),
+        (
+            "/message/123456",
+            "url",
+            "/message/{message_id}",
+            "route",
+        ),
         (
             "/message/123456",
             "endpoint",
@@ -369,9 +379,10 @@ def test_transaction_style(
     expected_source,
 ):
     sentry_init(
-        integrations=[StarletteIntegration(transaction_style=transaction_style)]
+        integrations=[StarletteIntegration(transaction_style=transaction_style)],
     )
     starlette_app = starlette_app_factory()
+
     events = capture_events()
 
     client = TestClient(starlette_app)
