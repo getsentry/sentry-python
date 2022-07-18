@@ -9,10 +9,9 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
-    TRANSACTION_SOURCE_COMPONENT,
     TRANSACTION_SOURCE_ROUTE,
-    TRANSACTION_SOURCE_UNKNOWN,
     AnnotatedValue,
     event_from_exception,
     transaction_from_function,
@@ -21,7 +20,6 @@ from sentry_sdk.utils import (
 if MYPY:
     from sentry_sdk._types import Event
     from typing import Any, Awaitable, Callable, Dict, Optional, Union
-
 
 try:
     from starlette.applications import Starlette
@@ -380,28 +378,43 @@ def _set_transaction_name_and_source(event, transaction_style, request):
 
     name = ""
 
-    router = request.scope["router"]
-    for route in router.routes:
-        match = route.matches(request.scope)
+    if transaction_style == "endpoint":
+        endpoint = request.scope.get("endpoint")
+        if endpoint:
+            name = transaction_from_function(endpoint) or ""
 
-        if match[0] == Match.FULL:
-            if transaction_style == "endpoint":
-                name = transaction_from_function(match[1]["endpoint"]) or ""
-            elif transaction_style == "url":
-                name = route.path
+    elif transaction_style == "url":
+
+        is_fastapi = "route" in request.scope
+
+        if is_fastapi:
+            route = request.scope.get("route")
+            if route:
+                path = getattr(route, "path", None)
+                if path is not None:
+                    name = path
+
+        else:
+            # In barebones Starlette we can can loop through all routes to find the right one.
+            router = request.scope["router"]
+            for route in router.routes:
+                match = route.matches(request.scope)
+
+                if match[0] == Match.FULL:
+                    if transaction_style == "endpoint":
+                        name = transaction_from_function(match[1]["endpoint"]) or ""
+                        break
+                    elif transaction_style == "url":
+                        name = route.path
+                        break
 
     if not name:
         event["transaction"] = "generic Starlette request"
-        event["transaction_info"] = {"source": TRANSACTION_SOURCE_UNKNOWN}
+        event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
         return event
 
-    source_for_style = {
-        "url": TRANSACTION_SOURCE_ROUTE,
-        "endpoint": TRANSACTION_SOURCE_COMPONENT,
-    }
-
     event["transaction"] = name
-    event["transaction_info"] = {"source": source_for_style[transaction_style]}
+    event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
 
     return event
 
@@ -442,7 +455,7 @@ class SentryStarletteMiddleware:
                             request_info["data"] = info["data"]
                     event["request"] = request_info
 
-                    event = _set_transaction_name_and_source(
+                    _set_transaction_name_and_source(
                         event, integration.transaction_style, req
                     )
 
