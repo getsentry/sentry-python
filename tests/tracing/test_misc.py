@@ -173,7 +173,7 @@ def test_circular_references(monkeypatch, sentry_init, request):
     #     request.addfinalizer(lambda: gc.set_debug(~gc.DEBUG_LEAK))
     #
     # immediately after the initial collection below, so we can see what new
-    # objects the garbage collecter has to clean up once `transaction.finish` is
+    # objects the garbage collector has to clean up once `transaction.finish` is
     # called and the serializer runs.)
     monkeypatch.setattr(
         sentry_sdk.client,
