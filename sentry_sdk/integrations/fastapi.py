@@ -1,9 +1,17 @@
+from sentry_sdk._types import MYPY
+from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.starlette import (
-    StarletteIntegration,
     SentryStarletteMiddleware,
+    StarletteIntegration,
 )
 
-from fastapi.applications import FastAPI
+if MYPY:
+    from typing import Any, Callable
+
+try:
+    from fastapi.applications import FastAPI
+except ImportError:
+    raise DidNotEnable("FastAPI is not installed")
 
 
 class FastApiIntegration(StarletteIntegration):
