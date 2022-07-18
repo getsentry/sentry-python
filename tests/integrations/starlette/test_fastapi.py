@@ -6,11 +6,10 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from sentry_sdk import capture_message
-from sentry_sdk.integrations.fastapi import FastAPIIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 
 
-@pytest.fixture
-def app():
+def fastapi_app_factory():
     app = FastAPI()
 
     @app.get("/message")
@@ -27,13 +26,26 @@ def app():
 
 
 @pytest.mark.asyncio
-async def test_response(sentry_init, app, capture_events):
-    sentry_init(integrations=[FastAPIIntegration()])
+async def test_response(sentry_init, capture_events):
+    # FastAPI is heavily based on Starlette so we just need to
+    # enable StarletteIntegration and we are good to go.
+    sentry_init(
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+        debug=True,
+    )
+
+    app = fastapi_app_factory()
+
     events = capture_events()
 
     client = TestClient(app)
     response = client.get("/message")
 
-    assert len(events) == 0
-
     assert response.json() == {"message": "Hi"}
+
+    assert len(events) == 2
+
+    (message_event, transaction_event) = events
+    assert message_event["message"] == "Hi"
