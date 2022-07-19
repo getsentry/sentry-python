@@ -5,6 +5,8 @@ import os
 
 import pytest
 
+from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+
 try:
     from unittest import mock  # python 3.3 and above
 except ImportError:
@@ -539,3 +541,27 @@ def test_middleware_spans(sentry_init, capture_events):
             assert span["description"] == expected[idx]
             assert span["tags"]["starlette.middleware_name"] == expected[idx]
             idx += 1
+
+
+def test_legacy_setup(
+    sentry_init,
+    capture_events,
+):
+    # Check that behaviour does not change
+    # if the user just adds the new Integration
+    # and forgets to remove SentryAsgiMiddleware
+    sentry_init(
+        integrations=[
+            StarletteIntegration(),
+        ],
+    )
+    app = starlette_app_factory()
+    asgi_app = SentryAsgiMiddleware(app)
+
+    events = capture_events()
+
+    client = TestClient(asgi_app)
+    client.get("/message/123456")
+
+    (event,) = events
+    assert event["transaction"] == "/message/{message_id}"

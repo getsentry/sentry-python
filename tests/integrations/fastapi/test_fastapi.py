@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.starlette import StarletteIntegration
+from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
 
 def fastapi_app_factory():
@@ -114,3 +115,28 @@ def test_transaction_style(
 
     assert "request" not in event
     assert "transaction" not in event
+
+
+def test_legacy_setup(
+    sentry_init,
+    capture_events,
+):
+    # Check that behaviour does not change
+    # if the user just adds the new Integrations
+    # and forgets to remove SentryAsgiMiddleware
+    sentry_init(
+        integrations=[
+            StarletteIntegration(),
+            FastApiIntegration(),
+        ],
+    )
+    app = fastapi_app_factory()
+    asgi_app = SentryAsgiMiddleware(app)
+
+    events = capture_events()
+
+    client = TestClient(asgi_app)
+    client.get("/message/123456")
+
+    (event,) = events
+    assert event["transaction"] == "/message/{message_id}"

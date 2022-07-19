@@ -57,8 +57,6 @@ def patch_middlewares():
 
 def _set_transaction_name_and_source(event, transaction_style, request):
     # type: (Event, str, Any) -> None
-    print("fastapi: _set_transaction_name_and_source")
-
     is_default_transaction_name = "transaction" in event and re.match(
         _DEFAULT_TRANSACTION_NAME_REGEX, event["transaction"]
     )
@@ -82,11 +80,9 @@ def _set_transaction_name_and_source(event, transaction_style, request):
                 name = path
 
     if not name:
-        print("fastapi: set DEFAULT name and source")
         event["transaction"] = _DEFAULT_TRANSACTION_NAME
         event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
 
-    print("fastapi: set FOUND name and source")
     event["transaction"] = name
     event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
 

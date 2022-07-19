@@ -379,8 +379,6 @@ class StarletteRequestExtractor:
 
 def _set_transaction_name_and_source(event, transaction_style, request):
     # type: (Event, str, Any) -> None
-    print("starlette: _set_transaction_name_and_source")
-
     is_default_transaction_name = "transaction" in event and re.match(
         _DEFAULT_TRANSACTION_NAME_REGEX, event["transaction"]
     )
@@ -410,11 +408,9 @@ def _set_transaction_name_and_source(event, transaction_style, request):
                     break
 
     if not name:
-        print("starlette: set DEFAULT name and source")
         event["transaction"] = _DEFAULT_TRANSACTION_NAME
         event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
 
-    print("starlette: set FOUND name and source")
     event["transaction"] = name
     event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
 
@@ -426,7 +422,6 @@ class SentryStarletteMiddleware:
 
     async def __call__(self, scope, receive, send):
         # type: (SentryStarletteMiddleware, Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> Any
-        print("starlette: RUN SentryStarletteMiddleware")
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
