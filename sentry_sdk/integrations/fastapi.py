@@ -1,5 +1,3 @@
-import re
-
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import DidNotEnable
@@ -62,14 +60,6 @@ def patch_middlewares():
 
 def _set_transaction_name_and_source(event, transaction_style, request):
     # type: (Event, str, Any) -> None
-    is_default_transaction_name = "transaction" in event and re.match(
-        _DEFAULT_TRANSACTION_NAME_REGEX, event["transaction"]
-    )
-
-    if not is_default_transaction_name:
-        # Another integration already set the name, do not override
-        return
-
     name = ""
 
     if transaction_style == "endpoint":

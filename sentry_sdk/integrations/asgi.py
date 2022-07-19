@@ -14,6 +14,7 @@ from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.tracing import (
+    SOURCE_FOR_STYLE,
     TRANSACTION_SOURCE_ROUTE,
 )
 from sentry_sdk.utils import (
@@ -21,6 +22,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
+    transaction_from_function,
 )
 from sentry_sdk.tracing import Transaction
 
@@ -197,8 +199,7 @@ class SentryAsgiMiddleware:
 
         event["request"] = request_info
 
-        event["transaction"] = _DEFAULT_TRANSACTION_NAME
-        event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
+        self._set_transaction_name_and_source(event, self.transaction_style, asgi_scope)
 
         return event
 
@@ -207,6 +208,42 @@ class SentryAsgiMiddleware:
     # Note: Those functions are not public API. If you want to mutate request
     # data to your liking it's recommended to use the `before_send` callback
     # for that.
+
+    def _set_transaction_name_and_source(self, event, transaction_style, asgi_scope):
+        # type: (Event, str, Any) -> None
+        transaction_name_already_set = (
+            event.get("transaction", _DEFAULT_TRANSACTION_NAME)
+            != _DEFAULT_TRANSACTION_NAME
+        )
+        if transaction_name_already_set:
+            return
+
+        name = ""
+
+        if transaction_style == "endpoint":
+            endpoint = asgi_scope.get("endpoint")
+            # Webframeworks like Starlette mutate the ASGI env once routing is
+            # done, which is sometime after the request has started. If we have
+            # an endpoint, overwrite our generic transaction name.
+            if endpoint:
+                name = transaction_from_function(endpoint) or ""
+
+        elif transaction_style == "url":
+            # FastAPI includes the route object in the scope to let Sentry extract the
+            # path from it for the transaction name
+            route = asgi_scope.get("route")
+            if route:
+                path = getattr(route, "path", None)
+                if path is not None:
+                    name = path
+
+        if not name:
+            event["transaction"] = _DEFAULT_TRANSACTION_NAME
+            event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
+            return
+
+        event["transaction"] = name
+        event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
 
     def _get_url(self, scope, default_scheme, host):
         # type: (Dict[str, Any], Literal["ws", "http"], Optional[str]) -> str

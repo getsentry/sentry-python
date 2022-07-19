@@ -73,7 +73,7 @@ def test_sync_request_data(sentry_init, app, capture_events):
     assert response.status_code == 200
 
     (event,) = events
-    assert event["transaction"] == "generic ASGI request"
+    assert event["transaction"] == "tests.integrations.asgi.test_asgi.app.<locals>.hi"
     assert event["request"]["env"] == {"REMOTE_ADDR": "testclient"}
     assert set(event["request"]["headers"]) == {
         "accept",
@@ -106,7 +106,7 @@ def test_async_request_data(sentry_init, app, capture_events):
     assert response.status_code == 200
 
     (event,) = events
-    assert event["transaction"] == "generic ASGI request"
+    assert event["transaction"] == "tests.integrations.asgi.test_asgi.app.<locals>.hi2"
     assert event["request"]["env"] == {"REMOTE_ADDR": "testclient"}
     assert set(event["request"]["headers"]) == {
         "accept",
@@ -142,7 +142,10 @@ def test_errors(sentry_init, app, capture_events):
     assert response.status_code == 500
 
     (event,) = events
-    assert event["transaction"] == "generic ASGI request"
+    assert (
+        event["transaction"]
+        == "tests.integrations.asgi.test_asgi.test_errors.<locals>.myerror"
+    )
     (exception,) = event["exception"]["values"]
 
     assert exception["type"] == "ValueError"
@@ -248,7 +251,10 @@ def test_transaction(app, sentry_init, capture_events):
 
     event = events[0]
     assert event["type"] == "transaction"
-    assert event["transaction"] == "generic ASGI request"
+    assert (
+        event["transaction"]
+        == "tests.integrations.asgi.test_asgi.test_transaction.<locals>.kangaroo_handler"
+    )
 
 
 @pytest.mark.parametrize(
@@ -257,8 +263,8 @@ def test_transaction(app, sentry_init, capture_events):
         (
             "/sync-message",
             "endpoint",
-            "generic ASGI request",  # the AsgiMiddleware can not extract routes from the Starlette framework used here for testing.
-            "route",
+            "tests.integrations.asgi.test_asgi.transaction_app.<locals>.hi",
+            "component",
         ),
         (
             "/sync-message",
@@ -269,8 +275,8 @@ def test_transaction(app, sentry_init, capture_events):
         (
             "/sync-message/123456",
             "endpoint",
-            "generic ASGI request",  # the AsgiMiddleware can not extract routes from the Starlette framework used here for testing.
-            "route",
+            "tests.integrations.asgi.test_asgi.transaction_app.<locals>.hi_with_id",
+            "component",
         ),
         (
             "/sync-message/123456",
@@ -281,8 +287,8 @@ def test_transaction(app, sentry_init, capture_events):
         (
             "/async-message",
             "endpoint",
-            "generic ASGI request",  # the AsgiMiddleware can not extract routes from the Starlette framework used here for testing.
-            "route",
+            "tests.integrations.asgi.test_asgi.transaction_app.<locals>.async_hi",
+            "component",
         ),
         (
             "/async-message",
