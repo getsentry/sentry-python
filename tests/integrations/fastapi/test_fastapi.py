@@ -65,7 +65,7 @@ async def test_response(sentry_init, capture_events):
         (
             "/message",
             "endpoint",
-            "tests.integrations.starlette.test_fastapi.fastapi_app_factory.<locals>._message",
+            "tests.integrations.fastapi.test_fastapi.fastapi_app_factory.<locals>._message",
             "component",
         ),
         (
@@ -77,7 +77,7 @@ async def test_response(sentry_init, capture_events):
         (
             "/message/123456",
             "endpoint",
-            "tests.integrations.starlette.test_fastapi.fastapi_app_factory.<locals>._message_with_id",
+            "tests.integrations.fastapi.test_fastapi.fastapi_app_factory.<locals>._message_with_id",
             "component",
         ),
     ],

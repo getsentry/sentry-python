@@ -1,5 +1,7 @@
 from __future__ import absolute_import
 
+import re
+
 from sentry_sdk._compat import iteritems
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
@@ -18,8 +20,9 @@ from sentry_sdk.utils import (
 )
 
 if MYPY:
-    from sentry_sdk._types import Event
     from typing import Any, Awaitable, Callable, Dict, Optional, Union
+
+    from sentry_sdk._types import Event
 
 try:
     from starlette.applications import Starlette
@@ -36,6 +39,9 @@ try:
 except ImportError:
     from starlette.exceptions import ExceptionMiddleware  # Startlette 0.19.1
 
+
+_DEFAULT_TRANSACTION_NAME = "generic Starlette request"
+_DEFAULT_TRANSACTION_NAME_REGEX = r"generic \S+ request"
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
@@ -372,9 +378,16 @@ class StarletteRequestExtractor:
 
 
 def _set_transaction_name_and_source(event, transaction_style, request):
-    # type: (Event, str, Any) -> Event
-    if "router" not in request.scope:
-        return event
+    # type: (Event, str, Any) -> None
+    print("starlette: _set_transaction_name_and_source")
+
+    is_default_transaction_name = "transaction" in event and re.match(
+        _DEFAULT_TRANSACTION_NAME_REGEX, event["transaction"]
+    )
+
+    if not is_default_transaction_name:
+        # Another integration already set the name, do not override
+        return
 
     name = ""
 
@@ -384,39 +397,26 @@ def _set_transaction_name_and_source(event, transaction_style, request):
             name = transaction_from_function(endpoint) or ""
 
     elif transaction_style == "url":
+        router = request.scope["router"]
+        for route in router.routes:
+            match = route.matches(request.scope)
 
-        is_fastapi = "route" in request.scope
-
-        if is_fastapi:
-            route = request.scope.get("route")
-            if route:
-                path = getattr(route, "path", None)
-                if path is not None:
-                    name = path
-
-        else:
-            # In barebones Starlette we can can loop through all routes to find the right one.
-            router = request.scope["router"]
-            for route in router.routes:
-                match = route.matches(request.scope)
-
-                if match[0] == Match.FULL:
-                    if transaction_style == "endpoint":
-                        name = transaction_from_function(match[1]["endpoint"]) or ""
-                        break
-                    elif transaction_style == "url":
-                        name = route.path
-                        break
+            if match[0] == Match.FULL:
+                if transaction_style == "endpoint":
+                    name = transaction_from_function(match[1]["endpoint"]) or ""
+                    break
+                elif transaction_style == "url":
+                    name = route.path
+                    break
 
     if not name:
-        event["transaction"] = "generic Starlette request"
+        print("starlette: set DEFAULT name and source")
+        event["transaction"] = _DEFAULT_TRANSACTION_NAME
         event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
-        return event
 
+    print("starlette: set FOUND name and source")
     event["transaction"] = name
     event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
-
-    return event
 
 
 class SentryStarletteMiddleware:
@@ -426,6 +426,7 @@ class SentryStarletteMiddleware:
 
     async def __call__(self, scope, receive, send):
         # type: (SentryStarletteMiddleware, Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> Any
+        print("starlette: RUN SentryStarletteMiddleware")
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
