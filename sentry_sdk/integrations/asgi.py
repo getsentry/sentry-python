@@ -197,6 +197,9 @@ class SentryAsgiMiddleware:
 
         event["request"] = request_info
 
+        event["transaction"] = _DEFAULT_TRANSACTION_NAME
+        event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
+
         return event
 
     # Helper functions for extracting request data.
