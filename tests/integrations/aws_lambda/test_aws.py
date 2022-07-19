@@ -362,6 +362,7 @@ def test_performance_no_error(run_lambda_function):
     assert envelope["type"] == "transaction"
     assert envelope["contexts"]["trace"]["op"] == "serverless.function"
     assert envelope["transaction"].startswith("test_function_")
+    assert envelope["transaction_info"] == {"source": "component"}
     assert envelope["transaction"] in envelope["request"]["url"]
 
 
@@ -390,6 +391,7 @@ def test_performance_error(run_lambda_function):
     assert envelope["type"] == "transaction"
     assert envelope["contexts"]["trace"]["op"] == "serverless.function"
     assert envelope["transaction"].startswith("test_function_")
+    assert envelope["transaction_info"] == {"source": "component"}
     assert envelope["transaction"] in envelope["request"]["url"]
 
 

@@ -30,6 +30,11 @@ def app():
         capture_message("hi")
         return response.text("ok")
 
+    @app.route("/message/<message_id>")
+    def hi_with_id(request, message_id):
+        capture_message("hi with id")
+        return response.text("ok with id")
+
     return app
 
 
@@ -60,6 +65,27 @@ def test_request_data(sentry_init, app, capture_events):
 
     assert "request" not in event
     assert "transaction" not in event
+
+
+@pytest.mark.parametrize(
+    "url,expected_transaction,expected_source",
+    [
+        ("/message", "hi", "component"),
+        ("/message/123456", "hi_with_id", "component"),
+    ],
+)
+def test_transaction(
+    sentry_init, app, capture_events, url, expected_transaction, expected_source
+):
+    sentry_init(integrations=[SanicIntegration()])
+    events = capture_events()
+
+    request, response = app.test_client.get(url)
+    assert response.status == 200
+
+    (event,) = events
+    assert event["transaction"] == expected_transaction
+    assert event["transaction_info"] == {"source": expected_source}
 
 
 def test_errors(sentry_init, app, capture_events):
