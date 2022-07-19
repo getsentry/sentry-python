@@ -31,6 +31,7 @@ try:
     from starlette.middleware.authentication import AuthenticationMiddleware
     from starlette.requests import Request
     from starlette.routing import Match
+    from starlette.types import ASGIApp, Receive, Scope, Send
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
 
@@ -235,7 +236,7 @@ def patch_middlewares():
     old_build_middleware_stack = Starlette.build_middleware_stack
 
     def _sentry_build_middleware_stack(self):
-        # type: (Callable[..., Any]) -> Callable[..., Any]
+        # type: (Starlette) -> Callable[..., Any]
         """
         Adds `SentryStarletteMiddleware` to the
         middleware stack of the Starlette application.
@@ -255,7 +256,7 @@ def patch_asgi_app():
     old_app = Starlette.__call__
 
     async def _sentry_patched_asgi_app(self, scope, receive, send):
-        # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
+        # type: (Starlette, Scope, Receive, Send) -> None
         if Hub.current.get_integration(StarletteIntegration) is None:
             return await old_app(self, scope, receive, send)
 
@@ -417,11 +418,11 @@ def _set_transaction_name_and_source(event, transaction_style, request):
 
 class SentryStarletteMiddleware:
     def __init__(self, app, dispatch=None):
-        # type: (SentryStarletteMiddleware, Any) -> None
+        # type: (ASGIApp, Any) -> None
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        # type: (SentryStarletteMiddleware, Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> Any
+        # type: (Scope, Receive, Send) -> Any
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return

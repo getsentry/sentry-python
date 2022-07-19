@@ -11,7 +11,7 @@ from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import transaction_from_function
 
 if MYPY:
-    from typing import Any, Awaitable, Callable, Dict
+    from typing import Any, Callable, Dict
 
     from sentry_sdk._types import Event
 
@@ -20,6 +20,11 @@ try:
     from fastapi.requests import Request
 except ImportError:
     raise DidNotEnable("FastAPI is not installed")
+
+try:
+    from starlette.types import ASGIApp, Receive, Scope, Send
+except ImportError:
+    raise DidNotEnable("Starlette is not installed")
 
 
 _DEFAULT_TRANSACTION_NAME = "generic FastApi request"
@@ -42,7 +47,7 @@ def patch_middlewares():
     old_build_middleware_stack = FastAPI.build_middleware_stack
 
     def _sentry_build_middleware_stack(self):
-        # type: (Callable[..., Any]) -> Callable[..., Any]
+        # type: (FastAPI) -> Callable[..., Any]
         """
         Adds `SentryStarletteMiddleware` and `SentryFastApiMiddleware` to the
         middleware stack of the FastAPI application.
@@ -89,11 +94,11 @@ def _set_transaction_name_and_source(event, transaction_style, request):
 
 class SentryFastApiMiddleware:
     def __init__(self, app, dispatch=None):
-        # type: (SentryFastApiMiddleware, Any) -> None
+        # type: (ASGIApp, Any) -> None
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        # type: (SentryFastApiMiddleware, Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> Any
+        # type: (Scope, Receive, Send) -> Any
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
