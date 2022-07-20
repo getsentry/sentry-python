@@ -270,7 +270,7 @@ def test_transaction(app, sentry_init, capture_events):
             "/sync-message",
             "url",
             "generic ASGI request",  # the AsgiMiddleware can not extract routes from the Starlette framework used here for testing.
-            "unknown",
+            "route",
         ),
         (
             "/sync-message/123456",
@@ -282,7 +282,7 @@ def test_transaction(app, sentry_init, capture_events):
             "/sync-message/123456",
             "url",
             "generic ASGI request",  # the AsgiMiddleware can not extract routes from the Starlette framework used here for testing.
-            "unknown",
+            "route",
         ),
         (
             "/async-message",
@@ -294,7 +294,7 @@ def test_transaction(app, sentry_init, capture_events):
             "/async-message",
             "url",
             "generic ASGI request",  # the AsgiMiddleware can not extract routes from the Starlette framework used here for testing.
-            "unknown",
+            "route",
         ),
     ],
 )

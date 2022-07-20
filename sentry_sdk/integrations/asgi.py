@@ -16,14 +16,13 @@ from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TRANSACTION_SOURCE_ROUTE,
-    TRANSACTION_SOURCE_UNKNOWN,
 )
 from sentry_sdk.utils import (
     ContextVar,
     event_from_exception,
-    transaction_from_function,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
+    transaction_from_function,
 )
 from sentry_sdk.tracing import Transaction
 
@@ -212,7 +211,6 @@ class SentryAsgiMiddleware:
 
     def _set_transaction_name_and_source(self, event, transaction_style, asgi_scope):
         # type: (Event, str, Any) -> None
-
         transaction_name_already_set = (
             event.get("transaction", _DEFAULT_TRANSACTION_NAME)
             != _DEFAULT_TRANSACTION_NAME
@@ -240,9 +238,8 @@ class SentryAsgiMiddleware:
                     name = path
 
         if not name:
-            # If no transaction name can be found set an unknown source.
-            # This can happen when ASGI frameworks that are not yet supported well are used.
-            event["transaction_info"] = {"source": TRANSACTION_SOURCE_UNKNOWN}
+            event["transaction"] = _DEFAULT_TRANSACTION_NAME
+            event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
             return
 
         event["transaction"] = name

@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+
 from sentry_sdk._compat import iteritems
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
@@ -9,19 +10,18 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
-    TRANSACTION_SOURCE_COMPONENT,
     TRANSACTION_SOURCE_ROUTE,
-    TRANSACTION_SOURCE_UNKNOWN,
     AnnotatedValue,
     event_from_exception,
     transaction_from_function,
 )
 
 if MYPY:
-    from sentry_sdk._types import Event
     from typing import Any, Awaitable, Callable, Dict, Optional, Union
 
+    from sentry_sdk._types import Event
 
 try:
     from starlette.applications import Starlette
@@ -30,6 +30,7 @@ try:
     from starlette.middleware.authentication import AuthenticationMiddleware
     from starlette.requests import Request
     from starlette.routing import Match
+    from starlette.types import ASGIApp, Receive, Scope, Send
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
 
@@ -38,6 +39,8 @@ try:
 except ImportError:
     from starlette.exceptions import ExceptionMiddleware  # Startlette 0.19.1
 
+
+_DEFAULT_TRANSACTION_NAME = "generic Starlette request"
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
@@ -231,7 +234,7 @@ def patch_middlewares():
     old_build_middleware_stack = Starlette.build_middleware_stack
 
     def _sentry_build_middleware_stack(self):
-        # type: (Callable[..., Any]) -> Callable[..., Any]
+        # type: (Starlette) -> Callable[..., Any]
         """
         Adds `SentryStarletteMiddleware` to the
         middleware stack of the Starlette application.
@@ -251,7 +254,7 @@ def patch_asgi_app():
     old_app = Starlette.__call__
 
     async def _sentry_patched_asgi_app(self, scope, receive, send):
-        # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
+        # type: (Starlette, Scope, Receive, Send) -> None
         if Hub.current.get_integration(StarletteIntegration) is None:
             return await old_app(self, scope, receive, send)
 
@@ -374,45 +377,43 @@ class StarletteRequestExtractor:
 
 
 def _set_transaction_name_and_source(event, transaction_style, request):
-    # type: (Event, str, Any) -> Event
-    if "router" not in request.scope:
-        return event
-
+    # type: (Event, str, Any) -> None
     name = ""
 
-    router = request.scope["router"]
-    for route in router.routes:
-        match = route.matches(request.scope)
+    if transaction_style == "endpoint":
+        endpoint = request.scope.get("endpoint")
+        if endpoint:
+            name = transaction_from_function(endpoint) or ""
 
-        if match[0] == Match.FULL:
-            if transaction_style == "endpoint":
-                name = transaction_from_function(match[1]["endpoint"]) or ""
-            elif transaction_style == "url":
-                name = route.path
+    elif transaction_style == "url":
+        router = request.scope["router"]
+        for route in router.routes:
+            match = route.matches(request.scope)
+
+            if match[0] == Match.FULL:
+                if transaction_style == "endpoint":
+                    name = transaction_from_function(match[1]["endpoint"]) or ""
+                    break
+                elif transaction_style == "url":
+                    name = route.path
+                    break
 
     if not name:
-        event["transaction"] = "generic Starlette request"
-        event["transaction_info"] = {"source": TRANSACTION_SOURCE_UNKNOWN}
-        return event
-
-    source_for_style = {
-        "url": TRANSACTION_SOURCE_ROUTE,
-        "endpoint": TRANSACTION_SOURCE_COMPONENT,
-    }
+        event["transaction"] = _DEFAULT_TRANSACTION_NAME
+        event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
+        return
 
     event["transaction"] = name
-    event["transaction_info"] = {"source": source_for_style[transaction_style]}
-
-    return event
+    event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
 
 
 class SentryStarletteMiddleware:
     def __init__(self, app, dispatch=None):
-        # type: (SentryStarletteMiddleware, Any) -> None
+        # type: (ASGIApp, Any) -> None
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        # type: (SentryStarletteMiddleware, Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> Any
+        # type: (Scope, Receive, Send) -> Any
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -442,7 +443,7 @@ class SentryStarletteMiddleware:
                             request_info["data"] = info["data"]
                     event["request"] = request_info
 
-                    event = _set_transaction_name_and_source(
+                    _set_transaction_name_and_source(
                         event, integration.transaction_style, req
                     )
 
