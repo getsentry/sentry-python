@@ -26,7 +26,7 @@ def nanosecond_time():
 class FrameData:
     def __init__(self, frame):
         self.function_name = frame.f_code.co_name
-        self.module = frame.f_globals['__name__']
+        self.module = frame.f_globals["__name__"]
 
         # Depending on Python version, frame.f_code.co_filename either stores just the file name or the entire absolute path.
         self.file_name = frame.f_code.co_filename
@@ -69,6 +69,7 @@ class Sampler(object):
     stack every `interval` seconds and keeps track of counts by frame. Because
     this uses signals, it only works on the main thread.
     """
+
     def __init__(self, transaction, interval=0.01):
         self.interval = interval
         self.stack_samples = []
@@ -89,14 +90,18 @@ class Sampler(object):
         try:
             signal.signal(signal.SIGVTALRM, self._sample)
         except ValueError:
-            logger.error('Profiler failed to run because it was started from a non-main thread')
+            logger.error(
+                "Profiler failed to run because it was started from a non-main thread"
+            )
             return
 
         signal.setitimer(signal.ITIMER_VIRTUAL, self.interval)
         atexit.register(self.stop)
 
     def _sample(self, _, frame):
-        self.stack_samples.append(StackSample(frame, self._start_time, self._frame_indices))
+        self.stack_samples.append(
+            StackSample(frame, self._start_time, self._frame_indices)
+        )
         signal.setitimer(signal.ITIMER_VIRTUAL, self.interval)
 
     def to_json(self):
@@ -106,16 +111,22 @@ class Sampler(object):
         """
         thread_id = threading.get_ident()
         return {
-            'samples': [{
-                'frames': sample.stack,
-                'relative_timestamp_ns': sample.sample_time,
-                'thread_id': thread_id
-            } for sample in self.stack_samples],
-            'frames': [{
-                'name': frame.function_name,
-                'file': frame.file_name,
-                'line': frame.line_number
-            } for frame in self.frame_list()]
+            "samples": [
+                {
+                    "frames": sample.stack,
+                    "relative_timestamp_ns": sample.sample_time,
+                    "thread_id": thread_id,
+                }
+                for sample in self.stack_samples
+            ],
+            "frames": [
+                {
+                    "name": frame.function_name,
+                    "file": frame.file_name,
+                    "line": frame.line_number,
+                }
+                for frame in self.frame_list()
+            ],
         }
 
     def frame_list(self):
