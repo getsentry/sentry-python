@@ -77,6 +77,7 @@ def _set_transaction_name_and_source(event, transaction_style, request):
     if not name:
         event["transaction"] = _DEFAULT_TRANSACTION_NAME
         event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
+        return
 
     event["transaction"] = name
     event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
