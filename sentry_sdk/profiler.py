@@ -16,14 +16,12 @@ import atexit
 import signal
 import time
 import threading
-import json
 from sentry_sdk.utils import logger
 
-# TODO: temp import to output file
-import os
 
 def nanosecond_time():
     return int(time.perf_counter() * 1e9)
+
 
 class FrameData:
     def __init__(self, frame):
@@ -33,7 +31,7 @@ class FrameData:
         # Depending on Python version, frame.f_code.co_filename either stores just the file name or the entire absolute path.
         self.file_name = frame.f_code.co_filename
         self.line_number = frame.f_code.co_firstlineno
-    
+
     @property
     def _attribute_tuple(self):
         """Returns a tuple of the attributes used in comparison"""
@@ -43,9 +41,10 @@ class FrameData:
         if isinstance(other, FrameData):
             return self._attribute_tuple == other._attribute_tuple
         return False
-    
+
     def __hash__(self):
         return hash(self._attribute_tuple)
+
 
 class StackSample:
     def __init__(self, top_frame, profiler_start_time, frame_indices):
@@ -63,6 +62,7 @@ class StackSample:
             frame = frame.f_back
         self.stack = list(reversed(self.stack))
 
+
 class Sampler(object):
     """
     A simple stack sampler for low-overhead CPU profiling: samples the call
@@ -75,10 +75,10 @@ class Sampler(object):
         self._frame_indices = dict()
         self._transaction = transaction
         transaction._profile = self
-    
+
     def __enter__(self):
         self.start()
-    
+
     def __exit__(self, *_):
         self.stop()
 
@@ -90,7 +90,7 @@ class Sampler(object):
             signal.signal(signal.SIGVTALRM, self._sample)
         except ValueError:
             logger.error('Profiler failed to run because it was started from a non-main thread')
-            return 
+            return
 
         signal.setitimer(signal.ITIMER_VIRTUAL, self.interval)
         atexit.register(self.stop)
@@ -119,7 +119,7 @@ class Sampler(object):
         }
 
     def frame_list(self):
-         # Build frame array from the frame indices
+        # Build frame array from the frame indices
         frames = [None] * len(self._frame_indices)
         for frame, index in self._frame_indices.items():
             frames[index] = frame
@@ -133,7 +133,7 @@ class Sampler(object):
 
     def __del__(self):
         self.stop()
-    
+
     @property
     def transaction_name(self):
         return self._transaction.name

@@ -95,6 +95,7 @@ def get_request_url(environ, use_x_forwarded_for=False):
         wsgi_decoding_dance(environ.get("PATH_INFO") or "").lstrip("/"),
     )
 
+
 @contextmanager
 def profiling(transaction, hub=None):
     # type: (Transaction, Optional[Hub]) -> Generator[None, None, None]
@@ -105,6 +106,7 @@ def profiling(transaction, hub=None):
             yield
     else:
         yield
+
 
 class SentryWsgiMiddleware(object):
     __slots__ = ("app", "use_x_forwarded_for")

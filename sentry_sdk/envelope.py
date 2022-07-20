@@ -61,9 +61,9 @@ class Envelope(object):
     ):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=transaction), type="transaction"))
-    
+
     def add_profile(
-        self, profile # type: dict
+        self, profile  # type: dict
     ):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=profile), type="profile"))

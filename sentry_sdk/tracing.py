@@ -566,7 +566,7 @@ class Transaction(Span):
         self._sentry_tracestate = sentry_tracestate
         self._third_party_tracestate = third_party_tracestate
         self._measurements = {}  # type: Dict[str, Any]
-        self._profile = None # type: Optional[Sampler]
+        self._profile = None  # type: Optional[Sampler]
         self._baggage = baggage
 
     def __repr__(self):

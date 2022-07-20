@@ -402,7 +402,7 @@ class _Client(object):
 
             if is_transaction:
                 if "profile" in event_opt:
-                    envelope.add_profile(event_opt.pop("profile")) 
+                    envelope.add_profile(event_opt.pop("profile"))
                 envelope.add_transaction(event_opt)
             else:
                 envelope.add_event(event_opt)
