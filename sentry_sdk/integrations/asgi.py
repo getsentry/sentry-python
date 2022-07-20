@@ -197,9 +197,9 @@ class SentryAsgiMiddleware:
         if client and _should_send_default_pii():
             request_info["env"] = {"REMOTE_ADDR": self._get_ip(asgi_scope)}
 
-        event["request"] = request_info
-
         self._set_transaction_name_and_source(event, self.transaction_style, asgi_scope)
+
+        event["request"] = request_info
 
         return event
 
