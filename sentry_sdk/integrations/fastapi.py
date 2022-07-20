@@ -26,7 +26,6 @@ except ImportError:
 
 
 _DEFAULT_TRANSACTION_NAME = "generic FastApi request"
-_DEFAULT_TRANSACTION_NAME_REGEX = r"generic \S+ request"
 
 
 class FastApiIntegration(StarletteIntegration):

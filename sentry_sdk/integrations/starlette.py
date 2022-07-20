@@ -41,7 +41,6 @@ except ImportError:
 
 
 _DEFAULT_TRANSACTION_NAME = "generic Starlette request"
-_DEFAULT_TRANSACTION_NAME_REGEX = r"generic \S+ request"
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
