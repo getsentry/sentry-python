@@ -16,14 +16,13 @@ from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TRANSACTION_SOURCE_ROUTE,
-    TRANSACTION_SOURCE_UNKNOWN,
 )
 from sentry_sdk.utils import (
     ContextVar,
     event_from_exception,
-    transaction_from_function,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
+    transaction_from_function,
 )
 from sentry_sdk.tracing import Transaction
 
@@ -45,15 +44,15 @@ _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 
-def _capture_exception(hub, exc):
-    # type: (Hub, Any) -> None
+def _capture_exception(hub, exc, mechanism_type="asgi"):
+    # type: (Hub, Any, str) -> None
 
     # Check client here as it might have been unset while streaming response
     if hub.client is not None:
         event, hint = event_from_exception(
             exc,
             client_options=hub.client.options,
-            mechanism={"type": "asgi", "handled": False},
+            mechanism={"type": mechanism_type, "handled": False},
         )
         hub.capture_event(event, hint=hint)
 
@@ -75,10 +74,16 @@ def _looks_like_asgi3(app):
 
 
 class SentryAsgiMiddleware:
-    __slots__ = ("app", "__call__", "transaction_style")
+    __slots__ = ("app", "__call__", "transaction_style", "mechanism_type")
 
-    def __init__(self, app, unsafe_context_data=False, transaction_style="endpoint"):
-        # type: (Any, bool, str) -> None
+    def __init__(
+        self,
+        app,
+        unsafe_context_data=False,
+        transaction_style="endpoint",
+        mechanism_type="asgi",
+    ):
+        # type: (Any, bool, str, str) -> None
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
         data to sent events and basic handling for exceptions bubbling up
@@ -100,6 +105,7 @@ class SentryAsgiMiddleware:
                 % (transaction_style, TRANSACTION_STYLE_VALUES)
             )
         self.transaction_style = transaction_style
+        self.mechanism_type = mechanism_type
         self.app = app
 
         if _looks_like_asgi3(app):
@@ -127,7 +133,7 @@ class SentryAsgiMiddleware:
             try:
                 return await callback()
             except Exception as exc:
-                _capture_exception(Hub.current, exc)
+                _capture_exception(Hub.current, exc, mechanism_type=self.mechanism_type)
                 raise exc from None
 
         _asgi_middleware_applied.set(True)
@@ -164,7 +170,9 @@ class SentryAsgiMiddleware:
                         try:
                             return await callback()
                         except Exception as exc:
-                            _capture_exception(hub, exc)
+                            _capture_exception(
+                                hub, exc, mechanism_type=self.mechanism_type
+                            )
                             raise exc from None
         finally:
             _asgi_middleware_applied.set(False)
@@ -203,7 +211,6 @@ class SentryAsgiMiddleware:
 
     def _set_transaction_name_and_source(self, event, transaction_style, asgi_scope):
         # type: (Event, str, Any) -> None
-
         transaction_name_already_set = (
             event.get("transaction", _DEFAULT_TRANSACTION_NAME)
             != _DEFAULT_TRANSACTION_NAME
@@ -231,9 +238,8 @@ class SentryAsgiMiddleware:
                     name = path
 
         if not name:
-            # If no transaction name can be found set an unknown source.
-            # This can happen when ASGI frameworks that are not yet supported well are used.
-            event["transaction_info"] = {"source": TRANSACTION_SOURCE_UNKNOWN}
+            event["transaction"] = _DEFAULT_TRANSACTION_NAME
+            event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
             return
 
         event["transaction"] = name
