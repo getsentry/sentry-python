@@ -94,15 +94,6 @@ class Sampler(object):
 
         signal.setitimer(signal.ITIMER_VIRTUAL, self.interval)
         atexit.register(self.stop)
-    
-    def sample_weights(self):
-        """
-        Return the weights of each sample (difference between the sample's and previous sample's timestamp).
-        """
-        if self.stack_samples == []:
-            return []
-
-        return [self.stack_samples[0].sample_time, *(sample.sample_time - prev_sample.sample_time for sample, prev_sample in zip(self.stack_samples[1:], self.stack_samples))]
 
     def _sample(self, _, frame):
         self.stack_samples.append(StackSample(frame, self._start_time, self._frame_indices))
