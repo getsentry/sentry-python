@@ -659,7 +659,11 @@ class Transaction(Span):
             "spans": finished_spans,
         }
 
-        if hub.client.options["enable_profiling"] and self._profile is not None:
+        if (
+            hub.client is not None
+            and hub.client.options["enable_profiling"]
+            and self._profile is not None
+        ):
             event["profile"] = self._profile.to_json()
 
         if has_custom_measurements_enabled():

@@ -18,13 +18,21 @@ import time
 import threading
 from sentry_sdk.utils import logger
 
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    import typing
+    import sentry_sdk.tracing
+
 
 def nanosecond_time():
+    # type: () -> int
     return int(time.perf_counter() * 1e9)
 
 
 class FrameData:
     def __init__(self, frame):
+        # type: (typing.Any) -> None
         self.function_name = frame.f_code.co_name
         self.module = frame.f_globals["__name__"]
 
@@ -34,25 +42,30 @@ class FrameData:
 
     @property
     def _attribute_tuple(self):
+        # type: () -> typing.Tuple[str, str, str, int]
         """Returns a tuple of the attributes used in comparison"""
         return (self.function_name, self.module, self.file_name, self.line_number)
 
     def __eq__(self, other):
+        # type: (typing.Any) -> bool
         if isinstance(other, FrameData):
             return self._attribute_tuple == other._attribute_tuple
         return False
 
     def __hash__(self):
+        # type: () -> int
         return hash(self._attribute_tuple)
 
 
 class StackSample:
     def __init__(self, top_frame, profiler_start_time, frame_indices):
+        # type: (typing.Any, int, typing.Dict[FrameData, int]) -> None
         self.sample_time = nanosecond_time() - profiler_start_time
-        self.stack = []
+        self.stack = []  # type: typing.List[int]
         self._add_all_frames(top_frame, frame_indices)
 
     def _add_all_frames(self, top_frame, frame_indices):
+        # type: (typing.Any, typing.Dict[FrameData, int]) -> None
         frame = top_frame
         while frame is not None:
             frame_data = FrameData(frame)
@@ -71,19 +84,23 @@ class Sampler(object):
     """
 
     def __init__(self, transaction, interval=0.01):
+        # type: (sentry_sdk.tracing.Transaction, float) -> None
         self.interval = interval
-        self.stack_samples = []
-        self._frame_indices = dict()
+        self.stack_samples = []  # type: typing.List[StackSample]
+        self._frame_indices = dict()  # type: typing.Dict[FrameData, int]
         self._transaction = transaction
         transaction._profile = self
 
     def __enter__(self):
+        # type: () -> None
         self.start()
 
     def __exit__(self, *_):
+        # type: (*typing.List[typing.Any]) -> None
         self.stop()
 
     def start(self):
+        # type: () -> None
         self._start_time = nanosecond_time()
         self.stack_samples = []
         self._frame_indices = dict()
@@ -99,12 +116,14 @@ class Sampler(object):
         atexit.register(self.stop)
 
     def _sample(self, _, frame):
+        # type: (typing.Any, typing.Any) -> None
         self.stack_samples.append(
             StackSample(frame, self._start_time, self._frame_indices)
         )
         signal.setitimer(signal.ITIMER_VIRTUAL, self.interval)
 
     def to_json(self):
+        # type: () -> typing.Any
         """
         Exports this object to a JSON format compatible with Sentry's profiling visualizer.
         Returns dictionary which can be serialized to JSON.
@@ -130,21 +149,18 @@ class Sampler(object):
         }
 
     def frame_list(self):
+        # type: () -> typing.List[FrameData]
         # Build frame array from the frame indices
-        frames = [None] * len(self._frame_indices)
+        frames = [None] * len(self._frame_indices)  # type: typing.List[typing.Any]
         for frame, index in self._frame_indices.items():
             frames[index] = frame
         return frames
 
-    def samples(self):
-        return len(self.stack_samples)
-
     def stop(self):
+        # type: () -> None
         signal.setitimer(signal.ITIMER_VIRTUAL, 0)
-
-    def __del__(self):
-        self.stop()
 
     @property
     def transaction_name(self):
+        # type: () -> str
         return self._transaction.name
