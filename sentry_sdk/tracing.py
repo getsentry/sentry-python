@@ -281,7 +281,7 @@ class Span(object):
 
         if sentrytrace_kwargs is not None:
             kwargs.update(sentrytrace_kwargs)
-            baggage.freeze
+            baggage.freeze()
 
         kwargs.update(extract_tracestate_data(headers.get("tracestate")))
 
@@ -310,7 +310,9 @@ class Span(object):
             yield "tracestate", tracestate
 
         if self.containing_transaction and self.containing_transaction._baggage:
-            yield "baggage", self.containing_transaction._baggage.serialize()
+            baggage = self.containing_transaction._baggage.serialize()
+            if baggage:
+                yield "baggage", baggage
 
     @classmethod
     def from_traceparent(
