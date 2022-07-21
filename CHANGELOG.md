@@ -4,8 +4,45 @@
 
 ### Various fixes & improvements
 
-- Update to FastAPI (#1513) by @antonpirker
 - feat(starlette): add Starlette integration (#1441) by @sl0thentr0py
+    
+    **Important:** Remove manual usage of `SentryAsgiMiddleware`! This is now done by the Starlette integration.
+    
+    Usage:
+    
+    ```python
+    from starlette.applications import Starlette
+    
+    from sentry_sdk.integrations.starlette import StarletteIntegration
+    
+    sentry_sdk.init(
+        dsn="...", 
+        integrations=[StarletteIntegration()],
+    )
+    
+    app = Starlette(debug=True, routes=[...])
+    ```
+- feat(fastapi): add FastAPI integration (#829) by @antonpirker
+    
+    **Important:** Remove manual usage of `SentryAsgiMiddleware`! This is now done by the FastAPI integration.
+    
+    Usage:
+    
+    ```python
+    from fastapi import FastAPI
+    
+    from sentry_sdk.integrations.starlette import StarletteIntegration
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+    sentry_sdk.init(
+        dsn="...", 
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+    )
+    
+    app = FastAPI()
+    ```
+    
+    Yes, you have to add both, the `StarletteIntegration` **AND** the `FastApiIntegration`!
 - fix: avoid sending empty Baggage header (#1507) by @intgr
 - fix: properly freeze Baggage object (#1508) by @intgr
 - docs: fix simple typo, collecter -> collector (#1505) by @timgates42
