@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.8.0
+
+### Various fixes & improvements
+
+- Update to FastAPI (#1513) by @antonpirker
+- feat(starlette): add Starlette integration (#1441) by @sl0thentr0py
+- fix: avoid sending empty Baggage header (#1507) by @intgr
+- fix: properly freeze Baggage object (#1508) by @intgr
+- docs: fix simple typo, collecter -> collector (#1505) by @timgates42
+
 ## 1.7.2
 
 ### Various fixes & improvements
