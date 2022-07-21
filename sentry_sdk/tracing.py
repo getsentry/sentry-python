@@ -1,6 +1,7 @@
 import uuid
 import random
 import time
+import platform
 
 from datetime import datetime, timedelta
 
@@ -664,7 +665,20 @@ class Transaction(Span):
             and hub.client.options["enable_profiling"]
             and self._profile is not None
         ):
-            event["profile"] = self._profile.to_json()
+            event["profile"] = {
+                "device_os_name": platform.system(),
+                "device_os_version": platform.release(),
+                "duration_ns": self._profile.duration,
+                "environment": hub.client.options["environment"],
+                "platform": "python",
+                "platform_version": platform.python_version(),
+                "profile_id": uuid.uuid4().hex,
+                "profile": self._profile.to_json(),
+                "trace_id": self.trace_id,
+                "transaction_id": None,  # Gets added in client.py
+                "transaction_name": self.name,
+                "version_name": None,  # Gets added in client.py
+            }
 
         if has_custom_measurements_enabled():
             event["measurements"] = self._measurements

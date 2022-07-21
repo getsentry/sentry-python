@@ -89,6 +89,7 @@ class Sampler(object):
         self.stack_samples = []  # type: typing.List[StackSample]
         self._frame_indices = dict()  # type: typing.Dict[FrameData, int]
         self._transaction = transaction
+        self.duration = 0  # This value will only be correct after the profiler has been started and stopped
         transaction._profile = self
 
     def __enter__(self):
@@ -158,6 +159,7 @@ class Sampler(object):
 
     def stop(self):
         # type: () -> None
+        self.duration = nanosecond_time() - self._start_time
         signal.setitimer(signal.ITIMER_VIRTUAL, 0)
 
     @property
