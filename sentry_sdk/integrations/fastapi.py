@@ -25,7 +25,7 @@ except ImportError:
     raise DidNotEnable("Starlette is not installed")
 
 
-_DEFAULT_TRANSACTION_NAME = "generic FastApi request"
+_DEFAULT_TRANSACTION_NAME = "generic FastAPI request"
 
 
 class FastApiIntegration(StarletteIntegration):
