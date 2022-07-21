@@ -14,13 +14,13 @@ if MYPY:
     from sentry_sdk._types import Event
 
 try:
-    from fastapi.applications import FastAPI
-    from fastapi.requests import Request
+    from fastapi import FastAPI  # type: ignore
+    from fastapi import Request
 except ImportError:
     raise DidNotEnable("FastAPI is not installed")
 
 try:
-    from starlette.types import ASGIApp, Receive, Scope, Send
+    from starlette.types import ASGIApp, Receive, Scope, Send  # type: ignore
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
 
