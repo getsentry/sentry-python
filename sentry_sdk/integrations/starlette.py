@@ -40,6 +40,12 @@ except ImportError:
     # Startlette 0.19.1
     from starlette.exceptions import ExceptionMiddleware  # type: ignore
 
+try:
+    # Optional dependency of Starlette to parse form data.
+    import multipart  # type: ignore # noqa: F401
+except ImportError:
+    multipart = None
+
 
 _DEFAULT_TRANSACTION_NAME = "generic Starlette request"
 
@@ -338,11 +344,8 @@ class StarletteRequestExtractor:
         curl -X POST http://localhost:8000/upload/somethign -H "Content-Type: application/x-www-form-urlencoded" -d "username=kevin&password=welcome123"
         curl -X POST http://localhost:8000/upload/somethign  -F username=Julian -F password=hello123
         """
-        try:
-            # Optional dependency of Starlette to parse form data.
-            import multipart  # type: ignore # noqa: F401
-        except ImportError:
-            return
+        if multipart is None:
+            return None
 
         return await self.request.form()
 
