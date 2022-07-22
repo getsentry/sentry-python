@@ -24,20 +24,22 @@ if MYPY:
     from sentry_sdk._types import Event
 
 try:
-    from starlette.applications import Starlette
-    from starlette.datastructures import UploadFile
-    from starlette.middleware import Middleware
-    from starlette.middleware.authentication import AuthenticationMiddleware
-    from starlette.requests import Request
-    from starlette.routing import Match
-    from starlette.types import ASGIApp, Receive, Scope, Send
+    from starlette.applications import Starlette  # type: ignore
+    from starlette.datastructures import UploadFile  # type: ignore
+    from starlette.middleware import Middleware  # type: ignore
+    from starlette.middleware.authentication import AuthenticationMiddleware  # type: ignore
+    from starlette.requests import Request  # type: ignore
+    from starlette.routing import Match  # type: ignore
+    from starlette.types import ASGIApp, Receive, Scope, Send  # type: ignore
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
 
 try:
-    from starlette.middle.exceptions import ExceptionMiddleware  # Starlette 0.20
+    # Starlette 0.20
+    from starlette.middleware.exceptions import ExceptionMiddleware  # type: ignore
 except ImportError:
-    from starlette.exceptions import ExceptionMiddleware  # Startlette 0.19.1
+    # Startlette 0.19.1
+    from starlette.exceptions import ExceptionMiddleware  # type: ignore
 
 
 _DEFAULT_TRANSACTION_NAME = "generic Starlette request"
