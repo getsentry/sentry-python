@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 
-
 from sentry_sdk._compat import iteritems
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
@@ -340,12 +339,12 @@ class StarletteRequestExtractor:
         curl -X POST http://localhost:8000/upload/somethign  -F username=Julian -F password=hello123
         """
         try:
-            return await self.request.form()
-
-        except AssertionError:
-            # We can not get form information,
-            # because `python-multipart` is not installed.
+            # Optional dependency of Starlette to parse form data.
+            import multipart  # type: ignore # noqa: F401
+        except ImportError:
             return
+
+        return await self.request.form()
 
     def is_json(self):
         # type: (StarletteRequestExtractor) -> bool
