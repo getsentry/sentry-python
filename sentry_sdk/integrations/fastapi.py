@@ -96,6 +96,7 @@ class SentryFastApiMiddleware:
         hub = Hub.current
         integration = hub.get_integration(FastApiIntegration)
         if integration is None:
+            await self.app(scope, receive, send)
             return
 
         with hub.configure_scope() as sentry_scope:
