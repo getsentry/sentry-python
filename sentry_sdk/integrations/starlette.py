@@ -339,7 +339,13 @@ class StarletteRequestExtractor:
         curl -X POST http://localhost:8000/upload/somethign -H "Content-Type: application/x-www-form-urlencoded" -d "username=kevin&password=welcome123"
         curl -X POST http://localhost:8000/upload/somethign  -F username=Julian -F password=hello123
         """
-        return await self.request.form()
+        try:
+            return await self.request.form()
+
+        except AssertionError:
+            # We can not get form information,
+            # because `python-multipart` is not installed.
+            return
 
     def is_json(self):
         # type: (StarletteRequestExtractor) -> bool
