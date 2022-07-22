@@ -423,6 +423,7 @@ class SentryStarletteMiddleware:
         hub = Hub.current
         integration = hub.get_integration(StarletteIntegration)
         if integration is None:
+            await self.app(scope, receive, send)
             return
 
         with hub.configure_scope() as sentry_scope:
