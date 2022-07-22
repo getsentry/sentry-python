@@ -664,7 +664,7 @@ class Transaction(Span):
 
         if (
             hub.client is not None
-            and hub.client.options["enable_profiling"]
+            and hub.client.options["_experiments"].get("enable_profiling", False)
             and self._profile is not None
         ):
             event["profile"] = {

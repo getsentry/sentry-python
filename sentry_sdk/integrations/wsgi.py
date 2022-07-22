@@ -101,7 +101,9 @@ def profiling(transaction, hub=None):
     # type: (Transaction, Optional[Hub]) -> Generator[None, None, None]
     if hub is None:
         hub = Hub.current
-    if hub.client is not None and hub.client.options["enable_profiling"]:
+    if hub.client is not None and hub.client.options["_experiments"].get(
+        "enable_profiling", False
+    ):
         with profiler.Sampler(transaction):
             yield
     else:
