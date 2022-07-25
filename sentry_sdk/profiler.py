@@ -15,8 +15,13 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 import atexit
 import signal
 import time
-import threading
+from sentry_sdk._compat import PY2
 from sentry_sdk.utils import logger
+
+if PY2:
+    import thread  # noqa
+else:
+    import threading
 
 from sentry_sdk._types import MYPY
 
@@ -25,26 +30,25 @@ if MYPY:
     import sentry_sdk.tracing
 
 
-def nanosecond_time():
-    # type: () -> int
-    return int(time.perf_counter() * 1e9)
+if PY2:
 
+    def thread_id():
+        # type: () -> int
+        return thread.get_ident()
 
-def thread_id():
-    # type: () -> int
-    """
-    Returns the thread ID of the current thread. This function is written to be compatible with Python 3 or Python 2.7.
-    """
-    try:
-        # threading.get_ident is only available in Python 3.3+, so this will fail for Python 2.7.
-        thread_id = threading.get_ident()
-    except AttributeError:  # Python 2.7
-        # The thread module is only available in Python 2.7, need to suppress MYPY missing import error
-        import thread  # type: ignore
+    def nanosecond_time():
+        # type: () -> int
+        return int(time.clock() * 1e9)
 
-        threading.get_ident = thread.get_ident
-        thread_id = threading.get_ident()
-    return thread_id
+else:
+
+    def thread_id():
+        # type: () -> int
+        return threading.get_ident()
+
+    def nanosecond_time():
+        # type: () -> int
+        return int(time.perf_counter() * 1e9)
 
 
 class FrameData:
