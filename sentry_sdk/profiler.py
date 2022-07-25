@@ -30,6 +30,21 @@ def nanosecond_time():
     return int(time.perf_counter() * 1e9)
 
 
+def thread_id():
+    """
+    Returns the thread ID of the current thread. This function is written to be compatible with Python 3 or Python 2.7.
+    """
+    # type: () -> int
+    try:
+        thread_id = threading.get_ident()
+    except AttributeError:  # Python 2.7
+        import thread
+
+        threading.get_ident = thread.get_ident
+        thread_id = threading.get_ident()
+    return thread_id
+
+
 class FrameData:
     def __init__(self, frame):
         # type: (typing.Any) -> None
@@ -129,13 +144,12 @@ class Sampler(object):
         Exports this object to a JSON format compatible with Sentry's profiling visualizer.
         Returns dictionary which can be serialized to JSON.
         """
-        thread_id = threading.get_ident()
         return {
             "samples": [
                 {
                     "frames": sample.stack,
                     "relative_timestamp_ns": sample.sample_time,
-                    "thread_id": thread_id,
+                    "thread_id": thread_id(),
                 }
                 for sample in self.stack_samples
             ],
