@@ -31,10 +31,10 @@ def nanosecond_time():
 
 
 def thread_id():
+    # type: () -> int
     """
     Returns the thread ID of the current thread. This function is written to be compatible with Python 3 or Python 2.7.
     """
-    # type: () -> int
     try:
         thread_id = threading.get_ident()
     except AttributeError:  # Python 2.7
