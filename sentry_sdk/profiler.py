@@ -36,9 +36,11 @@ def thread_id():
     Returns the thread ID of the current thread. This function is written to be compatible with Python 3 or Python 2.7.
     """
     try:
+        # threading.get_ident is only available in Python 3.3+, so this will fail for Python 2.7.
         thread_id = threading.get_ident()
     except AttributeError:  # Python 2.7
-        import thread
+        # The thread module is only available in Python 2.7, need to suppress MYPY missing import error
+        import thread  # type: ignore
 
         threading.get_ident = thread.get_ident
         thread_id = threading.get_ident()
