@@ -679,6 +679,7 @@ class Transaction(Span):
                 "trace_id": self.trace_id,
                 "transaction_id": None,  # Gets added in client.py
                 "transaction_name": self.name,
+                "version_code": "",  # TODO: Determine appropriate value. Currently set to empty string so profile will not get rejected.
                 "version_name": None,  # Gets added in client.py
             }
 
