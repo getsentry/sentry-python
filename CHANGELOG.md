@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.9.0
+
+### Various fixes & improvements
+
+- feat(profiler): Add experimental profiler under experiments.enable_profiling (#1481) by @szokeasaurusrex
+- Fixed problem with broken response and python-multipart (#1516) by @antonpirker
+
 ## 1.8.0
 
 ### Various fixes & improvements
