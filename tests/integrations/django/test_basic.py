@@ -469,10 +469,17 @@ def test_django_connect_breadcrumbs(
 
 
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction,expected_source",
+    "transaction_style,client_url,expected_transaction,expected_source,expected_response",
     [
-        ("function_name", "tests.integrations.django.myapp.views.message", "component"),
-        ("url", "/message", "route"),
+        (
+            "function_name",
+            "/message",
+            "tests.integrations.django.myapp.views.message",
+            "component",
+            b"ok",
+        ),
+        ("url", "/message", "/message", "route", b"ok"),
+        ("url", "/404", "/404", "url", b"404"),
     ],
 )
 def test_transaction_style(
@@ -480,16 +487,18 @@ def test_transaction_style(
     client,
     capture_events,
     transaction_style,
+    client_url,
     expected_transaction,
     expected_source,
+    expected_response,
 ):
     sentry_init(
         integrations=[DjangoIntegration(transaction_style=transaction_style)],
         send_default_pii=True,
     )
     events = capture_events()
-    content, status, headers = client.get(reverse("message"))
-    assert b"".join(content) == b"ok"
+    content, status, headers = client.get(client_url)
+    assert b"".join(content) == expected_response
 
     (event,) = events
     assert event["transaction"] == expected_transaction
