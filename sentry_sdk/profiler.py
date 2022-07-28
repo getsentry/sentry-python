@@ -17,8 +17,8 @@ import signal
 import time
 from contextlib import contextmanager
 
+import sentry_sdk
 from sentry_sdk._compat import PY2
-from sentry_sdk.hub import Hub
 from sentry_sdk.utils import logger
 
 if PY2:
@@ -193,17 +193,19 @@ class Sampler(object):
         return self._transaction.name
 
 
+def has_profiling_enabled(hub=None):
+    # type: (Optional[sentry_sdk.Hub]) -> bool
+    if hub is None:
+        hub = sentry_sdk.Hub.current
+
+    options = hub.client and hub.client.options
+    return bool(options and options["_experiments"].get("enable_profiling"))
+
+
 @contextmanager
 def profiling(transaction, hub=None):
-    # type: (sentry_sdk.tracing.Transaction, Optional[Hub]) -> Generator[None, None, None]
-    if hub is None:
-        hub = Hub.current
-
-    if (
-        hub.client
-        and hub.client.options
-        and hub.client.options["_experiments"].get("enable_profiling", False)
-    ):
+    # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
+    if has_profiling_enabled(hub):
         with Sampler(transaction):
             yield
     else:

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 import sentry_sdk
 
+from sentry_sdk.profiler import has_profiling_enabled
 from sentry_sdk.utils import logger
 from sentry_sdk._types import MYPY
 
@@ -663,8 +664,8 @@ class Transaction(Span):
         }
 
         if (
-            hub.client is not None
-            and hub.client.options["_experiments"].get("enable_profiling", False)
+            has_profiling_enabled(hub)
+            and hub.client is not None
             and self._profile is not None
         ):
             event["profile"] = {
