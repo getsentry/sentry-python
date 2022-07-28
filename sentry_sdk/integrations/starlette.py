@@ -133,15 +133,17 @@ def patch_exception_middleware(middleware_class):
         old_middleware_init(self, *args, **kwargs)
 
         # Patch existing exception handlers
+        old_handlers = self._exception_handlers.copy()
+
+        async def _sentry_patched_exception_handler(self, *args, **kwargs):
+            # type: (Any, Any, Any) -> None
+            exp = args[0]
+            _capture_exception(exp, handled=True)
+
+            old_handler = old_handlers[exp.__class__]
+            return await old_handler(self, *args, **kwargs)
+
         for key in self._exception_handlers.keys():
-            old_handler = self._exception_handlers.get(key)
-
-            def _sentry_patched_exception_handler(self, *args, **kwargs):
-                # type: (Any, Any, Any) -> None
-                exp = args[0]
-                _capture_exception(exp, handled=True)
-                return old_handler(self, *args, **kwargs)
-
             self._exception_handlers[key] = _sentry_patched_exception_handler
 
     middleware_class.__init__ = _sentry_middleware_init
@@ -225,32 +227,42 @@ def patch_middlewares():
     """
     old_middleware_init = Middleware.__init__
 
-    def _sentry_middleware_init(self, cls, **options):
-        # type: (Any, Any, Any) -> None
-        span_enabled_cls = _enable_span_for_middleware(cls)
-        old_middleware_init(self, span_enabled_cls, **options)
+    not_yet_patched = "_sentry_middleware_init" not in str(old_middleware_init)
 
-        if cls == AuthenticationMiddleware:
-            patch_authentication_middleware(cls)
+    if not_yet_patched:
 
-        if cls == ExceptionMiddleware:
-            patch_exception_middleware(cls)
+        def _sentry_middleware_init(self, cls, **options):
+            # type: (Any, Any, Any) -> None
+            span_enabled_cls = _enable_span_for_middleware(cls)
+            old_middleware_init(self, span_enabled_cls, **options)
 
-    Middleware.__init__ = _sentry_middleware_init
+            if cls == AuthenticationMiddleware:
+                patch_authentication_middleware(cls)
+
+            if cls == ExceptionMiddleware:
+                patch_exception_middleware(cls)
+
+        Middleware.__init__ = _sentry_middleware_init
 
     old_build_middleware_stack = Starlette.build_middleware_stack
 
-    def _sentry_build_middleware_stack(self):
-        # type: (Starlette) -> Callable[..., Any]
-        """
-        Adds `SentryStarletteMiddleware` to the
-        middleware stack of the Starlette application.
-        """
-        app = old_build_middleware_stack(self)
-        app = SentryStarletteMiddleware(app=app)
-        return app
+    not_yet_patched = "_sentry_build_middleware_stack" not in str(
+        old_build_middleware_stack
+    )
 
-    Starlette.build_middleware_stack = _sentry_build_middleware_stack
+    if not_yet_patched:
+
+        def _sentry_build_middleware_stack(self):
+            # type: (Starlette) -> Callable[..., Any]
+            """
+            Adds `SentryStarletteMiddleware` to the
+            middleware stack of the Starlette application.
+            """
+            app = old_build_middleware_stack(self)
+            app = SentryStarletteMiddleware(app=app)
+            return app
+
+        Starlette.build_middleware_stack = _sentry_build_middleware_stack
 
 
 def patch_asgi_app():
