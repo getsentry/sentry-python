@@ -1,7 +1,5 @@
 import sys
-import sentry_sdk.profiler as profiler
 
-from contextlib import contextmanager
 from sentry_sdk._functools import partial
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import (
@@ -13,6 +11,7 @@ from sentry_sdk._compat import PY2, reraise, iteritems
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.profiler import profiling
 
 from sentry_sdk._types import MYPY
 
@@ -25,7 +24,6 @@ if MYPY:
     from typing import Optional
     from typing import TypeVar
     from typing import Protocol
-    from typing import Generator
 
     from sentry_sdk.utils import ExcInfo
     from sentry_sdk._types import EventProcessor
@@ -94,20 +92,6 @@ def get_request_url(environ, use_x_forwarded_for=False):
         get_host(environ, use_x_forwarded_for),
         wsgi_decoding_dance(environ.get("PATH_INFO") or "").lstrip("/"),
     )
-
-
-@contextmanager
-def profiling(transaction, hub=None):
-    # type: (Transaction, Optional[Hub]) -> Generator[None, None, None]
-    if hub is None:
-        hub = Hub.current
-    if hub.client is not None and hub.client.options["_experiments"].get(
-        "enable_profiling", False
-    ):
-        with profiler.Sampler(transaction):
-            yield
-    else:
-        yield
 
 
 class SentryWsgiMiddleware(object):

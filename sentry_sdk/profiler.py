@@ -15,7 +15,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 import atexit
 import signal
 import time
+from contextlib import contextmanager
+
 from sentry_sdk._compat import PY2
+from sentry_sdk.hub import Hub
 from sentry_sdk.utils import logger
 
 if PY2:
@@ -27,6 +30,8 @@ from sentry_sdk._types import MYPY
 
 if MYPY:
     import typing
+    from typing import Generator
+    from typing import Optional
     import sentry_sdk.tracing
 
 
@@ -186,3 +191,20 @@ class Sampler(object):
     def transaction_name(self):
         # type: () -> str
         return self._transaction.name
+
+
+@contextmanager
+def profiling(transaction, hub=None):
+    # type: (sentry_sdk.tracing.Transaction, Optional[Hub]) -> Generator[None, None, None]
+    if hub is None:
+        hub = Hub.current
+
+    if (
+        hub.client
+        and hub.client.options
+        and hub.client.options["_experiments"].get("enable_profiling", False)
+    ):
+        with Sampler(transaction):
+            yield
+    else:
+        yield
