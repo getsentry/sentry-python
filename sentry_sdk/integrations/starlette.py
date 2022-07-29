@@ -138,7 +138,8 @@ def patch_exception_middleware(middleware_class):
         async def _sentry_patched_exception_handler(self, *args, **kwargs):
             # type: (Any, Any, Any) -> None
             exp = args[0]
-            _capture_exception(exp, handled=True)
+            if exp.status_code >= 500:  # Only capture server errors
+                _capture_exception(exp, handled=True)
 
             old_handler = old_handlers[exp.__class__]
             return await old_handler(self, *args, **kwargs)
