@@ -1,5 +1,8 @@
 from __future__ import absolute_import
 
+import asyncio
+import functools
+
 from sentry_sdk._compat import iteritems
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
@@ -23,6 +26,7 @@ if MYPY:
     from sentry_sdk._types import Event
 
 try:
+    import starlette
     from starlette.applications import Starlette  # type: ignore
     from starlette.datastructures import UploadFile  # type: ignore
     from starlette.middleware import Middleware  # type: ignore
@@ -69,8 +73,9 @@ class StarletteIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        patch_middlewares()
+        # patch_middlewares()
         patch_asgi_app()
+        patch_request_response()
 
 
 def _enable_span_for_middleware(middleware_class):
@@ -288,6 +293,113 @@ def patch_asgi_app():
     Starlette.__call__ = _sentry_patched_asgi_app
 
 
+# This was vendored in from Starlette to support Starlette 0.19.1 because
+# this function was only introduced in 0.20.x
+def _is_async_callable(obj):
+    while isinstance(obj, functools.partial):
+        obj = obj.func
+
+    return asyncio.iscoroutinefunction(obj) or (
+        callable(obj) and asyncio.iscoroutinefunction(obj.__call__)
+    )
+
+
+def patch_request_response():
+    old_request_response = starlette.routing.request_response
+
+    def _sentry_request_response(func):
+        old_func = func
+
+        is_coroutine = _is_async_callable(old_func)
+        if is_coroutine:
+
+            async def _sentry_func(*args, **kwargs):
+                hub = Hub.current
+                integration = hub.get_integration(StarletteIntegration)
+                if integration is None:
+                    return await old_func(*args, **kwargs)
+
+                with hub.configure_scope() as sentry_scope:
+                    request = args[0]
+                    extractor = StarletteRequestExtractor(request)
+                    info = await extractor.extract_request_info()
+
+                    def _make_request_event_processor(req, integration):
+                        # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
+                        def event_processor(event, hint):
+                            # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+
+                            # Extract information from request
+                            request_info = event.get("request", {})
+                            if info:
+                                if "cookies" in info and _should_send_default_pii():
+                                    request_info["cookies"] = info["cookies"]
+                                if "data" in info:
+                                    request_info["data"] = info["data"]
+                            event["request"] = request_info
+
+                            _set_transaction_name_and_source(
+                                event, integration.transaction_style, req
+                            )
+
+                            return event
+
+                        return event_processor
+
+                sentry_scope._name = StarletteIntegration.identifier
+                sentry_scope.add_event_processor(
+                    _make_request_event_processor(request, integration)
+                )
+
+                return await old_func(*args, **kwargs)
+
+        else:
+
+            def _sentry_func(*args, **kwargs):
+                hub = Hub.current
+                integration = hub.get_integration(StarletteIntegration)
+                if integration is None:
+                    return old_func(*args, **kwargs)
+
+                with hub.configure_scope() as sentry_scope:
+                    request = args[0]
+                    extractor = StarletteRequestExtractor(request)
+                    cookies = extractor.extract_cookies_from_request()
+
+                    def _make_request_event_processor(req, integration):
+                        # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
+                        def event_processor(event, hint):
+                            # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+
+                            # Extract information from request
+                            request_info = event.get("request", {})
+                            if cookies:
+                                request_info["cookies"] = cookies
+
+                            event["request"] = request_info
+
+                            _set_transaction_name_and_source(
+                                event, integration.transaction_style, req
+                            )
+
+                            return event
+
+                        return event_processor
+
+                sentry_scope._name = StarletteIntegration.identifier
+                sentry_scope.add_event_processor(
+                    _make_request_event_processor(request, integration)
+                )
+
+                return old_func(*args, **kwargs)
+
+        func = _sentry_func
+
+        return old_request_response(func)
+
+    starlette.routing.request_response = _sentry_request_response
+
+
 class StarletteRequestExtractor:
     """
     Extracts useful information from the Starlette request
@@ -299,6 +411,18 @@ class StarletteRequestExtractor:
     def __init__(self, request):
         # type: (StarletteRequestExtractor, Request) -> None
         self.request = request
+
+    def extract_cookies_from_request(self):
+        # type: (StarletteRequestExtractor) -> Optional[Dict[str, Any]]
+        client = Hub.current.client
+        if client is None:
+            return None
+
+        cookies = None  # type: Dict[str, Any]
+        if _should_send_default_pii():
+            cookies = self.cookies()
+
+        return cookies
 
     async def extract_request_info(self):
         # type: (StarletteRequestExtractor) -> Optional[Dict[str, Any]]
@@ -450,22 +574,10 @@ class SentryStarletteMiddleware:
         with hub.configure_scope() as sentry_scope:
             request = Request(scope, receive=receive, send=send)
 
-            extractor = StarletteRequestExtractor(request)
-            info = await extractor.extract_request_info()
-
             def _make_request_event_processor(req, integration):
                 # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
                 def event_processor(event, hint):
                     # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-
-                    # Extract information from request
-                    request_info = event.get("request", {})
-                    if info:
-                        if "cookies" in info and _should_send_default_pii():
-                            request_info["cookies"] = info["cookies"]
-                        if "data" in info:
-                            request_info["data"] = info["data"]
-                    event["request"] = request_info
 
                     _set_transaction_name_and_source(
                         event, integration.transaction_style, req
