@@ -1,5 +1,83 @@
 # Changelog
 
+## 1.9.0
+
+### Various fixes & improvements
+
+- feat(profiler): Add experimental profiler under experiments.enable_profiling (#1481) by @szokeasaurusrex
+- Fixed problem with broken response and python-multipart (#1516) by @antonpirker
+
+## 1.8.0
+
+### Various fixes & improvements
+
+- feat(starlette): add Starlette integration (#1441) by @sl0thentr0py
+    
+    **Important:** Remove manual usage of `SentryAsgiMiddleware`! This is now done by the Starlette integration.
+    
+    Usage:
+    
+    ```python
+    from starlette.applications import Starlette
+    
+    from sentry_sdk.integrations.starlette import StarletteIntegration
+    
+    sentry_sdk.init(
+        dsn="...", 
+        integrations=[StarletteIntegration()],
+    )
+    
+    app = Starlette(debug=True, routes=[...])
+    ```
+- feat(fastapi): add FastAPI integration (#829) by @antonpirker
+    
+    **Important:** Remove manual usage of `SentryAsgiMiddleware`! This is now done by the FastAPI integration.
+    
+    Usage:
+    
+    ```python
+    from fastapi import FastAPI
+    
+    from sentry_sdk.integrations.starlette import StarletteIntegration
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+    sentry_sdk.init(
+        dsn="...", 
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+    )
+    
+    app = FastAPI()
+    ```
+    
+    Yes, you have to add both, the `StarletteIntegration` **AND** the `FastApiIntegration`!
+- fix: avoid sending empty Baggage header (#1507) by @intgr
+- fix: properly freeze Baggage object (#1508) by @intgr
+- docs: fix simple typo, collecter -> collector (#1505) by @timgates42
+
+## 1.7.2
+
+### Various fixes & improvements
+
+- feat(transactions): Transaction Source (#1490) by @antonpirker
+- Removed (unused) sentry_timestamp header (#1494) by @antonpirker
+
+## 1.7.1
+
+### Various fixes & improvements
+
+- Skip malformed baggage items (#1491) by @robyoung
+
+## 1.7.0
+
+### Various fixes & improvements
+
+- feat(tracing): Dynamic Sampling Context / Baggage continuation (#1485) by @sl0thentr0py
+
+  The SDK now propagates the [W3C Baggage Header](https://www.w3.org/TR/baggage/) from
+  incoming transactions to outgoing requests.  
+  It also extracts Sentry specific [sampling information](https://develop.sentry.dev/sdk/performance/dynamic-sampling-context/)
+  and adds it to the transaction headers to enable Dynamic Sampling in the product.
+
 ## 1.6.0
 
 ### Various fixes & improvements

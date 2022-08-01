@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="1.6.0",
+    version="1.9.0",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -55,6 +55,8 @@ setup(
         "pure_eval": ["pure_eval", "executing", "asttokens"],
         "chalice": ["chalice>=1.16.0"],
         "httpx": ["httpx>=0.16.0"],
+        "starlette": ["starlette>=0.19.1"],
+        "fastapi": ["fastapi>=0.79.0"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",

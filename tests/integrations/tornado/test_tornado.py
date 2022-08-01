@@ -96,6 +96,7 @@ def test_basic(tornado_testcase, sentry_init, capture_events):
         event["transaction"]
         == "tests.integrations.tornado.test_tornado.CrashingHandler.get"
     )
+    assert event["transaction_info"] == {"source": "component"}
 
     with configure_scope() as scope:
         assert not scope._tags
@@ -129,6 +130,9 @@ def test_transactions(tornado_testcase, sentry_init, capture_events, handler, co
 
     assert client_tx["type"] == "transaction"
     assert client_tx["transaction"] == "client"
+    assert client_tx["transaction_info"] == {
+        "source": "unknown"
+    }  # because this is just the start_transaction() above.
 
     if server_error is not None:
         assert server_error["exception"]["values"][0]["type"] == "ZeroDivisionError"
@@ -136,6 +140,7 @@ def test_transactions(tornado_testcase, sentry_init, capture_events, handler, co
             server_error["transaction"]
             == "tests.integrations.tornado.test_tornado.CrashingHandler.post"
         )
+        assert server_error["transaction_info"] == {"source": "component"}
 
     if code == 200:
         assert (
@@ -148,6 +153,7 @@ def test_transactions(tornado_testcase, sentry_init, capture_events, handler, co
             == "tests.integrations.tornado.test_tornado.CrashingHandler.post"
         )
 
+    assert server_tx["transaction_info"] == {"source": "component"}
     assert server_tx["type"] == "transaction"
 
     request = server_tx["request"]

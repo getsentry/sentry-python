@@ -13,12 +13,16 @@ from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.sessions import auto_session_tracking
+from sentry_sdk.tracing import (
+    SOURCE_FOR_STYLE,
+    TRANSACTION_SOURCE_ROUTE,
+)
 from sentry_sdk.utils import (
     ContextVar,
     event_from_exception,
-    transaction_from_function,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
+    transaction_from_function,
 )
 from sentry_sdk.tracing import Transaction
 
@@ -40,15 +44,15 @@ _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 
-def _capture_exception(hub, exc):
-    # type: (Hub, Any) -> None
+def _capture_exception(hub, exc, mechanism_type="asgi"):
+    # type: (Hub, Any, str) -> None
 
     # Check client here as it might have been unset while streaming response
     if hub.client is not None:
         event, hint = event_from_exception(
             exc,
             client_options=hub.client.options,
-            mechanism={"type": "asgi", "handled": False},
+            mechanism={"type": mechanism_type, "handled": False},
         )
         hub.capture_event(event, hint=hint)
 
@@ -70,10 +74,16 @@ def _looks_like_asgi3(app):
 
 
 class SentryAsgiMiddleware:
-    __slots__ = ("app", "__call__", "transaction_style")
+    __slots__ = ("app", "__call__", "transaction_style", "mechanism_type")
 
-    def __init__(self, app, unsafe_context_data=False, transaction_style="endpoint"):
-        # type: (Any, bool, str) -> None
+    def __init__(
+        self,
+        app,
+        unsafe_context_data=False,
+        transaction_style="endpoint",
+        mechanism_type="asgi",
+    ):
+        # type: (Any, bool, str, str) -> None
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
         data to sent events and basic handling for exceptions bubbling up
@@ -95,6 +105,7 @@ class SentryAsgiMiddleware:
                 % (transaction_style, TRANSACTION_STYLE_VALUES)
             )
         self.transaction_style = transaction_style
+        self.mechanism_type = mechanism_type
         self.app = app
 
         if _looks_like_asgi3(app):
@@ -122,7 +133,7 @@ class SentryAsgiMiddleware:
             try:
                 return await callback()
             except Exception as exc:
-                _capture_exception(Hub.current, exc)
+                _capture_exception(Hub.current, exc, mechanism_type=self.mechanism_type)
                 raise exc from None
 
         _asgi_middleware_applied.set(True)
@@ -147,6 +158,7 @@ class SentryAsgiMiddleware:
                         transaction = Transaction(op="asgi.server")
 
                     transaction.name = _DEFAULT_TRANSACTION_NAME
+                    transaction.source = TRANSACTION_SOURCE_ROUTE
                     transaction.set_tag("asgi.type", ty)
 
                     with hub.start_transaction(
@@ -158,7 +170,9 @@ class SentryAsgiMiddleware:
                         try:
                             return await callback()
                         except Exception as exc:
-                            _capture_exception(hub, exc)
+                            _capture_exception(
+                                hub, exc, mechanism_type=self.mechanism_type
+                            )
                             raise exc from None
         finally:
             _asgi_middleware_applied.set(False)
@@ -183,25 +197,7 @@ class SentryAsgiMiddleware:
         if client and _should_send_default_pii():
             request_info["env"] = {"REMOTE_ADDR": self._get_ip(asgi_scope)}
 
-        if (
-            event.get("transaction", _DEFAULT_TRANSACTION_NAME)
-            == _DEFAULT_TRANSACTION_NAME
-        ):
-            if self.transaction_style == "endpoint":
-                endpoint = asgi_scope.get("endpoint")
-                # Webframeworks like Starlette mutate the ASGI env once routing is
-                # done, which is sometime after the request has started. If we have
-                # an endpoint, overwrite our generic transaction name.
-                if endpoint:
-                    event["transaction"] = transaction_from_function(endpoint)
-            elif self.transaction_style == "url":
-                # FastAPI includes the route object in the scope to let Sentry extract the
-                # path from it for the transaction name
-                route = asgi_scope.get("route")
-                if route:
-                    path = getattr(route, "path", None)
-                    if path is not None:
-                        event["transaction"] = path
+        self._set_transaction_name_and_source(event, self.transaction_style, asgi_scope)
 
         event["request"] = request_info
 
@@ -212,6 +208,42 @@ class SentryAsgiMiddleware:
     # Note: Those functions are not public API. If you want to mutate request
     # data to your liking it's recommended to use the `before_send` callback
     # for that.
+
+    def _set_transaction_name_and_source(self, event, transaction_style, asgi_scope):
+        # type: (Event, str, Any) -> None
+        transaction_name_already_set = (
+            event.get("transaction", _DEFAULT_TRANSACTION_NAME)
+            != _DEFAULT_TRANSACTION_NAME
+        )
+        if transaction_name_already_set:
+            return
+
+        name = ""
+
+        if transaction_style == "endpoint":
+            endpoint = asgi_scope.get("endpoint")
+            # Webframeworks like Starlette mutate the ASGI env once routing is
+            # done, which is sometime after the request has started. If we have
+            # an endpoint, overwrite our generic transaction name.
+            if endpoint:
+                name = transaction_from_function(endpoint) or ""
+
+        elif transaction_style == "url":
+            # FastAPI includes the route object in the scope to let Sentry extract the
+            # path from it for the transaction name
+            route = asgi_scope.get("route")
+            if route:
+                path = getattr(route, "path", None)
+                if path is not None:
+                    name = path
+
+        if not name:
+            event["transaction"] = _DEFAULT_TRANSACTION_NAME
+            event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
+            return
+
+        event["transaction"] = name
+        event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
 
     def _get_url(self, scope, default_scheme, host):
         # type: (Dict[str, Any], Literal["ws", "http"], Optional[str]) -> str
