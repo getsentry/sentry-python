@@ -296,6 +296,7 @@ def patch_asgi_app():
 # This was vendored in from Starlette to support Starlette 0.19.1 because
 # this function was only introduced in 0.20.x
 def _is_async_callable(obj):
+    # type: (Any) -> bool
     while isinstance(obj, functools.partial):
         obj = obj.func
 
@@ -305,15 +306,18 @@ def _is_async_callable(obj):
 
 
 def patch_request_response():
+    # type: () -> None
     old_request_response = starlette.routing.request_response
 
     def _sentry_request_response(func):
+        # type: (Callable[[Any], Any]) -> ASGIApp
         old_func = func
 
         is_coroutine = _is_async_callable(old_func)
         if is_coroutine:
 
-            async def _sentry_func(*args, **kwargs):
+            async def _sentry_async_func(*args, **kwargs):
+                # type: (*Any, **Any) -> Any
                 hub = Hub.current
                 integration = hub.get_integration(StarletteIntegration)
                 if integration is None:
@@ -353,9 +357,11 @@ def patch_request_response():
 
                 return await old_func(*args, **kwargs)
 
+            func = _sentry_async_func
         else:
 
-            def _sentry_func(*args, **kwargs):
+            def _sentry_sync_func(*args, **kwargs):
+                # type: (*Any, **Any) -> Any
                 hub = Hub.current
                 integration = hub.get_integration(StarletteIntegration)
                 if integration is None:
@@ -393,7 +399,7 @@ def patch_request_response():
 
                 return old_func(*args, **kwargs)
 
-        func = _sentry_func
+            func = _sentry_sync_func
 
         return old_request_response(func)
 
@@ -418,7 +424,7 @@ class StarletteRequestExtractor:
         if client is None:
             return None
 
-        cookies = None  # type: Dict[str, Any]
+        cookies = None  # type: Optional[Dict[str, Any]]
         if _should_send_default_pii():
             cookies = self.cookies()
 

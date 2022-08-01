@@ -84,12 +84,15 @@ def _set_transaction_name_and_source(event, transaction_style, request):
 
 
 def patch_get_request_handler():
+    # type: () -> None
     old_get_request_handler = fastapi.routing.get_request_handler
 
     def _sentry_get_request_handler(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
         old_app = old_get_request_handler(*args, **kwargs)
 
         async def _sentry_app(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
             hub = Hub.current
             integration = hub.get_integration(FastApiIntegration)
             if integration is None:
