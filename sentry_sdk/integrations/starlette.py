@@ -73,7 +73,7 @@ class StarletteIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        # patch_middlewares()
+        patch_middlewares()
         patch_asgi_app()
         patch_request_response()
 
