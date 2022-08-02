@@ -10,7 +10,7 @@ from django.dispatch import Signal
 def patch_signals():
     """Patch django signal receivers to create a span"""
 
-    def send(self: Signal,  sender, **kwargs):
+    def send(self: Signal, sender, **kwargs):
         if not self.receivers or self.sender_receivers_cache.get(sender) is NO_RECEIVERS:
             return []
         results = []
