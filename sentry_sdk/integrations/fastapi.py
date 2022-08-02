@@ -14,8 +14,8 @@ if MYPY:
     from sentry_sdk._types import Event
 
 try:
-    import fastapi
-    from fastapi import FastAPI  # type: ignore
+    import fastapi  # type: ignore
+    from fastapi import FastAPI
     from fastapi import Request
 except ImportError:
     raise DidNotEnable("FastAPI is not installed")

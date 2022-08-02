@@ -26,7 +26,7 @@ if MYPY:
     from sentry_sdk._types import Event
 
 try:
-    import starlette
+    import starlette  # type: ignore
     from starlette.applications import Starlette  # type: ignore
     from starlette.datastructures import UploadFile  # type: ignore
     from starlette.middleware import Middleware  # type: ignore
