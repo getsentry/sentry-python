@@ -28,7 +28,7 @@ except ImportError:
 try:
     from flask import Flask, Markup, Request  # type: ignore
     from flask import __version__ as FLASK_VERSION
-    from flask import _app_ctx_stack, _request_ctx_stack
+    from flask import request as flask_request
     from flask.signals import (
         before_render_template,
         got_request_exception,
@@ -124,19 +124,17 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         pass
 
 
-def _request_started(sender, **kwargs):
+def _request_started(app, **kwargs):
     # type: (Flask, **Any) -> None
     hub = Hub.current
     integration = hub.get_integration(FlaskIntegration)
     if integration is None:
         return
 
-    app = _app_ctx_stack.top.app
     with hub.configure_scope() as scope:
-        request = _request_ctx_stack.top.request
-
         # Set the transaction name and source here,
         # but rely on WSGI middleware to actually start the transaction
+        request = flask_request._get_current_object()
         _set_transaction_name_and_source(scope, integration.transaction_style, request)
         evt_processor = _make_request_event_processor(app, request, integration)
         scope.add_event_processor(evt_processor)
