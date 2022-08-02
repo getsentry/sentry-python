@@ -9,7 +9,7 @@ from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
 from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
@@ -323,12 +323,10 @@ def _patch_django_asgi_handler():
 def _set_transaction_name_and_source(scope, transaction_style, request):
     # type: (Scope, str, WSGIRequest) -> None
     try:
-        transaction_name = ""
+        transaction_name = None
         if transaction_style == "function_name":
             fn = resolve(request.path).func
-            transaction_name = (
-                transaction_from_function(getattr(fn, "view_class", fn)) or ""
-            )
+            transaction_name = transaction_from_function(getattr(fn, "view_class", fn))
 
         elif transaction_style == "url":
             if hasattr(request, "urlconf"):
@@ -338,9 +336,15 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
             else:
                 transaction_name = LEGACY_RESOLVER.resolve(request.path_info)
 
+        if transaction_name is None:
+            transaction_name = request.path_info
+            source = TRANSACTION_SOURCE_URL
+        else:
+            source = SOURCE_FOR_STYLE[transaction_style]
+
         scope.set_transaction_name(
             transaction_name,
-            source=SOURCE_FOR_STYLE[transaction_style],
+            source=source,
         )
     except Exception:
         pass

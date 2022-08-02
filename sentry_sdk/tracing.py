@@ -1,11 +1,13 @@
 import uuid
 import random
 import time
+import platform
 
 from datetime import datetime, timedelta
 
 import sentry_sdk
 
+from sentry_sdk.profiler import has_profiling_enabled
 from sentry_sdk.utils import logger
 from sentry_sdk._types import MYPY
 
@@ -19,6 +21,7 @@ if MYPY:
     from typing import List
     from typing import Tuple
     from typing import Iterator
+    from sentry_sdk.profiler import Sampler
 
     from sentry_sdk._types import SamplingContext, MeasurementUnit
 
@@ -533,6 +536,7 @@ class Transaction(Span):
         # tracestate data from other vendors, of the form `dogs=yes,cats=maybe`
         "_third_party_tracestate",
         "_measurements",
+        "_profile",
         "_baggage",
     )
 
@@ -566,6 +570,7 @@ class Transaction(Span):
         self._sentry_tracestate = sentry_tracestate
         self._third_party_tracestate = third_party_tracestate
         self._measurements = {}  # type: Dict[str, Any]
+        self._profile = None  # type: Optional[Sampler]
         self._baggage = baggage
 
     def __repr__(self):
@@ -657,6 +662,27 @@ class Transaction(Span):
             "start_timestamp": self.start_timestamp,
             "spans": finished_spans,
         }
+
+        if (
+            has_profiling_enabled(hub)
+            and hub.client is not None
+            and self._profile is not None
+        ):
+            event["profile"] = {
+                "device_os_name": platform.system(),
+                "device_os_version": platform.release(),
+                "duration_ns": self._profile.duration,
+                "environment": hub.client.options["environment"],
+                "platform": "python",
+                "platform_version": platform.python_version(),
+                "profile_id": uuid.uuid4().hex,
+                "profile": self._profile.to_json(),
+                "trace_id": self.trace_id,
+                "transaction_id": None,  # Gets added in client.py
+                "transaction_name": self.name,
+                "version_code": "",  # TODO: Determine appropriate value. Currently set to empty string so profile will not get rejected.
+                "version_name": None,  # Gets added in client.py
+            }
 
         if has_custom_measurements_enabled():
             event["measurements"] = self._measurements
