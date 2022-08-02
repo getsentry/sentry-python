@@ -37,7 +37,12 @@ setup(
     package_data={"sentry_sdk": ["py.typed"]},
     zip_safe=False,
     license="BSD",
-    install_requires=["urllib3>=1.10.0", "certifi"],
+    install_requires=[
+        'urllib3>=1.25.7; python_version<="3.4"',
+        'urllib3>=1.26.9; python_version>="3.5"',
+        'urllib3>=1.26.11"; python_version >="3.6"',
+        "certifi",
+    ],
     extras_require={
         "flask": ["flask>=0.11", "blinker>=1.1"],
         "quart": ["quart>=0.16.1", "blinker>=1.1"],
