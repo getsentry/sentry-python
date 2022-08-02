@@ -27,11 +27,12 @@ except ImportError:
 
 try:
     from quart import (  # type: ignore
+        has_request_context,
+        has_websocket_context,
         Request,
         Quart,
-        _request_ctx_stack,
-        _websocket_ctx_stack,
-        _app_ctx_stack,
+        request,
+        websocket,
     )
     from quart.signals import (  # type: ignore
         got_background_exception,
@@ -100,19 +101,18 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         pass
 
 
-def _request_websocket_started(sender, **kwargs):
+def _request_websocket_started(app, **kwargs):
     # type: (Quart, **Any) -> None
     hub = Hub.current
     integration = hub.get_integration(QuartIntegration)
     if integration is None:
         return
 
-    app = _app_ctx_stack.top.app
     with hub.configure_scope() as scope:
-        if _request_ctx_stack.top is not None:
-            request_websocket = _request_ctx_stack.top.request
-        if _websocket_ctx_stack.top is not None:
-            request_websocket = _websocket_ctx_stack.top.websocket
+        if has_request_context():
+            request_websocket = request._get_current_object()
+        if has_websocket_context():
+            request_websocket = websocket._get_current_object()
 
         # Set the transaction name here, but rely on ASGI middleware
         # to actually start the transaction
