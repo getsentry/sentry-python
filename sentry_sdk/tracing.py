@@ -1,11 +1,13 @@
 import uuid
 import random
 import time
+import platform
 
 from datetime import datetime, timedelta
 
 import sentry_sdk
 
+from sentry_sdk.profiler import has_profiling_enabled
 from sentry_sdk.utils import logger
 from sentry_sdk._types import MYPY
 
@@ -19,8 +21,32 @@ if MYPY:
     from typing import List
     from typing import Tuple
     from typing import Iterator
+    from sentry_sdk.profiler import Sampler
 
     from sentry_sdk._types import SamplingContext, MeasurementUnit
+
+
+# Transaction source
+# see https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
+TRANSACTION_SOURCE_CUSTOM = "custom"
+TRANSACTION_SOURCE_URL = "url"
+TRANSACTION_SOURCE_ROUTE = "route"
+TRANSACTION_SOURCE_VIEW = "view"
+TRANSACTION_SOURCE_COMPONENT = "component"
+TRANSACTION_SOURCE_TASK = "task"
+TRANSACTION_SOURCE_UNKNOWN = "unknown"
+
+SOURCE_FOR_STYLE = {
+    "endpoint": TRANSACTION_SOURCE_COMPONENT,
+    "function_name": TRANSACTION_SOURCE_COMPONENT,
+    "handler_name": TRANSACTION_SOURCE_COMPONENT,
+    "method_and_path_pattern": TRANSACTION_SOURCE_ROUTE,
+    "path": TRANSACTION_SOURCE_URL,
+    "route_name": TRANSACTION_SOURCE_COMPONENT,
+    "route_pattern": TRANSACTION_SOURCE_ROUTE,
+    "uri_template": TRANSACTION_SOURCE_ROUTE,
+    "url": TRANSACTION_SOURCE_ROUTE,
+}
 
 
 class _SpanRecorder(object):
@@ -215,7 +241,7 @@ class Span(object):
         # type: (...) -> Transaction
         """
         Create a Transaction with the given params, then add in data pulled from
-        the 'sentry-trace' and 'tracestate' headers from the environ (if any)
+        the 'sentry-trace', 'baggage' and 'tracestate' headers from the environ (if any)
         before returning the Transaction.
 
         This is different from `continue_from_headers` in that it assumes header
@@ -238,7 +264,7 @@ class Span(object):
         # type: (...) -> Transaction
         """
         Create a transaction with the given params (including any data pulled from
-        the 'sentry-trace' and 'tracestate' headers).
+        the 'sentry-trace', 'baggage' and 'tracestate' headers).
         """
         # TODO move this to the Transaction class
         if cls is Span:
@@ -247,7 +273,17 @@ class Span(object):
                 "instead of Span.continue_from_headers."
             )
 
-        kwargs.update(extract_sentrytrace_data(headers.get("sentry-trace")))
+        # TODO-neel move away from this kwargs stuff, it's confusing and opaque
+        # make more explicit
+        baggage = Baggage.from_incoming_header(headers.get("baggage"))
+        kwargs.update({"baggage": baggage})
+
+        sentrytrace_kwargs = extract_sentrytrace_data(headers.get("sentry-trace"))
+
+        if sentrytrace_kwargs is not None:
+            kwargs.update(sentrytrace_kwargs)
+            baggage.freeze()
+
         kwargs.update(extract_tracestate_data(headers.get("tracestate")))
 
         transaction = Transaction(**kwargs)
@@ -258,7 +294,7 @@ class Span(object):
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
         """
-        Creates a generator which returns the span's `sentry-trace` and
+        Creates a generator which returns the span's `sentry-trace`, `baggage` and
         `tracestate` headers.
 
         If the span's containing transaction doesn't yet have a
@@ -273,6 +309,11 @@ class Span(object):
         # behind a flag
         if tracestate:
             yield "tracestate", tracestate
+
+        if self.containing_transaction and self.containing_transaction._baggage:
+            baggage = self.containing_transaction._baggage.serialize()
+            if baggage:
+                yield "baggage", baggage
 
     @classmethod
     def from_traceparent(
@@ -460,7 +501,7 @@ class Span(object):
             "parent_span_id": self.parent_span_id,
             "op": self.op,
             "description": self.description,
-        }
+        }  # type: Dict[str, Any]
         if self.status:
             rv["status"] = self.status
 
@@ -473,12 +514,19 @@ class Span(object):
         if sentry_tracestate:
             rv["tracestate"] = sentry_tracestate
 
+        # TODO-neel populate fresh if head SDK
+        if self.containing_transaction and self.containing_transaction._baggage:
+            rv[
+                "dynamic_sampling_context"
+            ] = self.containing_transaction._baggage.dynamic_sampling_context()
+
         return rv
 
 
 class Transaction(Span):
     __slots__ = (
         "name",
+        "source",
         "parent_sampled",
         # the sentry portion of the `tracestate` header used to transmit
         # correlation context for server-side dynamic sampling, of the form
@@ -488,6 +536,8 @@ class Transaction(Span):
         # tracestate data from other vendors, of the form `dogs=yes,cats=maybe`
         "_third_party_tracestate",
         "_measurements",
+        "_profile",
+        "_baggage",
     )
 
     def __init__(
@@ -496,6 +546,8 @@ class Transaction(Span):
         parent_sampled=None,  # type: Optional[bool]
         sentry_tracestate=None,  # type: Optional[str]
         third_party_tracestate=None,  # type: Optional[str]
+        baggage=None,  # type: Optional[Baggage]
+        source=TRANSACTION_SOURCE_UNKNOWN,  # type: str
         **kwargs  # type: Any
     ):
         # type: (...) -> None
@@ -510,6 +562,7 @@ class Transaction(Span):
             name = kwargs.pop("transaction")
         Span.__init__(self, **kwargs)
         self.name = name
+        self.source = source
         self.parent_sampled = parent_sampled
         # if tracestate isn't inherited and set here, it will get set lazily,
         # either the first time an outgoing request needs it for a header or the
@@ -517,11 +570,13 @@ class Transaction(Span):
         self._sentry_tracestate = sentry_tracestate
         self._third_party_tracestate = third_party_tracestate
         self._measurements = {}  # type: Dict[str, Any]
+        self._profile = None  # type: Optional[Sampler]
+        self._baggage = baggage
 
     def __repr__(self):
         # type: () -> str
         return (
-            "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>"
+            "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, source=%r)>"
             % (
                 self.__class__.__name__,
                 self.name,
@@ -530,6 +585,7 @@ class Transaction(Span):
                 self.span_id,
                 self.parent_span_id,
                 self.sampled,
+                self.source,
             )
         )
 
@@ -599,12 +655,34 @@ class Transaction(Span):
         event = {
             "type": "transaction",
             "transaction": self.name,
+            "transaction_info": {"source": self.source},
             "contexts": {"trace": self.get_trace_context()},
             "tags": self._tags,
             "timestamp": self.timestamp,
             "start_timestamp": self.start_timestamp,
             "spans": finished_spans,
         }
+
+        if (
+            has_profiling_enabled(hub)
+            and hub.client is not None
+            and self._profile is not None
+        ):
+            event["profile"] = {
+                "device_os_name": platform.system(),
+                "device_os_version": platform.release(),
+                "duration_ns": self._profile.duration,
+                "environment": hub.client.options["environment"],
+                "platform": "python",
+                "platform_version": platform.python_version(),
+                "profile_id": uuid.uuid4().hex,
+                "profile": self._profile.to_json(),
+                "trace_id": self.trace_id,
+                "transaction_id": None,  # Gets added in client.py
+                "transaction_name": self.name,
+                "version_code": "",  # TODO: Determine appropriate value. Currently set to empty string so profile will not get rejected.
+                "version_name": None,  # Gets added in client.py
+            }
 
         if has_custom_measurements_enabled():
             event["measurements"] = self._measurements
@@ -626,6 +704,7 @@ class Transaction(Span):
         rv = super(Transaction, self).to_json()
 
         rv["name"] = self.name
+        rv["source"] = self.source
         rv["sampled"] = self.sampled
 
         return rv
@@ -734,6 +813,7 @@ class Transaction(Span):
 # Circular imports
 
 from sentry_sdk.tracing_utils import (
+    Baggage,
     EnvironHeaders,
     compute_tracestate_entry,
     extract_sentrytrace_data,

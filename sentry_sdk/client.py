@@ -373,6 +373,12 @@ class _Client(object):
             event_opt.get("contexts", {}).get("trace", {}).pop("tracestate", "")
         )
 
+        dynamic_sampling_context = (
+            event_opt.get("contexts", {})
+            .get("trace", {})
+            .pop("dynamic_sampling_context", {})
+        )
+
         # Transactions or events with attachments should go to the /envelope/
         # endpoint.
         if is_transaction or attachments:
@@ -382,15 +388,23 @@ class _Client(object):
                 "sent_at": format_timestamp(datetime.utcnow()),
             }
 
-            tracestate_data = raw_tracestate and reinflate_tracestate(
-                raw_tracestate.replace("sentry=", "")
-            )
-            if tracestate_data and has_tracestate_enabled():
-                headers["trace"] = tracestate_data
+            if has_tracestate_enabled():
+                tracestate_data = raw_tracestate and reinflate_tracestate(
+                    raw_tracestate.replace("sentry=", "")
+                )
+
+                if tracestate_data:
+                    headers["trace"] = tracestate_data
+            elif dynamic_sampling_context:
+                headers["trace"] = dynamic_sampling_context
 
             envelope = Envelope(headers=headers)
 
             if is_transaction:
+                if "profile" in event_opt:
+                    event_opt["profile"]["transaction_id"] = event_opt["event_id"]
+                    event_opt["profile"]["version_name"] = event_opt["release"]
+                    envelope.add_profile(event_opt.pop("profile"))
                 envelope.add_transaction(event_opt)
             else:
                 envelope.add_event(event_opt)

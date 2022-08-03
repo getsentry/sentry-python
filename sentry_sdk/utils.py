@@ -42,6 +42,16 @@ logger = logging.getLogger("sentry_sdk.errors")
 MAX_STRING_LENGTH = 512
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
+# Transaction source
+# see https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
+TRANSACTION_SOURCE_CUSTOM = "custom"
+TRANSACTION_SOURCE_URL = "url"
+TRANSACTION_SOURCE_ROUTE = "route"
+TRANSACTION_SOURCE_VIEW = "view"
+TRANSACTION_SOURCE_COMPONENT = "component"
+TRANSACTION_SOURCE_TASK = "task"
+TRANSACTION_SOURCE_UNKNOWN = "unknown"
+
 
 def json_dumps(data):
     # type: (Any) -> bytes
@@ -270,12 +280,10 @@ class Auth(object):
             type,
         )
 
-    def to_header(self, timestamp=None):
-        # type: (Optional[datetime]) -> str
+    def to_header(self):
+        # type: () -> str
         """Returns the auth header a string."""
         rv = [("sentry_key", self.public_key), ("sentry_version", self.version)]
-        if timestamp is not None:
-            rv.append(("sentry_timestamp", str(to_timestamp(timestamp))))
         if self.client is not None:
             rv.append(("sentry_client", self.client))
         if self.secret_key is not None:

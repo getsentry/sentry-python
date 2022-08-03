@@ -3,7 +3,7 @@ import contextlib
 from inspect import iscoroutinefunction
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
-from sentry_sdk.tracing import Transaction
+from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, Transaction
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
@@ -157,6 +157,7 @@ def _make_event_processor(weak_handler):
         with capture_internal_exceptions():
             method = getattr(handler, handler.request.method.lower())
             event["transaction"] = transaction_from_function(method)
+            event["transaction_info"] = {"source": TRANSACTION_SOURCE_COMPONENT}
 
         with capture_internal_exceptions():
             extractor = TornadoRequestExtractor(request)

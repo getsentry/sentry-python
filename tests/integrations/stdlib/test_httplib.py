@@ -23,6 +23,7 @@ except ImportError:
     import mock  # python < 3.3
 
 from sentry_sdk import capture_message, start_transaction
+from sentry_sdk.tracing import Transaction
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 
 
@@ -132,7 +133,17 @@ def test_outgoing_trace_headers(
 
     sentry_init(traces_sample_rate=1.0)
 
+    headers = {}
+    headers["baggage"] = (
+        "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
+        "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
+        "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
+    )
+
+    transaction = Transaction.continue_from_headers(headers)
+
     with start_transaction(
+        transaction=transaction,
         name="/interactions/other-dogs/new-dog",
         op="greeting.sniff",
         trace_id="12312012123120121231201212312012",
@@ -140,14 +151,28 @@ def test_outgoing_trace_headers(
 
         HTTPSConnection("www.squirrelchasers.com").request("GET", "/top-chasers")
 
+        (request_str,) = mock_send.call_args[0]
+        request_headers = {}
+        for line in request_str.decode("utf-8").split("\r\n")[1:]:
+            if line:
+                key, val = line.split(": ")
+                request_headers[key] = val
+
         request_span = transaction._span_recorder.spans[-1]
-
-        expected_sentry_trace = (
-            "sentry-trace: {trace_id}-{parent_span_id}-{sampled}".format(
-                trace_id=transaction.trace_id,
-                parent_span_id=request_span.span_id,
-                sampled=1,
-            )
+        expected_sentry_trace = "{trace_id}-{parent_span_id}-{sampled}".format(
+            trace_id=transaction.trace_id,
+            parent_span_id=request_span.span_id,
+            sampled=1,
         )
+        assert request_headers["sentry-trace"] == expected_sentry_trace
 
-        mock_send.assert_called_with(StringContaining(expected_sentry_trace))
+        expected_outgoing_baggage_items = [
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700",
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3",
+            "sentry-sample_rate=0.01337",
+            "sentry-user_id=Am%C3%A9lie",
+        ]
+
+        assert sorted(request_headers["baggage"].split(",")) == sorted(
+            expected_outgoing_baggage_items
+        )
