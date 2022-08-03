@@ -313,57 +313,58 @@ def test_retry(celery, capture_events):
         assert e["type"] == "ZeroDivisionError"
 
 
-# TODO: This test is hanging when running test with `tox --parallel auto`. Find out why and fix it
-# @pytest.mark.forked
-# def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe, tmpdir):
-#     celery = init_celery(traces_sample_rate=1.0, backend="redis", debug=True)
+# TODO: This test is hanging when running test with `tox --parallel auto`. Find out why and fix it!
+@pytest.mark.skip
+@pytest.mark.forked
+def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe, tmpdir):
+    celery = init_celery(traces_sample_rate=1.0, backend="redis", debug=True)
 
-#     events = capture_events_forksafe()
+    events = capture_events_forksafe()
 
-#     runs = []
+    runs = []
 
-#     @celery.task(name="dummy_task", bind=True)
-#     def dummy_task(self):
-#         runs.append(1)
-#         1 / 0
+    @celery.task(name="dummy_task", bind=True)
+    def dummy_task(self):
+        runs.append(1)
+        1 / 0
 
-#     with start_transaction(name="submit_celery"):
-#         # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
-#         res = dummy_task.apply_async()
+    with start_transaction(name="submit_celery"):
+        # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
+        res = dummy_task.apply_async()
 
-#     with pytest.raises(Exception):
-#         # Celery 4.1 raises a gibberish exception
-#         res.wait()
+    with pytest.raises(Exception):
+        # Celery 4.1 raises a gibberish exception
+        res.wait()
 
-#     # if this is nonempty, the worker never really forked
-#     assert not runs
+    # if this is nonempty, the worker never really forked
+    assert not runs
 
-#     submit_transaction = events.read_event()
-#     assert submit_transaction["type"] == "transaction"
-#     assert submit_transaction["transaction"] == "submit_celery"
+    submit_transaction = events.read_event()
+    assert submit_transaction["type"] == "transaction"
+    assert submit_transaction["transaction"] == "submit_celery"
 
-#     assert len(
-#         submit_transaction["spans"]
-#     ), 4  # Because redis integration was auto enabled
-#     span = submit_transaction["spans"][0]
-#     assert span["op"] == "celery.submit"
-#     assert span["description"] == "dummy_task"
+    assert len(
+        submit_transaction["spans"]
+    ), 4  # Because redis integration was auto enabled
+    span = submit_transaction["spans"][0]
+    assert span["op"] == "celery.submit"
+    assert span["description"] == "dummy_task"
 
-#     event = events.read_event()
-#     (exception,) = event["exception"]["values"]
-#     assert exception["type"] == "ZeroDivisionError"
+    event = events.read_event()
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
 
-#     transaction = events.read_event()
-#     assert (
-#         transaction["contexts"]["trace"]["trace_id"]
-#         == event["contexts"]["trace"]["trace_id"]
-#         == submit_transaction["contexts"]["trace"]["trace_id"]
-#     )
+    transaction = events.read_event()
+    assert (
+        transaction["contexts"]["trace"]["trace_id"]
+        == event["contexts"]["trace"]["trace_id"]
+        == submit_transaction["contexts"]["trace"]["trace_id"]
+    )
 
-#     events.read_flush()
+    events.read_flush()
 
-#     # if this is nonempty, the worker never really forked
-#     assert not runs
+    # if this is nonempty, the worker never really forked
+    assert not runs
 
 
 @pytest.mark.forked
