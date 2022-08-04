@@ -149,7 +149,10 @@ def patch_exception_middleware(middleware_class):
                 _capture_exception(exp, handled=True)
 
             old_handler = old_handlers[exp.__class__]
-            return await old_handler(self, *args, **kwargs)
+            if _is_async_callable(old_handler):
+                return await old_handler(self, *args, **kwargs)
+            else:
+                return old_handler(self, *args, **kwargs)
 
         for key in self._exception_handlers.keys():
             self._exception_handlers[key] = _sentry_patched_exception_handler
