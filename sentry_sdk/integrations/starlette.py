@@ -30,7 +30,9 @@ try:
     from starlette.applications import Starlette  # type: ignore
     from starlette.datastructures import UploadFile  # type: ignore
     from starlette.middleware import Middleware  # type: ignore
-    from starlette.middleware.authentication import AuthenticationMiddleware  # type: ignore
+    from starlette.middleware.authentication import (
+        AuthenticationMiddleware,
+    )  # type: ignore
     from starlette.requests import Request  # type: ignore
     from starlette.routing import Match  # type: ignore
     from starlette.types import ASGIApp, Receive, Scope, Send  # type: ignore
@@ -249,26 +251,6 @@ def patch_middlewares():
                 patch_exception_middleware(cls)
 
         Middleware.__init__ = _sentry_middleware_init
-
-    old_build_middleware_stack = Starlette.build_middleware_stack
-
-    not_yet_patched = "_sentry_build_middleware_stack" not in str(
-        old_build_middleware_stack
-    )
-
-    if not_yet_patched:
-
-        def _sentry_build_middleware_stack(self):
-            # type: (Starlette) -> Callable[..., Any]
-            """
-            Adds `SentryStarletteMiddleware` to the
-            middleware stack of the Starlette application.
-            """
-            app = old_build_middleware_stack(self)
-            app = SentryStarletteMiddleware(app=app)
-            return app
-
-        Starlette.build_middleware_stack = _sentry_build_middleware_stack
 
 
 def patch_asgi_app():
@@ -558,44 +540,3 @@ def _set_transaction_name_and_source(event, transaction_style, request):
 
     event["transaction"] = name
     event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
-
-
-class SentryStarletteMiddleware:
-    def __init__(self, app, dispatch=None):
-        # type: (ASGIApp, Any) -> None
-        self.app = app
-
-    async def __call__(self, scope, receive, send):
-        # type: (Scope, Receive, Send) -> Any
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-
-        hub = Hub.current
-        integration = hub.get_integration(StarletteIntegration)
-        if integration is None:
-            await self.app(scope, receive, send)
-            return
-
-        with hub.configure_scope() as sentry_scope:
-            request = Request(scope, receive=receive, send=send)
-
-            def _make_request_event_processor(req, integration):
-                # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
-                def event_processor(event, hint):
-                    # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-
-                    _set_transaction_name_and_source(
-                        event, integration.transaction_style, req
-                    )
-
-                    return event
-
-                return event_processor
-
-            sentry_scope._name = StarletteIntegration.identifier
-            sentry_scope.add_event_processor(
-                _make_request_event_processor(request, integration)
-            )
-
-            await self.app(scope, receive, send)

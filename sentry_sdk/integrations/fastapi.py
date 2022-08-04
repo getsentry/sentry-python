@@ -15,15 +15,8 @@ if MYPY:
 
 try:
     import fastapi  # type: ignore
-    from fastapi import FastAPI
-    from fastapi import Request
 except ImportError:
     raise DidNotEnable("FastAPI is not installed")
-
-try:
-    from starlette.types import ASGIApp, Receive, Scope, Send  # type: ignore
-except ImportError:
-    raise DidNotEnable("Starlette is not installed")
 
 
 _DEFAULT_TRANSACTION_NAME = "generic FastAPI request"
@@ -36,26 +29,7 @@ class FastApiIntegration(StarletteIntegration):
     def setup_once():
         # type: () -> None
         StarletteIntegration.setup_once()
-        patch_middlewares()
         patch_get_request_handler()
-
-
-def patch_middlewares():
-    # type: () -> None
-
-    old_build_middleware_stack = FastAPI.build_middleware_stack
-
-    def _sentry_build_middleware_stack(self):
-        # type: (FastAPI) -> Callable[..., Any]
-        """
-        Adds `SentryStarletteMiddleware` and `SentryFastApiMiddleware` to the
-        middleware stack of the FastAPI application.
-        """
-        app = old_build_middleware_stack(self)
-        app = SentryFastApiMiddleware(app=app)
-        return app
-
-    FastAPI.build_middleware_stack = _sentry_build_middleware_stack
 
 
 def _set_transaction_name_and_source(event, transaction_style, request):
@@ -135,44 +109,3 @@ def patch_get_request_handler():
         return _sentry_app
 
     fastapi.routing.get_request_handler = _sentry_get_request_handler
-
-
-class SentryFastApiMiddleware:
-    def __init__(self, app, dispatch=None):
-        # type: (ASGIApp, Any) -> None
-        self.app = app
-
-    async def __call__(self, scope, receive, send):
-        # type: (Scope, Receive, Send) -> Any
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-
-        hub = Hub.current
-        integration = hub.get_integration(FastApiIntegration)
-        if integration is None:
-            await self.app(scope, receive, send)
-            return
-
-        with hub.configure_scope() as sentry_scope:
-            request = Request(scope, receive=receive, send=send)
-
-            def _make_request_event_processor(req, integration):
-                # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
-                def event_processor(event, hint):
-                    # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-
-                    _set_transaction_name_and_source(
-                        event, integration.transaction_style, req
-                    )
-
-                    return event
-
-                return event_processor
-
-            sentry_scope._name = FastApiIntegration.identifier
-            sentry_scope.add_event_processor(
-                _make_request_event_processor(request, integration)
-            )
-
-            await self.app(scope, receive, send)
