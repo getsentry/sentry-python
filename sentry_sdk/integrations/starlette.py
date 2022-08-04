@@ -30,9 +30,9 @@ try:
     from starlette.applications import Starlette  # type: ignore
     from starlette.datastructures import UploadFile  # type: ignore
     from starlette.middleware import Middleware  # type: ignore
-    from starlette.middleware.authentication import (
+    from starlette.middleware.authentication import (  # type: ignore
         AuthenticationMiddleware,
-    )  # type: ignore
+    )
     from starlette.requests import Request  # type: ignore
     from starlette.routing import Match  # type: ignore
     from starlette.types import ASGIApp, Receive, Scope, Send  # type: ignore
@@ -156,6 +156,9 @@ def patch_exception_middleware(middleware_class):
                 if cls in old_handlers:
                     old_handler = old_handlers[cls]
                     break
+
+            if old_handler is None:
+                return
 
             if _is_async_callable(old_handler):
                 return await old_handler(self, *args, **kwargs)
