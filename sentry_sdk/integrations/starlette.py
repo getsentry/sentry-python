@@ -150,7 +150,13 @@ def patch_exception_middleware(middleware_class):
             if is_http_server_error:
                 _capture_exception(exp, handled=True)
 
-            old_handler = old_handlers[exp.__class__]
+            # Find a matching handler
+            old_handler = None
+            for cls in type(exp).__mro__:
+                if cls in old_handlers:
+                    old_handler = old_handlers[cls]
+                    break
+
             if _is_async_callable(old_handler):
                 return await old_handler(self, *args, **kwargs)
             else:
