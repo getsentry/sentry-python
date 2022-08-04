@@ -145,7 +145,9 @@ def patch_exception_middleware(middleware_class):
         async def _sentry_patched_exception_handler(self, *args, **kwargs):
             # type: (Any, Any, Any) -> None
             exp = args[0]
-            if exp.status_code >= 500:  # Only capture server errors
+
+            is_http_server_error = hasattr(exp, "staus_code") and exp.status_code >= 500
+            if is_http_server_error:
                 _capture_exception(exp, handled=True)
 
             old_handler = old_handlers[exp.__class__]
