@@ -28,7 +28,6 @@ class FastApiIntegration(StarletteIntegration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        StarletteIntegration.setup_once()
         patch_get_request_handler()
 
 
