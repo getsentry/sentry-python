@@ -40,7 +40,7 @@ setup(
     install_requires=[
         'urllib3>=1.25.7; python_version<="3.4"',
         'urllib3>=1.26.9; python_version>="3.5"',
-        'urllib3>=1.26.11"; python_version >="3.6"',
+        'urllib3>=1.26.11; python_version >="3.6"',
         "certifi",
     ],
     extras_require={
