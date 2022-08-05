@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>sentry_sdk.hub &#8212; sentry-python 1.9.0 documentation</title>
+    <title>sentry_sdk.hub &#8212; sentry-python 1.9.1 documentation</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css" />
     <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
@@ -130,6 +130,20 @@
             <span class="n">c</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 
 
+<span class="k">def</span> <span class="nf">_check_python_deprecations</span><span class="p">():</span>
+    <span class="c1"># type: () -&gt; None</span>
+    <span class="n">version</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">version</span> <span class="o">==</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span> <span class="ow">or</span> <span class="n">version</span> <span class="o">==</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">5</span><span class="p">):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;sentry-sdk 2.0.0 will drop support for Python </span><span class="si">%s</span><span class="s2">.&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">.</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="o">*</span><span class="n">version</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;Please upgrade to the latest version to continue receiving upgrades and bugfixes.&quot;</span>
+        <span class="p">)</span>
+
+
 <span class="k">def</span> <span class="nf">_init</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="c1"># type: (*Optional[str], **Any) -&gt; ContextManager[Any]</span>
     <span class="sd">&quot;&quot;&quot;Initializes the SDK and optionally integrations.</span>
@@ -138,6 +152,7 @@
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">client</span> <span class="o">=</span> <span class="n">Client</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
     <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">bind_client</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
+    <span class="n">_check_python_deprecations</span><span class="p">()</span>
     <span class="n">rv</span> <span class="o">=</span> <span class="n">_InitGuard</span><span class="p">(</span><span class="n">client</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">rv</span>
 
