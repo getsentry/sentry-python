@@ -403,7 +403,10 @@ class _Client(object):
             if is_transaction:
                 if "profile" in event_opt:
                     event_opt["profile"]["transaction_id"] = event_opt["event_id"]
-                    event_opt["profile"]["version_name"] = event_opt["release"]
+                    try:
+                        event_opt["profile"]["version_name"] = event_opt["release"]
+                    except KeyError:
+                        event_opt["profile"]["version_name"] = ""
                     envelope.add_profile(event_opt.pop("profile"))
                 envelope.add_transaction(event_opt)
             else:
