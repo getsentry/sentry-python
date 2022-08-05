@@ -1,5 +1,8 @@
 from __future__ import absolute_import
 
+import asyncio
+import functools
+
 from sentry_sdk._compat import iteritems
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
@@ -23,10 +26,13 @@ if MYPY:
     from sentry_sdk._types import Event
 
 try:
+    import starlette  # type: ignore
     from starlette.applications import Starlette  # type: ignore
     from starlette.datastructures import UploadFile  # type: ignore
     from starlette.middleware import Middleware  # type: ignore
-    from starlette.middleware.authentication import AuthenticationMiddleware  # type: ignore
+    from starlette.middleware.authentication import (  # type: ignore
+        AuthenticationMiddleware,
+    )
     from starlette.requests import Request  # type: ignore
     from starlette.routing import Match  # type: ignore
     from starlette.types import ASGIApp, Receive, Scope, Send  # type: ignore
@@ -71,6 +77,7 @@ class StarletteIntegration(Integration):
         # type: () -> None
         patch_middlewares()
         patch_asgi_app()
+        patch_request_response()
 
 
 def _enable_span_for_middleware(middleware_class):
@@ -133,15 +140,32 @@ def patch_exception_middleware(middleware_class):
         old_middleware_init(self, *args, **kwargs)
 
         # Patch existing exception handlers
-        for key in self._exception_handlers.keys():
-            old_handler = self._exception_handlers.get(key)
+        old_handlers = self._exception_handlers.copy()
 
-            def _sentry_patched_exception_handler(self, *args, **kwargs):
-                # type: (Any, Any, Any) -> None
-                exp = args[0]
+        async def _sentry_patched_exception_handler(self, *args, **kwargs):
+            # type: (Any, Any, Any) -> None
+            exp = args[0]
+
+            is_http_server_error = hasattr(exp, "staus_code") and exp.status_code >= 500
+            if is_http_server_error:
                 _capture_exception(exp, handled=True)
+
+            # Find a matching handler
+            old_handler = None
+            for cls in type(exp).__mro__:
+                if cls in old_handlers:
+                    old_handler = old_handlers[cls]
+                    break
+
+            if old_handler is None:
+                return
+
+            if _is_async_callable(old_handler):
+                return await old_handler(self, *args, **kwargs)
+            else:
                 return old_handler(self, *args, **kwargs)
 
+        for key in self._exception_handlers.keys():
             self._exception_handlers[key] = _sentry_patched_exception_handler
 
     middleware_class.__init__ = _sentry_middleware_init
@@ -225,32 +249,22 @@ def patch_middlewares():
     """
     old_middleware_init = Middleware.__init__
 
-    def _sentry_middleware_init(self, cls, **options):
-        # type: (Any, Any, Any) -> None
-        span_enabled_cls = _enable_span_for_middleware(cls)
-        old_middleware_init(self, span_enabled_cls, **options)
+    not_yet_patched = "_sentry_middleware_init" not in str(old_middleware_init)
 
-        if cls == AuthenticationMiddleware:
-            patch_authentication_middleware(cls)
+    if not_yet_patched:
 
-        if cls == ExceptionMiddleware:
-            patch_exception_middleware(cls)
+        def _sentry_middleware_init(self, cls, **options):
+            # type: (Any, Any, Any) -> None
+            span_enabled_cls = _enable_span_for_middleware(cls)
+            old_middleware_init(self, span_enabled_cls, **options)
 
-    Middleware.__init__ = _sentry_middleware_init
+            if cls == AuthenticationMiddleware:
+                patch_authentication_middleware(cls)
 
-    old_build_middleware_stack = Starlette.build_middleware_stack
+            if cls == ExceptionMiddleware:
+                patch_exception_middleware(cls)
 
-    def _sentry_build_middleware_stack(self):
-        # type: (Starlette) -> Callable[..., Any]
-        """
-        Adds `SentryStarletteMiddleware` to the
-        middleware stack of the Starlette application.
-        """
-        app = old_build_middleware_stack(self)
-        app = SentryStarletteMiddleware(app=app)
-        return app
-
-    Starlette.build_middleware_stack = _sentry_build_middleware_stack
+        Middleware.__init__ = _sentry_middleware_init
 
 
 def patch_asgi_app():
@@ -275,6 +289,119 @@ def patch_asgi_app():
     Starlette.__call__ = _sentry_patched_asgi_app
 
 
+# This was vendored in from Starlette to support Starlette 0.19.1 because
+# this function was only introduced in 0.20.x
+def _is_async_callable(obj):
+    # type: (Any) -> bool
+    while isinstance(obj, functools.partial):
+        obj = obj.func
+
+    return asyncio.iscoroutinefunction(obj) or (
+        callable(obj) and asyncio.iscoroutinefunction(obj.__call__)
+    )
+
+
+def patch_request_response():
+    # type: () -> None
+    old_request_response = starlette.routing.request_response
+
+    def _sentry_request_response(func):
+        # type: (Callable[[Any], Any]) -> ASGIApp
+        old_func = func
+
+        is_coroutine = _is_async_callable(old_func)
+        if is_coroutine:
+
+            async def _sentry_async_func(*args, **kwargs):
+                # type: (*Any, **Any) -> Any
+                hub = Hub.current
+                integration = hub.get_integration(StarletteIntegration)
+                if integration is None:
+                    return await old_func(*args, **kwargs)
+
+                with hub.configure_scope() as sentry_scope:
+                    request = args[0]
+                    extractor = StarletteRequestExtractor(request)
+                    info = await extractor.extract_request_info()
+
+                    def _make_request_event_processor(req, integration):
+                        # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
+                        def event_processor(event, hint):
+                            # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+
+                            # Extract information from request
+                            request_info = event.get("request", {})
+                            if info:
+                                if "cookies" in info and _should_send_default_pii():
+                                    request_info["cookies"] = info["cookies"]
+                                if "data" in info:
+                                    request_info["data"] = info["data"]
+                            event["request"] = request_info
+
+                            _set_transaction_name_and_source(
+                                event, integration.transaction_style, req
+                            )
+
+                            return event
+
+                        return event_processor
+
+                sentry_scope._name = StarletteIntegration.identifier
+                sentry_scope.add_event_processor(
+                    _make_request_event_processor(request, integration)
+                )
+
+                return await old_func(*args, **kwargs)
+
+            func = _sentry_async_func
+        else:
+
+            def _sentry_sync_func(*args, **kwargs):
+                # type: (*Any, **Any) -> Any
+                hub = Hub.current
+                integration = hub.get_integration(StarletteIntegration)
+                if integration is None:
+                    return old_func(*args, **kwargs)
+
+                with hub.configure_scope() as sentry_scope:
+                    request = args[0]
+                    extractor = StarletteRequestExtractor(request)
+                    cookies = extractor.extract_cookies_from_request()
+
+                    def _make_request_event_processor(req, integration):
+                        # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
+                        def event_processor(event, hint):
+                            # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+
+                            # Extract information from request
+                            request_info = event.get("request", {})
+                            if cookies:
+                                request_info["cookies"] = cookies
+
+                            event["request"] = request_info
+
+                            _set_transaction_name_and_source(
+                                event, integration.transaction_style, req
+                            )
+
+                            return event
+
+                        return event_processor
+
+                sentry_scope._name = StarletteIntegration.identifier
+                sentry_scope.add_event_processor(
+                    _make_request_event_processor(request, integration)
+                )
+
+                return old_func(*args, **kwargs)
+
+            func = _sentry_sync_func
+
+        return old_request_response(func)
+
+    starlette.routing.request_response = _sentry_request_response
+
+
 class StarletteRequestExtractor:
     """
     Extracts useful information from the Starlette request
@@ -286,6 +413,18 @@ class StarletteRequestExtractor:
     def __init__(self, request):
         # type: (StarletteRequestExtractor, Request) -> None
         self.request = request
+
+    def extract_cookies_from_request(self):
+        # type: (StarletteRequestExtractor) -> Optional[Dict[str, Any]]
+        client = Hub.current.client
+        if client is None:
+            return None
+
+        cookies = None  # type: Optional[Dict[str, Any]]
+        if _should_send_default_pii():
+            cookies = self.cookies()
+
+        return cookies
 
     async def extract_request_info(self):
         # type: (StarletteRequestExtractor) -> Optional[Dict[str, Any]]
@@ -415,56 +554,3 @@ def _set_transaction_name_and_source(event, transaction_style, request):
 
     event["transaction"] = name
     event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
-
-
-class SentryStarletteMiddleware:
-    def __init__(self, app, dispatch=None):
-        # type: (ASGIApp, Any) -> None
-        self.app = app
-
-    async def __call__(self, scope, receive, send):
-        # type: (Scope, Receive, Send) -> Any
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-
-        hub = Hub.current
-        integration = hub.get_integration(StarletteIntegration)
-        if integration is None:
-            await self.app(scope, receive, send)
-            return
-
-        with hub.configure_scope() as sentry_scope:
-            request = Request(scope, receive=receive, send=send)
-
-            extractor = StarletteRequestExtractor(request)
-            info = await extractor.extract_request_info()
-
-            def _make_request_event_processor(req, integration):
-                # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
-                def event_processor(event, hint):
-                    # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-
-                    # Extract information from request
-                    request_info = event.get("request", {})
-                    if info:
-                        if "cookies" in info and _should_send_default_pii():
-                            request_info["cookies"] = info["cookies"]
-                        if "data" in info:
-                            request_info["data"] = info["data"]
-                    event["request"] = request_info
-
-                    _set_transaction_name_and_source(
-                        event, integration.transaction_style, req
-                    )
-
-                    return event
-
-                return event_processor
-
-            sentry_scope._name = StarletteIntegration.identifier
-            sentry_scope.add_event_processor(
-                _make_request_event_processor(request, integration)
-            )
-
-            await self.app(scope, receive, send)

@@ -1,9 +1,9 @@
 from sentry_sdk._types import MYPY
-from sentry_sdk.hub import Hub
+from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.starlette import (
-    SentryStarletteMiddleware,
     StarletteIntegration,
+    StarletteRequestExtractor,
 )
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import transaction_from_function
@@ -14,15 +14,9 @@ if MYPY:
     from sentry_sdk._types import Event
 
 try:
-    from fastapi import FastAPI  # type: ignore
-    from fastapi import Request
+    import fastapi  # type: ignore
 except ImportError:
     raise DidNotEnable("FastAPI is not installed")
-
-try:
-    from starlette.types import ASGIApp, Receive, Scope, Send  # type: ignore
-except ImportError:
-    raise DidNotEnable("Starlette is not installed")
 
 
 _DEFAULT_TRANSACTION_NAME = "generic FastAPI request"
@@ -34,27 +28,7 @@ class FastApiIntegration(StarletteIntegration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        StarletteIntegration.setup_once()
-        patch_middlewares()
-
-
-def patch_middlewares():
-    # type: () -> None
-
-    old_build_middleware_stack = FastAPI.build_middleware_stack
-
-    def _sentry_build_middleware_stack(self):
-        # type: (FastAPI) -> Callable[..., Any]
-        """
-        Adds `SentryStarletteMiddleware` and `SentryFastApiMiddleware` to the
-        middleware stack of the FastAPI application.
-        """
-        app = old_build_middleware_stack(self)
-        app = SentryStarletteMiddleware(app=app)
-        app = SentryFastApiMiddleware(app=app)
-        return app
-
-    FastAPI.build_middleware_stack = _sentry_build_middleware_stack
+        patch_get_request_handler()
 
 
 def _set_transaction_name_and_source(event, transaction_style, request):
@@ -82,42 +56,55 @@ def _set_transaction_name_and_source(event, transaction_style, request):
     event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
 
 
-class SentryFastApiMiddleware:
-    def __init__(self, app, dispatch=None):
-        # type: (ASGIApp, Any) -> None
-        self.app = app
+def patch_get_request_handler():
+    # type: () -> None
+    old_get_request_handler = fastapi.routing.get_request_handler
 
-    async def __call__(self, scope, receive, send):
-        # type: (Scope, Receive, Send) -> Any
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
+    def _sentry_get_request_handler(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        old_app = old_get_request_handler(*args, **kwargs)
 
-        hub = Hub.current
-        integration = hub.get_integration(FastApiIntegration)
-        if integration is None:
-            await self.app(scope, receive, send)
-            return
+        async def _sentry_app(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+            hub = Hub.current
+            integration = hub.get_integration(FastApiIntegration)
+            if integration is None:
+                return await old_app(*args, **kwargs)
 
-        with hub.configure_scope() as sentry_scope:
-            request = Request(scope, receive=receive, send=send)
+            with hub.configure_scope() as sentry_scope:
+                request = args[0]
+                extractor = StarletteRequestExtractor(request)
+                info = await extractor.extract_request_info()
 
-            def _make_request_event_processor(req, integration):
-                # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
-                def event_processor(event, hint):
-                    # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+                def _make_request_event_processor(req, integration):
+                    # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
+                    def event_processor(event, hint):
+                        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
 
-                    _set_transaction_name_and_source(
-                        event, integration.transaction_style, req
-                    )
+                        # Extract information from request
+                        request_info = event.get("request", {})
+                        if info:
+                            if "cookies" in info and _should_send_default_pii():
+                                request_info["cookies"] = info["cookies"]
+                            if "data" in info:
+                                request_info["data"] = info["data"]
+                        event["request"] = request_info
 
-                    return event
+                        _set_transaction_name_and_source(
+                            event, integration.transaction_style, req
+                        )
 
-                return event_processor
+                        return event
 
-            sentry_scope._name = FastApiIntegration.identifier
-            sentry_scope.add_event_processor(
-                _make_request_event_processor(request, integration)
-            )
+                    return event_processor
 
-            await self.app(scope, receive, send)
+                sentry_scope._name = FastApiIntegration.identifier
+                sentry_scope.add_event_processor(
+                    _make_request_event_processor(request, integration)
+                )
+
+            return await old_app(*args, **kwargs)
+
+        return _sentry_app
+
+    fastapi.routing.get_request_handler = _sentry_get_request_handler
