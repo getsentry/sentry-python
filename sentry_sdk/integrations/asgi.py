@@ -91,7 +91,6 @@ class SentryAsgiMiddleware:
 
         :param unsafe_context_data: Disable errors when a proper contextvars installation could not be found. We do not recommend changing this from the default.
         """
-
         if not unsafe_context_data and not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between
             # requests.
@@ -108,10 +107,19 @@ class SentryAsgiMiddleware:
         self.mechanism_type = mechanism_type
         self.app = app
 
-        if _looks_like_asgi3(app):
-            self.__call__ = self._run_asgi3  # type: Callable[..., Any]
-        else:
-            self.__call__ = self._run_asgi2
+        try:
+            if _looks_like_asgi3(app):
+                self.__call__ = self._run_asgi3  # type: Callable[..., Any]
+            else:
+                self.__call__ = self._run_asgi2
+        except Exception as ex:
+            if (
+                str(ex)
+                == "'SentryAsgiMiddleware' object attribute '__call__' is read-only"
+            ):
+                raise RuntimeError(
+                    "The Python SDK can now automatically support ASGI frameworks like Starlette and FastAPI. Please remove 'SentryAsgiMiddleware' from your project. See https://docs.sentry.io/platforms/python/guides/asgi/ for more information."
+                )
 
     def _run_asgi2(self, scope):
         # type: (Any) -> Any
