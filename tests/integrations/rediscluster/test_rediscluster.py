@@ -1,5 +1,6 @@
 import pytest
 from sentry_sdk import capture_message
+from sentry_sdk.api import start_transaction
 from sentry_sdk.integrations.redis import RedisIntegration
 
 import rediscluster
@@ -12,6 +13,11 @@ if hasattr(rediscluster, "StrictRedisCluster"):
 
 @pytest.fixture(scope="module", autouse=True)
 def monkeypatch_rediscluster_classes():
+    # FIXME: patch StrictRedisCluster
+    rediscluster.RedisCluster.pipeline = lambda *_, **__: rediscluster.ClusterPipeline(
+        connection_pool=True
+    )
+    rediscluster.ClusterPipeline.execute = lambda *_, **__: None
     for cls in rediscluster_classes:
         cls.execute_command = lambda *_, **__: None
 
@@ -34,4 +40,32 @@ def test_rediscluster_basic(rediscluster_cls, sentry_init, capture_events):
         "data": {"redis.key": "foobar", "redis.command": "GET"},
         "timestamp": crumb["timestamp"],
         "type": "redis",
+    }
+
+
+def test_rediscluster_pipeline(sentry_init, capture_events):
+    sentry_init(integrations=[RedisIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    rc = rediscluster.RedisCluster(connection_pool=True)
+    with start_transaction():
+        pipeline = rc.pipeline()
+        pipeline.get("foo")
+        pipeline.set("bar", 1)
+        pipeline.set("baz", 2)
+        pipeline.execute()
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert span["op"] == "redis"
+    assert span["description"] == "redis.pipeline.execute"
+    assert span["data"] == {
+        "commands": {
+            "count": 3,
+            "first_ten": [
+                [["GET", "foo"], {}],
+                [["SET", "bar", 1], {}],
+                [["SET", "baz", 2], {}],
+            ],
+        }
     }

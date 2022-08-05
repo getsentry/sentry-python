@@ -15,6 +15,43 @@ _SINGLE_KEY_COMMANDS = frozenset(
 _MULTI_KEY_COMMANDS = frozenset(["del", "touch", "unlink"])
 
 
+def patch_redis_pipeline(pipeline_cls, parse_command_fn):
+    # type: (Any) -> None
+    old_execute = pipeline_cls.execute
+
+    def sentry_patched_execute(self, *args, **kwargs):
+        # type: (Any, *Any, **Any) -> Any
+        hub = Hub.current
+
+        if hub.get_integration(RedisIntegration) is None:
+            return old_execute(self, *args, **kwargs)
+
+        with hub.start_span(op="redis", description="redis.pipeline.execute") as span:
+            with capture_internal_exceptions():
+                print(self.command_stack)
+                commands = [parse_command_fn(c) for c in self.command_stack[:10]]
+                if len(self.command_stack) > 10:
+                    commands.append("...")
+                span.set_data(
+                    "commands",
+                    {"count": len(self.command_stack), "first_ten": commands},
+                )
+
+            return old_execute(self, *args, **kwargs)
+
+    pipeline_cls.execute = sentry_patched_execute
+
+
+def _parse_redis_command(command):
+    # type: (Any) -> str
+    return " ".join(map(str, command[0]))
+
+
+def _parse_rediscluster_command(command):
+    # type: (Any) -> str
+    return " ".join(map(str, command.args))
+
+
 def _patch_rediscluster():
     # type: () -> None
     try:
@@ -23,6 +60,7 @@ def _patch_rediscluster():
         return
 
     patch_redis_client(rediscluster.RedisCluster)
+    patch_redis_pipeline(rediscluster.ClusterPipeline, _parse_rediscluster_command)
 
     # up to v1.3.6, __version__ attribute is a tuple
     # from v2.0.0, __version__ is a string and VERSION a tuple
@@ -46,6 +84,7 @@ class RedisIntegration(Integration):
             raise DidNotEnable("Redis client not installed")
 
         patch_redis_client(redis.StrictRedis)
+        patch_redis_pipeline(redis.client.Pipeline, _parse_redis_command)
 
         try:
             import rb.clients  # type: ignore
