@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.2
+
+### Various fixes & improvements
+
+- chore: remove quotes (#1545) by @vladanpaunovic
+
 ## 1.9.1
 
 ### Various fixes & improvements
