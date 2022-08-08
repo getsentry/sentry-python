@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.9.2
+
+### Various fixes & improvements
+
+- chore: remove quotes (#1545) by @vladanpaunovic
+
+## 1.9.1
+
+### Various fixes & improvements
+
+- Fix FastAPI issues (#1532) ( #1514) (#1532) by @antonpirker
+- Add deprecation warning for 3.4, 3.5 (#1541) by @sl0thentr0py
+- Fast tests (#1504) by @antonpirker
+- Replace Travis CI badge with GitHub Actions badge (#1538) by @153957
+- chore(deps): update urllib3 minimum version with environment markers (#1312) by @miketheman
+- Update Flask and Quart integrations (#1520) by @pgjones
+- chore: Remove ancient examples from tracing prototype (#1528) by @sl0thentr0py
+- fix(django): Send correct "url" transaction source if Django resolver fails to resolve (#1525) by @sl0thentr0py
+
 ## 1.9.0
 
 ### Various fixes & improvements
