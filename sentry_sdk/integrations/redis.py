@@ -28,7 +28,11 @@ def patch_redis_pipeline(pipeline_cls, parse_command_fn):
 
         with hub.start_span(op="redis", description="redis.pipeline.execute") as span:
             with capture_internal_exceptions():
-                print(self.command_stack)
+                transaction = (
+                    self.transaction if pipeline_cls.__name__ == "Pipeline" else False
+                )
+                span.set_tag("transaction", transaction)
+
                 commands = [parse_command_fn(c) for c in self.command_stack[:10]]
                 if len(self.command_stack) > 10:
                     commands.append("...")

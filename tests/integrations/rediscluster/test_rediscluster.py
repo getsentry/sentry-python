@@ -60,12 +60,8 @@ def test_rediscluster_pipeline(sentry_init, capture_events):
     assert span["op"] == "redis"
     assert span["description"] == "redis.pipeline.execute"
     assert span["data"] == {
-        "commands": {
-            "count": 3,
-            "first_ten": [
-                [["GET", "foo"], {}],
-                [["SET", "bar", 1], {}],
-                [["SET", "baz", 2], {}],
-            ],
-        }
+        "commands": {"count": 3, "first_ten": ["GET foo", "SET bar 1", "SET baz 2"]}
+    }
+    assert span["tags"] == {
+        "transaction": False,  # For Cluster, this is always False
     }
