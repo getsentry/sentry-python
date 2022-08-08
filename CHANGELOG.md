@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.3
+
+### Various fixes & improvements
+
+- Wrap StarletteRequestExtractor in capture_internal_exceptions (#1551) by @sl0thentr0py
+
 ## 1.9.2
 
 ### Various fixes & improvements
