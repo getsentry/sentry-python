@@ -16,6 +16,7 @@ from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     TRANSACTION_SOURCE_ROUTE,
     AnnotatedValue,
+    capture_internal_exceptions,
     event_from_exception,
     transaction_from_function,
 )
@@ -437,28 +438,35 @@ class StarletteRequestExtractor:
         content_length = await self.content_length()
         request_info = {}  # type: Dict[str, Any]
 
-        if _should_send_default_pii():
-            request_info["cookies"] = self.cookies()
+        with capture_internal_exceptions():
+            if _should_send_default_pii():
+                request_info["cookies"] = self.cookies()
 
-        if not request_body_within_bounds(client, content_length):
-            data = AnnotatedValue(
-                "",
-                {"rem": [["!config", "x", 0, content_length]], "len": content_length},
-            )
-        else:
-            parsed_body = await self.parsed_body()
-            if parsed_body is not None:
-                data = parsed_body
-            elif await self.raw_data():
+            if not request_body_within_bounds(client, content_length):
                 data = AnnotatedValue(
                     "",
-                    {"rem": [["!raw", "x", 0, content_length]], "len": content_length},
+                    {
+                        "rem": [["!config", "x", 0, content_length]],
+                        "len": content_length,
+                    },
                 )
             else:
-                data = None
+                parsed_body = await self.parsed_body()
+                if parsed_body is not None:
+                    data = parsed_body
+                elif await self.raw_data():
+                    data = AnnotatedValue(
+                        "",
+                        {
+                            "rem": [["!raw", "x", 0, content_length]],
+                            "len": content_length,
+                        },
+                    )
+                else:
+                    data = None
 
-        if data is not None:
-            request_info["data"] = data
+            if data is not None:
+                request_info["data"] = data
 
         return request_info
 
