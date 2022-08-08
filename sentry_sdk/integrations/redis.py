@@ -18,8 +18,8 @@ _MULTI_KEY_COMMANDS = frozenset(["del", "touch", "unlink"])
 _MAX_NUM_ARGS = 10
 
 
-def patch_redis_pipeline(pipeline_cls, get_command_args_fn):
-    # type: (Any) -> None
+def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
+    # type: (Any, bool, Any) -> None
     old_execute = pipeline_cls.execute
 
     def sentry_patched_execute(self, *args, **kwargs):
@@ -31,9 +31,8 @@ def patch_redis_pipeline(pipeline_cls, get_command_args_fn):
 
         with hub.start_span(op="redis", description="redis.pipeline.execute") as span:
             with capture_internal_exceptions():
-                transaction = (
-                    self.transaction if pipeline_cls.__name__ == "Pipeline" else False
-                )
+                span.set_tag("redis.is_cluster", is_cluster)
+                transaction = self.transaction if not is_cluster else False
                 span.set_tag("redis.transaction", transaction)
 
                 commands = []
@@ -74,8 +73,10 @@ def _patch_rediscluster():
     except ImportError:
         return
 
-    patch_redis_client(rediscluster.RedisCluster)
-    patch_redis_pipeline(rediscluster.ClusterPipeline, _parse_rediscluster_command)
+    patch_redis_client(rediscluster.RedisCluster, is_cluster=True)
+    patch_redis_pipeline(
+        rediscluster.ClusterPipeline, True, _parse_rediscluster_command
+    )
 
     # up to v1.3.6, __version__ attribute is a tuple
     # from v2.0.0, __version__ is a string and VERSION a tuple
@@ -84,7 +85,7 @@ def _patch_rediscluster():
     # StrictRedisCluster was introduced in v0.2.0 and removed in v2.0.0
     # https://github.com/Grokzen/redis-py-cluster/blob/master/docs/release-notes.rst
     if (0, 2, 0) < version < (2, 0, 0):
-        patch_redis_client(rediscluster.StrictRedisCluster)
+        patch_redis_client(rediscluster.StrictRedisCluster, is_cluster=True)
 
 
 class RedisIntegration(Integration):
@@ -98,17 +99,17 @@ class RedisIntegration(Integration):
         except ImportError:
             raise DidNotEnable("Redis client not installed")
 
-        patch_redis_client(redis.StrictRedis)
-        patch_redis_pipeline(redis.client.Pipeline, _get_redis_command_args)
+        patch_redis_client(redis.StrictRedis, is_cluster=False)
+        patch_redis_pipeline(redis.client.Pipeline, False, _get_redis_command_args)
 
         try:
             import rb.clients  # type: ignore
         except ImportError:
             pass
         else:
-            patch_redis_client(rb.clients.FanoutClient)
-            patch_redis_client(rb.clients.MappingClient)
-            patch_redis_client(rb.clients.RoutingClient)
+            patch_redis_client(rb.clients.FanoutClient, is_cluster=False)
+            patch_redis_client(rb.clients.MappingClient, is_cluster=False)
+            patch_redis_client(rb.clients.RoutingClient, is_cluster=False)
 
         try:
             _patch_rediscluster()
@@ -116,8 +117,8 @@ class RedisIntegration(Integration):
             logger.exception("Error occurred while patching `rediscluster` library")
 
 
-def patch_redis_client(cls):
-    # type: (Any) -> None
+def patch_redis_client(cls, is_cluster):
+    # type: (Any, bool) -> None
     """
     This function can be used to instrument custom redis client classes or
     subclasses.
@@ -145,6 +146,7 @@ def patch_redis_client(cls):
             description = " ".join(description_parts)
 
         with hub.start_span(op="redis", description=description) as span:
+            span.set_tag("redis.is_cluster", is_cluster)
             if name:
                 span.set_tag("redis.command", name)
 

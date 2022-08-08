@@ -36,7 +36,11 @@ def test_rediscluster_basic(rediscluster_cls, sentry_init, capture_events):
     assert crumb == {
         "category": "redis",
         "message": "GET 'foobar'",
-        "data": {"redis.key": "foobar", "redis.command": "GET"},
+        "data": {
+            "redis.key": "foobar",
+            "redis.command": "GET",
+            "redis.is_cluster": True,
+        },
         "timestamp": crumb["timestamp"],
         "type": "redis",
     }
@@ -66,4 +70,5 @@ def test_rediscluster_pipeline(sentry_init, capture_events):
     }
     assert span["tags"] == {
         "redis.transaction": False,  # For Cluster, this is always False
+        "redis.is_cluster": True,
     }

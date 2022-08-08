@@ -20,7 +20,11 @@ def test_basic(sentry_init, capture_events):
     assert crumb == {
         "category": "redis",
         "message": "GET 'foobar'",
-        "data": {"redis.key": "foobar", "redis.command": "GET"},
+        "data": {
+            "redis.key": "foobar",
+            "redis.command": "GET",
+            "redis.is_cluster": False,
+        },
         "timestamp": crumb["timestamp"],
         "type": "redis",
     }
@@ -40,7 +44,6 @@ def test_redis_pipeline(sentry_init, capture_events, is_transaction):
         pipeline.execute()
 
     (event,) = events
-    print(event)
     (span,) = event["spans"]
     assert span["op"] == "redis"
     assert span["description"] == "redis.pipeline.execute"
@@ -52,4 +55,5 @@ def test_redis_pipeline(sentry_init, capture_events, is_transaction):
     }
     assert span["tags"] == {
         "redis.transaction": is_transaction,
+        "redis.is_cluster": False,
     }
