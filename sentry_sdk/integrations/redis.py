@@ -7,15 +7,18 @@ from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk._types import MYPY
 
 if MYPY:
-    from typing import Any
+    from typing import Any, Sequence
 
 _SINGLE_KEY_COMMANDS = frozenset(
     ["decr", "decrby", "get", "incr", "incrby", "pttl", "set", "setex", "setnx", "ttl"]
 )
 _MULTI_KEY_COMMANDS = frozenset(["del", "touch", "unlink"])
 
+#: Trim argument lists to this many values
+_MAX_NUM_ARGS = 10
 
-def patch_redis_pipeline(pipeline_cls, parse_command_fn):
+
+def patch_redis_pipeline(pipeline_cls, get_command_args_fn):
     # type: (Any) -> None
     old_execute = pipeline_cls.execute
 
@@ -31,13 +34,21 @@ def patch_redis_pipeline(pipeline_cls, parse_command_fn):
                 transaction = (
                     self.transaction if pipeline_cls.__name__ == "Pipeline" else False
                 )
-                span.set_tag("transaction", transaction)
+                span.set_tag("redis.transaction", transaction)
 
-                commands = [parse_command_fn(c) for c in self.command_stack[:10]]
-                if len(self.command_stack) > 10:
-                    commands.append("...")
+                commands = []
+                for i, arg in enumerate(self.command_stack):
+                    if i > _MAX_NUM_ARGS:
+                        break
+                    command_args = []
+                    for j, command_arg in enumerate(get_command_args_fn(arg)):
+                        if j > 0:
+                            command_arg = repr(command_arg)
+                        command_args.append(command_arg)
+                    commands.append(" ".join(command_args))
+
                 span.set_data(
-                    "commands",
+                    "redis.commands",
                     {"count": len(self.command_stack), "first_ten": commands},
                 )
 
@@ -46,14 +57,14 @@ def patch_redis_pipeline(pipeline_cls, parse_command_fn):
     pipeline_cls.execute = sentry_patched_execute
 
 
-def _parse_redis_command(command):
-    # type: (Any) -> str
-    return " ".join(map(str, command[0]))
+def _get_redis_command_args(command):
+    # type: (Any) -> Sequence[Any]
+    return command[0]
 
 
 def _parse_rediscluster_command(command):
-    # type: (Any) -> str
-    return " ".join(map(str, command.args))
+    # type: (Any) -> Sequence[Any]
+    return command.args
 
 
 def _patch_rediscluster():
@@ -88,7 +99,7 @@ class RedisIntegration(Integration):
             raise DidNotEnable("Redis client not installed")
 
         patch_redis_client(redis.StrictRedis)
-        patch_redis_pipeline(redis.client.Pipeline, _parse_redis_command)
+        patch_redis_pipeline(redis.client.Pipeline, _get_redis_command_args)
 
         try:
             import rb.clients  # type: ignore
@@ -126,7 +137,7 @@ def patch_redis_client(cls):
         with capture_internal_exceptions():
             description_parts = [name]
             for i, arg in enumerate(args):
-                if i > 10:
+                if i > _MAX_NUM_ARGS:
                     break
 
                 description_parts.append(repr(arg))

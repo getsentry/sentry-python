@@ -13,7 +13,6 @@ if hasattr(rediscluster, "StrictRedisCluster"):
 
 @pytest.fixture(scope="module", autouse=True)
 def monkeypatch_rediscluster_classes():
-    # FIXME: patch StrictRedisCluster
     rediscluster.RedisCluster.pipeline = lambda *_, **__: rediscluster.ClusterPipeline(
         connection_pool=True
     )
@@ -60,8 +59,11 @@ def test_rediscluster_pipeline(sentry_init, capture_events):
     assert span["op"] == "redis"
     assert span["description"] == "redis.pipeline.execute"
     assert span["data"] == {
-        "commands": {"count": 3, "first_ten": ["GET foo", "SET bar 1", "SET baz 2"]}
+        "redis.commands": {
+            "count": 3,
+            "first_ten": ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"],
+        }
     }
     assert span["tags"] == {
-        "transaction": False,  # For Cluster, this is always False
+        "redis.transaction": False,  # For Cluster, this is always False
     }
