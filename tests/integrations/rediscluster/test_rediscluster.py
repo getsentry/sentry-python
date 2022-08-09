@@ -1,7 +1,7 @@
 import pytest
 from sentry_sdk import capture_message
 from sentry_sdk.api import start_transaction
-from sentry_sdk.integrations.redis import RedisIntegration, _get_pipeline_cls
+from sentry_sdk.integrations.redis import RedisIntegration, _get_cluster_pipeline_cls
 
 import rediscluster
 
@@ -13,7 +13,7 @@ if hasattr(rediscluster, "StrictRedisCluster"):
 
 @pytest.fixture(scope="module", autouse=True)
 def monkeypatch_rediscluster_classes():
-    pipeline_cls = _get_pipeline_cls(rediscluster)
+    pipeline_cls = _get_cluster_pipeline_cls(rediscluster)
     rediscluster.RedisCluster.pipeline = lambda *_, **__: pipeline_cls(
         connection_pool=True
     )
@@ -48,7 +48,7 @@ def test_rediscluster_basic(rediscluster_cls, sentry_init, capture_events):
 
 
 def test_rediscluster_pipeline(sentry_init, capture_events):
-    sentry_init(integrations=[RedisIntegration()], traces_sample_rate=1.0, debug=True)
+    sentry_init(integrations=[RedisIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
     rc = rediscluster.RedisCluster(connection_pool=True)

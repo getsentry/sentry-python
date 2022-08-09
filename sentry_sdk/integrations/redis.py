@@ -66,7 +66,7 @@ def _parse_rediscluster_command(command):
     return command.args
 
 
-def _get_pipeline_cls(rediscluster):
+def _get_cluster_pipeline_cls(rediscluster):
     # type: (Any) -> Any
     try:
         return rediscluster.ClusterPipeline
@@ -83,7 +83,7 @@ def _patch_rediscluster():
 
     patch_redis_client(rediscluster.RedisCluster, is_cluster=True)
     patch_redis_pipeline(
-        _get_pipeline_cls(rediscluster), True, _parse_rediscluster_command
+        _get_cluster_pipeline_cls(rediscluster), True, _parse_rediscluster_command
     )
 
     # up to v1.3.6, __version__ attribute is a tuple
@@ -109,9 +109,12 @@ class RedisIntegration(Integration):
 
         patch_redis_client(redis.StrictRedis, is_cluster=False)
         patch_redis_pipeline(redis.client.Pipeline, False, _get_redis_command_args)
-        patch_redis_pipeline(
-            redis.client.StrictPipeline, False, _get_redis_command_args
-        )
+        try:
+            strict_pipeline = redis.client.StrictPipeline  # type: ignore
+        except AttributeError:
+            pass
+        else:
+            patch_redis_pipeline(strict_pipeline, False, _get_redis_command_args)
 
         try:
             import rb.clients  # type: ignore
