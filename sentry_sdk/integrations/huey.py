@@ -1,14 +1,19 @@
+import sys
 from datetime import datetime
 
+from sentry_sdk._compat import reraise
 from sentry_sdk._types import MYPY
 from sentry_sdk import Hub
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
-from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
 if MYPY:
-    from typing import Any, Optional
+    from typing import Any, Callable, Optional, TypeVar
     from sentry_sdk._types import EventProcessor, Event, Hint
+    from sentry_sdk.utils import ExcInfo
+
+    F = TypeVar("F", bound=Callable[..., Any])
 
 try:
     from huey.api import Huey, Task
@@ -47,6 +52,39 @@ def _make_event_processor(task):
     return event_processor
 
 
+def _capture_exception(exc_info):
+    # type: (ExcInfo) -> None
+    hub = Hub.current
+
+    hub.scope.transaction.set_status("internal_error")
+    event, hint = event_from_exception(
+        exc_info,
+        client_options=hub.client.options if hub.client else None,
+        mechanism={"type": "huey", "handled": False},
+    )
+    hub.capture_event(event, hint=hint)
+
+
+def _wrap_task_execute(func):
+    # type: (F) -> F
+    def _sentry_execute(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        hub = Hub.current
+        if hub.get_integration(HueyIntegration) is None:
+            return func(*args, **kwargs)
+
+        try:
+            result = func(*args, **kwargs)
+        except Exception:
+            exc_info = sys.exc_info()
+            _capture_exception(exc_info)
+            reraise(*exc_info)
+
+        return result
+
+    return _sentry_execute  # type: ignore
+
+
 def patch_execute():
     # type: () -> None
     old_execute = Huey._execute
@@ -70,6 +108,10 @@ def patch_execute():
                 op="huey.task",
                 source=TRANSACTION_SOURCE_TASK,
             )
+
+            if not getattr(task, "_sentry_patched", False):
+                task.execute = _wrap_task_execute(task.execute)
+                task._sentry_patched = True
 
             with hub.start_transaction(transaction):
                 return old_execute(self, task, timestamp)

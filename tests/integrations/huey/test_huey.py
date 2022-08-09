@@ -72,11 +72,17 @@ def test_task_transaction(capture_events, init_huey, task_fails):
     if task_fails:
         error_event = events.pop(0)
         assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+        assert error_event["exception"]["values"][0]["mechanism"]["type"] == "huey"
 
     (event,) = events
     assert event["type"] == "transaction"
     assert event["transaction"] == "division"
     assert event["transaction_info"] == {"source": "task"}
+
+    if task_fails:
+        assert event["contexts"]["trace"]["status"] == "internal_error"
+    else:
+        assert event["contexts"]["trace"]["status"] == "ok"
 
     assert "huey_task_id" in event["tags"]
     assert "huey_task_retry" in event["tags"]
