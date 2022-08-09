@@ -13,10 +13,14 @@ if hasattr(rediscluster, "StrictRedisCluster"):
 
 @pytest.fixture(scope="module", autouse=True)
 def monkeypatch_rediscluster_classes():
-    rediscluster.RedisCluster.pipeline = lambda *_, **__: rediscluster.ClusterPipeline(
+    try:
+        pipeline_cls = rediscluster.ClusterPipeline
+    except AttributeError:
+        pipeline_cls = rediscluster.StrictClusterPipeline
+    rediscluster.RedisCluster.pipeline = lambda *_, **__: pipeline_cls(
         connection_pool=True
     )
-    rediscluster.ClusterPipeline.execute = lambda *_, **__: None
+    pipeline_cls.execute = lambda *_, **__: None
     for cls in rediscluster_classes:
         cls.execute_command = lambda *_, **__: None
 
