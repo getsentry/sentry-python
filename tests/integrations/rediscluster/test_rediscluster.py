@@ -48,7 +48,7 @@ def test_rediscluster_basic(rediscluster_cls, sentry_init, capture_events):
 
 
 def test_rediscluster_pipeline(sentry_init, capture_events):
-    sentry_init(integrations=[RedisIntegration()], traces_sample_rate=1.0)
+    sentry_init(integrations=[RedisIntegration()], traces_sample_rate=1.0, debug=True)
     events = capture_events()
 
     rc = rediscluster.RedisCluster(connection_pool=True)

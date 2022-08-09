@@ -109,6 +109,9 @@ class RedisIntegration(Integration):
 
         patch_redis_client(redis.StrictRedis, is_cluster=False)
         patch_redis_pipeline(redis.client.Pipeline, False, _get_redis_command_args)
+        patch_redis_pipeline(
+            redis.client.StrictPipeline, False, _get_redis_command_args
+        )
 
         try:
             import rb.clients  # type: ignore
