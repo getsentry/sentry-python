@@ -66,6 +66,14 @@ def _parse_rediscluster_command(command):
     return command.args
 
 
+def _get_pipeline_cls(rediscluster):
+    # type: (Any) -> Any
+    try:
+        return rediscluster.ClusterPipeline
+    except AttributeError:
+        return rediscluster.StrictClusterPipeline
+
+
 def _patch_rediscluster():
     # type: () -> None
     try:
@@ -75,7 +83,7 @@ def _patch_rediscluster():
 
     patch_redis_client(rediscluster.RedisCluster, is_cluster=True)
     patch_redis_pipeline(
-        rediscluster.ClusterPipeline, True, _parse_rediscluster_command
+        _get_pipeline_cls(rediscluster), True, _parse_rediscluster_command
     )
 
     # up to v1.3.6, __version__ attribute is a tuple
