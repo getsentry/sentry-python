@@ -51,6 +51,7 @@ setup(
         "django": ["django>=1.8"],
         "sanic": ["sanic>=0.8"],
         "celery": ["celery>=3"],
+        "huey": ["huey>=2"],
         "beam": ["apache-beam>=2.12"],
         "rq": ["rq>=0.6"],
         "aiohttp": ["aiohttp>=3.5"],
