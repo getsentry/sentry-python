@@ -2,7 +2,7 @@ import pytest
 
 from sentry_sdk.integrations.huey import HueyIntegration
 
-from huey.api import RedisExpireHuey
+from huey.api import RedisExpireHuey, Result
 
 
 @pytest.fixture
@@ -24,3 +24,19 @@ def init_huey(sentry_init):
 def flush_huey_tasks(init_huey):
     huey = init_huey()
     huey.flush()
+
+
+def test_task_result(init_huey):
+    huey = init_huey()
+
+    @huey.task()
+    def increase(num):
+        return num + 1
+
+    result = increase(3)
+
+    assert isinstance(result, Result)
+    assert len(huey) == 1
+    task = huey.dequeue()
+    assert huey.execute(task) == 4
+    assert result.get() == 4
