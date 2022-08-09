@@ -4,6 +4,7 @@ from decimal import DivisionByZero
 from sentry_sdk.integrations.huey import HueyIntegration
 
 from huey.api import RedisExpireHuey, Result
+from huey.exceptions import RetryTask
 
 
 @pytest.fixture
@@ -86,3 +87,30 @@ def test_task_transaction(capture_events, init_huey, task_fails):
 
     assert "huey_task_id" in event["tags"]
     assert "huey_task_retry" in event["tags"]
+
+
+def test_task_retry(capture_events, init_huey):
+    huey = init_huey()
+    context = {"retry": True}
+
+    @huey.task()
+    def retry_task(context):
+        if context["retry"]:
+            context["retry"] = False
+            raise RetryTask()
+
+    events = capture_events()
+    result = execute_huey_task(huey, retry_task, context)
+    (event,) = events
+
+    assert event["transaction"] == "retry_task"
+    assert event["tags"]["huey_task_id"] == result.task.id
+    assert len(huey) == 1
+
+    task = huey.dequeue()
+    huey.execute(task)
+    (event, _) = events
+
+    assert event["transaction"] == "retry_task"
+    assert event["tags"]["huey_task_id"] == result.task.id
+    assert len(huey) == 0

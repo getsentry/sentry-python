@@ -17,8 +17,12 @@ if MYPY:
 
 try:
     from huey.api import Huey, Task
+    from huey.exceptions import CancelExecution, RetryTask
 except ImportError:
     raise DidNotEnable("Huey is not installed")
+
+
+HUEY_CONTROL_FLOW_EXCEPTIONS = (CancelExecution, RetryTask)
 
 
 class HueyIntegration(Integration):
@@ -55,6 +59,10 @@ def _make_event_processor(task):
 def _capture_exception(exc_info):
     # type: (ExcInfo) -> None
     hub = Hub.current
+
+    if exc_info[0] in HUEY_CONTROL_FLOW_EXCEPTIONS:
+        hub.scope.transaction.set_status("aborted")
+        return
 
     hub.scope.transaction.set_status("internal_error")
     event, hint = event_from_exception(
