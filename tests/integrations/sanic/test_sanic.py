@@ -1,5 +1,5 @@
+import os
 import sys
-
 import random
 import asyncio
 from unittest.mock import Mock
@@ -18,6 +18,20 @@ SANIC_VERSION = tuple(map(int, SANIC_VERSION_RAW.split(".")))
 
 @pytest.fixture
 def app():
+    if SANIC_VERSION < (19,):
+        """
+        Older Sanic versions 0.8 and 18 bind to the same fixed port which
+        creates problems when we run tests concurrently.
+        """
+        old_test_client = Sanic.test_client.__get__
+
+        def new_test_client(self):
+            client = old_test_client(self, Sanic)
+            client.port += os.getpid() % 100
+            return client
+
+        Sanic.test_client = property(new_test_client)
+
     if SANIC_VERSION >= (20, 12):
         # Build (20.12.0) adds a feature where the instance is stored in an internal class
         # registry for later retrieval, and so add register=False to disable that
