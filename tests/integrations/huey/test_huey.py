@@ -1,6 +1,7 @@
 import pytest
 from decimal import DivisionByZero
 
+from sentry_sdk import start_transaction
 from sentry_sdk.integrations.huey import HueyIntegration
 
 from huey.api import RedisExpireHuey, Result
@@ -114,3 +115,25 @@ def test_task_retry(capture_events, init_huey):
     assert event["transaction"] == "retry_task"
     assert event["tags"]["huey_task_id"] == result.task.id
     assert len(huey) == 0
+
+
+def test_huey_enqueue(init_huey, capture_events):
+    huey = init_huey()
+
+    @huey.task(name="different_task_name")
+    def dummy_task():
+        pass
+
+    events = capture_events()
+
+    with start_transaction() as transaction:
+        dummy_task()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+    assert event["contexts"]["trace"]["span_id"] == transaction.span_id
+
+    assert len(event["spans"])
+    assert event["spans"][0]["op"] == "huey.enqueue"
+    assert event["spans"][0]["description"] == "different_task_name"

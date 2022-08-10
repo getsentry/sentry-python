@@ -9,14 +9,14 @@ from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
 if MYPY:
-    from typing import Any, Callable, Optional, TypeVar
+    from typing import Any, Callable, Optional, Union, TypeVar
     from sentry_sdk._types import EventProcessor, Event, Hint
     from sentry_sdk.utils import ExcInfo
 
     F = TypeVar("F", bound=Callable[..., Any])
 
 try:
-    from huey.api import Huey, Task
+    from huey.api import Huey, Result, ResultGroup, Task
     from huey.exceptions import CancelExecution, RetryTask
 except ImportError:
     raise DidNotEnable("Huey is not installed")
@@ -31,7 +31,25 @@ class HueyIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+        patch_enqueue()
         patch_execute()
+
+
+def patch_enqueue():
+    # type: () -> None
+    old_enqueue = Huey.enqueue
+
+    def _sentry_enqueue(self, task):
+        # type: (Huey, Task) -> Optional[Union[Result, ResultGroup]]
+        hub = Hub.current
+
+        if hub.get_integration(HueyIntegration) is None:
+            return old_enqueue(self, task)
+
+        with hub.start_span(op="huey.enqueue", description=task.name):
+            return old_enqueue(self, task)
+
+    Huey.enqueue = _sentry_enqueue
 
 
 def _make_event_processor(task):
@@ -117,9 +135,9 @@ def patch_execute():
                 source=TRANSACTION_SOURCE_TASK,
             )
 
-            if not getattr(task, "_sentry_patched", False):
+            if not getattr(task, "_sentry_is_patched", False):
                 task.execute = _wrap_task_execute(task.execute)
-                task._sentry_patched = True
+                task._sentry_is_patched = True
 
             with hub.start_transaction(transaction):
                 return old_execute(self, task, timestamp)
