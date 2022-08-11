@@ -12,9 +12,8 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
-    TRANSACTION_SOURCE_ROUTE,
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,

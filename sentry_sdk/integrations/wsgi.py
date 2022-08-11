@@ -8,7 +8,7 @@ from sentry_sdk.utils import (
     event_from_exception,
 )
 from sentry_sdk._compat import PY2, reraise, iteritems
-from sentry_sdk.tracing import Transaction
+from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.profiler import profiling
@@ -123,7 +123,10 @@ class SentryWsgiMiddleware(object):
                             )
 
                     transaction = Transaction.continue_from_environ(
-                        environ, op="http.server", name="generic WSGI request"
+                        environ,
+                        op="http.server",
+                        name="generic WSGI request",
+                        source=TRANSACTION_SOURCE_ROUTE,
                     )
 
                     with hub.start_transaction(
