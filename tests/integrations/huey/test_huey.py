@@ -29,7 +29,8 @@ def flush_huey_tasks(init_huey):
     huey.flush()
 
 
-def execute_huey_task(huey, func, *args, exceptions=None, **kwargs):
+def execute_huey_task(huey, func, *args, **kwargs):
+    exceptions = kwargs.pop("exceptions", None)
     result = func(*args, **kwargs)
     task = huey.dequeue()
     if exceptions is not None:

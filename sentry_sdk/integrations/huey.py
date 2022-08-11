@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import sys
 from datetime import datetime
 
@@ -10,6 +12,7 @@ from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
 if MYPY:
     from typing import Any, Callable, Optional, Union, TypeVar
+
     from sentry_sdk._types import EventProcessor, Event, Hint
     from sentry_sdk.utils import ExcInfo
 
