@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.9.4
+
+### Various fixes & improvements
+
+- Remove TRANSACTION_SOURCE_UNKNOWN and default to CUSTOM (#1558) by @sl0thentr0py
+- feat(redis): Add instrumentation for redis pipeline (#1543) by @jjbayer
+- Handle no release when uploading profiles (#1548) by @szokeasaurusrex
+
 ## 1.9.3
 
 ### Various fixes & improvements
