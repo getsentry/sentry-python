@@ -66,14 +66,6 @@ def _parse_rediscluster_command(command):
     return command.args
 
 
-def _get_cluster_pipeline_cls(rediscluster):
-    # type: (Any) -> Any
-    try:
-        return rediscluster.ClusterPipeline
-    except AttributeError:
-        return rediscluster.StrictClusterPipeline
-
-
 def _patch_rediscluster():
     # type: () -> None
     try:
@@ -82,9 +74,6 @@ def _patch_rediscluster():
         return
 
     patch_redis_client(rediscluster.RedisCluster, is_cluster=True)
-    patch_redis_pipeline(
-        _get_cluster_pipeline_cls(rediscluster), True, _parse_rediscluster_command
-    )
 
     # up to v1.3.6, __version__ attribute is a tuple
     # from v2.0.0, __version__ is a string and VERSION a tuple
@@ -93,7 +82,12 @@ def _patch_rediscluster():
     # StrictRedisCluster was introduced in v0.2.0 and removed in v2.0.0
     # https://github.com/Grokzen/redis-py-cluster/blob/master/docs/release-notes.rst
     if (0, 2, 0) < version < (2, 0, 0):
+        pipeline_cls = rediscluster.StrictClusterPipeline
         patch_redis_client(rediscluster.StrictRedisCluster, is_cluster=True)
+    else:
+        pipeline_cls = rediscluster.ClusterPipeline
+
+    patch_redis_pipeline(pipeline_cls, True, _parse_rediscluster_command)
 
 
 class RedisIntegration(Integration):
