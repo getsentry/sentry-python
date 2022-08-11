@@ -34,7 +34,6 @@ TRANSACTION_SOURCE_ROUTE = "route"
 TRANSACTION_SOURCE_VIEW = "view"
 TRANSACTION_SOURCE_COMPONENT = "component"
 TRANSACTION_SOURCE_TASK = "task"
-TRANSACTION_SOURCE_UNKNOWN = "unknown"
 
 SOURCE_FOR_STYLE = {
     "endpoint": TRANSACTION_SOURCE_COMPONENT,
@@ -547,7 +546,7 @@ class Transaction(Span):
         sentry_tracestate=None,  # type: Optional[str]
         third_party_tracestate=None,  # type: Optional[str]
         baggage=None,  # type: Optional[Baggage]
-        source=TRANSACTION_SOURCE_UNKNOWN,  # type: str
+        source=TRANSACTION_SOURCE_CUSTOM,  # type: str
         **kwargs  # type: Any
     ):
         # type: (...) -> None

@@ -32,6 +32,9 @@ def test_basic(sentry_init, capture_events, sample_rate):
         assert len(events) == 1
         event = events[0]
 
+        assert event["transaction"] == "hi"
+        assert event["transaction_info"]["source"] == "custom"
+
         span1, span2 = event["spans"]
         parent_span = event
         assert span1["tags"]["status"] == "internal_error"

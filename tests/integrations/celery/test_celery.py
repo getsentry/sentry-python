@@ -159,7 +159,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     assert execution_event["transaction_info"] == {"source": "task"}
 
     assert submission_event["transaction"] == "submission"
-    assert submission_event["transaction_info"] == {"source": "unknown"}
+    assert submission_event["transaction_info"] == {"source": "custom"}
 
     assert execution_event["type"] == submission_event["type"] == "transaction"
     assert execution_event["contexts"]["trace"]["trace_id"] == transaction.trace_id

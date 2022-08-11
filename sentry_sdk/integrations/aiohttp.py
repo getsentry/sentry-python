@@ -9,7 +9,7 @@ from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
 )
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, Transaction
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, Transaction, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -103,6 +103,7 @@ class AioHttpIntegration(Integration):
                     # If this transaction name makes it to the UI, AIOHTTP's
                     # URL resolver did not find a route or died trying.
                     name="generic AIOHTTP request",
+                    source=TRANSACTION_SOURCE_ROUTE,
                 )
                 with hub.start_transaction(
                     transaction, custom_sampling_context={"aiohttp_request": request}
