@@ -11,8 +11,8 @@ if hasattr(rediscluster, "StrictRedisCluster"):
     rediscluster_classes.append(rediscluster.StrictRedisCluster)
 
 
-@pytest.fixture(scope="module", autouse=True)
-def monkeypatch_rediscluster_classes():
+@pytest.fixture(autouse=True)
+def monkeypatch_rediscluster_classes(reset_integrations):
 
     try:
         pipeline_cls = rediscluster.ClusterPipeline
