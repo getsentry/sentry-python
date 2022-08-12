@@ -5,7 +5,7 @@ import weakref
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import Transaction
+from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
 try:
@@ -63,6 +63,7 @@ class RqIntegration(Integration):
                     job.meta.get("_sentry_trace_headers") or {},
                     op="rq.task",
                     name="unknown RQ task",
+                    source=TRANSACTION_SOURCE_TASK,
                 )
 
                 with capture_internal_exceptions():
