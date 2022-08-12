@@ -131,7 +131,6 @@ def patch_redis_client(cls, is_cluster):
     This function can be used to instrument custom redis client classes or
     subclasses.
     """
-
     old_execute_command = cls.execute_command
 
     def sentry_patched_execute_command(self, name, *args, **kwargs):

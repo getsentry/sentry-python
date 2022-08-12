@@ -19,6 +19,7 @@ from sentry_sdk._compat import reraise, string_types, iteritems
 from sentry_sdk.transport import Transport
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.integrations import _installed_integrations  # noqa: F401
 
 from tests import _warning_recorder, _warning_recorder_mgr
 
@@ -163,6 +164,17 @@ def validate_event_schema(tmpdir):
             jsonschema.validate(instance=event, schema=SENTRY_EVENT_SCHEMA)
 
     return inner
+
+
+@pytest.fixture
+def reset_integrations():
+    """
+    Use with caution, sometimes we really need to start
+    with a clean slate to ensure monkeypatching works well,
+    but this also means some other stuff will be monkeypatched twice.
+    """
+    global _installed_integrations
+    _installed_integrations.clear()
 
 
 @pytest.fixture
