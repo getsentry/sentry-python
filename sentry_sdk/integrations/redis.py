@@ -82,10 +82,10 @@ def _patch_rediscluster():
     # StrictRedisCluster was introduced in v0.2.0 and removed in v2.0.0
     # https://github.com/Grokzen/redis-py-cluster/blob/master/docs/release-notes.rst
     if (0, 2, 0) < version < (2, 0, 0):
-        pipeline_cls = rediscluster.StrictClusterPipeline
+        pipeline_cls = rediscluster.pipeline.StrictClusterPipeline
         patch_redis_client(rediscluster.StrictRedisCluster, is_cluster=True)
     else:
-        pipeline_cls = rediscluster.ClusterPipeline
+        pipeline_cls = rediscluster.pipeline.ClusterPipeline
 
     patch_redis_pipeline(pipeline_cls, True, _parse_rediscluster_command)
 

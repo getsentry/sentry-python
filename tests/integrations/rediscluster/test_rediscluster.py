@@ -15,7 +15,7 @@ if hasattr(rediscluster, "StrictRedisCluster"):
 def monkeypatch_rediscluster_classes(reset_integrations):
 
     try:
-        pipeline_cls = rediscluster.ClusterPipeline
+        pipeline_cls = rediscluster.pipeline.ClusterPipeline
     except AttributeError:
         pipeline_cls = rediscluster.StrictClusterPipeline
     rediscluster.RedisCluster.pipeline = lambda *_, **__: pipeline_cls(
