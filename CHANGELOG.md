@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.9.5
+
+### Various fixes & improvements
+
+- fix(redis): import redis pipeline using full path (#1565) by @olksdr
+- Fix side effects for parallel tests (#1554) by @sl0thentr0py
+
 ## 1.9.4
 
 ### Various fixes & improvements
