@@ -5,6 +5,6 @@ mypy==0.961
 types-certifi
 types-redis
 types-setuptools
-flake8-bugbear==21.4.3
+flake8-bugbear==22.7.1
 pep8-naming==0.13.0
 pre-commit # local linting
