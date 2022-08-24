@@ -218,7 +218,7 @@ class HttpTransport(Transport):
         headers,  # type: Dict[str, str]
         endpoint_type="store",  # type: EndpointType
         envelope=None,  # type: Optional[Envelope]
-        callback=None,  # type: Callable[[urllib3.HTTPResponse], None]
+        callback=None,  # type: Optional[Callable[[urllib3.HTTPResponse], None]]
     ):
         # type: (...) -> None
 
@@ -280,7 +280,9 @@ class HttpTransport(Transport):
     def request_feature_flags(
         self, callback  # type: Callable[[Any], None]
     ):
+        # type: (...) -> None
         def on_response(response):
+            # type: (Any) -> None
             if response.status == 200:
                 rv = json.loads(response.data)
                 callback(rv["feature_flags"])

@@ -727,7 +727,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         client, top_scope = self._stack[-1]
         if client is None:
-            return
+            return None
         scope = _update_scope(top_scope, scope, {})
         if context is None:
             context = {}
@@ -735,17 +735,17 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             context = dict(context)
         for tag, value in scope._tags.items():
             context[tag] = str(value)
-        context["release"] = self.client.options["release"]
-        context["environment"] = self.client.options["environment"]
+        context["release"] = client.options["release"]
+        context["environment"] = client.options["environment"]
         context["transaction"] = scope.transaction
         if scope._user:
             user_id = scope._user.get("id")
             if user_id is not None:
                 context["userId"] = user_id
-        return self.client.feature_flags_manager.evaluate_feature_flag(name, context)
+        return client.feature_flags_manager.evaluate_feature_flag(name, context)
 
     def is_feature_flag_enabled(self, name, scope=None, context=None, default=False):
-        # type: (str, Optional[Scope], Optional[Dict[str, Any]], Optional[bool]) -> bool
+        # type: (str, Optional[Scope], Optional[Dict[str, Any]], bool) -> bool
         """
         Given the name of a feature flag, optional scope and context
         evaluates the feature flag and returns the result as bool.

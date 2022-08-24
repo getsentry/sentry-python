@@ -219,10 +219,10 @@ def start_transaction(
 
 @hubmethod
 def is_feature_flag_enabled(
-    name,
-    scope=None,
-    context=None,
-    default=False,
+    name,  # type: str
+    scope=None,  # type: Optional[Scope]
+    context=None,  # type: Optional[Dict[str, Any]]
+    default=False,  # type: bool
 ):
     # type: (...) -> bool
     return Hub.current.is_feature_flag_enabled(name, scope, context, default)
@@ -230,9 +230,9 @@ def is_feature_flag_enabled(
 
 @hubmethod
 def get_feature_flag_info(
-    name,
-    scope=None,
-    context=None,
+    name,  # type: str
+    scope=None,  # type: Optional[Scope]
+    context=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> Optional[FeatureFlagInfo]
     return Hub.current.get_feature_flag_info(name, scope, context)

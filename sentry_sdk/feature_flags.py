@@ -4,6 +4,8 @@ import hashlib
 import struct
 import uuid
 
+from collections import namedtuple
+
 from sentry_sdk._types import MYPY
 
 if MYPY:
@@ -13,7 +15,7 @@ if MYPY:
 
 
 MASK = 0xFFFFFFFF
-FALLBACK_ID = uuid.uuid4()
+FALLBACK_ID = uuid.getnode()
 
 
 class XorShift(object):
@@ -45,7 +47,7 @@ class XorShift(object):
 
         return self.state[0]
 
-    def next(self):
+    def next_float(self):
         # type: () -> float
         return self.next_u32() / MASK
 
@@ -54,15 +56,17 @@ class FeatureFlagsManager(object):
     def __init__(self, request_func=None, refresh=None, is_enabled=None):
         # type: (Any, Optional[float], Optional[bool]) -> None
         self._request_func = request_func
-        self._fetched_flags = {}
-        self._last_fetch = None
-        self._dead = False
+        self._fetched_flags = {}  # type: Dict[str, Any]
+        self._last_fetch = None  # type: Optional[float]
+        self._dead = False  # type: bool
         self._refresh = refresh or 60.0
         self.is_enabled = is_enabled or False
 
         if self.is_enabled:
 
-            def refresh():
+            def thread_func():
+                # type: () -> None
+
                 while self._dead:
                     if (
                         self._last_fetch is None
@@ -71,7 +75,7 @@ class FeatureFlagsManager(object):
                         self.refresh()
                     time.sleep(1.0)
 
-            self._thread = threading.Thread(target=refresh)
+            self._thread = threading.Thread(target=thread_func)
             self._thread.daemon = True
             self._thread.start()
 
@@ -83,6 +87,7 @@ class FeatureFlagsManager(object):
             return
 
         def callback(response):
+            # type: (Any) -> None
             self._fetched_flags = response
 
         self._request_func(callback)
@@ -111,25 +116,21 @@ class FeatureFlagsManager(object):
         return None
 
     def close(self):
+        # type: () -> None
         self._dead = True
 
 
-class FeatureFlagInfo(object):
-    def __init__(self, result, payload, tags):
-        # type: (Any, Dict[str, Any], Dict[str, str]) -> None
-        self.result = result
-        self.payload = payload
-        self.tags = tags
+FeatureFlagInfo = namedtuple("FeatureFlagInfo", ["result", "payload", "tags"])
 
 
 def roll_random_number(context):
     # type: (Dict[str, Any]) -> float
-    sticky_id = context.get("stickyId") or context.get("userId") or FALLBACK_ID.hex
-    return XorShift(seed=sticky_id).next()
+    sticky_id = str(context.get("stickyId") or context.get("userId") or FALLBACK_ID)
+    return XorShift(seed=sticky_id).next_float()
 
 
 def matches_tags(tags, context):
-    # type: (Dict[str, str], Dict[str, Any]) -> None
+    # type: (Dict[str, str], Dict[str, Any]) -> bool
     for key, value in tags.items():
         if context.get(key) != str(value):
             return False
