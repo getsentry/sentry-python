@@ -47,6 +47,7 @@ __all__ = [
     "set_level",
     "is_feature_flag_enabled",
     "get_feature_flag_info",
+    "wait_until_ready",
 ]
 
 
@@ -236,3 +237,11 @@ def get_feature_flag_info(
 ):
     # type: (...) -> Optional[FeatureFlagInfo]
     return Hub.current.get_feature_flag_info(name, scope, context)
+
+
+@hubmethod
+def wait_until_ready(
+    timeout=None,  # type: Optional[float]
+):
+    # type: (...) -> bool
+    return Hub.current.wait_until_ready(timeout)

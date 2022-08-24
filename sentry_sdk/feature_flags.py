@@ -61,6 +61,7 @@ class FeatureFlagsManager(object):
         self._dead = False  # type: bool
         self._refresh = refresh or 60.0
         self.is_enabled = is_enabled or False
+        self._load_event = threading.Event()  # type: threading.Event
 
         if self.is_enabled:
 
@@ -81,6 +82,12 @@ class FeatureFlagsManager(object):
 
         self.refresh()
 
+    def wait(self, timeout=None):
+        # type: (Optional[float]) -> bool
+        if not self.is_enabled:
+            return True
+        return self._load_event.wait(timeout)
+
     def refresh(self):
         # type: () -> None
         if not self.is_enabled:
@@ -89,6 +96,7 @@ class FeatureFlagsManager(object):
         def callback(response):
             # type: (Any) -> None
             self._fetched_flags = response
+            self._load_event.set()
 
         self._request_func(callback)
         self._last_fetch = time.time()

@@ -262,6 +262,21 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         old = self._old_hubs.pop()
         _local.set(old)
 
+    def wait_until_ready(self, timeout=None):
+        """
+        The SDK can perform some on-startup functionality that
+        you might want to await.  In that case method returns `True`
+        if it managed to complete the activity upon calling within
+        the given timeout.
+        """
+        # type: (...) -> bool
+        if timeout is None:
+            timeout = 2.0
+        client = self.client
+        if client is not None:
+            return client.feature_flags_manager.wait(timeout)
+        return True
+
     def run(
         self, callback  # type: Callable[[], T]
     ):
