@@ -36,6 +36,7 @@ if MYPY:
     from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
     from sentry_sdk.session import Session
+    from sentry_sdk.feature_flags import FeatureFlagInfo
 
 
 _client_init_debug = ContextVar("client_init_debug")
@@ -112,6 +113,15 @@ class _Client(object):
             if self.transport is not None:
                 self.transport.request_feature_flags(callback)
 
+        def _on_updated_feature_flags():
+            # type: () -> None
+            sample_rate = self._get_feature_flag_info("@@sampleRate")
+            if sample_rate is not None:
+                self.options["sample_rate"] = sample_rate.result
+            traces_sample_rate = self._get_feature_flag_info("@@tracesSampleRate")
+            if traces_sample_rate is not None:
+                self.options["traces_sample_rate"] = traces_sample_rate.result
+
         try:
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
@@ -136,6 +146,7 @@ class _Client(object):
 
             self.feature_flags_manager = FeatureFlagsManager(
                 request_func=_request_feature_flags,
+                apply_func=_on_updated_feature_flags,
                 refresh=self.options["_experiments"].get("feature_flags_refresh"),
                 is_enabled=self.options["_experiments"].get("feature_flags_enabled"),
             )
@@ -473,6 +484,16 @@ class _Client(object):
                 timeout = self.options["shutdown_timeout"]
             self.session_flusher.flush()
             self.transport.flush(timeout=timeout, callback=callback)
+
+    def _get_feature_flag_info(self, name, context=None):
+        # type: (str, Optional[Dict[str, Any]]) -> Optional[FeatureFlagInfo]
+        if context is None:
+            context = {}
+        else:
+            context = dict(context)
+        context["release"] = self.options["release"]
+        context["environment"] = self.options["environment"]
+        return self.feature_flags_manager.evaluate_feature_flag(name, context)
 
     def __enter__(self):
         # type: () -> _Client

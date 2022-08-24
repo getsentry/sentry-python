@@ -262,14 +262,16 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         old = self._old_hubs.pop()
         _local.set(old)
 
-    def wait_until_ready(self, timeout=None):
+    def wait_until_ready(
+        self, timeout=None  # type: Optional[float]
+    ):
+        # type: (...) -> bool
         """
         The SDK can perform some on-startup functionality that
         you might want to await.  In that case method returns `True`
         if it managed to complete the activity upon calling within
         the given timeout.
         """
-        # type: (...) -> bool
         if timeout is None:
             timeout = 2.0
         client = self.client
@@ -750,14 +752,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             context = dict(context)
         for tag, value in scope._tags.items():
             context[tag] = str(value)
-        context["release"] = client.options["release"]
-        context["environment"] = client.options["environment"]
         context["transaction"] = scope.transaction
         if scope._user:
             user_id = scope._user.get("id")
             if user_id is not None:
                 context["userId"] = user_id
-        return client.feature_flags_manager.evaluate_feature_flag(name, context)
+        return client._get_feature_flag_info(name, context)
 
     def is_feature_flag_enabled(self, name, scope=None, context=None, default=False):
         # type: (str, Optional[Scope], Optional[Dict[str, Any]], bool) -> bool
