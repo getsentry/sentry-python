@@ -17,6 +17,7 @@ if MYPY:
 
     from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint, ExcInfo
     from sentry_sdk.tracing import Span, Transaction
+    from sentry_sdk.feature_flags import FeatureFlagInfo
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
@@ -45,6 +46,7 @@ __all__ = [
     "set_user",
     "set_level",
     "is_feature_flag_enabled",
+    "get_feature_flag_info",
 ]
 
 
@@ -224,3 +226,13 @@ def is_feature_flag_enabled(
 ):
     # type: (...) -> bool
     return Hub.current.is_feature_flag_enabled(name, scope, context, default)
+
+
+@hubmethod
+def get_feature_flag_info(
+    name,
+    scope=None,
+    context=None,
+):
+    # type: (...) -> Optional[FeatureFlagInfo]
+    return Hub.current.get_feature_flag_info(name, scope, context)
