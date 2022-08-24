@@ -132,6 +132,10 @@ def roll_random_number(context):
 def matches_tags(tags, context):
     # type: (Dict[str, str], Dict[str, Any]) -> bool
     for key, value in tags.items():
-        if context.get(key) != str(value):
+        context_value = context.get(key)
+        if isinstance(context_value, list):
+            if str(value) not in context_value:
+                return False
+        elif context_value != str(value):
             return False
     return True
