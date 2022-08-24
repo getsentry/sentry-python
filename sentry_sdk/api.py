@@ -44,6 +44,7 @@ __all__ = [
     "set_extra",
     "set_user",
     "set_level",
+    "is_feature_flag_enabled",
 ]
 
 
@@ -212,3 +213,14 @@ def start_transaction(
 ):
     # type: (...) -> Transaction
     return Hub.current.start_transaction(transaction, **kwargs)
+
+
+@hubmethod
+def is_feature_flag_enabled(
+    name,
+    scope=None,
+    context=None,
+    default=False,
+):
+    # type: (...) -> bool
+    return Hub.current.is_feature_flag_enabled(name, scope, context, default)

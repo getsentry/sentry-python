@@ -4,6 +4,7 @@ import io
 import urllib3  # type: ignore
 import certifi
 import gzip
+import json
 import time
 
 from datetime import datetime, timedelta
@@ -80,6 +81,14 @@ class Transport(object):
         compat.
         """
         raise NotImplementedError()
+
+    def request_feature_flags(
+        self, callback  # type: Callable[[Any], None]
+    ):
+        # type: (...) -> None
+        """Requests feature flags and invokes the callback once they were
+        fetched.  There is no guarantee that the callback is invoked.
+        """
 
     def flush(
         self,
@@ -209,6 +218,7 @@ class HttpTransport(Transport):
         headers,  # type: Dict[str, str]
         endpoint_type="store",  # type: EndpointType
         envelope=None,  # type: Optional[Envelope]
+        callback=None,  # type: Callable[[urllib3.HTTPResponse], None]
     ):
         # type: (...) -> None
 
@@ -257,12 +267,34 @@ class HttpTransport(Transport):
                 )
                 self.on_dropped_event("status_{}".format(response.status))
                 record_loss("network_error")
+
+            if callback is not None:
+                callback(response)
         finally:
             response.close()
 
     def on_dropped_event(self, reason):
         # type: (str) -> None
         return None
+
+    def request_feature_flags(
+        self, callback  # type: Callable[[Any], None]
+    ):
+        def on_response(response):
+            if response.status == 200:
+                rv = json.loads(response.data)
+                callback(rv["feature_flags"])
+
+        def request_feature_flags():
+            # type: () -> None
+            self._send_request(
+                body=b"",
+                headers={},
+                endpoint_type="feature-flags",
+                callback=on_response,
+            )
+
+        self._worker.submit(request_feature_flags)
 
     def _fetch_pending_client_report(self, force=False, interval=60):
         # type: (bool, int) -> Optional[Item]

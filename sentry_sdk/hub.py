@@ -33,6 +33,7 @@ if MYPY:
     from typing import ContextManager
 
     from sentry_sdk.integrations import Integration
+    from sentry_sdk.feature_flags import FeatureFlagInfo
     from sentry_sdk._types import (
         Event,
         Hint,
@@ -716,6 +717,45 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         for header in span.iter_headers():
             yield header
+
+    def get_feature_flag_info(self, name, scope=None, context=None):
+        # type: (str, Optional[Scope], Optional[Dict[str, Any]]) -> Optional[FeatureFlagInfo]
+        """
+        Given the name of a feature flags and optional scope and context,
+        evaluates the feature flag and if it matches it returns the
+        feature flag info object for additional processing.
+        """
+        client, top_scope = self._stack[-1]
+        if client is None:
+            return
+        scope = _update_scope(top_scope, scope, {})
+        if context is None:
+            context = {}
+        else:
+            context = dict(context)
+        for tag, value in scope._tags.items():
+            context[tag] = str(value)
+        context["release"] = self.client.options["release"]
+        context["environment"] = self.client.options["environment"]
+        context["transaction"] = scope.transaction
+        if scope._user:
+            user_id = scope._user.get("id")
+            if user_id is not None:
+                context["userId"] = user_id
+        return self.client.feature_flags_manager.evaluate_feature_flag(name, context)
+
+    def is_feature_flag_enabled(self, name, scope=None, context=None, default=False):
+        # type: (str, Optional[Scope], Optional[Dict[str, Any]], Optional[bool]) -> bool
+        """
+        Given the name of a feature flag, optional scope and context
+        evaluates the feature flag and returns the result as bool.
+        If the feature flag was not fetched or missing, it returnst
+        the default instead.
+        """
+        info = self.get_feature_flag_info(name, scope, context)
+        if info is not None:
+            return bool(info.result)
+        return default
 
 
 GLOBAL_HUB = Hub()

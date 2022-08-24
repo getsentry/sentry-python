@@ -23,6 +23,7 @@ from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.tracing_utils import has_tracestate_enabled, reinflate_tracestate
+from sentry_sdk.feature_flags import FeatureFlagsManager
 
 from sentry_sdk._types import MYPY
 
@@ -106,6 +107,11 @@ class _Client(object):
             if self.transport is not None:
                 self.transport.capture_envelope(envelope)
 
+        def _request_feature_flags(callback):
+            # type: (Any) -> None
+            if self.transport is not None:
+                self.transport.request_feature_flags(callback)
+
         try:
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
@@ -126,6 +132,12 @@ class _Client(object):
                 with_auto_enabling_integrations=self.options[
                     "auto_enabling_integrations"
                 ],
+            )
+
+            self.feature_flags_manager = FeatureFlagsManager(
+                request_func=_request_feature_flags,
+                refresh=self.options["_experiments"].get("feature_flags_refresh"),
+                is_enabled=self.options["_experiments"].get("feature_flags_enabled"),
             )
         finally:
             _client_init_debug.set(old_debug)
@@ -439,6 +451,7 @@ class _Client(object):
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
             self.session_flusher.kill()
+            self.feature_flags_manager.close()
             self.transport.kill()
             self.transport = None
 
