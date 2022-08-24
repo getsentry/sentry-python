@@ -198,8 +198,14 @@ def has_profiling_enabled(hub=None):
     if hub is None:
         hub = sentry_sdk.Hub.current
 
-    options = hub.client and hub.client.options
-    return bool(options and options["_experiments"].get("enable_profiling"))
+    if hub.client:
+        options = hub.client.options
+        profiling_enabled = bool(options and options["_experiments"].get("enable_profiling"))
+        dynamic_profiling_enabled = hub.client._get_feature_flag_info("@@profilingEnabled")
+        if dynamic_profiling_enabled is not None:
+            profiling_enabled = dynamic_profiling_enabled
+        return profiling_enabled
+    return False
 
 
 @contextmanager
