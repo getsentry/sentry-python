@@ -113,15 +113,6 @@ class _Client(object):
             if self.transport is not None:
                 self.transport.request_feature_flags(callback)
 
-        def _on_updated_feature_flags():
-            # type: () -> None
-            sample_rate = self._get_feature_flag_info("@@sampleRate")
-            if sample_rate is not None:
-                self.options["sample_rate"] = sample_rate.result
-            traces_sample_rate = self._get_feature_flag_info("@@tracesSampleRate")
-            if traces_sample_rate is not None:
-                self.options["traces_sample_rate"] = traces_sample_rate.result
-
         try:
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
@@ -146,7 +137,6 @@ class _Client(object):
 
             self.feature_flags_manager = FeatureFlagsManager(
                 request_func=_request_feature_flags,
-                apply_func=_on_updated_feature_flags,
                 refresh=self.options["_experiments"].get("feature_flags_refresh"),
                 is_enabled=self.options["_experiments"].get("feature_flags_enabled"),
             )
@@ -291,12 +281,19 @@ class _Client(object):
     def _should_sample_error(
         self,
         event,  # type: Event
+        scope=None,  # type: Optional[Scope]
     ):
         # type: (...) -> bool
-        not_in_sample_rate = (
-            self.options["sample_rate"] < 1.0
-            and random.random() >= self.options["sample_rate"]
+        sample_rate = self.options["sample_rate"]
+        dynamic_sample_rate = self._get_feature_flag_info(
+            "@@sampleRate",
+            scope=scope,
+            context={"transaction": event.get("transaction")},
         )
+        if dynamic_sample_rate is not None:
+            sample_rate = dynamic_sample_rate.result
+
+        not_in_sample_rate = sample_rate < 1.0 and random.random() >= sample_rate
         if not_in_sample_rate:
             # because we will not sample this event, record a "lost event".
             if self.transport:
@@ -384,7 +381,7 @@ class _Client(object):
 
         is_transaction = event_opt.get("type") == "transaction"
 
-        if not is_transaction and not self._should_sample_error(event):
+        if not is_transaction and not self._should_sample_error(event, scope):
             return None
 
         attachments = hint.get("attachments")
@@ -485,14 +482,23 @@ class _Client(object):
             self.session_flusher.flush()
             self.transport.flush(timeout=timeout, callback=callback)
 
-    def _get_feature_flag_info(self, name, context=None):
-        # type: (str, Optional[Dict[str, Any]]) -> Optional[FeatureFlagInfo]
+    def _get_feature_flag_info(self, name, scope=None, context=None):
+        # type: (str, Optional[Scope], Optional[Dict[str, Any]]) -> Optional[FeatureFlagInfo]
         if context is None:
             context = {}
         else:
             context = dict(context)
         context["release"] = self.options["release"]
         context["environment"] = self.options["environment"]
+        if scope is not None:
+            if scope._user:
+                user_id = scope._user.get("id")
+                if user_id is not None:
+                    context["userId"] = user_id
+            for tag, value in scope._tags.items():
+                context[tag] = str(value)
+            if scope.transaction is not None:
+                context["transaction"] = scope.transaction
         return self.feature_flags_manager.evaluate_feature_flag(name, context)
 
     def __enter__(self):

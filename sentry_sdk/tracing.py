@@ -761,6 +761,16 @@ class Transaction(Span):
             )
         )
 
+        # Override sample rate with what comes from the feature flag system.
+        dynamic_sample_rate = hub.get_feature_flag_info(
+            "@@tracesSampleRate",
+            context={
+                "transaction": self.name,
+            },
+        )
+        if dynamic_sample_rate is not None:
+            sample_rate = dynamic_sample_rate.result
+
         # Since this is coming from the user (or from a function provided by the
         # user), who knows what we might get. (The only valid values are
         # booleans or numbers between 0 and 1.)

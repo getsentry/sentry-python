@@ -750,14 +750,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             context = {}
         else:
             context = dict(context)
-        for tag, value in scope._tags.items():
-            context[tag] = str(value)
-        context["transaction"] = scope.transaction
-        if scope._user:
-            user_id = scope._user.get("id")
-            if user_id is not None:
-                context["userId"] = user_id
-        return client._get_feature_flag_info(name, context)
+        return client._get_feature_flag_info(name, scope, context)
 
     def is_feature_flag_enabled(self, name, scope=None, context=None, default=False):
         # type: (str, Optional[Scope], Optional[Dict[str, Any]], bool) -> bool

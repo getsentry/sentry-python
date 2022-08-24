@@ -53,10 +53,9 @@ class XorShift(object):
 
 
 class FeatureFlagsManager(object):
-    def __init__(self, request_func, apply_func=None, refresh=None, is_enabled=None):
-        # type: (Any, Any, Optional[float], Optional[bool]) -> None
+    def __init__(self, request_func, refresh=None, is_enabled=None):
+        # type: (Any, Optional[float], Optional[bool]) -> None
         self._request_func = request_func
-        self._apply_func = apply_func
         self._fetched_flags = {}  # type: Dict[str, Any]
         self._last_fetch = None  # type: Optional[float]
         self._dead = False  # type: bool
@@ -97,8 +96,6 @@ class FeatureFlagsManager(object):
         def callback(response):
             # type: (Any) -> None
             self._fetched_flags = response
-            if self._apply_func is not None:
-                self._apply_func()
             self._load_event.set()
 
         self._request_func(callback)
