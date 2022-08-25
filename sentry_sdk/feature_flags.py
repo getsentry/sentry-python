@@ -113,7 +113,8 @@ class FeatureFlagsManager(object):
                 continue
             if eval_config["type"] == "match" or (
                 eval_config["type"] == "rollout"
-                and roll_random_number(context) < eval_config["percentage"]
+                and roll_random_number(config.get("group") or name, context)
+                < eval_config["percentage"]
             ):
                 return FeatureFlagInfo(
                     result=eval_config["result"],
@@ -131,9 +132,10 @@ class FeatureFlagsManager(object):
 FeatureFlagInfo = namedtuple("FeatureFlagInfo", ["result", "payload", "tags"])
 
 
-def roll_random_number(context):
-    # type: (Dict[str, Any]) -> float
+def roll_random_number(group, context):
+    # type: (str, Dict[str, Any]) -> float
     sticky_id = str(context.get("stickyId") or context.get("userId") or FALLBACK_ID)
+    seed = "%s|%s" % (group, sticky_id)
     return XorShift(seed=sticky_id).next_float()
 
 
