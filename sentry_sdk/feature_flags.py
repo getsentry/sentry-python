@@ -136,7 +136,7 @@ def roll_random_number(group, context):
     # type: (str, Dict[str, Any]) -> float
     sticky_id = str(context.get("stickyId") or context.get("userId") or FALLBACK_ID)
     seed = "%s|%s" % (group, sticky_id)
-    return XorShift(seed=sticky_id).next_float()
+    return XorShift(seed=seed).next_float()
 
 
 def matches_tags(tags, context):

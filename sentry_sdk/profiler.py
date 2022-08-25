@@ -202,7 +202,9 @@ def has_profiling_enabled(hub=None):
 
     if client:
         options = client.options
-        profiling_enabled = bool(options and options["_experiments"].get("enable_profiling"))
+        profiling_enabled = bool(
+            options and options["_experiments"].get("enable_profiling")
+        )
         dynamic_profiling_enabled = client._get_feature_flag_info("@@profilingEnabled")
         if dynamic_profiling_enabled is not None:
             profiling_enabled = dynamic_profiling_enabled.result
