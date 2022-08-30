@@ -470,6 +470,49 @@ class Baggage(object):
 
         return Baggage(sentry_items, third_party_items, mutable)
 
+    @classmethod
+    def populate_from_transaction(cls, transaction):
+        # type: (Transaction) -> Baggage
+        """
+        Populate fresh baggage entry with sentry_items and make it immutable
+        if this is the head SDK which originates traces.
+        """
+
+        hub = transaction.hub or sentry_sdk.Hub.current
+        client = hub.client
+        sentry_items = {}  # type: Dict[str, str]
+
+        if not client:
+            return Baggage(sentry_items)
+
+        options = client.options or {}
+        user = (hub.scope and hub.scope._user) or {}
+
+        sentry_items["trace_id"] = transaction.trace_id
+
+        if options.get("environment"):
+            sentry_items["environment"] = options["environment"]
+
+        if options.get("release"):
+            sentry_items["release"] = options["release"]
+
+        if options.get("dsn"):
+            sentry_items["public_key"] = Dsn(options["dsn"]).public_key
+
+        if (
+            transaction.name
+            and transaction.source not in LOW_QUALITY_TRANSACTION_SOURCES
+        ):
+            sentry_items["transaction"] = transaction.name
+
+        if user.get("segment"):
+            sentry_items["user_segment"] = user["segment"]
+
+        if transaction.sample_rate is not None:
+            sentry_items["sample_rate"] = str(transaction.sample_rate)
+
+        return Baggage(sentry_items, mutable=False)
+
     def freeze(self):
         # type: () -> None
         self.mutable = False
@@ -500,6 +543,7 @@ class Baggage(object):
 
 
 # Circular imports
+from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
 
 if MYPY:
-    from sentry_sdk.tracing import Span
+    from sentry_sdk.tracing import Span, Transaction
