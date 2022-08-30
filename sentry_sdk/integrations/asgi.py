@@ -12,6 +12,7 @@ from sentry_sdk._functools import partial
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
@@ -107,19 +108,20 @@ class SentryAsgiMiddleware:
         self.mechanism_type = mechanism_type
         self.app = app
 
-        try:
-            if _looks_like_asgi3(app):
-                self.__call__ = self._run_asgi3  # type: Callable[..., Any]
-            else:
-                self.__call__ = self._run_asgi2
-        except Exception as ex:
-            if (
-                str(ex)
-                == "'SentryAsgiMiddleware' object attribute '__call__' is read-only"
-            ):
-                raise RuntimeError(
-                    "The Python SDK can now automatically support ASGI frameworks like Starlette and FastAPI. Please remove 'SentryAsgiMiddleware' from your project. See https://docs.sentry.io/platforms/python/guides/asgi/ for more information."
-                )
+        asgi_middleware_while_using_starlette_or_fastapi = (
+            "starlette" in _get_installed_modules() and self.mechanism_type == "asgi"
+        )
+        if asgi_middleware_while_using_starlette_or_fastapi:
+            raise RuntimeError(
+                "The Sentry Python SDK can now automatically support ASGI frameworks like Starlette and FastAPI. "
+                "Please remove 'SentryAsgiMiddleware' from your project. "
+                "See https://docs.sentry.io/platforms/python/guides/asgi/ for more information."
+            )
+
+        if _looks_like_asgi3(app):
+            self.__call__ = self._run_asgi3  # type: Callable[..., Any]
+        else:
+            self.__call__ = self._run_asgi2
 
     def _run_asgi2(self, scope):
         # type: (Any) -> Any
