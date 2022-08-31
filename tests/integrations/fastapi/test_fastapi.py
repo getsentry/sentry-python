@@ -117,26 +117,17 @@ def test_transaction_style(
     assert "transaction" not in event
 
 
-def test_legacy_setup(
-    sentry_init,
-    capture_events,
-):
-    # Check that behaviour does not change
-    # if the user just adds the new Integrations
-    # and forgets to remove SentryAsgiMiddleware
-    sentry_init(
-        integrations=[
-            StarletteIntegration(),
-            FastApiIntegration(),
-        ],
+def test_legacy_setup(sentry_init):
+    # Check for error message if the user
+    # updates and the integrations are auto enabled
+    # and the SentryAsgiMiddleware is still there
+    sentry_init()
+
+    with pytest.raises(RuntimeError) as exc:
+        app = fastapi_app_factory()
+        app = SentryAsgiMiddleware(app)
+
+    assert (
+        "The Sentry Python SDK can now automatically support ASGI frameworks like Starlette and FastAPI."
+        in str(exc)
     )
-    app = fastapi_app_factory()
-    asgi_app = SentryAsgiMiddleware(app)
-
-    events = capture_events()
-
-    client = TestClient(asgi_app)
-    client.get("/message/123456")
-
-    (event,) = events
-    assert event["transaction"] == "/message/{message_id}"

@@ -12,6 +12,7 @@ from sentry_sdk._functools import partial
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
@@ -91,7 +92,6 @@ class SentryAsgiMiddleware:
 
         :param unsafe_context_data: Disable errors when a proper contextvars installation could not be found. We do not recommend changing this from the default.
         """
-
         if not unsafe_context_data and not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between
             # requests.
@@ -107,6 +107,16 @@ class SentryAsgiMiddleware:
         self.transaction_style = transaction_style
         self.mechanism_type = mechanism_type
         self.app = app
+
+        asgi_middleware_while_using_starlette_or_fastapi = (
+            "starlette" in _get_installed_modules() and self.mechanism_type == "asgi"
+        )
+        if asgi_middleware_while_using_starlette_or_fastapi:
+            raise RuntimeError(
+                "The Sentry Python SDK can now automatically support ASGI frameworks like Starlette and FastAPI. "
+                "Please remove 'SentryAsgiMiddleware' from your project. "
+                "See https://docs.sentry.io/platforms/python/guides/asgi/ for more information."
+            )
 
         if _looks_like_asgi3(app):
             self.__call__ = self._run_asgi3  # type: Callable[..., Any]

@@ -54,6 +54,8 @@ def _generate_default_integrations_iterator(integrations, auto_enabling_integrat
 _AUTO_ENABLING_INTEGRATIONS = (
     "sentry_sdk.integrations.django.DjangoIntegration",
     "sentry_sdk.integrations.flask.FlaskIntegration",
+    "sentry_sdk.integrations.starlette.StarletteIntegration",
+    "sentry_sdk.integrations.fastapi.FastApiIntegration",
     "sentry_sdk.integrations.bottle.BottleIntegration",
     "sentry_sdk.integrations.falcon.FalconIntegration",
     "sentry_sdk.integrations.sanic.SanicIntegration",
