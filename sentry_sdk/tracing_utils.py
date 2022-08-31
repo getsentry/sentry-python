@@ -477,7 +477,6 @@ class Baggage(object):
         Populate fresh baggage entry with sentry_items and make it immutable
         if this is the head SDK which originates traces.
         """
-
         hub = transaction.hub or sentry_sdk.Hub.current
         client = hub.client
         sentry_items = {}  # type: Dict[str, str]
@@ -510,6 +509,12 @@ class Baggage(object):
 
         if transaction.sample_rate is not None:
             sentry_items["sample_rate"] = str(transaction.sample_rate)
+
+        # there's an existing baggage but it was mutable,
+        # which is why we are creating this new baggage.
+        # However, if by chance the user put some sentry items in there, give them precedence.
+        if transaction._baggage and transaction._baggage.sentry_items:
+            sentry_items.update(transaction._baggage.sentry_items)
 
         return Baggage(sentry_items, mutable=False)
 
