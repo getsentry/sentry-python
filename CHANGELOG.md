@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.9.6
+
+### Various fixes & improvements
+
+- Auto-enable Starlette and FastAPI (#1533) by @antonpirker
+- Add more version constraints (#1574) by @isra17
+- Fix typo in starlette attribute check (#1566) by @sl0thentr0py
+
 ## 1.9.5
 
 ### Various fixes & improvements
