@@ -117,10 +117,7 @@ def test_transaction_style(
     assert "transaction" not in event
 
 
-def test_legacy_setup(
-    sentry_init,
-    capture_events,
-):
+def test_legacy_setup(sentry_init):
     # Check for error message if the user
     # updates and the integrations are auto enabled
     # and the SentryAsgiMiddleware is still there
