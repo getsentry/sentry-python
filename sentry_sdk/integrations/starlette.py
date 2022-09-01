@@ -257,6 +257,9 @@ def patch_middlewares():
 
         def _sentry_middleware_init(self, cls, **options):
             # type: (Any, Any, Any) -> None
+            if cls == SentryAsgiMiddleware:
+                return old_middleware_init(self, cls, **options)
+
             span_enabled_cls = _enable_span_for_middleware(cls)
             old_middleware_init(self, span_enabled_cls, **options)
 
@@ -285,6 +288,7 @@ def patch_asgi_app():
             lambda *a, **kw: old_app(self, *a, **kw),
             mechanism_type=StarletteIntegration.identifier,
         )
+
         middleware.__call__ = middleware._run_asgi3
         return await middleware(scope, receive, send)
 
