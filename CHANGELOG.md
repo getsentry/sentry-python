@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.7
+
+### Various fixes & improvements
+
+- Let SentryAsgiMiddleware work with Starlette and FastAPI integrations (#1594) by @antonpirker
+
 ## 1.9.6
 
 ### Various fixes & improvements
