@@ -62,6 +62,7 @@ setup(
         "httpx": ["httpx>=0.16.0"],
         "starlette": ["starlette>=0.19.1"],
         "fastapi": ["fastapi>=0.79.0"],
+        "starlite": ["starlite>=1.16.0"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
