@@ -63,7 +63,9 @@ def test_invalid_transaction_style(asgi3_app):
 
 @pytest.mark.asyncio
 async def test_capture_transaction(
-    sentry_init, asgi3_app, capture_events, DictionaryContaining
+    sentry_init,
+    asgi3_app,
+    capture_events,
 ):
     sentry_init(send_default_pii=True, traces_sample_rate=1.0)
     app = SentryAsgiMiddleware(asgi3_app)
@@ -91,7 +93,10 @@ async def test_capture_transaction(
 
 @pytest.mark.asyncio
 async def test_capture_transaction_with_error(
-    sentry_init, asgi3_app_with_error, capture_events, DictionaryContaining
+    sentry_init,
+    asgi3_app_with_error,
+    capture_events,
+    DictionaryContaining,  # noqa: N803
 ):
     sentry_init(send_default_pii=True, traces_sample_rate=1.0)
     app = SentryAsgiMiddleware(asgi3_app_with_error)
