@@ -1,6 +1,7 @@
 # coding: utf-8
 import weakref
 import gc
+import re
 import pytest
 import random
 
@@ -257,3 +258,27 @@ def test_start_span_after_finish(sentry_init, capture_events):
             pass
 
     assert len(events) == 1
+
+
+def test_trace_propagation_meta_head_sdk(sentry_init):
+    sentry_init(traces_sample_rate=1.0, release="foo")
+
+    transaction = Transaction.continue_from_headers({}, name="Head SDK tx")
+    meta = None
+    span = None
+
+    with start_transaction(transaction):
+        with start_span(op="foo", description="foodesc") as current_span:
+            span = current_span
+            meta = Hub.current.trace_propagation_meta()
+
+    ind = meta.find(">") + 1
+    sentry_trace, baggage = meta[:ind], meta[ind:]
+
+    assert 'meta name="sentry-trace"' in sentry_trace
+    sentry_trace_content = re.findall('content="([^"]*)"', sentry_trace)[0]
+    assert sentry_trace_content == span.to_traceparent()
+
+    assert 'meta name="baggage"' in baggage
+    baggage_content = re.findall('content="([^"]*)"', baggage)[0]
+    assert baggage_content == transaction.get_baggage().serialize()
