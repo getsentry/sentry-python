@@ -5,7 +5,7 @@
 ### Various fixes & improvements
 
 - Baggage creation for head of trace (#1589) by @sl0thentr0py
-- doc(readme): add links to Starlette and FastAPI (#1598) by @thomasleveil
+  - The SDK now also generates new baggage entries for dynamic sampling when it is the first (head) SDK in the pipeline.
 
 ## 1.9.7
 
