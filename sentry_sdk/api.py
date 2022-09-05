@@ -17,6 +17,7 @@ if MYPY:
 
     from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint, ExcInfo
     from sentry_sdk.tracing import Span, Transaction
+    from sentry_sdk.feature_flags import FeatureFlagInfo
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
@@ -44,6 +45,9 @@ __all__ = [
     "set_extra",
     "set_user",
     "set_level",
+    "is_feature_flag_enabled",
+    "get_feature_flag_info",
+    "wait_until_ready",
 ]
 
 
@@ -212,3 +216,32 @@ def start_transaction(
 ):
     # type: (...) -> Transaction
     return Hub.current.start_transaction(transaction, **kwargs)
+
+
+@hubmethod
+def is_feature_flag_enabled(
+    name,  # type: str
+    scope=None,  # type: Optional[Scope]
+    context=None,  # type: Optional[Dict[str, Any]]
+    default=False,  # type: bool
+):
+    # type: (...) -> bool
+    return Hub.current.is_feature_flag_enabled(name, scope, context, default)
+
+
+@hubmethod
+def get_feature_flag_info(
+    name,  # type: str
+    scope=None,  # type: Optional[Scope]
+    context=None,  # type: Optional[Dict[str, Any]]
+):
+    # type: (...) -> Optional[FeatureFlagInfo]
+    return Hub.current.get_feature_flag_info(name, scope, context)
+
+
+@hubmethod
+def wait_until_ready(
+    timeout=None,  # type: Optional[float]
+):
+    # type: (...) -> bool
+    return Hub.current.wait_until_ready(timeout)

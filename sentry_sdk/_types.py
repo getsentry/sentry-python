@@ -47,7 +47,7 @@ if MYPY:
         "internal",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
-    EndpointType = Literal["store", "envelope"]
+    EndpointType = Literal["store", "envelope", "feature-flags"]
 
     DurationUnit = Literal[
         "nanosecond",
