@@ -2,8 +2,6 @@ import pytest
 from async_asgi_testclient import TestClient
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
-# from unittest import mock
-
 
 @pytest.fixture
 def asgi3_app():
@@ -51,20 +49,6 @@ def asgi3_app_with_error():
         )
 
     return app
-
-
-def test_warning_if_manual_setup_and_starlette():
-    assert False
-
-
-def test_run_asgi2():
-    assert False
-
-
-@pytest.mark.asyncio
-# @mock.patch("sentry_sdk.integrations.asgi.SentryAsgiMiddleware._run_asgi3")
-async def test_run_asgi3(asgi3_app):
-    assert False
 
 
 def test_invalid_transaction_style(asgi3_app):
@@ -123,6 +107,8 @@ async def test_capture_transaction_with_error(
     assert error_event["contexts"]["trace"]["op"] == "http.server"
     assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
     assert error_event["exception"]["values"][0]["value"] == "division by zero"
+    assert error_event["exception"]["values"][0]["mechanism"]["handled"] is False
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "asgi"
 
     assert transaction_event["type"] == "transaction"
     assert transaction_event["contexts"]["trace"] == DictionaryContaining(
@@ -139,54 +125,44 @@ async def test_capture_transaction_with_error(
         (
             "/message",
             "url",
-            "/message",
+            "generic ASGI request",
             "route",
         ),
         (
             "/message",
             "endpoint",
-            "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message",
-            "component",
-        ),
-        (
-            "/message/123456",
-            "url",
-            "/message/{message_id}",
-            "route",
-        ),
-        (
-            "/message/123456",
-            "endpoint",
-            "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message_with_id",
+            "tests.integrations.asgi.test_asgi.asgi3_app_with_error.<locals>.app",
             "component",
         ),
     ],
 )
-def test_transaction_style(
+@pytest.mark.asyncio
+async def test_transaction_style(
     sentry_init,
+    asgi3_app_with_error,
     capture_events,
     url,
     transaction_style,
     expected_transaction,
     expected_source,
 ):
-    # sentry_init(
-    #     integrations=[StarletteIntegration(transaction_style=transaction_style)],
-    # )
-    assert False
+    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    app = SentryAsgiMiddleware(
+        asgi3_app_with_error, transaction_style=transaction_style
+    )
 
+    scope = {
+        "endpoint": asgi3_app_with_error,
+        "route": url,
+        "client": ("127.0.0.1", 60457),
+    }
 
-def test_get_url():
-    assert False
+    with pytest.raises(ZeroDivisionError):
+        async with TestClient(app, scope=scope) as client:
+            events = capture_events()
+            await client.get(url)
 
+    (_, transaction_event) = events
 
-def test_get_query():
-    assert False
-
-
-def test_get_ip():
-    assert False
-
-
-def test_get_headers():
-    assert False
+    assert transaction_event["transaction"] == expected_transaction
+    assert transaction_event["transaction_info"] == {"source": expected_source}
