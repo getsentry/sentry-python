@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.9.8
+
+### Various fixes & improvements
+
+- Baggage creation for head of trace (#1589) by @sl0thentr0py
+  - The SDK now also generates new baggage entries for dynamic sampling when it is the first (head) SDK in the pipeline.
+
 ## 1.9.7
 
 ### Various fixes & improvements

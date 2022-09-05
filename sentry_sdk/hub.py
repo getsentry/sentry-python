@@ -717,6 +717,19 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         for header in span.iter_headers():
             yield header
 
+    def trace_propagation_meta(self, span=None):
+        # type: (Optional[Span]) -> str
+        """
+        Return meta tags which should be injected into the HTML template
+        to allow propagation of trace data.
+        """
+        meta = ""
+
+        for name, content in self.iter_trace_propagation_headers(span):
+            meta += '<meta name="%s" content="%s">' % (name, content)
+
+        return meta
+
 
 GLOBAL_HUB = Hub()
 _local.set(GLOBAL_HUB)
