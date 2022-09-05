@@ -535,6 +535,7 @@ class Transaction(Span):
         "name",
         "source",
         "parent_sampled",
+        # used to create baggage value for head SDKs in dynamic sampling
         "sample_rate",
         # the sentry portion of the `tracestate` header used to transmit
         # correlation context for server-side dynamic sampling, of the form
@@ -766,6 +767,7 @@ class Transaction(Span):
         # if the user has forced a sampling decision by passing a `sampled`
         # value when starting the transaction, go with that
         if self.sampled is not None:
+            self.sample_rate = float(self.sampled)
             return
 
         # we would have bailed already if neither `traces_sampler` nor
@@ -794,7 +796,6 @@ class Transaction(Span):
             self.sampled = False
             return
 
-        # used to create baggage value for head SDKs in dynamic sampling
         self.sample_rate = float(sample_rate)
 
         # if the function returned 0 (or false), or if `traces_sample_rate` is
