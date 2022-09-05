@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.9.8
+
+### Various fixes & improvements
+
+- Baggage creation for head of trace (#1589) by @sl0thentr0py
+- doc(readme): add links to Starlette and FastAPI (#1598) by @thomasleveil
+
 ## 1.9.7
 
 ### Various fixes & improvements
