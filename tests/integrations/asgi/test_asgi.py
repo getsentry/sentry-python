@@ -1,6 +1,6 @@
 import pytest
 from async_asgi_testclient import TestClient
-from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
 
 
 @pytest.fixture
@@ -166,3 +166,36 @@ async def test_transaction_style(
 
     assert transaction_event["transaction"] == expected_transaction
     assert transaction_event["transaction_info"] == {"source": expected_source}
+
+
+def mock_asgi2_app():
+    pass
+
+
+class MockAsgi2App:
+    def __call__():
+        pass
+
+
+class MockAsgi3App(MockAsgi2App):
+    def __await__():
+        pass
+
+    async def __call__():
+        pass
+
+
+def test_looks_like_asgi3(asgi3_app):
+    # branch: inspect.isclass(app)
+    assert _looks_like_asgi3(MockAsgi3App)
+    assert not _looks_like_asgi3(MockAsgi2App)
+
+    # branch: inspect.isfunction(app)
+    assert _looks_like_asgi3(asgi3_app)
+    assert not _looks_like_asgi3(mock_asgi2_app)
+
+    # breanch: else
+    asgi3 = MockAsgi3App()
+    assert _looks_like_asgi3(asgi3)
+    asgi2 = MockAsgi2App()
+    assert not _looks_like_asgi3(asgi2)
