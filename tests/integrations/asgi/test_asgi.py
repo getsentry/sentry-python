@@ -1,6 +1,15 @@
+import sys
+
 import pytest
-from async_asgi_testclient import TestClient
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
+
+async_asgi_testclient = pytest.importorskip("async_asgi_testclient")
+from async_asgi_testclient import TestClient
+
+
+minimum_python_36 = pytest.mark.skipif(
+    sys.version_info < (3, 6), reason="ASGI is only supported in Python >= 3.6"
+)
 
 
 @pytest.fixture
@@ -51,6 +60,7 @@ def asgi3_app_with_error():
     return app
 
 
+@minimum_python_36
 def test_invalid_transaction_style(asgi3_app):
     with pytest.raises(ValueError) as exp:
         SentryAsgiMiddleware(asgi3_app, transaction_style="URL")
@@ -61,6 +71,7 @@ def test_invalid_transaction_style(asgi3_app):
     )
 
 
+@minimum_python_36
 @pytest.mark.asyncio
 async def test_capture_transaction(
     sentry_init,
@@ -91,6 +102,7 @@ async def test_capture_transaction(
     }
 
 
+@minimum_python_36
 @pytest.mark.asyncio
 async def test_capture_transaction_with_error(
     sentry_init,
@@ -124,6 +136,7 @@ async def test_capture_transaction_with_error(
     assert transaction_event["request"] == error_event["request"]
 
 
+@minimum_python_36
 @pytest.mark.parametrize(
     "url,transaction_style,expected_transaction,expected_source",
     [
@@ -190,6 +203,7 @@ class MockAsgi3App(MockAsgi2App):
         pass
 
 
+@minimum_python_36
 def test_looks_like_asgi3(asgi3_app):
     # branch: inspect.isclass(app)
     assert _looks_like_asgi3(MockAsgi3App)
