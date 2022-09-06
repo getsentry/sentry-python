@@ -117,8 +117,9 @@ jobs:
           CI_PYTHON_VERSION: ${{ matrix.python-version }}
         timeout-minutes: 45
         run: |
-          coverage erase
-          ./scripts/runtox.sh 'py${{ matrix.python-version }}-django-${{ matrix.django-version }}' --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
-          coverage xml -i
-          codecov --file coverage.xml
+          # coverage erase
+          # ./scripts/runtox.sh 'py${{ matrix.python-version }}-django-${{ matrix.django-version }}' --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          tox -e 'py${{ matrix.python-version }}-django-${{ matrix.django-version }}'
+          # coverage combine .coverage*
+          # coverage xml -i
+          # codecov --file coverage.xml
