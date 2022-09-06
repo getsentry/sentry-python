@@ -95,7 +95,7 @@ jobs:
           PGHOST: localhost
           PGPASSWORD: sentry
         run: |
-          pip install codecov tox
+          pip install codecov tox tox-gh
 
       - name: Run Tests
         env:
