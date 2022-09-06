@@ -63,11 +63,62 @@ jobs:
           - python-version: "3.6"
             django-version: "2.1"
             os: ubuntu-latest
+
+    services:
+      # Label used to access the service container
+      redis:
+        # Docker Hub image
+        image: redis
+        # Set health checks to wait until redis has started
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          # Maps port 6379 on service container to the host
+          - 6379:6379
+
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: sentry
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        # Maps tcp port 5432 on service container to the host
+        ports:
+          - 5432:5432
+
+    env:
+      SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
+      SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
+
     steps:
-      # - uses: actions/checkout@v3
-      # - uses: actions/setup-python@v4
-      #   with:
-      #     python-version: ${{ matrix.python-version }}
-      - name: Run Tests
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Setup Test Env
+        env:
+          PGHOST: localhost
+          PGPASSWORD: sentry
         run: |
-          echo "Running tests for Django ${{ matrix.django-version }} / Python ${{ matrix.python-version }}"
+          pip install codecov tox tox-gh
+
+      - name: Run Tests
+        env:
+          CI_PYTHON_VERSION: ${{ matrix.python-version }}
+        timeout-minutes: 45
+        run: |
+          coverage erase
+          ./scripts/runtox.sh 'py${{ matrix.python-version }}-django-${{ matrix.django-version }}' --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          coverage combine .coverage*
+          coverage xml -i
+          codecov --file coverage.xml
