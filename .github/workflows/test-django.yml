@@ -22,7 +22,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         python-version: ["3.7", "3.8", "3.9", "3.10"]
-        django-version: ["2.0", "2.1", "2.2", "3.0", "3.1", "3.2", "3.3", "4.0", "4.1"]
+        django-version: ["2.0", "2.1", "2.2", "3.0", "3.1", "3.2"]
         include:
           # Python 2.7
           - python-version: "2.7"
