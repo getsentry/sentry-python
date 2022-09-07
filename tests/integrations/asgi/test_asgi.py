@@ -4,6 +4,7 @@ from collections import Counter
 
 import pytest
 import sentry_sdk
+from sentry_sdk import capture_message
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
 
 async_asgi_testclient = pytest.importorskip("async_asgi_testclient")
@@ -60,6 +61,23 @@ def asgi3_app_with_error():
             {
                 "type": "http.response.body",
                 "body": b"Hello, world!",
+            }
+        )
+
+    return app
+
+
+@pytest.fixture
+def asgi3_ws_app():
+    def message():
+        capture_message("Some message to the world!")
+        raise ValueError("Oh no")
+
+    async def app(scope, receive, send):
+        await send(
+            {
+                "type": "websocket.send",
+                "text": message(),
             }
         )
 
@@ -144,16 +162,35 @@ async def test_capture_transaction_with_error(
 
 @minimum_python_36
 @pytest.mark.asyncio
-async def test_websocket(
-    sentry_init,
-    asgi3_app_with_error,
-    capture_events,
-    DictionaryContaining,  # noqa: N803
-):
-    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
-    app = SentryAsgiMiddleware(asgi3_app_with_error)
-    print(app)
-    # TODO: implement
+async def test_websocket(sentry_init, asgi3_ws_app, capture_events, request):
+    sentry_init(debug=True, send_default_pii=True)
+
+    events = capture_events()
+
+    asgi3_ws_app = SentryAsgiMiddleware(asgi3_ws_app)
+
+    scope = {
+        "type": "websocket",
+        "endpoint": asgi3_app,
+        "client": ("127.0.0.1", 60457),
+        "route": "some_url",
+        "headers": [
+            ("accept", "*/*"),
+        ],
+    }
+
+    with pytest.raises(ValueError):
+        async with TestClient(asgi3_ws_app, scope=scope) as client:
+            async with client.websocket_connect("/ws") as ws:
+                await ws.receive_text()
+
+    msg_event, error_event = events
+
+    assert msg_event["message"] == "Some message to the world!"
+
+    (exc,) = error_event["exception"]["values"]
+    assert exc["type"] == "ValueError"
+    assert exc["value"] == "Oh no"
 
 
 @minimum_python_36
