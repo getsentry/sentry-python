@@ -24,16 +24,16 @@ jobs:
         python-version: ["3.10"]
         django-version: ["3.1"]
         include:
-          - { os: "ubuntu-latest", django-version: "1.8", python-version: "pypy"}
+          - { os: "ubuntu-latest", django-version: "1.8", python-version: "pypy2.7"}
           - { os: "ubuntu-latest", django-version: "1.8", python-version: "2.7"}
           - { os: "ubuntu-latest", django-version: "1.8", python-version: "3.5"}
-          - { os: "ubuntu-latest", django-version: "1.9", python-version: "pypy"}
+          - { os: "ubuntu-latest", django-version: "1.9", python-version: "pypy2.7"}
           - { os: "ubuntu-latest", django-version: "1.9", python-version: "2.7"}
           - { os: "ubuntu-latest", django-version: "1.9", python-version: "3.5"}
-          - { os: "ubuntu-latest", django-version: "1.10", python-version: "pypy"}
+          - { os: "ubuntu-latest", django-version: "1.10", python-version: "pypy2.7"}
           - { os: "ubuntu-latest", django-version: "1.10", python-version: "2.7"}
           - { os: "ubuntu-latest", django-version: "1.10", python-version: "3.5"}
-          - { os: "ubuntu-latest", django-version: "1.11", python-version: "pypy"}
+          - { os: "ubuntu-latest", django-version: "1.11", python-version: "pypy2.7"}
           - { os: "ubuntu-latest", django-version: "1.11", python-version: "2.7"}
           - { os: "ubuntu-latest", django-version: "1.11", python-version: "3.5"}
           - { os: "ubuntu-latest", django-version: "1.11", python-version: "3.6"}
