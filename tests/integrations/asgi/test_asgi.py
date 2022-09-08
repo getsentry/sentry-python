@@ -19,7 +19,11 @@ minimum_python_36 = pytest.mark.skipif(
 @pytest.fixture
 def asgi3_app():
     async def app(scope, receive, send):
-        if scope["type"] == "http" and scope["route"] == "/trigger/error":
+        if (
+            scope["type"] == "http"
+            and "route" in scope
+            and scope["route"] == "/trigger/error"
+        ):
             division_by_zero = 1 / 0  # noqa
 
         await send(
