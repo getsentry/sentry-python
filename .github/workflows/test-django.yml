@@ -21,53 +21,53 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        django-version: ["3.2"]
-        python-version: ["3.10"]
+        python-version: []
+        django-version: []
         include:
-          - { os: "ubuntu-latest", django-version: "1.8", python-version: "pypy"}
-          - { os: "ubuntu-latest", django-version: "1.8", python-version: "py2.7"}
-          - { os: "ubuntu-latest", django-version: "1.8", python-version: "py3.5"}
-          - { os: "ubuntu-latest", django-version: "1.9", python-version: "pypy"}
-          - { os: "ubuntu-latest", django-version: "1.9", python-version: "py2.7"}
-          - { os: "ubuntu-latest", django-version: "1.9", python-version: "py3.5"}
-          - { os: "ubuntu-latest", django-version: "1.10", python-version: "pypy"}
-          - { os: "ubuntu-latest", django-version: "1.10", python-version: "py2.7"}
-          - { os: "ubuntu-latest", django-version: "1.10", python-version: "py3.5"}
-          - { os: "ubuntu-latest", django-version: "1.11", python-version: "pypy"}
-          - { os: "ubuntu-latest", django-version: "1.11", python-version: "py2.7"}
-          - { os: "ubuntu-latest", django-version: "1.11", python-version: "py3.5"}
-          - { os: "ubuntu-latest", django-version: "1.11", python-version: "py3.6"}
-          - { os: "ubuntu-latest", django-version: "1.11", python-version: "py3.7"}
-          - { os: "ubuntu-latest", django-version: "2.0", python-version: "py3.5"}
-          - { os: "ubuntu-latest", django-version: "2.0", python-version: "py3.6"}
-          - { os: "ubuntu-latest", django-version: "2.0", python-version: "py3.7"}
-          - { os: "ubuntu-latest", django-version: "2.1", python-version: "py3.5"}
-          - { os: "ubuntu-latest", django-version: "2.1", python-version: "py3.6"}
-          - { os: "ubuntu-latest", django-version: "2.1", python-version: "py3.7"}
-          - { os: "ubuntu-latest", django-version: "2.2", python-version: "py3.5"}
-          - { os: "ubuntu-latest", django-version: "2.2", python-version: "py3.6"}
-          - { os: "ubuntu-latest", django-version: "2.2", python-version: "py3.7"}
-          - { os: "ubuntu-latest", django-version: "2.2", python-version: "py3.8"}
-          - { os: "ubuntu-latest", django-version: "2.2", python-version: "py3.9"}
-          - { os: "ubuntu-latest", django-version: "3.0", python-version: "py3.6"}
-          - { os: "ubuntu-latest", django-version: "3.0", python-version: "py3.7"}
-          - { os: "ubuntu-latest", django-version: "3.0", python-version: "py3.8"}
-          - { os: "ubuntu-latest", django-version: "3.0", python-version: "py3.9"}
-          - { os: "ubuntu-latest", django-version: "3.1", python-version: "py3.6"}
-          - { os: "ubuntu-latest", django-version: "3.1", python-version: "py3.7"}
-          - { os: "ubuntu-latest", django-version: "3.1", python-version: "py3.8"}
-          - { os: "ubuntu-latest", django-version: "3.1", python-version: "py3.9"}
-          - { os: "ubuntu-latest", django-version: "3.2", python-version: "py3.6"}
-          - { os: "ubuntu-latest", django-version: "3.2", python-version: "py3.7"}
-          - { os: "ubuntu-latest", django-version: "3.2", python-version: "py3.8"}
-          - { os: "ubuntu-latest", django-version: "3.2", python-version: "py3.9"}
-          - { os: "ubuntu-latest", django-version: "3.2", python-version: "py3.10"}
-          - { os: "ubuntu-latest", django-version: "4.0", python-version: "py3.8"}
-          - { os: "ubuntu-latest", django-version: "4.0", python-version: "py3.9"}
-          - { os: "ubuntu-latest", django-version: "4.0", python-version: "py3.10"}
-          - { os: "ubuntu-latest", django-version: "4.1", python-version: "py3.8"}
-          - { os: "ubuntu-latest", django-version: "4.1", python-version: "py3.9"}
-          - { os: "ubuntu-latest", django-version: "4.1", python-version: "py3.10"}
+          - { os: "ubuntu-latest", django-version: "1.8", python-version: ""}
+          - { os: "ubuntu-latest", django-version: "1.8", python-version: "2.7"}
+          - { os: "ubuntu-latest", django-version: "1.8", python-version: "3.5"}
+          - { os: "ubuntu-latest", django-version: "1.9", python-version: ""}
+          - { os: "ubuntu-latest", django-version: "1.9", python-version: "2.7"}
+          - { os: "ubuntu-latest", django-version: "1.9", python-version: "3.5"}
+          - { os: "ubuntu-latest", django-version: "1.10", python-version: ""}
+          - { os: "ubuntu-latest", django-version: "1.10", python-version: "2.7"}
+          - { os: "ubuntu-latest", django-version: "1.10", python-version: "3.5"}
+          - { os: "ubuntu-latest", django-version: "1.11", python-version: ""}
+          - { os: "ubuntu-latest", django-version: "1.11", python-version: "2.7"}
+          - { os: "ubuntu-latest", django-version: "1.11", python-version: "3.5"}
+          - { os: "ubuntu-latest", django-version: "1.11", python-version: "3.6"}
+          - { os: "ubuntu-latest", django-version: "1.11", python-version: "3.7"}
+          - { os: "ubuntu-latest", django-version: "2.0", python-version: "3.5"}
+          - { os: "ubuntu-latest", django-version: "2.0", python-version: "3.6"}
+          - { os: "ubuntu-latest", django-version: "2.0", python-version: "3.7"}
+          - { os: "ubuntu-latest", django-version: "2.1", python-version: "3.5"}
+          - { os: "ubuntu-latest", django-version: "2.1", python-version: "3.6"}
+          - { os: "ubuntu-latest", django-version: "2.1", python-version: "3.7"}
+          - { os: "ubuntu-latest", django-version: "2.2", python-version: "3.5"}
+          - { os: "ubuntu-latest", django-version: "2.2", python-version: "3.6"}
+          - { os: "ubuntu-latest", django-version: "2.2", python-version: "3.7"}
+          - { os: "ubuntu-latest", django-version: "2.2", python-version: "3.8"}
+          - { os: "ubuntu-latest", django-version: "2.2", python-version: "3.9"}
+          - { os: "ubuntu-latest", django-version: "3.0", python-version: "3.6"}
+          - { os: "ubuntu-latest", django-version: "3.0", python-version: "3.7"}
+          - { os: "ubuntu-latest", django-version: "3.0", python-version: "3.8"}
+          - { os: "ubuntu-latest", django-version: "3.0", python-version: "3.9"}
+          - { os: "ubuntu-latest", django-version: "3.1", python-version: "3.6"}
+          - { os: "ubuntu-latest", django-version: "3.1", python-version: "3.7"}
+          - { os: "ubuntu-latest", django-version: "3.1", python-version: "3.8"}
+          - { os: "ubuntu-latest", django-version: "3.1", python-version: "3.9"}
+          - { os: "ubuntu-latest", django-version: "3.2", python-version: "3.6"}
+          - { os: "ubuntu-latest", django-version: "3.2", python-version: "3.7"}
+          - { os: "ubuntu-latest", django-version: "3.2", python-version: "3.8"}
+          - { os: "ubuntu-latest", django-version: "3.2", python-version: "3.9"}
+          - { os: "ubuntu-latest", django-version: "3.2", python-version: "3.10"}
+          - { os: "ubuntu-latest", django-version: "4.0", python-version: "3.8"}
+          - { os: "ubuntu-latest", django-version: "4.0", python-version: "3.9"}
+          - { os: "ubuntu-latest", django-version: "4.0", python-version: "3.10"}
+          - { os: "ubuntu-latest", django-version: "4.1", python-version: "3.8"}
+          - { os: "ubuntu-latest", django-version: "4.1", python-version: "3.9"}
+          - { os: "ubuntu-latest", django-version: "4.1", python-version: "3.10"}
 
     services:
       # Label used to access the service container
