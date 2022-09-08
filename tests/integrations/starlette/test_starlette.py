@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-from sentry_sdk import last_event_id
+from sentry_sdk import last_event_id, capture_exception
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
 try:
@@ -550,7 +550,8 @@ def test_last_event_id(sentry_init, capture_events):
     )
     events = capture_events()
 
-    def handler(*args, **kwargs):
+    def handler(request, exc):
+        capture_exception(exc)
         return starlette.responses.PlainTextResponse(last_event_id(), status_code=500)
 
     app = starlette_app_factory(debug=False)
@@ -560,11 +561,11 @@ def test_last_event_id(sentry_init, capture_events):
     response = client.get("/custom_error")
     assert response.status_code == 500
 
-    (event,) = events
+    event = events[0]
     assert response.content.strip().decode("ascii") == event["event_id"]
     (exception,) = event["exception"]["values"]
-    assert exception["type"] == "ValueError"
-    assert exception["value"] == "oh no"
+    assert exception["type"] == "Exception"
+    assert exception["value"] == "Too Hot"
 
 
 def test_legacy_setup(
