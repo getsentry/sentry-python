@@ -27,7 +27,7 @@ jobs:
         os: [ubuntu-latest]
         python-version: ["pypy2.7"]
         django-version: ["1.8"]
-        include:    
+        include:
           - { os: "ubuntu-latest", django-version: "1.8", python-version: "pypy2.7"}
           - { os: "ubuntu-latest", django-version: "1.8", python-version: "2.7"}
           - { os: "ubuntu-latest", django-version: "1.8", python-version: "3.5"}
