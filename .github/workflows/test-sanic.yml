@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: sanic ${{ matrix.sanic-version }}, Python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: sanic ${{ matrix.sanic-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true

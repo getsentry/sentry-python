@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: pyramid ${{ matrix.pyramid-version }}, Python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: pyramid ${{ matrix.pyramid-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true

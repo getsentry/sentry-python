@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: aws_lambda ${{ matrix.aws_lambda-version }}, Python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: aws_lambda ${{ matrix.aws_lambda-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true

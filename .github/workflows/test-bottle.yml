@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: bottle ${{ matrix.bottle-version }}, Python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: bottle ${{ matrix.bottle-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true

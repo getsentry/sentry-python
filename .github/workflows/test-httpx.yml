@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: httpx ${{ matrix.httpx-version }}, Python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: httpx ${{ matrix.httpx-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true

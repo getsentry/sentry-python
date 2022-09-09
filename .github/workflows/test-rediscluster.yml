@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: rediscluster ${{ matrix.rediscluster-version }}, Python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: rediscluster ${{ matrix.rediscluster-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true

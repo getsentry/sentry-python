@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: pure_eval ${{ matrix.pure_eval-version }}, Python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: pure_eval ${{ matrix.pure_eval-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true

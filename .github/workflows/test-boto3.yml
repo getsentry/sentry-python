@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: boto3 ${{ matrix.boto3-version }}, Python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: boto3 ${{ matrix.boto3-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true

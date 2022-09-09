@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: quart ${{ matrix.quart-version }}, Python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: quart ${{ matrix.quart-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
