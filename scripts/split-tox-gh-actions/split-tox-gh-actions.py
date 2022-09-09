@@ -10,12 +10,37 @@ header = [
     "\n        include:    ",
 ]
 
+service_postgres = [
+    "    services:",
+    "\n      postgres:",
+    "\n        image: postgres",
+    "\n        env:",
+    "\n          POSTGRES_PASSWORD: sentry",
+    "\n        # Set health checks to wait until postgres has started",
+    "\n        options: >-",
+    "\n          --health-cmd pg_isready",
+    "\n          --health-interval 10s",
+    "\n          --health-timeout 5s",
+    "\n          --health-retries 5",
+    "\n        # Maps tcp port 5432 on service container to the host",
+    "\n        ports:",
+    "\n          - 5432:5432",
+    "\n    env:",
+    "\n      SENTRY_PYTHON_TEST_POSTGRES_USER: postgres",
+    "\n      SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry",
+    "\n      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test",
+]
+
 TOX_FILE = "/Users/antonpirker/code/sentry-python/tox.ini"
 TEMPLATE_FILE = (
     "/Users/antonpirker/code/sentry-python/scripts/split-tox-gh-actions/ci-template.yml"
 )
 
 OUT_DIR = "/Users/antonpirker/code/sentry-python/.github/workflows/"
+
+FRAMEWORKS_NEEDING_POSTGRES = [
+    "django",
+]
 
 
 def write_yaml_file(
@@ -47,6 +72,23 @@ def write_yaml_file(
             # write gh frameworks
             for fr in gh_frameworks:
                 out_lines.append(fr)
+        elif template_line == "{{ services }}\n":
+            if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
+                services = service_postgres.copy()
+
+                for l in services:
+                    l = (
+                        l.replace("{{ framework }}", current_framework)
+                        .replace(
+                            "{{ python-version }}",
+                            init_python_version.replace("py", "")
+                            if init_python_version != "pypy"
+                            else "pypy2.7",
+                        )
+                        .replace("{{ framework-version }}", init_framework_version)
+                    )
+                    out_lines.append(l)
+
         else:
             out_lines.append(
                 template_line.replace("{{ framework }}", current_framework)
