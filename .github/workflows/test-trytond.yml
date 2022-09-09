@@ -48,39 +48,39 @@ jobs:
           - { os: "ubuntu-latest", trytond-version: "5.4", python-version: "3.8"}
           - { os: "ubuntu-latest", trytond-version: "5.4", python-version: "3.9"}
           - { os: "ubuntu-latest", trytond-version: "5.4", python-version: "3.10"}
-    services:
-      # Label used to access the service container
-      redis:
-        # Docker Hub image
-        image: redis
-        # Set health checks to wait until redis has started
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          # Maps port 6379 on service container to the host
-          - 6379:6379
+    # services:
+    #   # Label used to access the service container
+    #   redis:
+    #     # Docker Hub image
+    #     image: redis
+    #     # Set health checks to wait until redis has started
+    #     options: >-
+    #       --health-cmd "redis-cli ping"
+    #       --health-interval 10s
+    #       --health-timeout 5s
+    #       --health-retries 5
+    #     ports:
+    #       # Maps port 6379 on service container to the host
+    #       - 6379:6379
 
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_PASSWORD: sentry
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        # Maps tcp port 5432 on service container to the host
-        ports:
-          - 5432:5432
+    #   postgres:
+    #     image: postgres
+    #     env:
+    #       POSTGRES_PASSWORD: sentry
+    #     # Set health checks to wait until postgres has started
+    #     options: >-
+    #       --health-cmd pg_isready
+    #       --health-interval 10s
+    #       --health-timeout 5s
+    #       --health-retries 5
+    #     # Maps tcp port 5432 on service container to the host
+    #     ports:
+    #       - 5432:5432
 
-    env:
-      SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
-      SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
+    # env:
+    #   SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
+    #   SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+    #   SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
 
     steps:
       - uses: actions/checkout@v3

@@ -138,7 +138,7 @@ def main():
                 if not init_framework_version:
                     init_framework_version = framework_version
             if not init_framework_version:
-                init_framework_version = "lastest"
+                init_framework_version = "latest"
 
             for fr in framework_versions:
                 for py in python_versions:
