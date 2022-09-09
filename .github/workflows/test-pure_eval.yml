@@ -1,0 +1,98 @@
+name: Test pure_eval
+
+on:
+  push:
+    branches:
+      - master
+      - release/**
+
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  BUILD_CACHE_KEY: ${{ github.sha }}
+  CACHED_BUILD_PATHS: |
+    ${{ github.workspace }}/dist-serverless
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    continue-on-error: true
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.5"]
+        pure_eval-version: ["lastest"]
+        include:    
+          - { os: "ubuntu-latest", pure_eval-version: "latest", python-version: "3.5"}
+          - { os: "ubuntu-latest", pure_eval-version: "latest", python-version: "3.6"}
+          - { os: "ubuntu-latest", pure_eval-version: "latest", python-version: "3.7"}
+          - { os: "ubuntu-latest", pure_eval-version: "latest", python-version: "3.8"}
+          - { os: "ubuntu-latest", pure_eval-version: "latest", python-version: "3.9"}
+          - { os: "ubuntu-latest", pure_eval-version: "latest", python-version: "3.10"}
+    services:
+      # Label used to access the service container
+      redis:
+        # Docker Hub image
+        image: redis
+        # Set health checks to wait until redis has started
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          # Maps port 6379 on service container to the host
+          - 6379:6379
+
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: sentry
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        # Maps tcp port 5432 on service container to the host
+        ports:
+          - 5432:5432
+
+    env:
+      SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
+      SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Setup Test Env
+        env:
+          PGHOST: localhost
+          PGPASSWORD: sentry
+        run: |
+          pip install codecov tox
+
+      - name: Run Tests
+        env:
+          CI_PYTHON_VERSION: ${{ matrix.python-version }}
+        timeout-minutes: 45
+        shell: bash
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+
+          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} pure_eval ${{ matrix.pure_eval-version }})
+          ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          coverage combine .coverage*
+          coverage xml -i
+          codecov --file coverage.xml
