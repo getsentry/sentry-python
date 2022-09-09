@@ -1,7 +1,17 @@
 import configparser
 from multiprocessing.sharedctypes import Value
 
-header = [
+OUT_DIR = "/Users/antonpirker/code/sentry-python/.github/workflows/"
+TOX_FILE = "/Users/antonpirker/code/sentry-python/tox.ini"
+TEMPLATE_FILE = (
+    "/Users/antonpirker/code/sentry-python/scripts/split-tox-gh-actions/ci-template.yml"
+)
+
+FRAMEWORKS_NEEDING_POSTGRES = [
+    "django",
+]
+
+MATRIX_DEFINITION = [
     "    strategy:",
     "\n      matrix:",
     "\n        os: [ubuntu-latest]",
@@ -10,7 +20,7 @@ header = [
     "\n        include:    ",
 ]
 
-service_postgres = [
+SERVICE_POSTGRES = [
     "    services:",
     "\n      postgres:",
     "\n        image: postgres",
@@ -31,17 +41,6 @@ service_postgres = [
     "\n      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test",
 ]
 
-TOX_FILE = "/Users/antonpirker/code/sentry-python/tox.ini"
-TEMPLATE_FILE = (
-    "/Users/antonpirker/code/sentry-python/scripts/split-tox-gh-actions/ci-template.yml"
-)
-
-OUT_DIR = "/Users/antonpirker/code/sentry-python/.github/workflows/"
-
-FRAMEWORKS_NEEDING_POSTGRES = [
-    "django",
-]
-
 
 def write_yaml_file(
     template,
@@ -54,7 +53,7 @@ def write_yaml_file(
     out_lines = []
     for template_line in template:
         if template_line == "{{ strategy_matrix }}\n":
-            h = header.copy()
+            h = MATRIX_DEFINITION.copy()
 
             for l in h:
                 l = (
@@ -74,7 +73,7 @@ def write_yaml_file(
                 out_lines.append(fr)
         elif template_line == "{{ services }}\n":
             if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
-                services = service_postgres.copy()
+                services = SERVICE_POSTGRES.copy()
 
                 for l in services:
                     l = (
@@ -96,6 +95,7 @@ def write_yaml_file(
 
     # write rendered template
     outfile_name = OUT_DIR + f"test-{current_framework}.yml"
+    print(f"Writing {outfile_name}")
     f = open(outfile_name, "w")
     f.writelines(out_lines)
     f.close()
@@ -200,6 +200,8 @@ def main():
         init_python_version,
         init_framework_version,
     )
+
+    print("All done. Have a nice day!")
 
 
 if __name__ == "__main__":
