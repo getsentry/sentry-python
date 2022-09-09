@@ -120,13 +120,11 @@ jobs:
         timeout-minutes: 45
         shell: bash
         run: |
-          set -x # print commands
-          #coverage erase
+          set -x # print commands that are executed
+          coverage erase
 
           envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
-          echo '$envname'
-          echo "---------------"
-          #./scripts/runtox.sh '$envname' --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          #coverage combine .coverage*
-          #coverage xml -i
-          #codecov --file coverage.xml
+          ./scripts/runtox.sh '$envname' --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          coverage combine .coverage*
+          coverage xml -i
+          codecov --file coverage.xml
