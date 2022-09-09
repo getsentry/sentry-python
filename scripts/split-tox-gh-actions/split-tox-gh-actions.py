@@ -143,7 +143,7 @@ def main():
             for fr in framework_versions:
                 for py in python_versions:
                     py = py.replace("py", "") if py != "pypy" else "pypy2.7"
-                    s = f'\n          - {{ os: "ubuntu-latest", {current_framework}-version: "{fr or "latest"}", python-version: "{py}"}}'
+                    s = f'\n          - {{ {current_framework}-version: "{fr or "latest"}", python-version: "{py}", os: "ubuntu-latest" }}'
                     gh_frameworks.append(s)
             python_versions = []
             framework_versions = []

@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: Run Tests
+    name: {{ framework }} ${{ matrix.{{ framework }}-version }}, Python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
@@ -72,7 +72,7 @@ jobs:
         run: |
           pip install codecov tox
 
-      - name: Run Tests
+      - name: Test {{ framework }}
         env:
           CI_PYTHON_VERSION: ${{ matrix.python-version }}
         timeout-minutes: 45

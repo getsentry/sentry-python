@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: Run Tests
+    name: boto3 ${{ matrix.boto3-version }}, Python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
@@ -28,38 +28,38 @@ jobs:
         python-version: ["2.7"]
         boto3-version: ["1.9"]
         include:    
-          - { os: "ubuntu-latest", boto3-version: "1.9", python-version: "2.7"}
-          - { os: "ubuntu-latest", boto3-version: "1.9", python-version: "3.6"}
-          - { os: "ubuntu-latest", boto3-version: "1.9", python-version: "3.7"}
-          - { os: "ubuntu-latest", boto3-version: "1.9", python-version: "3.8"}
-          - { os: "ubuntu-latest", boto3-version: "1.10", python-version: "2.7"}
-          - { os: "ubuntu-latest", boto3-version: "1.10", python-version: "3.6"}
-          - { os: "ubuntu-latest", boto3-version: "1.10", python-version: "3.7"}
-          - { os: "ubuntu-latest", boto3-version: "1.10", python-version: "3.8"}
-          - { os: "ubuntu-latest", boto3-version: "1.11", python-version: "2.7"}
-          - { os: "ubuntu-latest", boto3-version: "1.11", python-version: "3.6"}
-          - { os: "ubuntu-latest", boto3-version: "1.11", python-version: "3.7"}
-          - { os: "ubuntu-latest", boto3-version: "1.11", python-version: "3.8"}
-          - { os: "ubuntu-latest", boto3-version: "1.12", python-version: "2.7"}
-          - { os: "ubuntu-latest", boto3-version: "1.12", python-version: "3.6"}
-          - { os: "ubuntu-latest", boto3-version: "1.12", python-version: "3.7"}
-          - { os: "ubuntu-latest", boto3-version: "1.12", python-version: "3.8"}
-          - { os: "ubuntu-latest", boto3-version: "1.13", python-version: "2.7"}
-          - { os: "ubuntu-latest", boto3-version: "1.13", python-version: "3.6"}
-          - { os: "ubuntu-latest", boto3-version: "1.13", python-version: "3.7"}
-          - { os: "ubuntu-latest", boto3-version: "1.13", python-version: "3.8"}
-          - { os: "ubuntu-latest", boto3-version: "1.14", python-version: "2.7"}
-          - { os: "ubuntu-latest", boto3-version: "1.14", python-version: "3.6"}
-          - { os: "ubuntu-latest", boto3-version: "1.14", python-version: "3.7"}
-          - { os: "ubuntu-latest", boto3-version: "1.14", python-version: "3.8"}
-          - { os: "ubuntu-latest", boto3-version: "1.15", python-version: "2.7"}
-          - { os: "ubuntu-latest", boto3-version: "1.15", python-version: "3.6"}
-          - { os: "ubuntu-latest", boto3-version: "1.15", python-version: "3.7"}
-          - { os: "ubuntu-latest", boto3-version: "1.15", python-version: "3.8"}
-          - { os: "ubuntu-latest", boto3-version: "1.16", python-version: "2.7"}
-          - { os: "ubuntu-latest", boto3-version: "1.16", python-version: "3.6"}
-          - { os: "ubuntu-latest", boto3-version: "1.16", python-version: "3.7"}
-          - { os: "ubuntu-latest", boto3-version: "1.16", python-version: "3.8"}
+          - { boto3-version: "1.9", python-version: "2.7", os: "ubuntu-latest" }
+          - { boto3-version: "1.9", python-version: "3.6", os: "ubuntu-latest" }
+          - { boto3-version: "1.9", python-version: "3.7", os: "ubuntu-latest" }
+          - { boto3-version: "1.9", python-version: "3.8", os: "ubuntu-latest" }
+          - { boto3-version: "1.10", python-version: "2.7", os: "ubuntu-latest" }
+          - { boto3-version: "1.10", python-version: "3.6", os: "ubuntu-latest" }
+          - { boto3-version: "1.10", python-version: "3.7", os: "ubuntu-latest" }
+          - { boto3-version: "1.10", python-version: "3.8", os: "ubuntu-latest" }
+          - { boto3-version: "1.11", python-version: "2.7", os: "ubuntu-latest" }
+          - { boto3-version: "1.11", python-version: "3.6", os: "ubuntu-latest" }
+          - { boto3-version: "1.11", python-version: "3.7", os: "ubuntu-latest" }
+          - { boto3-version: "1.11", python-version: "3.8", os: "ubuntu-latest" }
+          - { boto3-version: "1.12", python-version: "2.7", os: "ubuntu-latest" }
+          - { boto3-version: "1.12", python-version: "3.6", os: "ubuntu-latest" }
+          - { boto3-version: "1.12", python-version: "3.7", os: "ubuntu-latest" }
+          - { boto3-version: "1.12", python-version: "3.8", os: "ubuntu-latest" }
+          - { boto3-version: "1.13", python-version: "2.7", os: "ubuntu-latest" }
+          - { boto3-version: "1.13", python-version: "3.6", os: "ubuntu-latest" }
+          - { boto3-version: "1.13", python-version: "3.7", os: "ubuntu-latest" }
+          - { boto3-version: "1.13", python-version: "3.8", os: "ubuntu-latest" }
+          - { boto3-version: "1.14", python-version: "2.7", os: "ubuntu-latest" }
+          - { boto3-version: "1.14", python-version: "3.6", os: "ubuntu-latest" }
+          - { boto3-version: "1.14", python-version: "3.7", os: "ubuntu-latest" }
+          - { boto3-version: "1.14", python-version: "3.8", os: "ubuntu-latest" }
+          - { boto3-version: "1.15", python-version: "2.7", os: "ubuntu-latest" }
+          - { boto3-version: "1.15", python-version: "3.6", os: "ubuntu-latest" }
+          - { boto3-version: "1.15", python-version: "3.7", os: "ubuntu-latest" }
+          - { boto3-version: "1.15", python-version: "3.8", os: "ubuntu-latest" }
+          - { boto3-version: "1.16", python-version: "2.7", os: "ubuntu-latest" }
+          - { boto3-version: "1.16", python-version: "3.6", os: "ubuntu-latest" }
+          - { boto3-version: "1.16", python-version: "3.7", os: "ubuntu-latest" }
+          - { boto3-version: "1.16", python-version: "3.8", os: "ubuntu-latest" }
     # services:
     #   # Label used to access the service container
     #   redis:
@@ -96,7 +96,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      #- uses: actions/setup-node@v3
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -108,7 +108,7 @@ jobs:
         run: |
           pip install codecov tox
 
-      - name: Run Tests
+      - name: Test boto3
         env:
           CI_PYTHON_VERSION: ${{ matrix.python-version }}
         timeout-minutes: 45

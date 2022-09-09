@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: Run Tests
+    name: requests ${{ matrix.requests-version }}, Python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
@@ -28,9 +28,9 @@ jobs:
         python-version: ["2.7"]
         requests-version: ["latest"]
         include:    
-          - { os: "ubuntu-latest", requests-version: "latest", python-version: "2.7"}
-          - { os: "ubuntu-latest", requests-version: "latest", python-version: "3.8"}
-          - { os: "ubuntu-latest", requests-version: "latest", python-version: "3.9"}
+          - { requests-version: "latest", python-version: "2.7", os: "ubuntu-latest" }
+          - { requests-version: "latest", python-version: "3.8", os: "ubuntu-latest" }
+          - { requests-version: "latest", python-version: "3.9", os: "ubuntu-latest" }
     # services:
     #   # Label used to access the service container
     #   redis:
@@ -67,7 +67,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      #- uses: actions/setup-node@v3
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -79,7 +79,7 @@ jobs:
         run: |
           pip install codecov tox
 
-      - name: Run Tests
+      - name: Test requests
         env:
           CI_PYTHON_VERSION: ${{ matrix.python-version }}
         timeout-minutes: 45

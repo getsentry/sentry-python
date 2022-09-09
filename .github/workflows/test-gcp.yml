@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: Run Tests
+    name: gcp ${{ matrix.gcp-version }}, Python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
@@ -28,7 +28,7 @@ jobs:
         python-version: ["3.7"]
         gcp-version: ["latest"]
         include:    
-          - { os: "ubuntu-latest", gcp-version: "latest", python-version: "3.7"}
+          - { gcp-version: "latest", python-version: "3.7", os: "ubuntu-latest" }
     # services:
     #   # Label used to access the service container
     #   redis:
@@ -65,7 +65,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      #- uses: actions/setup-node@v3
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -77,7 +77,7 @@ jobs:
         run: |
           pip install codecov tox
 
-      - name: Run Tests
+      - name: Test gcp
         env:
           CI_PYTHON_VERSION: ${{ matrix.python-version }}
         timeout-minutes: 45

@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: Run Tests
+    name: rediscluster ${{ matrix.rediscluster-version }}, Python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
@@ -28,18 +28,18 @@ jobs:
         python-version: ["2.7"]
         rediscluster-version: ["1"]
         include:    
-          - { os: "ubuntu-latest", rediscluster-version: "1", python-version: "2.7"}
-          - { os: "ubuntu-latest", rediscluster-version: "1", python-version: "3.7"}
-          - { os: "ubuntu-latest", rediscluster-version: "1", python-version: "3.8"}
-          - { os: "ubuntu-latest", rediscluster-version: "1", python-version: "3.9"}
-          - { os: "ubuntu-latest", rediscluster-version: "2.1.0", python-version: "2.7"}
-          - { os: "ubuntu-latest", rediscluster-version: "2.1.0", python-version: "3.7"}
-          - { os: "ubuntu-latest", rediscluster-version: "2.1.0", python-version: "3.8"}
-          - { os: "ubuntu-latest", rediscluster-version: "2.1.0", python-version: "3.9"}
-          - { os: "ubuntu-latest", rediscluster-version: "2", python-version: "2.7"}
-          - { os: "ubuntu-latest", rediscluster-version: "2", python-version: "3.7"}
-          - { os: "ubuntu-latest", rediscluster-version: "2", python-version: "3.8"}
-          - { os: "ubuntu-latest", rediscluster-version: "2", python-version: "3.9"}
+          - { rediscluster-version: "1", python-version: "2.7", os: "ubuntu-latest" }
+          - { rediscluster-version: "1", python-version: "3.7", os: "ubuntu-latest" }
+          - { rediscluster-version: "1", python-version: "3.8", os: "ubuntu-latest" }
+          - { rediscluster-version: "1", python-version: "3.9", os: "ubuntu-latest" }
+          - { rediscluster-version: "2.1.0", python-version: "2.7", os: "ubuntu-latest" }
+          - { rediscluster-version: "2.1.0", python-version: "3.7", os: "ubuntu-latest" }
+          - { rediscluster-version: "2.1.0", python-version: "3.8", os: "ubuntu-latest" }
+          - { rediscluster-version: "2.1.0", python-version: "3.9", os: "ubuntu-latest" }
+          - { rediscluster-version: "2", python-version: "2.7", os: "ubuntu-latest" }
+          - { rediscluster-version: "2", python-version: "3.7", os: "ubuntu-latest" }
+          - { rediscluster-version: "2", python-version: "3.8", os: "ubuntu-latest" }
+          - { rediscluster-version: "2", python-version: "3.9", os: "ubuntu-latest" }
     # services:
     #   # Label used to access the service container
     #   redis:
@@ -76,7 +76,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      #- uses: actions/setup-node@v3
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -88,7 +88,7 @@ jobs:
         run: |
           pip install codecov tox
 
-      - name: Run Tests
+      - name: Test rediscluster
         env:
           CI_PYTHON_VERSION: ${{ matrix.python-version }}
         timeout-minutes: 45
