@@ -27,7 +27,7 @@ jobs:
         os: [ubuntu-latest]
         python-version: ["pypy2.7"]
         django-version: ["1.8"]
-        include:
+        include:    
           - { os: "ubuntu-latest", django-version: "1.8", python-version: "pypy2.7"}
           - { os: "ubuntu-latest", django-version: "1.8", python-version: "2.7"}
           - { os: "ubuntu-latest", django-version: "1.8", python-version: "3.5"}
@@ -123,7 +123,7 @@ jobs:
           set -x # print commands
           #coverage erase
 
-          envname=$(python ./scripts/tox_env_name.sh ${{ matrix.python-version }} django ${{ matrix.django-version }})
+          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
           echo '$envname'
           echo "---------------"
           #./scripts/runtox.sh '$envname' --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
