@@ -19,7 +19,7 @@ env:
 jobs:
   test:
     name: Run Tests
-    runs-on: ${{ matrix.linux-version }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
     strategy:
@@ -27,7 +27,7 @@ jobs:
         os: [ubuntu-latest]
         python-version: ["pypy2.7"]
         django-version: ["1.8"]
-        include:
+        include:    
           - { os: "ubuntu-latest", django-version: "1.8", python-version: "pypy2.7"}
           - { os: "ubuntu-latest", django-version: "1.8", python-version: "2.7"}
           - { os: "ubuntu-latest", django-version: "1.8", python-version: "3.5"}
@@ -128,8 +128,8 @@ jobs:
             pyverion="pypy"
           else
             pyversion="py${{ matrix.python-version }}"
-          fi
-
+          fi  
+  
           if [ ${{ matrix.django-version }} == "lastest" ];
           then
             frversion=""
