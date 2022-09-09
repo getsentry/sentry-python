@@ -121,23 +121,12 @@ jobs:
         shell: bash
         run: |
           set -x # print commands
-          coverage erase
+          #coverage erase
 
-          if [ "${{ matrix.python-version }}" == "pypy2.7" ];
-          then
-            pyverion="pypy"
-          else
-            pyversion="py${{ matrix.python-version }}"
-          fi  
-  
-          if [ ${{ matrix.django-version }} == "lastest" ];
-          then
-            frversion=""
-          else
-            frversion="-${{ matrix.django-version }}"
-          if
-
-          ./scripts/runtox.sh '$pyversion-django$frversion' --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
-          coverage xml -i
-          codecov --file coverage.xml
+          envname=$(python ./scripts/tox_env_name.sh ${{ matrix.python-version }} django ${{ matrix.django-version }})
+          echo '$envname'
+          echo "---------------"
+          #./scripts/runtox.sh '$envname' --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          #coverage combine .coverage*
+          #coverage xml -i
+          #codecov --file coverage.xml
