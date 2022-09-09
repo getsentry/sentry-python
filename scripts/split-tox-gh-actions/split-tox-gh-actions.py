@@ -94,7 +94,7 @@ def write_yaml_file(
             )
 
     # write rendered template
-    outfile_name = OUT_DIR + f"test-{current_framework}.yml"
+    outfile_name = OUT_DIR + f"test-integration-{current_framework}.yml"
     print(f"Writing {outfile_name}")
     f = open(outfile_name, "w")
     f.writelines(out_lines)
