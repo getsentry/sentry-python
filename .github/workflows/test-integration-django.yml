@@ -71,8 +71,9 @@ jobs:
 
           pwd
 
-          sudo mount -o size=180m -t tmpfs none /mnt/tmpfs
-          ls -alh /mnt/tmpfs
+          mkdir ~/tmpfs
+          sudo mount -o size=180m -t tmpfs none ~/tmpfs
+          ls -alh ~/tmpfs
 
 
           envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
