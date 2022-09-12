@@ -72,6 +72,9 @@ jobs:
           whoami
           sudo ls
 
+          sudo mount -o size=180m -t tmpfs none /mnt/tmpfs
+          
+
           envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
           ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
