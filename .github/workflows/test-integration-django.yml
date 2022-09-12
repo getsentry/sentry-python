@@ -28,43 +28,6 @@ jobs:
         python-version: ["pypy2.7"]
         django-version: ["1.8"]
         include:    
-          - { django-version: "1.8", python-version: "pypy2.7", os: "ubuntu-latest" }
-          - { django-version: "1.8", python-version: "2.7", os: "ubuntu-latest" }
-          - { django-version: "1.8", python-version: "3.5", os: "ubuntu-latest" }
-          - { django-version: "1.9", python-version: "pypy2.7", os: "ubuntu-latest" }
-          - { django-version: "1.9", python-version: "2.7", os: "ubuntu-latest" }
-          - { django-version: "1.9", python-version: "3.5", os: "ubuntu-latest" }
-          - { django-version: "1.10", python-version: "pypy2.7", os: "ubuntu-latest" }
-          - { django-version: "1.10", python-version: "2.7", os: "ubuntu-latest" }
-          - { django-version: "1.10", python-version: "3.5", os: "ubuntu-latest" }
-          - { django-version: "1.11", python-version: "pypy2.7", os: "ubuntu-latest" }
-          - { django-version: "1.11", python-version: "2.7", os: "ubuntu-latest" }
-          - { django-version: "1.11", python-version: "3.5", os: "ubuntu-latest" }
-          - { django-version: "1.11", python-version: "3.6", os: "ubuntu-latest" }
-          - { django-version: "1.11", python-version: "3.7", os: "ubuntu-latest" }
-          - { django-version: "2.0", python-version: "3.5", os: "ubuntu-latest" }
-          - { django-version: "2.0", python-version: "3.6", os: "ubuntu-latest" }
-          - { django-version: "2.0", python-version: "3.7", os: "ubuntu-latest" }
-          - { django-version: "2.1", python-version: "3.5", os: "ubuntu-latest" }
-          - { django-version: "2.1", python-version: "3.6", os: "ubuntu-latest" }
-          - { django-version: "2.1", python-version: "3.7", os: "ubuntu-latest" }
-          - { django-version: "2.2", python-version: "3.5", os: "ubuntu-latest" }
-          - { django-version: "2.2", python-version: "3.6", os: "ubuntu-latest" }
-          - { django-version: "2.2", python-version: "3.7", os: "ubuntu-latest" }
-          - { django-version: "2.2", python-version: "3.8", os: "ubuntu-latest" }
-          - { django-version: "2.2", python-version: "3.9", os: "ubuntu-latest" }
-          - { django-version: "3.0", python-version: "3.6", os: "ubuntu-latest" }
-          - { django-version: "3.0", python-version: "3.7", os: "ubuntu-latest" }
-          - { django-version: "3.0", python-version: "3.8", os: "ubuntu-latest" }
-          - { django-version: "3.0", python-version: "3.9", os: "ubuntu-latest" }
-          - { django-version: "3.1", python-version: "3.6", os: "ubuntu-latest" }
-          - { django-version: "3.1", python-version: "3.7", os: "ubuntu-latest" }
-          - { django-version: "3.1", python-version: "3.8", os: "ubuntu-latest" }
-          - { django-version: "3.1", python-version: "3.9", os: "ubuntu-latest" }
-          - { django-version: "3.2", python-version: "3.6", os: "ubuntu-latest" }
-          - { django-version: "3.2", python-version: "3.7", os: "ubuntu-latest" }
-          - { django-version: "3.2", python-version: "3.8", os: "ubuntu-latest" }
-          - { django-version: "3.2", python-version: "3.9", os: "ubuntu-latest" }
           - { django-version: "3.2", python-version: "3.10", os: "ubuntu-latest" }
     services:
       postgres:
@@ -105,6 +68,9 @@ jobs:
         run: |
           set -x # print commands that are executed
           coverage erase
+
+          whoami
+          sudo ls
 
           envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
           ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
