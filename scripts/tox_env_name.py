@@ -3,8 +3,8 @@ import sys
 
 def main():
     python_version = sys.argv[1]
-    framework = sys.argv[2]
-    framework_version = sys.argv[3]
+    framework = sys.argv[2] if len(sys.argv) >= 3 else ""
+    framework_version = sys.argv[3] if len(sys.argv) >= 4 else ""
 
     py_version = ""
     fr_version = ""
