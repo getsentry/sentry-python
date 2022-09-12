@@ -274,8 +274,8 @@ def test_sql_dict_query_params(sentry_init, capture_events):
 
     from django.db import connections
 
-    # if "postgres" not in connections:
-    #     pytest.skip("postgres tests disabled")
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
 
     sql = connections["postgres"].cursor()
 
@@ -318,8 +318,8 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     )
     from django.db import connections
 
-    # if "postgres" not in connections:
-    #     pytest.skip("postgres tests disabled")
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
 
     import psycopg2.sql
 
@@ -351,8 +351,8 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     )
     from django.db import connections
 
-    # if "postgres" not in connections:
-    #     pytest.skip("postgres tests disabled")
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
 
     import psycopg2.sql
 
@@ -416,8 +416,8 @@ def test_django_connect_trace(sentry_init, client, capture_events, render_span_t
 
     from django.db import connections
 
-    # if "postgres" not in connections:
-    #     pytest.skip("postgres tests disabled")
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
 
     # trigger Django to open a new connection by marking the existing one as None.
     connections["postgres"].connection = None
@@ -445,8 +445,8 @@ def test_django_connect_breadcrumbs(
 
     from django.db import connections
 
-    # if "postgres" not in connections:
-    #     pytest.skip("postgres tests disabled")
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
 
     # trigger Django to open a new connection by marking the existing one as None.
     connections["postgres"].connection = None
