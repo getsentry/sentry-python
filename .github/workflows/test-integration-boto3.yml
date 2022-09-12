@@ -83,8 +83,13 @@ jobs:
           set -x # print commands that are executed
           coverage erase
 
-          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} boto3 ${{ matrix.boto3-version }})
+          # create ram drive to run test in
+          mkdir ~/tmpfs
+          sudo mount -o size=200m -t tmpfs none ~/tmpfs
+          ls -alh ~/tmpfs
+
+          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
           ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
-          codecov --file coverage.xml
+          codecov --file coverage.xml          
