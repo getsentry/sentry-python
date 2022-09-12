@@ -50,7 +50,7 @@ def test_processors(sentry_init, capture_events):
 
 def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
     caplog.set_level(logging.DEBUG)
-    REDIS = 10  # noqa: N806
+    REDIS = 12  # noqa: N806
 
     sentry_init(auto_enabling_integrations=True, debug=True)
 
@@ -65,7 +65,7 @@ def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
                 "Did not import default integration {}:".format(import_string)
             )
             for record in caplog.records
-        )
+        ), "Problem with checking auto enabling {}".format(import_string)
 
 
 def test_event_id(sentry_init, capture_events):

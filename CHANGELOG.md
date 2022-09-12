@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.9.8
+
+### Various fixes & improvements
+
+- Baggage creation for head of trace (#1589) by @sl0thentr0py
+  - The SDK now also generates new baggage entries for dynamic sampling when it is the first (head) SDK in the pipeline.
+
+## 1.9.7
+
+### Various fixes & improvements
+
+- Let SentryAsgiMiddleware work with Starlette and FastAPI integrations (#1594) by @antonpirker
+
+**Note:** The last version 1.9.6 introduced a breaking change where projects that used Starlette or FastAPI
+and had manually setup `SentryAsgiMiddleware` could not start. This versions fixes this behaviour.
+With this version if you have a manual `SentryAsgiMiddleware` setup and are using Starlette or FastAPI
+everything just works out of the box.
+
+Sorry for any inconveniences the last version might have brought to you.
+
+We can do better and in the future we will do our best to not break your code again.
+
+## 1.9.6
+
+### Various fixes & improvements
+
+- Auto-enable Starlette and FastAPI (#1533) by @antonpirker
+- Add more version constraints (#1574) by @isra17
+- Fix typo in starlette attribute check (#1566) by @sl0thentr0py
+
 ## 1.9.5
 
 ### Various fixes & improvements
@@ -52,44 +82,44 @@
 ### Various fixes & improvements
 
 - feat(starlette): add Starlette integration (#1441) by @sl0thentr0py
-    
-    **Important:** Remove manual usage of `SentryAsgiMiddleware`! This is now done by the Starlette integration.
-    
-    Usage:
-    
-    ```python
-    from starlette.applications import Starlette
-    
-    from sentry_sdk.integrations.starlette import StarletteIntegration
-    
-    sentry_sdk.init(
-        dsn="...", 
-        integrations=[StarletteIntegration()],
-    )
-    
-    app = Starlette(debug=True, routes=[...])
-    ```
-- feat(fastapi): add FastAPI integration (#829) by @antonpirker
-    
-    **Important:** Remove manual usage of `SentryAsgiMiddleware`! This is now done by the FastAPI integration.
-    
-    Usage:
-    
-    ```python
-    from fastapi import FastAPI
-    
-    from sentry_sdk.integrations.starlette import StarletteIntegration
-    from sentry_sdk.integrations.fastapi import FastApiIntegration
+  **Important:** Remove manual usage of `SentryAsgiMiddleware`! This is now done by the Starlette integration.
+  Usage:
 
-    sentry_sdk.init(
-        dsn="...", 
-        integrations=[StarletteIntegration(), FastApiIntegration()],
-    )
-    
-    app = FastAPI()
-    ```
-    
-    Yes, you have to add both, the `StarletteIntegration` **AND** the `FastApiIntegration`!
+  ```python
+  from starlette.applications import Starlette
+
+  from sentry_sdk.integrations.starlette import StarletteIntegration
+
+  sentry_sdk.init(
+      dsn="...",
+      integrations=[StarletteIntegration()],
+  )
+
+  app = Starlette(debug=True, routes=[...])
+  ```
+
+- feat(fastapi): add FastAPI integration (#829) by @antonpirker
+
+  **Important:** Remove manual usage of `SentryAsgiMiddleware`! This is now done by the FastAPI integration.
+
+  Usage:
+
+  ```python
+  from fastapi import FastAPI
+
+  from sentry_sdk.integrations.starlette import StarletteIntegration
+  from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+  sentry_sdk.init(
+      dsn="...",
+      integrations=[StarletteIntegration(), FastApiIntegration()],
+  )
+
+  app = FastAPI()
+  ```
+
+  Yes, you have to add both, the `StarletteIntegration` **AND** the `FastApiIntegration`!
+
 - fix: avoid sending empty Baggage header (#1507) by @intgr
 - fix: properly freeze Baggage object (#1508) by @intgr
 - docs: fix simple typo, collecter -> collector (#1505) by @timgates42
@@ -114,7 +144,7 @@
 - feat(tracing): Dynamic Sampling Context / Baggage continuation (#1485) by @sl0thentr0py
 
   The SDK now propagates the [W3C Baggage Header](https://www.w3.org/TR/baggage/) from
-  incoming transactions to outgoing requests.  
+  incoming transactions to outgoing requests.
   It also extracts Sentry specific [sampling information](https://develop.sentry.dev/sdk/performance/dynamic-sampling-context/)
   and adds it to the transaction headers to enable Dynamic Sampling in the product.
 
@@ -124,7 +154,7 @@
 
 - Fix Deployment (#1474) by @antonpirker
 - Serverless V2 (#1450) by @antonpirker
-- Use logging levelno instead of levelname.  Levelnames can be overridden (#1449) by @rrauenza
+- Use logging levelno instead of levelname. Levelnames can be overridden (#1449) by @rrauenza
 
 ## 1.5.12
 

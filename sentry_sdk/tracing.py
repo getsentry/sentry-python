@@ -32,6 +32,11 @@ TRANSACTION_SOURCE_VIEW = "view"
 TRANSACTION_SOURCE_COMPONENT = "component"
 TRANSACTION_SOURCE_TASK = "task"
 
+# These are typically high cardinality and the server hates them
+LOW_QUALITY_TRANSACTION_SOURCES = [
+    TRANSACTION_SOURCE_URL,
+]
+
 SOURCE_FOR_STYLE = {
     "endpoint": TRANSACTION_SOURCE_COMPONENT,
     "function_name": TRANSACTION_SOURCE_COMPONENT,
@@ -278,6 +283,10 @@ class Span(object):
 
         if sentrytrace_kwargs is not None:
             kwargs.update(sentrytrace_kwargs)
+
+            # If there's an incoming sentry-trace but no incoming baggage header,
+            # for instance in traces coming from older SDKs,
+            # baggage will be empty and immutable and won't be populated as head SDK.
             baggage.freeze()
 
         kwargs.update(extract_tracestate_data(headers.get("tracestate")))
@@ -306,8 +315,8 @@ class Span(object):
         if tracestate:
             yield "tracestate", tracestate
 
-        if self.containing_transaction and self.containing_transaction._baggage:
-            baggage = self.containing_transaction._baggage.serialize()
+        if self.containing_transaction:
+            baggage = self.containing_transaction.get_baggage().serialize()
             if baggage:
                 yield "baggage", baggage
 
@@ -510,11 +519,10 @@ class Span(object):
         if sentry_tracestate:
             rv["tracestate"] = sentry_tracestate
 
-        # TODO-neel populate fresh if head SDK
-        if self.containing_transaction and self.containing_transaction._baggage:
+        if self.containing_transaction:
             rv[
                 "dynamic_sampling_context"
-            ] = self.containing_transaction._baggage.dynamic_sampling_context()
+            ] = self.containing_transaction.get_baggage().dynamic_sampling_context()
 
         return rv
 
@@ -524,6 +532,8 @@ class Transaction(Span):
         "name",
         "source",
         "parent_sampled",
+        # used to create baggage value for head SDKs in dynamic sampling
+        "sample_rate",
         # the sentry portion of the `tracestate` header used to transmit
         # correlation context for server-side dynamic sampling, of the form
         # `sentry=xxxxx`, where `xxxxx` is the base64-encoded json of the
@@ -559,6 +569,7 @@ class Transaction(Span):
         Span.__init__(self, **kwargs)
         self.name = name
         self.source = source
+        self.sample_rate = None  # type: Optional[float]
         self.parent_sampled = parent_sampled
         # if tracestate isn't inherited and set here, it will get set lazily,
         # either the first time an outgoing request needs it for a header or the
@@ -687,6 +698,17 @@ class Transaction(Span):
 
         return rv
 
+    def get_baggage(self):
+        # type: () -> Baggage
+        """
+        The first time a new baggage with sentry items is made,
+        it will be frozen.
+        """
+        if not self._baggage or self._baggage.mutable:
+            self._baggage = Baggage.populate_from_transaction(self)
+
+        return self._baggage
+
     def _set_initial_sampling_decision(self, sampling_context):
         # type: (SamplingContext) -> None
         """
@@ -724,6 +746,7 @@ class Transaction(Span):
         # if the user has forced a sampling decision by passing a `sampled`
         # value when starting the transaction, go with that
         if self.sampled is not None:
+            self.sample_rate = float(self.sampled)
             return
 
         # we would have bailed already if neither `traces_sampler` nor
@@ -751,6 +774,8 @@ class Transaction(Span):
             )
             self.sampled = False
             return
+
+        self.sample_rate = float(sample_rate)
 
         # if the function returned 0 (or false), or if `traces_sample_rate` is
         # 0, it's a sign the transaction should be dropped
