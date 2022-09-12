@@ -550,11 +550,7 @@ def test_legacy_setup(
     # Check that behaviour does not change
     # if the user just adds the new Integration
     # and forgets to remove SentryAsgiMiddleware
-    sentry_init(
-        integrations=[
-            StarletteIntegration(),
-        ],
-    )
+    sentry_init()
     app = starlette_app_factory()
     asgi_app = SentryAsgiMiddleware(app)
 

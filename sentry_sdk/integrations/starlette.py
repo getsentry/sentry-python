@@ -12,10 +12,10 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
-    TRANSACTION_SOURCE_ROUTE,
     AnnotatedValue,
+    capture_internal_exceptions,
     event_from_exception,
     transaction_from_function,
 )
@@ -146,7 +146,9 @@ def patch_exception_middleware(middleware_class):
             # type: (Any, Any, Any) -> None
             exp = args[0]
 
-            is_http_server_error = hasattr(exp, "staus_code") and exp.status_code >= 500
+            is_http_server_error = (
+                hasattr(exp, "status_code") and exp.status_code >= 500
+            )
             if is_http_server_error:
                 _capture_exception(exp, handled=True)
 
@@ -255,6 +257,9 @@ def patch_middlewares():
 
         def _sentry_middleware_init(self, cls, **options):
             # type: (Any, Any, Any) -> None
+            if cls == SentryAsgiMiddleware:
+                return old_middleware_init(self, cls, **options)
+
             span_enabled_cls = _enable_span_for_middleware(cls)
             old_middleware_init(self, span_enabled_cls, **options)
 
@@ -283,6 +288,7 @@ def patch_asgi_app():
             lambda *a, **kw: old_app(self, *a, **kw),
             mechanism_type=StarletteIntegration.identifier,
         )
+
         middleware.__call__ = middleware._run_asgi3
         return await middleware(scope, receive, send)
 
@@ -437,28 +443,35 @@ class StarletteRequestExtractor:
         content_length = await self.content_length()
         request_info = {}  # type: Dict[str, Any]
 
-        if _should_send_default_pii():
-            request_info["cookies"] = self.cookies()
+        with capture_internal_exceptions():
+            if _should_send_default_pii():
+                request_info["cookies"] = self.cookies()
 
-        if not request_body_within_bounds(client, content_length):
-            data = AnnotatedValue(
-                "",
-                {"rem": [["!config", "x", 0, content_length]], "len": content_length},
-            )
-        else:
-            parsed_body = await self.parsed_body()
-            if parsed_body is not None:
-                data = parsed_body
-            elif await self.raw_data():
+            if not request_body_within_bounds(client, content_length):
                 data = AnnotatedValue(
                     "",
-                    {"rem": [["!raw", "x", 0, content_length]], "len": content_length},
+                    {
+                        "rem": [["!config", "x", 0, content_length]],
+                        "len": content_length,
+                    },
                 )
             else:
-                data = None
+                parsed_body = await self.parsed_body()
+                if parsed_body is not None:
+                    data = parsed_body
+                elif await self.raw_data():
+                    data = AnnotatedValue(
+                        "",
+                        {
+                            "rem": [["!raw", "x", 0, content_length]],
+                            "len": content_length,
+                        },
+                    )
+                else:
+                    data = None
 
-        if data is not None:
-            request_info["data"] = data
+            if data is not None:
+                request_info["data"] = data
 
         return request_info
 

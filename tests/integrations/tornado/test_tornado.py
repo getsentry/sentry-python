@@ -131,7 +131,7 @@ def test_transactions(tornado_testcase, sentry_init, capture_events, handler, co
     assert client_tx["type"] == "transaction"
     assert client_tx["transaction"] == "client"
     assert client_tx["transaction_info"] == {
-        "source": "unknown"
+        "source": "custom"
     }  # because this is just the start_transaction() above.
 
     if server_error is not None:

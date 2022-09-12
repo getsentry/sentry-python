@@ -1,7 +1,9 @@
 # coding: utf-8
 import weakref
 import gc
+import re
 import pytest
+import random
 
 from sentry_sdk import (
     capture_message,
@@ -31,6 +33,9 @@ def test_basic(sentry_init, capture_events, sample_rate):
     if sample_rate:
         assert len(events) == 1
         event = events[0]
+
+        assert event["transaction"] == "hi"
+        assert event["transaction_info"]["source"] == "custom"
 
         span1, span2 = event["spans"]
         parent_span = event
@@ -139,6 +144,61 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
     assert message_payload["message"] == "hello"
 
 
+@pytest.mark.parametrize("sample_rate", [0.5, 1.0])
+def test_dynamic_sampling_head_sdk_creates_dsc(
+    sentry_init, capture_envelopes, sample_rate, monkeypatch
+):
+    sentry_init(traces_sample_rate=sample_rate, release="foo")
+    envelopes = capture_envelopes()
+
+    # make sure transaction is sampled for both cases
+    monkeypatch.setattr(random, "random", lambda: 0.1)
+
+    transaction = Transaction.continue_from_headers({}, name="Head SDK tx")
+
+    # will create empty mutable baggage
+    baggage = transaction._baggage
+    assert baggage
+    assert baggage.mutable
+    assert baggage.sentry_items == {}
+    assert baggage.third_party_items == ""
+
+    with start_transaction(transaction):
+        with start_span(op="foo", description="foodesc"):
+            pass
+
+    # finish will create a new baggage entry
+    baggage = transaction._baggage
+    trace_id = transaction.trace_id
+
+    assert baggage
+    assert not baggage.mutable
+    assert baggage.third_party_items == ""
+    assert baggage.sentry_items == {
+        "environment": "production",
+        "release": "foo",
+        "sample_rate": str(sample_rate),
+        "transaction": "Head SDK tx",
+        "trace_id": trace_id,
+    }
+
+    expected_baggage = (
+        "sentry-environment=production,sentry-release=foo,sentry-sample_rate=%s,sentry-transaction=Head%%20SDK%%20tx,sentry-trace_id=%s"
+        % (sample_rate, trace_id)
+    )
+    assert sorted(baggage.serialize().split(",")) == sorted(expected_baggage.split(","))
+
+    (envelope,) = envelopes
+    assert envelope.headers["trace"] == baggage.dynamic_sampling_context()
+    assert envelope.headers["trace"] == {
+        "environment": "production",
+        "release": "foo",
+        "sample_rate": str(sample_rate),
+        "transaction": "Head SDK tx",
+        "trace_id": trace_id,
+    }
+
+
 @pytest.mark.parametrize(
     "args,expected_refcount",
     [({"traces_sample_rate": 1.0}, 100), ({"traces_sample_rate": 0.0}, 0)],
@@ -198,3 +258,27 @@ def test_start_span_after_finish(sentry_init, capture_events):
             pass
 
     assert len(events) == 1
+
+
+def test_trace_propagation_meta_head_sdk(sentry_init):
+    sentry_init(traces_sample_rate=1.0, release="foo")
+
+    transaction = Transaction.continue_from_headers({}, name="Head SDK tx")
+    meta = None
+    span = None
+
+    with start_transaction(transaction):
+        with start_span(op="foo", description="foodesc") as current_span:
+            span = current_span
+            meta = Hub.current.trace_propagation_meta()
+
+    ind = meta.find(">") + 1
+    sentry_trace, baggage = meta[:ind], meta[ind:]
+
+    assert 'meta name="sentry-trace"' in sentry_trace
+    sentry_trace_content = re.findall('content="([^"]*)"', sentry_trace)[0]
+    assert sentry_trace_content == span.to_traceparent()
+
+    assert 'meta name="baggage"' in baggage
+    baggage_content = re.findall('content="([^"]*)"', baggage)[0]
+    assert baggage_content == transaction.get_baggage().serialize()
