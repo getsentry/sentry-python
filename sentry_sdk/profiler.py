@@ -26,7 +26,6 @@ from contextlib import contextmanager
 
 import sentry_sdk
 from sentry_sdk._compat import PY2
-
 from sentry_sdk._types import MYPY
 
 if MYPY:

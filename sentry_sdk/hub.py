@@ -546,7 +546,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return transaction
 
     @overload
-    def push_scope(  # noqa: F811
+    def push_scope(
         self, callback=None  # type: Optional[None]
     ):
         # type: (...) -> ContextManager[Scope]
@@ -595,7 +595,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return rv
 
     @overload
-    def configure_scope(  # noqa: F811
+    def configure_scope(
         self, callback=None  # type: Optional[None]
     ):
         # type: (...) -> ContextManager[Scope]
@@ -610,7 +610,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def configure_scope(  # noqa
         self, callback=None  # type: Optional[Callable[[Scope], None]]
-    ):  # noqa
+    ):
         # type: (...) -> Optional[ContextManager[Scope]]
 
         """
