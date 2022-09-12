@@ -63,7 +63,7 @@ _sample_buffer = None  # type: Optional[_SampleBuffer]
 _scheduler = None  # type: Optional[_Scheduler]
 
 
-def _setup_profiler(buffer_secs=60, frequency=100):
+def _setup_profiler(buffer_secs=60, frequency=101):
     # type: (int, int) -> None
 
     """
