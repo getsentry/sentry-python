@@ -2,7 +2,9 @@ from werkzeug.test import Client
 import pytest
 
 import sentry_sdk
+from sentry_sdk.integrations.profiling import ProfilingIntegration
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.profiler import _teardown_profiler
 from collections import Counter
 
 try:
@@ -17,6 +19,12 @@ def crashing_app():
         1 / 0
 
     return app
+
+
+@pytest.fixture
+def profiling_integration():
+    yield ProfilingIntegration()
+    _teardown_profiler()
 
 
 class IterableApp(object):
@@ -281,12 +289,14 @@ def test_auto_session_tracking_with_aggregates(sentry_init, capture_envelopes):
     assert len(session_aggregates) == 1
 
 
-def test_profile_sent_when_profiling_enabled(capture_envelopes, sentry_init):
+def test_profile_sent_when_profiling_enabled(
+    capture_envelopes, sentry_init, profiling_integration
+):
     def test_app(environ, start_response):
         start_response("200 OK", [])
         return ["Go get the ball! Good dog!"]
 
-    sentry_init(traces_sample_rate=1.0, _experiments={"enable_profiling": True})
+    sentry_init(traces_sample_rate=1.0, integrations=[profiling_integration])
     app = SentryWsgiMiddleware(test_app)
     envelopes = capture_envelopes()
 

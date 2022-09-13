@@ -45,6 +45,7 @@ if MYPY:
         "attachment",
         "session",
         "internal",
+        "profile",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
     EndpointType = Literal["store", "envelope"]
