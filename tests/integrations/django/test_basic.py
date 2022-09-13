@@ -703,6 +703,8 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
             render_span_tree(transaction)
             == """\
 - op="http.server": description=null
+  - op="django.signals": description="django.db.reset_queries"
+  - op="django.signals": description="django.db.close_old_connections"
   - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.__call__"
     - op="django.middleware": description="django.contrib.auth.middleware.AuthenticationMiddleware.__call__"
       - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.__call__"
@@ -742,7 +744,13 @@ def test_middleware_spans_disabled(sentry_init, client, capture_events):
 
     assert message["message"] == "hi"
 
-    assert not transaction["spans"]
+    assert len(transaction["spans"]) == 2
+
+    assert transaction["spans"][0]["op"] == "django.signals"
+    assert transaction["spans"][0]["description"] == "django.db.reset_queries"
+
+    assert transaction["spans"][1]["op"] == "django.signals"
+    assert transaction["spans"][1]["description"] == "django.db.close_old_connections"
 
 
 def test_csrf(sentry_init, client):
