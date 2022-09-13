@@ -1,7 +1,5 @@
 from werkzeug.test import Client
 
-import random
-
 import pytest
 
 import sentry_sdk
