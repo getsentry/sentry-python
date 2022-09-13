@@ -59,10 +59,7 @@ def write_yaml_file(
                 l = (
                     l.replace("{{ framework }}", current_framework)
                     .replace(
-                        "{{ python-version }}",
-                        init_python_version.replace("py", "")
-                        if init_python_version != "pypy"
-                        else "pypy2.7",
+                        "{{ python-version }}", init_python_version.replace("py", "")
                     )
                     .replace("{{ framework-version }}", init_framework_version)
                 )
@@ -80,9 +77,7 @@ def write_yaml_file(
                         l.replace("{{ framework }}", current_framework)
                         .replace(
                             "{{ python-version }}",
-                            init_python_version.replace("py", "")
-                            if init_python_version != "pypy"
-                            else "pypy2.7",
+                            init_python_version.replace("py", ""),
                         )
                         .replace("{{ framework-version }}", init_framework_version)
                     )
@@ -170,7 +165,9 @@ def main():
                 if python_version not in python_versions:
                     python_versions.append(python_version)
                 if not init_python_version:
-                    init_python_version = python_version
+                    init_python_version = (
+                        python_version if python_version != "pypy" else None
+                    )
 
             for framework_version in (
                 raw_framework_versions.replace("{", "").replace("}", "").split(",")
@@ -184,7 +181,9 @@ def main():
 
             for fr in framework_versions:
                 for py in python_versions:
-                    py = py.replace("py", "") if py != "pypy" else "pypy2.7"
+                    if py == "pypy":
+                        continue
+                    py = py.replace("py", "")
                     s = f'\n          - {{ {current_framework}-version: "{fr or "latest"}", python-version: "{py}", os: "ubuntu-latest" }}'
                     gh_frameworks.append(s)
             python_versions = []

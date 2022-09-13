@@ -25,26 +25,21 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ["pypy2.7"]
+        python-version: ["2.7"]
         celery-version: ["3"]
         include:    
-          - { celery-version: "3", python-version: "pypy2.7", os: "ubuntu-latest" }
           - { celery-version: "3", python-version: "2.7", os: "ubuntu-latest" }
-          - { celery-version: "4.1", python-version: "pypy2.7", os: "ubuntu-latest" }
           - { celery-version: "4.1", python-version: "2.7", os: "ubuntu-latest" }
           - { celery-version: "4.1", python-version: "3.5", os: "ubuntu-latest" }
           - { celery-version: "4.1", python-version: "3.6", os: "ubuntu-latest" }
-          - { celery-version: "4.2", python-version: "pypy2.7", os: "ubuntu-latest" }
           - { celery-version: "4.2", python-version: "2.7", os: "ubuntu-latest" }
           - { celery-version: "4.2", python-version: "3.5", os: "ubuntu-latest" }
           - { celery-version: "4.2", python-version: "3.6", os: "ubuntu-latest" }
-          - { celery-version: "4.3", python-version: "pypy2.7", os: "ubuntu-latest" }
           - { celery-version: "4.3", python-version: "2.7", os: "ubuntu-latest" }
           - { celery-version: "4.3", python-version: "3.5", os: "ubuntu-latest" }
           - { celery-version: "4.3", python-version: "3.6", os: "ubuntu-latest" }
           - { celery-version: "4.3", python-version: "3.7", os: "ubuntu-latest" }
           - { celery-version: "4.3", python-version: "3.8", os: "ubuntu-latest" }
-          - { celery-version: "4.4", python-version: "pypy2.7", os: "ubuntu-latest" }
           - { celery-version: "4.4", python-version: "2.7", os: "ubuntu-latest" }
           - { celery-version: "4.4", python-version: "3.5", os: "ubuntu-latest" }
           - { celery-version: "4.4", python-version: "3.6", os: "ubuntu-latest" }
@@ -78,9 +73,9 @@ jobs:
           set -x # print commands that are executed
           coverage erase
 
-          # create ram drive to run test in
-          mkdir ~/tmpfs
-          sudo mount -o size=200m -t tmpfs none ~/tmpfs
+          # create ram drive to run tests in
+          mkdir -p ~/toxworkdir
+          sudo mount -o size=180m -t tmpfs none ~/toxworkdir
 
           envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
           ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
