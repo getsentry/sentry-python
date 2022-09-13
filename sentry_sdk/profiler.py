@@ -205,19 +205,31 @@ class Profile(object):
         assert self._stop_ns is not None
 
         return {
-            "device_os_name": platform.system(),
-            "device_os_version": platform.release(),
-            "duration_ns": str(self._stop_ns - self._start_ns),
             "environment": None,  # Gets added in client.py
+            "event_id": uuid.uuid4().hex,
             "platform": "python",
-            "platform_version": platform.python_version(),
-            "profile_id": uuid.uuid4().hex,
             "profile": _sample_buffer.slice_profile(self._start_ns, self._stop_ns),
-            "trace_id": self.transaction.trace_id,
-            "transaction_id": None,  # Gets added in client.py
-            "transaction_name": self.transaction.name,
-            "version_code": "",  # TODO: Determine appropriate value. Currently set to empty string so profile will not get rejected.
-            "version_name": None,  # Gets added in client.py
+            "release": None,  # Gets added in client.py
+            "timestamp": None,  # Gets added in client.py
+            "version": "1",
+            "device": {
+                "architecture": platform.machine(),
+            },
+            "os": {
+                "name": platform.system(),
+                "version": platform.release(),
+            },
+            "runtime": {
+                "name": platform.python_implementation(),
+                "version": platform.python_version(),
+            },
+            "transactions": [{
+                "id": None,  # Gets added in client.py
+                "name": self.transaction.name,
+                "relative_start_ns": str(self._start_ns),
+                "relative_stop_ns": str(self._stop_ns),
+                "trace_id": self.transaction.trace_id,
+            }],
         }
 
 
@@ -258,6 +270,7 @@ class _SampleBuffer(object):
     def slice_profile(self, start_ns, stop_ns):
         # type: (int, int) -> Dict[str, List[Any]]
         samples = []  # type: List[Any]
+        stacks = list()  # type: List[List]
         frames = dict()  # type: Dict[FrameData, int]
         frames_list = list()  # type: List[Any]
 
@@ -276,12 +289,12 @@ class _SampleBuffer(object):
 
             for tid, stack in raw_sample[1]:
                 sample = {
-                    "frames": [],
                     "relative_timestamp_ns": ts - start_ns,
                     "thread_id": tid,
                 }
 
                 for frame in stack:
+                    current_stack = []
                     if frame not in frames:
                         frames[frame] = len(frames)
                         frames_list.append(
@@ -291,11 +304,18 @@ class _SampleBuffer(object):
                                 "line": frame[2],
                             }
                         )
-                    sample["frames"].append(frames[frame])
+                    current_stack.append(frames[frame])
 
+                try:
+                    stack_idx = stacks.index(current_stack)
+                except ValueError:
+                    stack_idx = len(stacks)
+                    stacks.append(current_stack)
+
+                sample["stack_id"] = stack_idx
                 samples.append(sample)
 
-        return {"frames": frames_list, "samples": samples}
+        return {"stacks": stacks, "frames": frames_list, "samples": samples}
 
 
 class _Scheduler(object):

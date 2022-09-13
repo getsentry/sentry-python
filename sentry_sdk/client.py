@@ -402,9 +402,10 @@ class _Client(object):
 
             if is_transaction:
                 if "profile" in event_opt:
-                    event_opt["profile"]["transaction_id"] = event_opt["event_id"]
                     event_opt["profile"]["environment"] = event_opt.get("environment")
-                    event_opt["profile"]["version_name"] = event_opt.get("release", "")
+                    event_opt["profile"]["release"] = event_opt.get("release", "")
+                    event_opt["profile"]["timestamp"] = event_opt.get("timestamp", "")
+                    event_opt["profile"]["transactions"][0]["id"] = event_opt["event_id"]
                     envelope.add_profile(event_opt.pop("profile"))
                 envelope.add_transaction(event_opt)
             else:
