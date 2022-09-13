@@ -270,10 +270,10 @@ class _SampleBuffer(object):
         self.idx = (idx + 1) % self.capacity
 
     def slice_profile(self, start_ns, stop_ns):
-        # type: (int, int) -> Dict[str, List[Any]]
+        # type: (int, int) -> Dict[str, Any]
         samples = []  # type: List[Any]
         stacks = dict()  # type: Dict[Any, int]
-        stacks_list = list()  # type: List[Any]
+        stacks_list = tuple()  # type: Tuple[int, ...]
         frames = dict()  # type: Dict[FrameData, int]
         frames_list = list()  # type: List[Any]
 
@@ -309,14 +309,15 @@ class _SampleBuffer(object):
                         )
                     current_stack.append(frames[frame])
 
+                current_stack = tuple(current_stack)
                 if current_stack not in stacks:
                     stacks[current_stack] = len(stacks)
                     stacks_list.append(current_stack)
-                sample["stack_id"] = stacks[current_stack]
 
+                sample["stack_id"] = stacks[current_stack]
                 samples.append(sample)
 
-        return {"stacks": stacks, "frames": frames_list, "samples": samples}
+        return {"stacks": stacks_list, "frames": frames_list, "samples": samples}
 
 
 class _Scheduler(object):
