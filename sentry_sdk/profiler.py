@@ -272,7 +272,8 @@ class _SampleBuffer(object):
     def slice_profile(self, start_ns, stop_ns):
         # type: (int, int) -> Dict[str, List[Any]]
         samples = []  # type: List[Any]
-        stacks = list()  # type: List[Any]
+        stacks = dict()  # type: Dict[Any, int]
+        stacks_list = list()  # type: List[Any]
         frames = dict()  # type: Dict[FrameData, int]
         frames_list = list()  # type: List[Any]
 
@@ -308,13 +309,11 @@ class _SampleBuffer(object):
                         )
                     current_stack.append(frames[frame])
 
-                try:
-                    stack_idx = stacks.index(current_stack)
-                except ValueError:
-                    stack_idx = len(stacks)
-                    stacks.append(current_stack)
+                if current_stack not in stacks:
+                    stacks[current_stack] = len(stacks)
+                    stacks_list.append(current_stack)
+                sample["stack_id"] = stacks[current_stack]
 
-                sample["stack_id"] = stack_idx
                 samples.append(sample)
 
         return {"stacks": stacks, "frames": frames_list, "samples": samples}
