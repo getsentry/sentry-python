@@ -405,7 +405,9 @@ class _Client(object):
                     event_opt["profile"]["environment"] = event_opt.get("environment")
                     event_opt["profile"]["release"] = event_opt.get("release", "")
                     event_opt["profile"]["timestamp"] = event_opt.get("timestamp", "")
-                    event_opt["profile"]["transactions"][0]["id"] = event_opt["event_id"]
+                    event_opt["profile"]["transactions"][0]["id"] = event_opt[
+                        "event_id"
+                    ]
                     envelope.add_profile(event_opt.pop("profile"))
                 envelope.add_transaction(event_opt)
             else:

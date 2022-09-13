@@ -223,13 +223,15 @@ class Profile(object):
                 "name": platform.python_implementation(),
                 "version": platform.python_version(),
             },
-            "transactions": [{
-                "id": None,  # Gets added in client.py
-                "name": self.transaction.name,
-                "relative_start_ns": str(self._start_ns),
-                "relative_stop_ns": str(self._stop_ns),
-                "trace_id": self.transaction.trace_id,
-            }],
+            "transactions": [
+                {
+                    "id": None,  # Gets added in client.py
+                    "name": self.transaction.name,
+                    "relative_start_ns": str(self._start_ns),
+                    "relative_stop_ns": str(self._stop_ns),
+                    "trace_id": self.transaction.trace_id,
+                }
+            ],
         }
 
 
@@ -270,7 +272,7 @@ class _SampleBuffer(object):
     def slice_profile(self, start_ns, stop_ns):
         # type: (int, int) -> Dict[str, List[Any]]
         samples = []  # type: List[Any]
-        stacks = list()  # type: List[List]
+        stacks = list()  # type: List[Any]
         frames = dict()  # type: Dict[FrameData, int]
         frames_list = list()  # type: List[Any]
 
