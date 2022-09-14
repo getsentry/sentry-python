@@ -68,11 +68,6 @@ def setup_profiler(buffer_secs=60, frequency=101):
     # type: (int, int) -> None
 
     """
-    This method sets up the application so that it can be profiled.
-    It MUST be called from the main thread. This is a limitation of
-    python's signal library where it only allows the main thread to
-    set a signal handler.
-
     `buffer_secs` determines the max time a sample will be buffered for
     `frequency` determines the number of samples to take per second (Hz)
     """
@@ -104,22 +99,11 @@ def teardown_profiler():
     _scheduler = None
 
 
-def _sample_stack():
+def _sample_stack(*args, **kwargs):
     # type: () -> None
     """
     Take a sample of the stack on all the threads in the process.
-    This handler is called to handle the signal at a set interval.
-
-    See https://www.gnu.org/software/libc/manual/html_node/Alarm-Signals.html
-
-    This is not based on wall time, and you may see some variances
-    in the frequency at which this handler is called.
-
-    Notably, it looks like only threads started using the threading
-    module counts towards the time elapsed. It is unclear why that
-    is the case right now. However, we are able to get samples from
-    threading._DummyThread if this handler is called as a result of
-    another thread (e.g. the main thread).
+    This should be called at a regular interval to collect samples.
     """
 
     assert _sample_buffer is not None
@@ -292,6 +276,8 @@ class _SampleBuffer(object):
 
 
 class _Scheduler(object):
+    mode = "unknown"
+
     def __init__(self, frequency):
         # type: (int) -> None
         self._lock = threading.Lock()
@@ -320,7 +306,17 @@ class _Scheduler(object):
 
 
 class _ThreadScheduler(_Scheduler):
-    event = threading.Event()
+    """
+    This abstract scheduler is based on running a daemon thread that will call
+    the sampler at a regular interval.
+    """
+
+    mode = "thread"
+
+    def __init__(self, frequency):
+        # type: (int) -> None
+        super(_ThreadScheduler, self).__init__(frequency)
+        self.event = threading.Event()
 
     def setup(self):
         # type: () -> None
@@ -333,6 +329,13 @@ class _ThreadScheduler(_Scheduler):
     def start_profiling(self):
         # type: () -> bool
         if super(_ThreadScheduler, self).start_profiling():
+            # make sure to clear the event as we reuse the same event
+            # over the lifetime of the scheduler
+            self.event.clear()
+
+            # make sure the thread is a daemon here otherwise this
+            # can keep the application running after other threads
+            # have exited
             thread = threading.Thread(target=self.run, daemon=True)
             thread.start()
             return True
@@ -341,6 +344,8 @@ class _ThreadScheduler(_Scheduler):
     def stop_profiling(self):
         # type: () -> bool
         if super(_ThreadScheduler, self).stop_profiling():
+            # make sure the set the event here so that the thread
+            # can check to see if it should keep running
             self.event.set()
             return True
         return False
@@ -351,28 +356,50 @@ class _ThreadScheduler(_Scheduler):
 
 
 class _SleepScheduler(_ThreadScheduler):
+    """
+    This scheduler uses time.sleep to wait the required interval before calling
+    the sampling function.
+    """
+
+    mode = "sleep"
+
     def run(self):
         # type: () -> None
         while True:
             if self.event.is_set():
-                self.event.clear()
                 break
             time.sleep(self._interval)
             _sample_stack()
 
 
 class _EventScheduler(_ThreadScheduler):
+    """
+    This scheduler uses threading.Event to wait the required interval before
+    calling the sampling function.
+    """
+
+    mode = "event"
+
     def run(self):
         # type: () -> None
         while True:
             if self.event.is_set():
-                self.event.clear()
                 break
             self.event.wait(timeout=self._interval)
             _sample_stack()
 
 
 class _SignalScheduler(_Scheduler):
+    """
+    This abstract scheduler is based on UNIX signals. It sets up a
+    signal handler for the specified signal, and the matching itimer in order
+    for the signal handler to fire at a regular interval.
+
+    See https://www.gnu.org/software/libc/manual/html_node/Alarm-Signals.html
+    """
+
+    mode = "signal"
+
     @property
     def signal_num(self):
         # type: () -> signal.Signals
@@ -383,22 +410,18 @@ class _SignalScheduler(_Scheduler):
         # type: () -> int
         raise NotImplementedError
 
-    def _signal_handler(self, _signal_num, _frame):
-        # type: (int, Frame) -> None
-        """
-        Wraps around the _sample_stack function. The signal handler
-        is called with the signal number and the interrupted frame.
-        The _sample_stack function does not take any argumnents so
-        we just use this wrapper to discard the arguments.
-        """
-        _sample_stack()
-
     def setup(self):
         # type: () -> None
+        """
+        This method sets up the application so that it can be profiled.
+        It MUST be called from the main thread. This is a limitation of
+        python's signal library where it only allows the main thread to
+        set a signal handler.
+        """
 
         # This setups a process wide signal handler that will be called
         # at an interval to record samples.
-        signal.signal(self.signal_num, self._signal_handler)
+        signal.signal(self.signal_num, _sample_stack)
 
     def teardown(self):
         # type: () -> None
@@ -425,6 +448,27 @@ class _SignalScheduler(_Scheduler):
 
 
 class _SigprofScheduler(_SignalScheduler):
+    """
+    This scheduler uses SIGPROF to regularly call a signal handler where the
+    samples will be taken.
+
+    This is not based on wall time, and you may see some variances
+    in the frequency at which this handler is called.
+
+    This has some limitations:
+    - Only the main thread counts towards the time elapsed. This means that if
+      the main thread is blocking on a sleep() or select() system call, then
+      this clock will not count down. Some examples of this in practice are
+        - When using uwsgi with multiple threads in a worker, the non main
+          threads will only be profiled if the main thread is actively running
+          at the same time.
+        - When using gunicorn with threads, the main thread does not handle the
+          requests directly, so the clock counts down slower than expected since
+          its mostly idling while waiting for requests.
+    """
+
+    mode = "sigprof"
+
     @property
     def signal_num(self):
         # type: () -> signal.Signals
@@ -437,6 +481,16 @@ class _SigprofScheduler(_SignalScheduler):
 
 
 class _SigalrmScheduler(_SignalScheduler):
+    """
+    This scheduler uses SIGALRM to regularly call a signal handler where the
+    samples will be taken.
+
+    This is based on real time, so it *should* be called close to the expected
+    frequency.
+    """
+
+    mode = "sigalrm"
+
     @property
     def signal_num(self):
         # type: () -> signal.Signals
