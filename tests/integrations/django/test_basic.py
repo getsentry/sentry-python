@@ -720,6 +720,8 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
             render_span_tree(transaction)
             == """\
 - op="http.server": description=null
+  - op="django.signals": description="django.db.reset_queries"
+  - op="django.signals": description="django.db.close_old_connections"
   - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.process_request"
   - op="django.middleware": description="django.contrib.auth.middleware.AuthenticationMiddleware.process_request"
   - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.process_request"
