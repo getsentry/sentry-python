@@ -76,7 +76,6 @@ def setup_profiler(buffer_secs=60, frequency=101):
     `buffer_secs` determines the max time a sample will be buffered for
     `frequency` determines the number of samples to take per second (Hz)
     """
-
     global _sample_buffer
     global _scheduler
 
@@ -86,11 +85,9 @@ def setup_profiler(buffer_secs=60, frequency=101):
     # a capcity of `buffer_secs * frequency`.
     _sample_buffer = _SampleBuffer(capacity=buffer_secs * frequency)
 
-    _scheduler = _Scheduler(frequency=frequency)
+    _scheduler = _SigprofScheduler(frequency=frequency)
+    _scheduler.setup()
 
-    # This setups a process wide signal handler that will be called
-    # at an interval to record samples.
-    signal.signal(signal.SIGPROF, _sample_stack)
     atexit.register(teardown_profiler)
 
 
@@ -100,18 +97,15 @@ def teardown_profiler():
     global _sample_buffer
     global _scheduler
 
+    if _scheduler is not None:
+        _scheduler.teardown()
+
     _sample_buffer = None
     _scheduler = None
 
-    # setting the timer with 0 will stop will clear the timer
-    signal.setitimer(signal.ITIMER_PROF, 0)
 
-    # put back the default signal handler
-    signal.signal(signal.SIGPROF, signal.SIG_DFL)
-
-
-def _sample_stack(_signal_num, _frame):
-    # type: (int, Frame) -> None
+def _sample_stack():
+    # type: () -> None
     """
     Take a sample of the stack on all the threads in the process.
     This handler is called to handle the signal at a set interval.
@@ -304,27 +298,154 @@ class _Scheduler(object):
         self._count = 0
         self._interval = 1.0 / frequency
 
+    def setup(self):
+        # type: () -> None
+        raise NotImplementedError
+
+    def teardown(self):
+        # type: () -> None
+        raise NotImplementedError
+
     def start_profiling(self):
         # type: () -> bool
         with self._lock:
-            # we only need to start the timer if we're starting the first profile
-            should_start_timer = self._count == 0
             self._count += 1
-
-        if should_start_timer:
-            signal.setitimer(signal.ITIMER_PROF, self._interval, self._interval)
-        return should_start_timer
+            return self._count == 1
 
     def stop_profiling(self):
         # type: () -> bool
         with self._lock:
-            # we only need to stop the timer if we're stoping the last profile
-            should_stop_timer = self._count == 1
             self._count -= 1
+            return self._count == 0
 
-        if should_stop_timer:
-            signal.setitimer(signal.ITIMER_PROF, 0)
-        return should_stop_timer
+
+class _ThreadScheduler(_Scheduler):
+    event = threading.Event()
+
+    def setup(self):
+        # type: () -> None
+        pass
+
+    def teardown(self):
+        # type: () -> None
+        pass
+
+    def start_profiling(self):
+        # type: () -> bool
+        if super(_ThreadScheduler, self).start_profiling():
+            thread = threading.Thread(target=self.run, daemon=True)
+            thread.start()
+            return True
+        return False
+
+    def stop_profiling(self):
+        # type: () -> bool
+        if super(_ThreadScheduler, self).stop_profiling():
+            self.event.set()
+            return True
+        return False
+
+    def run(self):
+        # type: () -> None
+        raise NotImplementedError
+
+
+class _SleepScheduler(_ThreadScheduler):
+    def run(self):
+        # type: () -> None
+        while True:
+            if self.event.is_set():
+                self.event.clear()
+                break
+            time.sleep(self._interval)
+            _sample_stack()
+
+
+class _EventScheduler(_ThreadScheduler):
+    def run(self):
+        # type: () -> None
+        while True:
+            if self.event.is_set():
+                self.event.clear()
+                break
+            self.event.wait(timeout=self._interval)
+            _sample_stack()
+
+
+class _SignalScheduler(_Scheduler):
+    @property
+    def signal_num(self):
+        # type: () -> signal.Signals
+        raise NotImplementedError
+
+    @property
+    def signal_timer(self):
+        # type: () -> int
+        raise NotImplementedError
+
+    def _signal_handler(self, _signal_num, _frame):
+        # type: (int, Frame) -> None
+        """
+        Wraps around the _sample_stack function. The signal handler
+        is called with the signal number and the interrupted frame.
+        The _sample_stack function does not take any argumnents so
+        we just use this wrapper to discard the arguments.
+        """
+        _sample_stack()
+
+    def setup(self):
+        # type: () -> None
+
+        # This setups a process wide signal handler that will be called
+        # at an interval to record samples.
+        signal.signal(self.signal_num, self._signal_handler)
+
+    def teardown(self):
+        # type: () -> None
+
+        # setting the timer with 0 will stop will clear the timer
+        signal.setitimer(self.signal_timer, 0)
+
+        # put back the default signal handler
+        signal.signal(self.signal_num, signal.SIG_DFL)
+
+    def start_profiling(self):
+        # type: () -> bool
+        if super(_SignalScheduler, self).start_profiling():
+            signal.setitimer(self.signal_timer, self._interval, self._interval)
+            return True
+        return False
+
+    def stop_profiling(self):
+        # type: () -> bool
+        if super(_SignalScheduler, self).stop_profiling():
+            signal.setitimer(self.signal_timer, 0)
+            return True
+        return False
+
+
+class _SigprofScheduler(_SignalScheduler):
+    @property
+    def signal_num(self):
+        # type: () -> signal.Signals
+        return signal.SIGPROF
+
+    @property
+    def signal_timer(self):
+        # type: () -> int
+        return signal.ITIMER_PROF
+
+
+class _SigalrmScheduler(_SignalScheduler):
+    @property
+    def signal_num(self):
+        # type: () -> signal.Signals
+        return signal.SIGALRM
+
+    @property
+    def signal_timer(self):
+        # type: () -> int
+        return signal.ITIMER_REAL
 
 
 def _should_profile(hub):
