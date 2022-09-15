@@ -17,7 +17,6 @@ import platform
 import random
 import signal
 import threading
-import time
 import sys
 import uuid
 
@@ -28,6 +27,7 @@ import sentry_sdk
 from sentry_sdk._compat import PY33
 
 from sentry_sdk._types import MYPY
+from sentry_sdk.utils import nanosecond_time
 
 if MYPY:
     from typing import Any
@@ -42,14 +42,6 @@ if MYPY:
 
     Frame = Any
     FrameData = Tuple[str, str, int]
-
-
-def nanosecond_time():
-    # type: () -> int
-
-    # In python3.7+, there is a time.perf_counter_ns()
-    # that we may want to switch to for more precision
-    return int(time.perf_counter() * 1e9)
 
 
 _sample_buffer = None  # type: Optional[_SampleBuffer]

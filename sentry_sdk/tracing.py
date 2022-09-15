@@ -1,13 +1,12 @@
 import uuid
 import random
-import time
 import threading
 
 from datetime import datetime, timedelta
 
 import sentry_sdk
 
-from sentry_sdk.utils import logger
+from sentry_sdk.utils import logger, nanosecond_time
 from sentry_sdk._types import MYPY
 
 
@@ -138,11 +137,7 @@ class Span(object):
         self._containing_transaction = containing_transaction
         self.start_timestamp = datetime.utcnow()
         try:
-            # TODO: For Python 3.7+, we could use a clock with ns resolution:
-            # self._start_timestamp_monotonic = time.perf_counter_ns()
-
-            # Python 3.3+
-            self._start_timestamp_monotonic = time.perf_counter()
+            self._start_timestamp_monotonic = nanosecond_time()
         except AttributeError:
             pass
 
@@ -465,7 +460,7 @@ class Span(object):
         hub = hub or self.hub or sentry_sdk.Hub.current
 
         try:
-            duration_seconds = time.perf_counter() - self._start_timestamp_monotonic
+            duration_seconds = nanosecond_time() - self._start_timestamp_monotonic
             self.timestamp = self.start_timestamp + timedelta(seconds=duration_seconds)
         except AttributeError:
             self.timestamp = datetime.utcnow()
