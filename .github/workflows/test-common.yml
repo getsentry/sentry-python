@@ -66,8 +66,7 @@ jobs:
           set -x # print commands that are executed
           coverage erase
 
-          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} "" "")
-          ./scripts/runtox.sh "$envname$" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --ignore=tests/integrations
+          ./scripts/runtox.sh "${{ matrix.python-version }}$" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --ignore=tests/integrations
           coverage combine .coverage*
           coverage xml -i
           codecov --file coverage.xml
