@@ -24,15 +24,8 @@ jobs:
     continue-on-error: true
     strategy:
       matrix:
-        python-version: ["3.5"]
-        sanic-versions: ["0.8,18"]
+        python-version: ["3.5","3.6","3.7","3.8","3.9","3.10"]
         os: [ubuntu-latest]
-        include:
-          - { python-version: "3.6", sanic-versions: "0.8,18,19,20", os: "ubuntu-latest" }
-          - { python-version: "3.7", sanic-versions: "0.8,18,19,20,21", os: "ubuntu-latest" }
-          - { python-version: "3.8", sanic-versions: "20,21", os: "ubuntu-latest" }
-          - { python-version: "3.9", sanic-versions: "21", os: "ubuntu-latest" }
-          - { python-version: "3.10", sanic-versions: "21", os: "ubuntu-latest" }
 
     steps:
       - uses: actions/checkout@v3
@@ -60,8 +53,7 @@ jobs:
           mkdir -p ~/toxworkdir
           sudo mount -o size=180m -t tmpfs none ~/toxworkdir
 
-          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} sanic)
-          ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "${{ matrix.python-version }}-sanic" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
           codecov --file coverage.xml

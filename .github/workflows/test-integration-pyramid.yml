@@ -24,16 +24,8 @@ jobs:
     continue-on-error: true
     strategy:
       matrix:
-        python-version: ["2.7"]
-        pyramid-versions: ["1.6,1.7,1.8,1.9,1.10"]
+        python-version: ["2.7","3.5","3.6","3.7","3.8","3.9","3.10"]
         os: [ubuntu-latest]
-        include:
-          - { python-version: "3.5", pyramid-versions: "1.6,1.7,1.8,1.9,1.10", os: "ubuntu-latest" }
-          - { python-version: "3.6", pyramid-versions: "1.6,1.7,1.8,1.9,1.10", os: "ubuntu-latest" }
-          - { python-version: "3.7", pyramid-versions: "1.6,1.7,1.8,1.9,1.10", os: "ubuntu-latest" }
-          - { python-version: "3.8", pyramid-versions: "1.6,1.7,1.8,1.9,1.10", os: "ubuntu-latest" }
-          - { python-version: "3.9", pyramid-versions: "1.6,1.7,1.8,1.9,1.10", os: "ubuntu-latest" }
-          - { python-version: "3.10", pyramid-versions: "1.6,1.7,1.8,1.9,1.10", os: "ubuntu-latest" }
 
     steps:
       - uses: actions/checkout@v3
@@ -61,8 +53,7 @@ jobs:
           mkdir -p ~/toxworkdir
           sudo mount -o size=180m -t tmpfs none ~/toxworkdir
 
-          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} pyramid)
-          ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "${{ matrix.python-version }}-pyramid" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
           codecov --file coverage.xml

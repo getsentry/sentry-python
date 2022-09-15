@@ -25,7 +25,6 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.7"]
-        beam-versions: ["2.12,2.13,2.32,2.33"]
         os: [ubuntu-latest]
 
     steps:
@@ -54,8 +53,7 @@ jobs:
           mkdir -p ~/toxworkdir
           sudo mount -o size=180m -t tmpfs none ~/toxworkdir
 
-          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} beam)
-          ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "${{ matrix.python-version }}-beam" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
           codecov --file coverage.xml

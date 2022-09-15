@@ -24,12 +24,8 @@ jobs:
     continue-on-error: true
     strategy:
       matrix:
-        python-version: ["3.6"]
-        chalice-versions: ["1.16,1.17,1.18,1.19,1.20"]
+        python-version: ["3.6","3.7","3.8"]
         os: [ubuntu-latest]
-        include:
-          - { python-version: "3.7", chalice-versions: "1.16,1.17,1.18,1.19,1.20", os: "ubuntu-latest" }
-          - { python-version: "3.8", chalice-versions: "1.16,1.17,1.18,1.19,1.20", os: "ubuntu-latest" }
 
     steps:
       - uses: actions/checkout@v3
@@ -57,8 +53,7 @@ jobs:
           mkdir -p ~/toxworkdir
           sudo mount -o size=180m -t tmpfs none ~/toxworkdir
 
-          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} chalice)
-          ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "${{ matrix.python-version }}-chalice" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
           codecov --file coverage.xml
