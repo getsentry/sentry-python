@@ -272,7 +272,7 @@ class _SampleBuffer(object):
         # type: (int, int) -> Dict[str, Any]
         samples = []  # type: List[Any]
         stacks = dict()  # type: Dict[Any, int]
-        stacks_list = tuple()  # type: Tuple[int, ...]
+        stacks_list = list()  # type: List[Tuple]
         frames = dict()  # type: Dict[FrameData, int]
         frames_list = list()  # type: List[Any]
 
@@ -294,9 +294,9 @@ class _SampleBuffer(object):
                     "relative_timestamp_ns": ts - start_ns,
                     "thread_id": tid,
                 }
+                current_stack = []
 
                 for frame in stack:
-                    current_stack = []
                     if frame not in frames:
                         frames[frame] = len(frames)
                         frames_list.append(
