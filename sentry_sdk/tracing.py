@@ -576,7 +576,9 @@ class Transaction(Span):
         self._measurements = {}  # type: Dict[str, Any]
         self._profile = None  # type: Optional[Dict[str, Any]]
         self._baggage = baggage
-        self._thread_id = threading.current_thread().ident
+        # for profiling, we want to know on which thread a transaction is started
+        # to accurately show the active thread in the UI
+        self._thread_id = threading.current_thread().ident  # used by profiling.py
 
     def __repr__(self):
         # type: () -> str
