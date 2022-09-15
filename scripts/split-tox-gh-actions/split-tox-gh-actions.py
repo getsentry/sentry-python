@@ -1,14 +1,26 @@
+"""Split Tox to GitHub Actions
+
+This is a small script to split a tox.ini config file into multiple GitHub actions configuration files.
+This way each framework defined in tox.ini will get its own GitHub actions configuration file
+which allows them to be run in parallel in GitHub actions.
+
+This will generate several configuration files, that need to be commited to Git afterwards.
+
+Usage:
+    python split-tox-gh-actions.py
+
+"""
+
+from pathlib import Path
 import configparser
 from collections import defaultdict
-from multiprocessing.sharedctypes import Value
 
 
-OUT_DIR = "/Users/antonpirker/code/sentry-python/.github/workflows/"
-TOX_FILE = "/Users/antonpirker/code/sentry-python/tox.ini"
-TEMPLATE_FILE = (
-    "/Users/antonpirker/code/sentry-python/scripts/split-tox-gh-actions/ci-yaml.txt"
-)
-TEMPLATE_FILE_SERVICES = "/Users/antonpirker/code/sentry-python/scripts/split-tox-gh-actions/ci-yaml-services.txt"
+OUT_DIR = Path(__file__).resolve().parent.parent.parent / ".github" / "workflows"
+TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
+TEMPLATE_DIR = Path(__file__).resolve().parent
+TEMPLATE_FILE = TEMPLATE_DIR / "ci-yaml.txt"
+TEMPLATE_FILE_SERVICES = TEMPLATE_DIR / "ci-yaml-services.txt"
 
 FRAMEWORKS_NEEDING_POSTGRES = ["django"]
 
@@ -30,9 +42,9 @@ def write_yaml_file(
     out = ""
     for template_line in template:
         if template_line == "{{ strategy_matrix }}\n":
-            m = MATRIX_DEFINITION
             py_versions = [f'"{py.replace("py", "")}"' for py in python_versions]
 
+            m = MATRIX_DEFINITION
             m = m.replace("{{ framework }}", current_framework).replace(
                 "{{ python-version }}", ",".join(py_versions)
             )
@@ -48,7 +60,7 @@ def write_yaml_file(
             out += template_line.replace("{{ framework }}", current_framework)
 
     # write rendered template
-    outfile_name = OUT_DIR + f"test-integration-{current_framework}.yml"
+    outfile_name = OUT_DIR / f"test-integration-{current_framework}.yml"
     print(f"Writing {outfile_name}")
     f = open(outfile_name, "w")
     f.writelines(out)
@@ -98,11 +110,7 @@ def main():
             print(f"ERROR reading line {line}")
 
     for framework in python_versions:
-        write_yaml_file(
-            template,
-            framework,
-            python_versions[framework],
-        )
+        write_yaml_file(template, framework, python_versions[framework])
 
     print("All done. Have a nice day!")
 
