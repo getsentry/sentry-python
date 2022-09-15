@@ -206,10 +206,24 @@ class Profile(object):
 
         if PY2:
             relative_start_ns = "0"
-            relative_end_ns = str(int((datetime.utcnow() - self.transaction.start_timestamp).total_seconds() * 1e9))
+            relative_end_ns = str(
+                int(
+                    (
+                        datetime.utcnow() - self.transaction.start_timestamp
+                    ).total_seconds()
+                    * 1e9
+                )
+            )
         else:
-            relative_start_ns = str(int(self._start_ns - self.transaction._start_timestamp_monotonic * 1e9))
-            relative_end_ns = str(int(nanosecond_time() - self.transaction._start_timestamp_monotonic * 1e9))
+            relative_start_ns = str(
+                int(self._start_ns - self.transaction._start_timestamp_monotonic * 1e9)
+            )
+            relative_end_ns = str(
+                int(
+                    nanosecond_time()
+                    - self.transaction._start_timestamp_monotonic * 1e9
+                )
+            )
 
         return {
             "environment": None,  # Gets added in client.py
@@ -281,7 +295,7 @@ class _SampleBuffer(object):
         # type: (int, int) -> Dict[str, Any]
         samples = []  # type: List[Any]
         stacks = dict()  # type: Dict[Any, int]
-        stacks_list = list()  # type: List[Tuple]
+        stacks_list = list()  # type: List[Any]
         frames = dict()  # type: Dict[FrameData, int]
         frames_list = list()  # type: List[Any]
 
