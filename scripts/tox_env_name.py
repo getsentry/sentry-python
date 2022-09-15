@@ -9,10 +9,7 @@ def main():
     py_version = ""
     fr_version = ""
 
-    if python_version == "pypy2.7":
-        py_version = "pypy"
-    else:
-        py_version = "py" + python_version
+    py_version = "py" + python_version
 
     if framework_version == "latest" or framework_version == "":
         fr_version = ""

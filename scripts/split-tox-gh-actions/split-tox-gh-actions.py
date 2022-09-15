@@ -165,9 +165,7 @@ def main():
                 if python_version not in python_versions:
                     python_versions.append(python_version)
                 if not init_python_version:
-                    init_python_version = (
-                        python_version if python_version != "pypy" else None
-                    )
+                    init_python_version = python_version
 
             for framework_version in (
                 raw_framework_versions.replace("{", "").replace("}", "").split(",")
@@ -180,9 +178,8 @@ def main():
                 init_framework_version = "latest"
 
             for fr in framework_versions:
+
                 for py in python_versions:
-                    if py == "pypy":
-                        continue
                     py = py.replace("py", "")
                     s = f'\n          - {{ {current_framework}-version: "{fr or "latest"}", python-version: "{py}", os: "ubuntu-latest" }}'
                     gh_frameworks.append(s)
