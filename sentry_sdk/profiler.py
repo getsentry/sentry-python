@@ -23,6 +23,7 @@ import uuid
 
 from collections import deque
 from contextlib import contextmanager
+from datetime import datetime
 
 import sentry_sdk
 from sentry_sdk._compat import PY2
@@ -226,8 +227,8 @@ class Profile(object):
                 {
                     "id": None,  # Gets added in client.py
                     "name": self.transaction.name,
-                    "relative_start_ns": str(self._start_ns),
-                    "relative_stop_ns": str(self._stop_ns),
+                    "relative_start_ns": "0",
+                    "relative_end_ns": str(int((datetime.utcnow() - self.transaction.start_timestamp).total_seconds() * 1e9)),
                     "trace_id": self.transaction.trace_id,
                     "thread_id": self.transaction._thread_id,
                 }
