@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: python ${{ matrix.python-version }}, celery, ${{ matrix.os }}
+    name: celery, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
