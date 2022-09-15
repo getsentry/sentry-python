@@ -14,6 +14,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 import atexit
 import platform
+import random
 import signal
 import threading
 import time
@@ -63,7 +64,7 @@ _sample_buffer = None  # type: Optional[_SampleBuffer]
 _scheduler = None  # type: Optional[_Scheduler]
 
 
-def _setup_profiler(buffer_secs=60, frequency=101):
+def setup_profiler(buffer_secs=60, frequency=101):
     # type: (int, int) -> None
 
     """
@@ -90,16 +91,14 @@ def _setup_profiler(buffer_secs=60, frequency=101):
     # This setups a process wide signal handler that will be called
     # at an interval to record samples.
     signal.signal(signal.SIGPROF, _sample_stack)
-    atexit.register(_teardown_profiler)
+    atexit.register(teardown_profiler)
 
 
-def _teardown_profiler():
+def teardown_profiler():
     # type: () -> None
 
     global _sample_buffer
     global _scheduler
-
-    assert _sample_buffer is not None and _scheduler is not None
 
     _sample_buffer = None
     _scheduler = None
@@ -350,9 +349,29 @@ class _Scheduler(object):
         return should_stop_timer
 
 
-def _has_profiling_enabled():
-    # type: () -> bool
-    return _sample_buffer is not None and _scheduler is not None
+def _should_profile(hub):
+    # type: (Optional[sentry_sdk.Hub]) -> bool
+
+    # The profiler hasn't been properly initialized.
+    if _sample_buffer is None or _scheduler is None:
+        return False
+
+    hub = hub or sentry_sdk.Hub.current
+    client = hub.client
+
+    # The client is None, so we can't get the sample rate.
+    if client is None:
+        return False
+
+    options = client.options
+    profiles_sample_rate = options["_experiments"].get("profiles_sample_rate")
+
+    # The profiles_sample_rate option was not set, so profiling
+    # was never enabled.
+    if profiles_sample_rate is None:
+        return False
+
+    return random.random() < float(profiles_sample_rate)
 
 
 @contextmanager
@@ -360,7 +379,7 @@ def start_profiling(transaction, hub=None):
     # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
 
     # if profiling was not enabled, this should be a noop
-    if _has_profiling_enabled():
+    if _should_profile(hub):
         with Profile(transaction, hub=hub):
             yield
     else:
