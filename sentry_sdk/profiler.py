@@ -100,7 +100,7 @@ def teardown_profiler():
 
 
 def _sample_stack(*args, **kwargs):
-    # type: () -> None
+    # type: (*Any, **Any) -> None
     """
     Take a sample of the stack on all the threads in the process.
     This should be called at a regular interval to collect samples.
