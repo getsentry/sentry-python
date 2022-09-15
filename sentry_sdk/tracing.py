@@ -581,7 +581,7 @@ class Transaction(Span):
         self._measurements = {}  # type: Dict[str, Any]
         self._profile = None  # type: Optional[Dict[str, Any]]
         self._baggage = baggage
-        self._thread_id = threading.get_ident()
+        self._thread_id = threading.current_thread().ident
 
     def __repr__(self):
         # type: () -> str
