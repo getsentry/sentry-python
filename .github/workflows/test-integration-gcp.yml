@@ -22,6 +22,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
+
     strategy:
       matrix:
         python-version: ["3.7"]

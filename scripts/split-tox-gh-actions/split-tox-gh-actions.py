@@ -1,44 +1,23 @@
 import configparser
-from multiprocessing.sharedctypes import Value
 from collections import defaultdict
+from multiprocessing.sharedctypes import Value
+
 
 OUT_DIR = "/Users/antonpirker/code/sentry-python/.github/workflows/"
 TOX_FILE = "/Users/antonpirker/code/sentry-python/tox.ini"
 TEMPLATE_FILE = (
-    "/Users/antonpirker/code/sentry-python/scripts/split-tox-gh-actions/ci-template.yml"
+    "/Users/antonpirker/code/sentry-python/scripts/split-tox-gh-actions/ci-yaml.txt"
 )
+TEMPLATE_FILE_SERVICES = "/Users/antonpirker/code/sentry-python/scripts/split-tox-gh-actions/ci-yaml-services.txt"
 
-FRAMEWORKS_NEEDING_POSTGRES = [
-    "django",
-]
+FRAMEWORKS_NEEDING_POSTGRES = ["django"]
 
-MATRIX_DEFINITION = [
-    "    strategy:",
-    "\n      matrix:",
-    "\n        python-version: [{{ python-version }}]",
-    "\n        os: [ubuntu-latest]",
-]
-
-SERVICE_POSTGRES = [
-    "    services:",
-    "\n      postgres:",
-    "\n        image: postgres",
-    "\n        env:",
-    "\n          POSTGRES_PASSWORD: sentry",
-    "\n        # Set health checks to wait until postgres has started",
-    "\n        options: >-",
-    "\n          --health-cmd pg_isready",
-    "\n          --health-interval 10s",
-    "\n          --health-timeout 5s",
-    "\n          --health-retries 5",
-    "\n        # Maps tcp port 5432 on service container to the host",
-    "\n        ports:",
-    "\n          - 5432:5432",
-    "\n    env:",
-    "\n      SENTRY_PYTHON_TEST_POSTGRES_USER: postgres",
-    "\n      SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry",
-    "\n      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test",
-]
+MATRIX_DEFINITION = """
+    strategy:
+      matrix:
+        python-version: [{{ python-version }}]
+        os: [ubuntu-latest]
+"""
 
 
 def write_yaml_file(
@@ -46,39 +25,39 @@ def write_yaml_file(
     current_framework,
     python_versions,
 ):
+    """Write the YAML configuration file for one framework to disk."""
     # render template for print
-    out_lines = []
+    out = ""
     for template_line in template:
         if template_line == "{{ strategy_matrix }}\n":
-            h = MATRIX_DEFINITION.copy()
+            m = MATRIX_DEFINITION
+            py_versions = [f'"{py.replace("py", "")}"' for py in python_versions]
 
-            for l in h:
-                output_array = [f'"{py.replace("py", "")}"' for py in python_versions]
-                output_string = ",".join(output_array)
-
-                l = l.replace("{{ framework }}", current_framework).replace(
-                    "{{ python-version }}", output_string
-                )
-                out_lines.append(l)
+            m = m.replace("{{ framework }}", current_framework).replace(
+                "{{ python-version }}", ",".join(py_versions)
+            )
+            out += m
 
         elif template_line == "{{ services }}\n":
             if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
-                out_lines += SERVICE_POSTGRES
+                f = open(TEMPLATE_FILE_SERVICES, "r")
+                out += "".join(f.readlines())
+                f.close()
 
         else:
-            out_lines.append(
-                template_line.replace("{{ framework }}", current_framework)
-            )
+            out += template_line.replace("{{ framework }}", current_framework)
 
     # write rendered template
     outfile_name = OUT_DIR + f"test-integration-{current_framework}.yml"
     print(f"Writing {outfile_name}")
     f = open(outfile_name, "w")
-    f.writelines(out_lines)
+    f.writelines(out)
     f.close()
 
 
 def main():
+    """Create one CI workflow for each framework defined in tox.ini"""
+
     print("Read GitHub actions config file template")
     f = open(TEMPLATE_FILE, "r")
     template = f.readlines()
