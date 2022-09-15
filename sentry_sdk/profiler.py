@@ -64,13 +64,16 @@ _sample_buffer = None  # type: Optional[_SampleBuffer]
 _scheduler = None  # type: Optional[_Scheduler]
 
 
-def setup_profiler(buffer_secs=60, frequency=101):
-    # type: (int, int) -> None
+def setup_profiler(options):
+    # type: (Dict[str, Any]) -> None
 
     """
     `buffer_secs` determines the max time a sample will be buffered for
     `frequency` determines the number of samples to take per second (Hz)
     """
+    buffer_secs = 60
+    frequency = 101
+
     global _sample_buffer
     global _scheduler
 
@@ -80,7 +83,17 @@ def setup_profiler(buffer_secs=60, frequency=101):
     # a capcity of `buffer_secs * frequency`.
     _sample_buffer = _SampleBuffer(capacity=buffer_secs * frequency)
 
-    _scheduler = _SigprofScheduler(frequency=frequency)
+    profiler_mode = options["_experiments"].get("profiler_mode", _SigprofScheduler.mode)
+    if profiler_mode == _SigprofScheduler.mode:
+        _scheduler = _SigprofScheduler(frequency=frequency)
+    elif profiler_mode == _SigalrmScheduler.mode:
+        _scheduler = _SigalrmScheduler(frequency=frequency)
+    elif profiler_mode == _SleepScheduler.mode:
+        _scheduler = _SleepScheduler(frequency=frequency)
+    elif profiler_mode == _EventScheduler.mode:
+        _scheduler = _EventScheduler(frequency=frequency)
+    else:
+        raise ValueError("Unknown profiler mode: {}".format(profiler_mode))
     _scheduler.setup()
 
     atexit.register(teardown_profiler)
@@ -421,7 +434,15 @@ class _SignalScheduler(_Scheduler):
 
         # This setups a process wide signal handler that will be called
         # at an interval to record samples.
-        signal.signal(self.signal_num, _sample_stack)
+        try:
+            signal.signal(self.signal_num, _sample_stack)
+        except ValueError:
+            raise ValueError("Signal based profiling can only be enabled from the main thread.")
+
+        # Ensures that system calls interrupted by signals are restarted
+        # automatically. Otherwise, we may see some strage behaviours
+        # such as IOErrors caused by the system call being interrupted.
+        signal.siginterrupt(self.signal_num, False)
 
     def teardown(self):
         # type: () -> None
