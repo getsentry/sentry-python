@@ -18,26 +18,20 @@ env:
 
 jobs:
   test:
-    name: sqlalchemy ${{ matrix.sqlalchemy-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: python ${{ matrix.python-version }}, sqlalchemy ${{ matrix.sqlalchemy-versions }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
     strategy:
       matrix:
-        os: [ubuntu-latest]
         python-version: ["2.7"]
-        sqlalchemy-version: ["1.2"]
-        include:    
-          - { sqlalchemy-version: "1.2", python-version: "2.7", os: "ubuntu-latest" }
-          - { sqlalchemy-version: "1.2", python-version: "3.7", os: "ubuntu-latest" }
-          - { sqlalchemy-version: "1.2", python-version: "3.8", os: "ubuntu-latest" }
-          - { sqlalchemy-version: "1.2", python-version: "3.9", os: "ubuntu-latest" }
-          - { sqlalchemy-version: "1.2", python-version: "3.10", os: "ubuntu-latest" }
-          - { sqlalchemy-version: "1.3", python-version: "2.7", os: "ubuntu-latest" }
-          - { sqlalchemy-version: "1.3", python-version: "3.7", os: "ubuntu-latest" }
-          - { sqlalchemy-version: "1.3", python-version: "3.8", os: "ubuntu-latest" }
-          - { sqlalchemy-version: "1.3", python-version: "3.9", os: "ubuntu-latest" }
-          - { sqlalchemy-version: "1.3", python-version: "3.10", os: "ubuntu-latest" }
+        sqlalchemy-versions: ["1.2,1.3"]
+        os: [ubuntu-latest]
+        include:
+          - { python-version: "3.7", sqlalchemy-versions: "1.2,1.3", os: "ubuntu-latest" }
+          - { python-version: "3.8", sqlalchemy-versions: "1.2,1.3", os: "ubuntu-latest" }
+          - { python-version: "3.9", sqlalchemy-versions: "1.2,1.3", os: "ubuntu-latest" }
+          - { python-version: "3.10", sqlalchemy-versions: "1.2,1.3", os: "ubuntu-latest" }
 
     steps:
       - uses: actions/checkout@v3
@@ -65,8 +59,8 @@ jobs:
           mkdir -p ~/toxworkdir
           sudo mount -o size=180m -t tmpfs none ~/toxworkdir
 
-          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
+          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} sqlalchemy
           ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
-          codecov --file coverage.xml          
+          codecov --file coverage.xml

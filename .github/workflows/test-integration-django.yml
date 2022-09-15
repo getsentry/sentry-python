@@ -18,50 +18,22 @@ env:
 
 jobs:
   test:
-    name: django ${{ matrix.django-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: python ${{ matrix.python-version }}, django ${{ matrix.django-versions }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
     strategy:
       matrix:
-        os: [ubuntu-latest]
         python-version: ["2.7"]
-        django-version: ["1.8"]
-        include:    
-          - { django-version: "1.8", python-version: "2.7", os: "ubuntu-latest" }
-          - { django-version: "1.8", python-version: "3.5", os: "ubuntu-latest" }
-          - { django-version: "1.9", python-version: "2.7", os: "ubuntu-latest" }
-          - { django-version: "1.9", python-version: "3.5", os: "ubuntu-latest" }
-          - { django-version: "1.10", python-version: "2.7", os: "ubuntu-latest" }
-          - { django-version: "1.10", python-version: "3.5", os: "ubuntu-latest" }
-          - { django-version: "1.11", python-version: "2.7", os: "ubuntu-latest" }
-          - { django-version: "1.11", python-version: "3.5", os: "ubuntu-latest" }
-          - { django-version: "1.11", python-version: "3.6", os: "ubuntu-latest" }
-          - { django-version: "1.11", python-version: "3.7", os: "ubuntu-latest" }
-          - { django-version: "2.0", python-version: "3.5", os: "ubuntu-latest" }
-          - { django-version: "2.0", python-version: "3.6", os: "ubuntu-latest" }
-          - { django-version: "2.0", python-version: "3.7", os: "ubuntu-latest" }
-          - { django-version: "2.1", python-version: "3.5", os: "ubuntu-latest" }
-          - { django-version: "2.1", python-version: "3.6", os: "ubuntu-latest" }
-          - { django-version: "2.1", python-version: "3.7", os: "ubuntu-latest" }
-          - { django-version: "2.2", python-version: "3.5", os: "ubuntu-latest" }
-          - { django-version: "2.2", python-version: "3.6", os: "ubuntu-latest" }
-          - { django-version: "2.2", python-version: "3.7", os: "ubuntu-latest" }
-          - { django-version: "2.2", python-version: "3.8", os: "ubuntu-latest" }
-          - { django-version: "2.2", python-version: "3.9", os: "ubuntu-latest" }
-          - { django-version: "3.0", python-version: "3.6", os: "ubuntu-latest" }
-          - { django-version: "3.0", python-version: "3.7", os: "ubuntu-latest" }
-          - { django-version: "3.0", python-version: "3.8", os: "ubuntu-latest" }
-          - { django-version: "3.0", python-version: "3.9", os: "ubuntu-latest" }
-          - { django-version: "3.1", python-version: "3.6", os: "ubuntu-latest" }
-          - { django-version: "3.1", python-version: "3.7", os: "ubuntu-latest" }
-          - { django-version: "3.1", python-version: "3.8", os: "ubuntu-latest" }
-          - { django-version: "3.1", python-version: "3.9", os: "ubuntu-latest" }
-          - { django-version: "3.2", python-version: "3.6", os: "ubuntu-latest" }
-          - { django-version: "3.2", python-version: "3.7", os: "ubuntu-latest" }
-          - { django-version: "3.2", python-version: "3.8", os: "ubuntu-latest" }
-          - { django-version: "3.2", python-version: "3.9", os: "ubuntu-latest" }
-          - { django-version: "3.2", python-version: "3.10", os: "ubuntu-latest" }
+        django-versions: ["1.8,1.9,1.10,1.11"]
+        os: [ubuntu-latest]
+        include:
+          - { python-version: "3.5", django-versions: "1.8,1.9,1.10,1.11,2.0,2.1,2.2", os: "ubuntu-latest" }
+          - { python-version: "3.6", django-versions: "1.11,2.0,2.1,2.2,3.0,3.1,3.2", os: "ubuntu-latest" }
+          - { python-version: "3.7", django-versions: "1.11,2.0,2.1,2.2,3.0,3.1,3.2", os: "ubuntu-latest" }
+          - { python-version: "3.8", django-versions: "2.2,3.0,3.1,3.2", os: "ubuntu-latest" }
+          - { python-version: "3.9", django-versions: "2.2,3.0,3.1,3.2", os: "ubuntu-latest" }
+          - { python-version: "3.10", django-versions: "3.2", os: "ubuntu-latest" }
     services:
       postgres:
         image: postgres
@@ -106,8 +78,8 @@ jobs:
           mkdir -p ~/toxworkdir
           sudo mount -o size=180m -t tmpfs none ~/toxworkdir
 
-          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
+          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django
           ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
-          codecov --file coverage.xml          
+          codecov --file coverage.xml

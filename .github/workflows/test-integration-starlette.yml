@@ -18,24 +18,19 @@ env:
 
 jobs:
   test:
-    name: starlette ${{ matrix.starlette-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: python ${{ matrix.python-version }}, starlette ${{ matrix.starlette-versions }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
     strategy:
       matrix:
-        os: [ubuntu-latest]
         python-version: ["3.7"]
-        starlette-version: ["0.19.1"]
-        include:    
-          - { starlette-version: "0.19.1", python-version: "3.7", os: "ubuntu-latest" }
-          - { starlette-version: "0.19.1", python-version: "3.8", os: "ubuntu-latest" }
-          - { starlette-version: "0.19.1", python-version: "3.9", os: "ubuntu-latest" }
-          - { starlette-version: "0.19.1", python-version: "3.10", os: "ubuntu-latest" }
-          - { starlette-version: "0.20", python-version: "3.7", os: "ubuntu-latest" }
-          - { starlette-version: "0.20", python-version: "3.8", os: "ubuntu-latest" }
-          - { starlette-version: "0.20", python-version: "3.9", os: "ubuntu-latest" }
-          - { starlette-version: "0.20", python-version: "3.10", os: "ubuntu-latest" }
+        starlette-versions: ["0.19.1,0.20"]
+        os: [ubuntu-latest]
+        include:
+          - { python-version: "3.8", starlette-versions: "0.19.1,0.20", os: "ubuntu-latest" }
+          - { python-version: "3.9", starlette-versions: "0.19.1,0.20", os: "ubuntu-latest" }
+          - { python-version: "3.10", starlette-versions: "0.19.1,0.20", os: "ubuntu-latest" }
 
     steps:
       - uses: actions/checkout@v3
@@ -63,8 +58,8 @@ jobs:
           mkdir -p ~/toxworkdir
           sudo mount -o size=180m -t tmpfs none ~/toxworkdir
 
-          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
+          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} starlette
           ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
-          codecov --file coverage.xml          
+          codecov --file coverage.xml

@@ -18,48 +18,19 @@ env:
 
 jobs:
   test:
-    name: boto3 ${{ matrix.boto3-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: python ${{ matrix.python-version }}, boto3 ${{ matrix.boto3-versions }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
     strategy:
       matrix:
-        os: [ubuntu-latest]
         python-version: ["2.7"]
-        boto3-version: ["1.9"]
-        include:    
-          - { boto3-version: "1.9", python-version: "2.7", os: "ubuntu-latest" }
-          - { boto3-version: "1.9", python-version: "3.6", os: "ubuntu-latest" }
-          - { boto3-version: "1.9", python-version: "3.7", os: "ubuntu-latest" }
-          - { boto3-version: "1.9", python-version: "3.8", os: "ubuntu-latest" }
-          - { boto3-version: "1.10", python-version: "2.7", os: "ubuntu-latest" }
-          - { boto3-version: "1.10", python-version: "3.6", os: "ubuntu-latest" }
-          - { boto3-version: "1.10", python-version: "3.7", os: "ubuntu-latest" }
-          - { boto3-version: "1.10", python-version: "3.8", os: "ubuntu-latest" }
-          - { boto3-version: "1.11", python-version: "2.7", os: "ubuntu-latest" }
-          - { boto3-version: "1.11", python-version: "3.6", os: "ubuntu-latest" }
-          - { boto3-version: "1.11", python-version: "3.7", os: "ubuntu-latest" }
-          - { boto3-version: "1.11", python-version: "3.8", os: "ubuntu-latest" }
-          - { boto3-version: "1.12", python-version: "2.7", os: "ubuntu-latest" }
-          - { boto3-version: "1.12", python-version: "3.6", os: "ubuntu-latest" }
-          - { boto3-version: "1.12", python-version: "3.7", os: "ubuntu-latest" }
-          - { boto3-version: "1.12", python-version: "3.8", os: "ubuntu-latest" }
-          - { boto3-version: "1.13", python-version: "2.7", os: "ubuntu-latest" }
-          - { boto3-version: "1.13", python-version: "3.6", os: "ubuntu-latest" }
-          - { boto3-version: "1.13", python-version: "3.7", os: "ubuntu-latest" }
-          - { boto3-version: "1.13", python-version: "3.8", os: "ubuntu-latest" }
-          - { boto3-version: "1.14", python-version: "2.7", os: "ubuntu-latest" }
-          - { boto3-version: "1.14", python-version: "3.6", os: "ubuntu-latest" }
-          - { boto3-version: "1.14", python-version: "3.7", os: "ubuntu-latest" }
-          - { boto3-version: "1.14", python-version: "3.8", os: "ubuntu-latest" }
-          - { boto3-version: "1.15", python-version: "2.7", os: "ubuntu-latest" }
-          - { boto3-version: "1.15", python-version: "3.6", os: "ubuntu-latest" }
-          - { boto3-version: "1.15", python-version: "3.7", os: "ubuntu-latest" }
-          - { boto3-version: "1.15", python-version: "3.8", os: "ubuntu-latest" }
-          - { boto3-version: "1.16", python-version: "2.7", os: "ubuntu-latest" }
-          - { boto3-version: "1.16", python-version: "3.6", os: "ubuntu-latest" }
-          - { boto3-version: "1.16", python-version: "3.7", os: "ubuntu-latest" }
-          - { boto3-version: "1.16", python-version: "3.8", os: "ubuntu-latest" }
+        boto3-versions: ["1.9,1.10,1.11,1.12,1.13,1.14,1.15,1.16"]
+        os: [ubuntu-latest]
+        include:
+          - { python-version: "3.6", boto3-versions: "1.9,1.10,1.11,1.12,1.13,1.14,1.15,1.16", os: "ubuntu-latest" }
+          - { python-version: "3.7", boto3-versions: "1.9,1.10,1.11,1.12,1.13,1.14,1.15,1.16", os: "ubuntu-latest" }
+          - { python-version: "3.8", boto3-versions: "1.9,1.10,1.11,1.12,1.13,1.14,1.15,1.16", os: "ubuntu-latest" }
 
     steps:
       - uses: actions/checkout@v3
@@ -87,8 +58,8 @@ jobs:
           mkdir -p ~/toxworkdir
           sudo mount -o size=180m -t tmpfs none ~/toxworkdir
 
-          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
+          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} boto3
           ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
-          codecov --file coverage.xml          
+          codecov --file coverage.xml

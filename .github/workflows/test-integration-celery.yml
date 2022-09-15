@@ -18,38 +18,22 @@ env:
 
 jobs:
   test:
-    name: celery ${{ matrix.celery-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: python ${{ matrix.python-version }}, celery ${{ matrix.celery-versions }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
     strategy:
       matrix:
-        os: [ubuntu-latest]
         python-version: ["2.7"]
-        celery-version: ["3"]
-        include:    
-          - { celery-version: "3", python-version: "2.7", os: "ubuntu-latest" }
-          - { celery-version: "4.1", python-version: "2.7", os: "ubuntu-latest" }
-          - { celery-version: "4.1", python-version: "3.5", os: "ubuntu-latest" }
-          - { celery-version: "4.1", python-version: "3.6", os: "ubuntu-latest" }
-          - { celery-version: "4.2", python-version: "2.7", os: "ubuntu-latest" }
-          - { celery-version: "4.2", python-version: "3.5", os: "ubuntu-latest" }
-          - { celery-version: "4.2", python-version: "3.6", os: "ubuntu-latest" }
-          - { celery-version: "4.3", python-version: "2.7", os: "ubuntu-latest" }
-          - { celery-version: "4.3", python-version: "3.5", os: "ubuntu-latest" }
-          - { celery-version: "4.3", python-version: "3.6", os: "ubuntu-latest" }
-          - { celery-version: "4.3", python-version: "3.7", os: "ubuntu-latest" }
-          - { celery-version: "4.3", python-version: "3.8", os: "ubuntu-latest" }
-          - { celery-version: "4.4", python-version: "2.7", os: "ubuntu-latest" }
-          - { celery-version: "4.4", python-version: "3.5", os: "ubuntu-latest" }
-          - { celery-version: "4.4", python-version: "3.6", os: "ubuntu-latest" }
-          - { celery-version: "4.4", python-version: "3.7", os: "ubuntu-latest" }
-          - { celery-version: "4.4", python-version: "3.8", os: "ubuntu-latest" }
-          - { celery-version: "5.0", python-version: "3.6", os: "ubuntu-latest" }
-          - { celery-version: "5.0", python-version: "3.7", os: "ubuntu-latest" }
-          - { celery-version: "5.0", python-version: "3.8", os: "ubuntu-latest" }
-          - { celery-version: "5.0", python-version: "3.9", os: "ubuntu-latest" }
-          - { celery-version: "5.0", python-version: "3.10", os: "ubuntu-latest" }
+        celery-versions: ["3,4.1,4.2,4.3,4.4"]
+        os: [ubuntu-latest]
+        include:
+          - { python-version: "3.5", celery-versions: "4.1,4.2,4.3,4.4", os: "ubuntu-latest" }
+          - { python-version: "3.6", celery-versions: "4.1,4.2,4.3,4.4,5.0", os: "ubuntu-latest" }
+          - { python-version: "3.7", celery-versions: "4.3,4.4,5.0", os: "ubuntu-latest" }
+          - { python-version: "3.8", celery-versions: "4.3,4.4,5.0", os: "ubuntu-latest" }
+          - { python-version: "3.9", celery-versions: "5.0", os: "ubuntu-latest" }
+          - { python-version: "3.10", celery-versions: "5.0", os: "ubuntu-latest" }
 
     steps:
       - uses: actions/checkout@v3
@@ -77,8 +61,8 @@ jobs:
           mkdir -p ~/toxworkdir
           sudo mount -o size=180m -t tmpfs none ~/toxworkdir
 
-          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
+          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} celery
           ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
-          codecov --file coverage.xml          
+          codecov --file coverage.xml

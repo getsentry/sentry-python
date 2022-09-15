@@ -18,82 +18,22 @@ env:
 
 jobs:
   test:
-    name: rq ${{ matrix.rq-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: python ${{ matrix.python-version }}, rq ${{ matrix.rq-versions }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
     strategy:
       matrix:
-        os: [ubuntu-latest]
         python-version: ["2.7"]
-        rq-version: ["0.6"]
-        include:    
-          - { rq-version: "0.6", python-version: "2.7", os: "ubuntu-latest" }
-          - { rq-version: "0.6", python-version: "3.5", os: "ubuntu-latest" }
-          - { rq-version: "0.6", python-version: "3.6", os: "ubuntu-latest" }
-          - { rq-version: "0.7", python-version: "2.7", os: "ubuntu-latest" }
-          - { rq-version: "0.7", python-version: "3.5", os: "ubuntu-latest" }
-          - { rq-version: "0.7", python-version: "3.6", os: "ubuntu-latest" }
-          - { rq-version: "0.8", python-version: "2.7", os: "ubuntu-latest" }
-          - { rq-version: "0.8", python-version: "3.5", os: "ubuntu-latest" }
-          - { rq-version: "0.8", python-version: "3.6", os: "ubuntu-latest" }
-          - { rq-version: "0.9", python-version: "2.7", os: "ubuntu-latest" }
-          - { rq-version: "0.9", python-version: "3.5", os: "ubuntu-latest" }
-          - { rq-version: "0.9", python-version: "3.6", os: "ubuntu-latest" }
-          - { rq-version: "0.10", python-version: "2.7", os: "ubuntu-latest" }
-          - { rq-version: "0.10", python-version: "3.5", os: "ubuntu-latest" }
-          - { rq-version: "0.10", python-version: "3.6", os: "ubuntu-latest" }
-          - { rq-version: "0.11", python-version: "2.7", os: "ubuntu-latest" }
-          - { rq-version: "0.11", python-version: "3.5", os: "ubuntu-latest" }
-          - { rq-version: "0.11", python-version: "3.6", os: "ubuntu-latest" }
-          - { rq-version: "0.12", python-version: "2.7", os: "ubuntu-latest" }
-          - { rq-version: "0.12", python-version: "3.5", os: "ubuntu-latest" }
-          - { rq-version: "0.12", python-version: "3.6", os: "ubuntu-latest" }
-          - { rq-version: "0.12", python-version: "3.7", os: "ubuntu-latest" }
-          - { rq-version: "0.12", python-version: "3.8", os: "ubuntu-latest" }
-          - { rq-version: "0.12", python-version: "3.9", os: "ubuntu-latest" }
-          - { rq-version: "0.13", python-version: "2.7", os: "ubuntu-latest" }
-          - { rq-version: "0.13", python-version: "3.5", os: "ubuntu-latest" }
-          - { rq-version: "0.13", python-version: "3.6", os: "ubuntu-latest" }
-          - { rq-version: "0.13", python-version: "3.7", os: "ubuntu-latest" }
-          - { rq-version: "0.13", python-version: "3.8", os: "ubuntu-latest" }
-          - { rq-version: "0.13", python-version: "3.9", os: "ubuntu-latest" }
-          - { rq-version: "1.0", python-version: "2.7", os: "ubuntu-latest" }
-          - { rq-version: "1.0", python-version: "3.5", os: "ubuntu-latest" }
-          - { rq-version: "1.0", python-version: "3.6", os: "ubuntu-latest" }
-          - { rq-version: "1.0", python-version: "3.7", os: "ubuntu-latest" }
-          - { rq-version: "1.0", python-version: "3.8", os: "ubuntu-latest" }
-          - { rq-version: "1.0", python-version: "3.9", os: "ubuntu-latest" }
-          - { rq-version: "1.1", python-version: "2.7", os: "ubuntu-latest" }
-          - { rq-version: "1.1", python-version: "3.5", os: "ubuntu-latest" }
-          - { rq-version: "1.1", python-version: "3.6", os: "ubuntu-latest" }
-          - { rq-version: "1.1", python-version: "3.7", os: "ubuntu-latest" }
-          - { rq-version: "1.1", python-version: "3.8", os: "ubuntu-latest" }
-          - { rq-version: "1.1", python-version: "3.9", os: "ubuntu-latest" }
-          - { rq-version: "1.2", python-version: "2.7", os: "ubuntu-latest" }
-          - { rq-version: "1.2", python-version: "3.5", os: "ubuntu-latest" }
-          - { rq-version: "1.2", python-version: "3.6", os: "ubuntu-latest" }
-          - { rq-version: "1.2", python-version: "3.7", os: "ubuntu-latest" }
-          - { rq-version: "1.2", python-version: "3.8", os: "ubuntu-latest" }
-          - { rq-version: "1.2", python-version: "3.9", os: "ubuntu-latest" }
-          - { rq-version: "1.3", python-version: "2.7", os: "ubuntu-latest" }
-          - { rq-version: "1.3", python-version: "3.5", os: "ubuntu-latest" }
-          - { rq-version: "1.3", python-version: "3.6", os: "ubuntu-latest" }
-          - { rq-version: "1.3", python-version: "3.7", os: "ubuntu-latest" }
-          - { rq-version: "1.3", python-version: "3.8", os: "ubuntu-latest" }
-          - { rq-version: "1.3", python-version: "3.9", os: "ubuntu-latest" }
-          - { rq-version: "1.4", python-version: "3.5", os: "ubuntu-latest" }
-          - { rq-version: "1.4", python-version: "3.6", os: "ubuntu-latest" }
-          - { rq-version: "1.4", python-version: "3.7", os: "ubuntu-latest" }
-          - { rq-version: "1.4", python-version: "3.8", os: "ubuntu-latest" }
-          - { rq-version: "1.4", python-version: "3.9", os: "ubuntu-latest" }
-          - { rq-version: "1.4", python-version: "3.10", os: "ubuntu-latest" }
-          - { rq-version: "1.5", python-version: "3.5", os: "ubuntu-latest" }
-          - { rq-version: "1.5", python-version: "3.6", os: "ubuntu-latest" }
-          - { rq-version: "1.5", python-version: "3.7", os: "ubuntu-latest" }
-          - { rq-version: "1.5", python-version: "3.8", os: "ubuntu-latest" }
-          - { rq-version: "1.5", python-version: "3.9", os: "ubuntu-latest" }
-          - { rq-version: "1.5", python-version: "3.10", os: "ubuntu-latest" }
+        rq-versions: ["0.6,0.7,0.8,0.9,0.10,0.11,0.12,0.13,1.0,1.1,1.2,1.3"]
+        os: [ubuntu-latest]
+        include:
+          - { python-version: "3.5", rq-versions: "0.6,0.7,0.8,0.9,0.10,0.11,0.12,0.13,1.0,1.1,1.2,1.3,1.4,1.5", os: "ubuntu-latest" }
+          - { python-version: "3.6", rq-versions: "0.6,0.7,0.8,0.9,0.10,0.11,0.12,0.13,1.0,1.1,1.2,1.3,1.4,1.5", os: "ubuntu-latest" }
+          - { python-version: "3.7", rq-versions: "0.12,0.13,1.0,1.1,1.2,1.3,1.4,1.5", os: "ubuntu-latest" }
+          - { python-version: "3.8", rq-versions: "0.12,0.13,1.0,1.1,1.2,1.3,1.4,1.5", os: "ubuntu-latest" }
+          - { python-version: "3.9", rq-versions: "0.12,0.13,1.0,1.1,1.2,1.3,1.4,1.5", os: "ubuntu-latest" }
+          - { python-version: "3.10", rq-versions: "1.4,1.5", os: "ubuntu-latest" }
 
     steps:
       - uses: actions/checkout@v3
@@ -121,8 +61,8 @@ jobs:
           mkdir -p ~/toxworkdir
           sudo mount -o size=180m -t tmpfs none ~/toxworkdir
 
-          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
+          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} rq
           ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
-          codecov --file coverage.xml          
+          codecov --file coverage.xml

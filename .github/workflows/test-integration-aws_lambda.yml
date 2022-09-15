@@ -18,17 +18,15 @@ env:
 
 jobs:
   test:
-    name: aws_lambda ${{ matrix.aws_lambda-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: python ${{ matrix.python-version }}, aws_lambda ${{ matrix.aws_lambda-versions }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
     strategy:
       matrix:
-        os: [ubuntu-latest]
         python-version: ["3.7"]
-        aws_lambda-version: ["latest"]
-        include:    
-          - { aws_lambda-version: "latest", python-version: "3.7", os: "ubuntu-latest" }
+        aws_lambda-versions: ["latest"]
+        os: [ubuntu-latest]
 
     steps:
       - uses: actions/checkout@v3
@@ -56,8 +54,8 @@ jobs:
           mkdir -p ~/toxworkdir
           sudo mount -o size=180m -t tmpfs none ~/toxworkdir
 
-          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
+          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} aws_lambda
           ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
-          codecov --file coverage.xml          
+          codecov --file coverage.xml

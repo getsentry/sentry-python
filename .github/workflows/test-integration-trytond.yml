@@ -18,36 +18,21 @@ env:
 
 jobs:
   test:
-    name: trytond ${{ matrix.trytond-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: python ${{ matrix.python-version }}, trytond ${{ matrix.trytond-versions }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
     strategy:
       matrix:
-        os: [ubuntu-latest]
         python-version: ["3.5"]
-        trytond-version: ["4.6"]
-        include:    
-          - { trytond-version: "4.6", python-version: "3.5", os: "ubuntu-latest" }
-          - { trytond-version: "4.6", python-version: "3.6", os: "ubuntu-latest" }
-          - { trytond-version: "4.6", python-version: "3.7", os: "ubuntu-latest" }
-          - { trytond-version: "4.6", python-version: "3.8", os: "ubuntu-latest" }
-          - { trytond-version: "4.6", python-version: "3.9", os: "ubuntu-latest" }
-          - { trytond-version: "5.0", python-version: "3.5", os: "ubuntu-latest" }
-          - { trytond-version: "5.0", python-version: "3.6", os: "ubuntu-latest" }
-          - { trytond-version: "5.0", python-version: "3.7", os: "ubuntu-latest" }
-          - { trytond-version: "5.0", python-version: "3.8", os: "ubuntu-latest" }
-          - { trytond-version: "5.0", python-version: "3.9", os: "ubuntu-latest" }
-          - { trytond-version: "5.2", python-version: "3.5", os: "ubuntu-latest" }
-          - { trytond-version: "5.2", python-version: "3.6", os: "ubuntu-latest" }
-          - { trytond-version: "5.2", python-version: "3.7", os: "ubuntu-latest" }
-          - { trytond-version: "5.2", python-version: "3.8", os: "ubuntu-latest" }
-          - { trytond-version: "5.2", python-version: "3.9", os: "ubuntu-latest" }
-          - { trytond-version: "5.4", python-version: "3.6", os: "ubuntu-latest" }
-          - { trytond-version: "5.4", python-version: "3.7", os: "ubuntu-latest" }
-          - { trytond-version: "5.4", python-version: "3.8", os: "ubuntu-latest" }
-          - { trytond-version: "5.4", python-version: "3.9", os: "ubuntu-latest" }
-          - { trytond-version: "5.4", python-version: "3.10", os: "ubuntu-latest" }
+        trytond-versions: ["4.6,5.0,5.2"]
+        os: [ubuntu-latest]
+        include:
+          - { python-version: "3.6", trytond-versions: "4.6,5.0,5.2,5.4", os: "ubuntu-latest" }
+          - { python-version: "3.7", trytond-versions: "4.6,5.0,5.2,5.4", os: "ubuntu-latest" }
+          - { python-version: "3.8", trytond-versions: "4.6,5.0,5.2,5.4", os: "ubuntu-latest" }
+          - { python-version: "3.9", trytond-versions: "4.6,5.0,5.2,5.4", os: "ubuntu-latest" }
+          - { python-version: "3.10", trytond-versions: "5.4", os: "ubuntu-latest" }
 
     steps:
       - uses: actions/checkout@v3
@@ -75,8 +60,8 @@ jobs:
           mkdir -p ~/toxworkdir
           sudo mount -o size=180m -t tmpfs none ~/toxworkdir
 
-          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
+          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} trytond
           ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
-          codecov --file coverage.xml          
+          codecov --file coverage.xml

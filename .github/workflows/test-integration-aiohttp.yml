@@ -18,21 +18,19 @@ env:
 
 jobs:
   test:
-    name: aiohttp ${{ matrix.aiohttp-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: python ${{ matrix.python-version }}, aiohttp ${{ matrix.aiohttp-versions }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
     strategy:
       matrix:
-        os: [ubuntu-latest]
         python-version: ["3.7"]
-        aiohttp-version: ["3.5"]
-        include:    
-          - { aiohttp-version: "3.5", python-version: "3.7", os: "ubuntu-latest" }
-          - { aiohttp-version: "3.6", python-version: "3.7", os: "ubuntu-latest" }
-          - { aiohttp-version: "3.6", python-version: "3.8", os: "ubuntu-latest" }
-          - { aiohttp-version: "3.6", python-version: "3.9", os: "ubuntu-latest" }
-          - { aiohttp-version: "3.6", python-version: "3.10", os: "ubuntu-latest" }
+        aiohttp-versions: ["3.5,3.6"]
+        os: [ubuntu-latest]
+        include:
+          - { python-version: "3.8", aiohttp-versions: "3.6", os: "ubuntu-latest" }
+          - { python-version: "3.9", aiohttp-versions: "3.6", os: "ubuntu-latest" }
+          - { python-version: "3.10", aiohttp-versions: "3.6", os: "ubuntu-latest" }
 
     steps:
       - uses: actions/checkout@v3
@@ -60,8 +58,8 @@ jobs:
           mkdir -p ~/toxworkdir
           sudo mount -o size=180m -t tmpfs none ~/toxworkdir
 
-          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
+          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} aiohttp
           ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
-          codecov --file coverage.xml          
+          codecov --file coverage.xml

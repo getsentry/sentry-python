@@ -18,45 +18,22 @@ env:
 
 jobs:
   test:
-    name: flask ${{ matrix.flask-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: python ${{ matrix.python-version }}, flask ${{ matrix.flask-versions }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
     strategy:
       matrix:
-        os: [ubuntu-latest]
         python-version: ["2.7"]
-        flask-version: ["0.11"]
-        include:    
-          - { flask-version: "0.11", python-version: "2.7", os: "ubuntu-latest" }
-          - { flask-version: "0.11", python-version: "3.5", os: "ubuntu-latest" }
-          - { flask-version: "0.11", python-version: "3.6", os: "ubuntu-latest" }
-          - { flask-version: "0.11", python-version: "3.7", os: "ubuntu-latest" }
-          - { flask-version: "0.11", python-version: "3.8", os: "ubuntu-latest" }
-          - { flask-version: "0.11", python-version: "3.9", os: "ubuntu-latest" }
-          - { flask-version: "0.12", python-version: "2.7", os: "ubuntu-latest" }
-          - { flask-version: "0.12", python-version: "3.5", os: "ubuntu-latest" }
-          - { flask-version: "0.12", python-version: "3.6", os: "ubuntu-latest" }
-          - { flask-version: "0.12", python-version: "3.7", os: "ubuntu-latest" }
-          - { flask-version: "0.12", python-version: "3.8", os: "ubuntu-latest" }
-          - { flask-version: "0.12", python-version: "3.9", os: "ubuntu-latest" }
-          - { flask-version: "1.0", python-version: "2.7", os: "ubuntu-latest" }
-          - { flask-version: "1.0", python-version: "3.5", os: "ubuntu-latest" }
-          - { flask-version: "1.0", python-version: "3.6", os: "ubuntu-latest" }
-          - { flask-version: "1.0", python-version: "3.7", os: "ubuntu-latest" }
-          - { flask-version: "1.0", python-version: "3.8", os: "ubuntu-latest" }
-          - { flask-version: "1.0", python-version: "3.9", os: "ubuntu-latest" }
-          - { flask-version: "1.1", python-version: "2.7", os: "ubuntu-latest" }
-          - { flask-version: "1.1", python-version: "3.5", os: "ubuntu-latest" }
-          - { flask-version: "1.1", python-version: "3.6", os: "ubuntu-latest" }
-          - { flask-version: "1.1", python-version: "3.7", os: "ubuntu-latest" }
-          - { flask-version: "1.1", python-version: "3.8", os: "ubuntu-latest" }
-          - { flask-version: "1.1", python-version: "3.9", os: "ubuntu-latest" }
-          - { flask-version: "1.1", python-version: "3.10", os: "ubuntu-latest" }
-          - { flask-version: "2.0", python-version: "3.6", os: "ubuntu-latest" }
-          - { flask-version: "2.0", python-version: "3.8", os: "ubuntu-latest" }
-          - { flask-version: "2.0", python-version: "3.9", os: "ubuntu-latest" }
-          - { flask-version: "2.0", python-version: "3.10", os: "ubuntu-latest" }
+        flask-versions: ["0.11,0.12,1.0,1.1"]
+        os: [ubuntu-latest]
+        include:
+          - { python-version: "3.5", flask-versions: "0.11,0.12,1.0,1.1", os: "ubuntu-latest" }
+          - { python-version: "3.6", flask-versions: "0.11,0.12,1.0,1.1,2.0", os: "ubuntu-latest" }
+          - { python-version: "3.7", flask-versions: "0.11,0.12,1.0,1.1", os: "ubuntu-latest" }
+          - { python-version: "3.8", flask-versions: "0.11,0.12,1.0,1.1,2.0", os: "ubuntu-latest" }
+          - { python-version: "3.9", flask-versions: "0.11,0.12,1.0,1.1,2.0", os: "ubuntu-latest" }
+          - { python-version: "3.10", flask-versions: "1.1,2.0", os: "ubuntu-latest" }
 
     steps:
       - uses: actions/checkout@v3
@@ -84,8 +61,8 @@ jobs:
           mkdir -p ~/toxworkdir
           sudo mount -o size=180m -t tmpfs none ~/toxworkdir
 
-          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
+          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} flask
           ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
-          codecov --file coverage.xml          
+          codecov --file coverage.xml

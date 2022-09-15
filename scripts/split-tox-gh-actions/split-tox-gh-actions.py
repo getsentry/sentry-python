@@ -1,5 +1,6 @@
 import configparser
 from multiprocessing.sharedctypes import Value
+from collections import defaultdict
 
 OUT_DIR = "/Users/antonpirker/code/sentry-python/.github/workflows/"
 TOX_FILE = "/Users/antonpirker/code/sentry-python/tox.ini"
@@ -14,10 +15,9 @@ FRAMEWORKS_NEEDING_POSTGRES = [
 MATRIX_DEFINITION = [
     "    strategy:",
     "\n      matrix:",
-    "\n        os: [ubuntu-latest]",
     '\n        python-version: ["{{ python-version }}"]',
-    '\n        {{ framework }}-version: ["{{ framework-version }}"]',
-    "\n        include:    ",
+    '\n        {{ framework }}-versions: ["{{ framework-version }}"]',
+    "\n        os: [ubuntu-latest]",
 ]
 
 SERVICE_POSTGRES = [
@@ -45,7 +45,7 @@ SERVICE_POSTGRES = [
 def write_yaml_file(
     template,
     current_framework,
-    gh_frameworks,
+    matrix_includes,
     init_python_version,
     init_framework_version,
 ):
@@ -65,9 +65,12 @@ def write_yaml_file(
                 )
                 out_lines.append(l)
 
-            # write gh frameworks
-            for fr in gh_frameworks:
-                out_lines.append(fr)
+            # write matrix includes
+            if len(matrix_includes) > 0:
+                out_lines.append("\n        include:")
+
+            for matrix_include in matrix_includes:
+                out_lines.append(matrix_include)
         elif template_line == "{{ services }}\n":
             if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
                 services = SERVICE_POSTGRES.copy()
@@ -97,26 +100,19 @@ def write_yaml_file(
 
 
 def main():
-    print(f"Splitting tox.init into separate GitHub actions workflows")
-
-    print("Read template")
+    print("Read GitHub actions config file template")
     f = open(TEMPLATE_FILE, "r")
     template = f.readlines()
     f.close()
 
     print("Read tox.ini")
-    # read tox.ini
     config = configparser.ConfigParser()
     config.read(TOX_FILE)
     lines = [x for x in config["tox"]["envlist"].split("\n") if len(x) > 0]
 
-    current_framework = None
-    python_versions = []
-    framework_versions = []
-    gh_frameworks = []
+    everything = defaultdict(lambda: defaultdict(list))
 
-    init_python_version = None
-    init_framework_version = None
+    print("Parse tox.ini nevlist")
 
     for line in lines:
         # normalize lines
@@ -127,7 +123,7 @@ def main():
             continue
 
         try:
-            # parse tox environment
+            # parse tox environment definition
             try:
                 (raw_python_versions, framework, raw_framework_versions) = line.split(
                     "-"
@@ -139,63 +135,48 @@ def main():
                 ) = line.split("-")
                 raw_framework_versions = ""
 
-            if current_framework is None:
-                current_framework = framework
-
-            if current_framework != framework:
-                write_yaml_file(
-                    template,
-                    current_framework,
-                    gh_frameworks,
-                    init_python_version,
-                    init_framework_version,
-                )
-
-                current_framework = framework
-                python_versions = []
-                framework_versions = []
-                gh_frameworks = []
-                init_python_version = None
-                init_framework_version = None
-
-            # collect environments
+            # collect framework versions per python version
             for python_version in (
                 raw_python_versions.replace("{", "").replace("}", "").split(",")
             ):
-                if python_version not in python_versions:
-                    python_versions.append(python_version)
-                if not init_python_version:
-                    init_python_version = python_version
+                if raw_framework_versions == "":
+                    everything[framework][python_version].append("latest")
+                    continue
 
-            for framework_version in (
-                raw_framework_versions.replace("{", "").replace("}", "").split(",")
-            ):
-                if framework_version not in framework_versions:
-                    framework_versions.append(framework_version)
-                if not init_framework_version:
-                    init_framework_version = framework_version
-            if not init_framework_version:
-                init_framework_version = "latest"
-
-            for fr in framework_versions:
-
-                for py in python_versions:
-                    py = py.replace("py", "")
-                    s = f'\n          - {{ {current_framework}-version: "{fr or "latest"}", python-version: "{py}", os: "ubuntu-latest" }}'
-                    gh_frameworks.append(s)
-            python_versions = []
-            framework_versions = []
+                for framework_version in (
+                    raw_framework_versions.replace("{", "").replace("}", "").split(",")
+                ):
+                    everything[framework][python_version].append(framework_version)
 
         except ValueError as err:
             print(f"ERROR reading line {line}")
 
-    write_yaml_file(
-        template,
-        current_framework,
-        gh_frameworks,
-        init_python_version,
-        init_framework_version,
-    )
+    matrix_includes = []
+    init_python_version = None
+    init_framework_version = None
+
+    for framework in everything:
+        for py in everything[framework]:
+            if not init_python_version and not init_framework_version:
+                init_python_version = py
+                init_framework_version = ",".join(everything[framework][py])
+
+            else:
+                fr_versions = ",".join(everything[framework][py])
+                s = f'\n          - {{ python-version: "{py.replace("py", "")}", {framework}-versions: "{fr_versions}", os: "ubuntu-latest" }}'
+                matrix_includes.append(s)
+
+        write_yaml_file(
+            template,
+            framework,
+            matrix_includes,
+            init_python_version,
+            init_framework_version,
+        )
+
+        matrix_includes = []
+        init_python_version = None
+        init_framework_version = None
 
     print("All done. Have a nice day!")
 

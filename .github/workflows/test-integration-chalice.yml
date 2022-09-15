@@ -18,31 +18,18 @@ env:
 
 jobs:
   test:
-    name: chalice ${{ matrix.chalice-version }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: python ${{ matrix.python-version }}, chalice ${{ matrix.chalice-versions }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
     strategy:
       matrix:
-        os: [ubuntu-latest]
         python-version: ["3.6"]
-        chalice-version: ["1.16"]
-        include:    
-          - { chalice-version: "1.16", python-version: "3.6", os: "ubuntu-latest" }
-          - { chalice-version: "1.16", python-version: "3.7", os: "ubuntu-latest" }
-          - { chalice-version: "1.16", python-version: "3.8", os: "ubuntu-latest" }
-          - { chalice-version: "1.17", python-version: "3.6", os: "ubuntu-latest" }
-          - { chalice-version: "1.17", python-version: "3.7", os: "ubuntu-latest" }
-          - { chalice-version: "1.17", python-version: "3.8", os: "ubuntu-latest" }
-          - { chalice-version: "1.18", python-version: "3.6", os: "ubuntu-latest" }
-          - { chalice-version: "1.18", python-version: "3.7", os: "ubuntu-latest" }
-          - { chalice-version: "1.18", python-version: "3.8", os: "ubuntu-latest" }
-          - { chalice-version: "1.19", python-version: "3.6", os: "ubuntu-latest" }
-          - { chalice-version: "1.19", python-version: "3.7", os: "ubuntu-latest" }
-          - { chalice-version: "1.19", python-version: "3.8", os: "ubuntu-latest" }
-          - { chalice-version: "1.20", python-version: "3.6", os: "ubuntu-latest" }
-          - { chalice-version: "1.20", python-version: "3.7", os: "ubuntu-latest" }
-          - { chalice-version: "1.20", python-version: "3.8", os: "ubuntu-latest" }
+        chalice-versions: ["1.16,1.17,1.18,1.19,1.20"]
+        os: [ubuntu-latest]
+        include:
+          - { python-version: "3.7", chalice-versions: "1.16,1.17,1.18,1.19,1.20", os: "ubuntu-latest" }
+          - { python-version: "3.8", chalice-versions: "1.16,1.17,1.18,1.19,1.20", os: "ubuntu-latest" }
 
     steps:
       - uses: actions/checkout@v3
@@ -70,8 +57,8 @@ jobs:
           mkdir -p ~/toxworkdir
           sudo mount -o size=180m -t tmpfs none ~/toxworkdir
 
-          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} django ${{ matrix.django-version }})
+          envname=$(python ./scripts/tox_env_name.py ${{ matrix.python-version }} chalice
           ./scripts/runtox.sh "$envname" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
-          codecov --file coverage.xml          
+          codecov --file coverage.xml
