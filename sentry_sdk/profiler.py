@@ -23,10 +23,9 @@ import uuid
 
 from collections import deque
 from contextlib import contextmanager
-from datetime import datetime
 
 import sentry_sdk
-from sentry_sdk._compat import PY2
+from sentry_sdk._compat import PY33
 
 from sentry_sdk._types import MYPY
 
@@ -45,20 +44,12 @@ if MYPY:
     FrameData = Tuple[str, str, int]
 
 
-if PY2:
+def nanosecond_time():
+    # type: () -> int
 
-    def nanosecond_time():
-        # type: () -> int
-        return int(time.clock() * 1e9)
-
-else:
-
-    def nanosecond_time():
-        # type: () -> int
-
-        # In python3.7+, there is a time.perf_counter_ns()
-        # that we may want to switch to for more precision
-        return int(time.perf_counter() * 1e9)
+    # In python3.7+, there is a time.perf_counter_ns()
+    # that we may want to switch to for more precision
+    return int(time.perf_counter() * 1e9)
 
 
 _sample_buffer = None  # type: Optional[_SampleBuffer]
@@ -204,26 +195,12 @@ class Profile(object):
         assert self._start_ns is not None
         assert self._stop_ns is not None
 
-        if PY2:
-            relative_start_ns = "0"
-            relative_end_ns = str(
-                int(
-                    (
-                        datetime.utcnow() - self.transaction.start_timestamp
-                    ).total_seconds()
-                    * 1e9
-                )
-            )
-        else:
-            relative_start_ns = str(
-                int(self._start_ns - self.transaction._start_timestamp_monotonic * 1e9)
-            )
-            relative_end_ns = str(
-                int(
-                    nanosecond_time()
-                    - self.transaction._start_timestamp_monotonic * 1e9
-                )
-            )
+        relative_start_ns = self._start_ns - int(
+            self.transaction._start_timestamp_monotonic * 1e9
+        )
+        relative_end_ns = nanosecond_time() - int(
+            self.transaction._start_timestamp_monotonic * 1e9
+        )
 
         return {
             "environment": None,  # Gets added in client.py
@@ -248,8 +225,8 @@ class Profile(object):
                 {
                     "id": None,  # Gets added in client.py
                     "name": self.transaction.name,
-                    "relative_start_ns": relative_start_ns,
-                    "relative_end_ns": relative_end_ns,
+                    "relative_start_ns": str(relative_start_ns),
+                    "relative_end_ns": str(relative_end_ns),
                     "trace_id": self.transaction.trace_id,
                     "thread_id": str(self.transaction._thread_id),
                 }
@@ -397,13 +374,25 @@ def _should_profile(hub):
     return random.random() < float(profiles_sample_rate)
 
 
-@contextmanager
-def start_profiling(transaction, hub=None):
-    # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
+if PY33:
 
-    # if profiling was not enabled, this should be a noop
-    if _should_profile(hub):
-        with Profile(transaction, hub=hub):
+    @contextmanager
+    def start_profiling(transaction, hub=None):
+        # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
+
+        # if profiling was not enabled, this should be a noop
+        if _should_profile(hub):
+            with Profile(transaction, hub=hub):
+                yield
+        else:
             yield
-    else:
+
+else:
+    import warnings
+
+    warnings.warn("profiling is only supported on Python >= 3.3")
+
+    @contextmanager
+    def start_profiling(_, hub=None):
+        # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
         yield
