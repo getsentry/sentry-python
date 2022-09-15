@@ -1,6 +1,7 @@
 import uuid
 import random
 import time
+import threading
 
 from datetime import datetime, timedelta
 
@@ -544,6 +545,7 @@ class Transaction(Span):
         "_measurements",
         "_profile",
         "_baggage",
+        "_thread_id",
     )
 
     def __init__(
@@ -579,6 +581,7 @@ class Transaction(Span):
         self._measurements = {}  # type: Dict[str, Any]
         self._profile = None  # type: Optional[Dict[str, Any]]
         self._baggage = baggage
+        self._thread_id = threading.get_ident()
 
     def __repr__(self):
         # type: () -> str

@@ -229,6 +229,7 @@ class Profile(object):
                     "relative_start_ns": str(self._start_ns),
                     "relative_stop_ns": str(self._stop_ns),
                     "trace_id": self.transaction.trace_id,
+                    "thread_id": self.transaction._thread_id,
                 }
             ],
         }
