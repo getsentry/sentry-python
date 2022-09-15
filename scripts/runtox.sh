@@ -26,4 +26,5 @@ elif [ -n "$AZURE_PYTHON_VERSION" ]; then
     fi
 fi
 
+export TOX_PARALLEL_NO_SPINNER=1
 exec $TOXPATH --parallel auto -e $($TOXPATH -l | grep "$searchstring" | tr $'\n' ',') -- "${@:2}"
