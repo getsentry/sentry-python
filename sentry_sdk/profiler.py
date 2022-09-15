@@ -363,28 +363,22 @@ def _should_profile(hub):
     if profiles_sample_rate is None:
         return False
 
+    if not PY33:
+        from sentry_sdk.utils import logger
+
+        logger.warn("profiling is only supported on Python >= 3.3")
+        return False
+
     return random.random() < float(profiles_sample_rate)
 
 
-if PY33:
+@contextmanager
+def start_profiling(transaction, hub=None):
+    # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
 
-    @contextmanager
-    def start_profiling(transaction, hub=None):
-        # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
-
-        # if profiling was not enabled, this should be a noop
-        if _should_profile(hub):
-            with Profile(transaction, hub=hub):
-                yield
-        else:
+    # if profiling was not enabled, this should be a noop
+    if _should_profile(hub):
+        with Profile(transaction, hub=hub):
             yield
-
-else:
-    import warnings
-
-    warnings.warn("profiling is only supported on Python >= 3.3")
-
-    @contextmanager
-    def start_profiling(_, hub=None):
-        # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
+    else:
         yield
