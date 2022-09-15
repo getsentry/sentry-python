@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: python ${{ matrix.python-version }}, django ${{ matrix.django-versions }}, ${{ matrix.os }}
+    name: python ${{ matrix.python-version }}, django, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true

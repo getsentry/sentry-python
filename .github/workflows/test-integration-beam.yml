@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: python ${{ matrix.python-version }}, beam ${{ matrix.beam-versions }}, ${{ matrix.os }}
+    name: python ${{ matrix.python-version }}, beam, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true

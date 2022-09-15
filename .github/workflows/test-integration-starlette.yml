@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: python ${{ matrix.python-version }}, starlette ${{ matrix.starlette-versions }}, ${{ matrix.os }}
+    name: python ${{ matrix.python-version }}, starlette, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
