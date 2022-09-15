@@ -26,4 +26,4 @@ elif [ -n "$AZURE_PYTHON_VERSION" ]; then
     fi
 fi
 
-exec --parallel auto $TOXPATH -e $($TOXPATH -l | grep "$searchstring" | tr $'\n' ',') -- "${@:2}"
+exec $TOXPATH --parallel auto -e $($TOXPATH -l | grep "$searchstring" | tr $'\n' ',') -- "${@:2}"
