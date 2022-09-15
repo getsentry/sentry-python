@@ -204,6 +204,13 @@ class Profile(object):
         assert self._start_ns is not None
         assert self._stop_ns is not None
 
+        if PY2:
+            relative_start_ns = "0"
+            relative_end_ns = str(int((datetime.utcnow() - self.transaction.start_timestamp).total_seconds() * 1e9))
+        else:
+            relative_start_ns = str(int(self._start_ns - self.transaction._start_timestamp_monotonic * 1e9))
+            relative_end_ns = str(int(nanosecond_time() - self.transaction._start_timestamp_monotonic * 1e9))
+
         return {
             "environment": None,  # Gets added in client.py
             "event_id": uuid.uuid4().hex,
@@ -227,10 +234,10 @@ class Profile(object):
                 {
                     "id": None,  # Gets added in client.py
                     "name": self.transaction.name,
-                    "relative_start_ns": "0",
-                    "relative_end_ns": str(int((datetime.utcnow() - self.transaction.start_timestamp).total_seconds() * 1e9)),
+                    "relative_start_ns": relative_start_ns,
+                    "relative_end_ns": relative_end_ns,
                     "trace_id": self.transaction.trace_id,
-                    "thread_id": self.transaction._thread_id,
+                    "thread_id": str(self.transaction._thread_id),
                 }
             ],
         }
@@ -293,8 +300,8 @@ class _SampleBuffer(object):
 
             for tid, stack in raw_sample[1]:
                 sample = {
-                    "relative_timestamp_ns": ts - start_ns,
-                    "thread_id": tid,
+                    "relative_timestamp_ns": str(ts - start_ns),
+                    "thread_id": str(tid),
                 }
                 current_stack = []
 
