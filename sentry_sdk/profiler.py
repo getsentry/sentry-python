@@ -437,7 +437,9 @@ class _SignalScheduler(_Scheduler):
         try:
             signal.signal(self.signal_num, _sample_stack)
         except ValueError:
-            raise ValueError("Signal based profiling can only be enabled from the main thread.")
+            raise ValueError(
+                "Signal based profiling can only be enabled from the main thread."
+            )
 
         # Ensures that system calls interrupted by signals are restarted
         # automatically. Otherwise, we may see some strage behaviours
