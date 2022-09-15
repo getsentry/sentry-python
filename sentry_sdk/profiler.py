@@ -61,6 +61,12 @@ def setup_profiler(buffer_secs=60, frequency=101):
     `frequency` determines the number of samples to take per second (Hz)
     """
 
+    if not PY33:
+        from sentry_sdk.utils import logger
+
+        logger.warn("profiling is only supported on Python >= 3.3")
+        return
+
     global _sample_buffer
     global _scheduler
 
@@ -361,12 +367,6 @@ def _should_profile(hub):
     # The profiles_sample_rate option was not set, so profiling
     # was never enabled.
     if profiles_sample_rate is None:
-        return False
-
-    if not PY33:
-        from sentry_sdk.utils import logger
-
-        logger.warn("profiling is only supported on Python >= 3.3")
         return False
 
     return random.random() < float(profiles_sample_rate)
