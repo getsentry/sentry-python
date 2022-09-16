@@ -13,33 +13,38 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 """
 
 import atexit
+import platform
+import random
 import signal
+import threading
 import time
+import sys
+import uuid
+
+from collections import deque
 from contextlib import contextmanager
 
 import sentry_sdk
 from sentry_sdk._compat import PY2
-from sentry_sdk.utils import logger
-
-if PY2:
-    import thread  # noqa
-else:
-    import threading
 
 from sentry_sdk._types import MYPY
 
 if MYPY:
-    import typing
+    from typing import Any
+    from typing import Deque
+    from typing import Dict
     from typing import Generator
+    from typing import List
     from typing import Optional
+    from typing import Sequence
+    from typing import Tuple
     import sentry_sdk.tracing
+
+    Frame = Any
+    FrameData = Tuple[str, str, int]
 
 
 if PY2:
-
-    def thread_id():
-        # type: () -> int
-        return thread.get_ident()
 
     def nanosecond_time():
         # type: () -> int
@@ -47,166 +52,313 @@ if PY2:
 
 else:
 
-    def thread_id():
-        # type: () -> int
-        return threading.get_ident()
-
     def nanosecond_time():
         # type: () -> int
+
+        # In python3.7+, there is a time.perf_counter_ns()
+        # that we may want to switch to for more precision
         return int(time.perf_counter() * 1e9)
 
 
-class FrameData:
-    def __init__(self, frame):
-        # type: (typing.Any) -> None
-        self.function_name = frame.f_code.co_name
-        self.module = frame.f_globals["__name__"]
-
-        # Depending on Python version, frame.f_code.co_filename either stores just the file name or the entire absolute path.
-        self.file_name = frame.f_code.co_filename
-        self.line_number = frame.f_code.co_firstlineno
-
-    @property
-    def _attribute_tuple(self):
-        # type: () -> typing.Tuple[str, str, str, int]
-        """Returns a tuple of the attributes used in comparison"""
-        return (self.function_name, self.module, self.file_name, self.line_number)
-
-    def __eq__(self, other):
-        # type: (typing.Any) -> bool
-        if isinstance(other, FrameData):
-            return self._attribute_tuple == other._attribute_tuple
-        return False
-
-    def __hash__(self):
-        # type: () -> int
-        return hash(self._attribute_tuple)
+_sample_buffer = None  # type: Optional[_SampleBuffer]
+_scheduler = None  # type: Optional[_Scheduler]
 
 
-class StackSample:
-    def __init__(self, top_frame, profiler_start_time, frame_indices):
-        # type: (typing.Any, int, typing.Dict[FrameData, int]) -> None
-        self.sample_time = nanosecond_time() - profiler_start_time
-        self.stack = []  # type: typing.List[int]
-        self._add_all_frames(top_frame, frame_indices)
+def setup_profiler(buffer_secs=60, frequency=101):
+    # type: (int, int) -> None
 
-    def _add_all_frames(self, top_frame, frame_indices):
-        # type: (typing.Any, typing.Dict[FrameData, int]) -> None
-        frame = top_frame
-        while frame is not None:
-            frame_data = FrameData(frame)
-            if frame_data not in frame_indices:
-                frame_indices[frame_data] = len(frame_indices)
-            self.stack.append(frame_indices[frame_data])
-            frame = frame.f_back
-        self.stack = list(reversed(self.stack))
-
-
-class Sampler(object):
     """
-    A simple stack sampler for low-overhead CPU profiling: samples the call
-    stack every `interval` seconds and keeps track of counts by frame. Because
-    this uses signals, it only works on the main thread.
+    This method sets up the application so that it can be profiled.
+    It MUST be called from the main thread. This is a limitation of
+    python's signal library where it only allows the main thread to
+    set a signal handler.
+
+    `buffer_secs` determines the max time a sample will be buffered for
+    `frequency` determines the number of samples to take per second (Hz)
     """
 
-    def __init__(self, transaction, interval=0.01):
-        # type: (sentry_sdk.tracing.Transaction, float) -> None
-        self.interval = interval
-        self.stack_samples = []  # type: typing.List[StackSample]
-        self._frame_indices = dict()  # type: typing.Dict[FrameData, int]
-        self._transaction = transaction
-        self.duration = 0  # This value will only be correct after the profiler has been started and stopped
-        transaction._profile = self
+    global _sample_buffer
+    global _scheduler
+
+    assert _sample_buffer is None and _scheduler is None
+
+    # To buffer samples for `buffer_secs` at `frequency` Hz, we need
+    # a capcity of `buffer_secs * frequency`.
+    _sample_buffer = _SampleBuffer(capacity=buffer_secs * frequency)
+
+    _scheduler = _Scheduler(frequency=frequency)
+
+    # This setups a process wide signal handler that will be called
+    # at an interval to record samples.
+    signal.signal(signal.SIGPROF, _sample_stack)
+    atexit.register(teardown_profiler)
+
+
+def teardown_profiler():
+    # type: () -> None
+
+    global _sample_buffer
+    global _scheduler
+
+    _sample_buffer = None
+    _scheduler = None
+
+    # setting the timer with 0 will stop will clear the timer
+    signal.setitimer(signal.ITIMER_PROF, 0)
+
+    # put back the default signal handler
+    signal.signal(signal.SIGPROF, signal.SIG_DFL)
+
+
+def _sample_stack(_signal_num, _frame):
+    # type: (int, Frame) -> None
+    """
+    Take a sample of the stack on all the threads in the process.
+    This handler is called to handle the signal at a set interval.
+
+    See https://www.gnu.org/software/libc/manual/html_node/Alarm-Signals.html
+
+    This is not based on wall time, and you may see some variances
+    in the frequency at which this handler is called.
+
+    Notably, it looks like only threads started using the threading
+    module counts towards the time elapsed. It is unclear why that
+    is the case right now. However, we are able to get samples from
+    threading._DummyThread if this handler is called as a result of
+    another thread (e.g. the main thread).
+    """
+
+    assert _sample_buffer is not None
+    _sample_buffer.write(
+        (
+            nanosecond_time(),
+            [
+                (tid, _extract_stack(frame))
+                for tid, frame in sys._current_frames().items()
+            ],
+        )
+    )
+
+
+# We want to impose a stack depth limit so that samples aren't too large.
+MAX_STACK_DEPTH = 128
+
+
+def _extract_stack(frame):
+    # type: (Frame) -> Sequence[FrameData]
+    """
+    Extracts the stack starting the specified frame. The extracted stack
+    assumes the specified frame is the top of the stack, and works back
+    to the bottom of the stack.
+
+    In the event that the stack is more than `MAX_STACK_DEPTH` frames deep,
+    only the first `MAX_STACK_DEPTH` frames will be returned.
+    """
+
+    stack = deque(maxlen=MAX_STACK_DEPTH)  # type: Deque[FrameData]
+
+    while frame is not None:
+        stack.append(
+            (
+                # co_name only contains the frame name.
+                # If the frame was a class method,
+                # the class name will NOT be included.
+                frame.f_code.co_name,
+                frame.f_code.co_filename,
+                frame.f_code.co_firstlineno,
+            )
+        )
+        frame = frame.f_back
+
+    return stack
+
+
+class Profile(object):
+    def __init__(self, transaction, hub=None):
+        # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> None
+        self.transaction = transaction
+        self.hub = hub
+        self._start_ns = None  # type: Optional[int]
+        self._stop_ns = None  # type: Optional[int]
 
     def __enter__(self):
         # type: () -> None
-        self.start()
+        assert _scheduler is not None
+        self._start_ns = nanosecond_time()
+        _scheduler.start_profiling()
 
-    def __exit__(self, *_):
-        # type: (*typing.List[typing.Any]) -> None
-        self.stop()
+    def __exit__(self, ty, value, tb):
+        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+        assert _scheduler is not None
+        _scheduler.stop_profiling()
+        self._stop_ns = nanosecond_time()
 
-    def start(self):
-        # type: () -> None
-        self._start_time = nanosecond_time()
-        self.stack_samples = []
-        self._frame_indices = dict()
-        try:
-            signal.signal(signal.SIGVTALRM, self._sample)
-        except ValueError:
-            logger.error(
-                "Profiler failed to run because it was started from a non-main thread"
-            )
-            return
-
-        signal.setitimer(signal.ITIMER_VIRTUAL, self.interval)
-        atexit.register(self.stop)
-
-    def _sample(self, _, frame):
-        # type: (typing.Any, typing.Any) -> None
-        self.stack_samples.append(
-            StackSample(frame, self._start_time, self._frame_indices)
-        )
-        signal.setitimer(signal.ITIMER_VIRTUAL, self.interval)
+        # Now that we've collected all the data, attach it to the
+        # transaction so that it can be sent in the same envelope
+        self.transaction._profile = self.to_json()
 
     def to_json(self):
-        # type: () -> typing.Any
-        """
-        Exports this object to a JSON format compatible with Sentry's profiling visualizer.
-        Returns dictionary which can be serialized to JSON.
-        """
+        # type: () -> Dict[str, Any]
+        assert _sample_buffer is not None
+        assert self._start_ns is not None
+        assert self._stop_ns is not None
+
         return {
-            "samples": [
-                {
-                    "frames": sample.stack,
-                    "relative_timestamp_ns": sample.sample_time,
-                    "thread_id": thread_id(),
-                }
-                for sample in self.stack_samples
-            ],
-            "frames": [
-                {
-                    "name": frame.function_name,
-                    "file": frame.file_name,
-                    "line": frame.line_number,
-                }
-                for frame in self.frame_list()
-            ],
+            "device_os_name": platform.system(),
+            "device_os_version": platform.release(),
+            "duration_ns": str(self._stop_ns - self._start_ns),
+            "environment": None,  # Gets added in client.py
+            "platform": "python",
+            "platform_version": platform.python_version(),
+            "profile_id": uuid.uuid4().hex,
+            "profile": _sample_buffer.slice_profile(self._start_ns, self._stop_ns),
+            "trace_id": self.transaction.trace_id,
+            "transaction_id": None,  # Gets added in client.py
+            "transaction_name": self.transaction.name,
+            "version_code": "",  # TODO: Determine appropriate value. Currently set to empty string so profile will not get rejected.
+            "version_name": None,  # Gets added in client.py
         }
 
-    def frame_list(self):
-        # type: () -> typing.List[FrameData]
-        # Build frame array from the frame indices
-        frames = [None] * len(self._frame_indices)  # type: typing.List[typing.Any]
-        for frame, index in self._frame_indices.items():
-            frames[index] = frame
-        return frames
 
-    def stop(self):
-        # type: () -> None
-        self.duration = nanosecond_time() - self._start_time
-        signal.setitimer(signal.ITIMER_VIRTUAL, 0)
+class _SampleBuffer(object):
+    """
+    A simple implementation of a ring buffer to buffer the samples taken.
 
-    @property
-    def transaction_name(self):
-        # type: () -> str
-        return self._transaction.name
+    At some point, the ring buffer will start overwriting old samples.
+    This is a trade off we've chosen to ensure the memory usage does not
+    grow indefinitely. But by having a sufficiently large buffer, this is
+    largely not a problem.
+    """
+
+    def __init__(self, capacity):
+        # type: (int) -> None
+
+        self.buffer = [None] * capacity
+        self.capacity = capacity
+        self.idx = 0
+
+    def write(self, sample):
+        # type: (Any) -> None
+        """
+        Writing to the buffer is not thread safe. There is the possibility
+        that parallel writes will overwrite one another.
+
+        This should only be a problem if the signal handler itself is
+        interrupted by the next signal.
+        (i.e. SIGPROF is sent again before the handler finishes).
+
+        For this reason, and to keep it performant, we've chosen not to add
+        any synchronization mechanisms here like locks.
+        """
+        idx = self.idx
+        self.buffer[idx] = sample
+        self.idx = (idx + 1) % self.capacity
+
+    def slice_profile(self, start_ns, stop_ns):
+        # type: (int, int) -> Dict[str, List[Any]]
+        samples = []  # type: List[Any]
+        frames = dict()  # type: Dict[FrameData, int]
+        frames_list = list()  # type: List[Any]
+
+        # TODO: This is doing an naive iteration over the
+        # buffer and extracting the appropriate samples.
+        #
+        # Is it safe to assume that the samples are always in
+        # chronological order and binary search the buffer?
+        for raw_sample in self.buffer:
+            if raw_sample is None:
+                continue
+
+            ts = raw_sample[0]
+            if start_ns > ts or ts > stop_ns:
+                continue
+
+            for tid, stack in raw_sample[1]:
+                sample = {
+                    "frames": [],
+                    "relative_timestamp_ns": ts - start_ns,
+                    "thread_id": tid,
+                }
+
+                for frame in stack:
+                    if frame not in frames:
+                        frames[frame] = len(frames)
+                        frames_list.append(
+                            {
+                                "name": frame[0],
+                                "file": frame[1],
+                                "line": frame[2],
+                            }
+                        )
+                    sample["frames"].append(frames[frame])
+
+                samples.append(sample)
+
+        return {"frames": frames_list, "samples": samples}
 
 
-def has_profiling_enabled(hub=None):
+class _Scheduler(object):
+    def __init__(self, frequency):
+        # type: (int) -> None
+        self._lock = threading.Lock()
+        self._count = 0
+        self._interval = 1.0 / frequency
+
+    def start_profiling(self):
+        # type: () -> bool
+        with self._lock:
+            # we only need to start the timer if we're starting the first profile
+            should_start_timer = self._count == 0
+            self._count += 1
+
+        if should_start_timer:
+            signal.setitimer(signal.ITIMER_PROF, self._interval, self._interval)
+        return should_start_timer
+
+    def stop_profiling(self):
+        # type: () -> bool
+        with self._lock:
+            # we only need to stop the timer if we're stoping the last profile
+            should_stop_timer = self._count == 1
+            self._count -= 1
+
+        if should_stop_timer:
+            signal.setitimer(signal.ITIMER_PROF, 0)
+        return should_stop_timer
+
+
+def _should_profile(hub):
     # type: (Optional[sentry_sdk.Hub]) -> bool
-    if hub is None:
-        hub = sentry_sdk.Hub.current
 
-    options = hub.client and hub.client.options
-    return bool(options and options["_experiments"].get("enable_profiling"))
+    # The profiler hasn't been properly initialized.
+    if _sample_buffer is None or _scheduler is None:
+        return False
+
+    hub = hub or sentry_sdk.Hub.current
+    client = hub.client
+
+    # The client is None, so we can't get the sample rate.
+    if client is None:
+        return False
+
+    options = client.options
+    profiles_sample_rate = options["_experiments"].get("profiles_sample_rate")
+
+    # The profiles_sample_rate option was not set, so profiling
+    # was never enabled.
+    if profiles_sample_rate is None:
+        return False
+
+    return random.random() < float(profiles_sample_rate)
 
 
 @contextmanager
-def profiling(transaction, hub=None):
+def start_profiling(transaction, hub=None):
     # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
-    if has_profiling_enabled(hub):
-        with Sampler(transaction):
+
+    # if profiling was not enabled, this should be a noop
+    if _should_profile(hub):
+        with Profile(transaction, hub=hub):
             yield
     else:
         yield
