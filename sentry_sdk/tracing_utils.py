@@ -459,14 +459,16 @@ class Baggage(object):
             for item in header.split(","):
                 if "=" not in item:
                     continue
-                item = item.strip()
-                key, val = item.split("=")
-                if Baggage.SENTRY_PREFIX_REGEX.match(key):
-                    baggage_key = unquote(key.split("-")[1])
-                    sentry_items[baggage_key] = unquote(val)
-                    mutable = False
-                else:
-                    third_party_items += ("," if third_party_items else "") + item
+
+                with capture_internal_exceptions():
+                    item = item.strip()
+                    key, val = item.split("=")
+                    if Baggage.SENTRY_PREFIX_REGEX.match(key):
+                        baggage_key = unquote(key.split("-")[1])
+                        sentry_items[baggage_key] = unquote(val)
+                        mutable = False
+                    else:
+                        third_party_items += ("," if third_party_items else "") + item
 
         return Baggage(sentry_items, third_party_items, mutable)
 
@@ -538,8 +540,9 @@ class Baggage(object):
         items = []
 
         for key, val in iteritems(self.sentry_items):
-            item = Baggage.SENTRY_PREFIX + quote(key) + "=" + quote(val)
-            items.append(item)
+            with capture_internal_exceptions():
+                item = Baggage.SENTRY_PREFIX + quote(key) + "=" + quote(str(val))
+                items.append(item)
 
         if include_third_party:
             items.append(self.third_party_items)
