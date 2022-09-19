@@ -4,17 +4,23 @@ This is a small script to split a tox.ini config file into multiple GitHub actio
 This way each framework defined in tox.ini will get its own GitHub actions configuration file
 which allows them to be run in parallel in GitHub actions.
 
-This will generate several configuration files, that need to be commited to Git afterwards.
+This will generate/update several configuration files, that need to be commited to Git afterwards.
+Whenever tox.ini is changed, this script needs to be run.
 
 Usage:
-    python split-tox-gh-actions.py
+    python split-tox-gh-actions.py [--fail-on-changes]
 
+If the parameter `--fail-on-changes` is set, the script will raise a RuntimeError in case the yaml
+files have been changed by the scripts execution. This is used in CI to check if the yaml files
+represent the current tox.ini file. (And if not the CI run fails.)
 """
 
-from pathlib import Path
 import configparser
+import hashlib
+import sys
 from collections import defaultdict
-
+from glob import glob
+from pathlib import Path
 
 OUT_DIR = Path(__file__).resolve().parent.parent.parent / ".github" / "workflows"
 TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
@@ -67,8 +73,23 @@ def write_yaml_file(
     f.close()
 
 
-def main():
+def get_yaml_files_hash():
+    """Calculate a hash of all the yaml configuration files"""
+
+    hasher = hashlib.md5()
+    path_pattern = (OUT_DIR / f"test-integration-*.yml").as_posix()
+    for file in glob(path_pattern):
+        with open(file, "rb") as f:
+            buf = f.read()
+            hasher.update(buf)
+
+    return hasher.hexdigest()
+
+
+def main(fail_on_changes):
     """Create one CI workflow for each framework defined in tox.ini"""
+    if fail_on_changes:
+        old_hash = get_yaml_files_hash()
 
     print("Read GitHub actions config file template")
     f = open(TEMPLATE_FILE, "r")
@@ -112,8 +133,22 @@ def main():
     for framework in python_versions:
         write_yaml_file(template, framework, python_versions[framework])
 
+    if fail_on_changes:
+        new_hash = get_yaml_files_hash()
+
+        if old_hash != new_hash:
+            raise RuntimeError(
+                "The yaml configuration files have changed. This means that tox.ini has changed "
+                "but the changes have not been propagated to the GitHub actions config files. "
+                "Please run `python scripts/split-tox-gh-actions/split-tox-gh-actions.py` "
+                "locally and commit the changes of the yaml configuration files to continue. "
+            )
+
     print("All done. Have a nice day!")
 
 
 if __name__ == "__main__":
-    main()
+    fail_on_changes = (
+        True if len(sys.argv) == 2 and sys.argv[1] == "--fail-on-changes" else False
+    )
+    main(fail_on_changes)

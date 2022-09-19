@@ -32,6 +32,20 @@ jobs:
           pip install tox
           tox -e linters
 
+  check-ci-config:
+    name: Check CI config
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+
+      - run: |
+          python scripts/split-tox-gh-actions/split-tox-gh-actions.py --fail-on-changes
+
   build_lambda_layer:
     name: Build Package
     runs-on: ubuntu-latest
