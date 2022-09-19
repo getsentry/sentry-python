@@ -327,8 +327,13 @@ class _Scheduler(object):
         return should_stop_timer
 
 
-def _should_profile(hub):
-    # type: (Optional[sentry_sdk.Hub]) -> bool
+def _should_profile(transaction, hub):
+    # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> bool
+
+    # The corresponding transaction was not sampled,
+    # so don't generate a profile for it.
+    if not transaction.sampled:
+        return False
 
     # The profiler hasn't been properly initialized.
     if _sample_buffer is None or _scheduler is None:
@@ -357,7 +362,7 @@ def start_profiling(transaction, hub=None):
     # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
 
     # if profiling was not enabled, this should be a noop
-    if _should_profile(hub):
+    if _should_profile(transaction, hub):
         with Profile(transaction, hub=hub):
             yield
     else:
