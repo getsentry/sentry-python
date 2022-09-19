@@ -43,6 +43,7 @@ from sentry_sdk.integrations.django.templates import (
     patch_templates,
 )
 from sentry_sdk.integrations.django.middleware import patch_django_middlewares
+from sentry_sdk.integrations.django.signals_handlers import patch_signals
 from sentry_sdk.integrations.django.views import patch_views
 
 
@@ -212,6 +213,7 @@ class DjangoIntegration(Integration):
         patch_django_middlewares()
         patch_views()
         patch_templates()
+        patch_signals()
 
 
 _DRF_PATCHED = False
