@@ -50,10 +50,6 @@ jobs:
           set -x # print commands that are executed
           coverage erase
 
-          # create ram drive to run tests in
-          mkdir -p $(pwd)/.tox
-          sudo mount -o size=400m -t tmpfs none $(pwd)/.tox
-
           ./scripts/runtox.sh "${{ matrix.python-version }}-asgi" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
