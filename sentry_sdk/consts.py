@@ -34,7 +34,7 @@ if MYPY:
             "smart_transaction_trimming": Optional[bool],
             "propagate_tracestate": Optional[bool],
             "custom_measurements": Optional[bool],
-            "enable_profiling": Optional[bool],
+            "profiles_sample_rate": Optional[float],
         },
         total=False,
     )
