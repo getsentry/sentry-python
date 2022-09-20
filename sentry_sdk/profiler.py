@@ -63,18 +63,15 @@ _sample_buffer = None  # type: Optional[_SampleBuffer]
 _scheduler = None  # type: Optional[_Scheduler]
 
 
-def setup_profiler(buffer_secs=60, frequency=101):
-    # type: (int, int) -> None
+def setup_profiler(options):
+    # type: (Dict[str, Any]) -> None
 
     """
-    This method sets up the application so that it can be profiled.
-    It MUST be called from the main thread. This is a limitation of
-    python's signal library where it only allows the main thread to
-    set a signal handler.
-
     `buffer_secs` determines the max time a sample will be buffered for
     `frequency` determines the number of samples to take per second (Hz)
     """
+    buffer_secs = 60
+    frequency = 101
 
     global _sample_buffer
     global _scheduler
@@ -85,11 +82,19 @@ def setup_profiler(buffer_secs=60, frequency=101):
     # a capcity of `buffer_secs * frequency`.
     _sample_buffer = _SampleBuffer(capacity=buffer_secs * frequency)
 
-    _scheduler = _Scheduler(frequency=frequency)
+    profiler_mode = options["_experiments"].get("profiler_mode", _SigprofScheduler.mode)
+    if profiler_mode == _SigprofScheduler.mode:
+        _scheduler = _SigprofScheduler(frequency=frequency)
+    elif profiler_mode == _SigalrmScheduler.mode:
+        _scheduler = _SigalrmScheduler(frequency=frequency)
+    elif profiler_mode == _SleepScheduler.mode:
+        _scheduler = _SleepScheduler(frequency=frequency)
+    elif profiler_mode == _EventScheduler.mode:
+        _scheduler = _EventScheduler(frequency=frequency)
+    else:
+        raise ValueError("Unknown profiler mode: {}".format(profiler_mode))
+    _scheduler.setup()
 
-    # This setups a process wide signal handler that will be called
-    # at an interval to record samples.
-    signal.signal(signal.SIGPROF, _sample_stack)
     atexit.register(teardown_profiler)
 
 
@@ -99,32 +104,18 @@ def teardown_profiler():
     global _sample_buffer
     global _scheduler
 
+    if _scheduler is not None:
+        _scheduler.teardown()
+
     _sample_buffer = None
     _scheduler = None
 
-    # setting the timer with 0 will stop will clear the timer
-    signal.setitimer(signal.ITIMER_PROF, 0)
 
-    # put back the default signal handler
-    signal.signal(signal.SIGPROF, signal.SIG_DFL)
-
-
-def _sample_stack(_signal_num, _frame):
-    # type: (int, Frame) -> None
+def _sample_stack(*args, **kwargs):
+    # type: (*Any, **Any) -> None
     """
     Take a sample of the stack on all the threads in the process.
-    This handler is called to handle the signal at a set interval.
-
-    See https://www.gnu.org/software/libc/manual/html_node/Alarm-Signals.html
-
-    This is not based on wall time, and you may see some variances
-    in the frequency at which this handler is called.
-
-    Notably, it looks like only threads started using the threading
-    module counts towards the time elapsed. It is unclear why that
-    is the case right now. However, we are able to get samples from
-    threading._DummyThread if this handler is called as a result of
-    another thread (e.g. the main thread).
+    This should be called at a regular interval to collect samples.
     """
 
     assert _sample_buffer is not None
@@ -297,37 +288,249 @@ class _SampleBuffer(object):
 
 
 class _Scheduler(object):
+    mode = "unknown"
+
     def __init__(self, frequency):
         # type: (int) -> None
         self._lock = threading.Lock()
         self._count = 0
         self._interval = 1.0 / frequency
 
+    def setup(self):
+        # type: () -> None
+        raise NotImplementedError
+
+    def teardown(self):
+        # type: () -> None
+        raise NotImplementedError
+
     def start_profiling(self):
         # type: () -> bool
         with self._lock:
-            # we only need to start the timer if we're starting the first profile
-            should_start_timer = self._count == 0
             self._count += 1
-
-        if should_start_timer:
-            signal.setitimer(signal.ITIMER_PROF, self._interval, self._interval)
-        return should_start_timer
+            return self._count == 1
 
     def stop_profiling(self):
         # type: () -> bool
         with self._lock:
-            # we only need to stop the timer if we're stoping the last profile
-            should_stop_timer = self._count == 1
             self._count -= 1
-
-        if should_stop_timer:
-            signal.setitimer(signal.ITIMER_PROF, 0)
-        return should_stop_timer
+            return self._count == 0
 
 
-def _should_profile(hub):
-    # type: (Optional[sentry_sdk.Hub]) -> bool
+class _ThreadScheduler(_Scheduler):
+    """
+    This abstract scheduler is based on running a daemon thread that will call
+    the sampler at a regular interval.
+    """
+
+    mode = "thread"
+
+    def __init__(self, frequency):
+        # type: (int) -> None
+        super(_ThreadScheduler, self).__init__(frequency)
+        self.event = threading.Event()
+
+    def setup(self):
+        # type: () -> None
+        pass
+
+    def teardown(self):
+        # type: () -> None
+        pass
+
+    def start_profiling(self):
+        # type: () -> bool
+        if super(_ThreadScheduler, self).start_profiling():
+            # make sure to clear the event as we reuse the same event
+            # over the lifetime of the scheduler
+            self.event.clear()
+
+            # make sure the thread is a daemon here otherwise this
+            # can keep the application running after other threads
+            # have exited
+            thread = threading.Thread(target=self.run, daemon=True)
+            thread.start()
+            return True
+        return False
+
+    def stop_profiling(self):
+        # type: () -> bool
+        if super(_ThreadScheduler, self).stop_profiling():
+            # make sure the set the event here so that the thread
+            # can check to see if it should keep running
+            self.event.set()
+            return True
+        return False
+
+    def run(self):
+        # type: () -> None
+        raise NotImplementedError
+
+
+class _SleepScheduler(_ThreadScheduler):
+    """
+    This scheduler uses time.sleep to wait the required interval before calling
+    the sampling function.
+    """
+
+    mode = "sleep"
+
+    def run(self):
+        # type: () -> None
+        while True:
+            if self.event.is_set():
+                break
+            time.sleep(self._interval)
+            _sample_stack()
+
+
+class _EventScheduler(_ThreadScheduler):
+    """
+    This scheduler uses threading.Event to wait the required interval before
+    calling the sampling function.
+    """
+
+    mode = "event"
+
+    def run(self):
+        # type: () -> None
+        while True:
+            if self.event.is_set():
+                break
+            self.event.wait(timeout=self._interval)
+            _sample_stack()
+
+
+class _SignalScheduler(_Scheduler):
+    """
+    This abstract scheduler is based on UNIX signals. It sets up a
+    signal handler for the specified signal, and the matching itimer in order
+    for the signal handler to fire at a regular interval.
+
+    See https://www.gnu.org/software/libc/manual/html_node/Alarm-Signals.html
+    """
+
+    mode = "signal"
+
+    @property
+    def signal_num(self):
+        # type: () -> signal.Signals
+        raise NotImplementedError
+
+    @property
+    def signal_timer(self):
+        # type: () -> int
+        raise NotImplementedError
+
+    def setup(self):
+        # type: () -> None
+        """
+        This method sets up the application so that it can be profiled.
+        It MUST be called from the main thread. This is a limitation of
+        python's signal library where it only allows the main thread to
+        set a signal handler.
+        """
+
+        # This setups a process wide signal handler that will be called
+        # at an interval to record samples.
+        try:
+            signal.signal(self.signal_num, _sample_stack)
+        except ValueError:
+            raise ValueError(
+                "Signal based profiling can only be enabled from the main thread."
+            )
+
+        # Ensures that system calls interrupted by signals are restarted
+        # automatically. Otherwise, we may see some strage behaviours
+        # such as IOErrors caused by the system call being interrupted.
+        signal.siginterrupt(self.signal_num, False)
+
+    def teardown(self):
+        # type: () -> None
+
+        # setting the timer with 0 will stop will clear the timer
+        signal.setitimer(self.signal_timer, 0)
+
+        # put back the default signal handler
+        signal.signal(self.signal_num, signal.SIG_DFL)
+
+    def start_profiling(self):
+        # type: () -> bool
+        if super(_SignalScheduler, self).start_profiling():
+            signal.setitimer(self.signal_timer, self._interval, self._interval)
+            return True
+        return False
+
+    def stop_profiling(self):
+        # type: () -> bool
+        if super(_SignalScheduler, self).stop_profiling():
+            signal.setitimer(self.signal_timer, 0)
+            return True
+        return False
+
+
+class _SigprofScheduler(_SignalScheduler):
+    """
+    This scheduler uses SIGPROF to regularly call a signal handler where the
+    samples will be taken.
+
+    This is not based on wall time, and you may see some variances
+    in the frequency at which this handler is called.
+
+    This has some limitations:
+    - Only the main thread counts towards the time elapsed. This means that if
+      the main thread is blocking on a sleep() or select() system call, then
+      this clock will not count down. Some examples of this in practice are
+        - When using uwsgi with multiple threads in a worker, the non main
+          threads will only be profiled if the main thread is actively running
+          at the same time.
+        - When using gunicorn with threads, the main thread does not handle the
+          requests directly, so the clock counts down slower than expected since
+          its mostly idling while waiting for requests.
+    """
+
+    mode = "sigprof"
+
+    @property
+    def signal_num(self):
+        # type: () -> signal.Signals
+        return signal.SIGPROF
+
+    @property
+    def signal_timer(self):
+        # type: () -> int
+        return signal.ITIMER_PROF
+
+
+class _SigalrmScheduler(_SignalScheduler):
+    """
+    This scheduler uses SIGALRM to regularly call a signal handler where the
+    samples will be taken.
+
+    This is based on real time, so it *should* be called close to the expected
+    frequency.
+    """
+
+    mode = "sigalrm"
+
+    @property
+    def signal_num(self):
+        # type: () -> signal.Signals
+        return signal.SIGALRM
+
+    @property
+    def signal_timer(self):
+        # type: () -> int
+        return signal.ITIMER_REAL
+
+
+def _should_profile(transaction, hub):
+    # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> bool
+
+    # The corresponding transaction was not sampled,
+    # so don't generate a profile for it.
+    if not transaction.sampled:
+        return False
 
     # The profiler hasn't been properly initialized.
     if _sample_buffer is None or _scheduler is None:
@@ -356,7 +559,7 @@ def start_profiling(transaction, hub=None):
     # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
 
     # if profiling was not enabled, this should be a noop
-    if _should_profile(hub):
+    if _should_profile(transaction, hub):
         with Profile(transaction, hub=hub):
             yield
     else:
