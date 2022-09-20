@@ -1,16 +1,17 @@
 [flake8]
-ignore = 
-  E203,  // Handled by black (Whitespace before ':' -- handled by black)
-  E266,  // Handled by black (Too many leading '#' for block comment)
-  E501,  // Handled by black (Line too long)
-  W503,  // Handled by black (Line break occured before a binary operator)
-  E402,  // Sometimes not possible due to execution order (Module level import is not at top of file)
-  E731,  // I don't care (Do not assign a lambda expression, use a def)
-  B950,  // Handled by black (Line too long by flake8-bugbear)
-  B011,  // I don't care (Do not call assert False)
-  B014,  // does not apply to Python 2 (redundant exception types by flake8-bugbear)
-  N812,  // I don't care (Lowercase imported as non-lowercase by pep8-naming)
-  N804   // is a worse version of and conflicts with B902 (first argument of a classmethod should be named cls)
-max-line-length = 80
-select = N,B,C,E,F,W,T4,B9
-exclude=checkouts,lol*,.tox
+extend-ignore =
+  # Handled by black (Whitespace before ':' -- handled by black)
+  E203,
+  # Handled by black (Line too long)
+  E501,
+  # Sometimes not possible due to execution order (Module level import is not at top of file)
+  E402,
+  # I don't care (Do not assign a lambda expression, use a def)
+  E731,
+  # does not apply to Python 2 (redundant exception types by flake8-bugbear)
+  B014,
+  # I don't care (Lowercase imported as non-lowercase by pep8-naming)
+  N812,
+  # is a worse version of and conflicts with B902 (first argument of a classmethod should be named cls)
+  N804,
+extend-exclude=checkouts,lol*
