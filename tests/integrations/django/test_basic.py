@@ -630,7 +630,7 @@ def test_rest_framework_basic(
     elif ct == "application/x-www-form-urlencoded":
         client.post(reverse(route), data=body)
     else:
-        assert False
+        raise AssertionError("unreachable")
 
     (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
