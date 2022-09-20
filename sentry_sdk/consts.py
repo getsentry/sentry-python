@@ -35,6 +35,7 @@ if MYPY:
             "propagate_tracestate": Optional[bool],
             "custom_measurements": Optional[bool],
             "profiles_sample_rate": Optional[float],
+            "profiler_mode": Optional[str],
         },
         total=False,
     )
