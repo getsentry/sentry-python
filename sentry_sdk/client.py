@@ -134,9 +134,9 @@ class _Client(object):
         profiles_sample_rate = self.options["_experiments"].get("profiles_sample_rate")
         if profiles_sample_rate is not None and profiles_sample_rate > 0:
             try:
-                setup_profiler()
-            except ValueError:
-                logger.debug("Profiling can only be enabled from the main thread.")
+                setup_profiler(self.options)
+            except ValueError as e:
+                logger.debug(str(e))
 
     @property
     def dsn(self):
