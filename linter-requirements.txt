@@ -1,10 +1,9 @@
 black==22.3.0
-flake8==3.9.2
-flake8-import-order==0.18.1
+flake8==5.0.4
 mypy==0.961
 types-certifi
 types-redis
 types-setuptools
-flake8-bugbear==21.4.3
-pep8-naming==0.13.0
+flake8-bugbear==22.9.11
+pep8-naming==0.13.2
 pre-commit # local linting
