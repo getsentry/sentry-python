@@ -141,15 +141,15 @@ def test_envelope_with_sized_items():
     """
     envelope_raw = (
         b'{"event_id":"9ec79c33ec9942ab8353589fcb2e04dc"}\n'
-        + b'{"type":"type1","length":4 }\n1234\n'
-        + b'{"type":"type2","length":4 }\nabcd\n'
-        + b'{"type":"type3","length":0}\n\n'
-        + b'{"type":"type4","length":4 }\nab12\n'
+        b'{"type":"type1","length":4 }\n1234\n'
+        b'{"type":"type2","length":4 }\nabcd\n'
+        b'{"type":"type3","length":0}\n\n'
+        b'{"type":"type4","length":4 }\nab12\n'
     )
     envelope_raw_eof_terminated = envelope_raw[:-1]
 
-    for envelope_raw in (envelope_raw, envelope_raw_eof_terminated):
-        actual = Envelope.deserialize(envelope_raw)
+    for envelope in (envelope_raw, envelope_raw_eof_terminated):
+        actual = Envelope.deserialize(envelope)
 
         items = [item for item in actual]
 
@@ -177,15 +177,15 @@ def test_envelope_with_implicitly_sized_items():
     """
     envelope_raw = (
         b'{"event_id":"9ec79c33ec9942ab8353589fcb2e04dc"}\n'
-        + b'{"type":"type1"}\n1234\n'
-        + b'{"type":"type2"}\nabcd\n'
-        + b'{"type":"type3"}\n\n'
-        + b'{"type":"type4"}\nab12\n'
+        b'{"type":"type1"}\n1234\n'
+        b'{"type":"type2"}\nabcd\n'
+        b'{"type":"type3"}\n\n'
+        b'{"type":"type4"}\nab12\n'
     )
     envelope_raw_eof_terminated = envelope_raw[:-1]
 
-    for envelope_raw in (envelope_raw, envelope_raw_eof_terminated):
-        actual = Envelope.deserialize(envelope_raw)
+    for envelope in (envelope_raw, envelope_raw_eof_terminated):
+        actual = Envelope.deserialize(envelope)
         assert actual.headers["event_id"] == "9ec79c33ec9942ab8353589fcb2e04dc"
 
         items = [item for item in actual]
