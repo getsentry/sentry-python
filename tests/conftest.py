@@ -400,7 +400,7 @@ def string_containing_matcher():
             try:
                 # the `unicode` type only exists in python 2, so if this blows up,
                 # we must be in py3 and have the `bytes` type
-                self.valid_types = (str, unicode)  # noqa
+                self.valid_types = (str, unicode)
             except NameError:
                 self.valid_types = (str, bytes)
 
