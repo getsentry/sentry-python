@@ -15,7 +15,7 @@ if MYPY:
 PY2 = sys.version_info[0] == 2
 
 if PY2:
-    import urlparse  # noqa
+    import urlparse
 
     text_type = unicode  # noqa
 
@@ -39,7 +39,7 @@ else:
     text_type = str
     string_types = (text_type,)  # type: Tuple[type]
     number_types = (int, float)  # type: Tuple[type, type]
-    int_types = (int,)  # noqa
+    int_types = (int,)
     iteritems = lambda x: x.items()
 
     def implements_str(x):
