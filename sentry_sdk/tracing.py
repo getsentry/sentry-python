@@ -460,8 +460,8 @@ class Span(object):
         hub = hub or self.hub or sentry_sdk.Hub.current
 
         try:
-            duration_seconds = nanosecond_time() - self._start_timestamp_monotonic
-            self.timestamp = self.start_timestamp + timedelta(seconds=duration_seconds)
+            duration_milliseconds = (nanosecond_time() - self._start_timestamp_monotonic) * 1e-6
+            self.timestamp = self.start_timestamp + timedelta(milliseconds=duration_milliseconds)
         except AttributeError:
             self.timestamp = datetime.utcnow()
 
@@ -578,7 +578,9 @@ class Transaction(Span):
         self._baggage = baggage
         # for profiling, we want to know on which thread a transaction is started
         # to accurately show the active thread in the UI
-        self._active_thread_id = threading.current_thread().ident  # used by profiling.py
+        self._active_thread_id = (
+            threading.current_thread().ident
+        )  # used by profiling.py
 
     def __repr__(self):
         # type: () -> str
