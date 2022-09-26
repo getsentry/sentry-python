@@ -540,7 +540,7 @@ class Transaction(Span):
         "_measurements",
         "_profile",
         "_baggage",
-        "_thread_id",
+        "_active_thread_id",
     )
 
     def __init__(
@@ -578,7 +578,7 @@ class Transaction(Span):
         self._baggage = baggage
         # for profiling, we want to know on which thread a transaction is started
         # to accurately show the active thread in the UI
-        self._thread_id = threading.current_thread().ident  # used by profiling.py
+        self._active_thread_id = threading.current_thread().ident  # used by profiling.py
 
     def __repr__(self):
         # type: () -> str

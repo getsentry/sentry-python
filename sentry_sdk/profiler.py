@@ -186,10 +186,10 @@ class Profile(object):
         assert self._stop_ns is not None
 
         relative_start_ns = self._start_ns - int(
-            self.transaction._start_timestamp_monotonic * 1e9
+            self.transaction._start_timestamp_monotonic
         )
         relative_end_ns = nanosecond_time() - int(
-            self.transaction._start_timestamp_monotonic * 1e9
+            self.transaction._start_timestamp_monotonic
         )
 
         return {
@@ -218,7 +218,7 @@ class Profile(object):
                     "relative_start_ns": str(relative_start_ns),
                     "relative_end_ns": str(relative_end_ns),
                     "trace_id": self.transaction.trace_id,
-                    "thread_id": str(self.transaction._thread_id),
+                    "active_thread_id": str(self.transaction._active_thread_id),
                 }
             ],
         }
