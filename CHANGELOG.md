@@ -4,10 +4,8 @@
 
 ### Django update (ongoing)
 
-* Support Django 4.0
-* include other Django enhancements brought up by the community
-
-By: @BeryJu (#1526)
+- Instrument Django Signals so they show up in "Performance" view (#1526) by @BeryJu
+- include other Django enhancements brought up by the community
 
 ### Various fixes & improvements
 
