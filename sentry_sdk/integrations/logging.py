@@ -215,9 +215,6 @@ class EventHandler(logging.Handler, object):
             event = {}
             hint = {}
             with capture_internal_exceptions():
-                import ipdb
-
-                ipdb.set_trace()
                 event["threads"] = {
                     "values": [
                         {

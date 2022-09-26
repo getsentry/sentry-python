@@ -514,10 +514,6 @@ def current_stacktrace(with_locals=True):
     __tracebackhide__ = True
     frames = []
 
-    import ipdb
-
-    ipdb.set_trace()
-
     f = sys._getframe()  # type: Optional[FrameType]
     while f is not None:
         if not should_hide_frame(f):

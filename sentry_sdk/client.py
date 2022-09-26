@@ -177,9 +177,6 @@ class _Client(object):
             and "threads" not in event
         ):
             with capture_internal_exceptions():
-                import ipdb
-
-                ipdb.set_trace()
                 event["threads"] = {
                     "values": [
                         {
