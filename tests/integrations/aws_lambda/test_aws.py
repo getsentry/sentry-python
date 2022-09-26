@@ -523,8 +523,8 @@ def test_non_dict_event(
 def test_traces_sampler_gets_correct_values_in_sampling_context(
     run_lambda_function,
     DictionaryContaining,  # noqa:N803
-    ObjectDescribedBy,  # noqa:N803
-    StringContaining,  # noqa:N803
+    ObjectDescribedBy,
+    StringContaining,
 ):
     # TODO: This whole thing is a little hacky, specifically around the need to
     # get `conftest.py` code into the AWS runtime, which is why there's both

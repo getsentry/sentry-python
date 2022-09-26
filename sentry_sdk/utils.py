@@ -862,7 +862,7 @@ def _get_contextvars():
             # `aiocontextvars` is absolutely required for functional
             # contextvars on Python 3.6.
             try:
-                from aiocontextvars import ContextVar  # noqa
+                from aiocontextvars import ContextVar
 
                 return True, ContextVar
             except ImportError:

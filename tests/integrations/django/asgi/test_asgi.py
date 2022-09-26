@@ -175,10 +175,15 @@ async def test_async_middleware_spans(
         render_span_tree(transaction)
         == """\
 - op="http.server": description=null
+  - op="django.signals": description="django.db.reset_queries"
+  - op="django.signals": description="django.db.close_old_connections"
   - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.__acall__"
     - op="django.middleware": description="django.contrib.auth.middleware.AuthenticationMiddleware.__acall__"
       - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.__acall__"
         - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.__acall__"
           - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
-          - op="django.view": description="async_message\""""
+          - op="django.view": description="async_message"
+  - op="django.signals": description="django.db.close_old_connections"
+  - op="django.signals": description="django.core.cache.close_caches"
+  - op="django.signals": description="django.core.handlers.base.reset_urlconf\""""
     )
