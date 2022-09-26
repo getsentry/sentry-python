@@ -289,7 +289,7 @@ class _SampleBuffer(object):
 
             for tid, stack in raw_sample[1]:
                 sample = {
-                    "relative_timestamp_ns": str(ts - start_ns),
+                    "elapsed_since_start_ns": str(ts - start_ns),
                     "thread_id": str(tid),
                 }
                 current_stack = []
