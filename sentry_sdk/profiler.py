@@ -185,10 +185,6 @@ class Profile(object):
         assert self._start_ns is not None
         assert self._stop_ns is not None
 
-        relative_end_ns = nanosecond_time() - int(
-            self.transaction._start_timestamp_monotonic
-        )
-
         return {
             "environment": None,  # Gets added in client.py
             "event_id": uuid.uuid4().hex,
@@ -216,7 +212,7 @@ class Profile(object):
                     # the transaction start time relative to the profile, so we
                     # hardcode it to 0 until we can start the profile before
                     "relative_start_ns": "0",
-                    "relative_end_ns": str(relative_end_ns),
+                    "relative_end_ns": nanosecond_time(),
                     "trace_id": self.transaction.trace_id,
                     "active_thread_id": str(self.transaction._active_thread_id),
                 }
