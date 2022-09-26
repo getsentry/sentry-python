@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.9.9
+
+### Django update (ongoing)
+
+- Instrument Django Signals so they show up in "Performance" view (#1526) by @BeryJu
+- include other Django enhancements brought up by the community
+
+### Various fixes & improvements
+
+- fix(profiling): Profiler mode type hints (#1633) by @Zylphrex
+- New ASGIMiddleware tests (#1600) by @antonpirker
+- build(deps): bump mypy from 0.961 to 0.971 (#1517) by @dependabot
+- build(deps): bump black from 22.3.0 to 22.8.0 (#1596) by @dependabot
+- build(deps): bump sphinx from 5.0.2 to 5.1.1 (#1524) by @dependabot
+- ref: upgrade linters to flake8 5.x (#1610) by @asottile-sentry
+- feat(profiling): Introduce different profiler schedulers (#1616) by @Zylphrex
+- fix(profiling): Check transaction sampled status before profiling (#1624) by @Zylphrex
+- Wrap Baggage ser/deser in capture_internal_exceptions (#1630) by @sl0thentr0py
+- Faster Tests (DjangoCon) (#1602) by @antonpirker
+- feat(profiling): Add support for profiles_sample_rate (#1613) by @Zylphrex
+- feat(profiling): Support for multithreaded profiles (#1570) by @Zylphrex
+
 ## 1.9.8
 
 ### Various fixes & improvements
