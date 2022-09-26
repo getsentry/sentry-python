@@ -5,6 +5,7 @@ import os
 
 import pytest
 
+from sentry_sdk import last_event_id, capture_exception
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
 try:
@@ -82,7 +83,7 @@ SCOPE = {
 }
 
 
-def starlette_app_factory(middleware=None):
+def starlette_app_factory(middleware=None, debug=True):
     async def _homepage(request):
         1 / 0
         return starlette.responses.JSONResponse({"status": "ok"})
@@ -99,7 +100,7 @@ def starlette_app_factory(middleware=None):
         return starlette.responses.JSONResponse({"status": "ok"})
 
     app = starlette.applications.Starlette(
-        debug=True,
+        debug=debug,
         routes=[
             starlette.routing.Route("/some_url", _homepage),
             starlette.routing.Route("/custom_error", _custom_error),
@@ -541,6 +542,30 @@ def test_middleware_spans(sentry_init, capture_events):
             assert span["description"] == expected[idx]
             assert span["tags"]["starlette.middleware_name"] == expected[idx]
             idx += 1
+
+
+def test_last_event_id(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration()],
+    )
+    events = capture_events()
+
+    def handler(request, exc):
+        capture_exception(exc)
+        return starlette.responses.PlainTextResponse(last_event_id(), status_code=500)
+
+    app = starlette_app_factory(debug=False)
+    app.add_exception_handler(500, handler)
+
+    client = TestClient(SentryAsgiMiddleware(app), raise_server_exceptions=False)
+    response = client.get("/custom_error")
+    assert response.status_code == 500
+
+    event = events[0]
+    assert response.content.strip().decode("ascii") == event["event_id"]
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "Exception"
+    assert exception["value"] == "Too Hot"
 
 
 def test_legacy_setup(
