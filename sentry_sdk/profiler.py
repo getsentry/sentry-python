@@ -212,7 +212,9 @@ class Profile(object):
                     # the transaction start time relative to the profile, so we
                     # hardcode it to 0 until we can start the profile before
                     "relative_start_ns": "0",
-                    "relative_end_ns": nanosecond_time(),
+                    # use the duration of the profile instead of the transaction
+                    # because we end the transaction after the profile
+                    "relative_end_ns": str(self._stop_ns - self._start_ns),
                     "trace_id": self.transaction.trace_id,
                     "active_thread_id": str(self.transaction._active_thread_id),
                 }
