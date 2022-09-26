@@ -460,8 +460,12 @@ class Span(object):
         hub = hub or self.hub or sentry_sdk.Hub.current
 
         try:
-            duration_milliseconds = (nanosecond_time() - self._start_timestamp_monotonic) * 1e-6
-            self.timestamp = self.start_timestamp + timedelta(milliseconds=duration_milliseconds)
+            duration_milliseconds = (
+                nanosecond_time() - self._start_timestamp_monotonic
+            ) * 1e-6
+            self.timestamp = self.start_timestamp + timedelta(
+                milliseconds=duration_milliseconds
+            )
         except AttributeError:
             self.timestamp = datetime.utcnow()
 
