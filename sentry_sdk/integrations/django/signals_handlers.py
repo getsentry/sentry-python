@@ -21,9 +21,11 @@ def patch_signals():
 
     def _get_receiver_name(receiver):
         # type: (Callable[..., Any]) -> str
-        name = receiver.__module__ + "."
+        name = receiver.__module__ + "." if hasattr(receiver, "__name__") else ""
+
         if hasattr(receiver, "__name__"):
             return name + receiver.__name__
+
         return name + str(receiver)
 
     def _sentry_live_receivers(self, sender):
@@ -35,11 +37,12 @@ def patch_signals():
             # type: (Callable[..., Any]) -> Callable[..., Any]
             def wrapper(*args, **kwargs):
                 # type: (Any, Any) -> Any
+                signal_name = _get_receiver_name(receiver)
                 with hub.start_span(
                     op="django.signals",
-                    description=_get_receiver_name(receiver),
+                    description=signal_name,
                 ) as span:
-                    span.set_data("signal", _get_receiver_name(receiver))
+                    span.set_data("signal", signal_name)
                     return receiver(*args, **kwargs)
 
             return wrapper
