@@ -21,7 +21,7 @@ def patch_signals():
 
     def _get_receiver_name(receiver):
         # type: (Callable[..., Any]) -> str
-        name = receiver.__module__ + "." if hasattr(receiver, "__name__") else ""
+        name = receiver.__module__ + "." if hasattr(receiver, "__module__") else ""
 
         if hasattr(receiver, "__name__"):
             return name + receiver.__name__
