@@ -377,10 +377,23 @@ class _SleepScheduler(_ThreadScheduler):
 
     def run(self):
         # type: () -> None
+        last = time.perf_counter()
+
         while True:
+            # some time may have elapsed since the last time
+            # we sampled, so we need to account for that and
+            # not sleep for too long
+            now = time.perf_counter()
+            elapsed = max(now - last, 0)
+
+            if elapsed < self._interval:
+                time.sleep(self._interval - elapsed)
+
+            last = time.perf_counter()
+
             if self.event.is_set():
                 break
-            time.sleep(self._interval)
+
             _sample_stack()
 
 
@@ -395,9 +408,11 @@ class _EventScheduler(_ThreadScheduler):
     def run(self):
         # type: () -> None
         while True:
+            self.event.wait(timeout=self._interval)
+
             if self.event.is_set():
                 break
-            self.event.wait(timeout=self._interval)
+
             _sample_stack()
 
 
