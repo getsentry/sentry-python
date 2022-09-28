@@ -13,23 +13,19 @@ if MYPY:
     from typing import List
 
 
+def _get_receiver_name(receiver):
+    # type: (Callable[..., Any]) -> str
+    if hasattr(receiver, "__qualname__"):
+        return receiver.__qualname__
+
+    return str(receiver)
+
+
 def patch_signals():
     # type: () -> None
     """Patch django signal receivers to create a span"""
 
     old_live_receivers = Signal._live_receivers
-
-    def _get_receiver_name(receiver):
-        # type: (Callable[..., Any]) -> str
-        if hasattr(receiver, "__module__"):
-            name = receiver.__module__ + "."
-        else:
-            name = ""
-
-        if hasattr(receiver, "__name__"):
-            return name + receiver.__name__
-
-        return name + str(receiver)
 
     def _sentry_live_receivers(self, sender):
         # type: (Signal, Any) -> List[Callable[..., Any]]
