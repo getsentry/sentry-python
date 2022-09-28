@@ -19,16 +19,19 @@ def _get_receiver_name(receiver):
 
     if hasattr(receiver, "__qualname__"):
         name += receiver.__qualname__
-    elif hasattr(receiver, "__name__"): # Python 2.7 has no __qualname__
+    elif hasattr(receiver, "__name__"):  # Python 2.7 has no __qualname__
         name += receiver.__name__
 
-    if name == "":  # certain functions (like partials) dont have a name so return the string representation
+    if (
+        name == ""
+    ):  # certain functions (like partials) dont have a name so return the string representation
         return str(receiver)
 
     if hasattr(receiver, "__module__"):  # prepend with module, if there is one
         name = receiver.__module__ + "." + name
 
     return name
+
 
 def patch_signals():
     # type: () -> None
