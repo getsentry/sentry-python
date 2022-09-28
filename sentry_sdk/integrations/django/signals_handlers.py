@@ -15,11 +15,17 @@ if MYPY:
 
 def _get_receiver_name(receiver):
     # type: (Callable[..., Any]) -> str
-    if hasattr(receiver, "__qualname__"):
-        return receiver.__qualname__
+    name = ""
+    if hasattr(receiver, "__module__"):
+        name += receiver.__module__ + "."
 
-    return str(receiver)
+    if hasattr(receiver, "__name__"):
+        name += receiver.__name__
 
+    if name == "":
+        return str(receiver)
+
+    return name
 
 def patch_signals():
     # type: () -> None
