@@ -823,7 +823,7 @@ def test_get_receiver_name():
         return a+b
 
     name = _get_receiver_name(dummy)
-    assert name == 'tests.integrations.django.test_basic.dummy'
+    assert name == 'tests.integrations.django.test_basic.test_get_receiver_name.<locals>.dummy'
 
     a_partial = partial(dummy)
     name = _get_receiver_name(a_partial)

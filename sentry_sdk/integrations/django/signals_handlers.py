@@ -19,8 +19,8 @@ def _get_receiver_name(receiver):
     if hasattr(receiver, "__module__"):
         name += receiver.__module__ + "."
 
-    if hasattr(receiver, "__name__"):
-        name += receiver.__name__
+    if hasattr(receiver, "__qualname__"):
+        name += receiver.__qualname__
 
     if name == "":
         return str(receiver)
