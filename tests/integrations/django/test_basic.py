@@ -16,6 +16,7 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
+from sentry_sdk._compat import PY2
 from sentry_sdk import capture_message, capture_exception, configure_scope
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
@@ -820,10 +821,17 @@ def test_custom_urlconf_middleware(
 
 def test_get_receiver_name():
     def dummy(a, b):
-        return a+b
+        return a + b
 
     name = _get_receiver_name(dummy)
-    assert name == 'tests.integrations.django.test_basic.test_get_receiver_name.<locals>.dummy'
+
+    if PY2:
+        assert name == "tests.integrations.django.test_basic.dummy"
+    else:
+        assert (
+            name
+            == "tests.integrations.django.test_basic.test_get_receiver_name.<locals>.dummy"
+        )
 
     a_partial = partial(dummy)
     name = _get_receiver_name(a_partial)
