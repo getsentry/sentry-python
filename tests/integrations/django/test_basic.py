@@ -1,8 +1,9 @@
 from __future__ import absolute_import
 
+import json
 import pytest
 import pytest_django
-import json
+from functools import partial
 
 from werkzeug.test import Client
 from django import VERSION as DJANGO_VERSION
@@ -10,16 +11,16 @@ from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError, ProgrammingError, DataError
 
-from sentry_sdk.integrations.executing import ExecutingIntegration
-
 try:
     from django.urls import reverse
 except ImportError:
     from django.core.urlresolvers import reverse
 
+from sentry_sdk._compat import PY2
 from sentry_sdk import capture_message, capture_exception, configure_scope
 from sentry_sdk.integrations.django import DjangoIntegration
-from functools import partial
+from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
+from sentry_sdk.integrations.executing import ExecutingIntegration
 
 from tests.integrations.django.myapp.wsgi import application
 
@@ -816,3 +817,22 @@ def test_custom_urlconf_middleware(
     assert "custom_urlconf_middleware" in render_span_tree(transaction_event)
 
     settings.MIDDLEWARE.pop(0)
+
+
+def test_get_receiver_name():
+    def dummy(a, b):
+        return a + b
+
+    name = _get_receiver_name(dummy)
+
+    if PY2:
+        assert name == "tests.integrations.django.test_basic.dummy"
+    else:
+        assert (
+            name
+            == "tests.integrations.django.test_basic.test_get_receiver_name.<locals>.dummy"
+        )
+
+    a_partial = partial(dummy)
+    name = _get_receiver_name(a_partial)
+    assert name == str(a_partial)
