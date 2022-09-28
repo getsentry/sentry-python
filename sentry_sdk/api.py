@@ -108,7 +108,7 @@ def add_breadcrumb(
 
 
 @overload
-def configure_scope():  # noqa: F811
+def configure_scope():
     # type: () -> ContextManager[Scope]
     pass
 
@@ -130,7 +130,7 @@ def configure_scope(  # noqa: F811
 
 
 @overload
-def push_scope():  # noqa: F811
+def push_scope():
     # type: () -> ContextManager[Scope]
     pass
 
@@ -151,31 +151,31 @@ def push_scope(  # noqa: F811
     return Hub.current.push_scope(callback)
 
 
-@scopemethod  # noqa
+@scopemethod
 def set_tag(key, value):
     # type: (str, Any) -> None
     return Hub.current.scope.set_tag(key, value)
 
 
-@scopemethod  # noqa
+@scopemethod
 def set_context(key, value):
     # type: (str, Dict[str, Any]) -> None
     return Hub.current.scope.set_context(key, value)
 
 
-@scopemethod  # noqa
+@scopemethod
 def set_extra(key, value):
     # type: (str, Any) -> None
     return Hub.current.scope.set_extra(key, value)
 
 
-@scopemethod  # noqa
+@scopemethod
 def set_user(value):
     # type: (Optional[Dict[str, Any]]) -> None
     return Hub.current.scope.set_user(value)
 
 
-@scopemethod  # noqa
+@scopemethod
 def set_level(value):
     # type: (str) -> None
     return Hub.current.scope.set_level(value)

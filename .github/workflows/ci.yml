@@ -32,81 +32,19 @@ jobs:
           pip install tox
           tox -e linters
 
-  test:
-    name: Run Tests
-    runs-on: ${{ matrix.linux-version }}
-    timeout-minutes: 45
-    continue-on-error: true
-    strategy:
-      matrix:
-        linux-version: [ubuntu-latest]
-        python-version: ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
-        include:
-          # GHA doesn't host the combo of python 3.4 and ubuntu-latest (which is
-          # currently 20.04), so run just that one under 18.04. (See
-          # https://raw.githubusercontent.com/actions/python-versions/main/versions-manifest.json
-          # for a listing of supported python/os combos.)
-          - linux-version: ubuntu-18.04
-            python-version: "3.4"
-
-    services:
-      # Label used to access the service container
-      redis:
-        # Docker Hub image
-        image: redis
-        # Set health checks to wait until redis has started
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          # Maps port 6379 on service container to the host
-          - 6379:6379
-
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_PASSWORD: sentry
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        # Maps tcp port 5432 on service container to the host
-        ports:
-          - 5432:5432
-
-    env:
-      SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
-      SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
+  check-ci-config:
+    name: Check CI config
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: 3.9
 
-      - name: Setup Test Env
-        env:
-          PGHOST: localhost
-          PGPASSWORD: sentry
-        run: |
-          pip install codecov tox
-
-      - name: Run Tests
-        env:
-          CI_PYTHON_VERSION: ${{ matrix.python-version }}
-        timeout-minutes: 45
-        run: |
-          coverage erase
-          ./scripts/runtox.sh '' --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
-          coverage xml -i
-          codecov --file coverage.xml
+      - run: |
+          python scripts/split-tox-gh-actions/split-tox-gh-actions.py --fail-on-changes
 
   build_lambda_layer:
     name: Build Package

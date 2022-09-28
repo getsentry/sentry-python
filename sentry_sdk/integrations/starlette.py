@@ -48,7 +48,7 @@ except ImportError:
 
 try:
     # Optional dependency of Starlette to parse form data.
-    import multipart  # type: ignore # noqa: F401
+    import multipart  # type: ignore
 except ImportError:
     multipart = None
 
