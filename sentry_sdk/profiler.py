@@ -25,8 +25,10 @@ from collections import deque
 from contextlib import contextmanager
 
 import sentry_sdk
-from sentry_sdk._compat import PY2
+from sentry_sdk._compat import PY33
+
 from sentry_sdk._types import MYPY
+from sentry_sdk.utils import nanosecond_time
 
 if MYPY:
     from typing import Any
@@ -43,22 +45,6 @@ if MYPY:
     FrameData = Tuple[str, str, int]
 
 
-if PY2:
-
-    def nanosecond_time():
-        # type: () -> int
-        return int(time.clock() * 1e9)
-
-else:
-
-    def nanosecond_time():
-        # type: () -> int
-
-        # In python3.7+, there is a time.perf_counter_ns()
-        # that we may want to switch to for more precision
-        return int(time.perf_counter() * 1e9)
-
-
 _sample_buffer = None  # type: Optional[_SampleBuffer]
 _scheduler = None  # type: Optional[_Scheduler]
 
@@ -72,6 +58,12 @@ def setup_profiler(options):
     """
     buffer_secs = 60
     frequency = 101
+
+    if not PY33:
+        from sentry_sdk.utils import logger
+
+        logger.warn("profiling is only supported on Python >= 3.3")
+        return
 
     global _sample_buffer
     global _scheduler
@@ -194,19 +186,39 @@ class Profile(object):
         assert self._stop_ns is not None
 
         return {
-            "device_os_name": platform.system(),
-            "device_os_version": platform.release(),
-            "duration_ns": str(self._stop_ns - self._start_ns),
             "environment": None,  # Gets added in client.py
+            "event_id": uuid.uuid4().hex,
             "platform": "python",
-            "platform_version": platform.python_version(),
-            "profile_id": uuid.uuid4().hex,
             "profile": _sample_buffer.slice_profile(self._start_ns, self._stop_ns),
-            "trace_id": self.transaction.trace_id,
-            "transaction_id": None,  # Gets added in client.py
-            "transaction_name": self.transaction.name,
-            "version_code": "",  # TODO: Determine appropriate value. Currently set to empty string so profile will not get rejected.
-            "version_name": None,  # Gets added in client.py
+            "release": None,  # Gets added in client.py
+            "timestamp": None,  # Gets added in client.py
+            "version": "1",
+            "device": {
+                "architecture": platform.machine(),
+            },
+            "os": {
+                "name": platform.system(),
+                "version": platform.release(),
+            },
+            "runtime": {
+                "name": platform.python_implementation(),
+                "version": platform.python_version(),
+            },
+            "transactions": [
+                {
+                    "id": None,  # Gets added in client.py
+                    "name": self.transaction.name,
+                    # we start the transaction before the profile and this is
+                    # the transaction start time relative to the profile, so we
+                    # hardcode it to 0 until we can start the profile before
+                    "relative_start_ns": "0",
+                    # use the duration of the profile instead of the transaction
+                    # because we end the transaction after the profile
+                    "relative_end_ns": str(self._stop_ns - self._start_ns),
+                    "trace_id": self.transaction.trace_id,
+                    "active_thread_id": str(self.transaction._active_thread_id),
+                }
+            ],
         }
 
 
@@ -245,8 +257,10 @@ class _SampleBuffer(object):
         self.idx = (idx + 1) % self.capacity
 
     def slice_profile(self, start_ns, stop_ns):
-        # type: (int, int) -> Dict[str, List[Any]]
+        # type: (int, int) -> Dict[str, Any]
         samples = []  # type: List[Any]
+        stacks = dict()  # type: Dict[Any, int]
+        stacks_list = list()  # type: List[Any]
         frames = dict()  # type: Dict[FrameData, int]
         frames_list = list()  # type: List[Any]
 
@@ -265,10 +279,10 @@ class _SampleBuffer(object):
 
             for tid, stack in raw_sample[1]:
                 sample = {
-                    "frames": [],
-                    "relative_timestamp_ns": ts - start_ns,
-                    "thread_id": tid,
+                    "elapsed_since_start_ns": str(ts - start_ns),
+                    "thread_id": str(tid),
                 }
+                current_stack = []
 
                 for frame in stack:
                     if frame not in frames:
@@ -280,11 +294,17 @@ class _SampleBuffer(object):
                                 "line": frame[2],
                             }
                         )
-                    sample["frames"].append(frames[frame])
+                    current_stack.append(frames[frame])
 
+                current_stack = tuple(current_stack)
+                if current_stack not in stacks:
+                    stacks[current_stack] = len(stacks)
+                    stacks_list.append(current_stack)
+
+                sample["stack_id"] = stacks[current_stack]
                 samples.append(sample)
 
-        return {"frames": frames_list, "samples": samples}
+        return {"stacks": stacks_list, "frames": frames_list, "samples": samples}
 
 
 class _Scheduler(object):
