@@ -104,7 +104,7 @@ class RequestExtractor(object):
         files = self.files()
         if form or files:
             data = dict(iteritems(form))
-            for key in files.keys():
+            for key, _ in iteritems(files):
                 data[key] = AnnotatedValue.removed_because_raw_data()
 
             return data

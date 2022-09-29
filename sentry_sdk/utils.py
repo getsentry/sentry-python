@@ -299,6 +299,7 @@ class AnnotatedValue(object):
 
     @classmethod
     def removed_because_raw_data(cls):
+        # type: () -> AnnotatedValue
         """The value was removed because it could not be parsed. This is done for request body values that are not json nor a form."""
         return AnnotatedValue(
             value="",
@@ -314,6 +315,7 @@ class AnnotatedValue(object):
 
     @classmethod
     def removed_because_over_size_limit(cls):
+        # type: () -> AnnotatedValue
         """The actual value was removed because the size of the field exceeded the configured maximum size (specified with the request_bodies sdk option)"""
         return AnnotatedValue(
             value="",
