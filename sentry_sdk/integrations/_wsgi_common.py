@@ -64,19 +64,13 @@ class RequestExtractor(object):
             request_info["cookies"] = dict(self.cookies())
 
         if not request_body_within_bounds(client, content_length):
-            data = AnnotatedValue(
-                "",
-                {"rem": [["!config", "x", 0, content_length]], "len": content_length},
-            )
+            data = AnnotatedValue.removed_because_over_size_limit()
         else:
             parsed_body = self.parsed_body()
             if parsed_body is not None:
                 data = parsed_body
             elif self.raw_data():
-                data = AnnotatedValue(
-                    "",
-                    {"rem": [["!raw", "x", 0, content_length]], "len": content_length},
-                )
+                data = AnnotatedValue.removed_because_raw_data()
             else:
                 data = None
 
@@ -110,11 +104,8 @@ class RequestExtractor(object):
         files = self.files()
         if form or files:
             data = dict(iteritems(form))
-            for k, v in iteritems(files):
-                size = self.size_of_file(v)
-                data[k] = AnnotatedValue(
-                    "", {"len": size, "rem": [["!raw", "x", 0, size]]}
-                )
+            for key in files.keys():
+                data[key] = AnnotatedValue.removed_because_raw_data()
 
             return data
 
@@ -175,7 +166,7 @@ def _filter_headers(headers):
         k: (
             v
             if k.upper().replace("-", "_") not in SENSITIVE_HEADERS
-            else AnnotatedValue("", {"rem": [["!config", "x", 0, len(v)]]})
+            else AnnotatedValue.removed_because_over_size_limit()
         )
         for k, v in iteritems(headers)
     }

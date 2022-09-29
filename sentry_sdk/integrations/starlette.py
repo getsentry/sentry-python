@@ -448,25 +448,13 @@ class StarletteRequestExtractor:
                 request_info["cookies"] = self.cookies()
 
             if not request_body_within_bounds(client, content_length):
-                data = AnnotatedValue(
-                    "",
-                    {
-                        "rem": [["!config", "x", 0, content_length]],
-                        "len": content_length,
-                    },
-                )
+                data = AnnotatedValue.removed_because_over_size_limit()
             else:
                 parsed_body = await self.parsed_body()
                 if parsed_body is not None:
                     data = parsed_body
                 elif await self.raw_data():
-                    data = AnnotatedValue(
-                        "",
-                        {
-                            "rem": [["!raw", "x", 0, content_length]],
-                            "len": content_length,
-                        },
-                    )
+                    data = AnnotatedValue.removed_because_raw_data()
                 else:
                     data = None
 
@@ -525,10 +513,7 @@ class StarletteRequestExtractor:
             data = {}
             for key, val in iteritems(form):
                 if isinstance(val, UploadFile):
-                    size = len(await val.read())
-                    data[key] = AnnotatedValue(
-                        "", {"len": size, "rem": [["!raw", "x", 0, size]]}
-                    )
+                    data[key] = AnnotatedValue.removed_because_raw_data()
                 else:
                     data[key] = val
 

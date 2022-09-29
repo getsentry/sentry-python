@@ -56,9 +56,7 @@ PARSED_FORM = starlette.datastructures.FormData(
 PARSED_BODY = {
     "username": "Jane",
     "password": "hello123",
-    "photo": AnnotatedValue(
-        "", {"len": 28023, "rem": [["!raw", "x", 0, 28023]]}
-    ),  # size of photo.jpg read above
+    "photo": AnnotatedValue("", {"rem": [["!raw", "x"]]}),
 }
 
 # Dummy ASGI scope for creating mock Starlette requests
@@ -283,10 +281,7 @@ async def test_starlettrequestextractor_extract_request_info_too_big(sentry_init
             "yummy_cookie": "choco",
         }
         # Because request is too big only the AnnotatedValue is extracted.
-        assert request_info["data"].metadata == {
-            "rem": [["!config", "x", 0, 28355]],
-            "len": 28355,
-        }
+        assert request_info["data"].metadata == {"rem": [["!config", "x"]]}
 
 
 @pytest.mark.asyncio

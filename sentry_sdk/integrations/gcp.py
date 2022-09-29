@@ -190,7 +190,7 @@ def _make_request_event_processor(gcp_event, configured_timeout, initial_time):
             if hasattr(gcp_event, "data"):
                 # Unfortunately couldn't find a way to get structured body from GCP
                 # event. Meaning every body is unstructured to us.
-                request["data"] = AnnotatedValue("", {"rem": [["!raw", "x", 0, 0]]})
+                request["data"] = AnnotatedValue.removed_because_raw_data()
 
         event["request"] = request
 
