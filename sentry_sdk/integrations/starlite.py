@@ -5,16 +5,19 @@ from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import event_from_exception, transaction_from_function
 
 try:
-    from typing import Dict, Any
+    from typing import Dict, Any, Optional, List
 
     from sentry_sdk._types import Event
 
     from pydantic import BaseModel
     from starlette.exceptions import HTTPException as StarletteHTTPException
     from starlite import Starlite, State, HTTPException, Request
-    from starlite.types import Scope, HTTPScope, Send, Receive, ASGIApp
+    from starlite.handlers.base import BaseRouteHandler
+    from starlite.plugins.base import get_plugin_for_value
     from starlite.routes.http import HTTPRoute
-    from starlite.utils.extractors import ConnectionDataExtractor
+    from starlite.types import Middleware
+    from starlite.types import Scope, HTTPScope, Send, Receive, ASGIApp
+    from starlite.utils import ConnectionDataExtractor, is_async_callable
 except ImportError:
     raise DidNotEnable("Starlite is not installed")
 
@@ -36,6 +39,7 @@ class StarliteIntegration(Integration):
     @staticmethod
     def setup_once():
         patch_app_init()
+        patch_middlewares()
         patch_http_route_handle()
 
 
@@ -69,6 +73,52 @@ def patch_app_init() -> None:
         old__init__(self, *args, **kwargs)
 
     Starlite.__init__ = injection_wrapper
+
+
+def patch_middlewares() -> None:
+    old__resolve_middleware_stack = BaseRouteHandler.resolve_middleware
+
+    def resolve_middleware_wrapper(self: Any) -> List["Middleware"]:
+        return list(
+            map(
+                lambda middleware: enable_span_for_middleware(middleware),
+                old__resolve_middleware_stack(self),
+            )
+        )
+
+    BaseRouteHandler.resolve_middleware = resolve_middleware_wrapper
+
+
+def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
+    if not hasattr(middleware, "__call__"):
+        return middleware
+
+    old_call = middleware.__call__
+
+    async def create_span_call(*args, **kwargs):
+        hub = Hub.current
+        integration = hub.get_integration(StarliteIntegration)
+        if integration is not None:
+            middleware_name = args[0].__class__.__name__
+            with hub.start_span(
+                op="starlite.middleware", description=middleware_name
+            ) as middleware_span:
+                middleware_span.set_tag("starlite.middleware_name", middleware_name)
+
+                await old_call(*args, **kwargs)
+        else:
+            await old_call(*args, **kwargs)
+
+    not_yet_patched = old_call.__name__ not in [
+        "_create_span_call",
+        "_sentry_authenticationmiddleware_call",
+        "_sentry_exceptionmiddleware_call",
+    ]
+
+    if not_yet_patched:
+        middleware.__call__ = create_span_call
+
+    return middleware
 
 
 def patch_http_route_handle() -> None:
@@ -115,19 +165,23 @@ def patch_http_route_handle() -> None:
     HTTPRoute.handle = handle_wrapper
 
 
-def retrieve_user_from_scope(scope: Scope) -> Dict[str, Any]:
-    user_dict = {}
-    if "user" not in scope and not _should_send_default_pii():
-        return user_dict
+def retrieve_user_from_scope(scope: "Scope") -> Optional[Dict[str, Any]]:
+    scope_user = scope.get("user", {})
+    if not scope_user or not _should_send_default_pii():
+        return None
 
-    scope_user = scope.get("user")
     if isinstance(scope_user, dict):
         return scope_user
-    elif isinstance(scope_user, BaseModel):
+    if isinstance(scope_user, BaseModel):
         return scope_user.dict()
-    elif hasattr(scope_user, "asdict"):
+    if hasattr(scope_user, "asdict"):  # dataclasses
         return scope_user.asdict()
-    return user_dict
+
+    plugin = get_plugin_for_value(scope_user)
+    if plugin and not is_async_callable(plugin.to_dict):
+        return plugin.to_dict(scope_user)
+
+    return None
 
 
 def exception_handler(exc: Exception, scope: Scope, _: State):
@@ -138,8 +192,7 @@ def exception_handler(exc: Exception, scope: Scope, _: State):
     user_info = retrieve_user_from_scope(scope)
     if user_info and isinstance(user_info, dict):
         with hub.configure_scope() as sentry_scope:
-            if sentry_scope:
-                sentry_scope.set_user(user_info)
+            sentry_scope.set_user(user_info)
 
     if isinstance(exc, (StarletteHTTPException, HTTPException)):
         event, hint = event_from_exception(
