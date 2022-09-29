@@ -414,9 +414,7 @@ def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, ap
     assert response.status_code == 200
 
     (event,) = events
-    assert event["_meta"]["request"]["data"] == {
-        "": {"len": 2000, "rem": [["!config", "x", 0, 2000]]}
-    }
+    assert event["_meta"]["request"]["data"] == {"": {"rem": [["!config", "x"]]}}
     assert not event["request"]["data"]
 
 
@@ -445,9 +443,7 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
     }
     assert len(event["request"]["data"]["foo"]) == 512
 
-    assert event["_meta"]["request"]["data"]["file"] == {
-        "": {"len": 0, "rem": [["!raw", "x", 0, 0]]}
-    }
+    assert event["_meta"]["request"]["data"]["file"] == {"": {"rem": [["!raw", "x"]]}}
     assert not event["request"]["data"]["file"]
 
 

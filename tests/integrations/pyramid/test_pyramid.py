@@ -213,9 +213,7 @@ def test_files_and_form(sentry_init, capture_events, route, get_client):
     }
     assert len(event["request"]["data"]["foo"]) == 512
 
-    assert event["_meta"]["request"]["data"]["file"] == {
-        "": {"len": 0, "rem": [["!raw", "x", 0, 0]]}
-    }
+    assert event["_meta"]["request"]["data"]["file"] == {"": {"rem": [["!raw", "x"]]}}
     assert not event["request"]["data"]["file"]
 
 
