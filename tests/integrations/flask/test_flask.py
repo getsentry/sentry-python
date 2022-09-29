@@ -263,9 +263,9 @@ def test_flask_large_json_request(sentry_init, capture_events, app):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
     }
-    assert len(event["request"]["data"]["foo"]["bar"]) == 512
+    assert len(event["request"]["data"]["foo"]["bar"]) == 1024
 
 
 def test_flask_session_tracking(sentry_init, capture_envelopes, app):
@@ -352,9 +352,9 @@ def test_flask_medium_formdata_request(sentry_init, capture_events, app):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
     }
-    assert len(event["request"]["data"]["foo"]) == 512
+    assert len(event["request"]["data"]["foo"]) == 1024
 
 
 def test_flask_formdata_request_appear_transaction_body(
@@ -439,9 +439,9 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
     }
-    assert len(event["request"]["data"]["foo"]) == 512
+    assert len(event["request"]["data"]["foo"]) == 1024
 
     assert event["_meta"]["request"]["data"]["file"] == {"": {"rem": [["!raw", "x"]]}}
     assert not event["request"]["data"]["file"]
