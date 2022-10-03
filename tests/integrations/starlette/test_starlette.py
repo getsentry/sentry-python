@@ -158,8 +158,11 @@ async def test_starlettrequestextractor_content_length(sentry_init):
         "starlette.requests.Request.stream",
         return_value=AsyncIterator(json.dumps(BODY_JSON)),
     ):
-        starlette_request = starlette.requests.Request(SCOPE)
-        starlette_request.headers["content-length"] = len(json.dumps(BODY_JSON))
+        scope = SCOPE.copy()
+        scope["headers"] = [
+            [b"content-length", len(json.dumps(BODY_JSON))],
+        ]
+        starlette_request = starlette.requests.Request(scope)
         extractor = StarletteRequestExtractor(starlette_request)
 
         assert (
