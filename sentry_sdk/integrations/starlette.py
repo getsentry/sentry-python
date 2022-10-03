@@ -447,7 +447,9 @@ class StarletteRequestExtractor:
             if _should_send_default_pii():
                 request_info["cookies"] = self.cookies()
 
-            if not request_body_within_bounds(client, content_length):
+            if not content_length or not request_body_within_bounds(
+                client, content_length
+            ):
                 data = AnnotatedValue.removed_because_over_size_limit()
             else:
                 parsed_body = await self.parsed_body()
@@ -464,11 +466,11 @@ class StarletteRequestExtractor:
         return request_info
 
     async def content_length(self):
-        # type: (StarletteRequestExtractor) -> int
-        raw_data = await self.raw_data()
-        if raw_data is None:
-            return 0
-        return len(raw_data)
+        # type: (StarletteRequestExtractor) -> Optional(int)
+        if "content-length" in self.request.headers:
+            return self.request.headers["content-length"]
+
+        return None
 
     def cookies(self):
         # type: (StarletteRequestExtractor) -> Dict[str, Any]
