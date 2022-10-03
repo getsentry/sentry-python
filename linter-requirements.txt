@@ -4,6 +4,6 @@ flake8==5.0.4
 types-certifi
 types-redis
 types-setuptools
-flake8-bugbear==22.9.11
+flake8-bugbear==22.9.23
 pep8-naming==0.13.2
 pre-commit # local linting
