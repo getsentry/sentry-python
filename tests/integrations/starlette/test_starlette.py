@@ -160,7 +160,7 @@ async def test_starlettrequestextractor_content_length(sentry_init):
     ):
         scope = SCOPE.copy()
         scope["headers"] = [
-            [b"content-length", len(json.dumps(BODY_JSON))],
+            [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
         ]
         starlette_request = starlette.requests.Request(scope)
         extractor = StarletteRequestExtractor(starlette_request)
@@ -300,7 +300,7 @@ async def test_starlettrequestextractor_extract_request_info(sentry_init):
     scope = SCOPE.copy()
     scope["headers"] = [
         [b"content-type", b"application/json"],
-        [b"content-length", len(json.dumps(BODY_JSON))],
+        [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
         [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
     ]
 
@@ -330,7 +330,7 @@ async def test_starlettrequestextractor_extract_request_info_no_pii(sentry_init)
     scope = SCOPE.copy()
     scope["headers"] = [
         [b"content-type", b"application/json"],
-        [b"content-length", len(json.dumps(BODY_JSON))],
+        [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
         [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
     ]
 
