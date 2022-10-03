@@ -165,10 +165,7 @@ async def test_starlettrequestextractor_content_length(sentry_init):
         starlette_request = starlette.requests.Request(scope)
         extractor = StarletteRequestExtractor(starlette_request)
 
-        assert (
-            await extractor.content_length()
-            == starlette_request.headers["content-length"]
-        )
+        assert await extractor.content_length() == len(json.dumps(BODY_JSON))
 
 
 @pytest.mark.asyncio
