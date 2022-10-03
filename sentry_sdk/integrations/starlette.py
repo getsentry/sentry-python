@@ -466,7 +466,7 @@ class StarletteRequestExtractor:
         return request_info
 
     async def content_length(self):
-        # type: (StarletteRequestExtractor) -> Optional(int)
+        # type: (StarletteRequestExtractor) -> Optional[int]
         if "content-length" in self.request.headers:
             return self.request.headers["content-length"]
 
