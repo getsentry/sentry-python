@@ -438,30 +438,31 @@ class StarletteRequestExtractor:
         if client is None:
             return None
 
-        data = None  # type: Union[Dict[str, Any], AnnotatedValue, None]
-
-        content_length = await self.content_length()
         request_info = {}  # type: Dict[str, Any]
 
         with capture_internal_exceptions():
             if _should_send_default_pii():
                 request_info["cookies"] = self.cookies()
 
-            if not content_length or not request_body_within_bounds(
-                client, content_length
-            ):
-                data = AnnotatedValue.removed_because_over_size_limit()
-            else:
-                parsed_body = await self.parsed_body()
-                if parsed_body is not None:
-                    data = parsed_body
-                elif await self.raw_data():
-                    data = AnnotatedValue.removed_because_raw_data()
-                else:
-                    data = None
+            content_length = await self.content_length()
 
-            if data is not None:
-                request_info["data"] = data
+            if content_length:
+                data = None  # type: Union[Dict[str, Any], AnnotatedValue, None]
+
+                if not request_body_within_bounds(client, content_length):
+                    data = AnnotatedValue.removed_because_over_size_limit()
+
+                else:
+                    parsed_body = await self.parsed_body()
+                    if parsed_body is not None:
+                        data = parsed_body
+                    elif await self.raw_data():
+                        data = AnnotatedValue.removed_because_raw_data()
+                    else:
+                        data = None
+
+                if data is not None:
+                    request_info["data"] = data
 
         return request_info
 
