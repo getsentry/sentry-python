@@ -302,16 +302,21 @@ class _SampleBuffer(object):
                 sample["stack_id"] = stacks[current_stack]
                 samples.append(sample)
 
+        # This collects the thread metadata at the end of a profile. Doing it
+        # this way means that any threads that terminate before the profile ends
+        # will not have any metadata associated with it.
+        thread_metadata = {
+            str(thread.ident): {
+                "name": thread.name,
+            }
+            for thread in threading.enumerate()
+        }
+
         return {
             "stacks": stacks_list,
             "frames": frames_list,
             "samples": samples,
-            "thread_metadata": {
-                str(thread.ident): {
-                    "name": thread.name,
-                }
-                for thread in threading.enumerate()
-            },
+            "thread_metadata": thread_metadata,
         }
 
 
