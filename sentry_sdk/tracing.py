@@ -21,7 +21,8 @@ if MYPY:
     from typing import Tuple
     from typing import Iterator
 
-    from sentry_sdk._types import SamplingContext, MeasurementUnit
+    import sentry_sdk.profiler
+    from sentry_sdk._types import Event, SamplingContext, MeasurementUnit
 
 
 # Transaction source
@@ -579,7 +580,7 @@ class Transaction(Span):
         self._sentry_tracestate = sentry_tracestate
         self._third_party_tracestate = third_party_tracestate
         self._measurements = {}  # type: Dict[str, Any]
-        self._profile = None  # type: Optional[Dict[str, Any]]
+        self._profile = None  # type: Optional[sentry_sdk.profiler.Profile]
         self._baggage = baggage
         # for profiling, we want to know on which thread a transaction is started
         # to accurately show the active thread in the UI
@@ -675,7 +676,7 @@ class Transaction(Span):
             "timestamp": self.timestamp,
             "start_timestamp": self.start_timestamp,
             "spans": finished_spans,
-        }
+        }  # type: Event
 
         if hub.client is not None and self._profile is not None:
             event["profile"] = self._profile
