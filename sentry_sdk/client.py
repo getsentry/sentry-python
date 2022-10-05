@@ -17,7 +17,12 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.transport import make_transport
-from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO, ClientConstructor
+from sentry_sdk.consts import (
+    DEFAULT_OPTIONS,
+    SDK_INFO,
+    ClientConstructor,
+    _get_sdk_name,
+)
 from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
@@ -128,6 +133,11 @@ class _Client(object):
                     "auto_enabling_integrations"
                 ],
             )
+
+            sdk_name = _get_sdk_name(list(self.integrations.keys()))
+            SDK_INFO["name"] = sdk_name
+            logger.debug("Setting SDK name to '%s'", sdk_name)
+
         finally:
             _client_init_debug.set(old_debug)
 

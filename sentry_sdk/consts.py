@@ -104,17 +104,43 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-def _get_sdk_name():
+def _get_sdk_name(installed_integrations):
+    # type: (list[str]) -> str
+    """Return the SDK name including the name of the used web framework."""
+
+    # Note: I can not use for example sentry_sdk.integrations.django.DjangoIntegration.identifier
+    # here because if django is not installed the integration is not accessible.
+    framework_integrations = [
+        "django",
+        "flask",
+        "fastapi",
+        "bottle",
+        "falcon",
+        "quart",
+        "sanic",
+        "starlette",
+        "chalice",
+        "serverless",
+        "pyramid",
+        "tornado",
+        "aiohttp",
+        "aws_lambda",
+        "gcp",
+        "beam",
+        "asgi",
+        "wsgi",
+    ]
+
+    for integration in framework_integrations:
+        if integration in installed_integrations:
+            return "sentry.python.{}".format(integration)
+
     return "sentry.python"
-
-
-SDK_NAME = _get_sdk_name()
-del _get_sdk_name
 
 
 VERSION = "1.9.10"
 SDK_INFO = {
-    "name": SDK_NAME,
+    "name": "sentry.python",  # SDK name be overridden after integrations have been loaded with sentry_sdk.integrations.setup_integrations()
     "version": VERSION,
     "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
 }
