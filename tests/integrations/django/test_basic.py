@@ -19,7 +19,7 @@ except ImportError:
 from sentry_sdk._compat import PY2
 from sentry_sdk import capture_message, capture_exception, configure_scope
 from sentry_sdk.integrations.django import DjangoIntegration
-from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
+from sentry_sdk.integrations.event.django_handlers import _get_receiver_name
 from sentry_sdk.integrations.executing import ExecutingIntegration
 
 from tests.integrations.django.myapp.wsgi import application
@@ -703,8 +703,8 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
             render_span_tree(transaction)
             == """\
 - op="http.server": description=null
-  - op="django.signals": description="django.db.reset_queries"
-  - op="django.signals": description="django.db.close_old_connections"
+  - op="event.django": description="django.db.reset_queries"
+  - op="event.django": description="django.db.close_old_connections"
   - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.__call__"
     - op="middleware.django": description="django.contrib.auth.middleware.AuthenticationMiddleware.__call__"
       - op="middleware.django": description="middleware.django.csrf.CsrfViewMiddleware.__call__"
@@ -720,8 +720,8 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
             render_span_tree(transaction)
             == """\
 - op="http.server": description=null
-  - op="django.signals": description="django.db.reset_queries"
-  - op="django.signals": description="django.db.close_old_connections"
+  - op="event.django": description="django.db.reset_queries"
+  - op="event.django": description="django.db.close_old_connections"
   - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.process_request"
   - op="middleware.django": description="django.contrib.auth.middleware.AuthenticationMiddleware.process_request"
   - op="middleware.django": description="tests.integrations.django.myapp.settings.TestMiddleware.process_request"
@@ -748,10 +748,10 @@ def test_middleware_spans_disabled(sentry_init, client, capture_events):
 
     assert len(transaction["spans"]) == 2
 
-    assert transaction["spans"][0]["op"] == "django.signals"
+    assert transaction["spans"][0]["op"] == "event.django"
     assert transaction["spans"][0]["description"] == "django.db.reset_queries"
 
-    assert transaction["spans"][1]["op"] == "django.signals"
+    assert transaction["spans"][1]["op"] == "event.django"
     assert transaction["spans"][1]["description"] == "django.db.close_old_connections"
 
 

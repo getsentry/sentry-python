@@ -175,15 +175,15 @@ async def test_async_middleware_spans(
         render_span_tree(transaction)
         == """\
 - op="http.server": description=null
-  - op="django.signals": description="django.db.reset_queries"
-  - op="django.signals": description="django.db.close_old_connections"
+  - op="event.django": description="django.db.reset_queries"
+  - op="event.django": description="django.db.close_old_connections"
   - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.__acall__"
     - op="middleware.django": description="django.contrib.auth.middleware.AuthenticationMiddleware.__acall__"
       - op="middleware.django": description="middleware.django.csrf.CsrfViewMiddleware.__acall__"
         - op="middleware.django": description="tests.integrations.django.myapp.settings.TestMiddleware.__acall__"
           - op="middleware.django": description="middleware.django.csrf.CsrfViewMiddleware.process_view"
           - op="view.django": description="async_message"
-  - op="django.signals": description="django.db.close_old_connections"
-  - op="django.signals": description="django.core.cache.close_caches"
-  - op="django.signals": description="django.core.handlers.base.reset_urlconf\""""
+  - op="event.django": description="django.db.close_old_connections"
+  - op="event.django": description="django.core.cache.close_caches"
+  - op="event.django": description="django.core.handlers.base.reset_urlconf\""""
     )
