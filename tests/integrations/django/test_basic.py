@@ -19,7 +19,7 @@ except ImportError:
 from sentry_sdk._compat import PY2
 from sentry_sdk import capture_message, capture_exception, configure_scope
 from sentry_sdk.integrations.django import DjangoIntegration
-from sentry_sdk.integrations.event.django_handlers import _get_receiver_name
+from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.executing import ExecutingIntegration
 
 from tests.integrations.django.myapp.wsgi import application
