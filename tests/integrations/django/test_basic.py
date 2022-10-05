@@ -707,10 +707,10 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
   - op="event.django": description="django.db.close_old_connections"
   - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.__call__"
     - op="middleware.django": description="django.contrib.auth.middleware.AuthenticationMiddleware.__call__"
-      - op="middleware.django": description="middleware.django.csrf.CsrfViewMiddleware.__call__"
+      - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.__call__"
         - op="middleware.django": description="tests.integrations.django.myapp.settings.TestMiddleware.__call__"
           - op="middleware.django": description="tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__"
-            - op="middleware.django": description="middleware.django.csrf.CsrfViewMiddleware.process_view"
+            - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
             - op="view.django": description="message"\
 """
         )
@@ -725,10 +725,10 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
   - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.process_request"
   - op="middleware.django": description="django.contrib.auth.middleware.AuthenticationMiddleware.process_request"
   - op="middleware.django": description="tests.integrations.django.myapp.settings.TestMiddleware.process_request"
-  - op="middleware.django": description="middleware.django.csrf.CsrfViewMiddleware.process_view"
+  - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
   - op="view.django": description="message"
   - op="middleware.django": description="tests.integrations.django.myapp.settings.TestMiddleware.process_response"
-  - op="middleware.django": description="middleware.django.csrf.CsrfViewMiddleware.process_response"
+  - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.process_response"
   - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.process_response"\
 """
         )
