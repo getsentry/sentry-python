@@ -104,9 +104,17 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
+def _get_sdk_name():
+    return "sentry.python"
+
+
+SDK_NAME = _get_sdk_name()
+del _get_sdk_name
+
+
 VERSION = "1.9.10"
 SDK_INFO = {
-    "name": "sentry.python",
+    "name": SDK_NAME,
     "version": VERSION,
     "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
 }
