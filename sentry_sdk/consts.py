@@ -105,7 +105,7 @@ del _get_default_options
 
 
 def _get_sdk_name(installed_integrations):
-    # type: (list[str]) -> str
+    # type: (List[str]) -> str
     """Return the SDK name including the name of the used web framework."""
 
     # Note: I can not use for example sentry_sdk.integrations.django.DjangoIntegration.identifier
