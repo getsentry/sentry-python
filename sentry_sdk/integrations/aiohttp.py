@@ -2,6 +2,7 @@ import sys
 import weakref
 
 from sentry_sdk._compat import reraise
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
@@ -99,7 +100,7 @@ class AioHttpIntegration(Integration):
 
                 transaction = Transaction.continue_from_headers(
                     request.headers,
-                    op="http.server",
+                    op=OP.HTTP_SERVER,
                     # If this transaction name makes it to the UI, AIOHTTP's
                     # URL resolver did not find a route or died trying.
                     name="generic AIOHTTP request",

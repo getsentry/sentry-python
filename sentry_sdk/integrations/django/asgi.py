@@ -10,6 +10,7 @@ import asyncio
 
 from sentry_sdk import Hub, _functools
 from sentry_sdk._types import MYPY
+from sentry_sdk.consts import OP
 
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
@@ -89,7 +90,7 @@ def wrap_async_view(hub, callback):
         # type: (Any, *Any, **Any) -> Any
 
         with hub.start_span(
-            op="django.view", description=request.resolver_match.view_name
+            op=OP.VIEW_DJANGO, description=request.resolver_match.view_name
         ):
             return await callback(request, *args, **kwargs)
 

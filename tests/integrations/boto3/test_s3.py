@@ -1,4 +1,5 @@
 from sentry_sdk import Hub
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from tests.integrations.boto3.aws_mock import MockResponse
 from tests.integrations.boto3 import read_fixture
@@ -30,7 +31,7 @@ def test_basic(sentry_init, capture_events):
     assert event["type"] == "transaction"
     assert len(event["spans"]) == 1
     (span,) = event["spans"]
-    assert span["op"] == "aws.request"
+    assert span["op"] == OP.HTTP_CLIENT
     assert span["description"] == "aws.s3.ListObjects"
 
 
@@ -54,10 +55,10 @@ def test_streaming(sentry_init, capture_events):
     assert event["type"] == "transaction"
     assert len(event["spans"]) == 2
     span1 = event["spans"][0]
-    assert span1["op"] == "aws.request"
+    assert span1["op"] == OP.HTTP_CLIENT
     assert span1["description"] == "aws.s3.GetObject"
     span2 = event["spans"][1]
-    assert span2["op"] == "aws.request.stream"
+    assert span2["op"] == OP.HTTP_CLIENT_STREAM
     assert span2["description"] == "aws.s3.GetObject"
     assert span2["parent_span_id"] == span1["span_id"]
 
@@ -80,6 +81,6 @@ def test_streaming_close(sentry_init, capture_events):
     assert event["type"] == "transaction"
     assert len(event["spans"]) == 2
     span1 = event["spans"][0]
-    assert span1["op"] == "aws.request"
+    assert span1["op"] == OP.HTTP_CLIENT
     span2 = event["spans"][1]
-    assert span2["op"] == "aws.request.stream"
+    assert span2["op"] == OP.HTTP_CLIENT_STREAM

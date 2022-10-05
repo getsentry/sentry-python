@@ -6,6 +6,7 @@ import os
 import pytest
 
 from sentry_sdk import last_event_id, capture_exception
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
 try:
@@ -540,7 +541,7 @@ def test_middleware_spans(sentry_init, capture_events):
 
     idx = 0
     for span in transaction_event["spans"]:
-        if span["op"] == "starlette.middleware":
+        if span["op"] == OP.MIDDLEWARE_STARLETTE:
             assert span["description"] == expected[idx]
             assert span["tags"]["starlette.middleware_name"] == expected[idx]
             idx += 1

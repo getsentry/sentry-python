@@ -12,6 +12,8 @@ import pytest
 import os.path
 import os
 
+from sentry_sdk.consts import OP
+
 pytestmark = pytest.mark.skipif(
     not hasattr(tempfile, "TemporaryDirectory"), reason="need Python 3.2+"
 )
@@ -253,7 +255,7 @@ def test_performance_no_error(run_cloud_function):
     )
 
     assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == "serverless.function"
+    assert envelope["contexts"]["trace"]["op"] == OP.FUNCTION_GCP
     assert envelope["transaction"].startswith("Google Cloud function")
     assert envelope["transaction_info"] == {"source": "component"}
     assert envelope["transaction"] in envelope["request"]["url"]
@@ -279,7 +281,7 @@ def test_performance_error(run_cloud_function):
     )
 
     assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == "serverless.function"
+    assert envelope["contexts"]["trace"]["op"] == OP.FUNCTION_GCP
     assert envelope["transaction"].startswith("Google Cloud function")
     assert envelope["transaction"] in envelope["request"]["url"]
     assert event["level"] == "error"

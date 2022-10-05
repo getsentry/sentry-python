@@ -110,3 +110,26 @@ SDK_INFO = {
     "version": VERSION,
     "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
 }
+
+
+class OP:
+    ASGI_SERVER = "asgi.server"
+    DB = "db"
+    DB_REDIS = "db.redis"
+    EVENT_DJANGO = "event.django"
+    FUNCTION_AWS_LAMBDA = "function.aws.lambda"
+    FUNCTION_GCP = "function.gcp"
+    HTTP_CLIENT = "http.client"
+    HTTP_CLIENT_STREAM = "http.client.stream"
+    HTTP_SERVER = "http.server"
+    MIDDLEWARE_DJANGO = "middleware.django"
+    MIDDLEWARE_STARLETTE = "middleware.starlette"
+    QUEUE_SUBMIT_CELERY = "queue.submit.celery"
+    QUEUE_TASK_CELERY = "queue.task.celery"
+    QUEUE_TASK_RQ = "queue.task.rq"
+    SUBPROCESS = "subprocess"
+    SUBPROCESS_WAIT = "subprocess.wait"
+    SUBPROCESS_COMMUNICATE = "subprocess.communicate"
+    TEMPLATE_RENDER = "template.render"
+    VIEW_DJANGO = "view.django"
+    WEBSOCKET_SERVER = "websocket.server"
