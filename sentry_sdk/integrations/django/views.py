@@ -63,7 +63,7 @@ def _wrap_sync_view(hub, callback):
     def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
         with hub.start_span(
-            op=OP.VIEW_DJANGO, description=request.resolver_match.view_name
+            op=OP.VIEW_RENDER, description=request.resolver_match.view_name
         ):
             return callback(request, *args, **kwargs)
 

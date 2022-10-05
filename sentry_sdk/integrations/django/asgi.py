@@ -90,7 +90,7 @@ def wrap_async_view(hub, callback):
         # type: (Any, *Any, **Any) -> Any
 
         with hub.start_span(
-            op=OP.VIEW_DJANGO, description=request.resolver_match.view_name
+            op=OP.VIEW_RENDER, description=request.resolver_match.view_name
         ):
             return await callback(request, *args, **kwargs)
 

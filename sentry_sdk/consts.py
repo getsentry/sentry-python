@@ -131,5 +131,5 @@ class OP:
     SUBPROCESS_WAIT = "subprocess.wait"
     SUBPROCESS_COMMUNICATE = "subprocess.communicate"
     TEMPLATE_RENDER = "template.render"
-    VIEW_DJANGO = "view.django"
+    VIEW_RENDER = "view.render"
     WEBSOCKET_SERVER = "websocket.server"
