@@ -1,7 +1,6 @@
 import pytest
 from sentry_sdk import capture_message
 from sentry_sdk.api import start_transaction
-from sentry_sdk.consts import OP
 from sentry_sdk.integrations.redis import RedisIntegration
 
 import rediscluster
@@ -66,7 +65,7 @@ def test_rediscluster_pipeline(sentry_init, capture_events):
 
     (event,) = events
     (span,) = event["spans"]
-    assert span["op"] == OP.DB_REDIS
+    assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
     assert span["data"] == {
         "redis.commands": {

@@ -1,7 +1,6 @@
 import threading
 
 import pytest
-from sentry_sdk.consts import OP
 
 pytest.importorskip("celery")
 
@@ -175,7 +174,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     assert submission_event["spans"] == [
         {
             "description": "dummy_task",
-            "op": OP.QUEUE_SUBMIT_CELERY,
+            "op": "queue.submit.celery",
             "parent_span_id": submission_event["contexts"]["trace"]["span_id"],
             "same_process_as_parent": True,
             "span_id": submission_event["spans"][0]["span_id"],
@@ -348,7 +347,7 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe, t
         submit_transaction["spans"]
     ), 4  # Because redis integration was auto enabled
     span = submit_transaction["spans"][0]
-    assert span["op"] == OP.QUEUE_SUBMIT_CELERY
+    assert span["op"] == "queue.submit.celery"
     assert span["description"] == "dummy_task"
 
     event = events.read_event()

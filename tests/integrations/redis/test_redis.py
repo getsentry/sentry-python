@@ -1,5 +1,4 @@
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk.consts import OP
 from sentry_sdk.integrations.redis import RedisIntegration
 
 from fakeredis import FakeStrictRedis
@@ -47,7 +46,7 @@ def test_redis_pipeline(sentry_init, capture_events, is_transaction):
 
     (event,) = events
     (span,) = event["spans"]
-    assert span["op"] == OP.DB_REDIS
+    assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
     assert span["data"] == {
         "redis.commands": {

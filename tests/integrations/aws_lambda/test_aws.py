@@ -21,7 +21,6 @@ import re
 from textwrap import dedent
 
 import pytest
-from sentry_sdk.consts import OP
 
 boto3 = pytest.importorskip("boto3")
 
@@ -361,7 +360,7 @@ def test_performance_no_error(run_lambda_function):
 
     (envelope,) = envelopes
     assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == OP.FUNCTION_AWS_LAMBDA
+    assert envelope["contexts"]["trace"]["op"] == "function.aws.lambda"
     assert envelope["transaction"].startswith("test_function_")
     assert envelope["transaction_info"] == {"source": "component"}
     assert envelope["transaction"] in envelope["request"]["url"]
@@ -390,7 +389,7 @@ def test_performance_error(run_lambda_function):
     (envelope,) = envelopes
 
     assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == OP.FUNCTION_AWS_LAMBDA
+    assert envelope["contexts"]["trace"]["op"] == "function.aws.lambda"
     assert envelope["transaction"].startswith("test_function_")
     assert envelope["transaction_info"] == {"source": "component"}
     assert envelope["transaction"] in envelope["request"]["url"]
@@ -477,7 +476,7 @@ def test_non_dict_event(
 
     error_event = events[0]
     assert error_event["level"] == "error"
-    assert error_event["contexts"]["trace"]["op"] == OP.FUNCTION_AWS_LAMBDA
+    assert error_event["contexts"]["trace"]["op"] == "function.aws.lambda"
 
     function_name = error_event["extra"]["lambda"]["function_name"]
     assert function_name.startswith("test_function_")
