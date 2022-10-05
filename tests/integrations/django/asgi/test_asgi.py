@@ -182,7 +182,7 @@ async def test_async_middleware_spans(
       - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.__acall__"
         - op="middleware.django": description="tests.integrations.django.myapp.settings.TestMiddleware.__acall__"
           - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
-          - op="view.django": description="async_message"
+          - op="view.render": description="async_message"
   - op="event.django": description="django.db.close_old_connections"
   - op="event.django": description="django.core.cache.close_caches"
   - op="event.django": description="django.core.handlers.base.reset_urlconf\""""
