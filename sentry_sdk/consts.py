@@ -113,7 +113,6 @@ SDK_INFO = {
 
 
 class OP:
-    ASGI_SERVER = "asgi.server"
     DB = "db"
     DB_REDIS = "db.redis"
     EVENT_DJANGO = "event.django"

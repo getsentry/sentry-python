@@ -167,7 +167,7 @@ class SentryAsgiMiddleware:
                             op="{}.server".format(ty),
                         )
                     else:
-                        transaction = Transaction(op=OP.ASGI_SERVER)
+                        transaction = Transaction(op=OP.HTTP_SERVER)
 
                     transaction.name = _DEFAULT_TRANSACTION_NAME
                     transaction.source = TRANSACTION_SOURCE_ROUTE
