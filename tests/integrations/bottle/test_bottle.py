@@ -234,9 +234,7 @@ def test_too_large_raw_request(
     assert response[1] == "200 OK"
 
     (event,) = events
-    assert event["_meta"]["request"]["data"] == {
-        "": {"len": 2000, "rem": [["!config", "x", 0, 2000]]}
-    }
+    assert event["_meta"]["request"]["data"] == {"": {"rem": [["!config", "x"]]}}
     assert not event["request"]["data"]
 
 
@@ -271,9 +269,8 @@ def test_files_and_form(sentry_init, capture_events, app, get_client):
 
     assert event["_meta"]["request"]["data"]["file"] == {
         "": {
-            "len": -1,
-            "rem": [["!raw", "x", 0, -1]],
-        }  # bottle default content-length is -1
+            "rem": [["!raw", "x"]],
+        }
     }
     assert not event["request"]["data"]["file"]
 

@@ -56,9 +56,7 @@ PARSED_FORM = starlette.datastructures.FormData(
 PARSED_BODY = {
     "username": "Jane",
     "password": "hello123",
-    "photo": AnnotatedValue(
-        "", {"len": 28023, "rem": [["!raw", "x", 0, 28023]]}
-    ),  # size of photo.jpg read above
+    "photo": AnnotatedValue("", {"rem": [["!raw", "x"]]}),
 }
 
 # Dummy ASGI scope for creating mock Starlette requests
@@ -160,7 +158,11 @@ async def test_starlettrequestextractor_content_length(sentry_init):
         "starlette.requests.Request.stream",
         return_value=AsyncIterator(json.dumps(BODY_JSON)),
     ):
-        starlette_request = starlette.requests.Request(SCOPE)
+        scope = SCOPE.copy()
+        scope["headers"] = [
+            [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
+        ]
+        starlette_request = starlette.requests.Request(scope)
         extractor = StarletteRequestExtractor(starlette_request)
 
         assert await extractor.content_length() == len(json.dumps(BODY_JSON))
@@ -266,6 +268,7 @@ async def test_starlettrequestextractor_extract_request_info_too_big(sentry_init
     scope = SCOPE.copy()
     scope["headers"] = [
         [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
+        [b"content-length", str(len(BODY_FORM)).encode()],
         [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
     ]
     with mock.patch(
@@ -283,10 +286,7 @@ async def test_starlettrequestextractor_extract_request_info_too_big(sentry_init
             "yummy_cookie": "choco",
         }
         # Because request is too big only the AnnotatedValue is extracted.
-        assert request_info["data"].metadata == {
-            "rem": [["!config", "x", 0, 28355]],
-            "len": 28355,
-        }
+        assert request_info["data"].metadata == {"rem": [["!config", "x"]]}
 
 
 @pytest.mark.asyncio
@@ -298,6 +298,7 @@ async def test_starlettrequestextractor_extract_request_info(sentry_init):
     scope = SCOPE.copy()
     scope["headers"] = [
         [b"content-type", b"application/json"],
+        [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
         [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
     ]
 
@@ -327,6 +328,7 @@ async def test_starlettrequestextractor_extract_request_info_no_pii(sentry_init)
     scope = SCOPE.copy()
     scope["headers"] = [
         [b"content-type", b"application/json"],
+        [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
         [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
     ]
 

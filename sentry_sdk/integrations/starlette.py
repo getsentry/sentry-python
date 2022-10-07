@@ -438,49 +438,40 @@ class StarletteRequestExtractor:
         if client is None:
             return None
 
-        data = None  # type: Union[Dict[str, Any], AnnotatedValue, None]
-
-        content_length = await self.content_length()
         request_info = {}  # type: Dict[str, Any]
 
         with capture_internal_exceptions():
             if _should_send_default_pii():
                 request_info["cookies"] = self.cookies()
 
-            if not request_body_within_bounds(client, content_length):
-                data = AnnotatedValue(
-                    "",
-                    {
-                        "rem": [["!config", "x", 0, content_length]],
-                        "len": content_length,
-                    },
-                )
-            else:
-                parsed_body = await self.parsed_body()
-                if parsed_body is not None:
-                    data = parsed_body
-                elif await self.raw_data():
-                    data = AnnotatedValue(
-                        "",
-                        {
-                            "rem": [["!raw", "x", 0, content_length]],
-                            "len": content_length,
-                        },
-                    )
-                else:
-                    data = None
+            content_length = await self.content_length()
 
-            if data is not None:
-                request_info["data"] = data
+            if content_length:
+                data = None  # type: Union[Dict[str, Any], AnnotatedValue, None]
+
+                if not request_body_within_bounds(client, content_length):
+                    data = AnnotatedValue.removed_because_over_size_limit()
+
+                else:
+                    parsed_body = await self.parsed_body()
+                    if parsed_body is not None:
+                        data = parsed_body
+                    elif await self.raw_data():
+                        data = AnnotatedValue.removed_because_raw_data()
+                    else:
+                        data = None
+
+                if data is not None:
+                    request_info["data"] = data
 
         return request_info
 
     async def content_length(self):
-        # type: (StarletteRequestExtractor) -> int
-        raw_data = await self.raw_data()
-        if raw_data is None:
-            return 0
-        return len(raw_data)
+        # type: (StarletteRequestExtractor) -> Optional[int]
+        if "content-length" in self.request.headers:
+            return int(self.request.headers["content-length"])
+
+        return None
 
     def cookies(self):
         # type: (StarletteRequestExtractor) -> Dict[str, Any]
@@ -525,10 +516,7 @@ class StarletteRequestExtractor:
             data = {}
             for key, val in iteritems(form):
                 if isinstance(val, UploadFile):
-                    size = len(await val.read())
-                    data[key] = AnnotatedValue(
-                        "", {"len": size, "rem": [["!raw", "x", 0, size]]}
-                    )
+                    data[key] = AnnotatedValue.removed_because_raw_data()
                 else:
                     data[key] = val
 

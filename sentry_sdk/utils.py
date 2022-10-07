@@ -283,12 +283,51 @@ class Auth(object):
 
 
 class AnnotatedValue(object):
+    """
+    Meta information for a data field in the event payload.
+    This is to tell Relay that we have tampered with the fields value.
+    See:
+    https://github.com/getsentry/relay/blob/be12cd49a0f06ea932ed9b9f93a655de5d6ad6d1/relay-general/src/types/meta.rs#L407-L423
+    """
+
     __slots__ = ("value", "metadata")
 
     def __init__(self, value, metadata):
         # type: (Optional[Any], Dict[str, Any]) -> None
         self.value = value
         self.metadata = metadata
+
+    @classmethod
+    def removed_because_raw_data(cls):
+        # type: () -> AnnotatedValue
+        """The value was removed because it could not be parsed. This is done for request body values that are not json nor a form."""
+        return AnnotatedValue(
+            value="",
+            metadata={
+                "rem": [  # Remark
+                    [
+                        "!raw",  # Unparsable raw data
+                        "x",  # The fields original value was removed
+                    ]
+                ]
+            },
+        )
+
+    @classmethod
+    def removed_because_over_size_limit(cls):
+        # type: () -> AnnotatedValue
+        """The actual value was removed because the size of the field exceeded the configured maximum size (specified with the request_bodies sdk option)"""
+        return AnnotatedValue(
+            value="",
+            metadata={
+                "rem": [  # Remark
+                    [
+                        "!config",  # Because of configured maximum size
+                        "x",  # The fields original value was removed
+                    ]
+                ]
+            },
+        )
 
 
 if MYPY:

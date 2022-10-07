@@ -377,7 +377,7 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
             if aws_event.get("body", None):
                 # Unfortunately couldn't find a way to get structured body from AWS
                 # event. Meaning every body is unstructured to us.
-                request["data"] = AnnotatedValue("", {"rem": [["!raw", "x", 0, 0]]})
+                request["data"] = AnnotatedValue.removed_because_raw_data()
 
         sentry_event["request"] = request
 
