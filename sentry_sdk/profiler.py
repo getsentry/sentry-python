@@ -135,7 +135,7 @@ def _extract_stack(frame):
     only the first `MAX_STACK_DEPTH` frames will be returned.
     """
 
-    stack = deque(maxlen=MAX_STACK_DEPTH)  # type: Deque[FrameData]
+    stack = deque(maxlen=MAX_STACK_DEPTH)  # type: Deque[FrameType]
 
     while frame is not None:
         stack.append(frame)
