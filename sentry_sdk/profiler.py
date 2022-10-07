@@ -138,16 +138,17 @@ def _extract_stack(frame):
     stack = deque(maxlen=MAX_STACK_DEPTH)  # type: Deque[FrameData]
 
     while frame is not None:
-        stack.append(
-            FrameData(
-                name=get_frame_name(frame),
-                file=frame.f_code.co_filename,
-                line=frame.f_lineno,
-            )
-        )
+        stack.append(frame)
         frame = frame.f_back
 
-    return stack
+    return [
+        FrameData(
+            name=get_frame_name(frame),
+            file=frame.f_code.co_filename,
+            line=frame.f_lineno,
+        )
+        for frame in stack
+    ]
 
 
 def get_frame_name(frame):
