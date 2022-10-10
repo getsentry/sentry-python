@@ -18,7 +18,7 @@ from sentry_sdk import (
 )
 
 from sentry_sdk._compat import reraise
-from sentry_sdk.consts import _get_sdk_name
+from sentry_sdk.client import _get_sdk_name
 from sentry_sdk.integrations import _AUTO_ENABLING_INTEGRATIONS
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.scope import (  # noqa: F401
