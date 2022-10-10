@@ -18,13 +18,13 @@ from sentry_sdk import (
 )
 
 from sentry_sdk._compat import reraise
-from sentry_sdk.client import _get_sdk_name
 from sentry_sdk.integrations import _AUTO_ENABLING_INTEGRATIONS
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.scope import (  # noqa: F401
     add_global_event_processor,
     global_event_processors,
 )
+from sentry_sdk.utils import get_sdk_name
 
 
 def test_processors(sentry_init, capture_events):
@@ -503,4 +503,4 @@ def test_event_processor_drop_records_client_report(
     ],
 )
 def test_get_sdk_name(installed_integrations, expected_name):
-    assert _get_sdk_name(installed_integrations) == expected_name
+    assert get_sdk_name(installed_integrations) == expected_name

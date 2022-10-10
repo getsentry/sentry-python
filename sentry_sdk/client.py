@@ -10,6 +10,7 @@ from sentry_sdk.utils import (
     current_stacktrace,
     disable_capture_event,
     format_timestamp,
+    get_sdk_name,
     get_type_name,
     get_default_release,
     handle_in_app,
@@ -35,7 +36,6 @@ if MYPY:
     from typing import Any
     from typing import Callable
     from typing import Dict
-    from typing import List
     from typing import Optional
 
     from sentry_sdk.scope import Scope
@@ -51,40 +51,6 @@ SDK_INFO = {
     "version": VERSION,
     "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
 }
-
-
-def _get_sdk_name(installed_integrations):
-    # type: (List[str]) -> str
-    """Return the SDK name including the name of the used web framework."""
-
-    # Note: I can not use for example sentry_sdk.integrations.django.DjangoIntegration.identifier
-    # here because if django is not installed the integration is not accessible.
-    framework_integrations = [
-        "django",
-        "flask",
-        "fastapi",
-        "bottle",
-        "falcon",
-        "quart",
-        "sanic",
-        "starlette",
-        "chalice",
-        "serverless",
-        "pyramid",
-        "tornado",
-        "aiohttp",
-        "aws_lambda",
-        "gcp",
-        "beam",
-        "asgi",
-        "wsgi",
-    ]
-
-    for integration in framework_integrations:
-        if integration in installed_integrations:
-            return "sentry.python.{}".format(integration)
-
-    return "sentry.python"
 
 
 def _get_options(*args, **kwargs):
@@ -175,7 +141,7 @@ class _Client(object):
                 ],
             )
 
-            sdk_name = _get_sdk_name(list(self.integrations.keys()))
+            sdk_name = get_sdk_name(list(self.integrations.keys()))
             SDK_INFO["name"] = sdk_name
             logger.debug("Setting SDK name to '%s'", sdk_name)
 
