@@ -1,6 +1,7 @@
 import sys
 
 from sentry_sdk._functools import partial
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import (
     ContextVar,
@@ -124,7 +125,7 @@ class SentryWsgiMiddleware(object):
 
                     transaction = Transaction.continue_from_environ(
                         environ,
-                        op="http.server",
+                        op=OP.HTTP_SERVER,
                         name="generic WSGI request",
                         source=TRANSACTION_SOURCE_ROUTE,
                     )

@@ -95,6 +95,40 @@ def get_default_release():
     return None
 
 
+def get_sdk_name(installed_integrations):
+    # type: (List[str]) -> str
+    """Return the SDK name including the name of the used web framework."""
+
+    # Note: I can not use for example sentry_sdk.integrations.django.DjangoIntegration.identifier
+    # here because if django is not installed the integration is not accessible.
+    framework_integrations = [
+        "django",
+        "flask",
+        "fastapi",
+        "bottle",
+        "falcon",
+        "quart",
+        "sanic",
+        "starlette",
+        "chalice",
+        "serverless",
+        "pyramid",
+        "tornado",
+        "aiohttp",
+        "aws_lambda",
+        "gcp",
+        "beam",
+        "asgi",
+        "wsgi",
+    ]
+
+    for integration in framework_integrations:
+        if integration in installed_integrations:
+            return "sentry.python.{}".format(integration)
+
+    return "sentry.python"
+
+
 class CaptureInternalException(object):
     __slots__ = ()
 

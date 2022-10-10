@@ -1,3 +1,4 @@
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
 from sentry_sdk._types import MYPY
 from sentry_sdk import _functools
@@ -62,7 +63,7 @@ def _wrap_sync_view(hub, callback):
     def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
         with hub.start_span(
-            op="django.view", description=request.resolver_match.view_name
+            op=OP.VIEW_RENDER, description=request.resolver_match.view_name
         ):
             return callback(request, *args, **kwargs)
 

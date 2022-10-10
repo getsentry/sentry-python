@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from os import environ
 import sys
+from sentry_sdk.consts import OP
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, Transaction
@@ -140,7 +141,7 @@ def _wrap_handler(handler):
                 headers = {}
             transaction = Transaction.continue_from_headers(
                 headers,
-                op="serverless.function",
+                op=OP.FUNCTION_AWS,
                 name=aws_context.function_name,
                 source=TRANSACTION_SOURCE_COMPONENT,
             )
