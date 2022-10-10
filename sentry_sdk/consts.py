@@ -105,11 +105,6 @@ del _get_default_options
 
 
 VERSION = "1.9.10"
-SDK_INFO = {
-    "name": "sentry.python",
-    "version": VERSION,
-    "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
-}
 
 
 class OP:

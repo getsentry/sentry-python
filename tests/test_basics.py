@@ -24,6 +24,7 @@ from sentry_sdk.scope import (  # noqa: F401
     add_global_event_processor,
     global_event_processors,
 )
+from sentry_sdk.utils import get_sdk_name
 
 
 def test_processors(sentry_init, capture_events):
@@ -437,3 +438,69 @@ def test_event_processor_drop_records_client_report(
     assert reports == [("event_processor", "error"), ("event_processor", "transaction")]
 
     global_event_processors.pop()
+
+
+@pytest.mark.parametrize(
+    "installed_integrations, expected_name",
+    [
+        # integrations with own name
+        (["django"], "sentry.python.django"),
+        (["flask"], "sentry.python.flask"),
+        (["fastapi"], "sentry.python.fastapi"),
+        (["bottle"], "sentry.python.bottle"),
+        (["falcon"], "sentry.python.falcon"),
+        (["quart"], "sentry.python.quart"),
+        (["sanic"], "sentry.python.sanic"),
+        (["starlette"], "sentry.python.starlette"),
+        (["chalice"], "sentry.python.chalice"),
+        (["serverless"], "sentry.python.serverless"),
+        (["pyramid"], "sentry.python.pyramid"),
+        (["tornado"], "sentry.python.tornado"),
+        (["aiohttp"], "sentry.python.aiohttp"),
+        (["aws_lambda"], "sentry.python.aws_lambda"),
+        (["gcp"], "sentry.python.gcp"),
+        (["beam"], "sentry.python.beam"),
+        (["asgi"], "sentry.python.asgi"),
+        (["wsgi"], "sentry.python.wsgi"),
+        # integrations without name
+        (["argv"], "sentry.python"),
+        (["atexit"], "sentry.python"),
+        (["boto3"], "sentry.python"),
+        (["celery"], "sentry.python"),
+        (["dedupe"], "sentry.python"),
+        (["excepthook"], "sentry.python"),
+        (["executing"], "sentry.python"),
+        (["modules"], "sentry.python"),
+        (["pure_eval"], "sentry.python"),
+        (["redis"], "sentry.python"),
+        (["rq"], "sentry.python"),
+        (["sqlalchemy"], "sentry.python"),
+        (["stdlib"], "sentry.python"),
+        (["threading"], "sentry.python"),
+        (["trytond"], "sentry.python"),
+        (["logging"], "sentry.python"),
+        (["gnu_backtrace"], "sentry.python"),
+        (["httpx"], "sentry.python"),
+        # precedence of frameworks
+        (["flask", "django", "celery"], "sentry.python.django"),
+        (["fastapi", "flask", "redis"], "sentry.python.flask"),
+        (["bottle", "fastapi", "httpx"], "sentry.python.fastapi"),
+        (["falcon", "bottle", "logging"], "sentry.python.bottle"),
+        (["quart", "falcon", "gnu_backtrace"], "sentry.python.falcon"),
+        (["sanic", "quart", "sqlalchemy"], "sentry.python.quart"),
+        (["starlette", "sanic", "rq"], "sentry.python.sanic"),
+        (["chalice", "starlette", "modules"], "sentry.python.starlette"),
+        (["serverless", "chalice", "pure_eval"], "sentry.python.chalice"),
+        (["pyramid", "serverless", "modules"], "sentry.python.serverless"),
+        (["tornado", "pyramid", "executing"], "sentry.python.pyramid"),
+        (["aiohttp", "tornado", "dedupe"], "sentry.python.tornado"),
+        (["aws_lambda", "aiohttp", "boto3"], "sentry.python.aiohttp"),
+        (["gcp", "aws_lambda", "atexit"], "sentry.python.aws_lambda"),
+        (["beam", "gcp", "argv"], "sentry.python.gcp"),
+        (["asgi", "beam", "stdtlib"], "sentry.python.beam"),
+        (["wsgi", "asgi", "boto3"], "sentry.python.asgi"),
+        (["wsgi", "celery", "redis"], "sentry.python.wsgi"),
+    ],
+)
+def test_get_sdk_name(installed_integrations, expected_name):
+    assert get_sdk_name(installed_integrations) == expected_name
