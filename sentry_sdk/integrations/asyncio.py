@@ -39,7 +39,7 @@ def _sentry_task_factory(loop, coro):
 def patch_asyncio():
     # type: () -> None
     loop = asyncio.get_running_loop()
-    loop.set_task_factory(_sentry_task_factory)
+    loop.set_task_factory(_sentry_task_factory)  # type: ignore
 
 
 class AsyncioIntegration(Integration):
