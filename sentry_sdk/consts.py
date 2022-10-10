@@ -116,7 +116,7 @@ class OP:
     DB = "db"
     DB_REDIS = "db.redis"
     EVENT_DJANGO = "event.django"
-    FUNCTION_AWS_LAMBDA = "function.aws.lambda"
+    FUNCTION_AWS = "function.aws"
     FUNCTION_GCP = "function.gcp"
     HTTP_CLIENT = "http.client"
     HTTP_CLIENT_STREAM = "http.client.stream"

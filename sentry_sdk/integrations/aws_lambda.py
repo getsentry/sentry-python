@@ -141,7 +141,7 @@ def _wrap_handler(handler):
                 headers = {}
             transaction = Transaction.continue_from_headers(
                 headers,
-                op=OP.FUNCTION_AWS_LAMBDA,
+                op=OP.FUNCTION_AWS,
                 name=aws_context.function_name,
                 source=TRANSACTION_SOURCE_COMPONENT,
             )
