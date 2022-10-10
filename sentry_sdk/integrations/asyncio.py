@@ -13,9 +13,10 @@ if MYPY:
 
 
 def _sentry_task_factory(loop, coro):
-    # type: (Any, Any) -> Task
+    # type: (Any, Any) -> Task[None]
 
     async def _coro_creating_hub_and_span():
+        # type: () -> None
         hub = Hub(Hub.current)
         with hub:
             with hub.start_span(op="asyncprocess", description=coro.__qualname__):
@@ -29,8 +30,8 @@ def _sentry_task_factory(loop, coro):
     # If the default behavior of the task creation in asyncio changes,
     # this will break!
     task = Task(_coro_creating_hub_and_span(), loop=loop)
-    if task._source_traceback:
-        del task._source_traceback[-1]
+    if task._source_traceback:  # type: ignore
+        del task._source_traceback[-1]  # type: ignore
 
     return task
 
@@ -38,7 +39,7 @@ def _sentry_task_factory(loop, coro):
 def patch_asyncio():
     # type: () -> None
     loop = asyncio.get_running_loop()
-    loop.set_task_factory(_sentry_task_factory)
+    loop.set_task_factory(_sentry_task_factory)  # type: ignore
 
 
 class AsyncioIntegration(Integration):
