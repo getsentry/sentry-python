@@ -5,6 +5,7 @@ from django.dispatch import Signal
 
 from sentry_sdk import Hub
 from sentry_sdk._types import MYPY
+from sentry_sdk.consts import OP
 
 
 if MYPY:
@@ -50,7 +51,7 @@ def patch_signals():
                 # type: (Any, Any) -> Any
                 signal_name = _get_receiver_name(receiver)
                 with hub.start_span(
-                    op="django.signals",
+                    op=OP.EVENT_DJANGO,
                     description=signal_name,
                 ) as span:
                     span.set_data("signal", signal_name)

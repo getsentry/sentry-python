@@ -65,7 +65,7 @@ def test_rediscluster_pipeline(sentry_init, capture_events):
 
     (event,) = events
     (span,) = event["spans"]
-    assert span["op"] == "redis"
+    assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
     assert span["data"] == {
         "redis.commands": {
