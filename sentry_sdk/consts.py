@@ -139,8 +139,3 @@ def _get_sdk_name(installed_integrations):
 
 
 VERSION = "1.9.10"
-SDK_INFO = {
-    "name": "sentry.python",  # SDK name be overridden after integrations have been loaded with sentry_sdk.integrations.setup_integrations()
-    "version": VERSION,
-    "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
-}

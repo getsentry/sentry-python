@@ -19,7 +19,7 @@ from sentry_sdk.serializer import serialize
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import (
     DEFAULT_OPTIONS,
-    SDK_INFO,
+    VERSION,
     ClientConstructor,
     _get_sdk_name,
 )
@@ -44,6 +44,13 @@ if MYPY:
 
 
 _client_init_debug = ContextVar("client_init_debug")
+
+
+SDK_INFO = {
+    "name": "sentry.python",  # SDK name be overridden after integrations have been loaded with sentry_sdk.integrations.setup_integrations()
+    "version": VERSION,
+    "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
+}
 
 
 def _get_options(*args, **kwargs):
