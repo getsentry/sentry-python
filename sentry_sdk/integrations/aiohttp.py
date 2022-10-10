@@ -108,7 +108,8 @@ class AioHttpIntegration(Integration):
                         source=TRANSACTION_SOURCE_ROUTE,
                     )
                     with hub.start_transaction(
-                        transaction, custom_sampling_context={"aiohttp_request": request}
+                        transaction,
+                        custom_sampling_context={"aiohttp_request": request},
                     ):
                         try:
                             response = await old_handle(self, request)
