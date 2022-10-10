@@ -34,7 +34,8 @@ if MYPY:
             "smart_transaction_trimming": Optional[bool],
             "propagate_tracestate": Optional[bool],
             "custom_measurements": Optional[bool],
-            "enable_profiling": Optional[bool],
+            "profiles_sample_rate": Optional[float],
+            "profiler_mode": Optional[str],
         },
         total=False,
     )
@@ -103,7 +104,7 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.9.8"
+VERSION = "1.9.10"
 SDK_INFO = {
     "name": "sentry.python",
     "version": VERSION,

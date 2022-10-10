@@ -1,9 +1,12 @@
 from werkzeug.test import Client
+
 import pytest
 
 import sentry_sdk
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.profiler import teardown_profiler
 from collections import Counter
+from sentry_sdk.utils import PY33
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -281,41 +284,38 @@ def test_auto_session_tracking_with_aggregates(sentry_init, capture_envelopes):
     assert len(session_aggregates) == 1
 
 
-def test_profile_sent_when_profiling_enabled(capture_envelopes, sentry_init):
-    def test_app(environ, start_response):
-        start_response("200 OK", [])
-        return ["Go get the ball! Good dog!"]
+if PY33:
 
-    sentry_init(traces_sample_rate=1.0, _experiments={"enable_profiling": True})
-    app = SentryWsgiMiddleware(test_app)
-    envelopes = capture_envelopes()
+    @pytest.fixture
+    def profiling():
+        yield
+        teardown_profiler()
 
-    client = Client(app)
-    client.get("/")
+    @pytest.mark.parametrize(
+        "profiles_sample_rate,should_send",
+        [(1.0, True), (0.75, True), (0.25, False), (None, False)],
+    )
+    def test_profile_sent_when_profiling_enabled(
+        capture_envelopes, sentry_init, profiling, profiles_sample_rate, should_send
+    ):
+        def test_app(environ, start_response):
+            start_response("200 OK", [])
+            return ["Go get the ball! Good dog!"]
 
-    profile_sent = False
-    for item in envelopes[0].items:
-        if item.headers["type"] == "profile":
-            profile_sent = True
-            break
-    assert profile_sent
+        sentry_init(
+            traces_sample_rate=1.0,
+            _experiments={"profiles_sample_rate": profiles_sample_rate},
+        )
+        app = SentryWsgiMiddleware(test_app)
+        envelopes = capture_envelopes()
 
+        with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
+            client = Client(app)
+            client.get("/")
 
-def test_profile_not_sent_when_profiling_disabled(capture_envelopes, sentry_init):
-    def test_app(environ, start_response):
-        start_response("200 OK", [])
-        return ["Go get the ball! Good dog!"]
-
-    sentry_init(traces_sample_rate=1.0)
-    app = SentryWsgiMiddleware(test_app)
-    envelopes = capture_envelopes()
-
-    client = Client(app)
-    client.get("/")
-
-    profile_sent = False
-    for item in envelopes[0].items:
-        if item.headers["type"] == "profile":
-            profile_sent = True
-            break
-    assert not profile_sent
+        profile_sent = False
+        for item in envelopes[0].items:
+            if item.headers["type"] == "profile":
+                profile_sent = True
+                break
+        assert profile_sent == should_send

@@ -5,6 +5,7 @@ import os
 
 import pytest
 
+from sentry_sdk import last_event_id, capture_exception
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
 try:
@@ -55,9 +56,7 @@ PARSED_FORM = starlette.datastructures.FormData(
 PARSED_BODY = {
     "username": "Jane",
     "password": "hello123",
-    "photo": AnnotatedValue(
-        "", {"len": 28023, "rem": [["!raw", "x", 0, 28023]]}
-    ),  # size of photo.jpg read above
+    "photo": AnnotatedValue("", {"rem": [["!raw", "x"]]}),
 }
 
 # Dummy ASGI scope for creating mock Starlette requests
@@ -82,7 +81,7 @@ SCOPE = {
 }
 
 
-def starlette_app_factory(middleware=None):
+def starlette_app_factory(middleware=None, debug=True):
     async def _homepage(request):
         1 / 0
         return starlette.responses.JSONResponse({"status": "ok"})
@@ -99,7 +98,7 @@ def starlette_app_factory(middleware=None):
         return starlette.responses.JSONResponse({"status": "ok"})
 
     app = starlette.applications.Starlette(
-        debug=True,
+        debug=debug,
         routes=[
             starlette.routing.Route("/some_url", _homepage),
             starlette.routing.Route("/custom_error", _custom_error),
@@ -159,7 +158,11 @@ async def test_starlettrequestextractor_content_length(sentry_init):
         "starlette.requests.Request.stream",
         return_value=AsyncIterator(json.dumps(BODY_JSON)),
     ):
-        starlette_request = starlette.requests.Request(SCOPE)
+        scope = SCOPE.copy()
+        scope["headers"] = [
+            [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
+        ]
+        starlette_request = starlette.requests.Request(scope)
         extractor = StarletteRequestExtractor(starlette_request)
 
         assert await extractor.content_length() == len(json.dumps(BODY_JSON))
@@ -265,6 +268,7 @@ async def test_starlettrequestextractor_extract_request_info_too_big(sentry_init
     scope = SCOPE.copy()
     scope["headers"] = [
         [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
+        [b"content-length", str(len(BODY_FORM)).encode()],
         [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
     ]
     with mock.patch(
@@ -282,10 +286,7 @@ async def test_starlettrequestextractor_extract_request_info_too_big(sentry_init
             "yummy_cookie": "choco",
         }
         # Because request is too big only the AnnotatedValue is extracted.
-        assert request_info["data"].metadata == {
-            "rem": [["!config", "x", 0, 28355]],
-            "len": 28355,
-        }
+        assert request_info["data"].metadata == {"rem": [["!config", "x"]]}
 
 
 @pytest.mark.asyncio
@@ -297,6 +298,7 @@ async def test_starlettrequestextractor_extract_request_info(sentry_init):
     scope = SCOPE.copy()
     scope["headers"] = [
         [b"content-type", b"application/json"],
+        [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
         [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
     ]
 
@@ -326,6 +328,7 @@ async def test_starlettrequestextractor_extract_request_info_no_pii(sentry_init)
     scope = SCOPE.copy()
     scope["headers"] = [
         [b"content-type", b"application/json"],
+        [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
         [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
     ]
 
@@ -541,6 +544,30 @@ def test_middleware_spans(sentry_init, capture_events):
             assert span["description"] == expected[idx]
             assert span["tags"]["starlette.middleware_name"] == expected[idx]
             idx += 1
+
+
+def test_last_event_id(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration()],
+    )
+    events = capture_events()
+
+    def handler(request, exc):
+        capture_exception(exc)
+        return starlette.responses.PlainTextResponse(last_event_id(), status_code=500)
+
+    app = starlette_app_factory(debug=False)
+    app.add_exception_handler(500, handler)
+
+    client = TestClient(SentryAsgiMiddleware(app), raise_server_exceptions=False)
+    response = client.get("/custom_error")
+    assert response.status_code == 500
+
+    event = events[0]
+    assert response.content.strip().decode("ascii") == event["event_id"]
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "Exception"
+    assert exception["value"] == "Too Hot"
 
 
 def test_legacy_setup(

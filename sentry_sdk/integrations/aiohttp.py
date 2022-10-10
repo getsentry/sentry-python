@@ -220,11 +220,8 @@ def get_aiohttp_request_data(hub, request):
     if bytes_body is not None:
         # we have body to show
         if not request_body_within_bounds(hub.client, len(bytes_body)):
+            return AnnotatedValue.removed_because_over_size_limit()
 
-            return AnnotatedValue(
-                "",
-                {"rem": [["!config", "x", 0, len(bytes_body)]], "len": len(bytes_body)},
-            )
         encoding = request.charset or "utf-8"
         return bytes_body.decode(encoding, "replace")
 
