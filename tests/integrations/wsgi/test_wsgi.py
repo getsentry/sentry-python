@@ -284,38 +284,37 @@ def test_auto_session_tracking_with_aggregates(sentry_init, capture_envelopes):
     assert len(session_aggregates) == 1
 
 
-if PY33:
+@pytest.fixture
+def profiling():
+    yield
+    teardown_profiler()
 
-    @pytest.fixture
-    def profiling():
-        yield
-        teardown_profiler()
 
-    @pytest.mark.parametrize(
-        "profiles_sample_rate,should_send",
-        [(1.0, True), (0.75, True), (0.25, False), (None, False)],
+@pytest.mark.skipif(not PY33, reason="requires >=python3.3")
+@pytest.mark.parametrize(
+    "profiles_sample_rate,profile_count",
+    [(1.0, 1), (0.75, 1), (0.25, 0), (None, 0)],
+)
+def test_profile_sent_when_profiling_enabled(
+    capture_envelopes, sentry_init, profiling, profiles_sample_rate, profile_count
+):
+    def test_app(environ, start_response):
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": profiles_sample_rate},
     )
-    def test_profile_sent_when_profiling_enabled(
-        capture_envelopes, sentry_init, profiling, profiles_sample_rate, should_send
-    ):
-        def test_app(environ, start_response):
-            start_response("200 OK", [])
-            return ["Go get the ball! Good dog!"]
+    app = SentryWsgiMiddleware(test_app)
+    envelopes = capture_envelopes()
 
-        sentry_init(
-            traces_sample_rate=1.0,
-            _experiments={"profiles_sample_rate": profiles_sample_rate},
-        )
-        app = SentryWsgiMiddleware(test_app)
-        envelopes = capture_envelopes()
+    with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
+        client = Client(app)
+        client.get("/")
 
-        with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
-            client = Client(app)
-            client.get("/")
-
-        profile_sent = False
-        for item in envelopes[0].items:
-            if item.headers["type"] == "profile":
-                profile_sent = True
-                break
-        assert profile_sent == should_send
+    count_item_types = Counter()
+    for envelope in envelopes:
+        for item in envelope.items:
+            count_item_types[item.type] += 1
+    assert count_item_types["profile"] == profile_count
