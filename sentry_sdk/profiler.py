@@ -370,11 +370,13 @@ class SampleBuffer(object):
                     stacks[current_stack] = len(stacks)
                     stacks_list.append(current_stack)
 
-                samples.append({
-                    "elapsed_since_start_ns": str(ts - start_ns),
-                    "thread_id": str(tid),
-                    "stack_id": stacks[current_stack],
-                })
+                samples.append(
+                    {
+                        "elapsed_since_start_ns": str(ts - start_ns),
+                        "thread_id": str(tid),
+                        "stack_id": stacks[current_stack],
+                    }
+                )
 
         return {"stacks": stacks_list, "frames": frames_list, "samples": samples}
 

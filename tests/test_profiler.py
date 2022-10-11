@@ -67,6 +67,7 @@ def test_profiler_signal_mode_none_main_thread(mode):
     signal based profiling must be initialized from the main thread because
     of how the signal library in python works
     """
+
     class ProfilerThread(threading.Thread):
         def run(self):
             self.exc = None
@@ -252,7 +253,18 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
             1,
             [
                 (0, [(1, [RawFrameData("name1", "file", 1)])]),
-                (1, [(1, [RawFrameData("name1", "file", 1), RawFrameData("name2", "file", 2)])]),
+                (
+                    1,
+                    [
+                        (
+                            1,
+                            [
+                                RawFrameData("name1", "file", 1),
+                                RawFrameData("name2", "file", 2),
+                            ],
+                        )
+                    ],
+                ),
             ],
             {
                 "stacks": [(0,), (0, 1)],
@@ -288,8 +300,30 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
             0,
             1,
             [
-                (0, [(1, [RawFrameData("name1", "file", 1), RawFrameData("name2", "file", 2)])]),
-                (1, [(1, [RawFrameData("name3", "file", 3), RawFrameData("name4", "file", 4)])]),
+                (
+                    0,
+                    [
+                        (
+                            1,
+                            [
+                                RawFrameData("name1", "file", 1),
+                                RawFrameData("name2", "file", 2),
+                            ],
+                        )
+                    ],
+                ),
+                (
+                    1,
+                    [
+                        (
+                            1,
+                            [
+                                RawFrameData("name3", "file", 3),
+                                RawFrameData("name4", "file", 4),
+                            ],
+                        )
+                    ],
+                ),
             ],
             {
                 "stacks": [(0, 1), (2, 3)],
@@ -336,7 +370,18 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
             1,
             [
                 (0, [(1, [RawFrameData("name1", "file", 1)])]),
-                (1, [(1, [RawFrameData("name2", "file", 2), RawFrameData("name3", "file", 3)])]),
+                (
+                    1,
+                    [
+                        (
+                            1,
+                            [
+                                RawFrameData("name2", "file", 2),
+                                RawFrameData("name3", "file", 3),
+                            ],
+                        )
+                    ],
+                ),
             ],
             {
                 "stacks": [(0, 1)],
