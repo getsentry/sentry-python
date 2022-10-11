@@ -2,6 +2,7 @@ import re
 import contextlib
 import json
 import math
+from decimal import Decimal
 
 from numbers import Real
 
@@ -132,9 +133,10 @@ def is_valid_sample_rate(rate):
     # both booleans and NaN are instances of Real, so a) checking for Real
     # checks for the possibility of a boolean also, and b) we have to check
     # separately for NaN
-    if not isinstance(rate, Real) or math.isnan(rate):
+    if not isinstance(rate, Real) or not isinstance(rate, Decimal) or math.isnan(rate):
         logger.warning(
-            "[Tracing] Given sample rate is invalid. Sample rate must be a boolean or a number between 0 and 1. Got {rate} of type {type}.".format(
+            "[Tracing] Given sample rate is invalid. Sample rate must be a boolean or a number between 0 and 1. "
+            "Got {rate} of type {type}.".format(
                 rate=rate, type=type(rate)
             )
         )
