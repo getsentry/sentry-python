@@ -152,6 +152,26 @@ class AsyncIterator:
             raise StopAsyncIteration
 
 
+class TestMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        # only handle http requests
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def do_stuff(message):
+            if message["type"] == "http.response.start":
+                # do something here.
+                pass
+
+            await send(message)
+
+        await self.app(scope, receive, do_stuff)
+
+
 @pytest.mark.asyncio
 async def test_starlettrequestextractor_content_length(sentry_init):
     with mock.patch(
@@ -544,6 +564,78 @@ def test_middleware_spans(sentry_init, capture_events):
             assert span["description"] == expected[idx]
             assert span["tags"]["starlette.middleware_name"] == expected[idx]
             idx += 1
+
+
+def test_middleware_callback_spans(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+    )
+    starlette_app = starlette_app_factory(middleware=[Middleware(TestMiddleware)])
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        client.get("/message", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
+
+    (_, transaction_event) = events
+
+    expected = [
+        {
+            "op": "middleware.starlette",
+            "description": "ServerErrorMiddleware",
+            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
+        },
+        {
+            "op": "middleware.starlette",
+            "description": "TestMiddleware",
+            "tags": {"starlette.middleware_name": "TestMiddleware"},
+        },
+        {
+            "op": "middleware.starlette",
+            "description": "ExceptionMiddleware",
+            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "TestMiddleware.__call__.<locals>.do_stuff",
+            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "ServerErrorMiddleware.__call__.<locals>._send",
+            "tags": {"starlette.middleware_name": "TestMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "_TestClientTransport.handle_request.<locals>.send",
+            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "TestMiddleware.__call__.<locals>.do_stuff",
+            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "ServerErrorMiddleware.__call__.<locals>._send",
+            "tags": {"starlette.middleware_name": "TestMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "_TestClientTransport.handle_request.<locals>.send",
+            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
+        },
+    ]
+
+    idx = 0
+    for span in transaction_event["spans"]:
+        assert span["op"] == expected[idx]["op"]
+        assert span["description"] == expected[idx]["description"]
+        assert span["tags"] == expected[idx]["tags"]
+        idx += 1
 
 
 def test_last_event_id(sentry_init, capture_events):
