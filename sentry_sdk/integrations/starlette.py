@@ -101,6 +101,7 @@ def _enable_span_for_middleware(middleware_class):
 
                 # Creating spans for the "receive" callback
                 async def _sentry_receive(*args, **kwargs):
+                    # type: (*Any, **Any) -> Any
                     hub = Hub.current
                     with hub.start_span(
                         op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
@@ -114,6 +115,7 @@ def _enable_span_for_middleware(middleware_class):
 
                 # Creating spans for the "send" callback
                 async def _sentry_send(*args, **kwargs):
+                    # type: (*Any, **Any) -> Any
                     hub = Hub.current
                     with hub.start_span(
                         op=OP.MIDDLEWARE_STARLETTE_SEND, description=send.__qualname__
