@@ -113,7 +113,7 @@ def _sample_stack(*args, **kwargs):
         (
             nanosecond_time(),
             [
-                (tid, _extract_stack(frame))
+                (tid, extract_stack(frame))
                 for tid, frame in sys._current_frames().items()
             ],
         )
@@ -124,7 +124,7 @@ def _sample_stack(*args, **kwargs):
 MAX_STACK_DEPTH = 128
 
 
-def _extract_stack(frame):
+def extract_stack(frame, max_stack_depth=MAX_STACK_DEPTH):
     # type: (Optional[FrameType]) -> Sequence[FrameData]
     """
     Extracts the stack starting the specified frame. The extracted stack
@@ -135,7 +135,7 @@ def _extract_stack(frame):
     only the first `MAX_STACK_DEPTH` frames will be returned.
     """
 
-    stack = deque(maxlen=MAX_STACK_DEPTH)  # type: Deque[FrameType]
+    stack = deque(maxlen=max_stack_depth)  # type: Deque[FrameType]
 
     while frame is not None:
         stack.append(frame)
