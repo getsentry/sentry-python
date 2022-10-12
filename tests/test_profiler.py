@@ -5,11 +5,7 @@ from sentry_sdk.profiler import SleepScheduler
 
 
 def get_scheduler_threads(scheduler):
-    return [
-        thread
-        for thread in threading.enumerate()
-        if thread.name == scheduler.name
-    ]
+    return [thread for thread in threading.enumerate() if thread.name == scheduler.name]
 
 
 def test_sleep_scheduler_single_background_thread():
