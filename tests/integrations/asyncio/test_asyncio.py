@@ -2,6 +2,8 @@ import asyncio
 import sys
 
 import pytest
+import pytest_asyncio
+
 import sentry_sdk
 from sentry_sdk.integrations.asyncio import AsyncioIntegration
 
@@ -17,6 +19,14 @@ async def foo():
 
 async def bar():
     await asyncio.sleep(0.01)
+
+
+@pytest_asyncio.fixture(scope="session")
+def event_loop(request):
+    """Create an instance of the default event loop for each test case."""
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
 
 
 @minimum_python_36
