@@ -6,7 +6,6 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.profiler import teardown_profiler
 from collections import Counter
 
 try:
