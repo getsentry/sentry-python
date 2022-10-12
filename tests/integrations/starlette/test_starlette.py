@@ -31,6 +31,8 @@ from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.testclient import TestClient
 
+STARLETTE_VERSION = tuple([int(x) for x in starlette.__version__.split(".")])
+
 PICTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "photo.jpg")
 
 BODY_JSON = {"some": "json", "for": "testing", "nested": {"numbers": 123}}
@@ -610,7 +612,9 @@ def test_middleware_callback_spans(sentry_init, capture_events):
         },
         {
             "op": "middleware.starlette.send",
-            "description": "_TestClientTransport.handle_request.<locals>.send",
+            "description": "_ASGIAdapter.send.<locals>.send"
+            if STARLETTE_VERSION < (0, 21)
+            else "_TestClientTransport.handle_request.<locals>.send",
             "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
         },
         {
