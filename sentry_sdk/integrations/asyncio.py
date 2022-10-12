@@ -19,7 +19,7 @@ def _sentry_task_factory(loop, coro):
         # type: () -> None
         hub = Hub(Hub.current)
         with hub:
-            with hub.start_span(op="asyncprocess", description=coro.__qualname__):
+            with hub.start_span(op="asynctask", description=coro.__qualname__):
                 await coro
 
     # The default task factory in `asyncio`` does not have its own function
