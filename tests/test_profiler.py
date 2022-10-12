@@ -8,7 +8,7 @@ from sentry_sdk.profiler import SleepScheduler
 
 
 minimum_python_33 = pytest.mark.skipif(
-    sys.version_info < (3, 3), reason="ASGI is only supported in Python >= 3.6"
+    sys.version_info < (3, 3), reason="Profiling is only supported in Python >= 3.3"
 )
 
 
