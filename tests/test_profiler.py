@@ -1,17 +1,22 @@
+import sys
 import threading
 import time
 
 import pytest
 
 from sentry_sdk.profiler import SleepScheduler
-from sentry_sdk.utils import PY33
+
+
+minimum_python_33 = pytest.mark.skipif(
+    sys.version_info < (3, 3), reason="ASGI is only supported in Python >= 3.6"
+)
 
 
 def get_scheduler_threads(scheduler):
     return [thread for thread in threading.enumerate() if thread.name == scheduler.name]
 
 
-@pytest.mark.skipif(not PY33, reason="requires >=python3.3")
+@minimum_python_33
 def test_sleep_scheduler_single_background_thread():
     def sampler():
         pass
