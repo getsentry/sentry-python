@@ -108,6 +108,7 @@ VERSION = "1.9.10"
 
 
 class OP:
+    ASYNCTASK = "asynctask"
     DB = "db"
     DB_REDIS = "db.redis"
     EVENT_DJANGO = "event.django"

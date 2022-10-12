@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import asyncio
 from asyncio.tasks import Task
+from sentry_sdk.consts import OP
 
 
 from sentry_sdk.hub import Hub
@@ -19,7 +20,7 @@ def _sentry_task_factory(loop, coro):
         # type: () -> None
         hub = Hub(Hub.current)
         with hub:
-            with hub.start_span(op="asynctask", description=coro.__qualname__):
+            with hub.start_span(op=OP.ASYNCTASK, description=coro.__qualname__):
                 await coro
 
     # The default task factory in `asyncio`` does not have its own function
