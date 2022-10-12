@@ -16,22 +16,22 @@ import atexit
 import platform
 import random
 import signal
+import sys
 import threading
 import time
-import sys
 import uuid
-
 from collections import deque
 from contextlib import contextmanager
 
 import sentry_sdk
 from sentry_sdk._compat import PY33
-
+from sentry_sdk._queue import Queue
 from sentry_sdk._types import MYPY
 from sentry_sdk.utils import nanosecond_time
 
 if MYPY:
     from typing import Any
+    from typing import Callable
     from typing import Deque
     from typing import Dict
     from typing import Generator
@@ -45,8 +45,8 @@ if MYPY:
     FrameData = Tuple[str, str, int]
 
 
-_sample_buffer = None  # type: Optional[_SampleBuffer]
-_scheduler = None  # type: Optional[_Scheduler]
+_sample_buffer = None  # type: Optional[SampleBuffer]
+_scheduler = None  # type: Optional[Scheduler]
 
 
 def setup_profiler(options):
@@ -72,17 +72,18 @@ def setup_profiler(options):
 
     # To buffer samples for `buffer_secs` at `frequency` Hz, we need
     # a capcity of `buffer_secs * frequency`.
-    _sample_buffer = _SampleBuffer(capacity=buffer_secs * frequency)
+    _sample_buffer = SampleBuffer(capacity=buffer_secs * frequency)
+    _sampler = _init_sample_stack_fn(_sample_buffer)
 
-    profiler_mode = options["_experiments"].get("profiler_mode", _SigprofScheduler.mode)
-    if profiler_mode == _SigprofScheduler.mode:
-        _scheduler = _SigprofScheduler(frequency=frequency)
-    elif profiler_mode == _SigalrmScheduler.mode:
-        _scheduler = _SigalrmScheduler(frequency=frequency)
-    elif profiler_mode == _SleepScheduler.mode:
-        _scheduler = _SleepScheduler(frequency=frequency)
-    elif profiler_mode == _EventScheduler.mode:
-        _scheduler = _EventScheduler(frequency=frequency)
+    profiler_mode = options["_experiments"].get("profiler_mode", SigprofScheduler.mode)
+    if profiler_mode == SigprofScheduler.mode:
+        _scheduler = SigprofScheduler(sampler=_sampler, frequency=frequency)
+    elif profiler_mode == SigalrmScheduler.mode:
+        _scheduler = SigalrmScheduler(sampler=_sampler, frequency=frequency)
+    elif profiler_mode == SleepScheduler.mode:
+        _scheduler = SleepScheduler(sampler=_sampler, frequency=frequency)
+    elif profiler_mode == EventScheduler.mode:
+        _scheduler = EventScheduler(sampler=_sampler, frequency=frequency)
     else:
         raise ValueError("Unknown profiler mode: {}".format(profiler_mode))
     _scheduler.setup()
@@ -103,23 +104,27 @@ def teardown_profiler():
     _scheduler = None
 
 
-def _sample_stack(*args, **kwargs):
-    # type: (*Any, **Any) -> None
-    """
-    Take a sample of the stack on all the threads in the process.
-    This should be called at a regular interval to collect samples.
-    """
+def _init_sample_stack_fn(buffer):
+    # type: (SampleBuffer) -> Callable[..., None]
 
-    assert _sample_buffer is not None
-    _sample_buffer.write(
-        (
-            nanosecond_time(),
-            [
-                (tid, _extract_stack(frame))
-                for tid, frame in sys._current_frames().items()
-            ],
+    def _sample_stack(*args, **kwargs):
+        # type: (*Any, **Any) -> None
+        """
+        Take a sample of the stack on all the threads in the process.
+        This should be called at a regular interval to collect samples.
+        """
+
+        buffer.write(
+            (
+                nanosecond_time(),
+                [
+                    (tid, _extract_stack(frame))
+                    for tid, frame in sys._current_frames().items()
+                ],
+            )
         )
-    )
+
+    return _sample_stack
 
 
 # We want to impose a stack depth limit so that samples aren't too large.
@@ -220,7 +225,7 @@ class Profile(object):
         }
 
 
-class _SampleBuffer(object):
+class SampleBuffer(object):
     """
     A simple implementation of a ring buffer to buffer the samples taken.
 
@@ -320,11 +325,12 @@ class _SampleBuffer(object):
         }
 
 
-class _Scheduler(object):
+class Scheduler(object):
     mode = "unknown"
 
-    def __init__(self, frequency):
-        # type: (int) -> None
+    def __init__(self, sampler, frequency):
+        # type: (Callable[..., None], int) -> None
+        self.sampler = sampler
         self._lock = threading.Lock()
         self._count = 0
         self._interval = 1.0 / frequency
@@ -350,7 +356,7 @@ class _Scheduler(object):
             return self._count == 0
 
 
-class _ThreadScheduler(_Scheduler):
+class ThreadScheduler(Scheduler):
     """
     This abstract scheduler is based on running a daemon thread that will call
     the sampler at a regular interval.
@@ -359,10 +365,10 @@ class _ThreadScheduler(_Scheduler):
     mode = "thread"
     name = None  # type: Optional[str]
 
-    def __init__(self, frequency):
-        # type: (int) -> None
-        super(_ThreadScheduler, self).__init__(frequency)
-        self.event = threading.Event()
+    def __init__(self, sampler, frequency):
+        # type: (Callable[..., None], int) -> None
+        super(ThreadScheduler, self).__init__(sampler=sampler, frequency=frequency)
+        self.threads = Queue()
 
     def setup(self):
         # type: () -> None
@@ -374,34 +380,37 @@ class _ThreadScheduler(_Scheduler):
 
     def start_profiling(self):
         # type: () -> bool
-        if super(_ThreadScheduler, self).start_profiling():
+        if super(ThreadScheduler, self).start_profiling():
             # make sure to clear the event as we reuse the same event
             # over the lifetime of the scheduler
-            self.event.clear()
+            event = threading.Event()
+            self.threads.put_nowait(event)
+            run = self.make_run(event)
 
             # make sure the thread is a daemon here otherwise this
             # can keep the application running after other threads
             # have exited
-            thread = threading.Thread(name=self.name, target=self.run, daemon=True)
+            thread = threading.Thread(name=self.name, target=run, daemon=True)
             thread.start()
             return True
         return False
 
     def stop_profiling(self):
         # type: () -> bool
-        if super(_ThreadScheduler, self).stop_profiling():
+        if super(ThreadScheduler, self).stop_profiling():
             # make sure the set the event here so that the thread
             # can check to see if it should keep running
-            self.event.set()
+            event = self.threads.get_nowait()
+            event.set()
             return True
         return False
 
-    def run(self):
-        # type: () -> None
+    def make_run(self, event):
+        # type: (threading.Event) -> Callable[..., None]
         raise NotImplementedError
 
 
-class _SleepScheduler(_ThreadScheduler):
+class SleepScheduler(ThreadScheduler):
     """
     This scheduler uses time.sleep to wait the required interval before calling
     the sampling function.
@@ -410,29 +419,34 @@ class _SleepScheduler(_ThreadScheduler):
     mode = "sleep"
     name = "sentry.profiler.SleepScheduler"
 
-    def run(self):
-        # type: () -> None
-        last = time.perf_counter()
+    def make_run(self, event):
+        # type: (threading.Event) -> Callable[..., None]
 
-        while True:
-            # some time may have elapsed since the last time
-            # we sampled, so we need to account for that and
-            # not sleep for too long
-            now = time.perf_counter()
-            elapsed = max(now - last, 0)
-
-            if elapsed < self._interval:
-                time.sleep(self._interval - elapsed)
-
+        def run():
+            # type: () -> None
             last = time.perf_counter()
 
-            if self.event.is_set():
-                break
+            while True:
+                # some time may have elapsed since the last time
+                # we sampled, so we need to account for that and
+                # not sleep for too long
+                now = time.perf_counter()
+                elapsed = max(now - last, 0)
 
-            _sample_stack()
+                if elapsed < self._interval:
+                    time.sleep(self._interval - elapsed)
+
+                last = time.perf_counter()
+
+                if event.is_set():
+                    break
+
+            self.sampler()
+
+        return run
 
 
-class _EventScheduler(_ThreadScheduler):
+class EventScheduler(ThreadScheduler):
     """
     This scheduler uses threading.Event to wait the required interval before
     calling the sampling function.
@@ -441,18 +455,25 @@ class _EventScheduler(_ThreadScheduler):
     mode = "event"
     name = "sentry.profiler.EventScheduler"
 
-    def run(self):
-        # type: () -> None
-        while True:
-            self.event.wait(timeout=self._interval)
+    def make_run(self, event):
+        # type: (threading.Event) -> Callable[..., None]
 
-            if self.event.is_set():
-                break
+        def run():
+            # type: () -> None
+            while True:
+                event.wait(timeout=self._interval)
 
-            _sample_stack()
+                if event.is_set():
+                    break
+
+                self.sampler()
+
+            self.sampler()
+
+        return run
 
 
-class _SignalScheduler(_Scheduler):
+class SignalScheduler(Scheduler):
     """
     This abstract scheduler is based on UNIX signals. It sets up a
     signal handler for the specified signal, and the matching itimer in order
@@ -485,7 +506,7 @@ class _SignalScheduler(_Scheduler):
         # This setups a process wide signal handler that will be called
         # at an interval to record samples.
         try:
-            signal.signal(self.signal_num, _sample_stack)
+            signal.signal(self.signal_num, self.sampler)
         except ValueError:
             raise ValueError(
                 "Signal based profiling can only be enabled from the main thread."
@@ -507,20 +528,20 @@ class _SignalScheduler(_Scheduler):
 
     def start_profiling(self):
         # type: () -> bool
-        if super(_SignalScheduler, self).start_profiling():
+        if super(SignalScheduler, self).start_profiling():
             signal.setitimer(self.signal_timer, self._interval, self._interval)
             return True
         return False
 
     def stop_profiling(self):
         # type: () -> bool
-        if super(_SignalScheduler, self).stop_profiling():
+        if super(SignalScheduler, self).stop_profiling():
             signal.setitimer(self.signal_timer, 0)
             return True
         return False
 
 
-class _SigprofScheduler(_SignalScheduler):
+class SigprofScheduler(SignalScheduler):
     """
     This scheduler uses SIGPROF to regularly call a signal handler where the
     samples will be taken.
@@ -553,7 +574,7 @@ class _SigprofScheduler(_SignalScheduler):
         return signal.ITIMER_PROF
 
 
-class _SigalrmScheduler(_SignalScheduler):
+class SigalrmScheduler(SignalScheduler):
     """
     This scheduler uses SIGALRM to regularly call a signal handler where the
     samples will be taken.
