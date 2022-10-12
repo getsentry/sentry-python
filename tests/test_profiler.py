@@ -21,7 +21,7 @@ def test_sleep_scheduler_single_background_thread():
     def sampler():
         pass
 
-    scheduler = SleepScheduler(sampler=sampler, frequency=100)
+    scheduler = SleepScheduler(sampler=sampler, frequency=1000)
 
     assert scheduler.start_profiling()
 
@@ -35,7 +35,10 @@ def test_sleep_scheduler_single_background_thread():
     # after stop_profiling is called, we have to wait a little
     # otherwise, we'll see an extra scheduler thread in the
     # following assertion
-    time.sleep(0.1)
+    #
+    # one iteration of the scheduler takes 1.0 / frequency seconds
+    # so make sure this sleeps for longer than that to avoid flakes
+    time.sleep(0.002)
 
     # there should be 1 scheduler thread now because the first
     # one should be stopped and a new one started
@@ -47,7 +50,10 @@ def test_sleep_scheduler_single_background_thread():
     # after stop_profiling is called, we have to wait a little
     # otherwise, we'll see an extra scheduler thread in the
     # following assertion
-    time.sleep(0.1)
+    #
+    # one iteration of the scheduler takes 1.0 / frequency seconds
+    # so make sure this sleeps for longer than that to avoid flakes
+    time.sleep(0.002)
 
     # there should be 0 scheduler threads now because they stopped
     assert len(get_scheduler_threads(scheduler)) == 0
