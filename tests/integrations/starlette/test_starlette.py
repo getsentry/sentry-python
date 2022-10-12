@@ -629,7 +629,9 @@ def test_middleware_callback_spans(sentry_init, capture_events):
         },
         {
             "op": "middleware.starlette.send",
-            "description": "_TestClientTransport.handle_request.<locals>.send",
+            "description": "_ASGIAdapter.send.<locals>.send"
+            if STARLETTE_VERSION < (0, 21)
+            else "_TestClientTransport.handle_request.<locals>.send",
             "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
         },
     ]
