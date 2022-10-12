@@ -4,6 +4,13 @@ import time
 from sentry_sdk.profiler import SleepScheduler
 
 
+def get_scheduler_threads(scheduler):
+    return [
+        thread
+        for thread in threading.enumerate()
+        if thread.name == scheduler.name
+    ]
+
 def test_sleep_scheduler_single_background_thread():
     def sampler():
         pass
@@ -26,11 +33,7 @@ def test_sleep_scheduler_single_background_thread():
 
     # there should be 1 scheduler thread now because the first
     # one should be stopped and a new one started
-    assert len([
-        thread
-        for thread in threading.enumerate()
-        if thread.name == scheduler.name
-    ]) == 1
+    assert len(get_scheduler_threads(scheduler)) == 1
 
     assert scheduler.stop_profiling()
 
@@ -41,8 +44,4 @@ def test_sleep_scheduler_single_background_thread():
     time.sleep(0.1)
 
     # there should be 0 scheduler threads now because they stopped
-    assert len([
-        thread
-        for thread in threading.enumerate()
-        if thread.name == scheduler.name
-    ]) == 0
+    assert len(get_scheduler_threads(scheduler)) == 0
