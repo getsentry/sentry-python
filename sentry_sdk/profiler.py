@@ -125,7 +125,7 @@ MAX_STACK_DEPTH = 128
 
 
 def extract_stack(frame, max_stack_depth=MAX_STACK_DEPTH):
-    # type: (Optional[FrameType]) -> Sequence[FrameData]
+    # type: (Optional[FrameType], int) -> Sequence[FrameData]
     """
     Extracts the stack starting the specified frame. The extracted stack
     assumes the specified frame is the top of the stack, and works back
