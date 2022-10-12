@@ -11,6 +11,7 @@ def get_scheduler_threads(scheduler):
         if thread.name == scheduler.name
     ]
 
+
 def test_sleep_scheduler_single_background_thread():
     def sampler():
         pass
