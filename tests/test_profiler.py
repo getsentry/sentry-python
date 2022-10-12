@@ -24,6 +24,7 @@ def test_profiler_invalid_mode(teardown_profiling):
 
 
 @unix_only
+@minimum_python_33
 @pytest.mark.parametrize("mode", ["sigprof", "sigalrm"])
 def test_profiler_signal_mode_none_main_thread(mode, teardown_profiling):
     """
