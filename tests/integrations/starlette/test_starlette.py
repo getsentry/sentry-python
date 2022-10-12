@@ -154,7 +154,7 @@ class AsyncIterator:
             raise StopAsyncIteration
 
 
-class TestMiddleware:
+class SampleMiddleware:
     def __init__(self, app):
         self.app = app
 
@@ -573,7 +573,7 @@ def test_middleware_callback_spans(sentry_init, capture_events):
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
     )
-    starlette_app = starlette_app_factory(middleware=[Middleware(TestMiddleware)])
+    starlette_app = starlette_app_factory(middleware=[Middleware(SampleMiddleware)])
     events = capture_events()
 
     client = TestClient(starlette_app, raise_server_exceptions=False)
@@ -592,8 +592,8 @@ def test_middleware_callback_spans(sentry_init, capture_events):
         },
         {
             "op": "middleware.starlette",
-            "description": "TestMiddleware",
-            "tags": {"starlette.middleware_name": "TestMiddleware"},
+            "description": "SampleMiddleware",
+            "tags": {"starlette.middleware_name": "SampleMiddleware"},
         },
         {
             "op": "middleware.starlette",
@@ -602,13 +602,13 @@ def test_middleware_callback_spans(sentry_init, capture_events):
         },
         {
             "op": "middleware.starlette.send",
-            "description": "TestMiddleware.__call__.<locals>.do_stuff",
+            "description": "SampleMiddleware.__call__.<locals>.do_stuff",
             "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
         },
         {
             "op": "middleware.starlette.send",
             "description": "ServerErrorMiddleware.__call__.<locals>._send",
-            "tags": {"starlette.middleware_name": "TestMiddleware"},
+            "tags": {"starlette.middleware_name": "SampleMiddleware"},
         },
         {
             "op": "middleware.starlette.send",
@@ -619,13 +619,13 @@ def test_middleware_callback_spans(sentry_init, capture_events):
         },
         {
             "op": "middleware.starlette.send",
-            "description": "TestMiddleware.__call__.<locals>.do_stuff",
+            "description": "SampleMiddleware.__call__.<locals>.do_stuff",
             "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
         },
         {
             "op": "middleware.starlette.send",
             "description": "ServerErrorMiddleware.__call__.<locals>._send",
-            "tags": {"starlette.middleware_name": "TestMiddleware"},
+            "tags": {"starlette.middleware_name": "SampleMiddleware"},
         },
         {
             "op": "middleware.starlette.send",
