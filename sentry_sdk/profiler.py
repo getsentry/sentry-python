@@ -390,8 +390,7 @@ class ThreadScheduler(Scheduler):
             # make sure the thread is a daemon here otherwise this
             # can keep the application running after other threads
             # have exited
-            thread = threading.Thread(target=run, name=self.name)
-            thread.daemon = True
+            thread = threading.Thread(name=self.name, target=run, daemon=True)
             thread.start()
             return True
         return False
