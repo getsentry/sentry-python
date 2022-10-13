@@ -454,6 +454,8 @@ class SleepScheduler(ThreadScheduler):
 
         def run():
             # type: () -> None
+            self.sampler()
+
             last = time.perf_counter()
 
             while True:
@@ -471,7 +473,7 @@ class SleepScheduler(ThreadScheduler):
                 if event.is_set():
                     break
 
-            self.sampler()
+                self.sampler()
 
         return run
 
@@ -490,6 +492,8 @@ class EventScheduler(ThreadScheduler):
 
         def run():
             # type: () -> None
+            self.sampler()
+
             while True:
                 event.wait(timeout=self._interval)
 
@@ -497,8 +501,6 @@ class EventScheduler(ThreadScheduler):
                     break
 
                 self.sampler()
-
-            self.sampler()
 
         return run
 
