@@ -2,10 +2,16 @@ import inspect
 import platform
 import sys
 import threading
+import time
 
 import pytest
 
-from sentry_sdk.profiler import extract_stack, get_frame_name, setup_profiler
+from sentry_sdk.profiler import (
+    SleepScheduler,
+    extract_stack,
+    get_frame_name,
+    setup_profiler,
+)
 
 
 minimum_python_33 = pytest.mark.skipif(
@@ -148,3 +154,50 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
     # index 0 contains the inner most frame on the stack, so the lamdba
     # should be at index `actual_depth`
     assert stack[actual_depth].name == "<lambda>", actual_depth
+
+
+def get_scheduler_threads(scheduler):
+    return [thread for thread in threading.enumerate() if thread.name == scheduler.name]
+
+
+@minimum_python_33
+def test_sleep_scheduler_single_background_thread():
+    def sampler():
+        pass
+
+    scheduler = SleepScheduler(sampler=sampler, frequency=1000)
+
+    assert scheduler.start_profiling()
+
+    # the scheduler thread does not immediately exit
+    # but it should exit after the next time it samples
+    assert scheduler.stop_profiling()
+
+    assert scheduler.start_profiling()
+
+    # because the scheduler thread does not immediately exit
+    # after stop_profiling is called, we have to wait a little
+    # otherwise, we'll see an extra scheduler thread in the
+    # following assertion
+    #
+    # one iteration of the scheduler takes 1.0 / frequency seconds
+    # so make sure this sleeps for longer than that to avoid flakes
+    time.sleep(0.002)
+
+    # there should be 1 scheduler thread now because the first
+    # one should be stopped and a new one started
+    assert len(get_scheduler_threads(scheduler)) == 1
+
+    assert scheduler.stop_profiling()
+
+    # because the scheduler thread does not immediately exit
+    # after stop_profiling is called, we have to wait a little
+    # otherwise, we'll see an extra scheduler thread in the
+    # following assertion
+    #
+    # one iteration of the scheduler takes 1.0 / frequency seconds
+    # so make sure this sleeps for longer than that to avoid flakes
+    time.sleep(0.002)
+
+    # there should be 0 scheduler threads now because they stopped
+    assert len(get_scheduler_threads(scheduler)) == 0
