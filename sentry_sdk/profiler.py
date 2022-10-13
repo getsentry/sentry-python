@@ -16,21 +16,20 @@ import atexit
 import platform
 import random
 import signal
+import sys
 import threading
 import time
-import sys
 import uuid
-
-from collections import deque
+from collections import deque, namedtuple
 from contextlib import contextmanager
 
 import sentry_sdk
 from sentry_sdk._compat import PY33
-
 from sentry_sdk._types import MYPY
 from sentry_sdk.utils import nanosecond_time
 
 if MYPY:
+    from types import FrameType
     from typing import Any
     from typing import Deque
     from typing import Dict
@@ -38,11 +37,10 @@ if MYPY:
     from typing import List
     from typing import Optional
     from typing import Sequence
-    from typing import Tuple
     import sentry_sdk.tracing
 
-    Frame = Any
-    FrameData = Tuple[str, str, int]
+
+FrameData = namedtuple("FrameData", ["name", "file", "line"])
 
 
 _sample_buffer = None  # type: Optional[_SampleBuffer]
@@ -115,7 +113,7 @@ def _sample_stack(*args, **kwargs):
         (
             nanosecond_time(),
             [
-                (tid, _extract_stack(frame))
+                (tid, extract_stack(frame))
                 for tid, frame in sys._current_frames().items()
             ],
         )
@@ -126,8 +124,8 @@ def _sample_stack(*args, **kwargs):
 MAX_STACK_DEPTH = 128
 
 
-def _extract_stack(frame):
-    # type: (Frame) -> Sequence[FrameData]
+def extract_stack(frame, max_stack_depth=MAX_STACK_DEPTH):
+    # type: (Optional[FrameType], int) -> Sequence[FrameData]
     """
     Extracts the stack starting the specified frame. The extracted stack
     assumes the specified frame is the top of the stack, and works back
@@ -137,22 +135,52 @@ def _extract_stack(frame):
     only the first `MAX_STACK_DEPTH` frames will be returned.
     """
 
-    stack = deque(maxlen=MAX_STACK_DEPTH)  # type: Deque[FrameData]
+    stack = deque(maxlen=max_stack_depth)  # type: Deque[FrameType]
 
     while frame is not None:
-        stack.append(
-            (
-                # co_name only contains the frame name.
-                # If the frame was a class method,
-                # the class name will NOT be included.
-                frame.f_code.co_name,
-                frame.f_code.co_filename,
-                frame.f_code.co_firstlineno,
-            )
-        )
+        stack.append(frame)
         frame = frame.f_back
 
-    return stack
+    return [
+        FrameData(
+            name=get_frame_name(frame),
+            file=frame.f_code.co_filename,
+            line=frame.f_lineno,
+        )
+        for frame in stack
+    ]
+
+
+def get_frame_name(frame):
+    # type: (FrameType) -> str
+
+    # in 3.11+, there is a frame.f_code.co_qualname that
+    # we should consider using instead where possible
+
+    # co_name only contains the frame name.  If the frame was a method,
+    # the class name will NOT be included.
+    name = frame.f_code.co_name
+
+    # if it was a method, we can get the class name by inspecting
+    # the f_locals for the `self` argument
+    try:
+        if "self" in frame.f_locals:
+            return "{}.{}".format(frame.f_locals["self"].__class__.__name__, name)
+    except AttributeError:
+        pass
+
+    # if it was a class method, (decorated with `@classmethod`)
+    # we can get the class name by inspecting the f_locals for the `cls` argument
+    try:
+        if "cls" in frame.f_locals:
+            return "{}.{}".format(frame.f_locals["cls"].__name__, name)
+    except AttributeError:
+        pass
+
+    # nothing we can do if it is a staticmethod (decorated with @staticmethod)
+
+    # we've done all we can, time to give up and return what we have
+    return name
 
 
 class Profile(object):
@@ -287,9 +315,9 @@ class _SampleBuffer(object):
                         frames[frame] = len(frames)
                         frames_list.append(
                             {
-                                "name": frame[0],
-                                "file": frame[1],
-                                "line": frame[2],
+                                "name": frame.name,
+                                "file": frame.file,
+                                "line": frame.line,
                             }
                         )
                     current_stack.append(frames[frame])
