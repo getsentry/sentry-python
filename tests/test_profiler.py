@@ -7,6 +7,8 @@ import time
 import pytest
 
 from sentry_sdk.profiler import (
+    RawFrameData,
+    SampleBuffer,
     SleepScheduler,
     extract_stack,
     get_frame_name,
@@ -149,11 +151,11 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
     assert len(stack) == base_stack_depth + actual_depth
 
     for i in range(actual_depth):
-        assert stack[i].name == "get_frame", i
+        assert stack[i].function == "get_frame", i
 
     # index 0 contains the inner most frame on the stack, so the lamdba
     # should be at index `actual_depth`
-    assert stack[actual_depth].name == "<lambda>", actual_depth
+    assert stack[actual_depth].function == "<lambda>", actual_depth
 
 
 def get_scheduler_threads(scheduler):
@@ -201,3 +203,271 @@ def test_sleep_scheduler_single_background_thread():
 
     # there should be 0 scheduler threads now because they stopped
     assert len(get_scheduler_threads(scheduler)) == 0
+
+
+current_thread = threading.current_thread()
+thread_metadata = {
+    str(current_thread.ident): {
+        "name": current_thread.name,
+    },
+}
+
+
+@pytest.mark.parametrize(
+    ("capacity", "start_ns", "stop_ns", "samples", "profile"),
+    [
+        pytest.param(
+            10,
+            0,
+            1,
+            [],
+            {
+                "frames": [],
+                "samples": [],
+                "stacks": [],
+                "thread_metadata": thread_metadata,
+            },
+            id="empty",
+        ),
+        pytest.param(
+            10,
+            0,
+            1,
+            [(2, [(1, [RawFrameData("name", "file", 1)])])],
+            {
+                "frames": [],
+                "samples": [],
+                "stacks": [],
+                "thread_metadata": thread_metadata,
+            },
+            id="single sample out of range",
+        ),
+        pytest.param(
+            10,
+            0,
+            1,
+            [(0, [(1, [RawFrameData("name", "file", 1)])])],
+            {
+                "frames": [
+                    {
+                        "function": "name",
+                        "filename": "file",
+                        "lineno": 1,
+                    },
+                ],
+                "samples": [
+                    {
+                        "elapsed_since_start_ns": "0",
+                        "thread_id": "1",
+                        "stack_id": 0,
+                    },
+                ],
+                "stacks": [(0,)],
+                "thread_metadata": thread_metadata,
+            },
+            id="single sample in range",
+        ),
+        pytest.param(
+            10,
+            0,
+            1,
+            [
+                (0, [(1, [RawFrameData("name", "file", 1)])]),
+                (1, [(1, [RawFrameData("name", "file", 1)])]),
+            ],
+            {
+                "frames": [
+                    {
+                        "function": "name",
+                        "filename": "file",
+                        "lineno": 1,
+                    },
+                ],
+                "samples": [
+                    {
+                        "elapsed_since_start_ns": "0",
+                        "thread_id": "1",
+                        "stack_id": 0,
+                    },
+                    {
+                        "elapsed_since_start_ns": "1",
+                        "thread_id": "1",
+                        "stack_id": 0,
+                    },
+                ],
+                "stacks": [(0,)],
+                "thread_metadata": thread_metadata,
+            },
+            id="two identical stacks",
+        ),
+        pytest.param(
+            10,
+            0,
+            1,
+            [
+                (0, [(1, [RawFrameData("name1", "file", 1)])]),
+                (
+                    1,
+                    [
+                        (
+                            1,
+                            [
+                                RawFrameData("name1", "file", 1),
+                                RawFrameData("name2", "file", 2),
+                            ],
+                        )
+                    ],
+                ),
+            ],
+            {
+                "frames": [
+                    {
+                        "function": "name1",
+                        "filename": "file",
+                        "lineno": 1,
+                    },
+                    {
+                        "function": "name2",
+                        "filename": "file",
+                        "lineno": 2,
+                    },
+                ],
+                "samples": [
+                    {
+                        "elapsed_since_start_ns": "0",
+                        "thread_id": "1",
+                        "stack_id": 0,
+                    },
+                    {
+                        "elapsed_since_start_ns": "1",
+                        "thread_id": "1",
+                        "stack_id": 1,
+                    },
+                ],
+                "stacks": [(0,), (0, 1)],
+                "thread_metadata": thread_metadata,
+            },
+            id="two identical frames",
+        ),
+        pytest.param(
+            10,
+            0,
+            1,
+            [
+                (
+                    0,
+                    [
+                        (
+                            1,
+                            [
+                                RawFrameData("name1", "file", 1),
+                                RawFrameData("name2", "file", 2),
+                            ],
+                        )
+                    ],
+                ),
+                (
+                    1,
+                    [
+                        (
+                            1,
+                            [
+                                RawFrameData("name3", "file", 3),
+                                RawFrameData("name4", "file", 4),
+                            ],
+                        )
+                    ],
+                ),
+            ],
+            {
+                "frames": [
+                    {
+                        "function": "name1",
+                        "filename": "file",
+                        "lineno": 1,
+                    },
+                    {
+                        "function": "name2",
+                        "filename": "file",
+                        "lineno": 2,
+                    },
+                    {
+                        "function": "name3",
+                        "filename": "file",
+                        "lineno": 3,
+                    },
+                    {
+                        "function": "name4",
+                        "filename": "file",
+                        "lineno": 4,
+                    },
+                ],
+                "samples": [
+                    {
+                        "elapsed_since_start_ns": "0",
+                        "thread_id": "1",
+                        "stack_id": 0,
+                    },
+                    {
+                        "elapsed_since_start_ns": "1",
+                        "thread_id": "1",
+                        "stack_id": 1,
+                    },
+                ],
+                "stacks": [(0, 1), (2, 3)],
+                "thread_metadata": thread_metadata,
+            },
+            id="two unique stacks",
+        ),
+        pytest.param(
+            1,
+            0,
+            1,
+            [
+                (0, [(1, [RawFrameData("name1", "file", 1)])]),
+                (
+                    1,
+                    [
+                        (
+                            1,
+                            [
+                                RawFrameData("name2", "file", 2),
+                                RawFrameData("name3", "file", 3),
+                            ],
+                        )
+                    ],
+                ),
+            ],
+            {
+                "frames": [
+                    {
+                        "function": "name2",
+                        "filename": "file",
+                        "lineno": 2,
+                    },
+                    {
+                        "function": "name3",
+                        "filename": "file",
+                        "lineno": 3,
+                    },
+                ],
+                "samples": [
+                    {
+                        "elapsed_since_start_ns": "1",
+                        "thread_id": "1",
+                        "stack_id": 0,
+                    },
+                ],
+                "stacks": [(0, 1)],
+                "thread_metadata": thread_metadata,
+            },
+            id="wraps around buffer",
+        ),
+    ],
+)
+def test_sample_buffer(capacity, start_ns, stop_ns, samples, profile):
+    buffer = SampleBuffer(capacity)
+    for sample in samples:
+        buffer.write(sample)
+    result = buffer.slice_profile(start_ns, stop_ns)
+    assert result == profile
