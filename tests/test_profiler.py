@@ -21,7 +21,6 @@ unix_only = pytest.mark.skipif(
 def test_profiler_invalid_mode(teardown_profiling):
     with pytest.raises(ValueError):
         setup_profiler({"_experiments": {"profiler_mode": "magic"}})
-    # make sure to clean up at the end of the test
 
 
 @unix_only
@@ -53,9 +52,8 @@ def test_profiler_signal_mode_none_main_thread(mode, teardown_profiling):
         thread.start()
         thread.join()
 
-    # make sure to clean up at the end of the test
 
-
+@unix_only
 @pytest.mark.parametrize("mode", ["sleep", "event", "sigprof", "sigalrm"])
 def test_profiler_valid_mode(mode, teardown_profiling):
     # should not raise any exceptions
