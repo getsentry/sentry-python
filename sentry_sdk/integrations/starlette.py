@@ -5,6 +5,7 @@ import functools
 
 from sentry_sdk._compat import iteritems
 from sentry_sdk._types import MYPY
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import (
@@ -91,7 +92,7 @@ def _enable_span_for_middleware(middleware_class):
         if integration is not None:
             middleware_name = args[0].__class__.__name__
             with hub.start_span(
-                op="starlette.middleware", description=middleware_name
+                op=OP.MIDDLEWARE_STARLETTE, description=middleware_name
             ) as middleware_span:
                 middleware_span.set_tag("starlette.middleware_name", middleware_name)
 

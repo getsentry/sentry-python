@@ -54,7 +54,7 @@ def setup_profiler(options):
     `buffer_secs` determines the max time a sample will be buffered for
     `frequency` determines the number of samples to take per second (Hz)
     """
-    buffer_secs = 60
+    buffer_secs = 30
     frequency = 101
 
     if not PY33:
@@ -191,6 +191,8 @@ class Profile(object):
         self._start_ns = None  # type: Optional[int]
         self._stop_ns = None  # type: Optional[int]
 
+        transaction._profile = self
+
     def __enter__(self):
         # type: () -> None
         assert _scheduler is not None
@@ -203,23 +205,19 @@ class Profile(object):
         _scheduler.stop_profiling()
         self._stop_ns = nanosecond_time()
 
-        # Now that we've collected all the data, attach it to the
-        # transaction so that it can be sent in the same envelope
-        self.transaction._profile = self.to_json()
-
-    def to_json(self):
-        # type: () -> Dict[str, Any]
+    def to_json(self, event_opt):
+        # type: (Any) -> Dict[str, Any]
         assert _sample_buffer is not None
         assert self._start_ns is not None
         assert self._stop_ns is not None
 
         return {
-            "environment": None,  # Gets added in client.py
+            "environment": event_opt.get("environment"),
             "event_id": uuid.uuid4().hex,
             "platform": "python",
             "profile": _sample_buffer.slice_profile(self._start_ns, self._stop_ns),
-            "release": None,  # Gets added in client.py
-            "timestamp": None,  # Gets added in client.py
+            "release": event_opt.get("release", ""),
+            "timestamp": event_opt["timestamp"],
             "version": "1",
             "device": {
                 "architecture": platform.machine(),
@@ -234,7 +232,7 @@ class Profile(object):
             },
             "transactions": [
                 {
-                    "id": None,  # Gets added in client.py
+                    "id": event_opt["event_id"],
                     "name": self.transaction.name,
                     # we start the transaction before the profile and this is
                     # the transaction start time relative to the profile, so we
@@ -332,7 +330,22 @@ class _SampleBuffer(object):
                 sample["stack_id"] = stacks[current_stack]
                 samples.append(sample)
 
-        return {"stacks": stacks_list, "frames": frames_list, "samples": samples}
+        # This collects the thread metadata at the end of a profile. Doing it
+        # this way means that any threads that terminate before the profile ends
+        # will not have any metadata associated with it.
+        thread_metadata = {
+            str(thread.ident): {
+                "name": thread.name,
+            }
+            for thread in threading.enumerate()
+        }
+
+        return {
+            "stacks": stacks_list,
+            "frames": frames_list,
+            "samples": samples,
+            "thread_metadata": thread_metadata,
+        }
 
 
 class _Scheduler(object):
@@ -372,6 +385,7 @@ class _ThreadScheduler(_Scheduler):
     """
 
     mode = "thread"
+    name = None  # type: Optional[str]
 
     def __init__(self, frequency):
         # type: (int) -> None
@@ -396,7 +410,7 @@ class _ThreadScheduler(_Scheduler):
             # make sure the thread is a daemon here otherwise this
             # can keep the application running after other threads
             # have exited
-            thread = threading.Thread(target=self.run, daemon=True)
+            thread = threading.Thread(name=self.name, target=self.run, daemon=True)
             thread.start()
             return True
         return False
@@ -422,6 +436,7 @@ class _SleepScheduler(_ThreadScheduler):
     """
 
     mode = "sleep"
+    name = "sentry.profiler.SleepScheduler"
 
     def run(self):
         # type: () -> None
@@ -452,6 +467,7 @@ class _EventScheduler(_ThreadScheduler):
     """
 
     mode = "event"
+    name = "sentry.profiler.EventScheduler"
 
     def run(self):
         # type: () -> None

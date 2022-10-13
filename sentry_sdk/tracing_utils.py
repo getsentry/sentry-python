@@ -4,8 +4,10 @@ import json
 import math
 
 from numbers import Real
+from decimal import Decimal
 
 import sentry_sdk
+from sentry_sdk.consts import OP
 
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -130,8 +132,8 @@ def is_valid_sample_rate(rate):
 
     # both booleans and NaN are instances of Real, so a) checking for Real
     # checks for the possibility of a boolean also, and b) we have to check
-    # separately for NaN
-    if not isinstance(rate, Real) or math.isnan(rate):
+    # separately for NaN and Decimal does not derive from Real so need to check that too
+    if not isinstance(rate, (Real, Decimal)) or math.isnan(rate):
         logger.warning(
             "[Tracing] Given sample rate is invalid. Sample rate must be a boolean or a number between 0 and 1. Got {rate} of type {type}.".format(
                 rate=rate, type=type(rate)
@@ -189,7 +191,7 @@ def record_sql_queries(
     with capture_internal_exceptions():
         hub.add_breadcrumb(message=query, category="query", data=data)
 
-    with hub.start_span(op="db", description=query) as span:
+    with hub.start_span(op=OP.DB, description=query) as span:
         for k, v in data.items():
             span.set_data(k, v)
         yield span
@@ -197,11 +199,11 @@ def record_sql_queries(
 
 def maybe_create_breadcrumbs_from_span(hub, span):
     # type: (sentry_sdk.Hub, Span) -> None
-    if span.op == "redis":
+    if span.op == OP.DB_REDIS:
         hub.add_breadcrumb(
             message=span.description, type="redis", category="redis", data=span._tags
         )
-    elif span.op == "http":
+    elif span.op == OP.HTTP_CLIENT:
         hub.add_breadcrumb(type="http", category="httplib", data=span._data)
     elif span.op == "subprocess":
         hub.add_breadcrumb(
