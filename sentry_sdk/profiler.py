@@ -398,7 +398,7 @@ class ThreadScheduler(Scheduler):
     def __init__(self, sampler, frequency):
         # type: (Callable[..., None], int) -> None
         super(ThreadScheduler, self).__init__(sampler=sampler, frequency=frequency)
-        self.threads = Queue()
+        self.stop_events = Queue()
 
     def setup(self):
         # type: () -> None
@@ -414,7 +414,7 @@ class ThreadScheduler(Scheduler):
             # make sure to clear the event as we reuse the same event
             # over the lifetime of the scheduler
             event = threading.Event()
-            self.threads.put_nowait(event)
+            self.stop_events.put_nowait(event)
             run = self.make_run(event)
 
             # make sure the thread is a daemon here otherwise this
@@ -430,7 +430,7 @@ class ThreadScheduler(Scheduler):
         if super(ThreadScheduler, self).stop_profiling():
             # make sure the set the event here so that the thread
             # can check to see if it should keep running
-            event = self.threads.get_nowait()
+            event = self.stop_events.get_nowait()
             event.set()
             return True
         return False
