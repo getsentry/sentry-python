@@ -29,6 +29,8 @@ from sentry_sdk._queue import Queue
 from sentry_sdk._types import MYPY
 from sentry_sdk.utils import nanosecond_time
 
+RawFrameData = namedtuple("RawFrameData", ["function", "abs_path", "lineno"])
+
 if MYPY:
     from types import FrameType
     from typing import Any
@@ -39,10 +41,46 @@ if MYPY:
     from typing import List
     from typing import Optional
     from typing import Sequence
+    from typing import Tuple
+    from typing_extensions import TypedDict
     import sentry_sdk.tracing
 
+    RawSampleData = Tuple[int, Sequence[Tuple[int, Sequence[RawFrameData]]]]
 
-FrameData = namedtuple("FrameData", ["name", "file", "line"])
+    ProcessedStack = Tuple[int, ...]
+
+    ProcessedSample = TypedDict(
+        "ProcessedSample",
+        {
+            "elapsed_since_start_ns": str,
+            "thread_id": str,
+            "stack_id": int,
+        },
+    )
+
+    ProcessedFrame = TypedDict(
+        "ProcessedFrame",
+        {
+            "function": str,
+            "filename": str,
+            "lineno": int,
+        },
+    )
+
+    ProcessedThreadMetadata = TypedDict(
+        "ProcessedThreadMetadata",
+        {"name": str},
+    )
+
+    ProcessedProfile = TypedDict(
+        "ProcessedProfile",
+        {
+            "frames": List[ProcessedFrame],
+            "stacks": List[ProcessedStack],
+            "samples": List[ProcessedSample],
+            "thread_metadata": Dict[str, ProcessedThreadMetadata],
+        },
+    )
 
 
 _sample_buffer = None  # type: Optional[SampleBuffer]
@@ -132,7 +170,7 @@ MAX_STACK_DEPTH = 128
 
 
 def extract_stack(frame, max_stack_depth=MAX_STACK_DEPTH):
-    # type: (Optional[FrameType], int) -> Sequence[FrameData]
+    # type: (Optional[FrameType], int) -> Sequence[RawFrameData]
     """
     Extracts the stack starting the specified frame. The extracted stack
     assumes the specified frame is the top of the stack, and works back
@@ -149,10 +187,10 @@ def extract_stack(frame, max_stack_depth=MAX_STACK_DEPTH):
         frame = frame.f_back
 
     return [
-        FrameData(
-            name=get_frame_name(frame),
-            file=frame.f_code.co_filename,
-            line=frame.f_lineno,
+        RawFrameData(
+            function=get_frame_name(frame),
+            abs_path=frame.f_code.co_filename,
+            lineno=frame.f_lineno,
         )
         for frame in stack
     ]
@@ -268,12 +306,12 @@ class SampleBuffer(object):
     def __init__(self, capacity):
         # type: (int) -> None
 
-        self.buffer = [None] * capacity
-        self.capacity = capacity
-        self.idx = 0
+        self.buffer = [None] * capacity  # type: List[Optional[RawSampleData]]
+        self.capacity = capacity  # type: int
+        self.idx = 0  # type: int
 
     def write(self, sample):
-        # type: (Any) -> None
+        # type: (RawSampleData) -> None
         """
         Writing to the buffer is not thread safe. There is the possibility
         that parallel writes will overwrite one another.
@@ -290,12 +328,12 @@ class SampleBuffer(object):
         self.idx = (idx + 1) % self.capacity
 
     def slice_profile(self, start_ns, stop_ns):
-        # type: (int, int) -> Dict[str, Any]
-        samples = []  # type: List[Any]
-        stacks = dict()  # type: Dict[Any, int]
-        stacks_list = list()  # type: List[Any]
-        frames = dict()  # type: Dict[FrameData, int]
-        frames_list = list()  # type: List[Any]
+        # type: (int, int) -> ProcessedProfile
+        samples = []  # type: List[ProcessedSample]
+        stacks = dict()  # type: Dict[ProcessedStack, int]
+        stacks_list = list()  # type: List[ProcessedStack]
+        frames = dict()  # type: Dict[RawFrameData, int]
+        frames_list = list()  # type: List[ProcessedFrame]
 
         # TODO: This is doing an naive iteration over the
         # buffer and extracting the appropriate samples.
@@ -311,10 +349,6 @@ class SampleBuffer(object):
                 continue
 
             for tid, stack in raw_sample[1]:
-                sample = {
-                    "elapsed_since_start_ns": str(ts - start_ns),
-                    "thread_id": str(tid),
-                }
                 current_stack = []
 
                 for frame in stack:
@@ -322,9 +356,9 @@ class SampleBuffer(object):
                         frames[frame] = len(frames)
                         frames_list.append(
                             {
-                                "name": frame.name,
-                                "file": frame.file,
-                                "line": frame.line,
+                                "function": frame.function,
+                                "filename": frame.abs_path,
+                                "lineno": frame.lineno,
                             }
                         )
                     current_stack.append(frames[frame])
@@ -334,8 +368,13 @@ class SampleBuffer(object):
                     stacks[current_stack] = len(stacks)
                     stacks_list.append(current_stack)
 
-                sample["stack_id"] = stacks[current_stack]
-                samples.append(sample)
+                samples.append(
+                    {
+                        "elapsed_since_start_ns": str(ts - start_ns),
+                        "thread_id": str(tid),
+                        "stack_id": stacks[current_stack],
+                    }
+                )
 
         # This collects the thread metadata at the end of a profile. Doing it
         # this way means that any threads that terminate before the profile ends
@@ -345,7 +384,7 @@ class SampleBuffer(object):
                 "name": thread.name,
             }
             for thread in threading.enumerate()
-        }
+        }  # type: Dict[str, ProcessedThreadMetadata]
 
         return {
             "stacks": stacks_list,
