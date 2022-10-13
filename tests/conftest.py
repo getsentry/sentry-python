@@ -15,11 +15,12 @@ except ImportError:
     eventlet = None
 
 import sentry_sdk
-from sentry_sdk._compat import reraise, string_types, iteritems
-from sentry_sdk.transport import Transport
+from sentry_sdk._compat import iteritems, reraise, string_types
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.utils import capture_internal_exceptions
 from sentry_sdk.integrations import _installed_integrations  # noqa: F401
+from sentry_sdk.profiler import teardown_profiler
+from sentry_sdk.transport import Transport
+from sentry_sdk.utils import capture_internal_exceptions
 
 from tests import _warning_recorder, _warning_recorder_mgr
 
@@ -554,3 +555,9 @@ def object_described_by_matcher():
             return not self.__eq__(test_obj)
 
     return ObjectDescribedBy
+
+
+@pytest.fixture
+def teardown_profiling():
+    yield
+    teardown_profiler()
