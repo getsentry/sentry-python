@@ -1,13 +1,16 @@
 from __future__ import absolute_import
 
-import asyncio
-from asyncio.tasks import Task
 from sentry_sdk.consts import OP
-
-
 from sentry_sdk.hub import Hub
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk._types import MYPY
+
+try:
+    import asyncio
+    from asyncio.tasks import Task
+except ImportError:
+    raise DidNotEnable("asyncio not available")
+
 
 if MYPY:
     from typing import Any
