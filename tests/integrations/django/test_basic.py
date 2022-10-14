@@ -666,14 +666,14 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
     views_tests = [
         (
             reverse("template_test2"),
-            '- op="django.template.render": description="[user_name.html, ...]"',
+            '- op="template.render": description="[user_name.html, ...]"',
         ),
     ]
     if DJANGO_VERSION >= (1, 7):
         views_tests.append(
             (
                 reverse("template_test"),
-                '- op="django.template.render": description="user_name.html"',
+                '- op="template.render": description="user_name.html"',
             ),
         )
 
@@ -703,15 +703,15 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
             render_span_tree(transaction)
             == """\
 - op="http.server": description=null
-  - op="django.signals": description="django.db.reset_queries"
-  - op="django.signals": description="django.db.close_old_connections"
-  - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.__call__"
-    - op="django.middleware": description="django.contrib.auth.middleware.AuthenticationMiddleware.__call__"
-      - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.__call__"
-        - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.__call__"
-          - op="django.middleware": description="tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__"
-            - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
-            - op="django.view": description="message"\
+  - op="event.django": description="django.db.reset_queries"
+  - op="event.django": description="django.db.close_old_connections"
+  - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.__call__"
+    - op="middleware.django": description="django.contrib.auth.middleware.AuthenticationMiddleware.__call__"
+      - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.__call__"
+        - op="middleware.django": description="tests.integrations.django.myapp.settings.TestMiddleware.__call__"
+          - op="middleware.django": description="tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__"
+            - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
+            - op="view.render": description="message"\
 """
         )
 
@@ -720,16 +720,16 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
             render_span_tree(transaction)
             == """\
 - op="http.server": description=null
-  - op="django.signals": description="django.db.reset_queries"
-  - op="django.signals": description="django.db.close_old_connections"
-  - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.process_request"
-  - op="django.middleware": description="django.contrib.auth.middleware.AuthenticationMiddleware.process_request"
-  - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.process_request"
-  - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
-  - op="django.view": description="message"
-  - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.process_response"
-  - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.process_response"
-  - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.process_response"\
+  - op="event.django": description="django.db.reset_queries"
+  - op="event.django": description="django.db.close_old_connections"
+  - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.process_request"
+  - op="middleware.django": description="django.contrib.auth.middleware.AuthenticationMiddleware.process_request"
+  - op="middleware.django": description="tests.integrations.django.myapp.settings.TestMiddleware.process_request"
+  - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
+  - op="view.render": description="message"
+  - op="middleware.django": description="tests.integrations.django.myapp.settings.TestMiddleware.process_response"
+  - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.process_response"
+  - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.process_response"\
 """
         )
 
@@ -748,10 +748,10 @@ def test_middleware_spans_disabled(sentry_init, client, capture_events):
 
     assert len(transaction["spans"]) == 2
 
-    assert transaction["spans"][0]["op"] == "django.signals"
+    assert transaction["spans"][0]["op"] == "event.django"
     assert transaction["spans"][0]["description"] == "django.db.reset_queries"
 
-    assert transaction["spans"][1]["op"] == "django.signals"
+    assert transaction["spans"][1]["op"] == "event.django"
     assert transaction["spans"][1]["description"] == "django.db.close_old_connections"
 
 

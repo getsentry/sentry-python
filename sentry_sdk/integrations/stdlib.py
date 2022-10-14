@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 import platform
+from sentry_sdk.consts import OP
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
@@ -78,7 +79,9 @@ def _install_httplib():
                 url,
             )
 
-        span = hub.start_span(op="http", description="%s %s" % (method, real_url))
+        span = hub.start_span(
+            op=OP.HTTP_CLIENT, description="%s %s" % (method, real_url)
+        )
 
         span.set_data("method", method)
         span.set_data("url", real_url)
@@ -183,7 +186,7 @@ def _install_subprocess():
 
         env = None
 
-        with hub.start_span(op="subprocess", description=description) as span:
+        with hub.start_span(op=OP.SUBPROCESS, description=description) as span:
 
             for k, v in hub.iter_trace_propagation_headers(span):
                 if env is None:
@@ -211,7 +214,7 @@ def _install_subprocess():
         if hub.get_integration(StdlibIntegration) is None:
             return old_popen_wait(self, *a, **kw)
 
-        with hub.start_span(op="subprocess.wait") as span:
+        with hub.start_span(op=OP.SUBPROCESS_WAIT) as span:
             span.set_tag("subprocess.pid", self.pid)
             return old_popen_wait(self, *a, **kw)
 
@@ -226,7 +229,7 @@ def _install_subprocess():
         if hub.get_integration(StdlibIntegration) is None:
             return old_popen_communicate(self, *a, **kw)
 
-        with hub.start_span(op="subprocess.communicate") as span:
+        with hub.start_span(op=OP.SUBPROCESS_COMMUNICATE) as span:
             span.set_tag("subprocess.pid", self.pid)
             return old_popen_communicate(self, *a, **kw)
 

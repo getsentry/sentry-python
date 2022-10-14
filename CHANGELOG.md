@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.9.11
+
+### Various fixes & improvements
+
+- Unified naming of span "op"s (#1643) by @antonpirker
+
+  We have unified the strings of our span operations. See https://develop.sentry.dev/sdk/performance/span-operations/
+
+  **WARNING:** If you have dashboards defined that use `transaction.op` in their fields, conditions, aggregates or columns please check them before updating to this version of the SDK.
+
+  Here a list of all the changes:
+
+  | Old operation (`op`)     | New Operation (`op`)   |
+  | ------------------------ | ---------------------- |
+  | `asgi.server`            | `http.server`          |
+  | `aws.request`            | `http.client`          |
+  | `aws.request.stream`     | `http.client.stream`   |
+  | `celery.submit`          | `queue.submit.celery`  |
+  | `celery.task`            | `queue.task.celery`    |
+  | `django.middleware`      | `middleware.django`    |
+  | `django.signals`         | `event.django`         |
+  | `django.template.render` | `template.render`      |
+  | `django.view`            | `view.render`          |
+  | `http`                   | `http.client`          |
+  | `redis`                  | `db.redis`             |
+  | `rq.task`                | `queue.task.rq`        |
+  | `serverless.function`    | `function.aws`         |
+  | `serverless.function`    | `function.gcp`         |
+  | `starlette.middleware`   | `middleware.starlette` |
+
 ## 1.9.10
 
 ### Various fixes & improvements
@@ -158,7 +188,7 @@ We can do better and in the future we will do our best to not break your code ag
 
 - fix: avoid sending empty Baggage header (#1507) by @intgr
 - fix: properly freeze Baggage object (#1508) by @intgr
-- docs: fix simple typo, collecter -> collector (#1505) by @timgates42
+- docs: fix simple typo, collecter | collector (#1505) by @timgates42
 
 ## 1.7.2
 
