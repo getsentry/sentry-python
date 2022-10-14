@@ -60,14 +60,14 @@ async def test_create_task(
     assert transaction_event["spans"][0]["op"] == "root"
     assert transaction_event["spans"][0]["description"] == "not so important"
 
-    assert transaction_event["spans"][1]["op"] == OP.ASYNCTASK
+    assert transaction_event["spans"][1]["op"] == OP.FUNCTION
     assert transaction_event["spans"][1]["description"] == "foo"
     assert (
         transaction_event["spans"][1]["parent_span_id"]
         == transaction_event["spans"][0]["span_id"]
     )
 
-    assert transaction_event["spans"][2]["op"] == OP.ASYNCTASK
+    assert transaction_event["spans"][2]["op"] == OP.FUNCTION
     assert transaction_event["spans"][2]["description"] == "bar"
     assert (
         transaction_event["spans"][2]["parent_span_id"]
@@ -103,14 +103,14 @@ async def test_gather(
     assert transaction_event["spans"][0]["op"] == "root"
     assert transaction_event["spans"][0]["description"] == "not so important"
 
-    assert transaction_event["spans"][1]["op"] == OP.ASYNCTASK
+    assert transaction_event["spans"][1]["op"] == OP.FUNCTION
     assert transaction_event["spans"][1]["description"] == "foo"
     assert (
         transaction_event["spans"][1]["parent_span_id"]
         == transaction_event["spans"][0]["span_id"]
     )
 
-    assert transaction_event["spans"][2]["op"] == OP.ASYNCTASK
+    assert transaction_event["spans"][2]["op"] == OP.FUNCTION
     assert transaction_event["spans"][2]["description"] == "bar"
     assert (
         transaction_event["spans"][2]["parent_span_id"]
