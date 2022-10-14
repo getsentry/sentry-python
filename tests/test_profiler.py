@@ -164,9 +164,9 @@ def get_scheduler_threads(scheduler):
 
 
 class DummySampleBuffer(SampleBuffer):
-    def __init__(self, capacity, sample_data=[]):
+    def __init__(self, capacity, sample_data=None):
         super(DummySampleBuffer, self).__init__(capacity)
-        self.sample_data = sample_data
+        self.sample_data = [] if sample_data is None else sample_data
 
     def make_sampler(self):
         def _sample_stack(*args, **kwargs):
