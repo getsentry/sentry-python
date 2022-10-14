@@ -86,7 +86,7 @@ def _enable_span_for_middleware(middleware_class):
     old_call = middleware_class.__call__
 
     async def _create_span_call(app, scope, receive, send, **kwargs):
-        # type: (Any, Dict, Callable, Callable, Any) -> None
+        # type: (Any, Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]], Any) -> None
         hub = Hub.current
         integration = hub.get_integration(StarletteIntegration)
         if integration is not None:
