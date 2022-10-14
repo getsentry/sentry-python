@@ -10,6 +10,7 @@ from sentry_sdk.utils import (
     current_stacktrace,
     disable_capture_event,
     format_timestamp,
+    get_sdk_name,
     get_type_name,
     get_default_release,
     handle_in_app,
@@ -17,7 +18,11 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.transport import make_transport
-from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO, ClientConstructor
+from sentry_sdk.consts import (
+    DEFAULT_OPTIONS,
+    VERSION,
+    ClientConstructor,
+)
 from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
@@ -39,6 +44,13 @@ if MYPY:
 
 
 _client_init_debug = ContextVar("client_init_debug")
+
+
+SDK_INFO = {
+    "name": "sentry.python",  # SDK name will be overridden after integrations have been loaded with sentry_sdk.integrations.setup_integrations()
+    "version": VERSION,
+    "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
+}
 
 
 def _get_options(*args, **kwargs):
@@ -128,6 +140,11 @@ class _Client(object):
                     "auto_enabling_integrations"
                 ],
             )
+
+            sdk_name = get_sdk_name(list(self.integrations.keys()))
+            SDK_INFO["name"] = sdk_name
+            logger.debug("Setting SDK name to '%s'", sdk_name)
+
         finally:
             _client_init_debug.set(old_debug)
 
