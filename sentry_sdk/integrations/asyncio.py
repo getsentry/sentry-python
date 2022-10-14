@@ -47,8 +47,12 @@ def _sentry_task_factory(loop, coro):
 
 def patch_asyncio():
     # type: () -> None
-    loop = asyncio.get_running_loop()
-    loop.set_task_factory(_sentry_task_factory)
+    try:
+        loop = asyncio.get_running_loop()
+        loop.set_task_factory(_sentry_task_factory)
+    except RuntimeError:
+        # When there is no running loop, we have nothing to patch.
+        pass
 
 
 class AsyncioIntegration(Integration):
