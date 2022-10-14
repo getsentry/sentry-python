@@ -101,7 +101,7 @@ def test_transaction_with_error(
     error_event, envelope = events
 
     assert error_event["transaction"] == "tests.integrations.rq.test_rq.chew_up_shoes"
-    assert error_event["contexts"]["trace"]["op"] == "rq.task"
+    assert error_event["contexts"]["trace"]["op"] == "queue.task.rq"
     assert error_event["exception"]["values"][0]["type"] == "Exception"
     assert (
         error_event["exception"]["values"][0]["value"]
@@ -136,7 +136,7 @@ def test_transaction_no_error(
     envelope = events[0]
 
     assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == "rq.task"
+    assert envelope["contexts"]["trace"]["op"] == "queue.task.rq"
     assert envelope["transaction"] == "tests.integrations.rq.test_rq.do_trick"
     assert envelope["extra"]["rq-job"] == DictionaryContaining(
         {
