@@ -29,7 +29,7 @@ def _sentry_task_factory(loop, coro):
     # Trying to use user set task factory (if there is one)
     orig_factory = loop.get_task_factory()
     if orig_factory:
-        return orig_factory(loop, coro)
+        return orig_factory(loop, _coro_creating_hub_and_span)
 
     # The default task factory in `asyncio` does not have its own function
     # but is just a couple of lines in `asyncio.base_events.create_task()`
