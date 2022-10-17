@@ -38,7 +38,7 @@ def _sentry_task_factory(loop, coro):
     # WARNING:
     # If the default behavior of the task creation in asyncio changes,
     # this will break!
-    task = Task(_coro_creating_hub_and_span, loop=loop)
+    task = Task(_coro_creating_hub_and_span, loop=loop)  # type: ignore
     if task._source_traceback:  # type: ignore
         del task._source_traceback[-1]  # type: ignore
 
