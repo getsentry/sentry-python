@@ -85,21 +85,49 @@ def _enable_span_for_middleware(middleware_class):
     # type: (Any) -> type
     old_call = middleware_class.__call__
 
-    async def _create_span_call(*args, **kwargs):
-        # type: (Any, Any) -> None
+    async def _create_span_call(app, scope, receive, send, **kwargs):
+        # type: (Any, Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]], Any) -> None
         hub = Hub.current
         integration = hub.get_integration(StarletteIntegration)
         if integration is not None:
-            middleware_name = args[0].__class__.__name__
+            middleware_name = app.__class__.__name__
+
             with hub.start_span(
                 op=OP.MIDDLEWARE_STARLETTE, description=middleware_name
             ) as middleware_span:
                 middleware_span.set_tag("starlette.middleware_name", middleware_name)
 
-                await old_call(*args, **kwargs)
+                # Creating spans for the "receive" callback
+                async def _sentry_receive(*args, **kwargs):
+                    # type: (*Any, **Any) -> Any
+                    hub = Hub.current
+                    with hub.start_span(
+                        op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
+                        description=receive.__qualname__,
+                    ) as span:
+                        span.set_tag("starlette.middleware_name", middleware_name)
+                        await receive(*args, **kwargs)
+
+                receive_patched = receive.__name__ == "_sentry_receive"
+                new_receive = _sentry_receive if not receive_patched else receive
+
+                # Creating spans for the "send" callback
+                async def _sentry_send(*args, **kwargs):
+                    # type: (*Any, **Any) -> Any
+                    hub = Hub.current
+                    with hub.start_span(
+                        op=OP.MIDDLEWARE_STARLETTE_SEND, description=send.__qualname__
+                    ) as span:
+                        span.set_tag("starlette.middleware_name", middleware_name)
+                        await send(*args, **kwargs)
+
+                send_patched = send.__name__ == "_sentry_send"
+                new_send = _sentry_send if not send_patched else send
+
+                await old_call(app, scope, new_receive, new_send, **kwargs)
 
         else:
-            await old_call(*args, **kwargs)
+            await old_call(app, scope, receive, send, **kwargs)
 
     not_yet_patched = old_call.__name__ not in [
         "_create_span_call",
