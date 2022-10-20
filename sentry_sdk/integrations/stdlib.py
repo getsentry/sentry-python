@@ -71,7 +71,7 @@ def _install_httplib():
         default_port = self.default_port
 
         real_url = url
-        if not real_url.startswith(("http://", "https://")):
+        if real_url is None or not real_url.startswith(("http://", "https://")):
             real_url = "%s://%s%s%s" % (
                 default_port == 443 and "https" or "http",
                 host,

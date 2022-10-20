@@ -7,6 +7,7 @@ import time
 import pytest
 
 from sentry_sdk.profiler import (
+    EventScheduler,
     RawFrameData,
     SampleBuffer,
     SleepScheduler,
@@ -85,9 +86,24 @@ class GetFrame:
     def instance_method(self):
         return inspect.currentframe()
 
+    def instance_method_wrapped(self):
+        def wrapped():
+            self
+            return inspect.currentframe()
+
+        return wrapped
+
     @classmethod
     def class_method(cls):
         return inspect.currentframe()
+
+    @classmethod
+    def class_method_wrapped(cls):
+        def wrapped():
+            cls
+            return inspect.currentframe()
+
+        return wrapped
 
     @staticmethod
     def static_method():
@@ -113,9 +129,19 @@ class GetFrame:
             id="instance_method",
         ),
         pytest.param(
+            GetFrame().instance_method_wrapped()(),
+            "wrapped",
+            id="instance_method_wrapped",
+        ),
+        pytest.param(
             GetFrame().class_method(),
             "GetFrame.class_method",
             id="class_method",
+        ),
+        pytest.param(
+            GetFrame().class_method_wrapped()(),
+            "wrapped",
+            id="class_method_wrapped",
         ),
         pytest.param(
             GetFrame().static_method(),
@@ -162,12 +188,83 @@ def get_scheduler_threads(scheduler):
     return [thread for thread in threading.enumerate() if thread.name == scheduler.name]
 
 
-@minimum_python_33
-def test_sleep_scheduler_single_background_thread():
-    def sampler():
-        pass
+class DummySampleBuffer(SampleBuffer):
+    def __init__(self, capacity, sample_data=None):
+        super(DummySampleBuffer, self).__init__(capacity)
+        self.sample_data = [] if sample_data is None else sample_data
 
-    scheduler = SleepScheduler(sampler=sampler, frequency=1000)
+    def make_sampler(self):
+        def _sample_stack(*args, **kwargs):
+            print("writing", self.sample_data[0])
+            self.write(self.sample_data.pop(0))
+
+        return _sample_stack
+
+
+@minimum_python_33
+@pytest.mark.parametrize(
+    ("scheduler_class",),
+    [
+        pytest.param(SleepScheduler, id="sleep scheduler"),
+        pytest.param(EventScheduler, id="event scheduler"),
+    ],
+)
+def test_thread_scheduler_takes_first_samples(scheduler_class):
+    sample_buffer = DummySampleBuffer(
+        capacity=1, sample_data=[(0, [(0, [RawFrameData("name", "file", 1)])])]
+    )
+    scheduler = scheduler_class(sample_buffer=sample_buffer, frequency=1000)
+    assert scheduler.start_profiling()
+    # immediately stopping means by the time the sampling thread will exit
+    # before it samples at the end of the first iteration
+    assert scheduler.stop_profiling()
+    time.sleep(0.002)
+    assert len(get_scheduler_threads(scheduler)) == 0
+
+    # there should be exactly 1 sample because we always sample once immediately
+    profile = sample_buffer.slice_profile(0, 1)
+    assert len(profile["samples"]) == 1
+
+
+@minimum_python_33
+@pytest.mark.parametrize(
+    ("scheduler_class",),
+    [
+        pytest.param(SleepScheduler, id="sleep scheduler"),
+        pytest.param(EventScheduler, id="event scheduler"),
+    ],
+)
+def test_thread_scheduler_takes_more_samples(scheduler_class):
+    sample_buffer = DummySampleBuffer(
+        capacity=10,
+        sample_data=[(i, [(0, [RawFrameData("name", "file", 1)])]) for i in range(3)],
+    )
+    scheduler = scheduler_class(sample_buffer=sample_buffer, frequency=1000)
+    assert scheduler.start_profiling()
+    # waiting a little before stopping the scheduler means the profiling
+    # thread will get a chance to take a few samples before exiting
+    time.sleep(0.002)
+    assert scheduler.stop_profiling()
+    time.sleep(0.002)
+    assert len(get_scheduler_threads(scheduler)) == 0
+
+    # there should be more than 1 sample because we always sample once immediately
+    # plus any samples take afterwards
+    profile = sample_buffer.slice_profile(0, 3)
+    assert len(profile["samples"]) > 1
+
+
+@minimum_python_33
+@pytest.mark.parametrize(
+    ("scheduler_class",),
+    [
+        pytest.param(SleepScheduler, id="sleep scheduler"),
+        pytest.param(EventScheduler, id="event scheduler"),
+    ],
+)
+def test_thread_scheduler_single_background_thread(scheduler_class):
+    sample_buffer = SampleBuffer(1)
+    scheduler = scheduler_class(sample_buffer=sample_buffer, frequency=1000)
 
     assert scheduler.start_profiling()
 
