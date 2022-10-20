@@ -1,9 +1,12 @@
 from __future__ import absolute_import
+import sys
 
+from sentry_sdk._compat import reraise
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk._types import MYPY
+from sentry_sdk.utils import event_from_exception
 
 try:
     import asyncio
@@ -14,6 +17,8 @@ except ImportError:
 
 if MYPY:
     from typing import Any
+
+    from sentry_sdk._types import ExcInfo
 
 
 def patch_asyncio():
@@ -31,7 +36,10 @@ def patch_asyncio():
                 hub = Hub(Hub.current)
                 with hub:
                     with hub.start_span(op=OP.FUNCTION, description=coro.__qualname__):
-                        await coro
+                        try:
+                            await coro
+                        except Exception:
+                            reraise(*_capture_exception(hub))
 
             # Trying to use user set task factory (if there is one)
             if orig_task_factory:
@@ -54,6 +62,25 @@ def patch_asyncio():
     except RuntimeError:
         # When there is no running loop, we have nothing to patch.
         pass
+
+
+def _capture_exception(hub):
+    # type: (Hub) -> ExcInfo
+    exc_info = sys.exc_info()
+
+    integration = hub.get_integration(AsyncioIntegration)
+    if integration is not None:
+        # If an integration is there, a client has to be there.
+        client = hub.client  # type: Any
+
+        event, hint = event_from_exception(
+            exc_info,
+            client_options=client.options,
+            mechanism={"type": "asyncio", "handled": False},
+        )
+        hub.capture_event(event, hint=hint)
+
+    return exc_info
 
 
 class AsyncioIntegration(Integration):
