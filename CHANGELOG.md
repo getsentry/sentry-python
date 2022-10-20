@@ -6,6 +6,8 @@
 
 - Unified naming for span ops (#1661) by @antonpirker
 
+  We have unified the strings of our span operations. See https://develop.sentry.dev/sdk/performance/span-operations/
+
   **WARNING**: If you have Sentry Dashboards or Sentry Discover queries that use `transaction.op` in their fields, conditions, aggregates or columns this change could potentially break your Dashboards/Discover setup.
   Here is a list of the changes we made to the `op`s. Please adjust your dashboards and Discover queries accordingly:
 
