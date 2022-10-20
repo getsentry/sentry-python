@@ -380,7 +380,7 @@ class SampleBuffer(object):
         # will not have any metadata associated with it.
         thread_metadata = {
             str(thread.ident): {
-                "name": thread.name,
+                "name": str(thread.name),
             }
             for thread in threading.enumerate()
         }  # type: Dict[str, ProcessedThreadMetadata]

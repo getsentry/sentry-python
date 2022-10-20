@@ -305,7 +305,7 @@ def test_thread_scheduler_single_background_thread(scheduler_class):
 current_thread = threading.current_thread()
 thread_metadata = {
     str(current_thread.ident): {
-        "name": current_thread.name,
+        "name": str(current_thread.name),
     },
 }
 
