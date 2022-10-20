@@ -4,42 +4,10 @@
 
 ### Various fixes & improvements
 
-- tests(profiling): Add tests for thread schedulers (#1683) by @Zylphrex
-- fix(profiling): get_frame_name only look at arguments (#1684) by @Zylphrex
-- Add exception handling to Asyncio Integration (#1695) by @antonpirker
-- Fix asyncio task factory (#1689) by @antonpirker
-- fix(integrations): Fix http putrequest when url is None (#1693) by @MattFlower
-- asyncio integration (#1671) by @antonpirker
-- Have instrumentation for ASGI middleware receive/send callbacks. (#1673) by @antonpirker
-- Use Django internal ASGI handling from Channels version 4.0.0. (#1688) by @antonpirker
-- build(deps): bump checkouts/data-schemas from `f0a57f2` to `a214fbc` (#1627) by @dependabot
-- build(deps): bump flake8-bugbear from 22.9.11 to 22.9.23 (#1637) by @dependabot
-- Remove unused node setup from ci. (#1681) by @antonpirker
-- build(deps): bump sphinx from 5.1.1 to 5.2.3 (#1653) by @dependabot
-- build(deps): bump actions/stale from 5 to 6 (#1638) by @dependabot
-- build(deps): bump black from 22.8.0 to 22.10.0 (#1670) by @dependabot
-- ref(profiling): Rename profiling frame keys (#1680) by @Zylphrex
-- fix(profiling): Need to sample profile correctly (#1679) by @Zylphrex
-- fix(profiling): Race condition spawning multiple profiling threads (#1676) by @Zylphrex
-- feat(profiling): Extract qualified name for each frame (#1669) by @Zylphrex
-- test(profiling): Add basic profiling tests (#1677) by @Zylphrex
-- Check for Decimal is in_valid_sample_rate (#1672) by @Arvind2222
-- Include framework in SDK name (#1662) by @antonpirker
 - Unified naming for span ops (#1661) by @antonpirker
-- Add session for aiohttp integration (#1605) by @denys-pidlisnyi
-- feat(profiling): Attach thread metadata to profiles (#1660) by @Zylphrex
 
-## 1.9.11
-
-### Various fixes & improvements
-
-- Unified naming of span "op"s (#1643) by @antonpirker
-
-  We have unified the strings of our span operations. See https://develop.sentry.dev/sdk/performance/span-operations/
-
-  **WARNING:** If you have dashboards defined that use `transaction.op` in their fields, conditions, aggregates or columns please check them before updating to this version of the SDK.
-
-  Here a list of all the changes:
+  **WARNING**: If you have Sentry Dashboards or Sentry Discover queries that use `transaction.op` in their fields, conditions, aggregates or columns this change could potentially break your Dashboards/Discover setup.
+  Here is a list of the changes we made to the `op`s. Please adjust your dashboards and Discover queries accordingly:
 
   | Old operation (`op`)     | New Operation (`op`)   |
   | ------------------------ | ---------------------- |
@@ -58,6 +26,30 @@
   | `serverless.function`    | `function.aws`         |
   | `serverless.function`    | `function.gcp`         |
   | `starlette.middleware`   | `middleware.starlette` |
+
+- Include framework in SDK name (#1662) by @antonpirker
+- Asyncio integration (#1671) by @antonpirker
+- Add exception handling to Asyncio Integration (#1695) by @antonpirker
+- Fix asyncio task factory (#1689) by @antonpirker
+- Have instrumentation for ASGI middleware receive/send callbacks. (#1673) by @antonpirker
+- Use Django internal ASGI handling from Channels version 4.0.0. (#1688) by @antonpirker
+- fix(integrations): Fix http putrequest when url is None (#1693) by @MattFlower
+- build(deps): bump checkouts/data-schemas from `f0a57f2` to `a214fbc` (#1627) by @dependabot
+- build(deps): bump flake8-bugbear from 22.9.11 to 22.9.23 (#1637) by @dependabot
+- build(deps): bump sphinx from 5.1.1 to 5.2.3 (#1653) by @dependabot
+- build(deps): bump actions/stale from 5 to 6 (#1638) by @dependabot
+- build(deps): bump black from 22.8.0 to 22.10.0 (#1670) by @dependabot
+- Remove unused node setup from ci. (#1681) by @antonpirker
+- Check for Decimal is in_valid_sample_rate (#1672) by @Arvind2222
+- Add session for aiohttp integration (#1605) by @denys-pidlisnyi
+- feat(profiling): Extract qualified name for each frame (#1669) by @Zylphrex
+- feat(profiling): Attach thread metadata to profiles (#1660) by @Zylphrex
+- ref(profiling): Rename profiling frame keys (#1680) by @Zylphrex
+- fix(profiling): get_frame_name only look at arguments (#1684) by @Zylphrex
+- fix(profiling): Need to sample profile correctly (#1679) by @Zylphrex
+- fix(profiling): Race condition spawning multiple profiling threads (#1676) by @Zylphrex
+- tests(profiling): Add basic profiling tests (#1677) by @Zylphrex
+- tests(profiling): Add tests for thread schedulers (#1683) by @Zylphrex
 
 ## 1.9.10
 
