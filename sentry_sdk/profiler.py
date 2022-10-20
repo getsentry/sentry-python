@@ -202,14 +202,21 @@ def get_frame_name(frame):
     # in 3.11+, there is a frame.f_code.co_qualname that
     # we should consider using instead where possible
 
+    f_code = frame.f_code
     # co_name only contains the frame name.  If the frame was a method,
     # the class name will NOT be included.
-    name = frame.f_code.co_name
+    name = f_code.co_name
 
     # if it was a method, we can get the class name by inspecting
     # the f_locals for the `self` argument
     try:
-        if "self" in frame.f_locals:
+        if (
+            # the co_varnames start with the frame's positional arguments
+            # and we expect the first to be `self` if its an instance method
+            f_code.co_varnames
+            and f_code.co_varnames[0] == "self"
+            and "self" in frame.f_locals
+        ):
             return "{}.{}".format(frame.f_locals["self"].__class__.__name__, name)
     except AttributeError:
         pass
@@ -217,7 +224,13 @@ def get_frame_name(frame):
     # if it was a class method, (decorated with `@classmethod`)
     # we can get the class name by inspecting the f_locals for the `cls` argument
     try:
-        if "cls" in frame.f_locals:
+        if (
+            # the co_varnames start with the frame's positional arguments
+            # and we expect the first to be `cls` if its a class method
+            f_code.co_varnames
+            and f_code.co_varnames[0] == "cls"
+            and "cls" in frame.f_locals
+        ):
             return "{}.{}".format(frame.f_locals["cls"].__name__, name)
     except AttributeError:
         pass

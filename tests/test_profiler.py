@@ -85,9 +85,24 @@ class GetFrame:
     def instance_method(self):
         return inspect.currentframe()
 
+    def instance_method_wrapped(self):
+        def wrapped():
+            self
+            return inspect.currentframe()
+
+        return wrapped
+
     @classmethod
     def class_method(cls):
         return inspect.currentframe()
+
+    @classmethod
+    def class_method_wrapped(cls):
+        def wrapped():
+            cls
+            return inspect.currentframe()
+
+        return wrapped
 
     @staticmethod
     def static_method():
@@ -113,9 +128,19 @@ class GetFrame:
             id="instance_method",
         ),
         pytest.param(
+            GetFrame().instance_method_wrapped()(),
+            "wrapped",
+            id="instance_method_wrapped",
+        ),
+        pytest.param(
             GetFrame().class_method(),
             "GetFrame.class_method",
             id="class_method",
+        ),
+        pytest.param(
+            GetFrame().class_method_wrapped()(),
+            "wrapped",
+            id="class_method_wrapped",
         ),
         pytest.param(
             GetFrame().static_method(),
