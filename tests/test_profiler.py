@@ -330,7 +330,7 @@ thread_metadata = {
             10,
             0,
             1,
-            [(2, [(1, (RawFrameData("name", "file", 1),))])],
+            [(2, [("1", (RawFrameData("name", "file", 1),))])],
             {
                 "frames": [],
                 "samples": [],
