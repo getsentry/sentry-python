@@ -12,10 +12,10 @@ except ImportError:
 
 try:
     # py2
-    from httplib import HTTPSConnection
+    from httplib import HTTPConnection, HTTPSConnection
 except ImportError:
     # py3
-    from http.client import HTTPSConnection
+    from http.client import HTTPConnection, HTTPSConnection
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -75,6 +75,16 @@ def test_crumb_capture_hint(sentry_init, capture_events):
 
     if platform.python_implementation() != "PyPy":
         assert sys.getrefcount(response) == 2
+
+
+def test_empty_realurl(sentry_init, capture_events):
+    """
+    Ensure that after using sentry_sdk.init you can putrequest a
+    None url.
+    """
+
+    sentry_init(dsn="")
+    HTTPConnection("httpbin.org", port=443).putrequest("POST", None)
 
 
 def test_httplib_misuse(sentry_init, capture_events, request):
