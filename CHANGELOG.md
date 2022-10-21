@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.10.1
+
+### Various fixes & improvements
+
+- Bug fixes for FastAPI and Sentry SDK 1.10.0 (#1699) by @antonpirker
+- The wrapped receive() did not return anything. (#1698) by @antonpirker
+
 ## 1.10.0
 
 ### Various fixes & improvements
