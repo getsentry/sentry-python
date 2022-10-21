@@ -174,6 +174,21 @@ class SampleMiddleware:
         await self.app(scope, receive, do_stuff)
 
 
+class SampleReceiveSendMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        message = await receive()
+        assert message
+        assert message["type"] == "http.request"
+
+        send_output = await send({"type": "something-unimportant"})
+        assert send_output is None
+
+        await self.app(scope, receive, send)
+
+
 @pytest.mark.asyncio
 async def test_starlettrequestextractor_content_length(sentry_init):
     with mock.patch(
@@ -642,6 +657,25 @@ def test_middleware_callback_spans(sentry_init, capture_events):
         assert span["description"] == expected[idx]["description"]
         assert span["tags"] == expected[idx]["tags"]
         idx += 1
+
+
+@pytest.mark.asyncio
+async def test_middleware_receive_send(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(SampleReceiveSendMiddleware)]
+    )
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        # NOTE: the assert statements checking
+        # for correct behaviour are in `SampleReceiveSendMiddleware`!
+        client.get("/message", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
 
 
 def test_last_event_id(sentry_init, capture_events):
