@@ -106,7 +106,7 @@ def _enable_span_for_middleware(middleware_class):
                         description=receive.__qualname__,
                     ) as span:
                         span.set_tag("starlette.middleware_name", middleware_name)
-                        await receive(*args, **kwargs)
+                        return await receive(*args, **kwargs)
 
                 receive_patched = receive.__name__ == "_sentry_receive"
                 new_receive = _sentry_receive if not receive_patched else receive
