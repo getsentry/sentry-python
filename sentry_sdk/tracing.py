@@ -6,6 +6,7 @@ import time
 from datetime import datetime, timedelta
 
 import sentry_sdk
+from sentry_sdk.consts import INSTRUMENTER
 
 from sentry_sdk.utils import logger
 from sentry_sdk._types import MYPY
@@ -73,6 +74,40 @@ class _SpanRecorder(object):
             span._span_recorder = None
         else:
             self.spans.append(span)
+
+
+class NoOp:
+    def __init__(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        pass
+
+    def __enter__(self):
+        # type: () -> Any
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        pass
+
+    def __setattr__(self, *args, **kwargs):
+        import ipdb
+
+        ipdb.set_trace()
+        pass
+
+    def __getattr__(self, *args, **kwargs):
+        import ipdb
+
+        ipdb.set_trace()
+        name = args[0]
+        if name in ["start_span", "start_transaction", "start_child"]:
+
+            def nothing(*args, **kwargs):
+                return NoOp(*args, **kwargs)
+
+            return nothing
+
+        pass
 
 
 class Span(object):
@@ -213,6 +248,13 @@ class Span(object):
         trace id, sampling decision, transaction pointer, and span recorder are
         inherited from the current span/transaction.
         """
+        import ipdb
+
+        ipdb.set_trace()
+        if self.client.options["instrumenter"] == INSTRUMENTER.OTEL:
+            logger.warn("start_transaction does NOTHING because instrumenter is OTEL")
+            return NoOp()
+
         kwargs.setdefault("sampled", self.sampled)
 
         child = Span(
