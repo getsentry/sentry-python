@@ -106,7 +106,7 @@ def _enable_span_for_middleware(middleware_class):
                         description=receive.__qualname__,
                     ) as span:
                         span.set_tag("starlette.middleware_name", middleware_name)
-                        await receive(*args, **kwargs)
+                        return await receive(*args, **kwargs)
 
                 receive_name = getattr(receive, "__name__", str(receive))
                 receive_patched = receive_name == "_sentry_receive"
@@ -120,16 +120,16 @@ def _enable_span_for_middleware(middleware_class):
                         op=OP.MIDDLEWARE_STARLETTE_SEND, description=send.__qualname__
                     ) as span:
                         span.set_tag("starlette.middleware_name", middleware_name)
-                        await send(*args, **kwargs)
+                        return await send(*args, **kwargs)
 
                 send_name = getattr(send, "__name__", str(send))
                 send_patched = send_name == "_sentry_send"
                 new_send = _sentry_send if not send_patched else send
 
-                await old_call(app, scope, new_receive, new_send, **kwargs)
+                return await old_call(app, scope, new_receive, new_send, **kwargs)
 
         else:
-            await old_call(app, scope, receive, send, **kwargs)
+            return await old_call(app, scope, receive, send, **kwargs)
 
     not_yet_patched = old_call.__name__ not in [
         "_create_span_call",
