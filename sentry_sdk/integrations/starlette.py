@@ -103,12 +103,13 @@ def _enable_span_for_middleware(middleware_class):
                     hub = Hub.current
                     with hub.start_span(
                         op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
-                        description=receive.__qualname__,
+                        description=getattr(receive, "__qualname__", str(receive)),
                     ) as span:
                         span.set_tag("starlette.middleware_name", middleware_name)
                         return await receive(*args, **kwargs)
 
-                receive_patched = receive.__name__ == "_sentry_receive"
+                receive_name = getattr(receive, "__name__", str(receive))
+                receive_patched = receive_name == "_sentry_receive"
                 new_receive = _sentry_receive if not receive_patched else receive
 
                 # Creating spans for the "send" callback
@@ -116,12 +117,14 @@ def _enable_span_for_middleware(middleware_class):
                     # type: (*Any, **Any) -> Any
                     hub = Hub.current
                     with hub.start_span(
-                        op=OP.MIDDLEWARE_STARLETTE_SEND, description=send.__qualname__
+                        op=OP.MIDDLEWARE_STARLETTE_SEND,
+                        description=getattr(send, "__qualname__", str(send)),
                     ) as span:
                         span.set_tag("starlette.middleware_name", middleware_name)
                         return await send(*args, **kwargs)
 
-                send_patched = send.__name__ == "_sentry_send"
+                send_name = getattr(send, "__name__", str(send))
+                send_patched = send_name == "_sentry_send"
                 new_send = _sentry_send if not send_patched else send
 
                 return await old_call(app, scope, new_receive, new_send, **kwargs)
