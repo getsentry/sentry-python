@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 from sentry_sdk import Hub
+from sentry_sdk.consts import OP
 from sentry_sdk.utils import capture_internal_exceptions, logger
 from sentry_sdk.integrations import Integration, DidNotEnable
 
@@ -29,7 +30,9 @@ def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
         if hub.get_integration(RedisIntegration) is None:
             return old_execute(self, *args, **kwargs)
 
-        with hub.start_span(op="redis", description="redis.pipeline.execute") as span:
+        with hub.start_span(
+            op=OP.DB_REDIS, description="redis.pipeline.execute"
+        ) as span:
             with capture_internal_exceptions():
                 span.set_tag("redis.is_cluster", is_cluster)
                 transaction = self.transaction if not is_cluster else False
@@ -152,7 +155,7 @@ def patch_redis_client(cls, is_cluster):
 
             description = " ".join(description_parts)
 
-        with hub.start_span(op="redis", description=description) as span:
+        with hub.start_span(op=OP.DB_REDIS, description=description) as span:
             span.set_tag("redis.is_cluster", is_cluster)
             if name:
                 span.set_tag("redis.command", name)

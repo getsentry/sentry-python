@@ -1,5 +1,79 @@
 # Changelog
 
+## 1.10.1
+
+### Various fixes & improvements
+
+- Bug fixes for FastAPI and Sentry SDK 1.10.0 (#1699) by @antonpirker
+- The wrapped receive() did not return anything. (#1698) by @antonpirker
+
+## 1.10.0
+
+### Various fixes & improvements
+
+- Unified naming for span ops (#1661) by @antonpirker
+
+  We have unified the strings of our span operations. See https://develop.sentry.dev/sdk/performance/span-operations/
+
+  **WARNING**: If you have Sentry Dashboards or Sentry Discover queries that use `transaction.op` in their fields, conditions, aggregates or columns this change could potentially break your Dashboards/Discover setup.
+  Here is a list of the changes we made to the `op`s. Please adjust your dashboards and Discover queries accordingly:
+
+  | Old operation (`op`)     | New Operation (`op`)   |
+  | ------------------------ | ---------------------- |
+  | `asgi.server`            | `http.server`          |
+  | `aws.request`            | `http.client`          |
+  | `aws.request.stream`     | `http.client.stream`   |
+  | `celery.submit`          | `queue.submit.celery`  |
+  | `celery.task`            | `queue.task.celery`    |
+  | `django.middleware`      | `middleware.django`    |
+  | `django.signals`         | `event.django`         |
+  | `django.template.render` | `template.render`      |
+  | `django.view`            | `view.render`          |
+  | `http`                   | `http.client`          |
+  | `redis`                  | `db.redis`             |
+  | `rq.task`                | `queue.task.rq`        |
+  | `serverless.function`    | `function.aws`         |
+  | `serverless.function`    | `function.gcp`         |
+  | `starlette.middleware`   | `middleware.starlette` |
+
+- Include framework in SDK name (#1662) by @antonpirker
+- Asyncio integration (#1671) by @antonpirker
+- Add exception handling to Asyncio Integration (#1695) by @antonpirker
+- Fix asyncio task factory (#1689) by @antonpirker
+- Have instrumentation for ASGI middleware receive/send callbacks. (#1673) by @antonpirker
+- Use Django internal ASGI handling from Channels version 4.0.0. (#1688) by @antonpirker
+- fix(integrations): Fix http putrequest when url is None (#1693) by @MattFlower
+- build(deps): bump checkouts/data-schemas from `f0a57f2` to `a214fbc` (#1627) by @dependabot
+- build(deps): bump flake8-bugbear from 22.9.11 to 22.9.23 (#1637) by @dependabot
+- build(deps): bump sphinx from 5.1.1 to 5.2.3 (#1653) by @dependabot
+- build(deps): bump actions/stale from 5 to 6 (#1638) by @dependabot
+- build(deps): bump black from 22.8.0 to 22.10.0 (#1670) by @dependabot
+- Remove unused node setup from ci. (#1681) by @antonpirker
+- Check for Decimal is in_valid_sample_rate (#1672) by @Arvind2222
+- Add session for aiohttp integration (#1605) by @denys-pidlisnyi
+- feat(profiling): Extract qualified name for each frame (#1669) by @Zylphrex
+- feat(profiling): Attach thread metadata to profiles (#1660) by @Zylphrex
+- ref(profiling): Rename profiling frame keys (#1680) by @Zylphrex
+- fix(profiling): get_frame_name only look at arguments (#1684) by @Zylphrex
+- fix(profiling): Need to sample profile correctly (#1679) by @Zylphrex
+- fix(profiling): Race condition spawning multiple profiling threads (#1676) by @Zylphrex
+- tests(profiling): Add basic profiling tests (#1677) by @Zylphrex
+- tests(profiling): Add tests for thread schedulers (#1683) by @Zylphrex
+
+## 1.9.10
+
+### Various fixes & improvements
+
+- Use content-length header in ASGI instead of reading request body (#1646, #1631, #1595, #1573) (#1649) by @antonpirker
+- Added newer Celery versions to test suite (#1655) by @antonpirker
+- Django 4.x support (#1632) by @antonpirker
+- Cancel old CI runs when new one is started. (#1651) by @antonpirker
+- Increase max string size for desc (#1647) by @k-fish
+- Pin Sanic version for CI (#1650) by @antonpirker
+- Fix for partial signals in old Django and old Python versions. (#1641) by @antonpirker
+- Convert profile output to the sample format (#1611) by @phacops
+- Dynamically adjust profiler sleep time (#1634) by @Zylphrex
+
 ## 1.9.9
 
 ### Django update (ongoing)
@@ -144,7 +218,7 @@ We can do better and in the future we will do our best to not break your code ag
 
 - fix: avoid sending empty Baggage header (#1507) by @intgr
 - fix: properly freeze Baggage object (#1508) by @intgr
-- docs: fix simple typo, collecter -> collector (#1505) by @timgates42
+- docs: fix simple typo, collecter | collector (#1505) by @timgates42
 
 ## 1.7.2
 

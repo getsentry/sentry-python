@@ -40,7 +40,7 @@ epoch = datetime(1970, 1, 1)
 # The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
 
-MAX_STRING_LENGTH = 512
+MAX_STRING_LENGTH = 1024
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
 
@@ -93,6 +93,40 @@ def get_default_release():
         if release:
             return release
     return None
+
+
+def get_sdk_name(installed_integrations):
+    # type: (List[str]) -> str
+    """Return the SDK name including the name of the used web framework."""
+
+    # Note: I can not use for example sentry_sdk.integrations.django.DjangoIntegration.identifier
+    # here because if django is not installed the integration is not accessible.
+    framework_integrations = [
+        "django",
+        "flask",
+        "fastapi",
+        "bottle",
+        "falcon",
+        "quart",
+        "sanic",
+        "starlette",
+        "chalice",
+        "serverless",
+        "pyramid",
+        "tornado",
+        "aiohttp",
+        "aws_lambda",
+        "gcp",
+        "beam",
+        "asgi",
+        "wsgi",
+    ]
+
+    for integration in framework_integrations:
+        if integration in installed_integrations:
+            return "sentry.python.{}".format(integration)
+
+    return "sentry.python"
 
 
 class CaptureInternalException(object):
@@ -283,12 +317,51 @@ class Auth(object):
 
 
 class AnnotatedValue(object):
+    """
+    Meta information for a data field in the event payload.
+    This is to tell Relay that we have tampered with the fields value.
+    See:
+    https://github.com/getsentry/relay/blob/be12cd49a0f06ea932ed9b9f93a655de5d6ad6d1/relay-general/src/types/meta.rs#L407-L423
+    """
+
     __slots__ = ("value", "metadata")
 
     def __init__(self, value, metadata):
         # type: (Optional[Any], Dict[str, Any]) -> None
         self.value = value
         self.metadata = metadata
+
+    @classmethod
+    def removed_because_raw_data(cls):
+        # type: () -> AnnotatedValue
+        """The value was removed because it could not be parsed. This is done for request body values that are not json nor a form."""
+        return AnnotatedValue(
+            value="",
+            metadata={
+                "rem": [  # Remark
+                    [
+                        "!raw",  # Unparsable raw data
+                        "x",  # The fields original value was removed
+                    ]
+                ]
+            },
+        )
+
+    @classmethod
+    def removed_because_over_size_limit(cls):
+        # type: () -> AnnotatedValue
+        """The actual value was removed because the size of the field exceeded the configured maximum size (specified with the request_bodies sdk option)"""
+        return AnnotatedValue(
+            value="",
+            metadata={
+                "rem": [  # Remark
+                    [
+                        "!config",  # Because of configured maximum size
+                        "x",  # The fields original value was removed
+                    ]
+                ]
+            },
+        )
 
 
 if MYPY:

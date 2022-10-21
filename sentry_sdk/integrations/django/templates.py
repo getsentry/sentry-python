@@ -3,6 +3,7 @@ from django import VERSION as DJANGO_VERSION
 
 from sentry_sdk import _functools, Hub
 from sentry_sdk._types import MYPY
+from sentry_sdk.consts import OP
 
 if MYPY:
     from typing import Any
@@ -66,7 +67,7 @@ def patch_templates():
             return real_rendered_content.fget(self)
 
         with hub.start_span(
-            op="django.template.render",
+            op=OP.TEMPLATE_RENDER,
             description=_get_template_name_description(self.template_name),
         ) as span:
             span.set_data("context", self.context_data)
@@ -88,7 +89,7 @@ def patch_templates():
             return real_render(request, template_name, context, *args, **kwargs)
 
         with hub.start_span(
-            op="django.template.render",
+            op=OP.TEMPLATE_RENDER,
             description=_get_template_name_description(template_name),
         ) as span:
             span.set_data("context", context)
