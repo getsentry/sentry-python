@@ -103,7 +103,7 @@ def _enable_span_for_middleware(middleware_class):
                     hub = Hub.current
                     with hub.start_span(
                         op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
-                        description=receive.__qualname__,
+                        description=getattr(receive, "__qualname__", str(receive)),
                     ) as span:
                         span.set_tag("starlette.middleware_name", middleware_name)
                         return await receive(*args, **kwargs)
@@ -117,7 +117,8 @@ def _enable_span_for_middleware(middleware_class):
                     # type: (*Any, **Any) -> Any
                     hub = Hub.current
                     with hub.start_span(
-                        op=OP.MIDDLEWARE_STARLETTE_SEND, description=send.__qualname__
+                        op=OP.MIDDLEWARE_STARLETTE_SEND,
+                        description=getattr(send, "__qualname__", str(send)),
                     ) as span:
                         span.set_tag("starlette.middleware_name", middleware_name)
                         return await send(*args, **kwargs)

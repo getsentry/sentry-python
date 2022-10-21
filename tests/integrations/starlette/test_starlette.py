@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import functools
 import json
 import os
 
@@ -187,6 +188,30 @@ class SampleReceiveSendMiddleware:
         assert send_output is None
 
         await self.app(scope, receive, send)
+
+
+class SamplePartialReceiveSendMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        message = await receive()
+        assert message
+        assert message["type"] == "http.request"
+
+        send_output = await send({"type": "something-unimportant"})
+        assert send_output is None
+
+        async def my_receive(*args, **kwargs):
+            pass
+
+        async def my_send(*args, **kwargs):
+            pass
+
+        partial_receive = functools.partial(my_receive)
+        partial_send = functools.partial(my_send)
+
+        await self.app(scope, partial_receive, partial_send)
 
 
 @pytest.mark.asyncio
@@ -659,8 +684,7 @@ def test_middleware_callback_spans(sentry_init, capture_events):
         idx += 1
 
 
-@pytest.mark.asyncio
-async def test_middleware_receive_send(sentry_init, capture_events):
+def test_middleware_receive_send(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
@@ -676,6 +700,75 @@ async def test_middleware_receive_send(sentry_init, capture_events):
         client.get("/message", auth=("Gabriela", "hello123"))
     except Exception:
         pass
+
+
+def test_middleware_partial_receive_send(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(SamplePartialReceiveSendMiddleware)]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        client.get("/message", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
+
+    (_, transaction_event) = events
+
+    expected = [
+        {
+            "op": "middleware.starlette",
+            "description": "ServerErrorMiddleware",
+            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
+        },
+        {
+            "op": "middleware.starlette",
+            "description": "SamplePartialReceiveSendMiddleware",
+            "tags": {"starlette.middleware_name": "SamplePartialReceiveSendMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.receive",
+            "description": "_ASGIAdapter.send.<locals>.receive",
+            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "ServerErrorMiddleware.__call__.<locals>._send",
+            "tags": {"starlette.middleware_name": "SamplePartialReceiveSendMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "_ASGIAdapter.send.<locals>.send",
+            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
+        },
+        {
+            "op": "middleware.starlette",
+            "description": "ExceptionMiddleware",
+            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "functools.partial(<function SamplePartialReceiveSendMiddleware.__call__.<locals>.my_send at ",
+            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "functools.partial(<function SamplePartialReceiveSendMiddleware.__call__.<locals>.my_send at ",
+            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
+        },
+    ]
+
+    idx = 0
+    for span in transaction_event["spans"]:
+        assert span["op"] == expected[idx]["op"]
+        assert span["description"].startswith(expected[idx]["description"])
+        assert span["tags"] == expected[idx]["tags"]
+        idx += 1
 
 
 def test_last_event_id(sentry_init, capture_events):
