@@ -211,7 +211,7 @@ class DummySampleBuffer(SampleBuffer):
 )
 def test_thread_scheduler_takes_first_samples(scheduler_class):
     sample_buffer = DummySampleBuffer(
-        capacity=1, sample_data=[(0, [(0, [RawFrameData("name", "file", 1)])])]
+        capacity=1, sample_data=[(0, [(0, (RawFrameData("name", "file", 1),))])]
     )
     scheduler = scheduler_class(sample_buffer=sample_buffer, frequency=1000)
     assert scheduler.start_profiling()
@@ -237,7 +237,7 @@ def test_thread_scheduler_takes_first_samples(scheduler_class):
 def test_thread_scheduler_takes_more_samples(scheduler_class):
     sample_buffer = DummySampleBuffer(
         capacity=10,
-        sample_data=[(i, [(0, [RawFrameData("name", "file", 1)])]) for i in range(3)],
+        sample_data=[(i, [(0, (RawFrameData("name", "file", 1),))]) for i in range(3)],
     )
     scheduler = scheduler_class(sample_buffer=sample_buffer, frequency=1000)
     assert scheduler.start_profiling()
@@ -305,7 +305,7 @@ def test_thread_scheduler_single_background_thread(scheduler_class):
 current_thread = threading.current_thread()
 thread_metadata = {
     str(current_thread.ident): {
-        "name": current_thread.name,
+        "name": str(current_thread.name),
     },
 }
 
@@ -330,7 +330,7 @@ thread_metadata = {
             10,
             0,
             1,
-            [(2, [(1, [RawFrameData("name", "file", 1)])])],
+            [(2, [("1", (RawFrameData("name", "file", 1),))])],
             {
                 "frames": [],
                 "samples": [],
@@ -343,7 +343,7 @@ thread_metadata = {
             10,
             0,
             1,
-            [(0, [(1, [RawFrameData("name", "file", 1)])])],
+            [(0, [("1", (RawFrameData("name", "file", 1),))])],
             {
                 "frames": [
                     {
@@ -369,8 +369,8 @@ thread_metadata = {
             0,
             1,
             [
-                (0, [(1, [RawFrameData("name", "file", 1)])]),
-                (1, [(1, [RawFrameData("name", "file", 1)])]),
+                (0, [("1", (RawFrameData("name", "file", 1),))]),
+                (1, [("1", (RawFrameData("name", "file", 1),))]),
             ],
             {
                 "frames": [
@@ -402,16 +402,16 @@ thread_metadata = {
             0,
             1,
             [
-                (0, [(1, [RawFrameData("name1", "file", 1)])]),
+                (0, [("1", (RawFrameData("name1", "file", 1),))]),
                 (
                     1,
                     [
                         (
-                            1,
-                            [
+                            "1",
+                            (
                                 RawFrameData("name1", "file", 1),
                                 RawFrameData("name2", "file", 2),
-                            ],
+                            ),
                         )
                     ],
                 ),
@@ -455,11 +455,11 @@ thread_metadata = {
                     0,
                     [
                         (
-                            1,
-                            [
+                            "1",
+                            (
                                 RawFrameData("name1", "file", 1),
                                 RawFrameData("name2", "file", 2),
-                            ],
+                            ),
                         )
                     ],
                 ),
@@ -467,11 +467,11 @@ thread_metadata = {
                     1,
                     [
                         (
-                            1,
-                            [
+                            "1",
+                            (
                                 RawFrameData("name3", "file", 3),
                                 RawFrameData("name4", "file", 4),
-                            ],
+                            ),
                         )
                     ],
                 ),
@@ -521,16 +521,16 @@ thread_metadata = {
             0,
             1,
             [
-                (0, [(1, [RawFrameData("name1", "file", 1)])]),
+                (0, [("1", (RawFrameData("name1", "file", 1),))]),
                 (
                     1,
                     [
                         (
-                            1,
-                            [
+                            "1",
+                            (
                                 RawFrameData("name2", "file", 2),
                                 RawFrameData("name3", "file", 3),
-                            ],
+                            ),
                         )
                     ],
                 ),

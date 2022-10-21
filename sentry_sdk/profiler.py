@@ -45,7 +45,7 @@ if MYPY:
     from typing_extensions import TypedDict
     import sentry_sdk.tracing
 
-    RawSampleData = Tuple[int, Sequence[Tuple[int, Sequence[RawFrameData]]]]
+    RawSampleData = Tuple[int, Sequence[Tuple[str, Sequence[RawFrameData]]]]
 
     ProcessedStack = Tuple[int, ...]
 
@@ -162,14 +162,14 @@ def extract_stack(frame, max_stack_depth=MAX_STACK_DEPTH):
         stack.append(frame)
         frame = frame.f_back
 
-    return [
+    return tuple(
         RawFrameData(
             function=get_frame_name(frame),
             abs_path=frame.f_code.co_filename,
             lineno=frame.f_lineno,
         )
         for frame in stack
-    ]
+    )
 
 
 def get_frame_name(frame):
@@ -324,7 +324,7 @@ class SampleBuffer(object):
     def slice_profile(self, start_ns, stop_ns):
         # type: (int, int) -> ProcessedProfile
         samples = []  # type: List[ProcessedSample]
-        stacks = dict()  # type: Dict[ProcessedStack, int]
+        stacks = dict()  # type: Dict[int, int]
         stacks_list = list()  # type: List[ProcessedStack]
         frames = dict()  # type: Dict[RawFrameData, int]
         frames_list = list()  # type: List[ProcessedFrame]
@@ -334,39 +334,44 @@ class SampleBuffer(object):
         #
         # Is it safe to assume that the samples are always in
         # chronological order and binary search the buffer?
-        for raw_sample in self.buffer:
-            if raw_sample is None:
-                continue
-
-            ts = raw_sample[0]
+        for ts, sample in filter(None, self.buffer):
             if start_ns > ts or ts > stop_ns:
                 continue
 
-            for tid, stack in raw_sample[1]:
-                current_stack = []
+            elapsed_since_start_ns = str(ts - start_ns)
 
-                for frame in stack:
-                    if frame not in frames:
-                        frames[frame] = len(frames)
-                        frames_list.append(
-                            {
-                                "function": frame.function,
-                                "filename": frame.abs_path,
-                                "lineno": frame.lineno,
-                            }
-                        )
-                    current_stack.append(frames[frame])
+            for tid, stack in sample:
+                # Instead of mapping the stack into frame ids and hashing
+                # that as a tuple, we can directly hash the stack.
+                # This saves us from having to generate yet another list.
+                # Additionally, using the stack as the key directly is
+                # costly because the stack can be large, so we pre-hash
+                # the stack, and use the hash as the key as this will be
+                # needed a few times to improve performance.
+                hashed_stack = hash(stack)
 
-                current_stack = tuple(current_stack)
-                if current_stack not in stacks:
-                    stacks[current_stack] = len(stacks)
-                    stacks_list.append(current_stack)
+                # Check if the stack is indexed first, this lets us skip
+                # indexing frames if it's not necessary
+                if hashed_stack not in stacks:
+                    for frame in stack:
+                        if frame not in frames:
+                            frames[frame] = len(frames)
+                            frames_list.append(
+                                {
+                                    "function": frame.function,
+                                    "filename": frame.abs_path,
+                                    "lineno": frame.lineno,
+                                }
+                            )
+
+                    stacks[hashed_stack] = len(stacks)
+                    stacks_list.append(tuple(frames[frame] for frame in stack))
 
                 samples.append(
                     {
-                        "elapsed_since_start_ns": str(ts - start_ns),
-                        "thread_id": str(tid),
-                        "stack_id": stacks[current_stack],
+                        "elapsed_since_start_ns": elapsed_since_start_ns,
+                        "thread_id": tid,
+                        "stack_id": stacks[hashed_stack],
                     }
                 )
 
@@ -375,7 +380,7 @@ class SampleBuffer(object):
         # will not have any metadata associated with it.
         thread_metadata = {
             str(thread.ident): {
-                "name": thread.name,
+                "name": str(thread.name),
             }
             for thread in threading.enumerate()
         }  # type: Dict[str, ProcessedThreadMetadata]
@@ -401,7 +406,7 @@ class SampleBuffer(object):
                 (
                     nanosecond_time(),
                     [
-                        (tid, extract_stack(frame))
+                        (str(tid), extract_stack(frame))
                         for tid, frame in sys._current_frames().items()
                     ],
                 )
