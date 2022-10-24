@@ -34,7 +34,9 @@ from sentry_sdk.utils import (
     nanosecond_time,
 )
 
-RawFrameData = namedtuple("RawFrameData", ["abs_path", "filename", "function", "lineno", "module"])
+RawFrameData = namedtuple(
+    "RawFrameData", ["abs_path", "filename", "function", "lineno", "module"]
+)
 
 if MYPY:
     from types import FrameType
