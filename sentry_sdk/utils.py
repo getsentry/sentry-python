@@ -841,7 +841,7 @@ def strip_string(value, max_length=None):
         # This is intentionally not just the default such that one can patch `MAX_STRING_LENGTH` and affect `strip_string`.
         max_length = MAX_STRING_LENGTH
 
-    length = len(value)
+    length = len(value.encode("utf-8"))
 
     if length > max_length:
         return AnnotatedValue(

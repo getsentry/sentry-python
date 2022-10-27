@@ -15,6 +15,8 @@ from sentry_sdk.utils import (
     iter_event_stacktraces,
     to_base64,
     from_base64,
+    strip_string,
+    AnnotatedValue,
 )
 from sentry_sdk._compat import text_type, string_types
 
@@ -217,3 +219,22 @@ def test_failed_base64_conversion(input):
     # failures
     if type(input) not in string_types:
         assert to_base64(input) is None
+
+
+def test_strip_string():
+    # If value is None returns None.
+    assert strip_string(None) is None
+
+    # If max_length is not passed, returns the full text (up to 1024 bytes).
+    text_1024_long = "a" * 1024
+    assert strip_string(text_1024_long).count("a") == 1024
+
+    # If value exceeds the max_length, returns an AnnotatedValue.
+    text_1025_long = "a" * 1025
+    stripped_text = strip_string(text_1025_long)
+    assert isinstance(stripped_text, AnnotatedValue)
+    assert stripped_text.value.count("a") == 1021  # + '...' is 1024
+
+    # If text has unicode characters, it counts bytes and not number of characters.
+    text_with_unicode_character = "éê"
+    assert strip_string(text_with_unicode_character, max_length=2).value == "é..."
