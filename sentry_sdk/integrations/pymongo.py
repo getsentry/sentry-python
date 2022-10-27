@@ -40,6 +40,10 @@ class CommandTracer(monitoring.CommandListener):
         with capture_internal_exceptions():
             command = dict(event.command)
 
+            command.pop("$db", None)
+            command.pop("$clusterTime", None)
+            command.pop("$signature", None)
+
             op = "db.query"
 
             tags = {
@@ -65,13 +69,11 @@ class CommandTracer(monitoring.CommandListener):
             except KeyError:
                 pass
 
-            if _should_send_default_pii():
-                command.pop("$db", None)
-                command.pop("$clusterTime", None)
-                command.pop("$signature", None)
-                query = "{} {}".format(event.command_name, command)
-            else:
-                query = event.command_name
+            if not _should_send_default_pii():
+                for key in command:
+                    command[key] = "%s"
+
+            query = "{} {}".format(event.command_name, command)
             span = hub.start_span(op=op, description=query)
 
             for tag, value in tags.items():
