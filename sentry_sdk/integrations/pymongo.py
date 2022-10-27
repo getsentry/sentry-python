@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 from sentry_sdk import Hub
+from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions
@@ -39,14 +40,7 @@ class CommandTracer(monitoring.CommandListener):
         with capture_internal_exceptions():
             command = dict(event.command)
 
-            command.pop("$db", None)
-            command.pop("$clusterTime", None)
-            command.pop("$signature", None)
-
-            if event.command_name:
-                op = "db." + event.command_name
-            else:
-                op = "db"
+            op = "db.query"
 
             tags = {
                 "db.name": event.database_name,
@@ -71,7 +65,13 @@ class CommandTracer(monitoring.CommandListener):
             except KeyError:
                 pass
 
-            query = "{} {}".format(event.command_name, command)
+            if _should_send_default_pii():
+                command.pop("$db", None)
+                command.pop("$clusterTime", None)
+                command.pop("$signature", None)
+                query = "{} {}".format(event.command_name, command)
+            else:
+                query = event.command_name
             span = hub.start_span(op=op, description=query)
 
             for tag, value in tags.items():
