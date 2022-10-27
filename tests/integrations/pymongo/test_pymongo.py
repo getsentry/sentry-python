@@ -53,9 +53,9 @@ def test_transactions(sentry_init, capture_events, mongo_server):
         for field, value in common_tags.items():
             assert span["tags"][field] == value
 
-    assert find["op"] == "db.find"
-    assert insert_success["op"] == "db.insert"
-    assert insert_fail["op"] == "db.insert"
+    assert find["op"] == "db.query"
+    assert insert_success["op"] == "db.query"
+    assert insert_fail["op"] == "db.query"
 
     assert find["tags"]["db.operation"] == "find"
     assert insert_success["tags"]["db.operation"] == "insert"
@@ -86,7 +86,7 @@ def test_breadcrumbs(sentry_init, capture_events, mongo_server):
 
     assert crumb["category"] == "query"
     assert crumb["message"].startswith("find {")
-    assert crumb["type"] == "db.find"
+    assert crumb["type"] == "db.query"
     assert crumb["data"] == {
         "db.name": "test_db",
         "db.system": "mongodb",
