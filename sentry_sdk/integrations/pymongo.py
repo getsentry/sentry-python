@@ -13,7 +13,7 @@ except ImportError:
     raise DidNotEnable("Pymongo not installed")
 
 if MYPY:
-    from typing import Dict
+    from typing import Any, Dict, Union
 
     from pymongo.monitoring import (
         CommandFailedEvent,
@@ -24,10 +24,11 @@ if MYPY:
 
 class CommandTracer(monitoring.CommandListener):
     def __init__(self):
+        # type: () -> None
         self._ongoing_operations = {}  # type: Dict[int, Span]
 
     def _operation_key(self, event):
-        # type: (CommandFailedEvent | CommandStartedEvent | CommandSucceededEvent) -> int
+        # type: (Union[CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent]) -> int
         return event.request_id
 
     def started(self, event):
@@ -59,7 +60,7 @@ class CommandTracer(monitoring.CommandListener):
             except TypeError:
                 pass
 
-            data = {"operation_ids": {}}
+            data = {"operation_ids": {}}  # type: Dict[str, Dict[str, Any]]
 
             data["operation_ids"]["operation"] = event.operation_id
             data["operation_ids"]["request"] = event.request_id
