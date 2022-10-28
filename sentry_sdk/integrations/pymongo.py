@@ -23,6 +23,52 @@ if MYPY:
     )
 
 
+SAFE_COMMAND_ATTRIBUTES = [
+    "insert",
+    "ordered",
+    "find",
+    "limit",
+    "singleBatch",
+    "aggregate",
+    "createIndexes",
+    "indexes",
+    "delete",
+    "findAndModify",
+    "renameCollection",
+    "to",
+    "drop",
+]
+
+
+def _strip_pii(command):
+    # type: (Dict[str, Any]) -> Dict[str, Any]
+    for idx, key in enumerate(command):
+        if key in SAFE_COMMAND_ATTRIBUTES or (key == "update" and idx == 0):
+            # Skip if safe key, or the is "update" but not on the first place
+            # "update" as the first key is safe because it is the mongo db command.
+            # "update" as a later key (for ex in the findAndModify command) is not save and should be stripped of PII.
+            continue
+
+        if key == "documents":
+            for doc in command[key]:
+                for doc_key in doc:
+                    doc[doc_key] = "%s"
+
+        elif key in ["filter", "query", "update"]:
+            for item_key in command[key]:
+                command[key][item_key] = "%s"
+
+        elif key == "pipeline":
+            for pipeline in command[key]:
+                for match_key in pipeline["$match"] if "$match" in pipeline else []:
+                    pipeline["$match"][match_key] = "%s"
+
+        else:
+            command[key] = "%s"
+
+    return command
+
+
 class CommandTracer(monitoring.CommandListener):
     def __init__(self):
         # type: () -> None
@@ -70,8 +116,7 @@ class CommandTracer(monitoring.CommandListener):
                 pass
 
             if not _should_send_default_pii():
-                for key in command:
-                    command[key] = "%s"
+                command = _strip_pii(command)
 
             query = "{} {}".format(event.command_name, command)
             span = hub.start_span(op=op, description=query)

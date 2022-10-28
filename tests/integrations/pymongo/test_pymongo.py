@@ -1,5 +1,5 @@
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk.integrations.pymongo import PyMongoIntegration
+from sentry_sdk.integrations.pymongo import PyMongoIntegration, _strip_pii
 
 from mockupdb import MockupDB, OpQuery
 from pymongo import MongoClient
@@ -123,3 +123,299 @@ def test_breadcrumbs(sentry_init, capture_events, mongo_server, with_pii):
         "net.peer.name": mongo_server.host,
         "net.peer.port": str(mongo_server.port),
     }
+
+
+@pytest.mark.parametrize(
+    "testcase",
+    [
+        {
+            "command": {
+                "insert": "my_collection",
+                "ordered": True,
+                "documents": [
+                    {
+                        "username": "anton2",
+                        "email": "anton@somewhere.io",
+                        "password": "c4e86722fb56d946f7ddeecdae47e1c4458bf98a0a3ee5d5113111adf7bf0175",
+                        "_id": "635bc7403cb4f8a736f61cf2",
+                    }
+                ],
+            },
+            "command_stripped": {
+                "insert": "my_collection",
+                "ordered": True,
+                "documents": [
+                    {"username": "%s", "email": "%s", "password": "%s", "_id": "%s"}
+                ],
+            },
+        },
+        {
+            "command": {
+                "insert": "my_collection",
+                "ordered": True,
+                "documents": [
+                    {
+                        "username": "indiana4",
+                        "email": "indy@jones.org",
+                        "password": "63e86722fb56d946f7ddeecdae47e1c4458bf98a0a3ee5d5113111adf7bf016b",
+                        "_id": "635bc7403cb4f8a736f61cf3",
+                    }
+                ],
+            },
+            "command_stripped": {
+                "insert": "my_collection",
+                "ordered": True,
+                "documents": [
+                    {"username": "%s", "email": "%s", "password": "%s", "_id": "%s"}
+                ],
+            },
+        },
+        {
+            "command": {
+                "find": "my_collection",
+                "filter": {},
+                "limit": 1,
+                "singleBatch": True,
+            },
+            "command_stripped": {
+                "find": "my_collection",
+                "filter": {},
+                "limit": 1,
+                "singleBatch": True,
+            },
+        },
+        {
+            "command": {
+                "find": "my_collection",
+                "filter": {"username": "notthere"},
+                "limit": 1,
+                "singleBatch": True,
+            },
+            "command_stripped": {
+                "find": "my_collection",
+                "filter": {"username": "%s"},
+                "limit": 1,
+                "singleBatch": True,
+            },
+        },
+        {
+            "command": {
+                "insert": "my_collection",
+                "ordered": True,
+                "documents": [
+                    {
+                        "username": "userx1",
+                        "email": "x@somewhere.io",
+                        "password": "ccc86722fb56d946f7ddeecdae47e1c4458bf98a0a3ee5d5113111adf7bf0175",
+                        "_id": "635bc7403cb4f8a736f61cf4",
+                    },
+                    {
+                        "username": "userx2",
+                        "email": "x@somewhere.io",
+                        "password": "xxx86722fb56d946f7ddeecdae47e1c4458bf98a0a3ee5d5113111adf7bf0175",
+                        "_id": "635bc7403cb4f8a736f61cf5",
+                    },
+                ],
+            },
+            "command_stripped": {
+                "insert": "my_collection",
+                "ordered": True,
+                "documents": [
+                    {"username": "%s", "email": "%s", "password": "%s", "_id": "%s"},
+                    {"username": "%s", "email": "%s", "password": "%s", "_id": "%s"},
+                ],
+            },
+        },
+        {
+            "command": {
+                "find": "my_collection",
+                "filter": {"email": "ada@lovelace.com"},
+            },
+            "command_stripped": {"find": "my_collection", "filter": {"email": "%s"}},
+        },
+        {
+            "command": {
+                "aggregate": "my_collection",
+                "pipeline": [{"$match": {}}, {"$group": {"_id": 1, "n": {"$sum": 1}}}],
+                "cursor": {},
+            },
+            "command_stripped": {
+                "aggregate": "my_collection",
+                "pipeline": [{"$match": {}}, {"$group": {"_id": 1, "n": {"$sum": 1}}}],
+                "cursor": "%s",
+            },
+        },
+        {
+            "command": {
+                "aggregate": "my_collection",
+                "pipeline": [
+                    {"$match": {"email": "x@somewhere.io"}},
+                    {"$group": {"_id": 1, "n": {"$sum": 1}}},
+                ],
+                "cursor": {},
+            },
+            "command_stripped": {
+                "aggregate": "my_collection",
+                "pipeline": [
+                    {"$match": {"email": "%s"}},
+                    {"$group": {"_id": 1, "n": {"$sum": 1}}},
+                ],
+                "cursor": "%s",
+            },
+        },
+        {
+            "command": {
+                "createIndexes": "my_collection",
+                "indexes": [{"name": "username_1", "key": [("username", 1)]}],
+            },
+            "command_stripped": {
+                "createIndexes": "my_collection",
+                "indexes": [{"name": "username_1", "key": [("username", 1)]}],
+            },
+        },
+        {
+            "command": {
+                "update": "my_collection",
+                "ordered": True,
+                "updates": [
+                    ("q", {"email": "anton@somewhere.io"}),
+                    (
+                        "u",
+                        {
+                            "email": "anton2@somwehre.io",
+                            "extra_field": "extra_content",
+                            "new": "bla",
+                        },
+                    ),
+                    ("multi", False),
+                    ("upsert", False),
+                ],
+            },
+            "command_stripped": {
+                "update": "my_collection",
+                "ordered": True,
+                "updates": "%s",
+            },
+        },
+        {
+            "command": {
+                "update": "my_collection",
+                "ordered": True,
+                "updates": [
+                    ("q", {"email": "anton2@somwehre.io"}),
+                    ("u", {"$rename": {"new": "new_field"}}),
+                    ("multi", False),
+                    ("upsert", False),
+                ],
+            },
+            "command_stripped": {
+                "update": "my_collection",
+                "ordered": True,
+                "updates": "%s",
+            },
+        },
+        {
+            "command": {
+                "update": "my_collection",
+                "ordered": True,
+                "updates": [
+                    ("q", {"email": "x@somewhere.io"}),
+                    ("u", {"$rename": {"password": "pwd"}}),
+                    ("multi", True),
+                    ("upsert", False),
+                ],
+            },
+            "command_stripped": {
+                "update": "my_collection",
+                "ordered": True,
+                "updates": "%s",
+            },
+        },
+        {
+            "command": {
+                "delete": "my_collection",
+                "ordered": True,
+                "deletes": [("q", {"username": "userx2"}), ("limit", 1)],
+            },
+            "command_stripped": {
+                "delete": "my_collection",
+                "ordered": True,
+                "deletes": "%s",
+            },
+        },
+        {
+            "command": {
+                "delete": "my_collection",
+                "ordered": True,
+                "deletes": [("q", {"email": "xplus@somewhere.io"}), ("limit", 0)],
+            },
+            "command_stripped": {
+                "delete": "my_collection",
+                "ordered": True,
+                "deletes": "%s",
+            },
+        },
+        {
+            "command": {
+                "findAndModify": "my_collection",
+                "query": {"email": "ada@lovelace.com"},
+                "new": False,
+                "remove": True,
+            },
+            "command_stripped": {
+                "findAndModify": "my_collection",
+                "query": {"email": "%s"},
+                "new": "%s",
+                "remove": "%s",
+            },
+        },
+        {
+            "command": {
+                "findAndModify": "my_collection",
+                "query": {"email": "anton2@somewhere.io"},
+                "new": False,
+                "update": {"email": "anton3@somwehre.io", "extra_field": "xxx"},
+                "upsert": False,
+            },
+            "command_stripped": {
+                "findAndModify": "my_collection",
+                "query": {"email": "%s"},
+                "new": "%s",
+                "update": {"email": "%s", "extra_field": "%s"},
+                "upsert": "%s",
+            },
+        },
+        {
+            "command": {
+                "findAndModify": "my_collection",
+                "query": {"email": "anton3@somewhere.io"},
+                "new": False,
+                "update": {"$rename": {"extra_field": "extra_field2"}},
+                "upsert": False,
+            },
+            "command_stripped": {
+                "findAndModify": "my_collection",
+                "query": {"email": "%s"},
+                "new": "%s",
+                "update": {"$rename": "%s"},
+                "upsert": "%s",
+            },
+        },
+        {
+            "command": {
+                "renameCollection": "test.my_collection",
+                "to": "test.new_collection",
+            },
+            "command_stripped": {
+                "renameCollection": "test.my_collection",
+                "to": "test.new_collection",
+            },
+        },
+        {
+            "command": {"drop": "new_collection"},
+            "command_stripped": {"drop": "new_collection"},
+        },
+    ],
+)
+def test_strip_pii(testcase):
+    assert _strip_pii(testcase["command"]) == testcase["command_stripped"]
