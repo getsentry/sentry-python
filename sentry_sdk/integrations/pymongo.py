@@ -44,10 +44,13 @@ SAFE_COMMAND_ATTRIBUTES = [
 def _strip_pii(command):
     # type: (Dict[str, Any]) -> Dict[str, Any]
     for idx, key in enumerate(command):
-        if key in SAFE_COMMAND_ATTRIBUTES or (key == "update" and idx == 0):
-            # Skip if safe key, or the is "update" but not on the first place
-            # "update" as the first key is safe because it is the mongo db command.
-            # "update" as a later key (for ex in the findAndModify command) is not save and should be stripped of PII.
+        if key in SAFE_COMMAND_ATTRIBUTES:
+            # Skip if safe key
+            continue
+
+        if key == "update" and "findAndModify" not in command:
+            # Also skip "update" db command because it is save.
+            # There is also an "update" key in the "findAndModify" command, which is NOT safe!
             continue
 
         if key == "documents":
