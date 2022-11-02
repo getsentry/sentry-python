@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+import copy
 
 from sentry_sdk import Hub
 from sentry_sdk.hub import _should_send_default_pii
@@ -84,7 +85,7 @@ class CommandTracer(monitoring.CommandListener):
         if hub.get_integration(PyMongoIntegration) is None:
             return
         with capture_internal_exceptions():
-            command = dict(event.command)
+            command = dict(copy.deepcopy(event.command))
 
             command.pop("$db", None)
             command.pop("$clusterTime", None)
