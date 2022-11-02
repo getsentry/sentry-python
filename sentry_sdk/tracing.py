@@ -76,40 +76,6 @@ class _SpanRecorder(object):
             self.spans.append(span)
 
 
-class NoOp:
-    def __init__(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
-        pass
-
-    def __enter__(self):
-        # type: () -> Any
-        return self
-
-    def __exit__(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
-        pass
-
-    def __setattr__(self, *args, **kwargs):
-        import ipdb
-
-        ipdb.set_trace()
-        pass
-
-    def __getattr__(self, *args, **kwargs):
-        import ipdb
-
-        ipdb.set_trace()
-        name = args[0]
-        if name in ["start_span", "start_transaction", "start_child"]:
-
-            def nothing(*args, **kwargs):
-                return NoOp(*args, **kwargs)
-
-            return nothing
-
-        pass
-
-
 class Span(object):
     __slots__ = (
         "trace_id",
@@ -239,8 +205,8 @@ class Span(object):
         # referencing themselves)
         return self._containing_transaction
 
-    def start_child(self, **kwargs):
-        # type: (**Any) -> Span
+    def start_child(self, instrumenter=None, **kwargs):
+        # type: (Optional[str], **Any) -> Span
         """
         Start a sub-span from the current span or transaction.
 
@@ -248,12 +214,14 @@ class Span(object):
         trace id, sampling decision, transaction pointer, and span recorder are
         inherited from the current span/transaction.
         """
-        import ipdb
-
-        ipdb.set_trace()
-        if self.client.options["instrumenter"] == INSTRUMENTER.OTEL:
-            logger.warn("start_transaction does NOTHING because instrumenter is OTEL")
-            return NoOp()
+        instrumenter = (
+            instrumenter
+            if instrumenter is not None
+            else self.client.options["instrumenter"]
+        )
+        if instrumenter == INSTRUMENTER.OTEL:
+            # logger.warn("start_transaction does NOTHING because instrumenter is OTEL")
+            return NoOpSpan()
 
         kwargs.setdefault("sampled", self.sampled)
 
@@ -695,6 +663,7 @@ class Transaction(Span):
             # to a concrete decision.
             if self.sampled is None:
                 logger.warning("Discarding transaction without sampling decision.")
+
             return None
 
         finished_spans = [
@@ -861,6 +830,38 @@ class Transaction(Span):
                     sample_rate=float(sample_rate),
                 )
             )
+
+
+class NoOpSpan(Span):
+    def __repr__(self):
+        return self.__class__.__name__
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, ty, value, tb):
+        pass
+
+    def start_child(self, **kwargs):
+        pass
+
+    def new_span(self, **kwargs):
+        pass
+
+    def set_tag(self, key, value):
+        pass
+
+    def set_data(self, key, value):
+        pass
+
+    def set_status(self, value):
+        pass
+
+    def set_http_status(self, http_status):
+        pass
+
+    def finish(self, hub=None):
+        pass
 
 
 # Circular imports
