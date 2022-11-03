@@ -43,7 +43,7 @@ SAFE_COMMAND_ATTRIBUTES = [
 
 def _strip_pii(command):
     # type: (Dict[str, Any]) -> Dict[str, Any]
-    for idx, key in enumerate(command):
+    for key in command:
         is_safe_field = key in SAFE_COMMAND_ATTRIBUTES
         if is_safe_field:
             # Skip if safe key
