@@ -40,7 +40,7 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
         )  # force query execution
         connection["test_db"]["test_collection"].insert_one({"foo": 2})
         try:
-            connection["test_db"]["erroneous"].insert_many([{"bar": 3}, {"baz": 3}])
+            connection["test_db"]["erroneous"].insert_many([{"bar": 3}, {"baz": 4}])
             pytest.fail("Request should raise")
         except Exception:
             pass
@@ -70,19 +70,17 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
     assert insert_success["description"].startswith("insert {")
     assert insert_fail["description"].startswith("insert {")
     if with_pii:
-        assert "'foobar'" in find["description"]
-        assert "'foo'" in insert_success["description"]
-        assert (
-            "'bar'" in insert_fail["description"]
-            and "'baz'" in insert_fail["description"]
-        )
+        assert "1" in find["description"]
+        assert "2" in insert_success["description"]
+        assert "3" in insert_fail["description"] and "4" in insert_fail["description"]
     else:
+        # All values in filter replaced by "%s"
+        assert "1" not in find["description"]
         # All keys below top level replaced by "%s"
-        assert "'foobar'" not in find["description"]
-        assert "'foo'" not in insert_success["description"]
+        assert "2" not in insert_success["description"]
         assert (
-            "'bar'" not in insert_fail["description"]
-            and "'baz'" not in insert_fail["description"]
+            "3" not in insert_fail["description"]
+            and "4" not in insert_fail["description"]
         )
 
     assert find["tags"]["status"] == "ok"
@@ -112,9 +110,9 @@ def test_breadcrumbs(sentry_init, capture_events, mongo_server, with_pii):
     assert crumb["category"] == "query"
     assert crumb["message"].startswith("find {")
     if with_pii:
-        assert "'foobar'" in crumb["message"]
+        assert "1" in crumb["message"]
     else:
-        assert "'foobar'" not in crumb["message"]
+        assert "1" not in crumb["message"]
     assert crumb["type"] == "db.query"
     assert crumb["data"] == {
         "db.name": "test_db",
