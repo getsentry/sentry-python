@@ -42,6 +42,12 @@ BODY_FORM = """--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="usern
     "{{image_data}}", str(base64.b64encode(open(PICTURE, "rb").read()))
 )
 
+FORM_RECEIVE_MESSAGES = [
+    {"type": "http.request", "body": BODY_FORM.encode("utf-8")},
+    {"type": "http.disconnect"},
+]
+
+
 PARSED_FORM = starlette.datastructures.FormData(
     [
         ("username", "Jane"),
@@ -256,11 +262,10 @@ async def test_starlettrequestextractor_json(sentry_init):
 
 @pytest.mark.asyncio
 async def test_starlettrequestextractor_parsed_body_json(sentry_init):
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(json.dumps(BODY_JSON)),
+    starlette_request = starlette.requests.Request(SCOPE)
+    with mock.patch.object(
+        starlette_request, "_receive", side_effect=FORM_RECEIVE_MESSAGES
     ):
-        starlette_request = starlette.requests.Request(SCOPE)
         extractor = StarletteRequestExtractor(starlette_request)
 
         parsed_body = await extractor.parsed_body()
@@ -273,11 +278,11 @@ async def test_starlettrequestextractor_parsed_body_form(sentry_init):
     scope["headers"] = [
         [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
     ]
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(BODY_FORM),
+
+    starlette_request = starlette.requests.Request(scope)
+    with mock.patch.object(
+        starlette_request, "_receive", side_effect=FORM_RECEIVE_MESSAGES
     ):
-        starlette_request = starlette.requests.Request(scope)
         extractor = StarletteRequestExtractor(starlette_request)
 
         parsed_body = await extractor.parsed_body()
@@ -295,11 +300,10 @@ async def test_starlettrequestextractor_form(sentry_init):
     ]
     # TODO add test for content-type: "application/x-www-form-urlencoded"
 
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(BODY_FORM),
+    starlette_request = starlette.requests.Request(scope)
+    with mock.patch.object(
+        starlette_request, "_receive", side_effect=FORM_RECEIVE_MESSAGES
     ):
-        starlette_request = starlette.requests.Request(scope)
         extractor = StarletteRequestExtractor(starlette_request)
 
         form_data = await extractor.form()
@@ -345,13 +349,10 @@ async def test_starlettrequestextractor_body_consumed_twice(
         [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
     ]
 
-    messages = [
-        {"type": "http.request", "body": ""},
-        {"type": "http.disconnect"},
-    ]
-
     starlette_request = starlette.requests.Request(scope)
-    with mock.patch.object(starlette_request, "_receive", side_effect=messages):
+    with mock.patch.object(
+        starlette_request, "_receive", side_effect=FORM_RECEIVE_MESSAGES
+    ):
         extractor = StarletteRequestExtractor(starlette_request)
 
         await extractor.request.form()
