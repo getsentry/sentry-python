@@ -516,11 +516,15 @@ class StarletteRequestExtractor:
     async def form(self):
         # type: (StarletteRequestExtractor) -> Any
         """
-        curl -X POST http://localhost:8000/upload/somethign -H "Content-Type: application/x-www-form-urlencoded" -d "username=kevin&password=welcome123"
-        curl -X POST http://localhost:8000/upload/somethign  -F username=Julian -F password=hello123
+        curl -X POST http://localhost:8000/upload/something -H "Content-Type: application/x-www-form-urlencoded" -d "username=kevin&password=welcome123"
+        curl -X POST http://localhost:8000/upload/something  -F username=Julian -F password=hello123
         """
         if multipart is None:
             return None
+
+        # Parse the body first to get it cached, as Starlette does not cache form() as it
+        # does with body() and json() https://github.com/encode/starlette/discussions/1933
+        await self.request.body()
 
         return await self.request.form()
 

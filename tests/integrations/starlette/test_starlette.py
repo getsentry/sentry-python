@@ -322,6 +322,45 @@ async def test_starlettrequestextractor_raw_data(sentry_init):
 
 
 @pytest.mark.asyncio
+async def test_starlettrequestextractor_body_consumed_twice(
+    sentry_init, capture_events
+):
+    """
+    Starlette does cache when you read the request data via `request.json()`
+    or `request.body()`, but it does NOT when using `request.form()`.
+    So we have an edge case when the Sentry Starlette reads the body using `.form()`
+    and the user wants to read the body using `.body()`.
+    Because the underlying stream can not be consumed twice and is not cached.
+
+    We have fixed this in `StarletteRequestExtractor.form()` by consuming the body
+    first with `.body()` (to put it into the `_body` cache and then consume it with `.form()`.
+
+    If this behavior is changed in Starlette and the `request.form()` in Starlette
+    is also caching the body, this test will fail.
+
+    See also https://github.com/encode/starlette/discussions/1933
+    """
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
+    ]
+
+    messages = [
+        {"type": "http.request", "body": ""},
+        {"type": "http.disconnect"},
+    ]
+
+    starlette_request = starlette.requests.Request(scope)
+    with mock.patch.object(starlette_request, "_receive", side_effect=messages):
+        extractor = StarletteRequestExtractor(starlette_request)
+
+        await extractor.request.form()
+
+        with pytest.raises(RuntimeError):
+            await extractor.request.body()
+
+
+@pytest.mark.asyncio
 async def test_starlettrequestextractor_extract_request_info_too_big(sentry_init):
     sentry_init(
         send_default_pii=True,
