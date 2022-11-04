@@ -11,3 +11,4 @@ jsonschema==3.2.0
 pyrsistent==0.16.0 # TODO(py3): 0.17.0 requires python3, see https://github.com/tobgu/pyrsistent/issues/205
 executing
 asttokens
+ipdb

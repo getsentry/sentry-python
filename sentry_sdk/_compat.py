@@ -15,6 +15,7 @@ if MYPY:
 PY2 = sys.version_info[0] == 2
 PY33 = sys.version_info[0] == 3 and sys.version_info[1] >= 3
 PY37 = sys.version_info[0] == 3 and sys.version_info[1] >= 7
+PY310 = sys.version_info[0] == 3 and sys.version_info[1] >= 10
 
 if PY2:
     import urlparse
