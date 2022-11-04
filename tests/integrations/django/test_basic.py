@@ -834,4 +834,4 @@ def test_get_receiver_name():
 
     a_partial = partial(dummy)
     name = _get_receiver_name(a_partial)
-    assert name == str(a_partial)
+    assert name == "functools.partial(<function " + a_partial.func.__name__ + ">)"
