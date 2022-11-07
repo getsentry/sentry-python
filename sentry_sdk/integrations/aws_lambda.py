@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from os import environ
 import sys
+from sentry_sdk.consts import OP
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, Transaction
@@ -140,7 +141,7 @@ def _wrap_handler(handler):
                 headers = {}
             transaction = Transaction.continue_from_headers(
                 headers,
-                op="serverless.function",
+                op=OP.FUNCTION_AWS,
                 name=aws_context.function_name,
                 source=TRANSACTION_SOURCE_COMPONENT,
             )
@@ -377,7 +378,7 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
             if aws_event.get("body", None):
                 # Unfortunately couldn't find a way to get structured body from AWS
                 # event. Meaning every body is unstructured to us.
-                request["data"] = AnnotatedValue("", {"rem": [["!raw", "x", 0, 0]]})
+                request["data"] = AnnotatedValue.removed_because_raw_data()
 
         sentry_event["request"] = request
 

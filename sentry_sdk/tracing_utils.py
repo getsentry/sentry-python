@@ -4,8 +4,10 @@ import json
 import math
 
 from numbers import Real
+from decimal import Decimal
 
 import sentry_sdk
+from sentry_sdk.consts import OP
 
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -130,8 +132,8 @@ def is_valid_sample_rate(rate):
 
     # both booleans and NaN are instances of Real, so a) checking for Real
     # checks for the possibility of a boolean also, and b) we have to check
-    # separately for NaN
-    if not isinstance(rate, Real) or math.isnan(rate):
+    # separately for NaN and Decimal does not derive from Real so need to check that too
+    if not isinstance(rate, (Real, Decimal)) or math.isnan(rate):
         logger.warning(
             "[Tracing] Given sample rate is invalid. Sample rate must be a boolean or a number between 0 and 1. Got {rate} of type {type}.".format(
                 rate=rate, type=type(rate)
@@ -189,7 +191,7 @@ def record_sql_queries(
     with capture_internal_exceptions():
         hub.add_breadcrumb(message=query, category="query", data=data)
 
-    with hub.start_span(op="db", description=query) as span:
+    with hub.start_span(op=OP.DB, description=query) as span:
         for k, v in data.items():
             span.set_data(k, v)
         yield span
@@ -197,11 +199,11 @@ def record_sql_queries(
 
 def maybe_create_breadcrumbs_from_span(hub, span):
     # type: (sentry_sdk.Hub, Span) -> None
-    if span.op == "redis":
+    if span.op == OP.DB_REDIS:
         hub.add_breadcrumb(
             message=span.description, type="redis", category="redis", data=span._tags
         )
-    elif span.op == "http":
+    elif span.op == OP.HTTP_CLIENT:
         hub.add_breadcrumb(type="http", category="httplib", data=span._data)
     elif span.op == "subprocess":
         hub.add_breadcrumb(
@@ -459,16 +461,66 @@ class Baggage(object):
             for item in header.split(","):
                 if "=" not in item:
                     continue
-                item = item.strip()
-                key, val = item.split("=")
-                if Baggage.SENTRY_PREFIX_REGEX.match(key):
-                    baggage_key = unquote(key.split("-")[1])
-                    sentry_items[baggage_key] = unquote(val)
-                    mutable = False
-                else:
-                    third_party_items += ("," if third_party_items else "") + item
+
+                with capture_internal_exceptions():
+                    item = item.strip()
+                    key, val = item.split("=")
+                    if Baggage.SENTRY_PREFIX_REGEX.match(key):
+                        baggage_key = unquote(key.split("-")[1])
+                        sentry_items[baggage_key] = unquote(val)
+                        mutable = False
+                    else:
+                        third_party_items += ("," if third_party_items else "") + item
 
         return Baggage(sentry_items, third_party_items, mutable)
+
+    @classmethod
+    def populate_from_transaction(cls, transaction):
+        # type: (Transaction) -> Baggage
+        """
+        Populate fresh baggage entry with sentry_items and make it immutable
+        if this is the head SDK which originates traces.
+        """
+        hub = transaction.hub or sentry_sdk.Hub.current
+        client = hub.client
+        sentry_items = {}  # type: Dict[str, str]
+
+        if not client:
+            return Baggage(sentry_items)
+
+        options = client.options or {}
+        user = (hub.scope and hub.scope._user) or {}
+
+        sentry_items["trace_id"] = transaction.trace_id
+
+        if options.get("environment"):
+            sentry_items["environment"] = options["environment"]
+
+        if options.get("release"):
+            sentry_items["release"] = options["release"]
+
+        if options.get("dsn"):
+            sentry_items["public_key"] = Dsn(options["dsn"]).public_key
+
+        if (
+            transaction.name
+            and transaction.source not in LOW_QUALITY_TRANSACTION_SOURCES
+        ):
+            sentry_items["transaction"] = transaction.name
+
+        if user.get("segment"):
+            sentry_items["user_segment"] = user["segment"]
+
+        if transaction.sample_rate is not None:
+            sentry_items["sample_rate"] = str(transaction.sample_rate)
+
+        # there's an existing baggage but it was mutable,
+        # which is why we are creating this new baggage.
+        # However, if by chance the user put some sentry items in there, give them precedence.
+        if transaction._baggage and transaction._baggage.sentry_items:
+            sentry_items.update(transaction._baggage.sentry_items)
+
+        return Baggage(sentry_items, mutable=False)
 
     def freeze(self):
         # type: () -> None
@@ -490,8 +542,9 @@ class Baggage(object):
         items = []
 
         for key, val in iteritems(self.sentry_items):
-            item = Baggage.SENTRY_PREFIX + quote(key) + "=" + quote(val)
-            items.append(item)
+            with capture_internal_exceptions():
+                item = Baggage.SENTRY_PREFIX + quote(key) + "=" + quote(str(val))
+                items.append(item)
 
         if include_third_party:
             items.append(self.third_party_items)
@@ -500,6 +553,7 @@ class Baggage(object):
 
 
 # Circular imports
+from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
 
 if MYPY:
-    from sentry_sdk.tracing import Span
+    from sentry_sdk.tracing import Span, Transaction

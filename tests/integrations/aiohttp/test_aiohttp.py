@@ -249,7 +249,7 @@ async def test_traces_sampler_gets_request_object_in_sampling_context(
     sentry_init,
     aiohttp_client,
     DictionaryContaining,  # noqa:N803
-    ObjectDescribedBy,  # noqa:N803
+    ObjectDescribedBy,
 ):
     traces_sampler = mock.Mock()
     sentry_init(

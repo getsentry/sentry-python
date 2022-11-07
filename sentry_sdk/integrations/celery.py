@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import sys
+from sentry_sdk.consts import OP
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
@@ -103,7 +104,9 @@ def _wrap_apply_async(f):
         hub = Hub.current
         integration = hub.get_integration(CeleryIntegration)
         if integration is not None and integration.propagate_traces:
-            with hub.start_span(op="celery.submit", description=args[0].name) as span:
+            with hub.start_span(
+                op=OP.QUEUE_SUBMIT_CELERY, description=args[0].name
+            ) as span:
                 with capture_internal_exceptions():
                     headers = dict(hub.iter_trace_propagation_headers(span))
 
@@ -156,7 +159,7 @@ def _wrap_tracer(task, f):
             with capture_internal_exceptions():
                 transaction = Transaction.continue_from_headers(
                     args[3].get("headers") or {},
-                    op="celery.task",
+                    op=OP.QUEUE_TASK_CELERY,
                     name="unknown celery task",
                     source=TRANSACTION_SOURCE_TASK,
                 )

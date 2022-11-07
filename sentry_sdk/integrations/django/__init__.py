@@ -6,6 +6,7 @@ import threading
 import weakref
 
 from sentry_sdk._types import MYPY
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
@@ -43,6 +44,7 @@ from sentry_sdk.integrations.django.templates import (
     patch_templates,
 )
 from sentry_sdk.integrations.django.middleware import patch_django_middlewares
+from sentry_sdk.integrations.django.signals_handlers import patch_signals
 from sentry_sdk.integrations.django.views import patch_views
 
 
@@ -212,6 +214,7 @@ class DjangoIntegration(Integration):
         patch_django_middlewares()
         patch_views()
         patch_templates()
+        patch_signals()
 
 
 _DRF_PATCHED = False
@@ -579,7 +582,7 @@ def install_sql_hook():
         with capture_internal_exceptions():
             hub.add_breadcrumb(message="connect", category="query")
 
-        with hub.start_span(op="db", description="connect"):
+        with hub.start_span(op=OP.DB, description="connect"):
             return real_connect(self)
 
     CursorWrapper.execute = execute

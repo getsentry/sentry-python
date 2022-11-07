@@ -63,6 +63,8 @@ raise ValueError()  # Will also create an event in Sentry.
 - [Google Cloud Functions](https://docs.sentry.io/platforms/python/guides/gcp-functions/)
 - [WSGI](https://docs.sentry.io/platforms/python/guides/wsgi/)
 - [ASGI](https://docs.sentry.io/platforms/python/guides/asgi/)
+- [Starlette](https://docs.sentry.io/platforms/python/guides/starlette/)
+- [FastAPI](https://docs.sentry.io/platforms/python/guides/fastapi/)
 - [AIOHTTP](https://docs.sentry.io/platforms/python/guides/aiohttp/)
 - [RQ (Redis Queue)](https://docs.sentry.io/platforms/python/guides/rq/)
 - [Celery](https://docs.sentry.io/platforms/python/guides/celery/)

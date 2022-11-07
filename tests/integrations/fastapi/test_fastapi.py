@@ -124,12 +124,7 @@ def test_legacy_setup(
     # Check that behaviour does not change
     # if the user just adds the new Integrations
     # and forgets to remove SentryAsgiMiddleware
-    sentry_init(
-        integrations=[
-            StarletteIntegration(),
-            FastApiIntegration(),
-        ],
-    )
+    sentry_init()
     app = fastapi_app_factory()
     asgi_app = SentryAsgiMiddleware(app)
 

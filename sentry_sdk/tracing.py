@@ -1,13 +1,12 @@
 import uuid
 import random
+import threading
 import time
-import platform
 
 from datetime import datetime, timedelta
 
 import sentry_sdk
 
-from sentry_sdk.profiler import has_profiling_enabled
 from sentry_sdk.utils import logger
 from sentry_sdk._types import MYPY
 
@@ -21,9 +20,9 @@ if MYPY:
     from typing import List
     from typing import Tuple
     from typing import Iterator
-    from sentry_sdk.profiler import Sampler
 
-    from sentry_sdk._types import SamplingContext, MeasurementUnit
+    import sentry_sdk.profiler
+    from sentry_sdk._types import Event, SamplingContext, MeasurementUnit
 
 
 # Transaction source
@@ -34,7 +33,11 @@ TRANSACTION_SOURCE_ROUTE = "route"
 TRANSACTION_SOURCE_VIEW = "view"
 TRANSACTION_SOURCE_COMPONENT = "component"
 TRANSACTION_SOURCE_TASK = "task"
-TRANSACTION_SOURCE_UNKNOWN = "unknown"
+
+# These are typically high cardinality and the server hates them
+LOW_QUALITY_TRANSACTION_SOURCES = [
+    TRANSACTION_SOURCE_URL,
+]
 
 SOURCE_FOR_STYLE = {
     "endpoint": TRANSACTION_SOURCE_COMPONENT,
@@ -282,6 +285,10 @@ class Span(object):
 
         if sentrytrace_kwargs is not None:
             kwargs.update(sentrytrace_kwargs)
+
+            # If there's an incoming sentry-trace but no incoming baggage header,
+            # for instance in traces coming from older SDKs,
+            # baggage will be empty and immutable and won't be populated as head SDK.
             baggage.freeze()
 
         kwargs.update(extract_tracestate_data(headers.get("tracestate")))
@@ -310,8 +317,8 @@ class Span(object):
         if tracestate:
             yield "tracestate", tracestate
 
-        if self.containing_transaction and self.containing_transaction._baggage:
-            baggage = self.containing_transaction._baggage.serialize()
+        if self.containing_transaction:
+            baggage = self.containing_transaction.get_baggage().serialize()
             if baggage:
                 yield "baggage", baggage
 
@@ -514,11 +521,10 @@ class Span(object):
         if sentry_tracestate:
             rv["tracestate"] = sentry_tracestate
 
-        # TODO-neel populate fresh if head SDK
-        if self.containing_transaction and self.containing_transaction._baggage:
+        if self.containing_transaction:
             rv[
                 "dynamic_sampling_context"
-            ] = self.containing_transaction._baggage.dynamic_sampling_context()
+            ] = self.containing_transaction.get_baggage().dynamic_sampling_context()
 
         return rv
 
@@ -528,6 +534,8 @@ class Transaction(Span):
         "name",
         "source",
         "parent_sampled",
+        # used to create baggage value for head SDKs in dynamic sampling
+        "sample_rate",
         # the sentry portion of the `tracestate` header used to transmit
         # correlation context for server-side dynamic sampling, of the form
         # `sentry=xxxxx`, where `xxxxx` is the base64-encoded json of the
@@ -538,6 +546,7 @@ class Transaction(Span):
         "_measurements",
         "_profile",
         "_baggage",
+        "_active_thread_id",
     )
 
     def __init__(
@@ -547,7 +556,7 @@ class Transaction(Span):
         sentry_tracestate=None,  # type: Optional[str]
         third_party_tracestate=None,  # type: Optional[str]
         baggage=None,  # type: Optional[Baggage]
-        source=TRANSACTION_SOURCE_UNKNOWN,  # type: str
+        source=TRANSACTION_SOURCE_CUSTOM,  # type: str
         **kwargs  # type: Any
     ):
         # type: (...) -> None
@@ -563,6 +572,7 @@ class Transaction(Span):
         Span.__init__(self, **kwargs)
         self.name = name
         self.source = source
+        self.sample_rate = None  # type: Optional[float]
         self.parent_sampled = parent_sampled
         # if tracestate isn't inherited and set here, it will get set lazily,
         # either the first time an outgoing request needs it for a header or the
@@ -570,8 +580,13 @@ class Transaction(Span):
         self._sentry_tracestate = sentry_tracestate
         self._third_party_tracestate = third_party_tracestate
         self._measurements = {}  # type: Dict[str, Any]
-        self._profile = None  # type: Optional[Sampler]
+        self._profile = None  # type: Optional[sentry_sdk.profiler.Profile]
         self._baggage = baggage
+        # for profiling, we want to know on which thread a transaction is started
+        # to accurately show the active thread in the UI
+        self._active_thread_id = (
+            threading.current_thread().ident
+        )  # used by profiling.py
 
     def __repr__(self):
         # type: () -> str
@@ -661,28 +676,10 @@ class Transaction(Span):
             "timestamp": self.timestamp,
             "start_timestamp": self.start_timestamp,
             "spans": finished_spans,
-        }
+        }  # type: Event
 
-        if (
-            has_profiling_enabled(hub)
-            and hub.client is not None
-            and self._profile is not None
-        ):
-            event["profile"] = {
-                "device_os_name": platform.system(),
-                "device_os_version": platform.release(),
-                "duration_ns": self._profile.duration,
-                "environment": hub.client.options["environment"],
-                "platform": "python",
-                "platform_version": platform.python_version(),
-                "profile_id": uuid.uuid4().hex,
-                "profile": self._profile.to_json(),
-                "trace_id": self.trace_id,
-                "transaction_id": None,  # Gets added in client.py
-                "transaction_name": self.name,
-                "version_code": "",  # TODO: Determine appropriate value. Currently set to empty string so profile will not get rejected.
-                "version_name": None,  # Gets added in client.py
-            }
+        if hub.client is not None and self._profile is not None:
+            event["profile"] = self._profile
 
         if has_custom_measurements_enabled():
             event["measurements"] = self._measurements
@@ -708,6 +705,17 @@ class Transaction(Span):
         rv["sampled"] = self.sampled
 
         return rv
+
+    def get_baggage(self):
+        # type: () -> Baggage
+        """
+        The first time a new baggage with sentry items is made,
+        it will be frozen.
+        """
+        if not self._baggage or self._baggage.mutable:
+            self._baggage = Baggage.populate_from_transaction(self)
+
+        return self._baggage
 
     def _set_initial_sampling_decision(self, sampling_context):
         # type: (SamplingContext) -> None
@@ -746,6 +754,7 @@ class Transaction(Span):
         # if the user has forced a sampling decision by passing a `sampled`
         # value when starting the transaction, go with that
         if self.sampled is not None:
+            self.sample_rate = float(self.sampled)
             return
 
         # we would have bailed already if neither `traces_sampler` nor
@@ -773,6 +782,8 @@ class Transaction(Span):
             )
             self.sampled = False
             return
+
+        self.sample_rate = float(sample_rate)
 
         # if the function returned 0 (or false), or if `traces_sample_rate` is
         # 0, it's a sign the transaction should be dropped

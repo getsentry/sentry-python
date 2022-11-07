@@ -7,6 +7,7 @@ from django import VERSION as DJANGO_VERSION
 from sentry_sdk import Hub
 from sentry_sdk._functools import wraps
 from sentry_sdk._types import MYPY
+from sentry_sdk.consts import OP
 from sentry_sdk.utils import (
     ContextVar,
     transaction_from_function,
@@ -88,7 +89,7 @@ def _wrap_middleware(middleware, middleware_name):
             description = "{}.{}".format(description, function_basename)
 
         middleware_span = hub.start_span(
-            op="django.middleware", description=description
+            op=OP.MIDDLEWARE_DJANGO, description=description
         )
         middleware_span.set_tag("django.function_name", function_name)
         middleware_span.set_tag("django.middleware_name", middleware_name)

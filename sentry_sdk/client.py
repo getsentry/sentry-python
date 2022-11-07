@@ -10,6 +10,7 @@ from sentry_sdk.utils import (
     current_stacktrace,
     disable_capture_event,
     format_timestamp,
+    get_sdk_name,
     get_type_name,
     get_default_release,
     handle_in_app,
@@ -17,11 +18,16 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.transport import make_transport
-from sentry_sdk.consts import DEFAULT_OPTIONS, SDK_INFO, ClientConstructor
+from sentry_sdk.consts import (
+    DEFAULT_OPTIONS,
+    VERSION,
+    ClientConstructor,
+)
 from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
+from sentry_sdk.profiler import setup_profiler
 from sentry_sdk.tracing_utils import has_tracestate_enabled, reinflate_tracestate
 
 from sentry_sdk._types import MYPY
@@ -38,6 +44,13 @@ if MYPY:
 
 
 _client_init_debug = ContextVar("client_init_debug")
+
+
+SDK_INFO = {
+    "name": "sentry.python",  # SDK name will be overridden after integrations have been loaded with sentry_sdk.integrations.setup_integrations()
+    "version": VERSION,
+    "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
+}
 
 
 def _get_options(*args, **kwargs):
@@ -127,8 +140,20 @@ class _Client(object):
                     "auto_enabling_integrations"
                 ],
             )
+
+            sdk_name = get_sdk_name(list(self.integrations.keys()))
+            SDK_INFO["name"] = sdk_name
+            logger.debug("Setting SDK name to '%s'", sdk_name)
+
         finally:
             _client_init_debug.set(old_debug)
+
+        profiles_sample_rate = self.options["_experiments"].get("profiles_sample_rate")
+        if profiles_sample_rate is not None and profiles_sample_rate > 0:
+            try:
+                setup_profiler(self.options)
+            except ValueError as e:
+                logger.debug(str(e))
 
     @property
     def dsn(self):
@@ -349,6 +374,8 @@ class _Client(object):
         if not self._should_capture(event, hint, scope):
             return None
 
+        profile = event.pop("profile", None)
+
         event_opt = self._prepare_event(event, hint, scope)
         if event_opt is None:
             return None
@@ -401,10 +428,8 @@ class _Client(object):
             envelope = Envelope(headers=headers)
 
             if is_transaction:
-                if "profile" in event_opt:
-                    event_opt["profile"]["transaction_id"] = event_opt["event_id"]
-                    event_opt["profile"]["version_name"] = event_opt.get("release", "")
-                    envelope.add_profile(event_opt.pop("profile"))
+                if profile is not None:
+                    envelope.add_profile(profile.to_json(event_opt))
                 envelope.add_transaction(event_opt)
             else:
                 envelope.add_event(event_opt)

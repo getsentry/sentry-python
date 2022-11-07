@@ -5,6 +5,7 @@ import functools
 
 from sentry_sdk._compat import iteritems
 from sentry_sdk._types import MYPY
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import (
@@ -12,9 +13,8 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
-    TRANSACTION_SOURCE_ROUTE,
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
@@ -49,7 +49,7 @@ except ImportError:
 
 try:
     # Optional dependency of Starlette to parse form data.
-    import multipart  # type: ignore # noqa: F401
+    import multipart  # type: ignore
 except ImportError:
     multipart = None
 
@@ -85,21 +85,52 @@ def _enable_span_for_middleware(middleware_class):
     # type: (Any) -> type
     old_call = middleware_class.__call__
 
-    async def _create_span_call(*args, **kwargs):
-        # type: (Any, Any) -> None
+    async def _create_span_call(app, scope, receive, send, **kwargs):
+        # type: (Any, Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]], Any) -> None
         hub = Hub.current
         integration = hub.get_integration(StarletteIntegration)
         if integration is not None:
-            middleware_name = args[0].__class__.__name__
+            middleware_name = app.__class__.__name__
+
             with hub.start_span(
-                op="starlette.middleware", description=middleware_name
+                op=OP.MIDDLEWARE_STARLETTE, description=middleware_name
             ) as middleware_span:
                 middleware_span.set_tag("starlette.middleware_name", middleware_name)
 
-                await old_call(*args, **kwargs)
+                # Creating spans for the "receive" callback
+                async def _sentry_receive(*args, **kwargs):
+                    # type: (*Any, **Any) -> Any
+                    hub = Hub.current
+                    with hub.start_span(
+                        op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
+                        description=getattr(receive, "__qualname__", str(receive)),
+                    ) as span:
+                        span.set_tag("starlette.middleware_name", middleware_name)
+                        return await receive(*args, **kwargs)
+
+                receive_name = getattr(receive, "__name__", str(receive))
+                receive_patched = receive_name == "_sentry_receive"
+                new_receive = _sentry_receive if not receive_patched else receive
+
+                # Creating spans for the "send" callback
+                async def _sentry_send(*args, **kwargs):
+                    # type: (*Any, **Any) -> Any
+                    hub = Hub.current
+                    with hub.start_span(
+                        op=OP.MIDDLEWARE_STARLETTE_SEND,
+                        description=getattr(send, "__qualname__", str(send)),
+                    ) as span:
+                        span.set_tag("starlette.middleware_name", middleware_name)
+                        return await send(*args, **kwargs)
+
+                send_name = getattr(send, "__name__", str(send))
+                send_patched = send_name == "_sentry_send"
+                new_send = _sentry_send if not send_patched else send
+
+                return await old_call(app, scope, new_receive, new_send, **kwargs)
 
         else:
-            await old_call(*args, **kwargs)
+            return await old_call(app, scope, receive, send, **kwargs)
 
     not_yet_patched = old_call.__name__ not in [
         "_create_span_call",
@@ -147,7 +178,9 @@ def patch_exception_middleware(middleware_class):
             # type: (Any, Any, Any) -> None
             exp = args[0]
 
-            is_http_server_error = hasattr(exp, "staus_code") and exp.status_code >= 500
+            is_http_server_error = (
+                hasattr(exp, "status_code") and exp.status_code >= 500
+            )
             if is_http_server_error:
                 _capture_exception(exp, handled=True)
 
@@ -256,6 +289,9 @@ def patch_middlewares():
 
         def _sentry_middleware_init(self, cls, **options):
             # type: (Any, Any, Any) -> None
+            if cls == SentryAsgiMiddleware:
+                return old_middleware_init(self, cls, **options)
+
             span_enabled_cls = _enable_span_for_middleware(cls)
             old_middleware_init(self, span_enabled_cls, **options)
 
@@ -284,6 +320,7 @@ def patch_asgi_app():
             lambda *a, **kw: old_app(self, *a, **kw),
             mechanism_type=StarletteIntegration.identifier,
         )
+
         middleware.__call__ = middleware._run_asgi3
         return await middleware(scope, receive, send)
 
@@ -433,49 +470,40 @@ class StarletteRequestExtractor:
         if client is None:
             return None
 
-        data = None  # type: Union[Dict[str, Any], AnnotatedValue, None]
-
-        content_length = await self.content_length()
         request_info = {}  # type: Dict[str, Any]
 
         with capture_internal_exceptions():
             if _should_send_default_pii():
                 request_info["cookies"] = self.cookies()
 
-            if not request_body_within_bounds(client, content_length):
-                data = AnnotatedValue(
-                    "",
-                    {
-                        "rem": [["!config", "x", 0, content_length]],
-                        "len": content_length,
-                    },
-                )
-            else:
-                parsed_body = await self.parsed_body()
-                if parsed_body is not None:
-                    data = parsed_body
-                elif await self.raw_data():
-                    data = AnnotatedValue(
-                        "",
-                        {
-                            "rem": [["!raw", "x", 0, content_length]],
-                            "len": content_length,
-                        },
-                    )
-                else:
-                    data = None
+            content_length = await self.content_length()
 
-            if data is not None:
-                request_info["data"] = data
+            if content_length:
+                data = None  # type: Union[Dict[str, Any], AnnotatedValue, None]
+
+                if not request_body_within_bounds(client, content_length):
+                    data = AnnotatedValue.removed_because_over_size_limit()
+
+                else:
+                    parsed_body = await self.parsed_body()
+                    if parsed_body is not None:
+                        data = parsed_body
+                    elif await self.raw_data():
+                        data = AnnotatedValue.removed_because_raw_data()
+                    else:
+                        data = None
+
+                if data is not None:
+                    request_info["data"] = data
 
         return request_info
 
     async def content_length(self):
-        # type: (StarletteRequestExtractor) -> int
-        raw_data = await self.raw_data()
-        if raw_data is None:
-            return 0
-        return len(raw_data)
+        # type: (StarletteRequestExtractor) -> Optional[int]
+        if "content-length" in self.request.headers:
+            return int(self.request.headers["content-length"])
+
+        return None
 
     def cookies(self):
         # type: (StarletteRequestExtractor) -> Dict[str, Any]
@@ -520,10 +548,7 @@ class StarletteRequestExtractor:
             data = {}
             for key, val in iteritems(form):
                 if isinstance(val, UploadFile):
-                    size = len(await val.read())
-                    data[key] = AnnotatedValue(
-                        "", {"len": size, "rem": [["!raw", "x", 0, size]]}
-                    )
+                    data[key] = AnnotatedValue.removed_because_raw_data()
                 else:
                     data[key] = val
 

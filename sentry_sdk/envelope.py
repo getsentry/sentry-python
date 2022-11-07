@@ -252,6 +252,8 @@ class Item(object):
             return "error"
         elif ty == "client_report":
             return "internal"
+        elif ty == "profile":
+            return "profile"
         else:
             return "default"
 
