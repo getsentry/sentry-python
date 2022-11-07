@@ -19,13 +19,17 @@ def _get_receiver_name(receiver):
     name = ""
 
     if hasattr(receiver, "__qualname__"):
-        name += receiver.__qualname__
+        name = receiver.__qualname__
     elif hasattr(receiver, "__name__"):  # Python 2.7 has no __qualname__
-        name += receiver.__name__
+        name = receiver.__name__
+    elif hasattr(
+        receiver, "func"
+    ):  # certain functions (like partials) dont have a name
+        name = "partial(<function " + receiver.func.__name__ + ">)"  # type: ignore
 
     if (
         name == ""
-    ):  # certain functions (like partials) dont have a name so return the string representation
+    ):  # In case nothing was found, return the string representation (this is the slowest case)
         return str(receiver)
 
     if hasattr(receiver, "__module__"):  # prepend with module, if there is one
