@@ -47,6 +47,10 @@ FORM_RECEIVE_MESSAGES = [
     {"type": "http.disconnect"},
 ]
 
+JSON_RECEIVE_MESSAGES = [
+    {"type": "http.request", "body": json.dumps(BODY_JSON).encode("utf-8")},
+    {"type": "http.disconnect"},
+]
 
 PARSED_FORM = starlette.datastructures.FormData(
     [
@@ -222,15 +226,15 @@ class SamplePartialReceiveSendMiddleware:
 
 @pytest.mark.asyncio
 async def test_starlettrequestextractor_content_length(sentry_init):
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(json.dumps(BODY_JSON)),
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
+    ]
+    starlette_request = starlette.requests.Request(scope)
+
+    with mock.patch.object(
+        starlette_request, "_receive", side_effect=JSON_RECEIVE_MESSAGES
     ):
-        scope = SCOPE.copy()
-        scope["headers"] = [
-            [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
-        ]
-        starlette_request = starlette.requests.Request(scope)
         extractor = StarletteRequestExtractor(starlette_request)
 
         assert await extractor.content_length() == len(json.dumps(BODY_JSON))
@@ -249,22 +253,24 @@ async def test_starlettrequestextractor_cookies(sentry_init):
 
 @pytest.mark.asyncio
 async def test_starlettrequestextractor_json(sentry_init):
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(json.dumps(BODY_JSON)),
+    starlette_request = starlette.requests.Request(SCOPE)
+    with mock.patch.object(
+        starlette_request, "_receive", side_effect=JSON_RECEIVE_MESSAGES
     ):
-        starlette_request = starlette.requests.Request(SCOPE)
         extractor = StarletteRequestExtractor(starlette_request)
 
         assert extractor.is_json()
         assert await extractor.json() == BODY_JSON
 
 
+# AND change all mocks of `.stream` to mock `.receive` instead
+
+
 @pytest.mark.asyncio
 async def test_starlettrequestextractor_parsed_body_json(sentry_init):
     starlette_request = starlette.requests.Request(SCOPE)
     with mock.patch.object(
-        starlette_request, "_receive", side_effect=FORM_RECEIVE_MESSAGES
+        starlette_request, "_receive", side_effect=JSON_RECEIVE_MESSAGES
     ):
         extractor = StarletteRequestExtractor(starlette_request)
 
@@ -315,11 +321,10 @@ async def test_starlettrequestextractor_form(sentry_init):
 
 @pytest.mark.asyncio
 async def test_starlettrequestextractor_raw_data(sentry_init):
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(json.dumps(BODY_JSON)),
+    starlette_request = starlette.requests.Request(SCOPE)
+    with mock.patch.object(
+        starlette_request, "_receive", side_effect=JSON_RECEIVE_MESSAGES
     ):
-        starlette_request = starlette.requests.Request(SCOPE)
         extractor = StarletteRequestExtractor(starlette_request)
 
         assert await extractor.raw_data() == bytes(json.dumps(BODY_JSON), "utf-8")
@@ -373,11 +378,10 @@ async def test_starlettrequestextractor_extract_request_info_too_big(sentry_init
         [b"content-length", str(len(BODY_FORM)).encode()],
         [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
     ]
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(BODY_FORM),
+    starlette_request = starlette.requests.Request(scope)
+    with mock.patch.object(
+        starlette_request, "_receive", side_effect=FORM_RECEIVE_MESSAGES
     ):
-        starlette_request = starlette.requests.Request(scope)
         extractor = StarletteRequestExtractor(starlette_request)
 
         request_info = await extractor.extract_request_info()
@@ -404,11 +408,10 @@ async def test_starlettrequestextractor_extract_request_info(sentry_init):
         [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
     ]
 
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(json.dumps(BODY_JSON)),
+    starlette_request = starlette.requests.Request(scope)
+    with mock.patch.object(
+        starlette_request, "_receive", side_effect=JSON_RECEIVE_MESSAGES
     ):
-        starlette_request = starlette.requests.Request(scope)
         extractor = StarletteRequestExtractor(starlette_request)
 
         request_info = await extractor.extract_request_info()
@@ -434,11 +437,10 @@ async def test_starlettrequestextractor_extract_request_info_no_pii(sentry_init)
         [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
     ]
 
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(json.dumps(BODY_JSON)),
+    starlette_request = starlette.requests.Request(scope)
+    with mock.patch.object(
+        starlette_request, "_receive", side_effect=JSON_RECEIVE_MESSAGES
     ):
-        starlette_request = starlette.requests.Request(scope)
         extractor = StarletteRequestExtractor(starlette_request)
 
         request_info = await extractor.extract_request_info()
