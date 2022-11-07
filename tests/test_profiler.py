@@ -211,7 +211,22 @@ class DummySampleBuffer(SampleBuffer):
 )
 def test_thread_scheduler_takes_first_samples(scheduler_class):
     sample_buffer = DummySampleBuffer(
-        capacity=1, sample_data=[(0, [(0, (RawFrameData("/path/to/file.py", "file.py", "name", 1, "file"),))])]
+        capacity=1,
+        sample_data=[
+            (
+                0,
+                [
+                    (
+                        0,
+                        (
+                            RawFrameData(
+                                "/path/to/file.py", "file.py", "name", 1, "file"
+                            ),
+                        ),
+                    )
+                ],
+            )
+        ],
     )
     scheduler = scheduler_class(sample_buffer=sample_buffer, frequency=1000)
     assert scheduler.start_profiling()
@@ -237,7 +252,22 @@ def test_thread_scheduler_takes_first_samples(scheduler_class):
 def test_thread_scheduler_takes_more_samples(scheduler_class):
     sample_buffer = DummySampleBuffer(
         capacity=10,
-        sample_data=[(i, [(0, (RawFrameData("/path/to/file.py", "file.py", "name", 1, "file"),))]) for i in range(3)],
+        sample_data=[
+            (
+                i,
+                [
+                    (
+                        0,
+                        (
+                            RawFrameData(
+                                "/path/to/file.py", "file.py", "name", 1, "file"
+                            ),
+                        ),
+                    )
+                ],
+            )
+            for i in range(3)
+        ],
     )
     scheduler = scheduler_class(sample_buffer=sample_buffer, frequency=1000)
     assert scheduler.start_profiling()
@@ -330,7 +360,21 @@ thread_metadata = {
             10,
             0,
             1,
-            [(2, [("1", (RawFrameData("/path/to/file.py", "file.py", "name", 1, "file"),))])],
+            [
+                (
+                    2,
+                    [
+                        (
+                            "1",
+                            (
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name", 1, "file"
+                                ),
+                            ),
+                        )
+                    ],
+                )
+            ],
             {
                 "frames": [],
                 "samples": [],
@@ -343,7 +387,21 @@ thread_metadata = {
             10,
             0,
             1,
-            [(0, [("1", (RawFrameData("/path/to/file.py", "file.py", "name", 1, "file"),))])],
+            [
+                (
+                    0,
+                    [
+                        (
+                            "1",
+                            (
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name", 1, "file"
+                                ),
+                            ),
+                        )
+                    ],
+                )
+            ],
             {
                 "frames": [
                     {
@@ -371,8 +429,32 @@ thread_metadata = {
             0,
             1,
             [
-                (0, [("1", (RawFrameData("/path/to/file.py", "file.py", "name", 1, "file"),))]),
-                (1, [("1", (RawFrameData("/path/to/file.py", "file.py", "name", 1, "file"),))]),
+                (
+                    0,
+                    [
+                        (
+                            "1",
+                            (
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name", 1, "file"
+                                ),
+                            ),
+                        )
+                    ],
+                ),
+                (
+                    1,
+                    [
+                        (
+                            "1",
+                            (
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name", 1, "file"
+                                ),
+                            ),
+                        )
+                    ],
+                ),
             ],
             {
                 "frames": [
@@ -406,15 +488,31 @@ thread_metadata = {
             0,
             1,
             [
-                (0, [("1", (RawFrameData("/path/to/file.py", "file.py", "name1", 1, "file"),))]),
+                (
+                    0,
+                    [
+                        (
+                            "1",
+                            (
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name1", 1, "file"
+                                ),
+                            ),
+                        )
+                    ],
+                ),
                 (
                     1,
                     [
                         (
                             "1",
                             (
-                                RawFrameData("/path/to/file.py", "file.py", "name1", 1, "file"),
-                                RawFrameData("/path/to/file.py", "file.py", "name2", 2, "file")
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name1", 1, "file"
+                                ),
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name2", 2, "file"
+                                ),
                             ),
                         )
                     ],
@@ -465,8 +563,12 @@ thread_metadata = {
                         (
                             "1",
                             (
-                                RawFrameData("/path/to/file.py", "file.py", "name1", 1, "file"),
-                                RawFrameData("/path/to/file.py", "file.py", "name2", 2, "file")
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name1", 1, "file"
+                                ),
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name2", 2, "file"
+                                ),
                             ),
                         )
                     ],
@@ -477,8 +579,12 @@ thread_metadata = {
                         (
                             "1",
                             (
-                                RawFrameData("/path/to/file.py", "file.py", "name3", 3, "file"),
-                                RawFrameData("/path/to/file.py", "file.py", "name4", 4, "file")
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name3", 3, "file"
+                                ),
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name4", 4, "file"
+                                ),
                             ),
                         )
                     ],
@@ -537,15 +643,31 @@ thread_metadata = {
             0,
             1,
             [
-                (0, [("1", (RawFrameData("/path/to/file.py", "file.py", "name1", 1, "file"),))]),
+                (
+                    0,
+                    [
+                        (
+                            "1",
+                            (
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name1", 1, "file"
+                                ),
+                            ),
+                        )
+                    ],
+                ),
                 (
                     1,
                     [
                         (
                             "1",
                             (
-                                RawFrameData("/path/to/file.py", "file.py", "name2", 2, "file"),
-                                RawFrameData("/path/to/file.py", "file.py", "name3", 3, "file")
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name2", 2, "file"
+                                ),
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name3", 3, "file"
+                                ),
                             ),
                         )
                     ],
