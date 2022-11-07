@@ -16,7 +16,7 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
-from sentry_sdk._compat import PY2
+from sentry_sdk._compat import PY2, PY310
 from sentry_sdk import capture_message, capture_exception, configure_scope
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
@@ -834,4 +834,7 @@ def test_get_receiver_name():
 
     a_partial = partial(dummy)
     name = _get_receiver_name(a_partial)
-    assert name == str(a_partial)
+    if PY310:
+        assert name == "functools.partial(<function " + a_partial.func.__name__ + ">)"
+    else:
+        assert name == "partial(<function " + a_partial.func.__name__ + ">)"

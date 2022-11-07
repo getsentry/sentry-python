@@ -21,7 +21,7 @@ if MYPY:
 def extension_relay_dsn(original_dsn):
     dsn = Dsn(original_dsn)
     dsn.host = "localhost"
-    dsn.port = 3000
+    dsn.port = 5333
     dsn.scheme = "http"
     return str(dsn)
 
