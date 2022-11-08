@@ -19,7 +19,6 @@ from sentry_sdk.integrations.starlette import (
     StarletteIntegration,
     StarletteRequestExtractor,
 )
-from sentry_sdk.utils import AnnotatedValue
 
 starlette = pytest.importorskip("starlette")
 from starlette.authentication import (
@@ -66,11 +65,6 @@ PARSED_FORM = starlette.datastructures.FormData(
         ),
     ]
 )
-PARSED_BODY = {
-    "username": "Jane",
-    "password": "hello123",
-    "photo": AnnotatedValue("", {"rem": [["!raw", "x"]]}),
-}
 
 # Dummy ASGI scope for creating mock Starlette requests
 SCOPE = {
@@ -266,45 +260,6 @@ async def test_starlettrequestextractor_json(sentry_init):
     assert await extractor.json() == BODY_JSON
 
 
-# AND change all mocks of `.stream` to mock `.receive` instead
-
-
-@pytest.mark.asyncio
-async def test_starlettrequestextractor_parsed_body_json(sentry_init):
-    starlette_request = starlette.requests.Request(SCOPE)
-
-    # Mocking async `_receive()` that works in Python 3.7+
-    side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
-    starlette_request._receive = mock.Mock(side_effect=side_effect)
-
-    extractor = StarletteRequestExtractor(starlette_request)
-
-    parsed_body = await extractor.parsed_body()
-    assert parsed_body == BODY_JSON
-
-
-@pytest.mark.asyncio
-async def test_starlettrequestextractor_parsed_body_form(sentry_init):
-    scope = SCOPE.copy()
-    scope["headers"] = [
-        [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
-    ]
-
-    starlette_request = starlette.requests.Request(scope)
-
-    # Mocking async `_receive()` that works in Python 3.7+
-    side_effect = [_mock_receive(msg) for msg in FORM_RECEIVE_MESSAGES]
-    starlette_request._receive = mock.Mock(side_effect=side_effect)
-
-    extractor = StarletteRequestExtractor(starlette_request)
-
-    parsed_body = await extractor.parsed_body()
-    assert parsed_body.keys() == PARSED_BODY.keys()
-    assert parsed_body["username"] == PARSED_BODY["username"]
-    assert parsed_body["password"] == PARSED_BODY["password"]
-    assert parsed_body["photo"].metadata == PARSED_BODY["photo"].metadata
-
-
 @pytest.mark.asyncio
 async def test_starlettrequestextractor_form(sentry_init):
     scope = SCOPE.copy()
@@ -326,19 +281,6 @@ async def test_starlettrequestextractor_form(sentry_init):
     assert form_data["username"] == PARSED_FORM["username"]
     assert form_data["password"] == PARSED_FORM["password"]
     assert form_data["photo"].filename == PARSED_FORM["photo"].filename
-
-
-@pytest.mark.asyncio
-async def test_starlettrequestextractor_raw_data(sentry_init):
-    starlette_request = starlette.requests.Request(SCOPE)
-
-    # Mocking async `_receive()` that works in Python 3.7+
-    side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
-    starlette_request._receive = mock.Mock(side_effect=side_effect)
-
-    extractor = StarletteRequestExtractor(starlette_request)
-
-    assert await extractor.raw_data() == bytes(json.dumps(BODY_JSON), "utf-8")
 
 
 @pytest.mark.asyncio
@@ -745,6 +687,7 @@ def test_middleware_callback_spans(sentry_init, capture_events):
         idx += 1
 
 
+@pytest.mark.skip
 def test_middleware_receive_send(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
@@ -763,6 +706,7 @@ def test_middleware_receive_send(sentry_init, capture_events):
         pass
 
 
+@pytest.mark.skip
 def test_middleware_partial_receive_send(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,

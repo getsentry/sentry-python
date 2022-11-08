@@ -370,7 +370,8 @@ def patch_request_response():
                             # Add info from request to event
                             request_info = event.get("request", {})
                             if info:
-                                request_info["cookies"] = info["cookies"]
+                                if "cookies" in info:
+                                    request_info["cookies"] = info["cookies"]
                                 request_info["data"] = info["data"]
                             event["request"] = request_info
 
@@ -474,21 +475,19 @@ class StarletteRequestExtractor:
             # Add cookies
             if _should_send_default_pii():
                 request_info["cookies"] = self.cookies()
-            else:
-                request_info["cookies"] = None
 
             # Add annotation if body is too big
             content_length = await self.content_length()
             if content_length and not request_body_within_bounds(
                 client, content_length
             ):
-                request_info["body"] = AnnotatedValue.removed_because_over_size_limit()
+                request_info["data"] = AnnotatedValue.removed_because_over_size_limit()
                 return request_info
 
             # Add JSON body, if it is a JSON request
             json = await self.json()
             if json:
-                request_info["body"] = json
+                request_info["data"] = json
                 return request_info
 
             # Add form as key/value pairs, if request has form data
@@ -503,11 +502,11 @@ class StarletteRequestExtractor:
                         else AnnotatedValue.removed_because_raw_data()
                     )
 
-                request_info["body"] = form_data
+                request_info["data"] = form_data
                 return request_info
 
             # Raw data, do not add body just an annotation
-            request_info["body"] = AnnotatedValue.removed_because_raw_data()
+            request_info["data"] = AnnotatedValue.removed_because_raw_data()
             return request_info
 
     async def content_length(self):
