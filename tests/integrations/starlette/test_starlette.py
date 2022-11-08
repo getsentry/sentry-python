@@ -88,8 +88,7 @@ SCOPE = {
 }
 
 
-@asyncio.coroutine
-def _mock_receive(msg):
+async def _mock_receive(msg):
     return msg
 
 
@@ -687,7 +686,6 @@ def test_middleware_callback_spans(sentry_init, capture_events):
         idx += 1
 
 
-@pytest.mark.skip
 def test_middleware_receive_send(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
@@ -706,7 +704,6 @@ def test_middleware_receive_send(sentry_init, capture_events):
         pass
 
 
-@pytest.mark.skip
 def test_middleware_partial_receive_send(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,

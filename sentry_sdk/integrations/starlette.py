@@ -372,7 +372,8 @@ def patch_request_response():
                             if info:
                                 if "cookies" in info:
                                     request_info["cookies"] = info["cookies"]
-                                request_info["data"] = info["data"]
+                                if "data" in info:
+                                    request_info["data"] = info["data"]
                             event["request"] = request_info
 
                             _set_transaction_name_and_source(
@@ -476,8 +477,12 @@ class StarletteRequestExtractor:
             if _should_send_default_pii():
                 request_info["cookies"] = self.cookies()
 
-            # Add annotation if body is too big
+            # If there is no body, just return the cookies
             content_length = await self.content_length()
+            if not content_length:
+                return request_info
+
+            # Add annotation if body is too big
             if content_length and not request_body_within_bounds(
                 client, content_length
             ):
