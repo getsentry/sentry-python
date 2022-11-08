@@ -13,6 +13,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 """
 
 import atexit
+import os
 import platform
 import random
 import signal
@@ -27,9 +28,15 @@ import sentry_sdk
 from sentry_sdk._compat import PY33
 from sentry_sdk._queue import Queue
 from sentry_sdk._types import MYPY
-from sentry_sdk.utils import nanosecond_time
+from sentry_sdk.utils import (
+    filename_for_module,
+    handle_in_app_impl,
+    nanosecond_time,
+)
 
-RawFrameData = namedtuple("RawFrameData", ["function", "abs_path", "lineno"])
+RawFrameData = namedtuple(
+    "RawFrameData", ["abs_path", "filename", "function", "lineno", "module"]
+)
 
 if MYPY:
     from types import FrameType
@@ -61,9 +68,11 @@ if MYPY:
     ProcessedFrame = TypedDict(
         "ProcessedFrame",
         {
+            "abs_path": str,
+            "filename": Optional[str],
             "function": str,
-            "filename": str,
             "lineno": int,
+            "module": Optional[str],
         },
     )
 
@@ -162,13 +171,24 @@ def extract_stack(frame, max_stack_depth=MAX_STACK_DEPTH):
         stack.append(frame)
         frame = frame.f_back
 
-    return tuple(
-        RawFrameData(
-            function=get_frame_name(frame),
-            abs_path=frame.f_code.co_filename,
-            lineno=frame.f_lineno,
-        )
-        for frame in stack
+    return tuple(extract_frame(frame) for frame in stack)
+
+
+def extract_frame(frame):
+    # type: (FrameType) -> RawFrameData
+    abs_path = frame.f_code.co_filename
+
+    try:
+        module = frame.f_globals["__name__"]
+    except Exception:
+        module = None
+
+    return RawFrameData(
+        abs_path=os.path.abspath(abs_path),
+        filename=filename_for_module(module, abs_path) or None,
+        function=get_frame_name(frame),
+        lineno=frame.f_lineno,
+        module=module,
     )
 
 
@@ -243,18 +263,24 @@ class Profile(object):
         self.scheduler.stop_profiling()
         self._stop_ns = nanosecond_time()
 
-    def to_json(self, event_opt):
-        # type: (Any) -> Dict[str, Any]
+    def to_json(self, event_opt, options):
+        # type: (Any, Dict[str, Any]) -> Dict[str, Any]
         assert self._start_ns is not None
         assert self._stop_ns is not None
+
+        profile = self.scheduler.sample_buffer.slice_profile(
+            self._start_ns, self._stop_ns
+        )
+
+        handle_in_app_impl(
+            profile["frames"], options["in_app_exclude"], options["in_app_include"]
+        )
 
         return {
             "environment": event_opt.get("environment"),
             "event_id": uuid.uuid4().hex,
             "platform": "python",
-            "profile": self.scheduler.sample_buffer.slice_profile(
-                self._start_ns, self._stop_ns
-            ),
+            "profile": profile,
             "release": event_opt.get("release", ""),
             "timestamp": event_opt["timestamp"],
             "version": "1",
@@ -358,9 +384,11 @@ class SampleBuffer(object):
                             frames[frame] = len(frames)
                             frames_list.append(
                                 {
-                                    "function": frame.function,
-                                    "filename": frame.abs_path,
+                                    "abs_path": frame.abs_path,
+                                    "function": frame.function or "<unknown>",
+                                    "filename": frame.filename,
                                     "lineno": frame.lineno,
+                                    "module": frame.module,
                                 }
                             )
 
