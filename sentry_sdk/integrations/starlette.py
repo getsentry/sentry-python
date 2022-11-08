@@ -478,8 +478,10 @@ class StarletteRequestExtractor:
                 request_info["cookies"] = None
 
             # Add annotation if body is too big
-            content_length = self.content_length()
-            if not request_body_within_bounds(client, content_length):
+            content_length = await self.content_length()
+            if content_length and not request_body_within_bounds(
+                client, content_length
+            ):
                 request_info["body"] = AnnotatedValue.removed_because_over_size_limit()
                 return request_info
 
@@ -508,7 +510,7 @@ class StarletteRequestExtractor:
             request_info["body"] = AnnotatedValue.removed_because_raw_data()
             return request_info
 
-    def content_length(self):
+    async def content_length(self):
         # type: (StarletteRequestExtractor) -> Optional[int]
         if "content-length" in self.request.headers:
             return int(self.request.headers["content-length"])

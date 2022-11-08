@@ -229,7 +229,8 @@ class SamplePartialReceiveSendMiddleware:
         await self.app(scope, partial_receive, partial_send)
 
 
-def test_starlettrequestextractor_content_length(sentry_init):
+@pytest.mark.asyncio
+async def test_starlettrequestextractor_content_length(sentry_init):
     scope = SCOPE.copy()
     scope["headers"] = [
         [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
@@ -237,7 +238,7 @@ def test_starlettrequestextractor_content_length(sentry_init):
     starlette_request = starlette.requests.Request(scope)
     extractor = StarletteRequestExtractor(starlette_request)
 
-    assert extractor.content_length() == len(json.dumps(BODY_JSON))
+    assert await extractor.content_length() == len(json.dumps(BODY_JSON))
 
 
 @pytest.mark.asyncio
