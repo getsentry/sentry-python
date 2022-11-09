@@ -121,7 +121,7 @@ def setup_profiler(options):
     # a capcity of `buffer_secs * frequency`.
     _sample_buffer = SampleBuffer(capacity=buffer_secs * frequency)
 
-    profiler_mode = options["_experiments"].get("profiler_mode", SigprofScheduler.mode)
+    profiler_mode = options["_experiments"].get("profiler_mode", SleepScheduler.mode)
     if profiler_mode == SigprofScheduler.mode:
         _scheduler = SigprofScheduler(sample_buffer=_sample_buffer, frequency=frequency)
     elif profiler_mode == SigalrmScheduler.mode:
