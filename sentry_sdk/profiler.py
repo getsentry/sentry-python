@@ -31,6 +31,7 @@ from sentry_sdk._types import MYPY
 from sentry_sdk.utils import (
     filename_for_module,
     handle_in_app_impl,
+    logger,
     nanosecond_time,
 )
 
@@ -92,7 +93,6 @@ if MYPY:
     )
 
 
-_sample_buffer = None  # type: Optional[SampleBuffer]
 _scheduler = None  # type: Optional[Scheduler]
 
 
@@ -103,33 +103,33 @@ def setup_profiler(options):
     `buffer_secs` determines the max time a sample will be buffered for
     `frequency` determines the number of samples to take per second (Hz)
     """
-    buffer_secs = 30
-    frequency = 101
+
+    global _scheduler
+
+    if _scheduler is not None:
+        logger.debug("profiling is already setup")
+        return
 
     if not PY33:
-        from sentry_sdk.utils import logger
-
         logger.warn("profiling is only supported on Python >= 3.3")
         return
 
-    global _sample_buffer
-    global _scheduler
-
-    assert _sample_buffer is None and _scheduler is None
+    buffer_secs = 30
+    frequency = 101
 
     # To buffer samples for `buffer_secs` at `frequency` Hz, we need
     # a capcity of `buffer_secs * frequency`.
-    _sample_buffer = SampleBuffer(capacity=buffer_secs * frequency)
+    buffer = SampleBuffer(capacity=buffer_secs * frequency)
 
     profiler_mode = options["_experiments"].get("profiler_mode", SleepScheduler.mode)
     if profiler_mode == SigprofScheduler.mode:
-        _scheduler = SigprofScheduler(sample_buffer=_sample_buffer, frequency=frequency)
+        _scheduler = SigprofScheduler(sample_buffer=buffer, frequency=frequency)
     elif profiler_mode == SigalrmScheduler.mode:
-        _scheduler = SigalrmScheduler(sample_buffer=_sample_buffer, frequency=frequency)
+        _scheduler = SigalrmScheduler(sample_buffer=buffer, frequency=frequency)
     elif profiler_mode == SleepScheduler.mode:
-        _scheduler = SleepScheduler(sample_buffer=_sample_buffer, frequency=frequency)
+        _scheduler = SleepScheduler(sample_buffer=buffer, frequency=frequency)
     elif profiler_mode == EventScheduler.mode:
-        _scheduler = EventScheduler(sample_buffer=_sample_buffer, frequency=frequency)
+        _scheduler = EventScheduler(sample_buffer=buffer, frequency=frequency)
     else:
         raise ValueError("Unknown profiler mode: {}".format(profiler_mode))
     _scheduler.setup()
@@ -140,13 +140,11 @@ def setup_profiler(options):
 def teardown_profiler():
     # type: () -> None
 
-    global _sample_buffer
     global _scheduler
 
     if _scheduler is not None:
         _scheduler.teardown()
 
-    _sample_buffer = None
     _scheduler = None
 
 
@@ -728,7 +726,7 @@ def _should_profile(transaction, hub):
         return False
 
     # The profiler hasn't been properly initialized.
-    if _sample_buffer is None or _scheduler is None:
+    if _scheduler is None:
         return False
 
     hub = hub or sentry_sdk.Hub.current
