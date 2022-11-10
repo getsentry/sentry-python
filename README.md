@@ -1,14 +1,14 @@
 <p align="center">
-    <a href="https://sentry.io" target="_blank" align="center">
-        <img src="https://sentry-brand.storage.googleapis.com/sentry-logo-black.png" width="280">
-    </a>
+  <a href="https://sentry.io/?utm_source=github&utm_medium=logo" target="_blank">
+    <img src="https://sentry-brand.storage.googleapis.com/sentry-wordmark-dark-280x84.png" alt="Sentry" width="280" height="84">
+  </a>
 </p>
 
 _Bad software is everywhere, and we're tired of it. Sentry is on a mission to help developers write better software faster, so we can get back to enjoying technology. If you want to join us [<kbd>**Check out our open positions**</kbd>](https://sentry.io/careers/)_
 
 # Official Sentry SDK for Python
 
-[![Build Status](https://travis-ci.com/getsentry/sentry-python.svg?branch=master)](https://travis-ci.com/getsentry/sentry-python)
+[![Build Status](https://github.com/getsentry/sentry-python/actions/workflows/ci.yml/badge.svg)](https://github.com/getsentry/sentry-python/actions/workflows/ci.yml)
 [![PyPi page link -- version](https://img.shields.io/pypi/v/sentry-sdk.svg)](https://pypi.python.org/pypi/sentry-sdk)
 [![Discord](https://img.shields.io/discord/621778831602221064)](https://discord.gg/cWnMQeA)
 
@@ -63,6 +63,8 @@ raise ValueError()  # Will also create an event in Sentry.
 - [Google Cloud Functions](https://docs.sentry.io/platforms/python/guides/gcp-functions/)
 - [WSGI](https://docs.sentry.io/platforms/python/guides/wsgi/)
 - [ASGI](https://docs.sentry.io/platforms/python/guides/asgi/)
+- [Starlette](https://docs.sentry.io/platforms/python/guides/starlette/)
+- [FastAPI](https://docs.sentry.io/platforms/python/guides/fastapi/)
 - [AIOHTTP](https://docs.sentry.io/platforms/python/guides/aiohttp/)
 - [RQ (Redis Queue)](https://docs.sentry.io/platforms/python/guides/rq/)
 - [Celery](https://docs.sentry.io/platforms/python/guides/celery/)

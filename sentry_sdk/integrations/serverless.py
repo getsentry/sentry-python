@@ -27,7 +27,7 @@ else:
 
 
 @overload
-def serverless_function(f, flush=True):  # noqa: F811
+def serverless_function(f, flush=True):
     # type: (F, bool) -> F
     pass
 

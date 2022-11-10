@@ -1,8 +1,9 @@
 from __future__ import absolute_import
 
+import json
 import pytest
 import pytest_django
-import json
+from functools import partial
 
 from werkzeug.test import Client
 from django import VERSION as DJANGO_VERSION
@@ -10,16 +11,16 @@ from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
 from django.db.utils import OperationalError, ProgrammingError, DataError
 
-from sentry_sdk.integrations.executing import ExecutingIntegration
-
 try:
     from django.urls import reverse
 except ImportError:
     from django.core.urlresolvers import reverse
 
+from sentry_sdk._compat import PY2, PY310
 from sentry_sdk import capture_message, capture_exception, configure_scope
 from sentry_sdk.integrations.django import DjangoIntegration
-from functools import partial
+from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
+from sentry_sdk.integrations.executing import ExecutingIntegration
 
 from tests.integrations.django.myapp.wsgi import application
 
@@ -469,25 +470,40 @@ def test_django_connect_breadcrumbs(
 
 
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction",
+    "transaction_style,client_url,expected_transaction,expected_source,expected_response",
     [
-        ("function_name", "tests.integrations.django.myapp.views.message"),
-        ("url", "/message"),
+        (
+            "function_name",
+            "/message",
+            "tests.integrations.django.myapp.views.message",
+            "component",
+            b"ok",
+        ),
+        ("url", "/message", "/message", "route", b"ok"),
+        ("url", "/404", "/404", "url", b"404"),
     ],
 )
 def test_transaction_style(
-    sentry_init, client, capture_events, transaction_style, expected_transaction
+    sentry_init,
+    client,
+    capture_events,
+    transaction_style,
+    client_url,
+    expected_transaction,
+    expected_source,
+    expected_response,
 ):
     sentry_init(
         integrations=[DjangoIntegration(transaction_style=transaction_style)],
         send_default_pii=True,
     )
     events = capture_events()
-    content, status, headers = client.get(reverse("message"))
-    assert b"".join(content) == b"ok"
+    content, status, headers = client.get(client_url)
+    assert b"".join(content) == expected_response
 
     (event,) = events
     assert event["transaction"] == expected_transaction
+    assert event["transaction_info"] == {"source": expected_source}
 
 
 def test_request_body(sentry_init, client, capture_events):
@@ -504,8 +520,7 @@ def test_request_body(sentry_init, client, capture_events):
     assert event["message"] == "hi"
     assert event["request"]["data"] == ""
     assert event["_meta"]["request"]["data"][""] == {
-        "len": 6,
-        "rem": [["!raw", "x", 0, 6]],
+        "rem": [["!raw", "x"]],
     }
 
     del events[:]
@@ -615,7 +630,7 @@ def test_rest_framework_basic(
     elif ct == "application/x-www-form-urlencoded":
         client.post(reverse(route), data=body)
     else:
-        assert False
+        raise AssertionError("unreachable")
 
     (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
@@ -651,14 +666,14 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
     views_tests = [
         (
             reverse("template_test2"),
-            '- op="django.template.render": description="[user_name.html, ...]"',
+            '- op="template.render": description="[user_name.html, ...]"',
         ),
     ]
     if DJANGO_VERSION >= (1, 7):
         views_tests.append(
             (
                 reverse("template_test"),
-                '- op="django.template.render": description="user_name.html"',
+                '- op="template.render": description="user_name.html"',
             ),
         )
 
@@ -688,13 +703,15 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
             render_span_tree(transaction)
             == """\
 - op="http.server": description=null
-  - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.__call__"
-    - op="django.middleware": description="django.contrib.auth.middleware.AuthenticationMiddleware.__call__"
-      - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.__call__"
-        - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.__call__"
-          - op="django.middleware": description="tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__"
-            - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
-            - op="django.view": description="message"\
+  - op="event.django": description="django.db.reset_queries"
+  - op="event.django": description="django.db.close_old_connections"
+  - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.__call__"
+    - op="middleware.django": description="django.contrib.auth.middleware.AuthenticationMiddleware.__call__"
+      - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.__call__"
+        - op="middleware.django": description="tests.integrations.django.myapp.settings.TestMiddleware.__call__"
+          - op="middleware.django": description="tests.integrations.django.myapp.settings.TestFunctionMiddleware.__call__"
+            - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
+            - op="view.render": description="message"\
 """
         )
 
@@ -703,14 +720,16 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
             render_span_tree(transaction)
             == """\
 - op="http.server": description=null
-  - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.process_request"
-  - op="django.middleware": description="django.contrib.auth.middleware.AuthenticationMiddleware.process_request"
-  - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.process_request"
-  - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
-  - op="django.view": description="message"
-  - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.process_response"
-  - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.process_response"
-  - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.process_response"\
+  - op="event.django": description="django.db.reset_queries"
+  - op="event.django": description="django.db.close_old_connections"
+  - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.process_request"
+  - op="middleware.django": description="django.contrib.auth.middleware.AuthenticationMiddleware.process_request"
+  - op="middleware.django": description="tests.integrations.django.myapp.settings.TestMiddleware.process_request"
+  - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
+  - op="view.render": description="message"
+  - op="middleware.django": description="tests.integrations.django.myapp.settings.TestMiddleware.process_response"
+  - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.process_response"
+  - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.process_response"\
 """
         )
 
@@ -727,7 +746,13 @@ def test_middleware_spans_disabled(sentry_init, client, capture_events):
 
     assert message["message"] == "hi"
 
-    assert not transaction["spans"]
+    assert len(transaction["spans"]) == 2
+
+    assert transaction["spans"][0]["op"] == "event.django"
+    assert transaction["spans"][0]["description"] == "django.db.reset_queries"
+
+    assert transaction["spans"][1]["op"] == "event.django"
+    assert transaction["spans"][1]["description"] == "django.db.close_old_connections"
 
 
 def test_csrf(sentry_init, client):
@@ -791,3 +816,25 @@ def test_custom_urlconf_middleware(
     assert "custom_urlconf_middleware" in render_span_tree(transaction_event)
 
     settings.MIDDLEWARE.pop(0)
+
+
+def test_get_receiver_name():
+    def dummy(a, b):
+        return a + b
+
+    name = _get_receiver_name(dummy)
+
+    if PY2:
+        assert name == "tests.integrations.django.test_basic.dummy"
+    else:
+        assert (
+            name
+            == "tests.integrations.django.test_basic.test_get_receiver_name.<locals>.dummy"
+        )
+
+    a_partial = partial(dummy)
+    name = _get_receiver_name(a_partial)
+    if PY310:
+        assert name == "functools.partial(<function " + a_partial.func.__name__ + ">)"
+    else:
+        assert name == "partial(<function " + a_partial.func.__name__ + ">)"

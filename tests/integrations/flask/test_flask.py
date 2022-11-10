@@ -46,6 +46,11 @@ def app():
         capture_message("hi")
         return "ok"
 
+    @app.route("/message/<int:message_id>")
+    def hi_with_id(message_id):
+        capture_message("hi again")
+        return "ok"
+
     return app
 
 
@@ -74,10 +79,22 @@ def test_has_context(sentry_init, app, capture_events):
 
 
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction", [("endpoint", "hi"), ("url", "/message")]
+    "url,transaction_style,expected_transaction,expected_source",
+    [
+        ("/message", "endpoint", "hi", "component"),
+        ("/message", "url", "/message", "route"),
+        ("/message/123456", "endpoint", "hi_with_id", "component"),
+        ("/message/123456", "url", "/message/<int:message_id>", "route"),
+    ],
 )
 def test_transaction_style(
-    sentry_init, app, capture_events, transaction_style, expected_transaction
+    sentry_init,
+    app,
+    capture_events,
+    url,
+    transaction_style,
+    expected_transaction,
+    expected_source,
 ):
     sentry_init(
         integrations=[
@@ -87,11 +104,12 @@ def test_transaction_style(
     events = capture_events()
 
     client = app.test_client()
-    response = client.get("/message")
+    response = client.get(url)
     assert response.status_code == 200
 
     (event,) = events
     assert event["transaction"] == expected_transaction
+    assert event["transaction_info"] == {"source": expected_source}
 
 
 @pytest.mark.parametrize("debug", (True, False))
@@ -245,9 +263,9 @@ def test_flask_large_json_request(sentry_init, capture_events, app):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
     }
-    assert len(event["request"]["data"]["foo"]["bar"]) == 512
+    assert len(event["request"]["data"]["foo"]["bar"]) == 1024
 
 
 def test_flask_session_tracking(sentry_init, capture_envelopes, app):
@@ -334,9 +352,9 @@ def test_flask_medium_formdata_request(sentry_init, capture_events, app):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
     }
-    assert len(event["request"]["data"]["foo"]) == 512
+    assert len(event["request"]["data"]["foo"]) == 1024
 
 
 def test_flask_formdata_request_appear_transaction_body(
@@ -396,9 +414,7 @@ def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, ap
     assert response.status_code == 200
 
     (event,) = events
-    assert event["_meta"]["request"]["data"] == {
-        "": {"len": 2000, "rem": [["!config", "x", 0, 2000]]}
-    }
+    assert event["_meta"]["request"]["data"] == {"": {"rem": [["!config", "x"]]}}
     assert not event["request"]["data"]
 
 
@@ -423,13 +439,11 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
     }
-    assert len(event["request"]["data"]["foo"]) == 512
+    assert len(event["request"]["data"]["foo"]) == 1024
 
-    assert event["_meta"]["request"]["data"]["file"] == {
-        "": {"len": 0, "rem": [["!raw", "x", 0, 0]]}
-    }
+    assert event["_meta"]["request"]["data"]["file"] == {"": {"rem": [["!raw", "x"]]}}
     assert not event["request"]["data"]["file"]
 
 

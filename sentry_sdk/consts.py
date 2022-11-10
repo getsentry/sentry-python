@@ -33,6 +33,9 @@ if MYPY:
             "record_sql_params": Optional[bool],
             "smart_transaction_trimming": Optional[bool],
             "propagate_tracestate": Optional[bool],
+            "custom_measurements": Optional[bool],
+            "profiles_sample_rate": Optional[float],
+            "profiler_mode": Optional[str],
         },
         total=False,
     )
@@ -101,9 +104,29 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.5.8"
-SDK_INFO = {
-    "name": "sentry.python",
-    "version": VERSION,
-    "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
-}
+VERSION = "1.10.1"
+
+
+class OP:
+    DB = "db"
+    DB_REDIS = "db.redis"
+    EVENT_DJANGO = "event.django"
+    FUNCTION = "function"
+    FUNCTION_AWS = "function.aws"
+    FUNCTION_GCP = "function.gcp"
+    HTTP_CLIENT = "http.client"
+    HTTP_CLIENT_STREAM = "http.client.stream"
+    HTTP_SERVER = "http.server"
+    MIDDLEWARE_DJANGO = "middleware.django"
+    MIDDLEWARE_STARLETTE = "middleware.starlette"
+    MIDDLEWARE_STARLETTE_RECEIVE = "middleware.starlette.receive"
+    MIDDLEWARE_STARLETTE_SEND = "middleware.starlette.send"
+    QUEUE_SUBMIT_CELERY = "queue.submit.celery"
+    QUEUE_TASK_CELERY = "queue.task.celery"
+    QUEUE_TASK_RQ = "queue.task.rq"
+    SUBPROCESS = "subprocess"
+    SUBPROCESS_WAIT = "subprocess.wait"
+    SUBPROCESS_COMMUNICATE = "subprocess.communicate"
+    TEMPLATE_RENDER = "template.render"
+    VIEW_RENDER = "view.render"
+    WEBSOCKET_SERVER = "websocket.server"

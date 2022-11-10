@@ -1,7 +1,9 @@
+# coding: utf-8
 import weakref
 import gc
-
+import re
 import pytest
+import random
 
 from sentry_sdk import (
     capture_message,
@@ -32,6 +34,9 @@ def test_basic(sentry_init, capture_events, sample_rate):
         assert len(events) == 1
         event = events[0]
 
+        assert event["transaction"] == "hi"
+        assert event["transaction_info"]["source"] == "custom"
+
         span1, span2 = event["spans"]
         parent_span = event
         assert span1["tags"]["status"] == "internal_error"
@@ -49,13 +54,13 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
 @pytest.mark.parametrize("sampled", [True, False, None])
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
-def test_continue_from_headers(sentry_init, capture_events, sampled, sample_rate):
+def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_rate):
     """
     Ensure data is actually passed along via headers, and that they are read
     correctly.
     """
     sentry_init(traces_sample_rate=sample_rate)
-    events = capture_events()
+    envelopes = capture_envelopes()
 
     # make a parent transaction (normally this would be in a different service)
     with start_transaction(
@@ -63,8 +68,16 @@ def test_continue_from_headers(sentry_init, capture_events, sampled, sample_rate
     ) as parent_transaction:
         with start_span() as old_span:
             old_span.sampled = sampled
-            headers = dict(Hub.current.iter_trace_propagation_headers(old_span))
             tracestate = parent_transaction._sentry_tracestate
+
+            headers = dict(Hub.current.iter_trace_propagation_headers(old_span))
+            headers["baggage"] = (
+                "other-vendor-value-1=foo;bar;baz, "
+                "sentry-trace_id=771a43a4192642f0b136d5159a501700, "
+                "sentry-public_key=49d0f7386ad645858ae85020e393bef3, "
+                "sentry-sample_rate=0.01337, sentry-user_id=Amelie, "
+                "other-vendor-value-2=foo;bar;"
+            )
 
     # child transaction, to prove that we can read 'sentry-trace' and
     # `tracestate` header data correctly
@@ -76,6 +89,16 @@ def test_continue_from_headers(sentry_init, capture_events, sampled, sample_rate
     assert child_transaction.parent_span_id == old_span.span_id
     assert child_transaction.span_id != old_span.span_id
     assert child_transaction._sentry_tracestate == tracestate
+
+    baggage = child_transaction._baggage
+    assert baggage
+    assert not baggage.mutable
+    assert baggage.sentry_items == {
+        "public_key": "49d0f7386ad645858ae85020e393bef3",
+        "trace_id": "771a43a4192642f0b136d5159a501700",
+        "user_id": "Amelie",
+        "sample_rate": "0.01337",
+    }
 
     # add child transaction to the scope, to show that the captured message will
     # be tagged with the trace id (since it happens while the transaction is
@@ -89,23 +112,91 @@ def test_continue_from_headers(sentry_init, capture_events, sampled, sample_rate
 
     # in this case the child transaction won't be captured
     if sampled is False or (sample_rate == 0 and sampled is None):
-        trace1, message = events
+        trace1, message = envelopes
+        message_payload = message.get_event()
+        trace1_payload = trace1.get_transaction_event()
 
-        assert trace1["transaction"] == "hi"
+        assert trace1_payload["transaction"] == "hi"
     else:
-        trace1, message, trace2 = events
+        trace1, message, trace2 = envelopes
+        trace1_payload = trace1.get_transaction_event()
+        message_payload = message.get_event()
+        trace2_payload = trace2.get_transaction_event()
 
-        assert trace1["transaction"] == "hi"
-        assert trace2["transaction"] == "ho"
+        assert trace1_payload["transaction"] == "hi"
+        assert trace2_payload["transaction"] == "ho"
 
         assert (
-            trace1["contexts"]["trace"]["trace_id"]
-            == trace2["contexts"]["trace"]["trace_id"]
+            trace1_payload["contexts"]["trace"]["trace_id"]
+            == trace2_payload["contexts"]["trace"]["trace_id"]
             == child_transaction.trace_id
-            == message["contexts"]["trace"]["trace_id"]
+            == message_payload["contexts"]["trace"]["trace_id"]
         )
 
-    assert message["message"] == "hello"
+        assert trace2.headers["trace"] == baggage.dynamic_sampling_context()
+        assert trace2.headers["trace"] == {
+            "public_key": "49d0f7386ad645858ae85020e393bef3",
+            "trace_id": "771a43a4192642f0b136d5159a501700",
+            "user_id": "Amelie",
+            "sample_rate": "0.01337",
+        }
+
+    assert message_payload["message"] == "hello"
+
+
+@pytest.mark.parametrize("sample_rate", [0.5, 1.0])
+def test_dynamic_sampling_head_sdk_creates_dsc(
+    sentry_init, capture_envelopes, sample_rate, monkeypatch
+):
+    sentry_init(traces_sample_rate=sample_rate, release="foo")
+    envelopes = capture_envelopes()
+
+    # make sure transaction is sampled for both cases
+    monkeypatch.setattr(random, "random", lambda: 0.1)
+
+    transaction = Transaction.continue_from_headers({}, name="Head SDK tx")
+
+    # will create empty mutable baggage
+    baggage = transaction._baggage
+    assert baggage
+    assert baggage.mutable
+    assert baggage.sentry_items == {}
+    assert baggage.third_party_items == ""
+
+    with start_transaction(transaction):
+        with start_span(op="foo", description="foodesc"):
+            pass
+
+    # finish will create a new baggage entry
+    baggage = transaction._baggage
+    trace_id = transaction.trace_id
+
+    assert baggage
+    assert not baggage.mutable
+    assert baggage.third_party_items == ""
+    assert baggage.sentry_items == {
+        "environment": "production",
+        "release": "foo",
+        "sample_rate": str(sample_rate),
+        "transaction": "Head SDK tx",
+        "trace_id": trace_id,
+    }
+
+    expected_baggage = (
+        "sentry-environment=production,sentry-release=foo,sentry-sample_rate=%s,sentry-transaction=Head%%20SDK%%20tx,sentry-trace_id=%s"
+        % (sample_rate, trace_id)
+    )
+    assert sorted(baggage.serialize().split(",")) == sorted(expected_baggage.split(","))
+
+    (envelope,) = envelopes
+    assert envelope.headers["trace"] == baggage.dynamic_sampling_context()
+    assert envelope.headers["trace"] == {
+        "environment": "production",
+        "release": "foo",
+        "sample_rate": str(sample_rate),
+        "transaction": "Head SDK tx",
+        "trace_id": trace_id,
+    }
 
 
 @pytest.mark.parametrize(
@@ -167,3 +258,27 @@ def test_start_span_after_finish(sentry_init, capture_events):
             pass
 
     assert len(events) == 1
+
+
+def test_trace_propagation_meta_head_sdk(sentry_init):
+    sentry_init(traces_sample_rate=1.0, release="foo")
+
+    transaction = Transaction.continue_from_headers({}, name="Head SDK tx")
+    meta = None
+    span = None
+
+    with start_transaction(transaction):
+        with start_span(op="foo", description="foodesc") as current_span:
+            span = current_span
+            meta = Hub.current.trace_propagation_meta()
+
+    ind = meta.find(">") + 1
+    sentry_trace, baggage = meta[:ind], meta[ind:]
+
+    assert 'meta name="sentry-trace"' in sentry_trace
+    sentry_trace_content = re.findall('content="([^"]*)"', sentry_trace)[0]
+    assert sentry_trace_content == span.to_traceparent()
+
+    assert 'meta name="baggage"' in baggage
+    baggage_content = re.findall('content="([^"]*)"', baggage)[0]
+    assert baggage_content == transaction.get_baggage().serialize()

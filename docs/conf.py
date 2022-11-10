@@ -25,11 +25,11 @@ sys.path.insert(0, os.path.abspath(".."))
 
 # -- Project information -----------------------------------------------------
 
-project = u"sentry-python"
-copyright = u"2019, Sentry Team and Contributors"
-author = u"Sentry Team and Contributors"
+project = "sentry-python"
+copyright = "2019, Sentry Team and Contributors"
+author = "Sentry Team and Contributors"
 
-release = "1.5.8"
+release = "1.10.1"
 version = ".".join(release.split(".")[:2])  # The short X.Y version.
 
 
@@ -67,12 +67,12 @@ master_doc = "index"
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = "en"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = [u"_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = None
@@ -89,7 +89,7 @@ on_rtd = os.environ.get("READTHEDOCS", None) == "True"
 html_theme = "alabaster"
 
 # Theme options are theme-specific and customize the look and feel of a theme
-# further.  For a list of options available for each theme, see the
+# further. For a list of options available for each theme, see the
 # documentation.
 #
 # html_theme_options = {}
@@ -103,7 +103,7 @@ html_static_path = ["_static"]
 # to template names.
 #
 # The default sidebars (for documents that don't match any pattern) are
-# defined by theme itself.  Builtin themes are using these templates by
+# defined by theme itself. Builtin themes are using these templates by
 # default: ``['localtoc.html', 'relations.html', 'sourcelink.html',
 # 'searchbox.html']``.
 #
@@ -140,8 +140,8 @@ latex_documents = [
     (
         master_doc,
         "sentry-python.tex",
-        u"sentry-python Documentation",
-        u"Sentry Team and Contributors",
+        "sentry-python Documentation",
+        "Sentry Team and Contributors",
         "manual",
     )
 ]
@@ -151,7 +151,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, "sentry-python", u"sentry-python Documentation", [author], 1)]
+man_pages = [(master_doc, "sentry-python", "sentry-python Documentation", [author], 1)]
 
 
 # -- Options for Texinfo output ----------------------------------------------
@@ -163,7 +163,7 @@ texinfo_documents = [
     (
         master_doc,
         "sentry-python",
-        u"sentry-python Documentation",
+        "sentry-python Documentation",
         author,
         "sentry-python",
         "One line description of project.",

@@ -7,11 +7,12 @@ import sys
 import threading
 import subprocess
 import re
+import time
 
 from datetime import datetime
 
 import sentry_sdk
-from sentry_sdk._compat import urlparse, text_type, implements_str, PY2
+from sentry_sdk._compat import urlparse, text_type, implements_str, PY2, PY33, PY37
 
 from sentry_sdk._types import MYPY
 
@@ -39,7 +40,7 @@ epoch = datetime(1970, 1, 1)
 # The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
 
-MAX_STRING_LENGTH = 512
+MAX_STRING_LENGTH = 1024
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
 
@@ -92,6 +93,40 @@ def get_default_release():
         if release:
             return release
     return None
+
+
+def get_sdk_name(installed_integrations):
+    # type: (List[str]) -> str
+    """Return the SDK name including the name of the used web framework."""
+
+    # Note: I can not use for example sentry_sdk.integrations.django.DjangoIntegration.identifier
+    # here because if django is not installed the integration is not accessible.
+    framework_integrations = [
+        "django",
+        "flask",
+        "fastapi",
+        "bottle",
+        "falcon",
+        "quart",
+        "sanic",
+        "starlette",
+        "chalice",
+        "serverless",
+        "pyramid",
+        "tornado",
+        "aiohttp",
+        "aws_lambda",
+        "gcp",
+        "beam",
+        "asgi",
+        "wsgi",
+    ]
+
+    for integration in framework_integrations:
+        if integration in installed_integrations:
+            return "sentry.python.{}".format(integration)
+
+    return "sentry.python"
 
 
 class CaptureInternalException(object):
@@ -171,7 +206,7 @@ class Dsn(object):
         self.host = parts.hostname
 
         if parts.port is None:
-            self.port = self.scheme == "https" and 443 or 80
+            self.port = self.scheme == "https" and 443 or 80  # type: int
         else:
             self.port = parts.port
 
@@ -270,12 +305,10 @@ class Auth(object):
             type,
         )
 
-    def to_header(self, timestamp=None):
-        # type: (Optional[datetime]) -> str
+    def to_header(self):
+        # type: () -> str
         """Returns the auth header a string."""
         rv = [("sentry_key", self.public_key), ("sentry_version", self.version)]
-        if timestamp is not None:
-            rv.append(("sentry_timestamp", str(to_timestamp(timestamp))))
         if self.client is not None:
             rv.append(("sentry_client", self.client))
         if self.secret_key is not None:
@@ -284,12 +317,51 @@ class Auth(object):
 
 
 class AnnotatedValue(object):
+    """
+    Meta information for a data field in the event payload.
+    This is to tell Relay that we have tampered with the fields value.
+    See:
+    https://github.com/getsentry/relay/blob/be12cd49a0f06ea932ed9b9f93a655de5d6ad6d1/relay-general/src/types/meta.rs#L407-L423
+    """
+
     __slots__ = ("value", "metadata")
 
     def __init__(self, value, metadata):
         # type: (Optional[Any], Dict[str, Any]) -> None
         self.value = value
         self.metadata = metadata
+
+    @classmethod
+    def removed_because_raw_data(cls):
+        # type: () -> AnnotatedValue
+        """The value was removed because it could not be parsed. This is done for request body values that are not json nor a form."""
+        return AnnotatedValue(
+            value="",
+            metadata={
+                "rem": [  # Remark
+                    [
+                        "!raw",  # Unparsable raw data
+                        "x",  # The fields original value was removed
+                    ]
+                ]
+            },
+        )
+
+    @classmethod
+    def removed_because_over_size_limit(cls):
+        # type: () -> AnnotatedValue
+        """The actual value was removed because the size of the field exceeded the configured maximum size (specified with the request_bodies sdk option)"""
+        return AnnotatedValue(
+            value="",
+            metadata={
+                "rem": [  # Remark
+                    [
+                        "!config",  # Because of configured maximum size
+                        "x",  # The fields original value was removed
+                    ]
+                ]
+            },
+        )
 
 
 if MYPY:
@@ -466,6 +538,9 @@ def filename_for_module(module, abs_path):
             return os.path.basename(abs_path)
 
         base_module_path = sys.modules[base_module].__file__
+        if not base_module_path:
+            return abs_path
+
         return abs_path.split(base_module_path.rsplit(os.sep, 2)[0], 1)[-1].lstrip(
             os.sep
         )
@@ -766,7 +841,7 @@ def strip_string(value, max_length=None):
         # This is intentionally not just the default such that one can patch `MAX_STRING_LENGTH` and affect `strip_string`.
         max_length = MAX_STRING_LENGTH
 
-    length = len(value)
+    length = len(value.encode("utf-8"))
 
     if length > max_length:
         return AnnotatedValue(
@@ -860,7 +935,7 @@ def _get_contextvars():
             # `aiocontextvars` is absolutely required for functional
             # contextvars on Python 3.6.
             try:
-                from aiocontextvars import ContextVar  # noqa
+                from aiocontextvars import ContextVar
 
                 return True, ContextVar
             except ImportError:
@@ -928,7 +1003,7 @@ def transaction_from_function(func):
 disable_capture_event = ContextVar("disable_capture_event")
 
 
-class ServerlessTimeoutWarning(Exception):
+class ServerlessTimeoutWarning(Exception):  # noqa: N818
     """Raised when a serverless method is about to reach its timeout."""
 
     pass
@@ -1009,3 +1084,24 @@ def from_base64(base64_string):
         )
 
     return utf8_string
+
+
+if PY37:
+
+    def nanosecond_time():
+        # type: () -> int
+        return time.perf_counter_ns()
+
+elif PY33:
+
+    def nanosecond_time():
+        # type: () -> int
+
+        return int(time.perf_counter() * 1e9)
+
+else:
+
+    def nanosecond_time():
+        # type: () -> int
+
+        raise AttributeError

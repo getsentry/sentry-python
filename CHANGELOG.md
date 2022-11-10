@@ -1,5 +1,294 @@
 # Changelog
 
+## 1.10.1
+
+### Various fixes & improvements
+
+- Bug fixes for FastAPI and Sentry SDK 1.10.0 (#1699) by @antonpirker
+- The wrapped receive() did not return anything. (#1698) by @antonpirker
+
+## 1.10.0
+
+### Various fixes & improvements
+
+- Unified naming for span ops (#1661) by @antonpirker
+
+  We have unified the strings of our span operations. See https://develop.sentry.dev/sdk/performance/span-operations/
+
+  **WARNING**: If you have Sentry Dashboards or Sentry Discover queries that use `transaction.op` in their fields, conditions, aggregates or columns this change could potentially break your Dashboards/Discover setup.
+  Here is a list of the changes we made to the `op`s. Please adjust your dashboards and Discover queries accordingly:
+
+  | Old operation (`op`)     | New Operation (`op`)   |
+  | ------------------------ | ---------------------- |
+  | `asgi.server`            | `http.server`          |
+  | `aws.request`            | `http.client`          |
+  | `aws.request.stream`     | `http.client.stream`   |
+  | `celery.submit`          | `queue.submit.celery`  |
+  | `celery.task`            | `queue.task.celery`    |
+  | `django.middleware`      | `middleware.django`    |
+  | `django.signals`         | `event.django`         |
+  | `django.template.render` | `template.render`      |
+  | `django.view`            | `view.render`          |
+  | `http`                   | `http.client`          |
+  | `redis`                  | `db.redis`             |
+  | `rq.task`                | `queue.task.rq`        |
+  | `serverless.function`    | `function.aws`         |
+  | `serverless.function`    | `function.gcp`         |
+  | `starlette.middleware`   | `middleware.starlette` |
+
+- Include framework in SDK name (#1662) by @antonpirker
+- Asyncio integration (#1671) by @antonpirker
+- Add exception handling to Asyncio Integration (#1695) by @antonpirker
+- Fix asyncio task factory (#1689) by @antonpirker
+- Have instrumentation for ASGI middleware receive/send callbacks. (#1673) by @antonpirker
+- Use Django internal ASGI handling from Channels version 4.0.0. (#1688) by @antonpirker
+- fix(integrations): Fix http putrequest when url is None (#1693) by @MattFlower
+- build(deps): bump checkouts/data-schemas from `f0a57f2` to `a214fbc` (#1627) by @dependabot
+- build(deps): bump flake8-bugbear from 22.9.11 to 22.9.23 (#1637) by @dependabot
+- build(deps): bump sphinx from 5.1.1 to 5.2.3 (#1653) by @dependabot
+- build(deps): bump actions/stale from 5 to 6 (#1638) by @dependabot
+- build(deps): bump black from 22.8.0 to 22.10.0 (#1670) by @dependabot
+- Remove unused node setup from ci. (#1681) by @antonpirker
+- Check for Decimal is in_valid_sample_rate (#1672) by @Arvind2222
+- Add session for aiohttp integration (#1605) by @denys-pidlisnyi
+- feat(profiling): Extract qualified name for each frame (#1669) by @Zylphrex
+- feat(profiling): Attach thread metadata to profiles (#1660) by @Zylphrex
+- ref(profiling): Rename profiling frame keys (#1680) by @Zylphrex
+- fix(profiling): get_frame_name only look at arguments (#1684) by @Zylphrex
+- fix(profiling): Need to sample profile correctly (#1679) by @Zylphrex
+- fix(profiling): Race condition spawning multiple profiling threads (#1676) by @Zylphrex
+- tests(profiling): Add basic profiling tests (#1677) by @Zylphrex
+- tests(profiling): Add tests for thread schedulers (#1683) by @Zylphrex
+
+## 1.9.10
+
+### Various fixes & improvements
+
+- Use content-length header in ASGI instead of reading request body (#1646, #1631, #1595, #1573) (#1649) by @antonpirker
+- Added newer Celery versions to test suite (#1655) by @antonpirker
+- Django 4.x support (#1632) by @antonpirker
+- Cancel old CI runs when new one is started. (#1651) by @antonpirker
+- Increase max string size for desc (#1647) by @k-fish
+- Pin Sanic version for CI (#1650) by @antonpirker
+- Fix for partial signals in old Django and old Python versions. (#1641) by @antonpirker
+- Convert profile output to the sample format (#1611) by @phacops
+- Dynamically adjust profiler sleep time (#1634) by @Zylphrex
+
+## 1.9.9
+
+### Django update (ongoing)
+
+- Instrument Django Signals so they show up in "Performance" view (#1526) by @BeryJu
+- include other Django enhancements brought up by the community
+
+### Various fixes & improvements
+
+- fix(profiling): Profiler mode type hints (#1633) by @Zylphrex
+- New ASGIMiddleware tests (#1600) by @antonpirker
+- build(deps): bump mypy from 0.961 to 0.971 (#1517) by @dependabot
+- build(deps): bump black from 22.3.0 to 22.8.0 (#1596) by @dependabot
+- build(deps): bump sphinx from 5.0.2 to 5.1.1 (#1524) by @dependabot
+- ref: upgrade linters to flake8 5.x (#1610) by @asottile-sentry
+- feat(profiling): Introduce different profiler schedulers (#1616) by @Zylphrex
+- fix(profiling): Check transaction sampled status before profiling (#1624) by @Zylphrex
+- Wrap Baggage ser/deser in capture_internal_exceptions (#1630) by @sl0thentr0py
+- Faster Tests (DjangoCon) (#1602) by @antonpirker
+- feat(profiling): Add support for profiles_sample_rate (#1613) by @Zylphrex
+- feat(profiling): Support for multithreaded profiles (#1570) by @Zylphrex
+
+## 1.9.8
+
+### Various fixes & improvements
+
+- Baggage creation for head of trace (#1589) by @sl0thentr0py
+  - The SDK now also generates new baggage entries for dynamic sampling when it is the first (head) SDK in the pipeline.
+
+## 1.9.7
+
+### Various fixes & improvements
+
+- Let SentryAsgiMiddleware work with Starlette and FastAPI integrations (#1594) by @antonpirker
+
+**Note:** The last version 1.9.6 introduced a breaking change where projects that used Starlette or FastAPI
+and had manually setup `SentryAsgiMiddleware` could not start. This versions fixes this behaviour.
+With this version if you have a manual `SentryAsgiMiddleware` setup and are using Starlette or FastAPI
+everything just works out of the box.
+
+Sorry for any inconveniences the last version might have brought to you.
+
+We can do better and in the future we will do our best to not break your code again.
+
+## 1.9.6
+
+### Various fixes & improvements
+
+- Auto-enable Starlette and FastAPI (#1533) by @antonpirker
+- Add more version constraints (#1574) by @isra17
+- Fix typo in starlette attribute check (#1566) by @sl0thentr0py
+
+## 1.9.5
+
+### Various fixes & improvements
+
+- fix(redis): import redis pipeline using full path (#1565) by @olksdr
+- Fix side effects for parallel tests (#1554) by @sl0thentr0py
+
+## 1.9.4
+
+### Various fixes & improvements
+
+- Remove TRANSACTION_SOURCE_UNKNOWN and default to CUSTOM (#1558) by @sl0thentr0py
+- feat(redis): Add instrumentation for redis pipeline (#1543) by @jjbayer
+- Handle no release when uploading profiles (#1548) by @szokeasaurusrex
+
+## 1.9.3
+
+### Various fixes & improvements
+
+- Wrap StarletteRequestExtractor in capture_internal_exceptions (#1551) by @sl0thentr0py
+
+## 1.9.2
+
+### Various fixes & improvements
+
+- chore: remove quotes (#1545) by @vladanpaunovic
+
+## 1.9.1
+
+### Various fixes & improvements
+
+- Fix FastAPI issues (#1532) ( #1514) (#1532) by @antonpirker
+- Add deprecation warning for 3.4, 3.5 (#1541) by @sl0thentr0py
+- Fast tests (#1504) by @antonpirker
+- Replace Travis CI badge with GitHub Actions badge (#1538) by @153957
+- chore(deps): update urllib3 minimum version with environment markers (#1312) by @miketheman
+- Update Flask and Quart integrations (#1520) by @pgjones
+- chore: Remove ancient examples from tracing prototype (#1528) by @sl0thentr0py
+- fix(django): Send correct "url" transaction source if Django resolver fails to resolve (#1525) by @sl0thentr0py
+
+## 1.9.0
+
+### Various fixes & improvements
+
+- feat(profiler): Add experimental profiler under experiments.enable_profiling (#1481) by @szokeasaurusrex
+- Fixed problem with broken response and python-multipart (#1516) by @antonpirker
+
+## 1.8.0
+
+### Various fixes & improvements
+
+- feat(starlette): add Starlette integration (#1441) by @sl0thentr0py
+  **Important:** Remove manual usage of `SentryAsgiMiddleware`! This is now done by the Starlette integration.
+  Usage:
+
+  ```python
+  from starlette.applications import Starlette
+
+  from sentry_sdk.integrations.starlette import StarletteIntegration
+
+  sentry_sdk.init(
+      dsn="...",
+      integrations=[StarletteIntegration()],
+  )
+
+  app = Starlette(debug=True, routes=[...])
+  ```
+
+- feat(fastapi): add FastAPI integration (#829) by @antonpirker
+
+  **Important:** Remove manual usage of `SentryAsgiMiddleware`! This is now done by the FastAPI integration.
+
+  Usage:
+
+  ```python
+  from fastapi import FastAPI
+
+  from sentry_sdk.integrations.starlette import StarletteIntegration
+  from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+  sentry_sdk.init(
+      dsn="...",
+      integrations=[StarletteIntegration(), FastApiIntegration()],
+  )
+
+  app = FastAPI()
+  ```
+
+  Yes, you have to add both, the `StarletteIntegration` **AND** the `FastApiIntegration`!
+
+- fix: avoid sending empty Baggage header (#1507) by @intgr
+- fix: properly freeze Baggage object (#1508) by @intgr
+- docs: fix simple typo, collecter | collector (#1505) by @timgates42
+
+## 1.7.2
+
+### Various fixes & improvements
+
+- feat(transactions): Transaction Source (#1490) by @antonpirker
+- Removed (unused) sentry_timestamp header (#1494) by @antonpirker
+
+## 1.7.1
+
+### Various fixes & improvements
+
+- Skip malformed baggage items (#1491) by @robyoung
+
+## 1.7.0
+
+### Various fixes & improvements
+
+- feat(tracing): Dynamic Sampling Context / Baggage continuation (#1485) by @sl0thentr0py
+
+  The SDK now propagates the [W3C Baggage Header](https://www.w3.org/TR/baggage/) from
+  incoming transactions to outgoing requests.
+  It also extracts Sentry specific [sampling information](https://develop.sentry.dev/sdk/performance/dynamic-sampling-context/)
+  and adds it to the transaction headers to enable Dynamic Sampling in the product.
+
+## 1.6.0
+
+### Various fixes & improvements
+
+- Fix Deployment (#1474) by @antonpirker
+- Serverless V2 (#1450) by @antonpirker
+- Use logging levelno instead of levelname. Levelnames can be overridden (#1449) by @rrauenza
+
+## 1.5.12
+
+### Various fixes & improvements
+
+- feat(measurements): Add experimental set_measurement api on transaction (#1359) by @sl0thentr0py
+- fix: Remove incorrect usage from flask helper example (#1434) by @BYK
+
+## 1.5.11
+
+### Various fixes & improvements
+
+- chore: Bump mypy and fix abstract ContextManager typing (#1421) by @sl0thentr0py
+- chore(issues): add link to Sentry support (#1420) by @vladanpaunovic
+- fix: replace git.io links with redirect targets (#1412) by @asottile-sentry
+- ref: Update error verbose for sentry init (#1361) by @targhs
+- fix(sessions): Update session also for non sampled events and change filter order (#1394) by @adinauer
+
+## 1.5.10
+
+### Various fixes & improvements
+
+- Remove Flask version contraint (#1395) by @antonpirker
+- Change ordering of event drop mechanisms (#1390) by @adinauer
+
+## 1.5.9
+
+### Various fixes & improvements
+
+- fix(sqlalchemy): Use context instead of connection in sqlalchemy integration (#1388) by @sl0thentr0py
+- Update correct test command in contributing docs (#1377) by @targhs
+- Update black (#1379) by @antonpirker
+- build(deps): bump sphinx from 4.1.1 to 4.5.0 (#1376) by @dependabot
+- fix: Auto-enabling Redis and Pyramid integration (#737) by @untitaker
+- feat(testing): Add pytest-watch (#853) by @lobsterkatie
+- Treat x-api-key header as sensitive (#1236) by @simonschmidt
+- fix: Remove obsolete MAX_FORMAT_PARAM_LENGTH (#1375) by @blueyed
+
 ## 1.5.8
 
 ### Various fixes & improvements
