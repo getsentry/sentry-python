@@ -5,6 +5,9 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.tracing import Transaction
 
 
+OPEN_TELEMETRY_CONTEXT = "otel"
+
+
 class SentrySpanProcessor(SpanProcessor):
     """
     Converts OTel spans into Sentry spans so they can be sent to the Sentry backend.
@@ -66,13 +69,29 @@ class SentrySpanProcessor(SpanProcessor):
 
         if isinstance(sentry_span, Transaction):
             scope.set_transaction_name(otel_span.name)
-            # TODO: set "otel" context scope.set_context(...)
+            scope.set_context(OPEN_TELEMETRY_CONTEXT, self._get_otel_context(otel_span))
+
         else:
             self._update_span_with_otel_data(sentry_span, otel_span)
 
         sentry_span.finish()
 
+    def _get_otel_context(self, otel_span):
+        ctx = {}
+
+        if otel_span.attributes:
+            ctx["attributes"] = dict(otel_span.attributes)
+
+        if otel_span.resource.attributes:
+            ctx["resource"] = dict(otel_span.resource.attributes)
+
+        return ctx
+
     def _update_span_with_otel_data(self, sentry_span, otel_span):
+        """
+        Convert OTel span data and update the Sentry span with it.
+        This should eventually happen on the server when ingesting the spans.
+        """
         for key in otel_span.attributes:
             val = otel_span.attributes[key]
             sentry_span.set_data(key, val)
