@@ -281,6 +281,11 @@ async def test_starlettrequestextractor_form(sentry_init):
     assert form_data["password"] == PARSED_FORM["password"]
     assert form_data["photo"].filename == PARSED_FORM["photo"].filename
 
+    # Make sure we still can read the body
+    # after alreading it with extractor.form() above.
+    body = await extractor.request.body()
+    assert body
+
 
 @pytest.mark.asyncio
 async def test_starlettrequestextractor_body_consumed_twice(
