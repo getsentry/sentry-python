@@ -186,6 +186,9 @@ def _install_subprocess():
 
         env = None
 
+        import ipdb
+
+        ipdb.set_trace()
         with hub.start_span(op=OP.SUBPROCESS, description=description) as span:
 
             for k, v in hub.iter_trace_propagation_headers(span):

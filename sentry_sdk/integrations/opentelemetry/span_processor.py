@@ -14,10 +14,14 @@ class SentrySpanProcessor(SpanProcessor):
         parent_sentry_span = hub.scope.span
 
         if parent_sentry_span:
-            sentry_span = parent_sentry_span.start_child(op=otel_span.name)
+            sentry_span = parent_sentry_span.start_child(
+                op="SENTRYOTEL-{}".format(otel_span.name)
+            )
         else:
             # TODO: add the baggagae sentry-trace stuff to transaction
-            sentry_span = hub.start_transaction(name=otel_span.name)
+            sentry_span = hub.start_transaction(
+                name="SENTRYOTEL-{}".format(otel_span.name)
+            )
 
         hub.scope.span = sentry_span
         self.otel_span_map[otel_span.context.span_id] = (
@@ -35,7 +39,7 @@ class SentrySpanProcessor(SpanProcessor):
 
         sentry_span.op = otel_span.name
         if isinstance(sentry_span, Transaction):
-            hub.scope.set_transaction_name(otel_span.name)
+            hub.scope.set_transaction_name("SENTRYOTEL-{}".format(otel_span.name))
 
         for key in otel_span.attributes:
             val = otel_span.attributes[key]
