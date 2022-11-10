@@ -22,7 +22,7 @@ from sentry_sdk.utils import (
 )
 
 if MYPY:
-    from typing import Any, Awaitable, Callable, Dict, Optional, Union
+    from typing import Any, Awaitable, Callable, Dict, Optional
 
     from sentry_sdk._types import Event
 
@@ -367,10 +367,10 @@ def patch_request_response():
                         def event_processor(event, hint):
                             # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
 
-                            # Extract information from request
+                            # Add info from request to event
                             request_info = event.get("request", {})
                             if info:
-                                if "cookies" in info and _should_send_default_pii():
+                                if "cookies" in info:
                                     request_info["cookies"] = info["cookies"]
                                 if "data" in info:
                                     request_info["data"] = info["data"]
@@ -473,30 +473,46 @@ class StarletteRequestExtractor:
         request_info = {}  # type: Dict[str, Any]
 
         with capture_internal_exceptions():
+            # Add cookies
             if _should_send_default_pii():
                 request_info["cookies"] = self.cookies()
 
+            # If there is no body, just return the cookies
             content_length = await self.content_length()
+            if not content_length:
+                return request_info
 
-            if content_length:
-                data = None  # type: Union[Dict[str, Any], AnnotatedValue, None]
+            # Add annotation if body is too big
+            if content_length and not request_body_within_bounds(
+                client, content_length
+            ):
+                request_info["data"] = AnnotatedValue.removed_because_over_size_limit()
+                return request_info
 
-                if not request_body_within_bounds(client, content_length):
-                    data = AnnotatedValue.removed_because_over_size_limit()
+            # Add JSON body, if it is a JSON request
+            json = await self.json()
+            if json:
+                request_info["data"] = json
+                return request_info
 
-                else:
-                    parsed_body = await self.parsed_body()
-                    if parsed_body is not None:
-                        data = parsed_body
-                    elif await self.raw_data():
-                        data = AnnotatedValue.removed_because_raw_data()
-                    else:
-                        data = None
+            # Add form as key/value pairs, if request has form data
+            form = await self.form()
+            if form:
+                form_data = {}
+                for key, val in iteritems(form):
+                    is_file = isinstance(val, UploadFile)
+                    form_data[key] = (
+                        val
+                        if not is_file
+                        else AnnotatedValue.removed_because_raw_data()
+                    )
 
-                if data is not None:
-                    request_info["data"] = data
+                request_info["data"] = form_data
+                return request_info
 
-        return request_info
+            # Raw data, do not add body just an annotation
+            request_info["data"] = AnnotatedValue.removed_because_raw_data()
+            return request_info
 
     async def content_length(self):
         # type: (StarletteRequestExtractor) -> Optional[int]
@@ -509,18 +525,16 @@ class StarletteRequestExtractor:
         # type: (StarletteRequestExtractor) -> Dict[str, Any]
         return self.request.cookies
 
-    async def raw_data(self):
-        # type: (StarletteRequestExtractor) -> Any
-        return await self.request.body()
-
     async def form(self):
         # type: (StarletteRequestExtractor) -> Any
-        """
-        curl -X POST http://localhost:8000/upload/somethign -H "Content-Type: application/x-www-form-urlencoded" -d "username=kevin&password=welcome123"
-        curl -X POST http://localhost:8000/upload/somethign  -F username=Julian -F password=hello123
-        """
         if multipart is None:
             return None
+
+        # Parse the body first to get it cached, as Starlette does not cache form() as it
+        # does with body() and json() https://github.com/encode/starlette/discussions/1933
+        # Calling `.form()` without calling `.body()` first will
+        # potentially break the users project.
+        await self.request.body()
 
         return await self.request.form()
 
@@ -530,32 +544,10 @@ class StarletteRequestExtractor:
 
     async def json(self):
         # type: (StarletteRequestExtractor) -> Optional[Dict[str, Any]]
-        """
-        curl -X POST localhost:8000/upload/something -H 'Content-Type: application/json' -d '{"login":"my_login","password":"my_password"}'
-        """
         if not self.is_json():
             return None
 
         return await self.request.json()
-
-    async def parsed_body(self):
-        # type: (StarletteRequestExtractor) -> Any
-        """
-        curl -X POST http://localhost:8000/upload/somethign  -F username=Julian -F password=hello123 -F photo=@photo.jpg
-        """
-        form = await self.form()
-        if form:
-            data = {}
-            for key, val in iteritems(form):
-                if isinstance(val, UploadFile):
-                    data[key] = AnnotatedValue.removed_because_raw_data()
-                else:
-                    data[key] = val
-
-            return data
-
-        json_data = await self.json()
-        return json_data
 
 
 def _set_transaction_name_and_source(event, transaction_style, request):
