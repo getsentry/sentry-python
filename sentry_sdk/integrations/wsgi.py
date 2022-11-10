@@ -105,10 +105,6 @@ class SentryWsgiMiddleware(object):
 
     def __call__(self, environ, start_response):
         # type: (Dict[str, str], Callable[..., Any]) -> _ScopedResponse
-        import ipdb
-
-        ipdb.set_trace()
-
         if _wsgi_middleware_applied.get(False):
             return self.app(environ, start_response)
 
