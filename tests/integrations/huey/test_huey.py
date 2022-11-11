@@ -136,5 +136,5 @@ def test_huey_enqueue(init_huey, capture_events):
     assert event["contexts"]["trace"]["span_id"] == transaction.span_id
 
     assert len(event["spans"])
-    assert event["spans"][0]["op"] == "huey.enqueue"
+    assert event["spans"][0]["op"] == "queue.submit.huey"
     assert event["spans"][0]["description"] == "different_task_name"

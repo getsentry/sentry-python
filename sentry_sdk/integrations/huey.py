@@ -6,6 +6,7 @@ from datetime import datetime
 from sentry_sdk._compat import reraise
 from sentry_sdk._types import MYPY
 from sentry_sdk import Hub
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
@@ -49,7 +50,7 @@ def patch_enqueue():
         if hub.get_integration(HueyIntegration) is None:
             return old_enqueue(self, task)
 
-        with hub.start_span(op="huey.enqueue", description=task.name):
+        with hub.start_span(op=OP.QUEUE_SUBMIT_HUEY, description=task.name):
             return old_enqueue(self, task)
 
     Huey.enqueue = _sentry_enqueue
@@ -89,7 +90,7 @@ def _capture_exception(exc_info):
     event, hint = event_from_exception(
         exc_info,
         client_options=hub.client.options if hub.client else None,
-        mechanism={"type": "huey", "handled": False},
+        mechanism={"type": HueyIntegration.identifier, "handled": False},
     )
     hub.capture_event(event, hint=hint)
 
@@ -134,7 +135,7 @@ def patch_execute():
             transaction = Transaction(
                 name=task.name,
                 status="ok",
-                op="huey.task",
+                op=OP.QUEUE_TASK_HUEY,
                 source=TRANSACTION_SOURCE_TASK,
             )
 
