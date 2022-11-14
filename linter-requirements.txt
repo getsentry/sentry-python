@@ -1,4 +1,4 @@
-mypy==0.971
+mypy==0.990
 black==22.10.0
 flake8==5.0.4
 types-certifi
