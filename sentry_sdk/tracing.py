@@ -91,6 +91,7 @@ class Span(object):
         "timestamp",
         "_tags",
         "_data",
+        "_contexts",
         "_span_recorder",
         "hub",
         "_context_manager_state",
@@ -137,6 +138,7 @@ class Span(object):
         self.hub = hub
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
+        self._contexts = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
         self.start_timestamp = datetime.utcnow()
         try:
@@ -461,6 +463,10 @@ class Span(object):
         else:
             self.set_status("unknown_error")
 
+    def set_context(self, key, value):
+        # type: (str, Any) -> None
+        self._contexts[key] = value
+
     def is_success(self):
         # type: () -> bool
         return self.status == "ok"
@@ -678,11 +684,15 @@ class Transaction(Span):
         # to be garbage collected
         self._span_recorder = None
 
+        contexts = {}
+        contexts.update(self._contexts)
+        contexts.update({"trace": self.get_trace_context()})
+
         event = {
             "type": "transaction",
             "transaction": self.name,
             "transaction_info": {"source": self.source},
-            "contexts": {"trace": self.get_trace_context()},
+            "contexts": contexts,
             "tags": self._tags,
             "timestamp": self.timestamp,
             "start_timestamp": self.start_timestamp,

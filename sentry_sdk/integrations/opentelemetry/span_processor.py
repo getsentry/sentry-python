@@ -68,8 +68,10 @@ class SentrySpanProcessor(SpanProcessor):
         sentry_span.op = otel_span.name
 
         if isinstance(sentry_span, Transaction):
-            scope.set_transaction_name(otel_span.name)
-            scope.set_context(OPEN_TELEMETRY_CONTEXT, self._get_otel_context(otel_span))
+            sentry_span.name = otel_span.name
+            sentry_span.set_context(
+                OPEN_TELEMETRY_CONTEXT, self._get_otel_context(otel_span)
+            )
 
         else:
             self._update_span_with_otel_data(sentry_span, otel_span)
