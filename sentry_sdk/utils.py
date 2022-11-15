@@ -39,7 +39,7 @@ if MYPY:
 epoch = datetime(1970, 1, 1)
 
 
-Components = namedtuple(
+Components = namedtuple(  # type: ignore
     typename="Components", field_names=["scheme", "netloc", "path", "query", "fragment"]
 )
 
@@ -1112,7 +1112,7 @@ def sanitize_url(url):
     query_string = parse.unquote(parse.urlencode({key: "%s" for key in query_params}))
 
     safe_url = parse.urlunsplit(
-        Components(
+        Components(  # type: ignore
             scheme=parsed_url.scheme,
             netloc=netloc,
             query=query_string,
