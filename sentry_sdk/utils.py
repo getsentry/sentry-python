@@ -9,7 +9,23 @@ import subprocess
 import re
 import time
 from collections import namedtuple
-from urllib import parse
+
+try:
+    # Python 3
+    from urllib.parse import parse_qs
+    from urllib.parse import unquote
+    from urllib.parse import urlencode
+    from urllib.parse import urlsplit
+    from urllib.parse import urlunsplit
+
+except ImportError:
+    # Python 2
+    from cgi import parse_qs
+    from urllib import unquote
+    from urllib import urlencode
+    from urlparse import urlsplit
+    from urlparse import urlunsplit
+
 
 from datetime import datetime
 
@@ -1098,8 +1114,8 @@ def sanitize_url(url):
     """
     Removes all query parameter values and username:password from a given URL.
     """
-    parsed_url = parse.urlsplit(url)
-    query_params = parse.parse_qs(parsed_url.query, keep_blank_values=True)
+    parsed_url = urlsplit(url)
+    query_params = parse_qs(parsed_url.query, keep_blank_values=True)
 
     # strip username:password (netloc can be usr:pwd@example.com)
     netloc_parts = parsed_url.netloc.split("@")
@@ -1109,9 +1125,9 @@ def sanitize_url(url):
         netloc = parsed_url.netloc
 
     # strip values from query string
-    query_string = parse.unquote(parse.urlencode({key: "%s" for key in query_params}))
+    query_string = unquote(urlencode({key: "%s" for key in query_params}))
 
-    safe_url = parse.urlunsplit(
+    safe_url = urlunsplit(
         Components(  # type: ignore
             scheme=parsed_url.scheme,
             netloc=netloc,
