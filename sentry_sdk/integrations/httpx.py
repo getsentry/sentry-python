@@ -1,5 +1,6 @@
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP
+from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.utils import logger, sanitize_url
 
@@ -43,7 +44,13 @@ def _install_httpx_client():
 
         with hub.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s" % (request.method, sanitize_url(request.url)),
+            description="%s %s"
+            % (
+                request.method,
+                request.url
+                if _should_send_default_pii()
+                else sanitize_url(request.url),
+            ),
         ) as span:
             span.set_data("method", request.method)
             span.set_data("url", str(request.url))
@@ -76,7 +83,13 @@ def _install_httpx_async_client():
 
         with hub.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s" % (request.method, sanitize_url(request.url)),
+            description="%s %s"
+            % (
+                request.method,
+                request.url
+                if _should_send_default_pii()
+                else sanitize_url(request.url),
+            ),
         ) as span:
             span.set_data("method", request.method)
             span.set_data("url", str(request.url))
