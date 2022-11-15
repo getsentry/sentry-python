@@ -1,7 +1,7 @@
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.utils import logger
+from sentry_sdk.utils import logger, parameterize_url
 
 from sentry_sdk._types import MYPY
 
@@ -42,7 +42,8 @@ def _install_httpx_client():
             return real_send(self, request, **kwargs)
 
         with hub.start_span(
-            op=OP.HTTP_CLIENT, description="%s %s" % (request.method, request.url)
+            op=OP.HTTP_CLIENT,
+            description="%s %s" % (request.method, parameterize_url(request.url)),
         ) as span:
             span.set_data("method", request.method)
             span.set_data("url", str(request.url))
@@ -74,7 +75,8 @@ def _install_httpx_async_client():
             return await real_send(self, request, **kwargs)
 
         with hub.start_span(
-            op=OP.HTTP_CLIENT, description="%s %s" % (request.method, request.url)
+            op=OP.HTTP_CLIENT,
+            description="%s %s" % (request.method, parameterize_url(request.url)),
         ) as span:
             span.set_data("method", request.method)
             span.set_data("url", str(request.url))

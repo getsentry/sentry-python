@@ -8,6 +8,8 @@ import threading
 import subprocess
 import re
 import time
+from collections import namedtuple
+from urllib import parse
 
 from datetime import datetime
 
@@ -35,6 +37,11 @@ if MYPY:
 
 
 epoch = datetime(1970, 1, 1)
+
+
+Components = namedtuple(
+    typename="Components", field_names=["scheme", "netloc", "path", "query", "fragment"]
+)
 
 
 # The logger is created here but initialized in the debug support module
@@ -1084,6 +1091,37 @@ def from_base64(base64_string):
         )
 
     return utf8_string
+
+
+def parameterize_url(url):
+    # type: (str) -> str
+    """
+    Removes all query parameter values and username:password from a given URL.
+    """
+    parsed_url = parse.urlsplit(url)
+    query_params = parse.parse_qs(parsed_url.query, keep_blank_values=True)
+
+    # strip username:password (netloc can be usr:pwd@example.com)
+    netloc_parts = parsed_url.netloc.split("@")
+    if len(netloc_parts) > 1:
+        netloc = "%s:%s@" + netloc_parts[-1]
+    else:
+        netloc = parsed_url.netloc
+
+    # strip values from query string
+    query_string = parse.unquote(parse.urlencode({key: "%s" for key in query_params}))
+
+    safe_url = parse.urlunsplit(
+        Components(
+            scheme=parsed_url.scheme,
+            netloc=netloc,
+            query=query_string,
+            path=parsed_url.path,
+            fragment=parsed_url.fragment,
+        )
+    )
+
+    return safe_url
 
 
 if PY37:
