@@ -1093,7 +1093,7 @@ def from_base64(base64_string):
     return utf8_string
 
 
-def parameterize_url(url):
+def sanitize_url(url):
     # type: (str) -> str
     """
     Removes all query parameter values and username:password from a given URL.

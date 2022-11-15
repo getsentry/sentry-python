@@ -1,6 +1,6 @@
 import pytest
 
-from sentry_sdk.utils import parameterize_url
+from sentry_sdk.utils import sanitize_url
 
 
 @pytest.mark.parametrize(
@@ -49,5 +49,5 @@ from sentry_sdk.utils import parameterize_url
         ),
     ],
 )
-def test_parameterize_url(url, expected_result):
-    assert parameterize_url(url) == expected_result
+def test_sanitize_url(url, expected_result):
+    assert sanitize_url(url) == expected_result

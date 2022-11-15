@@ -11,7 +11,7 @@ from sentry_sdk.tracing_utils import EnvironHeaders
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     logger,
-    parameterize_url,
+    sanitize_url,
     safe_repr,
 )
 
@@ -86,7 +86,7 @@ def _install_httplib():
 
         span = hub.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s" % (method, parameterize_url(real_url)),
+            description="%s %s" % (method, sanitize_url(real_url)),
         )
 
         span.set_data("method", method)
