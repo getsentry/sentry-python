@@ -4,7 +4,7 @@ from decimal import DivisionByZero
 from sentry_sdk import start_transaction
 from sentry_sdk.integrations.huey import HueyIntegration
 
-from huey.api import RedisExpireHuey, Result
+from huey.api import MemoryHuey, Result
 from huey.exceptions import RetryTask
 
 
@@ -18,7 +18,7 @@ def init_huey(sentry_init):
             debug=True,
         )
 
-        return RedisExpireHuey(name="sentry_sdk", url="redis://127.0.0.1:6379")
+        return MemoryHuey(name="sentry_sdk")
 
     return inner
 
