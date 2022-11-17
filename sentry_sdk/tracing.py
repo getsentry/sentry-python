@@ -222,7 +222,7 @@ class Span(object):
             else self.client.options["instrumenter"]
         )
         if instrumenter == INSTRUMENTER.OTEL:
-            # logger.warn("start_transaction does NOTHING because instrumenter is OTEL")
+            # logger.warn("start_child does NOTHING because instrumenter is OTEL")
             return NoOpSpan()
 
         kwargs.setdefault("sampled", self.sampled)

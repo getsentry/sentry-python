@@ -1,3 +1,4 @@
+from opentelemetry.trace import format_span_id, format_trace_id
 from opentelemetry.sdk.trace import SpanProcessor
 from opentelemetry.semconv.trace import SpanAttributes
 
@@ -20,47 +21,39 @@ class SentrySpanProcessor(SpanProcessor):
         if not hub:
             return
 
-        # TODO: check for isSentryRequest and if sdk is initialized...
+        span_id = format_span_id(otel_span.context.span_id)
+        trace_id = format_trace_id(otel_span.context.trace_id)
 
-        span_id = otel_span.context.span_id
-        parent_span_id = otel_span.parent.span_id if otel_span.parent else None
-        trace_id = otel_span.context.trace_id
-
-        parent_sentry_span = (
+        parent_span_id = (
+            format_span_id(otel_span.parent.span_id) if otel_span.parent else None
+        )
+        sentry_parent_span = (
             self.otel_span_map[parent_span_id] if parent_span_id else None
         )
 
         sentry_span = None
-        if parent_sentry_span:
-            sentry_span = parent_sentry_span.start_child(
+        if sentry_parent_span:
+            sentry_span = sentry_parent_span.start_child(
                 span_id=span_id,
                 description=otel_span.name,
+                # start_timestamp = xxx, TODO: add start_timestamp to start_child and start_transaction.
                 instrumenter="sentry",
             )
         else:
-            # TODO: add the baggagae sentry-trace stuff to transaction
             sentry_span = hub.start_transaction(
                 name=otel_span.name,
                 span_id=span_id,
                 parent_span_id=parent_span_id,
                 trace_id=trace_id,
-                baggage={},  # TODO: add baggage
-                # TODO: check if we can set start_timestamp
+                # baggage={},  # TODO: get baggage from propagator
+                # start_timestamp = xxx, TODO: add start_timestamp to start_child and start_transaction.
                 instrumenter="sentry",
             )
 
         self.otel_span_map[span_id] = sentry_span
 
     def on_end(self, otel_span):
-        hub = Hub.current
-        if not hub:
-            return
-
-        scope = hub.scope
-        if not scope:
-            return
-
-        span_id = otel_span.context.span_id
+        span_id = format_span_id(otel_span.context.span_id)
         sentry_span = self.otel_span_map.pop(span_id)
         if not sentry_span:
             return
@@ -79,6 +72,10 @@ class SentrySpanProcessor(SpanProcessor):
         sentry_span.finish()
 
     def _get_otel_context(self, otel_span):
+        """
+        Returns the OTel context for Sentry.
+        See: https://develop.sentry.dev/sdk/performance/opentelemetry/#step-5-add-opentelemetry-context
+        """
         ctx = {}
 
         if otel_span.attributes:
