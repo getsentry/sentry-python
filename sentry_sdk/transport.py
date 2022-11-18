@@ -156,6 +156,7 @@ class HttpTransport(Transport):
             http_proxy=options["http_proxy"],
             https_proxy=options["https_proxy"],
             ca_certs=options["ca_certs"],
+            proxy_headers=options["proxy_headers"],
         )
 
         from sentry_sdk import Hub
@@ -420,6 +421,7 @@ class HttpTransport(Transport):
         http_proxy,  # type: Optional[str]
         https_proxy,  # type: Optional[str]
         ca_certs,  # type: Optional[Any]
+        proxy_headers,  # type: Optional[Dict[str, str]]
     ):
         # type: (...) -> Union[PoolManager, ProxyManager]
         proxy = None
@@ -436,6 +438,9 @@ class HttpTransport(Transport):
         opts = self._get_pool_options(ca_certs)
 
         if proxy:
+            if proxy_headers:
+                opts["proxy_headers"] = proxy_headers
+
             return urllib3.ProxyManager(proxy, **opts)
         else:
             return urllib3.PoolManager(**opts)
