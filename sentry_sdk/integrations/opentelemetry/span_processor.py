@@ -16,6 +16,12 @@ class SentrySpanProcessor(SpanProcessor):
 
     otel_span_map = {}  # The mapping from otel span ids to sentry spans
 
+    def __new__(cls):
+        if not hasattr(cls, "instance"):
+            cls.instance = super(SentrySpanProcessor, cls).__new__(cls)
+
+        return cls.instance
+
     def on_start(self, otel_span, parent_context=None):
         hub = Hub.current
         if not hub:
