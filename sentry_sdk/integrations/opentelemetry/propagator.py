@@ -13,11 +13,10 @@ from opentelemetry.propagators.textmap import (
 from opentelemetry.trace import TraceFlags, NonRecordingSpan, SpanContext
 
 from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
-from sentry_sdk.tracing import Transaction
+from sentry_sdk.tracing import SENTRY_TRACE_HEADER_NAME, Transaction
 from sentry_sdk.tracing_utils import Baggage
 
 
-SENTRY_TRACE_HEADER_NAME = "sentry-trace"
 BAGGAGE_HEADER_NAME = "sentry-baggage"
 
 

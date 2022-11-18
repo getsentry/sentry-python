@@ -26,6 +26,8 @@ if MYPY:
     from sentry_sdk._types import Event, SamplingContext, MeasurementUnit
 
 
+SENTRY_TRACE_HEADER_NAME = "sentry-trace"
+
 # Transaction source
 # see https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
 TRANSACTION_SOURCE_CUSTOM = "custom"
@@ -293,7 +295,9 @@ class Span(object):
         baggage = Baggage.from_incoming_header(headers.get("baggage"))
         kwargs.update({"baggage": baggage})
 
-        sentrytrace_kwargs = extract_sentrytrace_data(headers.get("sentry-trace"))
+        sentrytrace_kwargs = extract_sentrytrace_data(
+            headers.get(SENTRY_TRACE_HEADER_NAME)
+        )
 
         if sentrytrace_kwargs is not None:
             kwargs.update(sentrytrace_kwargs)
@@ -320,7 +324,7 @@ class Span(object):
         `sentry_tracestate` value, this will cause one to be generated and
         stored.
         """
-        yield "sentry-trace", self.to_traceparent()
+        yield SENTRY_TRACE_HEADER_NAME, self.to_traceparent()
 
         tracestate = self.to_tracestate() if has_tracestate_enabled(self) else None
         # `tracestate` will only be `None` if there's no client or no DSN
@@ -356,7 +360,9 @@ class Span(object):
         if not traceparent:
             return None
 
-        return cls.continue_from_headers({"sentry-trace": traceparent}, **kwargs)
+        return cls.continue_from_headers(
+            {SENTRY_TRACE_HEADER_NAME: traceparent}, **kwargs
+        )
 
     def to_traceparent(self):
         # type: () -> str
