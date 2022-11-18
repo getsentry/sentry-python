@@ -83,7 +83,7 @@ def patch_app_init() -> None:
         )
 
         SentryStarliteASGIMiddleware.__call__ = SentryStarliteASGIMiddleware._run_asgi3
-        middleware = kwargs.pop("middleware", [])
+        middleware = kwargs.pop("middleware", None) or []
         kwargs["middleware"] = [SentryStarliteASGIMiddleware, *middleware]
         old__init__(self, *args, **kwargs)
 
@@ -105,7 +105,10 @@ def patch_middlewares() -> None:
 
 
 def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
-    if not hasattr(middleware, "__call__"):
+    if (
+        not hasattr(middleware, "__call__")
+        or middleware is SentryStarliteASGIMiddleware
+    ):
         return middleware
 
     if isinstance(middleware, DefineMiddleware):
