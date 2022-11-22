@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.11.1
+
+### Various fixes & improvements
+
+- Move set_transaction_name out of event processor in fastapi/starlette (#1751) by @sl0thentr0py
+- Expose proxy_headers as top level config and use in ProxyManager (#1746) by @sl0thentr0py
+
 ## 1.11.0
 
 ### Various fixes & improvements
