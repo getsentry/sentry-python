@@ -24,7 +24,7 @@ from sentry_sdk.utils import (
 if MYPY:
     from typing import Any, Awaitable, Callable, Dict, Optional
 
-    from sentry_sdk._types import Event
+    from sentry_sdk.scope import Scope as SentryScope
 
 try:
     import starlette  # type: ignore
@@ -36,7 +36,7 @@ try:
     )
     from starlette.requests import Request  # type: ignore
     from starlette.routing import Match  # type: ignore
-    from starlette.types import ASGIApp, Receive, Scope, Send  # type: ignore
+    from starlette.types import ASGIApp, Receive, Scope as StarletteScope, Send  # type: ignore
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
 
@@ -312,7 +312,7 @@ def patch_asgi_app():
     old_app = Starlette.__call__
 
     async def _sentry_patched_asgi_app(self, scope, receive, send):
-        # type: (Starlette, Scope, Receive, Send) -> None
+        # type: (Starlette, StarletteScope, Receive, Send) -> None
         if Hub.current.get_integration(StarletteIntegration) is None:
             return await old_app(self, scope, receive, send)
 
@@ -359,6 +359,11 @@ def patch_request_response():
 
                 with hub.configure_scope() as sentry_scope:
                     request = args[0]
+
+                    _set_transaction_name_and_source(
+                        sentry_scope, integration.transaction_style, request
+                    )
+
                     extractor = StarletteRequestExtractor(request)
                     info = await extractor.extract_request_info()
 
@@ -375,10 +380,6 @@ def patch_request_response():
                                 if "data" in info:
                                     request_info["data"] = info["data"]
                             event["request"] = request_info
-
-                            _set_transaction_name_and_source(
-                                event, integration.transaction_style, req
-                            )
 
                             return event
 
@@ -403,6 +404,11 @@ def patch_request_response():
 
                 with hub.configure_scope() as sentry_scope:
                     request = args[0]
+
+                    _set_transaction_name_and_source(
+                        sentry_scope, integration.transaction_style, request
+                    )
+
                     extractor = StarletteRequestExtractor(request)
                     cookies = extractor.extract_cookies_from_request()
 
@@ -417,10 +423,6 @@ def patch_request_response():
                                 request_info["cookies"] = cookies
 
                             event["request"] = request_info
-
-                            _set_transaction_name_and_source(
-                                event, integration.transaction_style, req
-                            )
 
                             return event
 
@@ -550,8 +552,8 @@ class StarletteRequestExtractor:
         return await self.request.json()
 
 
-def _set_transaction_name_and_source(event, transaction_style, request):
-    # type: (Event, str, Any) -> None
+def _set_transaction_name_and_source(scope, transaction_style, request):
+    # type: (SentryScope, str, Any) -> None
     name = ""
 
     if transaction_style == "endpoint":
@@ -573,9 +575,9 @@ def _set_transaction_name_and_source(event, transaction_style, request):
                     break
 
     if not name:
-        event["transaction"] = _DEFAULT_TRANSACTION_NAME
-        event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
-        return
+        name = _DEFAULT_TRANSACTION_NAME
+        source = TRANSACTION_SOURCE_ROUTE
+    else:
+        source = SOURCE_FOR_STYLE[transaction_style]
 
-    event["transaction"] = name
-    event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
+    scope.set_transaction_name(name, source=source)
