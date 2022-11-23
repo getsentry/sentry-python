@@ -1,7 +1,7 @@
-from opentelemetry.trace import format_span_id, format_trace_id
+from opentelemetry.context import get_value
 from opentelemetry.sdk.trace import SpanProcessor
 from opentelemetry.semconv.trace import SpanAttributes
-from opentelemetry.context import get_value
+from opentelemetry.trace import format_span_id, format_trace_id
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations.opentelemetry.propagator import (
@@ -9,7 +9,6 @@ from sentry_sdk.integrations.opentelemetry.propagator import (
     SENTRY_TRACE_KEY,
 )
 from sentry_sdk.tracing import Transaction
-
 
 OPEN_TELEMETRY_CONTEXT = "otel"
 
