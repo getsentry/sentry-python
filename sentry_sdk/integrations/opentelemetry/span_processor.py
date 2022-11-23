@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from opentelemetry.context import get_value
 from opentelemetry.sdk.trace import SpanProcessor
 from opentelemetry.semconv.trace import SpanAttributes
@@ -43,7 +45,7 @@ class SentrySpanProcessor(SpanProcessor):
             sentry_span = sentry_parent_span.start_child(
                 span_id=trace_data["span_id"],
                 description=otel_span.name,
-                # start_timestamp = xxx, TODO: add start_timestamp to start_child and start_transaction.
+                start_timestamp=datetime.fromtimestamp(otel_span.start_time / 1e9),
                 instrumenter="sentry",
             )
         else:
@@ -53,7 +55,7 @@ class SentrySpanProcessor(SpanProcessor):
                 parent_span_id=parent_span_id,
                 trace_id=trace_data["trace_id"],
                 baggage=trace_data["baggage"],
-                # start_timestamp = xxx, TODO: add start_timestamp to start_child and start_transaction.
+                start_timestamp=datetime.fromtimestamp(otel_span.start_time / 1e9),
                 instrumenter="sentry",
             )
 
@@ -76,7 +78,9 @@ class SentrySpanProcessor(SpanProcessor):
         else:
             self._update_span_with_otel_data(sentry_span, otel_span)
 
-        sentry_span.finish()
+        sentry_span.finish(
+            end_timestamp=datetime.fromtimestamp(otel_span.end_time / 1e9)
+        )
 
     def _get_otel_context(self, otel_span):
         """

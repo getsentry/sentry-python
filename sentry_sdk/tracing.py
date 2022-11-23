@@ -127,6 +127,7 @@ class Span(object):
         status=None,  # type: Optional[str]
         transaction=None,  # type: Optional[str] # deprecated
         containing_transaction=None,  # type: Optional[Transaction]
+        start_timestamp=None,  # type: Optional[datetime]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -142,7 +143,7 @@ class Span(object):
         self._data = {}  # type: Dict[str, Any]
         self._contexts = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
-        self.start_timestamp = datetime.utcnow()
+        self.start_timestamp = start_timestamp or datetime.utcnow()
         try:
             # TODO: For Python 3.7+, we could use a clock with ns resolution:
             # self._start_timestamp_monotonic = time.perf_counter_ns()
@@ -483,8 +484,8 @@ class Span(object):
         # type: () -> bool
         return self.status == "ok"
 
-    def finish(self, hub=None):
-        # type: (Optional[sentry_sdk.Hub]) -> Optional[str]
+    def finish(self, hub=None, end_timestamp=None):
+        # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
         # XXX: would be type: (Optional[sentry_sdk.Hub]) -> None, but that leads
         # to incompatible return types for Span.finish and Transaction.finish.
         if self.timestamp is not None:
@@ -494,8 +495,13 @@ class Span(object):
         hub = hub or self.hub or sentry_sdk.Hub.current
 
         try:
-            duration_seconds = time.perf_counter() - self._start_timestamp_monotonic
-            self.timestamp = self.start_timestamp + timedelta(seconds=duration_seconds)
+            if end_timestamp:
+                self.timestamp = end_timestamp
+            else:
+                duration_seconds = time.perf_counter() - self._start_timestamp_monotonic
+                self.timestamp = self.start_timestamp + timedelta(
+                    seconds=duration_seconds
+                )
         except AttributeError:
             self.timestamp = datetime.utcnow()
 
@@ -641,8 +647,8 @@ class Transaction(Span):
         # reference.
         return self
 
-    def finish(self, hub=None):
-        # type: (Optional[sentry_sdk.Hub]) -> Optional[str]
+    def finish(self, hub=None, end_timestamp=None):
+        # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
         if self.timestamp is not None:
             # This transaction is already finished, ignore.
             return None
@@ -674,7 +680,7 @@ class Transaction(Span):
             )
             self.name = "<unlabeled transaction>"
 
-        Span.finish(self, hub)
+        Span.finish(self, hub, end_timestamp)
 
         if not self.sampled:
             # At this point a `sampled = None` should have already been resolved
