@@ -1,8 +1,13 @@
 from opentelemetry.trace import format_span_id, format_trace_id
 from opentelemetry.sdk.trace import SpanProcessor
 from opentelemetry.semconv.trace import SpanAttributes
+from opentelemetry.context import get_value
 
 from sentry_sdk.hub import Hub
+from sentry_sdk.integrations.opentelemetry.propagator import (
+    SENTRY_BAGGAGE_KEY,
+    SENTRY_TRACE_KEY,
+)
 from sentry_sdk.tracing import Transaction
 
 
@@ -27,12 +32,9 @@ class SentrySpanProcessor(SpanProcessor):
         if not hub:
             return
 
-        span_id = format_span_id(otel_span.context.span_id)
-        trace_id = format_trace_id(otel_span.context.trace_id)
+        trace_data = self._get_trace_data(otel_span, parent_context)
 
-        parent_span_id = (
-            format_span_id(otel_span.parent.span_id) if otel_span.parent else None
-        )
+        parent_span_id = trace_data["parent_span_id"]
         sentry_parent_span = (
             self.otel_span_map.get(parent_span_id, None) if parent_span_id else None
         )
@@ -40,7 +42,7 @@ class SentrySpanProcessor(SpanProcessor):
         sentry_span = None
         if sentry_parent_span:
             sentry_span = sentry_parent_span.start_child(
-                span_id=span_id,
+                span_id=trace_data["span_id"],
                 description=otel_span.name,
                 # start_timestamp = xxx, TODO: add start_timestamp to start_child and start_transaction.
                 instrumenter="sentry",
@@ -48,15 +50,15 @@ class SentrySpanProcessor(SpanProcessor):
         else:
             sentry_span = hub.start_transaction(
                 name=otel_span.name,
-                span_id=span_id,
+                span_id=trace_data["span_id"],
                 parent_span_id=parent_span_id,
-                trace_id=trace_id,
-                # baggage={},  # TODO: get baggage from propagator
+                trace_id=trace_data["trace_id"],
+                baggage=trace_data["baggage"],
                 # start_timestamp = xxx, TODO: add start_timestamp to start_child and start_transaction.
                 instrumenter="sentry",
             )
 
-        self.otel_span_map[span_id] = sentry_span
+        self.otel_span_map[trace_data["span_id"]] = sentry_span
 
     def on_end(self, otel_span):
         span_id = format_span_id(otel_span.context.span_id)
@@ -91,6 +93,33 @@ class SentrySpanProcessor(SpanProcessor):
             ctx["resource"] = dict(otel_span.resource.attributes)
 
         return ctx
+
+    def _get_trace_data(self, otel_span, parent_context):
+        """
+        Extracts tracing information from one OTel span and its parent OTel context.
+        """
+        trace_data = {}
+
+        span_id = format_span_id(otel_span.context.span_id)
+        trace_data["span_id"] = span_id
+
+        trace_id = format_trace_id(otel_span.context.trace_id)
+        trace_data["trace_id"] = trace_id
+
+        parent_span_id = (
+            format_span_id(otel_span.parent.span_id) if otel_span.parent else None
+        )
+        trace_data["parent_span_id"] = parent_span_id
+
+        sentry_trace_data = get_value(SENTRY_TRACE_KEY, parent_context)
+        trace_data["parent_sampled"] = (
+            sentry_trace_data[2] if sentry_trace_data else None
+        )
+
+        baggage = get_value(SENTRY_BAGGAGE_KEY, parent_context)
+        trace_data["baggage"] = baggage
+
+        return trace_data
 
     def _update_span_with_otel_data(self, sentry_span, otel_span):
         """

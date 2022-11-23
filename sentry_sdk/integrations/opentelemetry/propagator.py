@@ -12,7 +12,6 @@ from opentelemetry.propagators.textmap import (
 )
 from opentelemetry.trace import TraceFlags, NonRecordingSpan, SpanContext
 
-from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
 from sentry_sdk.tracing import SENTRY_TRACE_HEADER_NAME, Transaction
 from sentry_sdk.tracing_utils import Baggage
 
@@ -79,6 +78,10 @@ class SentryPropagator(TextMapPropagator):
 
         current_span = trace.get_current_span(context)
         span_id = trace.format_span_id(current_span.context.span_id)
+
+        from sentry_sdk.integrations.opentelemetry.span_processor import (
+            SentrySpanProcessor,
+        )
 
         span_map = SentrySpanProcessor().otel_span_map
         sentry_span = span_map.get(span_id, None)
