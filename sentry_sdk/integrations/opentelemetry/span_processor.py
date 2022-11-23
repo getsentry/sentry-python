@@ -34,7 +34,7 @@ class SentrySpanProcessor(SpanProcessor):
             format_span_id(otel_span.parent.span_id) if otel_span.parent else None
         )
         sentry_parent_span = (
-            self.otel_span_map[parent_span_id] if parent_span_id else None
+            self.otel_span_map.get(parent_span_id, None) if parent_span_id else None
         )
 
         sentry_span = None

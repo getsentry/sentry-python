@@ -1,7 +1,7 @@
 import typing
 
 from opentelemetry import trace
-from opentelemetry.context import Context, create_key, get_current
+from opentelemetry.context import Context, create_key, get_current, set_value
 from opentelemetry.propagators.textmap import (
     CarrierT,
     Getter,
@@ -17,7 +17,7 @@ from sentry_sdk.tracing import SENTRY_TRACE_HEADER_NAME, Transaction
 from sentry_sdk.tracing_utils import Baggage
 
 
-BAGGAGE_HEADER_NAME = "sentry-baggage"
+BAGGAGE_HEADER_NAME = "baggage"
 
 
 SENTRY_TRACE_KEY = create_key("sentry-trace")
@@ -38,23 +38,23 @@ class SentryPropagator(TextMapPropagator):
         if not sentry_trace:
             return context
 
-        sentry_trace_data = Transaction.extract_sentry_trace(sentry_trace)
-        context = context.set_value(SENTRY_TRACE_KEY, sentry_trace_data)
+        sentry_trace_data = Transaction.extract_sentry_trace(sentry_trace[0])
+        context = set_value(SENTRY_TRACE_KEY, sentry_trace_data, context)
 
         trace_id, span_id, _parent_sampled = sentry_trace_data
 
         span_context = SpanContext(
-            trace_id=trace_id,
-            span_id=span_id,
+            trace_id=int(trace_id, 16),
+            span_id=int(span_id, 16),
             # we simulate a sampled trace on the otel side and leave the sampling to sentry
-            trace_flags=TraceFlags.SAMPLED,
+            trace_flags=TraceFlags(TraceFlags.SAMPLED),
             is_remote=True,
         )
 
         baggage_header = getter.get(carrier, BAGGAGE_HEADER_NAME)
 
         if baggage_header:
-            baggage = Baggage.from_incoming_header(baggage_header)
+            baggage = Baggage.from_incoming_header(baggage_header[0])
         else:
             # If there's an incoming sentry-trace but no incoming baggage header,
             # for instance in traces coming from older SDKs,
@@ -62,7 +62,7 @@ class SentryPropagator(TextMapPropagator):
             baggage = Baggage()
 
         baggage.freeze()
-        context = context.set_value(SENTRY_BAGGAGE_KEY, baggage)
+        context = set_value(SENTRY_BAGGAGE_KEY, baggage, context)
 
         span = NonRecordingSpan(span_context)
         modified_context = trace.set_span_in_context(span, context)
