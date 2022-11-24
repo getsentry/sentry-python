@@ -1,11 +1,18 @@
 # Changelog
 
+## 1.11.1
+
+### Various fixes & improvements
+
+- Move set_transaction_name out of event processor in fastapi/starlette (#1751) by @sl0thentr0py
+- Expose proxy_headers as top level config and use in ProxyManager: https://docs.sentry.io/platforms/python/configuration/options/#proxy-headers (#1746) by @sl0thentr0py
+
 ## 1.11.0
 
 ### Various fixes & improvements
 
 - Fix signals problem on sentry.io (#1732) by @antonpirker
-- Fix reading FastAPI request body twice.  (#1724) by @antonpirker
+- Fix reading FastAPI request body twice. (#1724) by @antonpirker
 - ref(profiling): Do not error if already setup (#1731) by @Zylphrex
 - ref(profiling): Use sleep scheduler by default (#1729) by @Zylphrex
 - feat(profiling): Extract more frame info (#1702) by @Zylphrex
