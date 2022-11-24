@@ -1,5 +1,3 @@
-import typing
-
 from opentelemetry import trace  # type: ignore
 from opentelemetry.context import (  # type: ignore
     Context,
@@ -23,6 +21,11 @@ from opentelemetry.trace import (  # type: ignore
 
 from sentry_sdk.tracing import SENTRY_TRACE_HEADER_NAME, Transaction
 from sentry_sdk.tracing_utils import Baggage
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from typing import Optional
+    from typing import Set
 
 
 BAGGAGE_HEADER_NAME = "baggage"
@@ -33,12 +36,8 @@ SENTRY_BAGGAGE_KEY = create_key("sentry-baggage")
 
 
 class SentryPropagator(TextMapPropagator):  # type: ignore
-    def extract(
-        self,
-        carrier: CarrierT,
-        context: typing.Optional[Context] = None,
-        getter: Getter = default_getter,
-    ) -> Context:
+    def extract(self, carrier, context=None, getter=default_getter):
+        # type: (CarrierT, Optional[Context], Getter) -> Context
         if context is None:
             context = get_current()
 
@@ -47,9 +46,10 @@ class SentryPropagator(TextMapPropagator):  # type: ignore
             return context
 
         sentry_trace_data = Transaction.extract_sentry_trace(sentry_trace[0])
+
         context = set_value(SENTRY_TRACE_KEY, sentry_trace_data, context)
 
-        trace_id, span_id, _parent_sampled = sentry_trace_data
+        trace_id, span_id, _ = sentry_trace_data
 
         span_context = SpanContext(
             trace_id=int(trace_id, 16),
@@ -76,12 +76,9 @@ class SentryPropagator(TextMapPropagator):  # type: ignore
         modified_context = trace.set_span_in_context(span, context)
         return modified_context
 
-    def inject(
-        self,
-        carrier: CarrierT,
-        context: typing.Optional[Context] = None,
-        setter: Setter = default_setter,
-    ) -> None:
+    def inject(self, carrier, context=None, setter=default_setter):
+        # type: (CarrierT, Optional[Context], Setter) -> None
+
         if context is None:
             context = get_current()
 
@@ -104,7 +101,8 @@ class SentryPropagator(TextMapPropagator):  # type: ignore
             setter.set(carrier, BAGGAGE_HEADER_NAME, baggage)
 
     @property
-    def fields(self) -> typing.Set[str]:
+    def fields(self):
+        # type: () -> Set[str]
         return {
             self.TRACE_ID_KEY,
             self.SPAN_ID_KEY,
