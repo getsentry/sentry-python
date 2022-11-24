@@ -1,8 +1,13 @@
 import typing
 
-from opentelemetry import trace
-from opentelemetry.context import Context, create_key, get_current, set_value
-from opentelemetry.propagators.textmap import (
+from opentelemetry import trace  # type: ignore
+from opentelemetry.context import (  # type: ignore
+    Context,
+    create_key,
+    get_current,
+    set_value,
+)
+from opentelemetry.propagators.textmap import (  # type: ignore
     CarrierT,
     Getter,
     Setter,
@@ -10,7 +15,11 @@ from opentelemetry.propagators.textmap import (
     default_getter,
     default_setter,
 )
-from opentelemetry.trace import TraceFlags, NonRecordingSpan, SpanContext
+from opentelemetry.trace import (  # type: ignore
+    TraceFlags,
+    NonRecordingSpan,
+    SpanContext,
+)
 
 from sentry_sdk.tracing import SENTRY_TRACE_HEADER_NAME, Transaction
 from sentry_sdk.tracing_utils import Baggage
@@ -23,7 +32,7 @@ SENTRY_TRACE_KEY = create_key("sentry-trace")
 SENTRY_BAGGAGE_KEY = create_key("sentry-baggage")
 
 
-class SentryPropagator(TextMapPropagator):
+class SentryPropagator(TextMapPropagator):  # type: ignore
     def extract(
         self,
         carrier: CarrierT,
@@ -58,7 +67,7 @@ class SentryPropagator(TextMapPropagator):
             # If there's an incoming sentry-trace but no incoming baggage header,
             # for instance in traces coming from older SDKs,
             # baggage will be empty and frozen and won't be populated as head SDK.
-            baggage = Baggage()
+            baggage = Baggage(sentry_items={})
 
         baggage.freeze()
         context = set_value(SENTRY_BAGGAGE_KEY, baggage, context)

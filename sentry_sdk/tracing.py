@@ -210,8 +210,8 @@ class Span(object):
         # referencing themselves)
         return self._containing_transaction
 
-    def start_child(self, instrumenter=None, **kwargs):
-        # type: (Optional[str], **Any) -> Span
+    def start_child(self, **kwargs):
+        # type: (**Any) -> Span
         """
         Start a sub-span from the current span or transaction.
 
@@ -219,10 +219,11 @@ class Span(object):
         trace id, sampling decision, transaction pointer, and span recorder are
         inherited from the current span/transaction.
         """
-        instrumenter = (
-            instrumenter
-            if instrumenter is not None
-            else self.client.options["instrumenter"]
+        hub = self.hub or sentry_sdk.Hub.current
+        client = hub.client
+
+        instrumenter = kwargs.get("instrumenter", None) or (
+            client and client.options["instrumenter"]
         )
         if instrumenter == INSTRUMENTER.OTEL:
             # logger.warn("start_child does NOTHING because instrumenter is OTEL")
@@ -376,6 +377,7 @@ class Span(object):
 
     @classmethod
     def extract_sentry_trace(cls, sentry_trace):
+        # type: (str) -> Tuple[str, str, bool]
         trace_id, parent_span_id, parent_sampled = sentry_trace.split("-")
         parent_sampled = True if parent_sampled == "1" else False
         return (trace_id, parent_span_id, parent_sampled)
@@ -484,7 +486,7 @@ class Span(object):
         # type: () -> bool
         return self.status == "ok"
 
-    def finish(self, hub=None, end_timestamp=None):
+    def finish(self, hub=None, **kwargs):
         # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
         # XXX: would be type: (Optional[sentry_sdk.Hub]) -> None, but that leads
         # to incompatible return types for Span.finish and Transaction.finish.
@@ -495,6 +497,7 @@ class Span(object):
         hub = hub or self.hub or sentry_sdk.Hub.current
 
         try:
+            end_timestamp = kwargs.get("end_timestamp", None)
             if end_timestamp:
                 self.timestamp = end_timestamp
             else:
@@ -647,7 +650,7 @@ class Transaction(Span):
         # reference.
         return self
 
-    def finish(self, hub=None, end_timestamp=None):
+    def finish(self, hub=None, **kwargs):
         # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
         if self.timestamp is not None:
             # This transaction is already finished, ignore.
@@ -680,7 +683,7 @@ class Transaction(Span):
             )
             self.name = "<unlabeled transaction>"
 
-        Span.finish(self, hub, end_timestamp)
+        Span.finish(self, hub, **kwargs)
 
         if not self.sampled:
             # At this point a `sampled = None` should have already been resolved
@@ -862,33 +865,43 @@ class Transaction(Span):
 
 class NoOpSpan(Span):
     def __repr__(self):
+        # type: () -> Any
         return self.__class__.__name__
 
     def __enter__(self):
+        # type: () -> Any
         return self
 
     def __exit__(self, ty, value, tb):
+        # type: (Any, Any, Any) -> Any
         pass
 
     def start_child(self, **kwargs):
+        # type: (**Any) -> Any
         pass
 
     def new_span(self, **kwargs):
+        # type: (**Any) -> Any
         pass
 
     def set_tag(self, key, value):
+        # type: (Any, Any) -> Any
         pass
 
     def set_data(self, key, value):
+        # type: (Any, Any) -> Any
         pass
 
     def set_status(self, value):
+        # type: (Any) -> Any
         pass
 
     def set_http_status(self, http_status):
+        # type: (Any) -> Any
         pass
 
-    def finish(self, hub=None):
+    def finish(self, hub=None, **kwargs):
+        # type: (Any, **Any) -> Any
         pass
 
 

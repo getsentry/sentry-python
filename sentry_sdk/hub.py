@@ -451,7 +451,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def start_span(
         self,
         span=None,  # type: Optional[Span]
-        instrumenter=None,  # type: Optional[str]
         **kwargs  # type: Any
     ):
         # type: (...) -> Span
@@ -466,13 +465,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         for every incoming HTTP request. Use `start_transaction` to start a new
         transaction when one is not already in progress.
         """
-        instrumenter = (
-            instrumenter
-            if instrumenter is not None
-            else self.client.options["instrumenter"]
+        instrumenter = kwargs.get("instrumenter", None) or (
+            self.client and self.client.options["instrumenter"]
         )
+
         if instrumenter == INSTRUMENTER.OTEL:
-            # logger.warn("start_span does NOTHING because instrumenter is OTEL")
+            # logger.warn("start_child does NOTHING because instrumenter is OTEL")
             return NoOpSpan()
 
         # TODO: consider removing this in a future release.
@@ -505,10 +503,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def start_transaction(
         self,
         transaction=None,  # type: Optional[Transaction]
-        instrumenter=None,  # type: Optional[str]
         **kwargs  # type: Any
     ):
-        # type: (...) -> Transaction
+        # type: (...) -> Union[Transaction, NoOpSpan]
         """
         Start and return a transaction.
 
@@ -531,13 +528,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         When the transaction is finished, it will be sent to Sentry with all its
         finished child spans.
         """
-        instrumenter = (
-            instrumenter
-            if instrumenter is not None
-            else self.client.options["instrumenter"]
+        instrumenter = kwargs.get("instrumenter", None) or (
+            self.client and self.client.options["instrumenter"]
         )
+
         if instrumenter == INSTRUMENTER.OTEL:
-            # logger.warn("start_transaction does NOTHING because instrumenter is OTEL")
+            # logger.warn("start_child does NOTHING because instrumenter is OTEL")
             return NoOpSpan()
 
         custom_sampling_context = kwargs.pop("custom_sampling_context", {})

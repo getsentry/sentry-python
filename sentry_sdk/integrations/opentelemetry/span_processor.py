@@ -1,34 +1,43 @@
 from datetime import datetime
 
-from opentelemetry.context import get_value
-from opentelemetry.sdk.trace import SpanProcessor
-from opentelemetry.semconv.trace import SpanAttributes
-from opentelemetry.trace import format_span_id, format_trace_id
+from opentelemetry.context import get_value, SpanContext  # type: ignore
+from opentelemetry.sdk.trace import SpanProcessor  # type: ignore
+from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
+from opentelemetry.trace import format_span_id, format_trace_id, Span as OTelSpan  # type: ignore
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations.opentelemetry.propagator import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
 )
-from sentry_sdk.tracing import Transaction
+from sentry_sdk.tracing import Transaction, Span as SentrySpan
+from sentry_sdk._types import MYPY
+
+if MYPY:
+    from typing import Any
+    from typing import Dict
+    from typing import Union
 
 OPEN_TELEMETRY_CONTEXT = "otel"
 
 
-class SentrySpanProcessor(SpanProcessor):
+class SentrySpanProcessor(SpanProcessor):  # type: ignore
     """
     Converts OTel spans into Sentry spans so they can be sent to the Sentry backend.
     """
 
-    otel_span_map = {}  # The mapping from otel span ids to sentry spans
+    # The mapping from otel span ids to sentry spans
+    otel_span_map = {}  # type: Dict[str, Union[Transaction, OTelSpan]]
 
     def __new__(cls):
+        # type: () -> SentrySpanProcessor
         if not hasattr(cls, "instance"):
             cls.instance = super(SentrySpanProcessor, cls).__new__(cls)
 
         return cls.instance
 
     def on_start(self, otel_span, parent_context=None):
+        # type: (OTelSpan, SpanContext) -> None
         hub = Hub.current
         if not hub:
             return
@@ -62,6 +71,7 @@ class SentrySpanProcessor(SpanProcessor):
         self.otel_span_map[trace_data["span_id"]] = sentry_span
 
     def on_end(self, otel_span):
+        # type: (OTelSpan) -> None
         span_id = format_span_id(otel_span.context.span_id)
         sentry_span = self.otel_span_map.pop(span_id)
         if not sentry_span:
@@ -83,6 +93,7 @@ class SentrySpanProcessor(SpanProcessor):
         )
 
     def _get_otel_context(self, otel_span):
+        # type: (OTelSpan) -> Dict[str, Any]
         """
         Returns the OTel context for Sentry.
         See: https://develop.sentry.dev/sdk/performance/opentelemetry/#step-5-add-opentelemetry-context
@@ -98,6 +109,7 @@ class SentrySpanProcessor(SpanProcessor):
         return ctx
 
     def _get_trace_data(self, otel_span, parent_context):
+        # type: (OTelSpan, SpanContext) -> Dict[str, Any]
         """
         Extracts tracing information from one OTel span and its parent OTel context.
         """
@@ -125,6 +137,7 @@ class SentrySpanProcessor(SpanProcessor):
         return trace_data
 
     def _update_span_with_otel_data(self, sentry_span, otel_span):
+        # type: (SentrySpan, OTelSpan) -> None
         """
         Convert OTel span data and update the Sentry span with it.
         This should eventually happen on the server when ingesting the spans.
