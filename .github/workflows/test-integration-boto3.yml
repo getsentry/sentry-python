@@ -48,8 +48,6 @@ jobs:
           pip install codecov tox
 
       - name: Test boto3
-        env:
-          CI_PYTHON_VERSION: ${{ matrix.python-version }}
         timeout-minutes: 45
         shell: bash
         run: |
