@@ -195,16 +195,16 @@ def test_on_start_transaction():
 
     parent_context = {}
 
-    fakeHub = MagicMock()
-    fakeHub.current.return_value = MagicMock()
+    fake_hub = MagicMock()
+    fake_hub.current.return_value = MagicMock()
 
     with mock.patch(
-        "sentry_sdk.integrations.opentelemetry.span_processor.Hub", fakeHub
+        "sentry_sdk.integrations.opentelemetry.span_processor.Hub", fake_hub
     ):
         span_processor = SentrySpanProcessor()
         span_processor.on_start(otel_span, parent_context)
 
-        fakeHub.current.start_transaction.assert_called_once_with(
+        fake_hub.current.start_transaction.assert_called_once_with(
             name="Sample OTel Span",
             span_id="1234567890abcdef",
             parent_span_id="abcdef1234567890",
@@ -230,11 +230,11 @@ def test_on_start_child():
 
     parent_context = {}
 
-    fakeHub = MagicMock()
-    fakeHub.current.return_value = MagicMock()
+    fake_hub = MagicMock()
+    fake_hub.current.return_value = MagicMock()
 
     with mock.patch(
-        "sentry_sdk.integrations.opentelemetry.span_processor.Hub", fakeHub
+        "sentry_sdk.integrations.opentelemetry.span_processor.Hub", fake_hub
     ):
         fakeSpan = MagicMock()
 
