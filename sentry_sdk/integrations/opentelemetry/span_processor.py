@@ -153,7 +153,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         db_query = otel_span.attributes.get(SpanAttributes.DB_SYSTEM, None)
 
         if http_method:
-            op = "http.{}".format(http_method)
+            op = "http.{}".format(http_method.lower())
             description = http_method
 
             peer_name = otel_span.attributes.get(SpanAttributes.NET_PEER_NAME, None)

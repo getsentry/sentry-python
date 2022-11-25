@@ -18,7 +18,6 @@ from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProce
 
 
 def test_extract_no_context_no_sentry_trace_header():
-    # type: () -> None
     """
     No context and NO Sentry trace data in getter.
     Extract should return empty context.
@@ -34,7 +33,6 @@ def test_extract_no_context_no_sentry_trace_header():
 
 
 def test_extract_context_no_sentry_trace_header():
-    # type: () -> None
     """
     Context but NO Sentry trace data in getter.
     Extract should return context as is.
@@ -50,7 +48,6 @@ def test_extract_context_no_sentry_trace_header():
 
 
 def test_extract_empty_context_sentry_trace_header_no_baggage():
-    # type: () -> None
     """
     Empty context but Sentry trace data but NO Baggage in getter.
     Extract should return context that has empty baggage in it and also a NoopSpan with span_id and trace_id.
@@ -80,7 +77,6 @@ def test_extract_empty_context_sentry_trace_header_no_baggage():
 
 
 def test_extract_context_sentry_trace_header_baggage():
-    # type: () -> None
     """
     Empty context but Sentry trace data and Baggage in getter.
     Extract should return context that has baggage in it and also a NoopSpan with span_id and trace_id.
@@ -120,7 +116,6 @@ def test_extract_context_sentry_trace_header_baggage():
 
 
 def test_inject_empty_otel_span_map():
-    # type: () -> None
     """
     Empty otel_span_map.
     So there is no sentry_span to be found in inject()
@@ -151,7 +146,6 @@ def test_inject_empty_otel_span_map():
 
 
 def test_inject_sentry_span_no_baggage():
-    # type: () -> None
     """
     Inject a sentry span with no baggage.
     """
@@ -196,7 +190,6 @@ def test_inject_sentry_span_no_baggage():
 
 
 def test_inject_sentry_span_baggage():
-    # type: () -> None
     """
     Inject a sentry span with baggage.
     """
