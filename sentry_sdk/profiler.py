@@ -240,12 +240,10 @@ class Profile(object):
         self,
         scheduler,  # type: Scheduler
         transaction,  # type: sentry_sdk.tracing.Transaction
-        hub=None,  # type: Optional[sentry_sdk.Hub]
     ):
         # type: (...) -> None
         self.scheduler = scheduler
         self.transaction = transaction
-        self.hub = hub
         self._start_ns = None  # type: Optional[int]
         self._stop_ns = None  # type: Optional[int]
 
@@ -754,7 +752,7 @@ def start_profiling(transaction, hub=None):
     # if profiling was not enabled, this should be a noop
     if _should_profile(transaction, hub):
         assert _scheduler is not None
-        with Profile(_scheduler, transaction, hub=hub):
+        with Profile(_scheduler, transaction):
             yield
     else:
         yield
