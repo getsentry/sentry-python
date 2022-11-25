@@ -112,6 +112,7 @@ class ClientConstructor(object):
         auto_session_tracking=True,  # type: bool
         send_client_reports=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
+        proxy_headers=None,  # type: Optional[Dict[str, str]]
     ):
         # type: (...) -> None
         pass
@@ -135,4 +136,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.11.0"
+VERSION = "1.11.1"
