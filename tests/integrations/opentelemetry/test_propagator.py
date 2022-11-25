@@ -58,7 +58,10 @@ def test_extract_empty_context_sentry_trace_header_no_baggage():
     carrier = None
     context = {}
     getter = MagicMock()
-    getter.get.return_value = ["1234567890abcdef1234567890abcdef-1234567890abcdef-1"]
+    getter.get.side_effect = [
+        ["1234567890abcdef1234567890abcdef-1234567890abcdef-1"],
+        None,
+    ]
 
     modified_context = SentryPropagator().extract(carrier, context, getter)
 
