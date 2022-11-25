@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from opentelemetry.context import get_value, SpanContext  # type: ignore
+from opentelemetry.context import get_value  # type: ignore
 from opentelemetry.sdk.trace import SpanProcessor  # type: ignore
 from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
-from opentelemetry.trace import format_span_id, format_trace_id, Span as OTelSpan  # type: ignore
+from opentelemetry.trace import format_span_id, format_trace_id, SpanContext, Span as OTelSpan  # type: ignore
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations.opentelemetry.propagator import (

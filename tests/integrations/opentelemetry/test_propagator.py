@@ -1,34 +1,248 @@
-# test extract
+from mock import MagicMock
+import mock
 
-#   no context, no SENTRY_TRACE_HEADER_NAME in getter
-#       should return context as is
-#   some context, no SENTRY_TRACE_HEADER_NAME in getter
-#       should return context as is
+from opentelemetry.context import get_current
+from opentelemetry.trace.propagation import get_current_span
+from opentelemetry.trace import (
+    set_span_in_context,
+    TraceFlags,
+    SpanContext,
+)
 
-#   no context but sentry trace data and baggage in getter
-#       return context should have baggage in it and also a noopspan with trace data (span and trace id)
-
-#   no context but sentry trace data and NO baggage in getter
-#       return context should have baggage in it and also a noopspan with trace data (span and trace id)
-
-
-#   some context but sentry trace data and baggage in getter
-#       return context should have given context and baggage in it and also a noopspan with trace data (span and trace id)
-
-#   some context but sentry trace data and NO baggage in getter
-#       return context should have given context and empty baggage in it and also a noopspan with trace data (span and trace id)
+from sentry_sdk.integrations.opentelemetry.propagator import (
+    SENTRY_BAGGAGE_KEY,
+    SENTRY_TRACE_KEY,
+    SentryPropagator,
+)
+from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
 
 
-# test inject
+def test_extract_no_context_no_sentry_trace_header():
+    # type: () -> None
+    """
+    No context and NO Sentry trace data in getter.
+    Extract should return empty context.
+    """
+    carrier = None
+    context = None
+    getter = MagicMock()
+    getter.get.return_value = None
 
-# give empty otel_span_map
-#   should return none
+    modified_context = SentryPropagator().extract(carrier, context, getter)
 
-# give empty otel_span_map with sentry span and also a context that has span with span id. the span id in otel_span_map and context should NOT match
-#   should return none
+    assert modified_context == {}
 
-# give otel_span_map with sentry span with matching span id, without baggage
-#   check that setter.set is called with sentry span to_traceparent() but no call to setter.set baggage header
 
-# give otel_span_map with sentry span with baggage
-#   call to setter.set baggage header
+def test_extract_context_no_sentry_trace_header():
+    # type: () -> None
+    """
+    Context but NO Sentry trace data in getter.
+    Extract should return context as is.
+    """
+    carrier = None
+    context = {"some": "value"}
+    getter = MagicMock()
+    getter.get.return_value = None
+
+    modified_context = SentryPropagator().extract(carrier, context, getter)
+
+    assert modified_context == context
+
+
+def test_extract_empty_context_sentry_trace_header_no_baggage():
+    # type: () -> None
+    """
+    Empty context but Sentry trace data but NO Baggage in getter.
+    Extract should return context that has empty baggage in it and also a NoopSpan with span_id and trace_id.
+    """
+    carrier = None
+    context = {}
+    getter = MagicMock()
+    getter.get.return_value = ["1234567890abcdef1234567890abcdef-1234567890abcdef-1"]
+
+    modified_context = SentryPropagator().extract(carrier, context, getter)
+
+    assert len(modified_context.keys()) == 3
+
+    assert modified_context[SENTRY_TRACE_KEY] == (
+        "1234567890abcdef1234567890abcdef",
+        "1234567890abcdef",
+        True,
+    )
+    assert modified_context[SENTRY_BAGGAGE_KEY].serialize() == ""
+
+    span_context = get_current_span(modified_context).get_span_context()
+    assert span_context.span_id == int("1234567890abcdef", 16)
+    assert span_context.trace_id == int("1234567890abcdef1234567890abcdef", 16)
+
+
+def test_extract_context_sentry_trace_header_baggage():
+    # type: () -> None
+    """
+    Empty context but Sentry trace data and Baggage in getter.
+    Extract should return context that has baggage in it and also a NoopSpan with span_id and trace_id.
+    """
+    baggage_header = (
+        "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
+        "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
+        "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
+    )
+
+    carrier = None
+    context = {"some": "value"}
+    getter = MagicMock()
+    getter.get.side_effect = [
+        ["1234567890abcdef1234567890abcdef-1234567890abcdef-1"],
+        [baggage_header],
+    ]
+
+    modified_context = SentryPropagator().extract(carrier, context, getter)
+
+    assert len(modified_context.keys()) == 4
+
+    assert modified_context[SENTRY_TRACE_KEY] == (
+        "1234567890abcdef1234567890abcdef",
+        "1234567890abcdef",
+        True,
+    )
+    assert modified_context[SENTRY_BAGGAGE_KEY].serialize() == (
+        "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+        "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+        "sentry-sample_rate=0.01337,sentry-user_id=Am%C3%A9lie"
+    )
+
+    span_context = get_current_span(modified_context).get_span_context()
+    assert span_context.span_id == int("1234567890abcdef", 16)
+    assert span_context.trace_id == int("1234567890abcdef1234567890abcdef", 16)
+
+
+def test_inject_empty_otel_span_map():
+    # type: () -> None
+    """
+    Empty otel_span_map.
+    So there is no sentry_span to be found in inject()
+    and the function is returned early and no setters are called.
+    """
+    carrier = None
+    context = get_current()
+    setter = MagicMock()
+    setter.set = MagicMock()
+
+    span_context = SpanContext(
+        trace_id=int("1234567890abcdef1234567890abcdef", 16),
+        span_id=int("1234567890abcdef", 16),
+        trace_flags=TraceFlags(TraceFlags.SAMPLED),
+        is_remote=True,
+    )
+    span = MagicMock()
+    span.context = span_context
+
+    with mock.patch(
+        "sentry_sdk.integrations.opentelemetry.propagator.trace.get_current_span",
+        return_value=span,
+    ):
+        full_context = set_span_in_context(span, context)
+        SentryPropagator().inject(carrier, full_context, setter)
+
+        setter.set.assert_not_called()
+
+
+def test_inject_sentry_span_no_baggage():
+    # type: () -> None
+    """
+    Inject a sentry span with no baggage.
+    """
+    carrier = None
+    context = get_current()
+    setter = MagicMock()
+    setter.set = MagicMock()
+
+    trace_id = "1234567890abcdef1234567890abcdef"
+    span_id = "1234567890abcdef"
+
+    span_context = SpanContext(
+        trace_id=int(trace_id, 16),
+        span_id=int(span_id, 16),
+        trace_flags=TraceFlags(TraceFlags.SAMPLED),
+        is_remote=True,
+    )
+    span = MagicMock()
+    span.context = span_context
+
+    sentry_span = MagicMock()
+    sentry_span.to_traceparent = mock.Mock(
+        return_value="1234567890abcdef1234567890abcdef-1234567890abcdef-1"
+    )
+    sentry_span.get_baggage = mock.Mock(return_value=None)
+
+    span_processor = SentrySpanProcessor()
+    span_processor.otel_span_map[span_id] = sentry_span
+
+    with mock.patch(
+        "sentry_sdk.integrations.opentelemetry.propagator.trace.get_current_span",
+        return_value=span,
+    ):
+        full_context = set_span_in_context(span, context)
+        SentryPropagator().inject(carrier, full_context, setter)
+
+        setter.set.assert_called_once_with(
+            carrier,
+            "sentry-trace",
+            "1234567890abcdef1234567890abcdef-1234567890abcdef-1",
+        )
+
+
+def test_inject_sentry_span_baggage():
+    # type: () -> None
+    """
+    Inject a sentry span with baggage.
+    """
+    carrier = None
+    context = get_current()
+    setter = MagicMock()
+    setter.set = MagicMock()
+
+    trace_id = "1234567890abcdef1234567890abcdef"
+    span_id = "1234567890abcdef"
+
+    span_context = SpanContext(
+        trace_id=int(trace_id, 16),
+        span_id=int(span_id, 16),
+        trace_flags=TraceFlags(TraceFlags.SAMPLED),
+        is_remote=True,
+    )
+    span = MagicMock()
+    span.context = span_context
+
+    sentry_span = MagicMock()
+    sentry_span.to_traceparent = mock.Mock(
+        return_value="1234567890abcdef1234567890abcdef-1234567890abcdef-1"
+    )
+    baggage = (
+        "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+        "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+        "sentry-sample_rate=0.01337,sentry-user_id=Am%C3%A9lie"
+    )
+    sentry_span.get_baggage = mock.Mock(return_value=baggage)
+
+    span_processor = SentrySpanProcessor()
+    span_processor.otel_span_map[span_id] = sentry_span
+
+    with mock.patch(
+        "sentry_sdk.integrations.opentelemetry.propagator.trace.get_current_span",
+        return_value=span,
+    ):
+        full_context = set_span_in_context(span, context)
+        SentryPropagator().inject(carrier, full_context, setter)
+
+        setter.set.assert_any_call(
+            carrier,
+            "sentry-trace",
+            "1234567890abcdef1234567890abcdef-1234567890abcdef-1",
+        )
+
+        setter.set.assert_any_call(
+            carrier,
+            "baggage",
+            baggage,
+        )

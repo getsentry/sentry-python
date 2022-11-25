@@ -128,6 +128,7 @@ class Span(object):
         transaction=None,  # type: Optional[str] # deprecated
         containing_transaction=None,  # type: Optional[Transaction]
         start_timestamp=None,  # type: Optional[datetime]
+        instrumenter=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -225,6 +226,7 @@ class Span(object):
         instrumenter = kwargs.get("instrumenter", None) or (
             client and client.options["instrumenter"]
         )
+
         if instrumenter == INSTRUMENTER.OTEL:
             # logger.warn("start_child does NOTHING because instrumenter is OTEL")
             return NoOpSpan()

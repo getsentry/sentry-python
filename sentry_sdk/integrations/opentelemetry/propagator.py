@@ -78,7 +78,6 @@ class SentryPropagator(TextMapPropagator):  # type: ignore
 
     def inject(self, carrier, context=None, setter=default_setter):
         # type: (CarrierT, Optional[Context], Setter) -> None
-
         if context is None:
             context = get_current()
 
