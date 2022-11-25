@@ -326,7 +326,9 @@ class SampleBuffer(object):
     def __init__(self, capacity):
         # type: (int) -> None
 
-        self.buffer = [None] * capacity  # type: List[Optional[Tuple[int, RawSampleWithId]]]
+        self.buffer = [
+            None
+        ] * capacity  # type: List[Optional[Tuple[int, RawSampleWithId]]]
         self.capacity = capacity  # type: int
         self.idx = 0  # type: int
 
@@ -438,7 +440,7 @@ class SampleBuffer(object):
                 [
                     (str(tid), extract_stack(frame))
                     for tid, frame in sys._current_frames().items()
-                ]
+                ],
             )
 
         return _sample_stack
