@@ -236,13 +236,13 @@ def test_on_start_child():
     with mock.patch(
         "sentry_sdk.integrations.opentelemetry.span_processor.Hub", fake_hub
     ):
-        fakeSpan = MagicMock()
+        fake_span = MagicMock()
 
         span_processor = SentrySpanProcessor()
-        span_processor.otel_span_map["abcdef1234567890"] = fakeSpan
+        span_processor.otel_span_map["abcdef1234567890"] = fake_span
         span_processor.on_start(otel_span, parent_context)
 
-        fakeSpan.start_child.assert_called_once_with(
+        fake_span.start_child.assert_called_once_with(
             span_id="1234567890abcdef",
             description="Sample OTel Span",
             start_timestamp=datetime.fromtimestamp(otel_span.start_time / 1e9),
