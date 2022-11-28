@@ -6,7 +6,6 @@ import time
 from datetime import datetime, timedelta
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER
 
 from sentry_sdk.utils import logger
 from sentry_sdk._types import MYPY
@@ -223,12 +222,10 @@ class Span(object):
         hub = self.hub or sentry_sdk.Hub.current
         client = hub.client
 
-        instrumenter = kwargs.get("instrumenter", None) or (
-            client and client.options["instrumenter"]
-        )
+        instrumenter = kwargs.get("instrumenter", None)
+        configuration_instrumenter = client and client.options.get("instrumenter", None)
 
-        if instrumenter == INSTRUMENTER.OTEL:
-            # logger.warn("start_child does NOTHING because instrumenter is OTEL")
+        if instrumenter != configuration_instrumenter:
             return NoOpSpan()
 
         kwargs.setdefault("sampled", self.sampled)

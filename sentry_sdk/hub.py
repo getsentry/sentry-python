@@ -5,7 +5,6 @@ from datetime import datetime
 from contextlib import contextmanager
 
 from sentry_sdk._compat import with_metaclass
-from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
 from sentry_sdk.tracing import NoOpSpan, Span, Transaction
@@ -465,12 +464,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         for every incoming HTTP request. Use `start_transaction` to start a new
         transaction when one is not already in progress.
         """
-        instrumenter = kwargs.get("instrumenter", None) or (
-            self.client and self.client.options["instrumenter"]
+        instrumenter = kwargs.get("instrumenter", None)
+        configuration_instrumenter = self.client and self.client.options.get(
+            "instrumenter", None
         )
 
-        if instrumenter == INSTRUMENTER.OTEL:
-            # logger.warn("start_child does NOTHING because instrumenter is OTEL")
+        if instrumenter != configuration_instrumenter:
             return NoOpSpan()
 
         # TODO: consider removing this in a future release.
@@ -528,12 +527,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         When the transaction is finished, it will be sent to Sentry with all its
         finished child spans.
         """
-        instrumenter = kwargs.get("instrumenter", None) or (
-            self.client and self.client.options["instrumenter"]
+        instrumenter = kwargs.get("instrumenter", None)
+        configuration_instrumenter = self.client and self.client.options.get(
+            "instrumenter", None
         )
 
-        if instrumenter == INSTRUMENTER.OTEL:
-            # logger.warn("start_child does NOTHING because instrumenter is OTEL")
+        if instrumenter != configuration_instrumenter:
             return NoOpSpan()
 
         custom_sampling_context = kwargs.pop("custom_sampling_context", {})

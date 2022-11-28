@@ -3,7 +3,13 @@ from datetime import datetime
 from opentelemetry.context import get_value  # type: ignore
 from opentelemetry.sdk.trace import SpanProcessor  # type: ignore
 from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
-from opentelemetry.trace import format_span_id, format_trace_id, SpanContext, Span as OTelSpan  # type: ignore
+from opentelemetry.trace import (
+    format_span_id,
+    format_trace_id,
+    SpanContext,
+    Span as OTelSpan,
+)
+from sentry_sdk.consts import INSTRUMENTER  # type: ignore
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations.opentelemetry.propagator import (
@@ -42,6 +48,9 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         if not hub:
             return
 
+        if hub.client.options.get("instrumenter", None) != INSTRUMENTER.OTEL:
+            return
+
         trace_data = self._get_trace_data(otel_span, parent_context)
 
         parent_span_id = trace_data["parent_span_id"]
@@ -55,7 +64,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
                 span_id=trace_data["span_id"],
                 description=otel_span.name,
                 start_timestamp=datetime.fromtimestamp(otel_span.start_time / 1e9),
-                instrumenter="sentry",
+                instrumenter=INSTRUMENTER.SENTRY,
             )
         else:
             sentry_span = hub.start_transaction(
@@ -65,13 +74,20 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
                 trace_id=trace_data["trace_id"],
                 baggage=trace_data["baggage"],
                 start_timestamp=datetime.fromtimestamp(otel_span.start_time / 1e9),
-                instrumenter="sentry",
+                instrumenter=INSTRUMENTER.SENTRY,
             )
 
         self.otel_span_map[trace_data["span_id"]] = sentry_span
 
     def on_end(self, otel_span):
         # type: (OTelSpan) -> None
+        hub = Hub.current
+        if not hub:
+            return
+
+        if hub.client.options.get("instrumenter", None) != INSTRUMENTER.OTEL:
+            return
+
         span_id = format_span_id(otel_span.context.span_id)
         sentry_span = self.otel_span_map.pop(span_id, None)
         if not sentry_span:
