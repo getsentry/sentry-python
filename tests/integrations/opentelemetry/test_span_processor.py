@@ -3,7 +3,7 @@ from mock import MagicMock
 import mock
 import time
 from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
-from sentry_sdk.tracing import Span
+from sentry_sdk.tracing import Span, Transaction
 
 
 def test_get_otel_context():
@@ -254,5 +254,80 @@ def test_on_start_child():
         assert "1234567890abcdef" in span_processor.otel_span_map.keys()
 
 
-def test_on_end():
-    assert "TODO" == "THIS NEEDS TO BE IMPLEMENTED"
+def test_on_end_no_sentry_span():
+    """
+    If on_end is called on a span that is not in the otel_span_map, it should be a no-op.
+    """
+    otel_span = MagicMock()
+    otel_span.name = "Sample OTel Span"
+    otel_span.end_time = time.time_ns()
+    otel_span.context = MagicMock()
+    otel_span.context.span_id = int("1234567890abcdef", 16)
+
+    span_processor = SentrySpanProcessor()
+    span_processor.otel_span_map = {}
+    span_processor._get_otel_context = MagicMock()
+    span_processor._update_span_with_otel_data = MagicMock()
+
+    span_processor.on_end(otel_span)
+
+    span_processor._get_otel_context.assert_not_called()
+    span_processor._update_span_with_otel_data.assert_not_called()
+
+
+def test_on_end_sentry_transaction():
+    """
+    Test on_end for a sentry Transaction.
+    """
+    otel_span = MagicMock()
+    otel_span.name = "Sample OTel Span"
+    otel_span.end_time = time.time_ns()
+    otel_span.context = MagicMock()
+    otel_span.context.span_id = int("1234567890abcdef", 16)
+
+    fake_sentry_span = MagicMock(spec=Transaction)
+    fake_sentry_span.set_context = MagicMock()
+    fake_sentry_span.finish = MagicMock()
+
+    span_processor = SentrySpanProcessor()
+    span_processor._get_otel_context = MagicMock()
+    span_processor._update_span_with_otel_data = MagicMock()
+    span_processor.otel_span_map["1234567890abcdef"] = fake_sentry_span
+
+    span_processor.on_end(otel_span)
+
+    fake_sentry_span.set_context.assert_called_once()
+    span_processor._update_span_with_otel_data.assert_not_called()
+    fake_sentry_span.finish.assert_called_once_with(
+        end_timestamp=datetime.fromtimestamp(otel_span.end_time / 1e9)
+    )
+
+
+def test_on_end_sentry_Span():
+    """
+    Test on_end for a sentry Span.
+    """
+    otel_span = MagicMock()
+    otel_span.name = "Sample OTel Span"
+    otel_span.end_time = time.time_ns()
+    otel_span.context = MagicMock()
+    otel_span.context.span_id = int("1234567890abcdef", 16)
+
+    fake_sentry_span = MagicMock(spec=Span)
+    fake_sentry_span.set_context = MagicMock()
+    fake_sentry_span.finish = MagicMock()
+
+    span_processor = SentrySpanProcessor()
+    span_processor._get_otel_context = MagicMock()
+    span_processor._update_span_with_otel_data = MagicMock()
+    span_processor.otel_span_map["1234567890abcdef"] = fake_sentry_span
+
+    span_processor.on_end(otel_span)
+
+    fake_sentry_span.set_context.assert_not_called()
+    span_processor._update_span_with_otel_data.assert_called_once_with(
+        fake_sentry_span, otel_span
+    )
+    fake_sentry_span.finish.assert_called_once_with(
+        end_timestamp=datetime.fromtimestamp(otel_span.end_time / 1e9)
+    )

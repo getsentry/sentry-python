@@ -73,7 +73,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
     def on_end(self, otel_span):
         # type: (OTelSpan) -> None
         span_id = format_span_id(otel_span.context.span_id)
-        sentry_span = self.otel_span_map.pop(span_id)
+        sentry_span = self.otel_span_map.pop(span_id, None)
         if not sentry_span:
             return
 
