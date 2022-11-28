@@ -224,9 +224,7 @@ class Span(object):
         client = hub.client
 
         instrumenter = kwargs.get("instrumenter", INSTRUMENTER.SENTRY)
-        configuration_instrumenter = client and client.options.get(
-            "instrumenter", INSTRUMENTER.SENTRY
-        )
+        configuration_instrumenter = client and client.options["instrumenter"]
 
         if instrumenter != configuration_instrumenter:
             return NoOpSpan()

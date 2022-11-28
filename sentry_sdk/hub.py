@@ -466,9 +466,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         transaction when one is not already in progress.
         """
         instrumenter = kwargs.get("instrumenter", INSTRUMENTER.SENTRY)
-        configuration_instrumenter = self.client and self.client.options.get(
-            "instrumenter", INSTRUMENTER.SENTRY
-        )
+        configuration_instrumenter = self.client and self.client.options["instrumenter"]
 
         if instrumenter != configuration_instrumenter:
             return NoOpSpan()
@@ -529,9 +527,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         finished child spans.
         """
         instrumenter = kwargs.get("instrumenter", INSTRUMENTER.SENTRY)
-        configuration_instrumenter = self.client and self.client.options.get(
-            "instrumenter", INSTRUMENTER.SENTRY
-        )
+        configuration_instrumenter = self.client and self.client.options["instrumenter"]
 
         if instrumenter != configuration_instrumenter:
             return NoOpSpan()

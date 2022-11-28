@@ -195,8 +195,14 @@ def test_on_start_transaction():
 
     parent_context = {}
 
+    fake_client = MagicMock()
+    fake_client.options = {"instrumenter": "otel"}
+
+    current_hub = MagicMock()
+    current_hub.client = fake_client
+
     fake_hub = MagicMock()
-    fake_hub.current.return_value = MagicMock()
+    fake_hub.current = current_hub
 
     with mock.patch(
         "sentry_sdk.integrations.opentelemetry.span_processor.Hub", fake_hub
@@ -230,8 +236,14 @@ def test_on_start_child():
 
     parent_context = {}
 
+    fake_client = MagicMock()
+    fake_client.options = {"instrumenter": "otel"}
+
+    current_hub = MagicMock()
+    current_hub.client = fake_client
+
     fake_hub = MagicMock()
-    fake_hub.current.return_value = MagicMock()
+    fake_hub.current = current_hub
 
     with mock.patch(
         "sentry_sdk.integrations.opentelemetry.span_processor.Hub", fake_hub

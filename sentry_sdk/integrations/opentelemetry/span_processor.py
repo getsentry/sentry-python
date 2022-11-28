@@ -48,10 +48,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         if not hub:
             return
 
-        if (
-            hub.client
-            and hub.client.options.get("instrumenter", None) != INSTRUMENTER.OTEL
-        ):
+        if hub.client and hub.client.options["instrumenter"] != INSTRUMENTER.OTEL:
             return
 
         trace_data = self._get_trace_data(otel_span, parent_context)
@@ -88,10 +85,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         if not hub:
             return
 
-        if (
-            hub.client
-            and hub.client.options.get("instrumenter", None) != INSTRUMENTER.OTEL
-        ):
+        if hub.client and hub.client.options["instrumenter"] != INSTRUMENTER.OTEL:
             return
 
         span_id = format_span_id(otel_span.context.span_id)
