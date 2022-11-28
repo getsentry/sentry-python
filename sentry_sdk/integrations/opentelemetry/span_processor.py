@@ -3,13 +3,13 @@ from datetime import datetime
 from opentelemetry.context import get_value  # type: ignore
 from opentelemetry.sdk.trace import SpanProcessor  # type: ignore
 from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
-from opentelemetry.trace import (
+from opentelemetry.trace import (  # type: ignore
     format_span_id,
     format_trace_id,
     SpanContext,
     Span as OTelSpan,
 )
-from sentry_sdk.consts import INSTRUMENTER  # type: ignore
+from sentry_sdk.consts import INSTRUMENTER
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations.opentelemetry.propagator import (
@@ -48,7 +48,10 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         if not hub:
             return
 
-        if hub.client.options.get("instrumenter", None) != INSTRUMENTER.OTEL:
+        if (
+            hub.client
+            and hub.client.options.get("instrumenter", None) != INSTRUMENTER.OTEL
+        ):
             return
 
         trace_data = self._get_trace_data(otel_span, parent_context)
@@ -85,7 +88,10 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         if not hub:
             return
 
-        if hub.client.options.get("instrumenter", None) != INSTRUMENTER.OTEL:
+        if (
+            hub.client
+            and hub.client.options.get("instrumenter", None) != INSTRUMENTER.OTEL
+        ):
             return
 
         span_id = format_span_id(otel_span.context.span_id)

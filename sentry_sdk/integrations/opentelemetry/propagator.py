@@ -1,4 +1,4 @@
-from opentelemetry import trace  # type: ignore
+from opentelemetry import trace
 from opentelemetry.context import (  # type: ignore
     Context,
     create_key,
