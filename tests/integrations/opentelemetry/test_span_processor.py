@@ -298,7 +298,7 @@ def test_on_end_sentry_transaction():
 
     fake_sentry_span.set_context.assert_called_once()
     span_processor._update_span_with_otel_data.assert_not_called()
-    fake_sentry_span.finish.assert_called_once_with()
+    fake_sentry_span.finish.assert_called_once()
 
 
 def test_on_end_sentry_span():
