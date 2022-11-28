@@ -299,11 +299,13 @@ def test_on_end_sentry_transaction():
     fake_sentry_span.set_context.assert_called_once()
     span_processor._update_span_with_otel_data.assert_not_called()
     fake_sentry_span.finish.assert_called_once_with(
-        end_timestamp=datetime.fromtimestamp(otel_span.end_time / 1e9)
+        end_timestamp=datetime.fromtimestamp(
+            otel_span.entest_on_end_sentry_Span_time / 1e9
+        )
     )
 
 
-def test_on_end_sentry_Span():
+def test_on_end_sentry_span():
     """
     Test on_end for a sentry Span.
     """
