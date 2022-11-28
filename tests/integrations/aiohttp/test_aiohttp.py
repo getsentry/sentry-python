@@ -7,7 +7,7 @@ from aiohttp import web
 from aiohttp.client import ServerDisconnectedError
 from aiohttp.web_request import Request
 
-from sentry_sdk import capture_message
+from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
 
 try:
@@ -54,6 +54,7 @@ async def test_basic(sentry_init, aiohttp_client, capture_events):
         "Accept-Encoding": "gzip, deflate",
         "Host": host,
         "User-Agent": request["headers"]["User-Agent"],
+        "sentry-trace": mock.ANY,
     }
 
 
@@ -427,3 +428,71 @@ async def test_trace_from_headers_if_performance_disabled(
 
     assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+
+
+async def test_crumb_capture(
+    sentry_init, aiohttp_raw_server, aiohttp_client, loop, capture_events
+):
+    def before_breadcrumb(crumb, hint):
+        crumb["data"]["extra"] = "foo"
+        return crumb
+
+    sentry_init(
+        integrations=[AioHttpIntegration()], before_breadcrumb=before_breadcrumb
+    )
+
+    async def handler(request):
+        return web.Response(text="OK")
+
+    raw_server = await aiohttp_raw_server(handler)
+
+    with start_transaction():
+        events = capture_events()
+
+        client = await aiohttp_client(raw_server)
+        resp = await client.get("/")
+        assert resp.status == 200
+        capture_message("Testing!")
+
+        (event,) = events
+
+        crumb = event["breadcrumbs"]["values"][0]
+        assert crumb["type"] == "http"
+        assert crumb["category"] == "httplib"
+        assert crumb["data"] == {
+            "url": "http://127.0.0.1:{}/".format(raw_server.port),
+            "method": "GET",
+            "status_code": 200,
+            "reason": "OK",
+            "extra": "foo",
+        }
+
+
+async def test_outgoing_trace_headers(sentry_init, aiohttp_raw_server, aiohttp_client):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    async def handler(request):
+        return web.Response(text="OK")
+
+    raw_server = await aiohttp_raw_server(handler)
+
+    with start_transaction(
+        name="/interactions/other-dogs/new-dog",
+        op="greeting.sniff",
+        # make trace_id difference between transactions
+        trace_id="0123456789012345678901234567890",
+    ) as transaction:
+        client = await aiohttp_client(raw_server)
+        resp = await client.get("/")
+        request_span = transaction._span_recorder.spans[-1]
+
+        assert resp.request_info.headers[
+            "sentry-trace"
+        ] == "{trace_id}-{parent_span_id}-{sampled}".format(
+            trace_id=transaction.trace_id,
+            parent_span_id=request_span.span_id,
+            sampled=1,
+        )
