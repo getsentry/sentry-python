@@ -5,6 +5,7 @@ from datetime import datetime
 from contextlib import contextmanager
 
 from sentry_sdk._compat import with_metaclass
+from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
 from sentry_sdk.tracing import NoOpSpan, Span, Transaction
@@ -464,9 +465,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         for every incoming HTTP request. Use `start_transaction` to start a new
         transaction when one is not already in progress.
         """
-        instrumenter = kwargs.get("instrumenter", None)
+        instrumenter = kwargs.get("instrumenter", INSTRUMENTER.SENTRY)
         configuration_instrumenter = self.client and self.client.options.get(
-            "instrumenter", None
+            "instrumenter", INSTRUMENTER.SENTRY
         )
 
         if instrumenter != configuration_instrumenter:
@@ -527,9 +528,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         When the transaction is finished, it will be sent to Sentry with all its
         finished child spans.
         """
-        instrumenter = kwargs.get("instrumenter", None)
+        instrumenter = kwargs.get("instrumenter", INSTRUMENTER.SENTRY)
         configuration_instrumenter = self.client and self.client.options.get(
-            "instrumenter", None
+            "instrumenter", INSTRUMENTER.SENTRY
         )
 
         if instrumenter != configuration_instrumenter:
