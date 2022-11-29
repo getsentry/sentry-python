@@ -15,6 +15,7 @@ from sentry_sdk.integrations.opentelemetry.propagator import (
     SentryPropagator,
 )
 from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
+from sentry_sdk.tracing_utils import Baggage
 
 
 def test_extract_no_context_no_sentry_trace_header():
@@ -214,12 +215,14 @@ def test_inject_sentry_span_baggage():
     sentry_span.to_traceparent = mock.Mock(
         return_value="1234567890abcdef1234567890abcdef-1234567890abcdef-1"
     )
-    baggage = (
-        "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
-        "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
-        "sentry-sample_rate=0.01337,sentry-user_id=Am%C3%A9lie"
-    )
-    sentry_span.get_baggage = mock.Mock(return_value=baggage)
+    sentry_items = {
+        "sentry-trace_id": "771a43a4192642f0b136d5159a501700",
+        "sentry-public_key": "49d0f7386ad645858ae85020e393bef3",
+        "sentry-sample_rate": 0.01337,
+        "sentry-user_id": "Amélie",
+    }
+    baggage = Baggage(sentry_items=sentry_items)
+    sentry_span.get_baggage = MagicMock(return_value=baggage)
 
     span_processor = SentrySpanProcessor()
     span_processor.otel_span_map[span_id] = sentry_span
@@ -240,5 +243,5 @@ def test_inject_sentry_span_baggage():
         setter.set.assert_any_call(
             carrier,
             "baggage",
-            baggage,
+            baggage.serialize(),
         )
