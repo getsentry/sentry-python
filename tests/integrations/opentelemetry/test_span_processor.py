@@ -217,7 +217,7 @@ def test_on_start_transaction():
             trace_id="1234567890abcdef1234567890abcdef",
             baggage=None,
             start_timestamp=datetime.fromtimestamp(otel_span.start_time / 1e9),
-            instrumenter="sentry",
+            instrumenter="otel",
         )
 
         assert len(span_processor.otel_span_map.keys()) == 1
@@ -258,7 +258,7 @@ def test_on_start_child():
             span_id="1234567890abcdef",
             description="Sample OTel Span",
             start_timestamp=datetime.fromtimestamp(otel_span.start_time / 1e9),
-            instrumenter="sentry",
+            instrumenter="otel",
         )
 
         assert len(span_processor.otel_span_map.keys()) == 2
