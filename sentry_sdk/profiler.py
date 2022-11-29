@@ -51,6 +51,7 @@ if MYPY:
     from typing import Sequence
     from typing import Tuple
     from typing_extensions import TypedDict
+    import sentry_sdk.scope
     import sentry_sdk.tracing
 
     RawSampleData = Tuple[int, Sequence[Tuple[str, Sequence[RawFrameData]]]]
@@ -265,8 +266,8 @@ class Profile(object):
         self.scheduler.stop_profiling()
         self._stop_ns = nanosecond_time()
 
-    def to_json(self, event_opt, options):
-        # type: (Any, Dict[str, Any]) -> Dict[str, Any]
+    def to_json(self, event_opt, options, scope):
+        # type: (Any, Dict[str, Any], Optional[sentry_sdk.scope.Scope]) -> Dict[str, Any]
         assert self._start_ns is not None
         assert self._stop_ns is not None
 
@@ -277,6 +278,9 @@ class Profile(object):
         handle_in_app_impl(
             profile["frames"], options["in_app_exclude"], options["in_app_include"]
         )
+
+        # the active thread id from the scope always take priorty if it exists
+        active_thread_id = None if scope is None else scope.active_thread_id
 
         return {
             "environment": event_opt.get("environment"),
@@ -309,7 +313,11 @@ class Profile(object):
                     # because we end the transaction after the profile
                     "relative_end_ns": str(self._stop_ns - self._start_ns),
                     "trace_id": self.transaction.trace_id,
-                    "active_thread_id": str(self.transaction._active_thread_id),
+                    "active_thread_id": str(
+                        self.transaction._active_thread_id
+                        if active_thread_id is None else
+                        active_thread_id
+                    ),
                 }
             ],
         }
