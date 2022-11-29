@@ -1,5 +1,7 @@
 from __future__ import absolute_import
 
+import threading
+
 from sentry_sdk.hub import _should_send_default_pii, Hub
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
@@ -11,6 +13,7 @@ from sentry_sdk.utils import (
     event_from_exception,
 )
 
+from sentry_sdk._functools import wraps
 from sentry_sdk._types import MYPY
 
 if MYPY:
@@ -25,6 +28,13 @@ try:
 except ImportError:
     quart_auth = None
 
+
+try:
+    from asyncio import iscoroutinefunction
+except ImportError:
+    iscoroutinefunction = None  # type: ignore
+
+
 try:
     from quart import (  # type: ignore
         has_request_context,
@@ -34,6 +44,7 @@ try:
         request,
         websocket,
     )
+    from quart.scaffold import Scaffold
     from quart.signals import (  # type: ignore
         got_background_exception,
         got_request_exception,
@@ -71,18 +82,72 @@ class QuartIntegration(Integration):
         got_request_exception.connect(_capture_exception)
         got_websocket_exception.connect(_capture_exception)
 
-        old_app = Quart.__call__
+        print("patching stuff for quart")
+        patch_asgi_app()
+        patch_route()
+        print(Scaffold.route)
 
-        async def sentry_patched_asgi_app(self, scope, receive, send):
-            # type: (Any, Any, Any, Any) -> Any
-            if Hub.current.get_integration(QuartIntegration) is None:
-                return await old_app(self, scope, receive, send)
 
-            middleware = SentryAsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))
-            middleware.__call__ = middleware._run_asgi3
-            return await middleware(scope, receive, send)
+def patch_asgi_app():
+    # type: () -> None
+    """
+    Instrument Quart ASGI app using the SentryASGIMiddleware.
+    """
+    old_app = Quart.__call__
 
-        Quart.__call__ = sentry_patched_asgi_app
+    async def sentry_patched_asgi_app(self, scope, receive, send):
+        # type: (Any, Any, Any, Any) -> Any
+        if Hub.current.get_integration(QuartIntegration) is None:
+            return await old_app(self, scope, receive, send)
+
+        middleware = SentryAsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))
+        middleware.__call__ = middleware._run_asgi3
+        return await middleware(scope, receive, send)
+
+    Quart.__call__ = sentry_patched_asgi_app
+
+
+def patch_route():
+    # type: () -> None
+    old_route = Scaffold.route
+
+    def _sentry_route(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        old_decorator = old_route(*args, **kwargs)
+
+        def decorator(old_func):
+            # type: (Any) -> Any
+            if iscoroutinefunction is not None and iscoroutinefunction(old_func):
+                # We're only patching the sync handlers to set the active thread id.
+                # Until we need to do more here, we can directly use the old func if
+                # it's an async handler.
+                func = old_func
+            else:
+
+                @wraps(old_func)
+                def _sentry_sync_func(*args, **kwargs):
+                    # type: (*Any, **Any) -> Any
+                    hub = Hub.current
+                    integration = hub.get_integration(QuartIntegration)
+                    if integration is None:
+                        return old_func(*args, **kwargs)
+
+                    with hub.configure_scope() as sentry_scope:
+                        # set the active thread id to the handler thread for sync views
+                        # this isn't necessary for async views since that runs on main
+                        sentry_scope.set_active_thread_id(
+                            threading.current_thread().ident
+                        )
+
+                        return old_func(*args, **kwargs)
+
+                func = _sentry_sync_func
+
+            return old_decorator(func)
+
+        return decorator
+
+    Scaffold.route = _sentry_route
 
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
