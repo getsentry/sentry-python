@@ -18,6 +18,7 @@ from sentry_sdk.integrations.opentelemetry.propagator import (
 )
 from sentry_sdk.tracing import Transaction, Span as SentrySpan
 from sentry_sdk._types import MYPY
+from sentry_sdk.utils import Dsn
 
 if MYPY:
     from typing import Any
@@ -64,7 +65,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
                 span_id=trace_data["span_id"],
                 description=otel_span.name,
                 start_timestamp=datetime.fromtimestamp(otel_span.start_time / 1e9),
-                instrumenter=INSTRUMENTER.SENTRY,
+                instrumenter=INSTRUMENTER.OTEL,
             )
         else:
             sentry_span = hub.start_transaction(
@@ -74,7 +75,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
                 trace_id=trace_data["trace_id"],
                 baggage=trace_data["baggage"],
                 start_timestamp=datetime.fromtimestamp(otel_span.start_time / 1e9),
-                instrumenter=INSTRUMENTER.SENTRY,
+                instrumenter=INSTRUMENTER.OTEL,
             )
 
         self.otel_span_map[trace_data["span_id"]] = sentry_span
@@ -86,6 +87,11 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
             return
 
         if hub.client and hub.client.options["instrumenter"] != INSTRUMENTER.OTEL:
+            return
+
+        # Break infinite http requests to Sentry are caught by OTel and send again to Sentry.
+        otel_span_url = otel_span.attributes.get(SpanAttributes.HTTP_URL, None)
+        if otel_span_url and Dsn(hub.client.dsn).netloc in otel_span_url:
             return
 
         span_id = format_span_id(otel_span.context.span_id)
