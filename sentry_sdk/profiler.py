@@ -51,7 +51,8 @@ if MYPY:
     from typing import Sequence
     from typing import Tuple
     from typing_extensions import TypedDict
-    import sentry_sdk.tracing
+    from sentry_sdk.scope import Scope
+    from sentry_sdk.tracing import Transaction
 
     RawSampleData = Tuple[int, Sequence[Tuple[str, Sequence[RawFrameData]]]]
 
@@ -239,7 +240,7 @@ class Profile(object):
     def __init__(
         self,
         scheduler,  # type: Scheduler
-        transaction,  # type: sentry_sdk.tracing.Transaction
+        transaction,  # type: Transaction
     ):
         # type: (...) -> None
         self.scheduler = scheduler
@@ -259,8 +260,8 @@ class Profile(object):
         self.scheduler.stop_profiling()
         self._stop_ns = nanosecond_time()
 
-    def to_json(self, event_opt, options):
-        # type: (Any, Dict[str, Any]) -> Dict[str, Any]
+    def to_json(self, event_opt, options, scope=None):
+        # type: (Any, Dict[str, Any], Optional[Scope]) -> Dict[str, Any]
         assert self._start_ns is not None
         assert self._stop_ns is not None
 
@@ -271,6 +272,9 @@ class Profile(object):
         handle_in_app_impl(
             profile["frames"], options["in_app_exclude"], options["in_app_include"]
         )
+
+        # if the scope has an active thread id set, that should take priority
+        active_thread_id = None if scope is None else scope.active_thread_id
 
         return {
             "environment": event_opt.get("environment"),
@@ -303,7 +307,11 @@ class Profile(object):
                     # because we end the transaction after the profile
                     "relative_end_ns": str(self._stop_ns - self._start_ns),
                     "trace_id": self.transaction.trace_id,
-                    "active_thread_id": str(self.transaction._active_thread_id),
+                    "active_thread_id": str(
+                        self.transaction._active_thread_id
+                        if active_thread_id is None else
+                        active_thread_id
+                    ),
                 }
             ],
         }
@@ -716,7 +724,7 @@ class SigalrmScheduler(SignalScheduler):
 
 
 def _should_profile(transaction, hub):
-    # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> bool
+    # type: (Transaction, Optional[sentry_sdk.Hub]) -> bool
 
     # The corresponding transaction was not sampled,
     # so don't generate a profile for it.
@@ -747,7 +755,7 @@ def _should_profile(transaction, hub):
 
 @contextmanager
 def start_profiling(transaction, hub=None):
-    # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
+    # type: (Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
 
     # if profiling was not enabled, this should be a noop
     if _should_profile(transaction, hub):

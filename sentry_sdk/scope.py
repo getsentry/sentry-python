@@ -1,6 +1,7 @@
 from copy import copy
 from collections import deque
 from itertools import chain
+from threading import current_thread
 
 from sentry_sdk._functools import wraps
 from sentry_sdk._types import MYPY
@@ -94,6 +95,9 @@ class Scope(object):
         "_session",
         "_attachments",
         "_force_auto_session_tracking",
+        # the active thread id refers to the thread where bulk of the works occurring
+        # for a web server this refers to the thread handing the request
+        "_active_thread_id",
     )
 
     def __init__(self):
@@ -124,6 +128,8 @@ class Scope(object):
         self._span = None  # type: Optional[Span]
         self._session = None  # type: Optional[Session]
         self._force_auto_session_tracking = None  # type: Optional[bool]
+
+        self._active_thread_id = None  # type: Optional[int]
 
     @_attr_setter
     def level(self, value):
@@ -216,6 +222,15 @@ class Scope(object):
         # type: () -> Optional[Span]
         """Get/set current tracing span or transaction."""
         return self._span
+
+    @property
+    def active_thread_id(self):
+        # type: () -> Optional[int]
+        return self._active_thread_id
+
+    def set_active_thread_id(self, active_thread_id):
+        # type: Optional[int] -> None
+        self._active_thread_id = active_thread_id
 
     @span.setter
     def span(self, span):
@@ -447,6 +462,8 @@ class Scope(object):
             self._span = scope._span
         if scope._attachments:
             self._attachments.extend(scope._attachments)
+        if scope._active_thread_id is not None:
+            self._active_thread_id = scope._active_thread_id
 
     def update_from_kwargs(
         self,
@@ -495,6 +512,8 @@ class Scope(object):
         rv._session = self._session
         rv._force_auto_session_tracking = self._force_auto_session_tracking
         rv._attachments = list(self._attachments)
+
+        rv._active_thread_id = self._active_thread_id
 
         return rv
 
