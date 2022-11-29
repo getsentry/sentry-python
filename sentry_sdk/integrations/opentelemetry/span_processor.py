@@ -21,7 +21,7 @@ from sentry_sdk.tracing import Transaction, Span as SentrySpan
 from sentry_sdk._types import MYPY
 from sentry_sdk.utils import Dsn
 
-from urllib3.util import parse_url as urlparse
+from urllib3.util import parse_url as urlparse  # type: ignore
 
 if MYPY:
     from typing import Any
@@ -94,7 +94,8 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
 
         # Break infinite http requests to Sentry are caught by OTel and send again to Sentry.
         otel_span_url = otel_span.attributes.get(SpanAttributes.HTTP_URL, None)
-        if otel_span_url and Dsn(hub.client.dsn).netloc in otel_span_url:
+        dsn_url = hub.client and Dsn(hub.client.dsn or "").netloc
+        if otel_span_url and dsn_url in otel_span_url:
             return
 
         span_id = format_span_id(otel_span.context.span_id)
