@@ -5,6 +5,8 @@ import time
 from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
 from sentry_sdk.tracing import Span, Transaction
 
+from opentelemetry.trace import SpanKind
+
 
 def test_get_otel_context():
     otel_span = MagicMock()
@@ -136,6 +138,7 @@ def test_update_span_with_otel_data_http_method():
 
     otel_span = MagicMock()
     otel_span.name = "Test OTel Span"
+    otel_span.kind = SpanKind.CLIENT
     otel_span.attributes = {
         "http.method": "GET",
         "http.status_code": 429,
@@ -148,7 +151,7 @@ def test_update_span_with_otel_data_http_method():
     span_processor = SentrySpanProcessor()
     span_processor._update_span_with_otel_data(sentry_span, otel_span)
 
-    assert sentry_span.op == "http.get"
+    assert sentry_span.op == "http.client"
     assert sentry_span.description == "GET example.com /"
     assert sentry_span._tags["http.status_code"] == "429"
     assert sentry_span.status == "resource_exhausted"
@@ -159,6 +162,38 @@ def test_update_span_with_otel_data_http_method():
     assert sentry_span._data["http.user_agent"] == "curl/7.64.1"
     assert sentry_span._data["net.peer.name"] == "example.com"
     assert sentry_span._data["http.target"] == "/"
+
+
+def test_update_span_with_otel_data_http_method2():
+    sentry_span = Span()
+
+    otel_span = MagicMock()
+    otel_span.name = "Test OTel Span"
+    otel_span.kind = SpanKind.SERVER
+    otel_span.attributes = {
+        "http.method": "GET",
+        "http.status_code": 429,
+        "http.status_text": "xxx",
+        "http.user_agent": "curl/7.64.1",
+        "http.url": "https://httpbin.org/status/403?password=123&username=test@example.com&author=User123&auth=1234567890abcdef",
+    }
+
+    span_processor = SentrySpanProcessor()
+    span_processor._update_span_with_otel_data(sentry_span, otel_span)
+
+    assert sentry_span.op == "http.server"
+    assert sentry_span.description == "GET https://httpbin.org/status/403"
+    assert sentry_span._tags["http.status_code"] == "429"
+    assert sentry_span.status == "resource_exhausted"
+
+    assert sentry_span._data["http.method"] == "GET"
+    assert sentry_span._data["http.status_code"] == 429
+    assert sentry_span._data["http.status_text"] == "xxx"
+    assert sentry_span._data["http.user_agent"] == "curl/7.64.1"
+    assert (
+        sentry_span._data["http.url"]
+        == "https://httpbin.org/status/403?password=123&username=test@example.com&author=User123&auth=1234567890abcdef"
+    )
 
 
 def test_update_span_with_otel_data_db_query():
