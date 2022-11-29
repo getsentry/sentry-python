@@ -8,6 +8,7 @@ from opentelemetry.trace import (  # type: ignore
     format_trace_id,
     SpanContext,
     Span as OTelSpan,
+    SpanKind,
 )
 from sentry_sdk.consts import INSTRUMENTER
 
@@ -19,6 +20,8 @@ from sentry_sdk.integrations.opentelemetry.propagator import (
 from sentry_sdk.tracing import Transaction, Span as SentrySpan
 from sentry_sdk._types import MYPY
 from sentry_sdk.utils import Dsn
+
+from urllib3.util import parse_url as urlparse
 
 if MYPY:
     from typing import Any
@@ -175,8 +178,15 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         db_query = otel_span.attributes.get(SpanAttributes.DB_SYSTEM, None)
 
         if http_method:
-            op = "http.{}".format(http_method.lower())
+            op = "http"
+
+            if otel_span.kind == SpanKind.SERVER:
+                op += ".server"
+            elif otel_span.kind == SpanKind.CLIENT:
+                op += ".client"
+
             description = http_method
+            print(f"~~~~~otel_span.attributes: {otel_span.attributes}")
 
             peer_name = otel_span.attributes.get(SpanAttributes.NET_PEER_NAME, None)
             if peer_name:
@@ -185,6 +195,13 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
             target = otel_span.attributes.get(SpanAttributes.HTTP_TARGET, None)
             if target:
                 description += " {}".format(target)
+
+            if not peer_name and not target:
+                url = otel_span.attributes.get(SpanAttributes.HTTP_URL, None)
+                if url:
+                    parsed_url = urlparse(url)
+                    url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
+                    description += " {}".format(url)
 
             status_code = otel_span.attributes.get(
                 SpanAttributes.HTTP_STATUS_CODE, None

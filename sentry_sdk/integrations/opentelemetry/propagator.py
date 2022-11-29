@@ -95,7 +95,7 @@ class SentryPropagator(TextMapPropagator):  # type: ignore
 
         setter.set(carrier, SENTRY_TRACE_HEADER_NAME, sentry_span.to_traceparent())
 
-        baggage = sentry_span.get_baggage()
+        baggage = hasattr(sentry_span, "get_baggage") and sentry_span.get_baggage()
         if baggage:
             setter.set(carrier, BAGGAGE_HEADER_NAME, baggage.serialize())
 
