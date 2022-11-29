@@ -65,6 +65,8 @@ def _wrap_sync_view(hub, callback):
     def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
         with hub.configure_scope() as sentry_scope:
+            # set the active thread id to the handler thread for sync views
+            # this isn't necessary for async views since that runs on main
             sentry_scope.set_active_thread_id(threading.current_thread().ident)
 
             with hub.start_span(

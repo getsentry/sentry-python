@@ -51,8 +51,8 @@ if MYPY:
     from typing import Sequence
     from typing import Tuple
     from typing_extensions import TypedDict
-    from sentry_sdk.scope import Scope
-    from sentry_sdk.tracing import Transaction
+    import sentry_sdk.scope
+    import sentry_sdk.tracing
 
     RawSampleData = Tuple[int, Sequence[Tuple[str, Sequence[RawFrameData]]]]
 
@@ -240,7 +240,7 @@ class Profile(object):
     def __init__(
         self,
         scheduler,  # type: Scheduler
-        transaction,  # type: Transaction
+        transaction,  # type: sentry_sdk.tracing.Transaction
     ):
         # type: (...) -> None
         self.scheduler = scheduler
@@ -261,7 +261,7 @@ class Profile(object):
         self._stop_ns = nanosecond_time()
 
     def to_json(self, event_opt, options, scope=None):
-        # type: (Any, Dict[str, Any], Optional[Scope]) -> Dict[str, Any]
+        # type: (Any, Dict[str, Any], Optional[sentry_sdk.scope.Scope]) -> Dict[str, Any]
         assert self._start_ns is not None
         assert self._stop_ns is not None
 
@@ -724,7 +724,7 @@ class SigalrmScheduler(SignalScheduler):
 
 
 def _should_profile(transaction, hub):
-    # type: (Transaction, Optional[sentry_sdk.Hub]) -> bool
+    # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> bool
 
     # The corresponding transaction was not sampled,
     # so don't generate a profile for it.
@@ -755,7 +755,7 @@ def _should_profile(transaction, hub):
 
 @contextmanager
 def start_profiling(transaction, hub=None):
-    # type: (Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
+    # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
 
     # if profiling was not enabled, this should be a noop
     if _should_profile(transaction, hub):

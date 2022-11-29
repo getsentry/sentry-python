@@ -1,7 +1,6 @@
 from copy import copy
 from collections import deque
 from itertools import chain
-from threading import current_thread
 
 from sentry_sdk._functools import wraps
 from sentry_sdk._types import MYPY
@@ -229,7 +228,7 @@ class Scope(object):
         return self._active_thread_id
 
     def set_active_thread_id(self, active_thread_id):
-        # type: Optional[int] -> None
+        # type: (Optional[int]) -> None
         self._active_thread_id = active_thread_id
 
     @span.setter
