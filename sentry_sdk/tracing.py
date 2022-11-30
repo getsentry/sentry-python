@@ -93,6 +93,7 @@ class Span(object):
         "timestamp",
         "_tags",
         "_data",
+        "_contexts",
         "_span_recorder",
         "hub",
         "_context_manager_state",
@@ -126,6 +127,7 @@ class Span(object):
         status=None,  # type: Optional[str]
         transaction=None,  # type: Optional[str] # deprecated
         containing_transaction=None,  # type: Optional[Transaction]
+        start_timestamp=None,  # type: Optional[datetime]
         instrumenter=None,  # type: Optional[str]
     ):
         # type: (...) -> None
@@ -140,8 +142,9 @@ class Span(object):
         self.hub = hub
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
+        self._contexts = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
-        self.start_timestamp = datetime.utcnow()
+        self.start_timestamp = start_timestamp or datetime.utcnow()
         try:
             # TODO: For Python 3.7+, we could use a clock with ns resolution:
             # self._start_timestamp_monotonic = time.perf_counter_ns()
@@ -372,6 +375,13 @@ class Span(object):
             sampled = "0"
         return "%s-%s-%s" % (self.trace_id, self.span_id, sampled)
 
+    @classmethod
+    def extract_sentry_trace(cls, sentry_trace):
+        # type: (str) -> Tuple[str, str, bool]
+        trace_id, parent_span_id, parent_sampled = sentry_trace.split("-")
+        parent_sampled = True if parent_sampled == "1" else False
+        return (trace_id, parent_span_id, parent_sampled)
+
     def to_tracestate(self):
         # type: () -> Optional[str]
         """
@@ -468,12 +478,16 @@ class Span(object):
         else:
             self.set_status("unknown_error")
 
+    def set_context(self, key, value):
+        # type: (str, Any) -> None
+        self._contexts[key] = value
+
     def is_success(self):
         # type: () -> bool
         return self.status == "ok"
 
-    def finish(self, hub=None):
-        # type: (Optional[sentry_sdk.Hub]) -> Optional[str]
+    def finish(self, hub=None, **kwargs):
+        # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
         # XXX: would be type: (Optional[sentry_sdk.Hub]) -> None, but that leads
         # to incompatible return types for Span.finish and Transaction.finish.
         if self.timestamp is not None:
@@ -483,8 +497,14 @@ class Span(object):
         hub = hub or self.hub or sentry_sdk.Hub.current
 
         try:
-            duration_seconds = time.perf_counter() - self._start_timestamp_monotonic
-            self.timestamp = self.start_timestamp + timedelta(seconds=duration_seconds)
+            end_timestamp = kwargs.get("end_timestamp", None)
+            if end_timestamp:
+                self.timestamp = end_timestamp
+            else:
+                duration_seconds = time.perf_counter() - self._start_timestamp_monotonic
+                self.timestamp = self.start_timestamp + timedelta(
+                    seconds=duration_seconds
+                )
         except AttributeError:
             self.timestamp = datetime.utcnow()
 
@@ -630,8 +650,8 @@ class Transaction(Span):
         # reference.
         return self
 
-    def finish(self, hub=None):
-        # type: (Optional[sentry_sdk.Hub]) -> Optional[str]
+    def finish(self, hub=None, **kwargs):
+        # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
         if self.timestamp is not None:
             # This transaction is already finished, ignore.
             return None
@@ -663,7 +683,7 @@ class Transaction(Span):
             )
             self.name = "<unlabeled transaction>"
 
-        Span.finish(self, hub)
+        Span.finish(self, hub, **kwargs)
 
         if not self.sampled:
             # At this point a `sampled = None` should have already been resolved
@@ -685,11 +705,15 @@ class Transaction(Span):
         # to be garbage collected
         self._span_recorder = None
 
+        contexts = {}
+        contexts.update(self._contexts)
+        contexts.update({"trace": self.get_trace_context()})
+
         event = {
             "type": "transaction",
             "transaction": self.name,
             "transaction_info": {"source": self.source},
-            "contexts": {"trace": self.get_trace_context()},
+            "contexts": contexts,
             "tags": self._tags,
             "timestamp": self.timestamp,
             "start_timestamp": self.start_timestamp,
