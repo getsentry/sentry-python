@@ -249,8 +249,8 @@ class DummySampleBuffer(SampleBuffer):
 
     def make_sampler(self):
         def _sample_stack(*args, **kwargs):
-            print("writing", self.sample_data[0])
-            self.write(self.sample_data.pop(0))
+            ts, sample = self.sample_data.pop(0)
+            self.write(ts, sample)
 
         return _sample_stack
 
@@ -760,7 +760,7 @@ thread_metadata = {
 )
 def test_sample_buffer(capacity, start_ns, stop_ns, samples, profile):
     buffer = SampleBuffer(capacity)
-    for sample in samples:
-        buffer.write(sample)
+    for ts, sample in samples:
+        buffer.write(ts, sample)
     result = buffer.slice_profile(start_ns, stop_ns)
     assert result == profile
