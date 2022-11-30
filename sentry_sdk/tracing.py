@@ -23,8 +23,9 @@ if MYPY:
     import sentry_sdk.profiler
     from sentry_sdk._types import Event, SamplingContext, MeasurementUnit
 
-
+BAGGAGE_HEADER_NAME = "baggage"
 SENTRY_TRACE_HEADER_NAME = "sentry-trace"
+
 
 # Transaction source
 # see https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
@@ -279,8 +280,8 @@ class Span(object):
 
         # TODO-neel move away from this kwargs stuff, it's confusing and opaque
         # make more explicit
-        baggage = Baggage.from_incoming_header(headers.get("baggage"))
-        kwargs.update({"baggage": baggage})
+        baggage = Baggage.from_incoming_header(headers.get(BAGGAGE_HEADER_NAME))
+        kwargs.update({BAGGAGE_HEADER_NAME: baggage})
 
         sentrytrace_kwargs = extract_sentrytrace_data(
             headers.get(SENTRY_TRACE_HEADER_NAME)
@@ -323,7 +324,7 @@ class Span(object):
         if self.containing_transaction:
             baggage = self.containing_transaction.get_baggage().serialize()
             if baggage:
-                yield "baggage", baggage
+                yield BAGGAGE_HEADER_NAME, baggage
 
     @classmethod
     def from_traceparent(
