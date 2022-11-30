@@ -93,7 +93,6 @@ class Span(object):
         "timestamp",
         "_tags",
         "_data",
-        "_contexts",
         "_span_recorder",
         "hub",
         "_context_manager_state",
@@ -141,7 +140,6 @@ class Span(object):
         self.hub = hub
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
-        self._contexts = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
         self.start_timestamp = datetime.utcnow()
         try:
@@ -470,10 +468,6 @@ class Span(object):
         else:
             self.set_status("unknown_error")
 
-    def set_context(self, key, value):
-        # type: (str, Any) -> None
-        self._contexts[key] = value
-
     def is_success(self):
         # type: () -> bool
         return self.status == "ok"
@@ -567,6 +561,7 @@ class Transaction(Span):
         # tracestate data from other vendors, of the form `dogs=yes,cats=maybe`
         "_third_party_tracestate",
         "_measurements",
+        "_contexts",
         "_profile",
         "_baggage",
         "_active_thread_id",
@@ -592,7 +587,9 @@ class Transaction(Span):
                 "instead of Span(transaction=...)."
             )
             name = kwargs.pop("transaction")
+
         Span.__init__(self, **kwargs)
+
         self.name = name
         self.source = source
         self.sample_rate = None  # type: Optional[float]
@@ -603,6 +600,7 @@ class Transaction(Span):
         self._sentry_tracestate = sentry_tracestate
         self._third_party_tracestate = third_party_tracestate
         self._measurements = {}  # type: Dict[str, Any]
+        self._contexts = {}  # type: Dict[str, Any]
         self._profile = None  # type: Optional[sentry_sdk.profiler.Profile]
         self._baggage = baggage
         # for profiling, we want to know on which thread a transaction is started
@@ -723,6 +721,10 @@ class Transaction(Span):
             return
 
         self._measurements[name] = {"value": value, "unit": unit}
+
+    def set_context(self, key, value):
+        # type: (str, Any) -> None
+        self._contexts[key] = value
 
     def to_json(self):
         # type: () -> Dict[str, Any]
