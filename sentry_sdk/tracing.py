@@ -561,6 +561,7 @@ class Transaction(Span):
         # tracestate data from other vendors, of the form `dogs=yes,cats=maybe`
         "_third_party_tracestate",
         "_measurements",
+        "_contexts",
         "_profile",
         "_baggage",
         "_active_thread_id",
@@ -586,7 +587,9 @@ class Transaction(Span):
                 "instead of Span(transaction=...)."
             )
             name = kwargs.pop("transaction")
+
         Span.__init__(self, **kwargs)
+
         self.name = name
         self.source = source
         self.sample_rate = None  # type: Optional[float]
@@ -597,6 +600,7 @@ class Transaction(Span):
         self._sentry_tracestate = sentry_tracestate
         self._third_party_tracestate = third_party_tracestate
         self._measurements = {}  # type: Dict[str, Any]
+        self._contexts = {}  # type: Dict[str, Any]
         self._profile = None  # type: Optional[sentry_sdk.profiler.Profile]
         self._baggage = baggage
         # for profiling, we want to know on which thread a transaction is started
@@ -685,11 +689,15 @@ class Transaction(Span):
         # to be garbage collected
         self._span_recorder = None
 
+        contexts = {}
+        contexts.update(self._contexts)
+        contexts.update({"trace": self.get_trace_context()})
+
         event = {
             "type": "transaction",
             "transaction": self.name,
             "transaction_info": {"source": self.source},
-            "contexts": {"trace": self.get_trace_context()},
+            "contexts": contexts,
             "tags": self._tags,
             "timestamp": self.timestamp,
             "start_timestamp": self.start_timestamp,
@@ -713,6 +721,10 @@ class Transaction(Span):
             return
 
         self._measurements[name] = {"value": value, "unit": unit}
+
+    def set_context(self, key, value):
+        # type: (str, Any) -> None
+        self._contexts[key] = value
 
     def to_json(self):
         # type: () -> Dict[str, Any]
