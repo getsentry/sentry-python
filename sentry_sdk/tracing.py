@@ -372,6 +372,13 @@ class Span(object):
             sampled = "0"
         return "%s-%s-%s" % (self.trace_id, self.span_id, sampled)
 
+    @classmethod
+    def extract_sentry_trace(cls, sentry_trace):
+        # type: (str) -> Tuple[str, str, bool]
+        trace_id, parent_span_id, parent_sampled = sentry_trace.split("-")
+        parent_sampled = True if parent_sampled == "1" else False
+        return (trace_id, parent_span_id, parent_sampled)
+
     def to_tracestate(self):
         # type: () -> Optional[str]
         """
