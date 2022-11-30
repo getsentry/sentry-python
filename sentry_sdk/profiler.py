@@ -213,7 +213,9 @@ def get_frame_name(frame):
             and f_code.co_varnames[0] == "self"
             and "self" in frame.f_locals
         ):
-            return "{}.{}".format(frame.f_locals["self"].__class__.__name__, name)
+            for cls in frame.f_locals["self"].__class__.__mro__:
+                if name in cls.__dict__:
+                    return "{}.{}".format(cls.__name__, name)
     except AttributeError:
         pass
 
@@ -227,7 +229,9 @@ def get_frame_name(frame):
             and f_code.co_varnames[0] == "cls"
             and "cls" in frame.f_locals
         ):
-            return "{}.{}".format(frame.f_locals["cls"].__name__, name)
+            for cls in frame.f_locals["cls"].__mro__:
+                if name in cls.__dict__:
+                    return "{}.{}".format(cls.__name__, name)
     except AttributeError:
         pass
 
