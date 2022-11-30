@@ -87,7 +87,6 @@ class ClientConstructor(object):
         server_name=None,  # type: Optional[str]
         shutdown_timeout=2,  # type: float
         integrations=[],  # type: Sequence[Integration]  # noqa: B006
-        instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
         in_app_include=[],  # type: List[str]  # noqa: B006
         in_app_exclude=[],  # type: List[str]  # noqa: B006
         default_integrations=True,  # type: bool
@@ -113,6 +112,7 @@ class ClientConstructor(object):
         send_client_reports=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
         proxy_headers=None,  # type: Optional[Dict[str, str]]
+        instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
     ):
         # type: (...) -> None
         pass
