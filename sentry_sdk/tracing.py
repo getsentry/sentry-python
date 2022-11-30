@@ -6,6 +6,7 @@ import time
 from datetime import datetime, timedelta
 
 import sentry_sdk
+from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.utils import logger
 from sentry_sdk._types import MYPY
 
@@ -125,6 +126,7 @@ class Span(object):
         status=None,  # type: Optional[str]
         transaction=None,  # type: Optional[str] # deprecated
         containing_transaction=None,  # type: Optional[Transaction]
+        instrumenter=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -215,6 +217,15 @@ class Span(object):
         trace id, sampling decision, transaction pointer, and span recorder are
         inherited from the current span/transaction.
         """
+        hub = self.hub or sentry_sdk.Hub.current
+        client = hub.client
+
+        instrumenter = kwargs.get("instrumenter", INSTRUMENTER.SENTRY)
+        configuration_instrumenter = client and client.options["instrumenter"]
+
+        if instrumenter != configuration_instrumenter:
+            return NoOpSpan()
+
         kwargs.setdefault("sampled", self.sampled)
 
         child = Span(
@@ -826,6 +837,48 @@ class Transaction(Span):
                     sample_rate=float(sample_rate),
                 )
             )
+
+
+class NoOpSpan(Span):
+    def __repr__(self):
+        # type: () -> Any
+        return self.__class__.__name__
+
+    def __enter__(self):
+        # type: () -> Any
+        return self
+
+    def __exit__(self, ty, value, tb):
+        # type: (Any, Any, Any) -> Any
+        pass
+
+    def start_child(self, **kwargs):
+        # type: (**Any) -> Any
+        pass
+
+    def new_span(self, **kwargs):
+        # type: (**Any) -> Any
+        pass
+
+    def set_tag(self, key, value):
+        # type: (Any, Any) -> Any
+        pass
+
+    def set_data(self, key, value):
+        # type: (Any, Any) -> Any
+        pass
+
+    def set_status(self, value):
+        # type: (Any) -> Any
+        pass
+
+    def set_http_status(self, http_status):
+        # type: (Any) -> Any
+        pass
+
+    def finish(self, hub=None, **kwargs):
+        # type: (Any, **Any) -> Any
+        pass
 
 
 # Circular imports

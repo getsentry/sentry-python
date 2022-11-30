@@ -5,9 +5,10 @@ from datetime import datetime
 from contextlib import contextmanager
 
 from sentry_sdk._compat import with_metaclass
+from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
-from sentry_sdk.tracing import Span, Transaction
+from sentry_sdk.tracing import NoOpSpan, Span, Transaction
 from sentry_sdk.session import Session
 from sentry_sdk.utils import (
     exc_info_from_error,
@@ -464,6 +465,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         for every incoming HTTP request. Use `start_transaction` to start a new
         transaction when one is not already in progress.
         """
+        instrumenter = kwargs.get("instrumenter", INSTRUMENTER.SENTRY)
+        configuration_instrumenter = self.client and self.client.options["instrumenter"]
+
+        if instrumenter != configuration_instrumenter:
+            return NoOpSpan()
+
         # TODO: consider removing this in a future release.
         # This is for backwards compatibility with releases before
         # start_transaction existed, to allow for a smoother transition.
@@ -496,7 +503,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         transaction=None,  # type: Optional[Transaction]
         **kwargs  # type: Any
     ):
-        # type: (...) -> Transaction
+        # type: (...) -> Union[Transaction, NoOpSpan]
         """
         Start and return a transaction.
 
@@ -519,6 +526,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         When the transaction is finished, it will be sent to Sentry with all its
         finished child spans.
         """
+        instrumenter = kwargs.get("instrumenter", INSTRUMENTER.SENTRY)
+        configuration_instrumenter = self.client and self.client.options["instrumenter"]
+
+        if instrumenter != configuration_instrumenter:
+            return NoOpSpan()
+
         custom_sampling_context = kwargs.pop("custom_sampling_context", {})
 
         # if we haven't been given a transaction, make one

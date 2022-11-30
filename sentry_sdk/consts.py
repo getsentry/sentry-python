@@ -44,6 +44,11 @@ DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
 
 
+class INSTRUMENTER:
+    SENTRY = "sentry"
+    OTEL = "otel"
+
+
 class OP:
     DB = "db"
     DB_REDIS = "db.redis"
@@ -82,6 +87,7 @@ class ClientConstructor(object):
         server_name=None,  # type: Optional[str]
         shutdown_timeout=2,  # type: float
         integrations=[],  # type: Sequence[Integration]  # noqa: B006
+        instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
         in_app_include=[],  # type: List[str]  # noqa: B006
         in_app_exclude=[],  # type: List[str]  # noqa: B006
         default_integrations=True,  # type: bool
