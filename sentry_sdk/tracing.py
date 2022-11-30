@@ -473,7 +473,7 @@ class Span(object):
         # type: () -> bool
         return self.status == "ok"
 
-    def finish(self, hub=None, **kwargs):
+    def finish(self, hub=None, end_timestamp=None):
         # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
         # XXX: would be type: (Optional[sentry_sdk.Hub]) -> None, but that leads
         # to incompatible return types for Span.finish and Transaction.finish.
@@ -484,7 +484,6 @@ class Span(object):
         hub = hub or self.hub or sentry_sdk.Hub.current
 
         try:
-            end_timestamp = kwargs.get("end_timestamp", None)
             if end_timestamp:
                 self.timestamp = end_timestamp
             else:
@@ -637,7 +636,7 @@ class Transaction(Span):
         # reference.
         return self
 
-    def finish(self, hub=None, **kwargs):
+    def finish(self, hub=None, end_timestamp=None):
         # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
         if self.timestamp is not None:
             # This transaction is already finished, ignore.
@@ -670,7 +669,7 @@ class Transaction(Span):
             )
             self.name = "<unlabeled transaction>"
 
-        Span.finish(self, hub, **kwargs)
+        Span.finish(self, hub, end_timestamp)
 
         if not self.sampled:
             # At this point a `sampled = None` should have already been resolved
@@ -883,8 +882,8 @@ class NoOpSpan(Span):
         # type: (Any) -> Any
         pass
 
-    def finish(self, hub=None, **kwargs):
-        # type: (Any, **Any) -> Any
+    def finish(self, hub=None, end_timestamp=None):
+        # type: (Any, Any) -> Any
         pass
 
 
