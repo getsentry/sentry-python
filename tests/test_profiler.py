@@ -82,7 +82,35 @@ def get_frame(depth=1):
     return inspect.currentframe()
 
 
-class GetFrame:
+class GetFrameBase:
+    def inherited_instance_method(self):
+        return inspect.currentframe()
+
+    def inherited_instance_method_wrapped(self):
+        def wrapped():
+            self
+            return inspect.currentframe()
+
+        return wrapped
+
+    @classmethod
+    def inherited_class_method(cls):
+        return inspect.currentframe()
+
+    @classmethod
+    def inherited_class_method_wrapped(cls):
+        def wrapped():
+            cls
+            return inspect.currentframe()
+
+        return wrapped
+
+    @staticmethod
+    def inherited_static_method():
+        return inspect.currentframe()
+
+
+class GetFrame(GetFrameBase):
     def instance_method(self):
         return inspect.currentframe()
 
@@ -147,6 +175,32 @@ class GetFrame:
             GetFrame().static_method(),
             "GetFrame.static_method",
             id="static_method",
+            marks=pytest.mark.skip(reason="unsupported"),
+        ),
+        pytest.param(
+            GetFrame().inherited_instance_method(),
+            "GetFrameBase.inherited_instance_method",
+            id="inherited_instance_method",
+        ),
+        pytest.param(
+            GetFrame().inherited_instance_method_wrapped()(),
+            "wrapped",
+            id="instance_method_wrapped",
+        ),
+        pytest.param(
+            GetFrame().inherited_class_method(),
+            "GetFrameBase.inherited_class_method",
+            id="inherited_class_method",
+        ),
+        pytest.param(
+            GetFrame().inherited_class_method_wrapped()(),
+            "wrapped",
+            id="inherited_class_method_wrapped",
+        ),
+        pytest.param(
+            GetFrame().inherited_static_method(),
+            "GetFrameBase.static_method",
+            id="inherited_static_method",
             marks=pytest.mark.skip(reason="unsupported"),
         ),
     ],
