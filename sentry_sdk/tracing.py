@@ -6,7 +6,6 @@ import time
 from datetime import datetime, timedelta
 
 import sentry_sdk
-
 from sentry_sdk.utils import logger
 from sentry_sdk._types import MYPY
 
@@ -24,6 +23,8 @@ if MYPY:
     import sentry_sdk.profiler
     from sentry_sdk._types import Event, SamplingContext, MeasurementUnit
 
+
+SENTRY_TRACE_HEADER_NAME = "sentry-trace"
 
 # Transaction source
 # see https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
@@ -281,7 +282,9 @@ class Span(object):
         baggage = Baggage.from_incoming_header(headers.get("baggage"))
         kwargs.update({"baggage": baggage})
 
-        sentrytrace_kwargs = extract_sentrytrace_data(headers.get("sentry-trace"))
+        sentrytrace_kwargs = extract_sentrytrace_data(
+            headers.get(SENTRY_TRACE_HEADER_NAME)
+        )
 
         if sentrytrace_kwargs is not None:
             kwargs.update(sentrytrace_kwargs)
@@ -308,7 +311,7 @@ class Span(object):
         `sentry_tracestate` value, this will cause one to be generated and
         stored.
         """
-        yield "sentry-trace", self.to_traceparent()
+        yield SENTRY_TRACE_HEADER_NAME, self.to_traceparent()
 
         tracestate = self.to_tracestate() if has_tracestate_enabled(self) else None
         # `tracestate` will only be `None` if there's no client or no DSN
@@ -344,7 +347,9 @@ class Span(object):
         if not traceparent:
             return None
 
-        return cls.continue_from_headers({"sentry-trace": traceparent}, **kwargs)
+        return cls.continue_from_headers(
+            {SENTRY_TRACE_HEADER_NAME: traceparent}, **kwargs
+        )
 
     def to_traceparent(self):
         # type: () -> str
@@ -653,6 +658,7 @@ class Transaction(Span):
             # to a concrete decision.
             if self.sampled is None:
                 logger.warning("Discarding transaction without sampling decision.")
+
             return None
 
         finished_spans = [
