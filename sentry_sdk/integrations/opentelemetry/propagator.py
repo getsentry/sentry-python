@@ -22,9 +22,8 @@ from opentelemetry.trace import (  # type: ignore
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
-    Transaction,
 )
-from sentry_sdk.tracing_utils import Baggage
+from sentry_sdk.tracing_utils import Baggage, extract_sentrytrace_data
 from sentry_sdk._types import MYPY
 
 if MYPY:
@@ -46,7 +45,12 @@ class SentryPropagator(TextMapPropagator):  # type: ignore
         if not sentry_trace:
             return context
 
-        sentry_trace_data = Transaction.extract_sentry_trace(sentry_trace[0])
+        sentrytrace = extract_sentrytrace_data(sentry_trace[0])
+        sentry_trace_data = (
+            sentrytrace["trace_id"],
+            sentrytrace["parent_span_id"],
+            sentrytrace["parent_sampled"],
+        )
 
         context = set_value(SENTRY_TRACE_KEY, sentry_trace_data, context)
 
