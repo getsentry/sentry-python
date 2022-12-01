@@ -4,6 +4,7 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
 
 from sentry_sdk._types import MYPY
+from sentry_sdk.tracing import NoOpSpan
 
 if MYPY:
     from typing import Any
@@ -210,5 +211,5 @@ def start_transaction(
     transaction=None,  # type: Optional[Transaction]
     **kwargs  # type: Any
 ):
-    # type: (...) -> Transaction
+    # type: (...) -> Union[Transaction, NoOpSpan]
     return Hub.current.start_transaction(transaction, **kwargs)
