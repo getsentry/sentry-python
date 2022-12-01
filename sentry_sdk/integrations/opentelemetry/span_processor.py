@@ -187,7 +187,6 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
                 op += ".client"
 
             description = http_method
-            print(f"~~~~~otel_span.attributes: {otel_span.attributes}")
 
             peer_name = otel_span.attributes.get(SpanAttributes.NET_PEER_NAME, None)
             if peer_name:
