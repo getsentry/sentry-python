@@ -209,8 +209,8 @@ class Span(object):
         # referencing themselves)
         return self._containing_transaction
 
-    def start_child(self, **kwargs):
-        # type: (**Any) -> Span
+    def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
+        # type: (str, **Any) -> Span
         """
         Start a sub-span from the current span or transaction.
 
@@ -220,8 +220,6 @@ class Span(object):
         """
         hub = self.hub or sentry_sdk.Hub.current
         client = hub.client
-
-        instrumenter = kwargs.get("instrumenter", INSTRUMENTER.SENTRY)
         configuration_instrumenter = client and client.options["instrumenter"]
 
         if instrumenter != configuration_instrumenter:

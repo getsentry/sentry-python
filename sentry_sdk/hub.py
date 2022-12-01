@@ -451,6 +451,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def start_span(
         self,
         span=None,  # type: Optional[Span]
+        instrumenter=INSTRUMENTER.SENTRY,  # type: str
         **kwargs  # type: Any
     ):
         # type: (...) -> Span
@@ -465,7 +466,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         for every incoming HTTP request. Use `start_transaction` to start a new
         transaction when one is not already in progress.
         """
-        instrumenter = kwargs.get("instrumenter", INSTRUMENTER.SENTRY)
         configuration_instrumenter = self.client and self.client.options["instrumenter"]
 
         if instrumenter != configuration_instrumenter:
@@ -501,6 +501,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def start_transaction(
         self,
         transaction=None,  # type: Optional[Transaction]
+        instrumenter=INSTRUMENTER.SENTRY,  # type: str
         **kwargs  # type: Any
     ):
         # type: (...) -> Union[Transaction, NoOpSpan]
@@ -526,7 +527,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         When the transaction is finished, it will be sent to Sentry with all its
         finished child spans.
         """
-        instrumenter = kwargs.get("instrumenter", INSTRUMENTER.SENTRY)
         configuration_instrumenter = self.client and self.client.options["instrumenter"]
 
         if instrumenter != configuration_instrumenter:
