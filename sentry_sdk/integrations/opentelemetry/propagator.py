@@ -36,6 +36,10 @@ SENTRY_BAGGAGE_KEY = create_key("sentry-baggage")
 
 
 class SentryPropagator(TextMapPropagator):  # type: ignore
+    """
+    Propagates tracing headers for Sentry's tracing system in a way OTel understands.
+    """
+
     def extract(self, carrier, context=None, getter=default_getter):
         # type: (CarrierT, Optional[Context], Getter) -> Context
         if context is None:
