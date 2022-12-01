@@ -869,7 +869,7 @@ class NoOpSpan(Span):
 
     def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
         # type: (str, **Any) -> Any
-        pass
+        return NoOpSpan()
 
     def new_span(self, **kwargs):
         # type: (**Any) -> Any
