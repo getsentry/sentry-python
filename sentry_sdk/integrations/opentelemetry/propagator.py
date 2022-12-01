@@ -46,10 +46,13 @@ class SentryPropagator(TextMapPropagator):  # type: ignore
             return context
 
         sentrytrace = extract_sentrytrace_data(sentry_trace[0])
+        if not sentrytrace:
+            return context
+
         sentry_trace_data = (
-            sentrytrace["trace_id"],
-            sentrytrace["parent_span_id"],
-            sentrytrace["parent_sampled"],
+            sentrytrace.get("trace_id", "0"),
+            sentrytrace.get("parent_span_id", "0"),
+            sentrytrace.get("parent_sampled", None),
         )
 
         context = set_value(SENTRY_TRACE_KEY, sentry_trace_data, context)
@@ -57,8 +60,8 @@ class SentryPropagator(TextMapPropagator):  # type: ignore
         trace_id, span_id, _ = sentry_trace_data
 
         span_context = SpanContext(
-            trace_id=int(trace_id, 16),
-            span_id=int(span_id, 16),
+            trace_id=int(trace_id, 16),  # type: ignore
+            span_id=int(span_id, 16),  # type: ignore
             # we simulate a sampled trace on the otel side and leave the sampling to sentry
             trace_flags=TraceFlags(TraceFlags.SAMPLED),
             is_remote=True,
