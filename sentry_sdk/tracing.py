@@ -127,7 +127,6 @@ class Span(object):
         transaction=None,  # type: Optional[str] # deprecated
         containing_transaction=None,  # type: Optional[Transaction]
         start_timestamp=None,  # type: Optional[datetime]
-        instrumenter=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -868,8 +867,8 @@ class NoOpSpan(Span):
         # type: (Any, Any, Any) -> Any
         pass
 
-    def start_child(self, **kwargs):
-        # type: (**Any) -> Any
+    def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
+        # type: (str, **Any) -> Any
         pass
 
     def new_span(self, **kwargs):
