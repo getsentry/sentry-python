@@ -315,8 +315,8 @@ class Profile(object):
                     "trace_id": self.transaction.trace_id,
                     "active_thread_id": str(
                         self.transaction._active_thread_id
-                        if active_thread_id is None else
-                        active_thread_id
+                        if active_thread_id is None
+                        else active_thread_id
                     ),
                 }
             ],

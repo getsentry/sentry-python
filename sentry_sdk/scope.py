@@ -94,7 +94,6 @@ class Scope(object):
         "_session",
         "_attachments",
         "_force_auto_session_tracking",
-
         # The thread that is handling the bulk of the work. This can just
         # be the main thread, but that's not always true. For web frameworks,
         # this would be the thread handling the request.
