@@ -291,7 +291,7 @@ def test_last_event_id(sentry_init, capture_events):
     assert response.status_code == 500
     print(events)
     event = events[-1]
-    assert response.content.strip().decode("ascii") == event["event_id"]
+    assert response.content.strip().decode("ascii").strip('"') == event["event_id"]
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "Exception"
     assert exception["value"] == "Too Hot"
