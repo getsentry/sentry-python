@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Awaitable, Dict, Optional, Union
 
 from pydantic import BaseModel
 
@@ -93,13 +93,11 @@ def patch_app_init() -> None:
 def patch_middlewares() -> None:
     old__resolve_middleware_stack = BaseRouteHandler.resolve_middleware
 
-    def resolve_middleware_wrapper(self: Any) -> List["Middleware"]:
-        return list(
-            map(
-                lambda middleware: enable_span_for_middleware(middleware),
-                old__resolve_middleware_stack(self),
-            )
-        )
+    def resolve_middleware_wrapper(self: Any) -> list["Middleware"]:
+        return [
+            enable_span_for_middleware(middleware)
+            for middleware in old__resolve_middleware_stack(self)
+        ]
 
     BaseRouteHandler.resolve_middleware = resolve_middleware_wrapper
 
@@ -143,7 +141,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 new_receive = _sentry_receive if not receive_patched else receive
 
                 # Creating spans for the "send" callback
-                async def _sentry_send(message: "Message") -> Awaitable[None]:
+                async def _sentry_send(message: "Message") -> None:
                     hub = Hub.current
                     with hub.start_span(
                         op=OP.MIDDLEWARE_STARLITE_SEND,
@@ -220,7 +218,7 @@ def patch_http_route_handle() -> None:
             sentry_scope._name = StarliteIntegration.identifier
             sentry_scope.add_event_processor(event_processor)
 
-            await old_handle(self, scope, receive, send)
+            return await old_handle(self, scope, receive, send)
 
     HTTPRoute.handle = handle_wrapper
 
