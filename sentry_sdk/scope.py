@@ -223,17 +223,6 @@ class Scope(object):
         """Get/set current tracing span or transaction."""
         return self._span
 
-    @property
-    def active_thread_id(self):
-        # type: () -> Optional[int]
-        """Get/set the current active thread id."""
-        return self._active_thread_id
-
-    def set_active_thread_id(self, active_thread_id):
-        # type: (Optional[int]) -> None
-        """Set the current active thread id."""
-        self._active_thread_id = active_thread_id
-
     @span.setter
     def span(self, span):
         # type: (Optional[Span]) -> None
@@ -244,6 +233,17 @@ class Scope(object):
             transaction = span
             if transaction.name:
                 self._transaction = transaction.name
+
+    @property
+    def active_thread_id(self):
+        # type: () -> Optional[int]
+        """Get/set the current active thread id."""
+        return self._active_thread_id
+
+    def set_active_thread_id(self, active_thread_id):
+        # type: (Optional[int]) -> None
+        """Set the current active thread id."""
+        self._active_thread_id = active_thread_id
 
     def set_tag(
         self,
