@@ -54,7 +54,9 @@ if MYPY:
     import sentry_sdk.scope
     import sentry_sdk.tracing
 
-    RawSampleData = Tuple[int, Sequence[Tuple[str, Sequence[RawFrameData]]]]
+    RawStack = Tuple[RawFrameData, ...]
+    RawSample = Sequence[Tuple[str, RawStack]]
+    RawSampleWithId = Sequence[Tuple[str, int, RawStack]]
 
     ProcessedStack = Tuple[int, ...]
 
@@ -154,7 +156,7 @@ MAX_STACK_DEPTH = 128
 
 
 def extract_stack(frame, max_stack_depth=MAX_STACK_DEPTH):
-    # type: (Optional[FrameType], int) -> Sequence[RawFrameData]
+    # type: (Optional[FrameType], int) -> Tuple[RawFrameData, ...]
     """
     Extracts the stack starting the specified frame. The extracted stack
     assumes the specified frame is the top of the stack, and works back
@@ -336,12 +338,14 @@ class SampleBuffer(object):
     def __init__(self, capacity):
         # type: (int) -> None
 
-        self.buffer = [None] * capacity  # type: List[Optional[RawSampleData]]
+        self.buffer = [
+            None
+        ] * capacity  # type: List[Optional[Tuple[int, RawSampleWithId]]]
         self.capacity = capacity  # type: int
         self.idx = 0  # type: int
 
-    def write(self, sample):
-        # type: (RawSampleData) -> None
+    def write(self, ts, raw_sample):
+        # type: (int, RawSample) -> None
         """
         Writing to the buffer is not thread safe. There is the possibility
         that parallel writes will overwrite one another.
@@ -354,7 +358,24 @@ class SampleBuffer(object):
         any synchronization mechanisms here like locks.
         """
         idx = self.idx
-        self.buffer[idx] = sample
+
+        sample = [
+            (
+                thread_id,
+                # Instead of mapping the stack into frame ids and hashing
+                # that as a tuple, we can directly hash the stack.
+                # This saves us from having to generate yet another list.
+                # Additionally, using the stack as the key directly is
+                # costly because the stack can be large, so we pre-hash
+                # the stack, and use the hash as the key as this will be
+                # needed a few times to improve performance.
+                hash(stack),
+                stack,
+            )
+            for thread_id, stack in raw_sample
+        ]
+
+        self.buffer[idx] = (ts, sample)
         self.idx = (idx + 1) % self.capacity
 
     def slice_profile(self, start_ns, stop_ns):
@@ -365,27 +386,13 @@ class SampleBuffer(object):
         frames = dict()  # type: Dict[RawFrameData, int]
         frames_list = list()  # type: List[ProcessedFrame]
 
-        # TODO: This is doing an naive iteration over the
-        # buffer and extracting the appropriate samples.
-        #
-        # Is it safe to assume that the samples are always in
-        # chronological order and binary search the buffer?
         for ts, sample in filter(None, self.buffer):
             if start_ns > ts or ts > stop_ns:
                 continue
 
             elapsed_since_start_ns = str(ts - start_ns)
 
-            for tid, stack in sample:
-                # Instead of mapping the stack into frame ids and hashing
-                # that as a tuple, we can directly hash the stack.
-                # This saves us from having to generate yet another list.
-                # Additionally, using the stack as the key directly is
-                # costly because the stack can be large, so we pre-hash
-                # the stack, and use the hash as the key as this will be
-                # needed a few times to improve performance.
-                hashed_stack = hash(stack)
-
+            for tid, hashed_stack, stack in sample:
                 # Check if the stack is indexed first, this lets us skip
                 # indexing frames if it's not necessary
                 if hashed_stack not in stacks:
@@ -441,13 +448,11 @@ class SampleBuffer(object):
             """
 
             self.write(
-                (
-                    nanosecond_time(),
-                    [
-                        (str(tid), extract_stack(frame))
-                        for tid, frame in sys._current_frames().items()
-                    ],
-                )
+                nanosecond_time(),
+                [
+                    (str(tid), extract_stack(frame))
+                    for tid, frame in sys._current_frames().items()
+                ],
             )
 
         return _sample_stack

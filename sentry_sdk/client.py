@@ -20,6 +20,7 @@ from sentry_sdk.serializer import serialize
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import (
     DEFAULT_OPTIONS,
+    INSTRUMENTER,
     VERSION,
     ClientConstructor,
 )
@@ -85,6 +86,9 @@ def _get_options(*args, **kwargs):
 
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
+
+    if rv["instrumenter"] is None:
+        rv["instrumenter"] = INSTRUMENTER.SENTRY
 
     return rv
 

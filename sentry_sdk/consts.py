@@ -44,6 +44,36 @@ DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
 
 
+class INSTRUMENTER:
+    SENTRY = "sentry"
+    OTEL = "otel"
+
+
+class OP:
+    DB = "db"
+    DB_REDIS = "db.redis"
+    EVENT_DJANGO = "event.django"
+    FUNCTION = "function"
+    FUNCTION_AWS = "function.aws"
+    FUNCTION_GCP = "function.gcp"
+    HTTP_CLIENT = "http.client"
+    HTTP_CLIENT_STREAM = "http.client.stream"
+    HTTP_SERVER = "http.server"
+    MIDDLEWARE_DJANGO = "middleware.django"
+    MIDDLEWARE_STARLETTE = "middleware.starlette"
+    MIDDLEWARE_STARLETTE_RECEIVE = "middleware.starlette.receive"
+    MIDDLEWARE_STARLETTE_SEND = "middleware.starlette.send"
+    QUEUE_SUBMIT_CELERY = "queue.submit.celery"
+    QUEUE_TASK_CELERY = "queue.task.celery"
+    QUEUE_TASK_RQ = "queue.task.rq"
+    SUBPROCESS = "subprocess"
+    SUBPROCESS_WAIT = "subprocess.wait"
+    SUBPROCESS_COMMUNICATE = "subprocess.communicate"
+    TEMPLATE_RENDER = "template.render"
+    VIEW_RENDER = "view.render"
+    WEBSOCKET_SERVER = "websocket.server"
+
+
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
 # take these arguments (even though they take opaque **kwargs)
 class ClientConstructor(object):
@@ -82,6 +112,7 @@ class ClientConstructor(object):
         send_client_reports=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
         proxy_headers=None,  # type: Optional[Dict[str, str]]
+        instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
     ):
         # type: (...) -> None
         pass
@@ -106,28 +137,3 @@ del _get_default_options
 
 
 VERSION = "1.11.1"
-
-
-class OP:
-    DB = "db"
-    DB_REDIS = "db.redis"
-    EVENT_DJANGO = "event.django"
-    FUNCTION = "function"
-    FUNCTION_AWS = "function.aws"
-    FUNCTION_GCP = "function.gcp"
-    HTTP_CLIENT = "http.client"
-    HTTP_CLIENT_STREAM = "http.client.stream"
-    HTTP_SERVER = "http.server"
-    MIDDLEWARE_DJANGO = "middleware.django"
-    MIDDLEWARE_STARLETTE = "middleware.starlette"
-    MIDDLEWARE_STARLETTE_RECEIVE = "middleware.starlette.receive"
-    MIDDLEWARE_STARLETTE_SEND = "middleware.starlette.send"
-    QUEUE_SUBMIT_CELERY = "queue.submit.celery"
-    QUEUE_TASK_CELERY = "queue.task.celery"
-    QUEUE_TASK_RQ = "queue.task.rq"
-    SUBPROCESS = "subprocess"
-    SUBPROCESS_WAIT = "subprocess.wait"
-    SUBPROCESS_COMMUNICATE = "subprocess.communicate"
-    TEMPLATE_RENDER = "template.render"
-    VIEW_RENDER = "view.render"
-    WEBSOCKET_SERVER = "websocket.server"
