@@ -53,15 +53,9 @@ class SentryPropagator(TextMapPropagator):  # type: ignore
         if not sentrytrace:
             return context
 
-        sentry_trace_data = (
-            sentrytrace.get("trace_id", "0"),
-            sentrytrace.get("parent_span_id", "0"),
-            sentrytrace.get("parent_sampled", None),
-        )
+        context = set_value(SENTRY_TRACE_KEY, sentrytrace, context)
 
-        context = set_value(SENTRY_TRACE_KEY, sentry_trace_data, context)
-
-        trace_id, span_id, _ = sentry_trace_data
+        trace_id, span_id = sentrytrace["trace_id"], sentrytrace["parent_span_id"]
 
         span_context = SpanContext(
             trace_id=int(trace_id, 16),  # type: ignore

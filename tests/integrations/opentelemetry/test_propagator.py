@@ -65,11 +65,11 @@ def test_extract_empty_context_sentry_trace_header_no_baggage():
 
     assert len(modified_context.keys()) == 3
 
-    assert modified_context[SENTRY_TRACE_KEY] == (
-        "1234567890abcdef1234567890abcdef",
-        "1234567890abcdef",
-        True,
-    )
+    assert modified_context[SENTRY_TRACE_KEY] == {
+        "trace_id": "1234567890abcdef1234567890abcdef",
+        "parent_span_id": "1234567890abcdef",
+        "parent_sampled": True,
+    }
     assert modified_context[SENTRY_BAGGAGE_KEY].serialize() == ""
 
     span_context = get_current_span(modified_context).get_span_context()
@@ -100,11 +100,12 @@ def test_extract_context_sentry_trace_header_baggage():
 
     assert len(modified_context.keys()) == 4
 
-    assert modified_context[SENTRY_TRACE_KEY] == (
-        "1234567890abcdef1234567890abcdef",
-        "1234567890abcdef",
-        True,
-    )
+    assert modified_context[SENTRY_TRACE_KEY] == {
+        "trace_id": "1234567890abcdef1234567890abcdef",
+        "parent_span_id": "1234567890abcdef",
+        "parent_sampled": True,
+    }
+
     assert modified_context[SENTRY_BAGGAGE_KEY].serialize() == (
         "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
         "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
