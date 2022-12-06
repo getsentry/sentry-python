@@ -55,6 +55,9 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         if hub.client and hub.client.options["instrumenter"] != INSTRUMENTER.OTEL:
             return
 
+        if not otel_span.context.is_valid:
+            return
+
         if self._is_sentry_span(hub, otel_span):
             return
 
@@ -93,6 +96,9 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
             return
 
         if hub.client and hub.client.options["instrumenter"] != INSTRUMENTER.OTEL:
+            return
+
+        if not otel_span.context.is_valid:
             return
 
         span_id = format_span_id(otel_span.context.span_id)
