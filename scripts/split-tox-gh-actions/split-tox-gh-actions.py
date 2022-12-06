@@ -34,7 +34,7 @@ MATRIX_DEFINITION = """
     strategy:
       matrix:
         python-version: [{{ python-version }}]
-        os: [ubuntu-latest]
+        os: [ubuntu-20.04]
 """
 
 
@@ -77,7 +77,7 @@ def get_yaml_files_hash():
     """Calculate a hash of all the yaml configuration files"""
 
     hasher = hashlib.md5()
-    path_pattern = (OUT_DIR / f"test-integration-*.yml").as_posix()
+    path_pattern = (OUT_DIR / "test-integration-*.yml").as_posix()
     for file in glob(path_pattern):
         with open(file, "rb") as f:
             buf = f.read()
@@ -127,7 +127,7 @@ def main(fail_on_changes):
                 if python_version not in python_versions[framework]:
                     python_versions[framework].append(python_version)
 
-        except ValueError as err:
+        except ValueError:
             print(f"ERROR reading line {line}")
 
     for framework in python_versions:
