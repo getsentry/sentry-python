@@ -179,8 +179,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         Convert OTel span data and update the Sentry span with it.
         This should eventually happen on the server when ingesting the spans.
         """
-        for key in otel_span.attributes:
-            val = otel_span.attributes[key]
+        for key, val in otel_span.attributes.items():
             sentry_span.set_data(key, val)
 
         op = otel_span.name
