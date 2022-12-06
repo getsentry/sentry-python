@@ -63,3 +63,6 @@ aws-lambda-layer: dist
 	$(VENV_PATH)/bin/pip install certifi
 	$(VENV_PATH)/bin/python -m scripts.build_aws_lambda_layer
 .PHONY: aws-lambda-layer
+
+gh-actions-config:
+	$(VENV_PATH)/bin/python scripts/split-tox-gh-actions/split-tox-gh-actions.py
