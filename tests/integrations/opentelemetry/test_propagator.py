@@ -172,7 +172,7 @@ def test_inject_sentry_span_no_baggage():
     sentry_span.to_traceparent = mock.Mock(
         return_value="1234567890abcdef1234567890abcdef-1234567890abcdef-1"
     )
-    sentry_span.get_baggage = mock.Mock(return_value=None)
+    sentry_span.containing_transaction.get_baggage = mock.Mock(return_value=None)
 
     span_processor = SentrySpanProcessor()
     span_processor.otel_span_map[span_id] = sentry_span
@@ -223,7 +223,7 @@ def test_inject_sentry_span_baggage():
         "sentry-user_id": "Amélie",
     }
     baggage = Baggage(sentry_items=sentry_items)
-    sentry_span.get_baggage = MagicMock(return_value=baggage)
+    sentry_span.containing_transaction.get_baggage = MagicMock(return_value=baggage)
 
     span_processor = SentrySpanProcessor()
     span_processor.otel_span_map[span_id] = sentry_span
