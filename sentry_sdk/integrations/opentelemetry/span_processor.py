@@ -55,6 +55,9 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         if hub.client and hub.client.options["instrumenter"] != INSTRUMENTER.OTEL:
             return
 
+        if self._is_sentry_span(hub, otel_span):
+            return
+
         trace_data = self._get_trace_data(otel_span, parent_context)
 
         parent_span_id = trace_data["parent_span_id"]
@@ -92,12 +95,6 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         if hub.client and hub.client.options["instrumenter"] != INSTRUMENTER.OTEL:
             return
 
-        # Break infinite http requests to Sentry are caught by OTel and send again to Sentry.
-        otel_span_url = otel_span.attributes.get(SpanAttributes.HTTP_URL, None)
-        dsn_url = hub.client and Dsn(hub.client.dsn or "").netloc
-        if otel_span_url and dsn_url in otel_span_url:
-            return
-
         span_id = format_span_id(otel_span.context.span_id)
         sentry_span = self.otel_span_map.pop(span_id, None)
         if not sentry_span:
@@ -117,6 +114,20 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         sentry_span.finish(
             end_timestamp=datetime.fromtimestamp(otel_span.end_time / 1e9)
         )
+
+    def _is_sentry_span(self, hub, otel_span):
+        # type: (Hub, OTelSpan) -> bool
+        """
+        Break infinite loop:
+        HTTP requests to Sentry are caught by OTel and send again to Sentry.
+        """
+        otel_span_url = otel_span.attributes.get(SpanAttributes.HTTP_URL, None)
+        dsn_url = hub.client and Dsn(hub.client.dsn or "").netloc
+
+        if otel_span_url and dsn_url in otel_span_url:
+            return True
+
+        return False
 
     def _get_otel_context(self, otel_span):
         # type: (OTelSpan) -> Dict[str, Any]
