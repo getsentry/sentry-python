@@ -1,7 +1,6 @@
 from opentelemetry import trace  # type: ignore
 from opentelemetry.context import (  # type: ignore
     Context,
-    create_key,
     get_current,
     set_value,
 )
@@ -18,6 +17,13 @@ from opentelemetry.trace import (  # type: ignore
     NonRecordingSpan,
     SpanContext,
 )
+from sentry_sdk.integrations.opentelemetry.consts import (
+    SENTRY_BAGGAGE_KEY,
+    SENTRY_TRACE_KEY,
+)
+from sentry_sdk.integrations.opentelemetry.span_processor import (
+    SentrySpanProcessor,
+)
 
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
@@ -29,10 +35,6 @@ from sentry_sdk._types import MYPY
 if MYPY:
     from typing import Optional
     from typing import Set
-
-
-SENTRY_TRACE_KEY = create_key("sentry-trace")
-SENTRY_BAGGAGE_KEY = create_key("sentry-baggage")
 
 
 class SentryPropagator(TextMapPropagator):  # type: ignore
@@ -89,10 +91,6 @@ class SentryPropagator(TextMapPropagator):  # type: ignore
 
         current_span = trace.get_current_span(context)
         span_id = trace.format_span_id(current_span.context.span_id)
-
-        from sentry_sdk.integrations.opentelemetry.span_processor import (
-            SentrySpanProcessor,
-        )
 
         span_map = SentrySpanProcessor().otel_span_map
         sentry_span = span_map.get(span_id, None)

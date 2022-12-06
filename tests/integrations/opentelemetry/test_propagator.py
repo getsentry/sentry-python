@@ -8,12 +8,12 @@ from opentelemetry.trace import (
     TraceFlags,
     SpanContext,
 )
-
-from sentry_sdk.integrations.opentelemetry.propagator import (
+from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
-    SentryPropagator,
 )
+
+from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
 from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
 from sentry_sdk.tracing_utils import Baggage
 

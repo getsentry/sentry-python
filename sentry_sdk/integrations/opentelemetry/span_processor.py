@@ -11,15 +11,14 @@ from opentelemetry.trace import (  # type: ignore
     SpanKind,
 )
 from sentry_sdk.consts import INSTRUMENTER
-
 from sentry_sdk.hub import Hub
-from sentry_sdk.integrations.opentelemetry.propagator import (
+from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
 )
 from sentry_sdk.tracing import Transaction, Span as SentrySpan
-from sentry_sdk._types import MYPY
 from sentry_sdk.utils import Dsn
+from sentry_sdk._types import MYPY
 
 from urllib3.util import parse_url as urlparse  # type: ignore
 
