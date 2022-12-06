@@ -8,6 +8,33 @@ from sentry_sdk.tracing import Span, Transaction
 from opentelemetry.trace import SpanKind
 
 
+def test_is_sentry_span():
+    otel_span = MagicMock()
+
+    hub = MagicMock()
+    hub.client = None
+
+    span_processor = SentrySpanProcessor()
+    assert not span_processor._is_sentry_span(hub, otel_span)
+
+    client = MagicMock()
+    client.options = {"instrumenter": "otel"}
+    client.dsn = "https://1234567890abcdef@o123456.ingest.sentry.io/123456"
+
+    hub.client = client
+    assert not span_processor._is_sentry_span(hub, otel_span)
+
+    otel_span.attributes = {
+        "http.url": "https://example.com",
+    }
+    assert not span_processor._is_sentry_span(hub, otel_span)
+
+    otel_span.attributes = {
+        "http.url": "https://o123456.ingest.sentry.io/api/123/envelope",
+    }
+    assert span_processor._is_sentry_span(hub, otel_span)
+
+
 def test_get_otel_context():
     otel_span = MagicMock()
     otel_span.attributes = {"foo": "bar"}
@@ -232,6 +259,7 @@ def test_on_start_transaction():
 
     fake_client = MagicMock()
     fake_client.options = {"instrumenter": "otel"}
+    fake_client.dsn = "https://1234567890abcdef@o123456.ingest.sentry.io/123456"
 
     current_hub = MagicMock()
     current_hub.client = fake_client
@@ -273,6 +301,7 @@ def test_on_start_child():
 
     fake_client = MagicMock()
     fake_client.options = {"instrumenter": "otel"}
+    fake_client.dsn = "https://1234567890abcdef@o123456.ingest.sentry.io/123456"
 
     current_hub = MagicMock()
     current_hub.client = fake_client
