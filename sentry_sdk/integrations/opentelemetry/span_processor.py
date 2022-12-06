@@ -182,6 +182,8 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         for key, val in otel_span.attributes.items():
             sentry_span.set_data(key, val)
 
+        sentry_span.set_data("otel.kind", otel_span.kind)
+
         op = otel_span.name
         description = otel_span.name
 
