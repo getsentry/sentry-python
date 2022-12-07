@@ -3,6 +3,7 @@ import base64
 import functools
 import json
 import os
+import threading
 
 import pytest
 
@@ -108,6 +109,22 @@ def starlette_app_factory(middleware=None, debug=True):
         capture_message("hi")
         return starlette.responses.JSONResponse({"status": "ok"})
 
+    def _thread_ids_sync(request):
+        return starlette.responses.JSONResponse(
+            {
+                "main": threading.main_thread().ident,
+                "active": threading.current_thread().ident,
+            }
+        )
+
+    async def _thread_ids_async(request):
+        return starlette.responses.JSONResponse(
+            {
+                "main": threading.main_thread().ident,
+                "active": threading.current_thread().ident,
+            }
+        )
+
     app = starlette.applications.Starlette(
         debug=debug,
         routes=[
@@ -115,6 +132,8 @@ def starlette_app_factory(middleware=None, debug=True):
             starlette.routing.Route("/custom_error", _custom_error),
             starlette.routing.Route("/message", _message),
             starlette.routing.Route("/message/{message_id}", _message_with_id),
+            starlette.routing.Route("/sync/thread_ids", _thread_ids_sync),
+            starlette.routing.Route("/async/thread_ids", _thread_ids_async),
         ],
         middleware=middleware,
     )
@@ -824,3 +843,32 @@ def test_legacy_setup(
 
     (event,) = events
     assert event["transaction"] == "/message/{message_id}"
+
+
+@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
+def test_active_thread_id(sentry_init, capture_envelopes, endpoint):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": 1.0},
+    )
+    app = starlette_app_factory()
+    asgi_app = SentryAsgiMiddleware(app)
+
+    envelopes = capture_envelopes()
+
+    client = TestClient(asgi_app)
+    response = client.get(endpoint)
+    assert response.status_code == 200
+
+    data = json.loads(response.content)
+
+    envelopes = [envelope for envelope in envelopes]
+    assert len(envelopes) == 1
+
+    profiles = [item for item in envelopes[0].items if item.type == "profile"]
+    assert len(profiles) == 1
+
+    for profile in profiles:
+        transactions = profile.payload.json["transactions"]
+        assert len(transactions) == 1
+        assert str(data["active"]) == transactions[0]["active_thread_id"]

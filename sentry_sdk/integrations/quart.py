@@ -1,5 +1,8 @@
 from __future__ import absolute_import
 
+import inspect
+import threading
+
 from sentry_sdk.hub import _should_send_default_pii, Hub
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
@@ -11,6 +14,7 @@ from sentry_sdk.utils import (
     event_from_exception,
 )
 
+from sentry_sdk._functools import wraps
 from sentry_sdk._types import MYPY
 
 if MYPY:
@@ -34,6 +38,7 @@ try:
         request,
         websocket,
     )
+    from quart.scaffold import Scaffold  # type: ignore
     from quart.signals import (  # type: ignore
         got_background_exception,
         got_request_exception,
@@ -41,6 +46,7 @@ try:
         request_started,
         websocket_started,
     )
+    from quart.utils import is_coroutine_function  # type: ignore
 except ImportError:
     raise DidNotEnable("Quart is not installed")
 
@@ -71,18 +77,62 @@ class QuartIntegration(Integration):
         got_request_exception.connect(_capture_exception)
         got_websocket_exception.connect(_capture_exception)
 
-        old_app = Quart.__call__
+        patch_asgi_app()
+        patch_scaffold_route()
 
-        async def sentry_patched_asgi_app(self, scope, receive, send):
-            # type: (Any, Any, Any, Any) -> Any
-            if Hub.current.get_integration(QuartIntegration) is None:
-                return await old_app(self, scope, receive, send)
 
-            middleware = SentryAsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))
-            middleware.__call__ = middleware._run_asgi3
-            return await middleware(scope, receive, send)
+def patch_asgi_app():
+    # type: () -> None
+    old_app = Quart.__call__
 
-        Quart.__call__ = sentry_patched_asgi_app
+    async def sentry_patched_asgi_app(self, scope, receive, send):
+        # type: (Any, Any, Any, Any) -> Any
+        if Hub.current.get_integration(QuartIntegration) is None:
+            return await old_app(self, scope, receive, send)
+
+        middleware = SentryAsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))
+        middleware.__call__ = middleware._run_asgi3
+        return await middleware(scope, receive, send)
+
+    Quart.__call__ = sentry_patched_asgi_app
+
+
+def patch_scaffold_route():
+    # type: () -> None
+    old_route = Scaffold.route
+
+    def _sentry_route(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        old_decorator = old_route(*args, **kwargs)
+
+        def decorator(old_func):
+            # type: (Any) -> Any
+
+            if inspect.isfunction(old_func) and not is_coroutine_function(old_func):
+
+                @wraps(old_func)
+                def _sentry_func(*args, **kwargs):
+                    # type: (*Any, **Any) -> Any
+                    hub = Hub.current
+                    integration = hub.get_integration(QuartIntegration)
+                    if integration is None:
+                        return old_func(*args, **kwargs)
+
+                    with hub.configure_scope() as sentry_scope:
+                        if sentry_scope.profile is not None:
+                            sentry_scope.profile.active_thread_id = (
+                                threading.current_thread().ident
+                            )
+
+                        return old_func(*args, **kwargs)
+
+                return old_decorator(_sentry_func)
+
+            return old_decorator(old_func)
+
+        return decorator
+
+    Scaffold.route = _sentry_route
 
 
 def _set_transaction_name_and_source(scope, transaction_style, request):

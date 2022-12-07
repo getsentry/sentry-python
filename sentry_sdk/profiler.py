@@ -47,7 +47,6 @@ if MYPY:
     from typing import Sequence
     from typing import Tuple
     from typing_extensions import TypedDict
-    import sentry_sdk.scope
     import sentry_sdk.tracing
 
     StackId = int
@@ -305,6 +304,7 @@ class Profile(object):
         self.scheduler = scheduler
         self.transaction = transaction
         self.hub = hub
+        self.active_thread_id = None  # type: Optional[int]
         self._start_ns = None  # type: Optional[int]
         self._stop_ns = None  # type: Optional[int]
 
@@ -312,6 +312,14 @@ class Profile(object):
 
     def __enter__(self):
         # type: () -> None
+        hub = self.hub or sentry_sdk.Hub.current
+
+        _, scope = hub._stack[-1]
+        old_profile = scope.profile
+        scope.profile = self
+
+        self._context_manager_state = (hub, scope, old_profile)
+
         self._start_ns = nanosecond_time()
         self.scheduler.start_profiling()
 
@@ -320,8 +328,13 @@ class Profile(object):
         self.scheduler.stop_profiling()
         self._stop_ns = nanosecond_time()
 
-    def to_json(self, event_opt, options, scope):
-        # type: (Any, Dict[str, Any], Optional[sentry_sdk.scope.Scope]) -> Dict[str, Any]
+        _, scope, old_profile = self._context_manager_state
+        del self._context_manager_state
+
+        scope.profile = old_profile
+
+    def to_json(self, event_opt, options):
+        # type: (Any, Dict[str, Any]) -> Dict[str, Any]
         assert self._start_ns is not None
         assert self._stop_ns is not None
 
@@ -332,9 +345,6 @@ class Profile(object):
         handle_in_app_impl(
             profile["frames"], options["in_app_exclude"], options["in_app_include"]
         )
-
-        # the active thread id from the scope always take priorty if it exists
-        active_thread_id = None if scope is None else scope.active_thread_id
 
         return {
             "environment": event_opt.get("environment"),
@@ -369,8 +379,8 @@ class Profile(object):
                     "trace_id": self.transaction.trace_id,
                     "active_thread_id": str(
                         self.transaction._active_thread_id
-                        if active_thread_id is None
-                        else active_thread_id
+                        if self.active_thread_id is None
+                        else self.active_thread_id
                     ),
                 }
             ],
