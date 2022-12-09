@@ -238,19 +238,18 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
     assert stack[actual_depth].function == "<lambda>", actual_depth
 
 
-def get_scheduler_threads(scheduler):
-    return [thread for thread in threading.enumerate() if thread.name == scheduler.name]
-
-
 class DummySampleBuffer(SampleBuffer):
     def __init__(self, capacity, sample_data=None):
         super(DummySampleBuffer, self).__init__(capacity)
         self.sample_data = [] if sample_data is None else sample_data
 
-    def make_sampler(self):
+    def make_sampler(self, transaction):
         def _sample_stack(*args, **kwargs):
-            ts, sample = self.sample_data.pop(0)
-            self.write(ts, sample)
+            try:
+                ts, sample = self.sample_data.pop(0)
+                self.write(ts, sample)
+            except IndexError:
+                pass
 
         return _sample_stack
 
@@ -282,17 +281,16 @@ def test_thread_scheduler_takes_first_samples(scheduler_class):
             )
         ],
     )
-    scheduler = scheduler_class(sample_buffer=sample_buffer, frequency=1000)
-    assert scheduler.start_profiling()
-    # immediately stopping means by the time the sampling thread will exit
-    # before it samples at the end of the first iteration
-    assert scheduler.stop_profiling()
-    time.sleep(0.002)
-    assert len(get_scheduler_threads(scheduler)) == 0
+    with scheduler_class(sample_buffer=sample_buffer, frequency=1000) as scheduler:
+        assert scheduler.start_profiling()
+        # immediately stopping means by the time the sampling thread will exit
+        # before it samples at the end of the first iteration
+        assert scheduler.stop_profiling()
+        time.sleep(0.002)
 
-    # there should be exactly 1 sample because we always sample once immediately
-    profile = sample_buffer.slice_profile(0, 1)
-    assert len(profile["samples"]) == 1
+        # there should be exactly 1 sample because we always sample once immediately
+        profile = sample_buffer.slice_profile(0, 1)
+        assert len(profile["samples"]) == 1
 
 
 @minimum_python_33
@@ -323,67 +321,18 @@ def test_thread_scheduler_takes_more_samples(scheduler_class):
             for i in range(3)
         ],
     )
-    scheduler = scheduler_class(sample_buffer=sample_buffer, frequency=1000)
-    assert scheduler.start_profiling()
-    # waiting a little before stopping the scheduler means the profiling
-    # thread will get a chance to take a few samples before exiting
-    time.sleep(0.002)
-    assert scheduler.stop_profiling()
-    time.sleep(0.002)
-    assert len(get_scheduler_threads(scheduler)) == 0
+    with scheduler_class(sample_buffer=sample_buffer, frequency=1000) as scheduler:
+        assert scheduler.start_profiling()
+        # waiting a little before stopping the scheduler means the profiling
+        # thread will get a chance to take a few samples before exiting
+        time.sleep(0.002)
+        assert scheduler.stop_profiling()
+        time.sleep(0.002)
 
-    # there should be more than 1 sample because we always sample once immediately
-    # plus any samples take afterwards
-    profile = sample_buffer.slice_profile(0, 3)
-    assert len(profile["samples"]) > 1
-
-
-@minimum_python_33
-@pytest.mark.parametrize(
-    ("scheduler_class",),
-    [
-        pytest.param(SleepScheduler, id="sleep scheduler"),
-        pytest.param(EventScheduler, id="event scheduler"),
-    ],
-)
-def test_thread_scheduler_single_background_thread(scheduler_class):
-    sample_buffer = SampleBuffer(1)
-    scheduler = scheduler_class(sample_buffer=sample_buffer, frequency=1000)
-
-    assert scheduler.start_profiling()
-
-    # the scheduler thread does not immediately exit
-    # but it should exit after the next time it samples
-    assert scheduler.stop_profiling()
-
-    assert scheduler.start_profiling()
-
-    # because the scheduler thread does not immediately exit
-    # after stop_profiling is called, we have to wait a little
-    # otherwise, we'll see an extra scheduler thread in the
-    # following assertion
-    #
-    # one iteration of the scheduler takes 1.0 / frequency seconds
-    # so make sure this sleeps for longer than that to avoid flakes
-    time.sleep(0.002)
-
-    # there should be 1 scheduler thread now because the first
-    # one should be stopped and a new one started
-    assert len(get_scheduler_threads(scheduler)) == 1
-
-    assert scheduler.stop_profiling()
-
-    # because the scheduler thread does not immediately exit
-    # after stop_profiling is called, we have to wait a little
-    # otherwise, we'll see an extra scheduler thread in the
-    # following assertion
-    #
-    # one iteration of the scheduler takes 1.0 / frequency seconds
-    # so make sure this sleeps for longer than that to avoid flakes
-    time.sleep(0.002)
-
-    # there should be 0 scheduler threads now because they stopped
-    assert len(get_scheduler_threads(scheduler)) == 0
+        # there should be more than 1 sample because we always sample once immediately
+        # plus any samples take afterwards
+        profile = sample_buffer.slice_profile(0, 3)
+        assert len(profile["samples"]) > 1
 
 
 current_thread = threading.current_thread()

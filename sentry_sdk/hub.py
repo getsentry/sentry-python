@@ -547,6 +547,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         }
         sampling_context.update(custom_sampling_context)
         transaction._set_initial_sampling_decision(sampling_context=sampling_context)
+        transaction._set_profiling_decision()
 
         # we don't bother to keep spans if we already know we're not going to
         # send the transaction

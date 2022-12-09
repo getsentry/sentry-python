@@ -26,7 +26,6 @@ from contextlib import contextmanager
 
 import sentry_sdk
 from sentry_sdk._compat import PY33
-from sentry_sdk._queue import Queue
 from sentry_sdk._types import MYPY
 from sentry_sdk.utils import (
     filename_for_module,
@@ -247,26 +246,32 @@ class Profile(object):
         self,
         scheduler,  # type: Scheduler
         transaction,  # type: sentry_sdk.tracing.Transaction
-        hub=None,  # type: Optional[sentry_sdk.Hub]
     ):
         # type: (...) -> None
         self.scheduler = scheduler
         self.transaction = transaction
-        self.hub = hub
         self._start_ns = None  # type: Optional[int]
         self._stop_ns = None  # type: Optional[int]
 
         transaction._profile = self
 
-    def __enter__(self):
+    def start(self):
         # type: () -> None
         self._start_ns = nanosecond_time()
         self.scheduler.start_profiling()
 
-    def __exit__(self, ty, value, tb):
-        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+    def stop(self):
+        # type: () -> None
         self.scheduler.stop_profiling()
         self._stop_ns = nanosecond_time()
+
+    def __enter__(self):
+        # type: () -> None
+        self.start()
+
+    def __exit__(self, ty, value, tb):
+        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+        self.stop()
 
     def to_json(self, event_opt, options, scope):
         # type: (Any, Dict[str, Any], Optional[sentry_sdk.scope.Scope]) -> Dict[str, Any]
@@ -323,6 +328,16 @@ class Profile(object):
                 }
             ],
         }
+
+    @classmethod
+    def from_transaction(cls, transaction):
+        # type: (sentry_sdk.tracing.Transaction) -> Optional[Profile]
+
+        if not should_profile(transaction):
+            return None
+
+        assert _scheduler is not None
+        return Profile(_scheduler, transaction)
 
 
 class SampleBuffer(object):
@@ -465,8 +480,8 @@ class Scheduler(object):
         # type: (SampleBuffer, int) -> None
         self.sample_buffer = sample_buffer
         self.sampler = sample_buffer.make_sampler()
+        self.active_profiles = 0
         self._lock = threading.Lock()
-        self._count = 0
         self._interval = 1.0 / frequency
 
     def setup(self):
@@ -477,17 +492,26 @@ class Scheduler(object):
         # type: () -> None
         raise NotImplementedError
 
+    def __enter__(self):
+        # type: () -> Scheduler
+        self.setup()
+        return self
+
+    def __exit__(self, ty, value, tb):
+        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+        self.teardown()
+
     def start_profiling(self):
         # type: () -> bool
         with self._lock:
-            self._count += 1
-            return self._count == 1
+            self.active_profiles += 1
+            return self.active_profiles == 1
 
     def stop_profiling(self):
         # type: () -> bool
         with self._lock:
-            self._count -= 1
-            return self._count == 0
+            self.active_profiles -= 1
+            return self.active_profiles == 0
 
 
 class ThreadScheduler(Scheduler):
@@ -499,50 +523,23 @@ class ThreadScheduler(Scheduler):
     mode = "thread"
     name = None  # type: Optional[str]
 
-    def __init__(self, sample_buffer, frequency):
-        # type: (SampleBuffer, int) -> None
-        super(ThreadScheduler, self).__init__(
-            sample_buffer=sample_buffer, frequency=frequency
-        )
-        self.stop_events = Queue()
-
     def setup(self):
         # type: () -> None
-        pass
+        self.event = threading.Event()
+
+        # make sure the thread is a daemon here otherwise this
+        # can keep the application running after other threads
+        # have exited
+        self.thread = threading.Thread(name=self.name, target=self.run, daemon=True)
+        self.thread.start()
 
     def teardown(self):
         # type: () -> None
-        pass
+        self.event.set()
+        self.thread.join()
 
-    def start_profiling(self):
-        # type: () -> bool
-        if super(ThreadScheduler, self).start_profiling():
-            # make sure to clear the event as we reuse the same event
-            # over the lifetime of the scheduler
-            event = threading.Event()
-            self.stop_events.put_nowait(event)
-            run = self.make_run(event)
-
-            # make sure the thread is a daemon here otherwise this
-            # can keep the application running after other threads
-            # have exited
-            thread = threading.Thread(name=self.name, target=run, daemon=True)
-            thread.start()
-            return True
-        return False
-
-    def stop_profiling(self):
-        # type: () -> bool
-        if super(ThreadScheduler, self).stop_profiling():
-            # make sure the set the event here so that the thread
-            # can check to see if it should keep running
-            event = self.stop_events.get_nowait()
-            event.set()
-            return True
-        return False
-
-    def make_run(self, event):
-        # type: (threading.Event) -> Callable[..., None]
+    def run(self):
+        # type: () -> None
         raise NotImplementedError
 
 
@@ -555,33 +552,30 @@ class SleepScheduler(ThreadScheduler):
     mode = "sleep"
     name = "sentry.profiler.SleepScheduler"
 
-    def make_run(self, event):
-        # type: (threading.Event) -> Callable[..., None]
-
-        def run():
-            # type: () -> None
+    def run(self):
+        # type: () -> None
+        if self.active_profiles:
             self.sampler()
+
+        last = time.perf_counter()
+
+        while True:
+            # some time may have elapsed since the last time
+            # we sampled, so we need to account for that and
+            # not sleep for too long
+            now = time.perf_counter()
+            elapsed = max(now - last, 0)
+
+            if elapsed < self._interval:
+                time.sleep(self._interval - elapsed)
 
             last = time.perf_counter()
 
-            while True:
-                # some time may have elapsed since the last time
-                # we sampled, so we need to account for that and
-                # not sleep for too long
-                now = time.perf_counter()
-                elapsed = max(now - last, 0)
+            if self.event.is_set():
+                break
 
-                if elapsed < self._interval:
-                    time.sleep(self._interval - elapsed)
-
-                last = time.perf_counter()
-
-                if event.is_set():
-                    break
-
+            if self.active_profiles:
                 self.sampler()
-
-        return run
 
 
 class EventScheduler(ThreadScheduler):
@@ -593,22 +587,19 @@ class EventScheduler(ThreadScheduler):
     mode = "event"
     name = "sentry.profiler.EventScheduler"
 
-    def make_run(self, event):
-        # type: (threading.Event) -> Callable[..., None]
-
-        def run():
-            # type: () -> None
+    def run(self):
+        # type: () -> None
+        if self.active_profiles:
             self.sampler()
 
-            while True:
-                event.wait(timeout=self._interval)
+        while True:
+            self.event.wait(timeout=self._interval)
 
-                if event.is_set():
-                    break
+            if self.event.is_set():
+                break
 
+            if self.active_profiles:
                 self.sampler()
-
-        return run
 
 
 class SignalScheduler(Scheduler):
@@ -734,8 +725,8 @@ class SigalrmScheduler(SignalScheduler):
         return signal.ITIMER_REAL
 
 
-def _should_profile(transaction, hub):
-    # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> bool
+def should_profile(transaction):
+    # type: (sentry_sdk.tracing.Transaction) -> bool
 
     # The corresponding transaction was not sampled,
     # so don't generate a profile for it.
@@ -746,7 +737,7 @@ def _should_profile(transaction, hub):
     if _scheduler is None:
         return False
 
-    hub = hub or sentry_sdk.Hub.current
+    hub = transaction.hub or sentry_sdk.Hub.current
     client = hub.client
 
     # The client is None, so we can't get the sample rate.
@@ -765,13 +756,15 @@ def _should_profile(transaction, hub):
 
 
 @contextmanager
-def start_profiling(transaction, hub=None):
-    # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
+def start_profiling(transaction, _hub=None):
+    # type: (sentry_sdk.tracing.Transaction, Any) -> Generator[None, None, None]
+    # TODO: remove `_hub` from the arguments since it's not used anymore
+
+    transaction._profile = Profile.from_transaction(transaction)
 
     # if profiling was not enabled, this should be a noop
-    if _should_profile(transaction, hub):
-        assert _scheduler is not None
-        with Profile(_scheduler, transaction, hub=hub):
+    if transaction._profile is not None:
+        with transaction._profile:
             yield
     else:
         yield

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
+from sentry_sdk.profiler import Profile, should_profile
 from sentry_sdk.utils import logger
 from sentry_sdk._types import MYPY
 
@@ -637,6 +638,12 @@ class Transaction(Span):
         # reference.
         return self
 
+    def _set_profiling_decision(self):
+        # type: () -> None
+        self._profile = Profile.from_transaction(self)
+        if self._profile is not None:
+            self._profile.start()
+
     def finish(self, hub=None, end_timestamp=None):
         # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
         if self.timestamp is not None:
@@ -707,7 +714,8 @@ class Transaction(Span):
             "spans": finished_spans,
         }  # type: Event
 
-        if hub.client is not None and self._profile is not None:
+        if self._profile is not None:
+            self._profile.stop()
             event["profile"] = self._profile
 
         if has_custom_measurements_enabled():
