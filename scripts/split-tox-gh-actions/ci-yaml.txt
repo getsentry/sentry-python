@@ -38,9 +38,6 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Setup Test Env
-        env:
-          PGHOST: localhost
-          PGPASSWORD: sentry
         run: |
           pip install codecov tox
 
