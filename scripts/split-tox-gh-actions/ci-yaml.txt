@@ -27,7 +27,6 @@ jobs:
     name: {{ framework }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
-    continue-on-error: true
 {{ strategy_matrix }}
 {{ services }}
 
@@ -46,6 +45,7 @@ jobs:
           CI_PYTHON_VERSION: ${{ matrix.python-version }}
         timeout-minutes: 45
         shell: bash
+        continue-on-error: true
         run: |
           set -x # print commands that are executed
           coverage erase
