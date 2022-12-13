@@ -64,7 +64,7 @@ jobs:
     steps:
       - name: Print result
         env:
-          RESULT: ${{ needs.*.result }}
+          RESULT: ${{ needs.test.result }}
         run: |
           echo "$RESULT"
       - name: Print outcome
