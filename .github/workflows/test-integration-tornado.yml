@@ -61,3 +61,15 @@ jobs:
           coverage combine .coverage*
           coverage xml -i
           codecov --file coverage.xml
+
+  check_required_tests:
+    name: All tornado tests passed or skipped
+    needs: test
+    # Always run this, even if a dependent job failed
+    if: always()
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check for failures
+        if: contains(needs.*.result, 'failure')
+        run: |
+          echo "One of the dependent jobs have failed. You may need to re-run it." && exit 1
