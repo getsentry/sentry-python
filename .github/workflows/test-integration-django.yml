@@ -29,6 +29,7 @@ jobs:
     timeout-minutes: 45
 
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["2.7","3.5","3.6","3.7","3.8","3.9","3.10"]
         # python3.6 reached EOL and is no longer being supported on
@@ -85,17 +86,6 @@ jobs:
     if: always()
     runs-on: ubuntu-20.04
     steps:
-      - name: Print result
-        env:
-          RESULT: ${{ needs.test.result }}
-        run: |
-          echo "$RESULT"
-      - name: Print outcome
-        env:
-          RESULT: ${{ needs.test.outcome }}
-        run: |
-          echo "$RESULT"
-
       - name: Check for failures
         if: contains(needs.test.result, 'failure')
         run: |
