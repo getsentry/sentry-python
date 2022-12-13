@@ -27,7 +27,6 @@ jobs:
     name: aws_lambda, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
-    continue-on-error: true
 
     strategy:
       matrix:
@@ -81,6 +80,6 @@ jobs:
           echo "$RESULT"
 
       - name: Check for failures
-        if: contains(needs.test.result, 'ERROR at')
+        if: contains(needs.test.result, 'failure')
         run: |
           echo "One of the dependent jobs have failed. You may need to re-run it." && exit 1

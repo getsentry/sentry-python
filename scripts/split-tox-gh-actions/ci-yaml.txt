@@ -45,7 +45,6 @@ jobs:
           CI_PYTHON_VERSION: ${{ matrix.python-version }}
         timeout-minutes: 45
         shell: bash
-        continue-on-error: true
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -74,6 +73,6 @@ jobs:
           echo "$RESULT"
 
       - name: Check for failures
-        if: contains(needs.test.result, 'ERROR at')
+        if: contains(needs.test.result, 'failure')
         run: |
           echo "One of the dependent jobs have failed. You may need to re-run it." && exit 1
