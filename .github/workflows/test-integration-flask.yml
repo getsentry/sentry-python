@@ -69,6 +69,17 @@ jobs:
     if: always()
     runs-on: ubuntu-20.04
     steps:
+      - name: Print result
+        env:
+          RESULT: ${{ needs.*.result }}
+        run: |
+          echo "$RESULT"
+      - name: Print outcome
+        env:
+          RESULT: ${{ needs.*.outcome }}
+        run: |
+          echo "$RESULT"
+
       - name: Check for failures
         if: contains(needs.*.result, 'ERROR at')
         run: |
