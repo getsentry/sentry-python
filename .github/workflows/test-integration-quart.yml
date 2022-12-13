@@ -70,6 +70,6 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
-        if: contains(needs.*.result, 'failure')
+        if: contains(needs.*.result, 'ERROR at')
         run: |
           echo "One of the dependent jobs have failed. You may need to re-run it." && exit 1
