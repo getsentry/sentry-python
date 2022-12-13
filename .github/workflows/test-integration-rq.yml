@@ -76,11 +76,11 @@ jobs:
           echo "$RESULT"
       - name: Print outcome
         env:
-          RESULT: ${{ needs.*.outcome }}
+          RESULT: ${{ needs.test.outcome }}
         run: |
           echo "$RESULT"
 
       - name: Check for failures
-        if: contains(needs.*.result, 'ERROR at')
+        if: contains(needs.test.result, 'ERROR at')
         run: |
           echo "One of the dependent jobs have failed. You may need to re-run it." && exit 1
