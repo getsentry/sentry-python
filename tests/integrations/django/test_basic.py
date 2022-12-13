@@ -404,7 +404,7 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
 
 
 @pytest.mark.forked
-@pytest_mark_django_db_decorator()
+@pytest_mark_django_db_decorator(transaction=True)
 def test_django_connect_trace(sentry_init, client, capture_events, render_span_tree):
     """
     Verify we record a span when opening a new database.
@@ -432,7 +432,7 @@ def test_django_connect_trace(sentry_init, client, capture_events, render_span_t
 
 
 @pytest.mark.forked
-@pytest_mark_django_db_decorator()
+@pytest_mark_django_db_decorator(transaction=True)
 def test_django_connect_breadcrumbs(
     sentry_init, client, capture_events, render_span_tree
 ):
