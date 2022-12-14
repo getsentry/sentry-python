@@ -243,7 +243,7 @@ class DummySampleBuffer(SampleBuffer):
         super(DummySampleBuffer, self).__init__(capacity)
         self.sample_data = [] if sample_data is None else sample_data
 
-    def make_sampler(self, transaction):
+    def make_sampler(self):
         def _sample_stack(*args, **kwargs):
             try:
                 ts, sample = self.sample_data.pop(0)
@@ -262,46 +262,7 @@ class DummySampleBuffer(SampleBuffer):
         pytest.param(EventScheduler, id="event scheduler"),
     ],
 )
-def test_thread_scheduler_takes_first_samples(scheduler_class):
-    sample_buffer = DummySampleBuffer(
-        capacity=1,
-        sample_data=[
-            (
-                0,
-                [
-                    (
-                        0,
-                        (
-                            RawFrameData(
-                                "/path/to/file.py", "file.py", "name", 1, "file"
-                            ),
-                        ),
-                    )
-                ],
-            )
-        ],
-    )
-    with scheduler_class(sample_buffer=sample_buffer, frequency=1000) as scheduler:
-        assert scheduler.start_profiling()
-        # immediately stopping means by the time the sampling thread will exit
-        # before it samples at the end of the first iteration
-        assert scheduler.stop_profiling()
-        time.sleep(0.002)
-
-        # there should be exactly 1 sample because we always sample once immediately
-        profile = sample_buffer.slice_profile(0, 1)
-        assert len(profile["samples"]) == 1
-
-
-@minimum_python_33
-@pytest.mark.parametrize(
-    ("scheduler_class",),
-    [
-        pytest.param(SleepScheduler, id="sleep scheduler"),
-        pytest.param(EventScheduler, id="event scheduler"),
-    ],
-)
-def test_thread_scheduler_takes_more_samples(scheduler_class):
+def test_thread_scheduler_takes_samples(scheduler_class):
     sample_buffer = DummySampleBuffer(
         capacity=10,
         sample_data=[
@@ -329,10 +290,10 @@ def test_thread_scheduler_takes_more_samples(scheduler_class):
         assert scheduler.stop_profiling()
         time.sleep(0.002)
 
-        # there should be more than 1 sample because we always sample once immediately
-        # plus any samples take afterwards
+        # there should be at least 1 sample because we gave it some time
+        # before stopping the profiler to take a sample
         profile = sample_buffer.slice_profile(0, 3)
-        assert len(profile["samples"]) > 1
+        assert len(profile["samples"]) > 0
 
 
 current_thread = threading.current_thread()

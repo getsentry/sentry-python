@@ -554,9 +554,6 @@ class SleepScheduler(ThreadScheduler):
 
     def run(self):
         # type: () -> None
-        if self.active_profiles:
-            self.sampler()
-
         last = time.perf_counter()
 
         while True:
@@ -589,9 +586,6 @@ class EventScheduler(ThreadScheduler):
 
     def run(self):
         # type: () -> None
-        if self.active_profiles:
-            self.sampler()
-
         while True:
             self.event.wait(timeout=self._interval)
 
