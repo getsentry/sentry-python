@@ -27,7 +27,6 @@ jobs:
     name: {{ framework }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
-    continue-on-error: true
 {{ strategy_matrix }}
 {{ services }}
 
@@ -38,15 +37,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Setup Test Env
-        env:
-          PGHOST: localhost
-          PGPASSWORD: sentry
         run: |
-          pip install codecov tox
+          pip install codecov "tox>=3,<4"
 
       - name: Test {{ framework }}
-        env:
-          CI_PYTHON_VERSION: ${{ matrix.python-version }}
         timeout-minutes: 45
         shell: bash
         run: |
@@ -57,3 +51,15 @@ jobs:
           coverage combine .coverage*
           coverage xml -i
           codecov --file coverage.xml
+
+  check_required_tests:
+    name: All {{ framework }} tests passed or skipped
+    needs: test
+    # Always run this, even if a dependent job failed
+    if: always()
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check for failures
+        if: contains(needs.test.result, 'failure')
+        run: |
+          echo "One of the dependent jobs have failed. You may need to re-run it." && exit 1
