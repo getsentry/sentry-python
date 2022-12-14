@@ -20,6 +20,7 @@ from sentry_sdk.serializer import serialize
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import (
     DEFAULT_OPTIONS,
+    INSTRUMENTER,
     VERSION,
     ClientConstructor,
 )
@@ -85,6 +86,9 @@ def _get_options(*args, **kwargs):
 
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
+
+    if rv["instrumenter"] is None:
+        rv["instrumenter"] = INSTRUMENTER.SENTRY
 
     return rv
 
@@ -429,7 +433,9 @@ class _Client(object):
 
             if is_transaction:
                 if profile is not None:
-                    envelope.add_profile(profile.to_json(event_opt, self.options))
+                    envelope.add_profile(
+                        profile.to_json(event_opt, self.options, scope)
+                    )
                 envelope.add_transaction(event_opt)
             else:
                 envelope.add_event(event_opt)

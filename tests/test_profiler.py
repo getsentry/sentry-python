@@ -82,7 +82,35 @@ def get_frame(depth=1):
     return inspect.currentframe()
 
 
-class GetFrame:
+class GetFrameBase:
+    def inherited_instance_method(self):
+        return inspect.currentframe()
+
+    def inherited_instance_method_wrapped(self):
+        def wrapped():
+            self
+            return inspect.currentframe()
+
+        return wrapped
+
+    @classmethod
+    def inherited_class_method(cls):
+        return inspect.currentframe()
+
+    @classmethod
+    def inherited_class_method_wrapped(cls):
+        def wrapped():
+            cls
+            return inspect.currentframe()
+
+        return wrapped
+
+    @staticmethod
+    def inherited_static_method():
+        return inspect.currentframe()
+
+
+class GetFrame(GetFrameBase):
     def instance_method(self):
         return inspect.currentframe()
 
@@ -149,6 +177,32 @@ class GetFrame:
             id="static_method",
             marks=pytest.mark.skip(reason="unsupported"),
         ),
+        pytest.param(
+            GetFrame().inherited_instance_method(),
+            "GetFrameBase.inherited_instance_method",
+            id="inherited_instance_method",
+        ),
+        pytest.param(
+            GetFrame().inherited_instance_method_wrapped()(),
+            "wrapped",
+            id="instance_method_wrapped",
+        ),
+        pytest.param(
+            GetFrame().inherited_class_method(),
+            "GetFrameBase.inherited_class_method",
+            id="inherited_class_method",
+        ),
+        pytest.param(
+            GetFrame().inherited_class_method_wrapped()(),
+            "wrapped",
+            id="inherited_class_method_wrapped",
+        ),
+        pytest.param(
+            GetFrame().inherited_static_method(),
+            "GetFrameBase.static_method",
+            id="inherited_static_method",
+            marks=pytest.mark.skip(reason="unsupported"),
+        ),
     ],
 )
 def test_get_frame_name(frame, frame_name):
@@ -195,8 +249,8 @@ class DummySampleBuffer(SampleBuffer):
 
     def make_sampler(self):
         def _sample_stack(*args, **kwargs):
-            print("writing", self.sample_data[0])
-            self.write(self.sample_data.pop(0))
+            ts, sample = self.sample_data.pop(0)
+            self.write(ts, sample)
 
         return _sample_stack
 
@@ -706,7 +760,7 @@ thread_metadata = {
 )
 def test_sample_buffer(capacity, start_ns, stop_ns, samples, profile):
     buffer = SampleBuffer(capacity)
-    for sample in samples:
-        buffer.write(sample)
+    for ts, sample in samples:
+        buffer.write(ts, sample)
     result = buffer.slice_profile(start_ns, stop_ns)
     assert result == profile
