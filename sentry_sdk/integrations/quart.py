@@ -108,25 +108,25 @@ def patch_scaffold_route():
         def decorator(old_func):
             # type: (Any) -> Any
 
-            if is_coroutine_function(old_func) or inspect.isclass(old_func):
-                return old_decorator(old_func)
+            if inspect.isfunction(old_func) and not is_coroutine_function(old_func):
+                @wraps(old_func)
+                def _sentry_func(*args, **kwargs):
+                    # type: (*Any, **Any) -> Any
+                    hub = Hub.current
+                    integration = hub.get_integration(QuartIntegration)
+                    if integration is None:
+                        return old_func(*args, **kwargs)
 
-            @wraps(old_func)
-            def _sentry_func(*args, **kwargs):
-                # type: (*Any, **Any) -> Any
-                hub = Hub.current
-                integration = hub.get_integration(QuartIntegration)
-                if integration is None:
-                    return old_func(*args, **kwargs)
+                    with hub.configure_scope() as sentry_scope:
+                        # set the active thread id to the handler thread for sync views
+                        # this isn't necessary for async views since that runs on main
+                        sentry_scope.set_active_thread_id(threading.current_thread().ident)
 
-                with hub.configure_scope() as sentry_scope:
-                    # set the active thread id to the handler thread for sync views
-                    # this isn't necessary for async views since that runs on main
-                    sentry_scope.set_active_thread_id(threading.current_thread().ident)
+                        return old_func(*args, **kwargs)
 
-                    return old_func(*args, **kwargs)
+                return old_decorator(_sentry_func)
 
-            return old_decorator(_sentry_func)
+            return old_decorator(old_func)
 
         return decorator
 
