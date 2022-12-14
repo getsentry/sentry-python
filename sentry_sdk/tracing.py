@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.profiler import Profile, should_profile
+from sentry_sdk.profiler import Profile
 from sentry_sdk.utils import logger
 from sentry_sdk._types import MYPY
 
