@@ -27,12 +27,16 @@ jobs:
     name: aws_lambda, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
-    continue-on-error: true
 
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.7"]
-        os: [ubuntu-latest]
+        # python3.6 reached EOL and is no longer being supported on
+        # new versions of hosted runners on Github Actions
+        # ubuntu-20.04 is the last version that supported python3.6
+        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
+        os: [ubuntu-20.04]
 
     steps:
       - uses: actions/checkout@v3
@@ -41,15 +45,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Setup Test Env
-        env:
-          PGHOST: localhost
-          PGPASSWORD: sentry
         run: |
-          pip install codecov tox
+          pip install codecov "tox>=3,<4"
 
       - name: Test aws_lambda
-        env:
-          CI_PYTHON_VERSION: ${{ matrix.python-version }}
         timeout-minutes: 45
         shell: bash
         run: |
@@ -60,3 +59,15 @@ jobs:
           coverage combine .coverage*
           coverage xml -i
           codecov --file coverage.xml
+
+  check_required_tests:
+    name: All aws_lambda tests passed or skipped
+    needs: test
+    # Always run this, even if a dependent job failed
+    if: always()
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check for failures
+        if: contains(needs.test.result, 'failure')
+        run: |
+          echo "One of the dependent jobs have failed. You may need to re-run it." && exit 1
