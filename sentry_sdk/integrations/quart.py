@@ -109,6 +109,7 @@ def patch_scaffold_route():
             # type: (Any) -> Any
 
             if inspect.isfunction(old_func) and not is_coroutine_function(old_func):
+
                 @wraps(old_func)
                 def _sentry_func(*args, **kwargs):
                     # type: (*Any, **Any) -> Any
@@ -120,7 +121,9 @@ def patch_scaffold_route():
                     with hub.configure_scope() as sentry_scope:
                         # set the active thread id to the handler thread for sync views
                         # this isn't necessary for async views since that runs on main
-                        sentry_scope.set_active_thread_id(threading.current_thread().ident)
+                        sentry_scope.set_active_thread_id(
+                            threading.current_thread().ident
+                        )
 
                         return old_func(*args, **kwargs)
 
