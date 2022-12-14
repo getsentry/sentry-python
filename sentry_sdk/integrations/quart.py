@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import inspect
 import threading
 
 from sentry_sdk.hub import _should_send_default_pii, Hub
@@ -45,6 +46,7 @@ try:
         request_started,
         websocket_started,
     )
+    from quart.utils import is_coroutine_function  # type: ignore
 except ImportError:
     raise DidNotEnable("Quart is not installed")
 
@@ -105,6 +107,10 @@ def patch_scaffold_route():
 
         def decorator(old_func):
             # type: (Any) -> Any
+
+            if is_coroutine_function(old_func) or inspect.isclass(old_func):
+                return old_decorator(old_func)
+
             @wraps(old_func)
             def _sentry_func(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
