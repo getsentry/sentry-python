@@ -1,3 +1,4 @@
+import asyncio
 import threading
 
 from sentry_sdk._types import MYPY
@@ -65,7 +66,7 @@ def patch_get_request_handler():
     def _sentry_get_request_handler(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         dependant = kwargs.get("dependant")
-        if dependant:
+        if dependant and not asyncio.iscoroutinefunction(dependant.call):
             old_call = dependant.call
 
             def _sentry_call(*args, **kwargs):
