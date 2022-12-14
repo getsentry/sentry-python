@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.12.0
+
+### Basic OTel support (ongoing)
+
+By: @antonpirker (#1772, #1766, #1765)
+
+### Various fixes & improvements
+
+- Tox Cleanup (#1749) by @antonpirker
+- fix(ci): Fix Github action checks (#1780) by @Zylphrex
+- feat(profiling): Introduce active thread id on scope (#1764) by @Zylphrex
+- ref(profiling): Eagerly hash stack for profiles (#1755) by @Zylphrex
+- fix(profiling): Resolve inherited method class names (#1756) by @Zylphrex
+
 ## 1.11.1
 
 ### Various fixes & improvements
