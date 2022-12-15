@@ -48,6 +48,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         return cls.instance
 
     def __init__(self):
+        # type: () -> None
         @add_global_event_processor
         def link_trace_context_to_error_event(event, hint):
             # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
