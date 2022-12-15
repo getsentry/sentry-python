@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>sentry_sdk.hub &#8212; sentry-python 1.11.1 documentation</title>
+    <title>sentry_sdk.hub &#8212; sentry-python 1.12.0 documentation</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css" />
     <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
@@ -40,9 +40,10 @@
 <span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">contextmanager</span>
 
 <span class="kn">from</span> <span class="nn">sentry_sdk._compat</span> <span class="kn">import</span> <span class="n">with_metaclass</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="kn">import</span> <span class="n">INSTRUMENTER</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.scope</span> <span class="kn">import</span> <span class="n">Scope</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.client</span> <span class="kn">import</span> <span class="n">Client</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.tracing</span> <span class="kn">import</span> <span class="n">Span</span><span class="p">,</span> <span class="n">Transaction</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.tracing</span> <span class="kn">import</span> <span class="n">NoOpSpan</span><span class="p">,</span> <span class="n">Span</span><span class="p">,</span> <span class="n">Transaction</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.session</span> <span class="kn">import</span> <span class="n">Session</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">exc_info_from_error</span><span class="p">,</span>
@@ -485,6 +486,7 @@
 <div class="viewcode-block" id="Hub.start_span"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.start_span">[docs]</a>    <span class="k">def</span> <span class="nf">start_span</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Span]</span>
+        <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span>  <span class="c1"># type: str</span>
         <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Span</span>
@@ -499,6 +501,11 @@
 <span class="sd">        for every incoming HTTP request. Use `start_transaction` to start a new</span>
 <span class="sd">        transaction when one is not already in progress.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">configuration_instrumenter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;instrumenter&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">instrumenter</span> <span class="o">!=</span> <span class="n">configuration_instrumenter</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">NoOpSpan</span><span class="p">()</span>
+
         <span class="c1"># TODO: consider removing this in a future release.</span>
         <span class="c1"># This is for backwards compatibility with releases before</span>
         <span class="c1"># start_transaction existed, to allow for a smoother transition.</span>
@@ -529,9 +536,10 @@
 <div class="viewcode-block" id="Hub.start_transaction"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.start_transaction">[docs]</a>    <span class="k">def</span> <span class="nf">start_transaction</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">transaction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Transaction]</span>
+        <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span>  <span class="c1"># type: str</span>
         <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
     <span class="p">):</span>
-        <span class="c1"># type: (...) -&gt; Transaction</span>
+        <span class="c1"># type: (...) -&gt; Union[Transaction, NoOpSpan]</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Start and return a transaction.</span>
 
@@ -554,6 +562,11 @@
 <span class="sd">        When the transaction is finished, it will be sent to Sentry with all its</span>
 <span class="sd">        finished child spans.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">configuration_instrumenter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;instrumenter&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">instrumenter</span> <span class="o">!=</span> <span class="n">configuration_instrumenter</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">NoOpSpan</span><span class="p">()</span>
+
         <span class="n">custom_sampling_context</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;custom_sampling_context&quot;</span><span class="p">,</span> <span class="p">{})</span>
 
         <span class="c1"># if we haven&#39;t been given a transaction, make one</span>
