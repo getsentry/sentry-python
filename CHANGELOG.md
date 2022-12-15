@@ -2,17 +2,24 @@
 
 ## 1.12.0
 
-### Basic OTel support (ongoing)
+### Basic OTel support
+
+This adds support to automatically integrate OpenTelemetry performance tracing with Sentry.
+
+See the documentation on how to set it up:
+https://docs.sentry.io/platforms/python/performance/instrumentation/opentelemetry/
+
+Give it a try and let us know if you have any feedback or problems with using it.
 
 By: @antonpirker (#1772, #1766, #1765)
 
 ### Various fixes & improvements
 
 - Tox Cleanup (#1749) by @antonpirker
-- fix(ci): Fix Github action checks (#1780) by @Zylphrex
-- feat(profiling): Introduce active thread id on scope (#1764) by @Zylphrex
-- ref(profiling): Eagerly hash stack for profiles (#1755) by @Zylphrex
-- fix(profiling): Resolve inherited method class names (#1756) by @Zylphrex
+- CI: Fix Github action checks (#1780) by @Zylphrex
+- Profiling: Introduce active thread id on scope (#1764) by @Zylphrex
+- Profiling: Eagerly hash stack for profiles (#1755) by @Zylphrex
+- Profiling: Resolve inherited method class names (#1756) by @Zylphrex
 
 ## 1.11.1
 
