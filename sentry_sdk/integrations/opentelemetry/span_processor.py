@@ -6,6 +6,7 @@ from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
 from opentelemetry.trace import (  # type: ignore
     format_span_id,
     format_trace_id,
+    get_current_span,
     SpanContext,
     Span as OTelSpan,
     SpanKind,
@@ -16,6 +17,7 @@ from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
 )
+from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing import Transaction, Span as SentrySpan
 from sentry_sdk.utils import Dsn
 from sentry_sdk._types import MYPY
@@ -44,6 +46,37 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
             cls.instance = super(SentrySpanProcessor, cls).__new__(cls)
 
         return cls.instance
+
+    def __init__(self):
+        @add_global_event_processor
+        def link_trace_context_to_error_event(event, hint):
+            # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+            if hasattr(event, "type") and event["type"] == "transaction":
+                return event
+
+            otel_span = get_current_span()
+            if not otel_span:
+                return event
+
+            ctx = otel_span.get_span_context()
+            trace_id = format_trace_id(ctx.trace_id)
+            span_id = format_span_id(ctx.span_id)
+
+            invalid_span = (
+                trace_id == "00000000000000000000000000000000"
+                or span_id == "0000000000000000"
+            )
+            if invalid_span:
+                return event
+
+            sentry_span = self.otel_span_map.get(span_id, None)
+            if not sentry_span:
+                return event
+
+            contexts = event.setdefault("contexts", {})
+            contexts.setdefault("trace", {}).update(sentry_span.get_trace_context())
+
+            return event
 
     def on_start(self, otel_span, parent_context=None):
         # type: (OTelSpan, SpanContext) -> None
