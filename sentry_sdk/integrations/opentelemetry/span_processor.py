@@ -11,7 +11,7 @@ from opentelemetry.trace import (  # type: ignore
     Span as OTelSpan,
     SpanKind,
 )
-from opentelemetry.trace.span import (
+from opentelemetry.trace.span import (  # type: ignore
     INVALID_SPAN_ID,
     INVALID_TRACE_ID,
 )
