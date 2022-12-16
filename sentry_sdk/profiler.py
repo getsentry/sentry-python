@@ -468,7 +468,12 @@ class SampleBuffer(object):
         # type: () -> Callable[..., None]
         cwd = os.getcwd()
 
-        last_sample = {}  # type: Dict[int, Tuple[StackId, RawStack, Deque[FrameType]]]
+        # In Python3+, we can use the `nonlocal` keyword to rebind the value,
+        # but this is not possible in Python2. To get around this, we wrap
+        # the value in a list to allow updating this value each sample.
+        last_sample = [
+            {}
+        ]  # type: List[Dict[int, Tuple[StackId, RawStack, Deque[FrameType]]]]
 
         def _sample_stack(*args, **kwargs):
             # type: (*Any, **Any) -> None
@@ -477,15 +482,13 @@ class SampleBuffer(object):
             This should be called at a regular interval to collect samples.
             """
 
-            nonlocal last_sample
-
             now = nanosecond_time()
             raw_sample = {
-                tid: extract_stack(frame, cwd, last_sample.get(tid))
+                tid: extract_stack(frame, cwd, last_sample[0].get(tid))
                 for tid, frame in sys._current_frames().items()
             }
 
-            last_sample = raw_sample
+            last_sample[0] = raw_sample
 
             sample = [
                 (str(tid), (stack_id, stack))
