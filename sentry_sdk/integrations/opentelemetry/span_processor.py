@@ -58,10 +58,10 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
             # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
             hub = Hub.current
             if not hub:
-                return
+                return event
 
             if hub.client and hub.client.options["instrumenter"] != INSTRUMENTER.OTEL:
-                return
+                return event
 
             if hasattr(event, "type") and event["type"] == "transaction":
                 return event
