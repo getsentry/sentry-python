@@ -32,8 +32,42 @@ if MYPY:
     from typing import Any
     from typing import Dict
     from typing import Union
+    from sentry_sdk._types import Event, Hint
 
 OPEN_TELEMETRY_CONTEXT = "otel"
+
+
+def link_trace_context_to_error_event(event, otel_span_map):
+    # type: (Event, Dict[str, Union[Transaction, OTelSpan]]) -> Event
+    hub = Hub.current
+    if not hub:
+        return event
+
+    if hub.client and hub.client.options["instrumenter"] != INSTRUMENTER.OTEL:
+        return event
+
+    if hasattr(event, "type") and event["type"] == "transaction":
+        return event
+
+    otel_span = get_current_span()
+    if not otel_span:
+        return event
+
+    ctx = otel_span.get_span_context()
+    trace_id = format_trace_id(ctx.trace_id)
+    span_id = format_span_id(ctx.span_id)
+
+    if trace_id == INVALID_TRACE_ID or span_id == INVALID_SPAN_ID:
+        return event
+
+    sentry_span = otel_span_map.get(span_id, None)
+    if not sentry_span:
+        return event
+
+    contexts = event.setdefault("contexts", {})
+    contexts.setdefault("trace", {}).update(sentry_span.get_trace_context())
+
+    return event
 
 
 class SentrySpanProcessor(SpanProcessor):  # type: ignore
@@ -54,37 +88,9 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
     def __init__(self):
         # type: () -> None
         @add_global_event_processor
-        def link_trace_context_to_error_event(event, hint):
-            # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-            hub = Hub.current
-            if not hub:
-                return event
-
-            if hub.client and hub.client.options["instrumenter"] != INSTRUMENTER.OTEL:
-                return event
-
-            if hasattr(event, "type") and event["type"] == "transaction":
-                return event
-
-            otel_span = get_current_span()
-            if not otel_span:
-                return event
-
-            ctx = otel_span.get_span_context()
-            trace_id = format_trace_id(ctx.trace_id)
-            span_id = format_span_id(ctx.span_id)
-
-            if trace_id == INVALID_TRACE_ID or span_id == INVALID_SPAN_ID:
-                return event
-
-            sentry_span = self.otel_span_map.get(span_id, None)
-            if not sentry_span:
-                return event
-
-            contexts = event.setdefault("contexts", {})
-            contexts.setdefault("trace", {}).update(sentry_span.get_trace_context())
-
-            return event
+        def global_event_processor(event, hint):
+            # type: (Event, Hint) -> Event
+            return link_trace_context_to_error_event(event, self.otel_span_map)
 
     def on_start(self, otel_span, parent_context=None):
         # type: (OTelSpan, SpanContext) -> None
