@@ -50,6 +50,8 @@ if MYPY:
     import sentry_sdk.scope
     import sentry_sdk.tracing
 
+    StackId = int
+
     RawFrame = Tuple[
         str,  # abs_path
         Optional[str],  # module
@@ -58,7 +60,7 @@ if MYPY:
         int,  # lineno
     ]
     RawStack = Tuple[RawFrame, ...]
-    RawSample = Sequence[Tuple[str, Tuple[int, RawStack]]]
+    RawSample = Sequence[Tuple[str, Tuple[StackId, RawStack]]]
 
     ProcessedStack = Tuple[int, ...]
 
@@ -157,8 +159,13 @@ def teardown_profiler():
 MAX_STACK_DEPTH = 128
 
 
-def extract_stack(frame, cwd, max_stack_depth=MAX_STACK_DEPTH):
-    # type: (Optional[FrameType], str, int) -> Tuple[int, RawStack]
+def extract_stack(
+    frame,  # type: Optional[FrameType]
+    cwd,  # type: str
+    prev_cache=None,  # type: Optional[Tuple[StackId, RawStack, Deque[FrameType]]]
+    max_stack_depth=MAX_STACK_DEPTH,  # type: int
+):
+    # type: (...) -> Tuple[StackId, RawStack, Deque[FrameType]]
     """
     Extracts the stack starting the specified frame. The extracted stack
     assumes the specified frame is the top of the stack, and works back
@@ -174,7 +181,27 @@ def extract_stack(frame, cwd, max_stack_depth=MAX_STACK_DEPTH):
         frames.append(frame)
         frame = frame.f_back
 
-    stack = tuple(extract_frame(frame, cwd) for frame in frames)
+    if prev_cache is None:
+        stack = tuple(extract_frame(frame, cwd) for frame in frames)
+    else:
+        _, prev_stack, prev_frames = prev_cache
+        prev_depth = len(prev_frames)
+        depth = len(frames)
+
+        # We want to match the frame found in this sample to the frames found in the
+        # previous sample. If they are the same (using the `is` operator), we can
+        # skip the expensive work of extracting the frame information and reuse what
+        # we extracted during the last sample.
+        #
+        # Make sure to keep in mind that the stack is ordered from the inner most
+        # from to the outer most frame so be careful with the indexing.
+        stack = tuple(
+            prev_stack[prev_depth - (depth - i)]
+            if prev_depth >= depth - i
+            and frame is prev_frames[prev_depth - (depth - i)]
+            else extract_frame(frame, cwd)
+            for i, frame in enumerate(frames)
+        )
 
     # Instead of mapping the stack into frame ids and hashing
     # that as a tuple, we can directly hash the stack.
@@ -185,7 +212,7 @@ def extract_stack(frame, cwd, max_stack_depth=MAX_STACK_DEPTH):
     # needed a few times to improve performance.
     stack_id = hash(stack)
 
-    return stack_id, stack
+    return stack_id, stack, frames
 
 
 def extract_frame(frame, cwd):
@@ -381,10 +408,10 @@ class SampleBuffer(object):
     def slice_profile(self, start_ns, stop_ns):
         # type: (int, int) -> ProcessedProfile
         samples = []  # type: List[ProcessedSample]
-        stacks = dict()  # type: Dict[int, int]
-        stacks_list = list()  # type: List[ProcessedStack]
-        frames = dict()  # type: Dict[RawFrame, int]
-        frames_list = list()  # type: List[ProcessedFrame]
+        stacks = {}  # type: Dict[StackId, int]
+        stacks_list = []  # type: List[ProcessedStack]
+        frames = {}  # type: Dict[RawFrame, int]
+        frames_list = []  # type: List[ProcessedFrame]
 
         for ts, sample in filter(None, self.buffer):
             if start_ns > ts or ts > stop_ns:
@@ -441,6 +468,8 @@ class SampleBuffer(object):
         # type: () -> Callable[..., None]
         cwd = os.getcwd()
 
+        last_sample = {}  # type: Dict[int, Tuple[StackId, RawStack, Deque[FrameType]]]
+
         def _sample_stack(*args, **kwargs):
             # type: (*Any, **Any) -> None
             """
@@ -448,13 +477,22 @@ class SampleBuffer(object):
             This should be called at a regular interval to collect samples.
             """
 
-            self.write(
-                nanosecond_time(),
-                [
-                    (str(tid), extract_stack(frame, cwd))
-                    for tid, frame in sys._current_frames().items()
-                ],
-            )
+            nonlocal last_sample
+
+            now = nanosecond_time()
+            raw_sample = {
+                tid: extract_stack(frame, cwd, last_sample.get(tid))
+                for tid, frame in sys._current_frames().items()
+            }
+
+            last_sample = raw_sample
+
+            sample = [
+                (str(tid), (stack_id, stack))
+                for tid, (stack_id, stack, _) in raw_sample.items()
+            ]
+
+            self.write(now, sample)
 
         return _sample_stack
 

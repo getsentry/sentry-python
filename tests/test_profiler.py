@@ -231,7 +231,7 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
 
     # increase the max_depth by the `base_stack_depth` to account
     # for the extra frames pytest will add
-    _, stack = extract_stack(
+    _, stack, _ = extract_stack(
         frame, os.getcwd(), max_stack_depth=max_stack_depth + base_stack_depth
     )
     assert len(stack) == base_stack_depth + actual_depth
@@ -242,6 +242,22 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
     # index 0 contains the inner most frame on the stack, so the lamdba
     # should be at index `actual_depth`
     assert stack[actual_depth][3] == "<lambda>", actual_depth
+
+
+def test_extract_stack_with_cache():
+    frame = get_frame(depth=1)
+
+    prev_cache = extract_stack(frame, os.getcwd())
+    _, stack1, _ = prev_cache
+    _, stack2, _ = extract_stack(frame, os.getcwd(), prev_cache)
+
+    assert len(stack1) == len(stack2)
+    for i, (frame1, frame2) in enumerate(zip(stack1, stack2)):
+        # DO NOT use `==` for the assertion here since we are
+        # testing for identity, and using `==` would test for
+        # equality which would always pass since we're extract
+        # the same stack.
+        assert frame1 is frame2, i
 
 
 def get_scheduler_threads(scheduler):
