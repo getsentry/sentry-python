@@ -232,9 +232,7 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
     # increase the max_depth by the `base_stack_depth` to account
     # for the extra frames pytest will add
     _, stack = extract_stack(
-        frame,
-        os.getcwd(),
-        max_stack_depth=max_stack_depth + base_stack_depth
+        frame, os.getcwd(), max_stack_depth=max_stack_depth + base_stack_depth
     )
     assert len(stack) == base_stack_depth + actual_depth
 
@@ -280,11 +278,7 @@ def test_thread_scheduler_takes_first_samples(scheduler_class):
                 [
                     (
                         0,
-                        (
-                            (
-                                "/path/to/file.py", "file", "file.py", "name", 1
-                            ),
-                        ),
+                        (("/path/to/file.py", "file", "file.py", "name", 1),),
                     )
                 ],
             )
@@ -320,11 +314,7 @@ def test_thread_scheduler_takes_more_samples(scheduler_class):
                 [
                     (
                         0,
-                        (
-                            (
-                                "/path/to/file.py", "file", "file.py", "name", 1
-                            ),
-                        ),
+                        (("/path/to/file.py", "file", "file.py", "name", 1),),
                     )
                 ],
             )
@@ -428,11 +418,7 @@ thread_metadata = {
                     [
                         (
                             "1",
-                            (
-                                (
-                                    "/path/to/file.py", "file", "file.py", "name", 1
-                                ),
-                            ),
+                            (("/path/to/file.py", "file", "file.py", "name", 1),),
                         )
                     ],
                 )
@@ -455,11 +441,7 @@ thread_metadata = {
                     [
                         (
                             "1",
-                            (
-                                (
-                                    "/path/to/file.py", "file", "file.py", "name", 1
-                                ),
-                            ),
+                            (("/path/to/file.py", "file", "file.py", "name", 1),),
                         )
                     ],
                 )
@@ -496,11 +478,7 @@ thread_metadata = {
                     [
                         (
                             "1",
-                            (
-                                (
-                                    "/path/to/file.py", "file", "file.py", "name", 1
-                                ),
-                            ),
+                            (("/path/to/file.py", "file", "file.py", "name", 1),),
                         )
                     ],
                 ),
@@ -509,11 +487,7 @@ thread_metadata = {
                     [
                         (
                             "1",
-                            (
-                                (
-                                    "/path/to/file.py", "file", "file.py", "name", 1
-                                ),
-                            ),
+                            (("/path/to/file.py", "file", "file.py", "name", 1),),
                         )
                     ],
                 ),
@@ -555,11 +529,7 @@ thread_metadata = {
                     [
                         (
                             "1",
-                            (
-                                (
-                                    "/path/to/file.py", "file", "file.py", "name1", 1
-                                ),
-                            ),
+                            (("/path/to/file.py", "file", "file.py", "name1", 1),),
                         )
                     ],
                 ),
@@ -569,12 +539,8 @@ thread_metadata = {
                         (
                             "1",
                             (
-                                (
-                                    "/path/to/file.py", "file", "file.py", "name1", 1
-                                ),
-                                (
-                                    "/path/to/file.py", "file", "file.py", "name2", 2
-                                ),
+                                ("/path/to/file.py", "file", "file.py", "name1", 1),
+                                ("/path/to/file.py", "file", "file.py", "name2", 2),
                             ),
                         )
                     ],
@@ -625,11 +591,14 @@ thread_metadata = {
                         (
                             "1",
                             (
+                                ("/path/to/file.py", "file", "file.py", "name1", 1),
                                 (
-                                    "/path/to/file.py", "file", "file.py", "name1", 1
-                                ),
-                                (
-                                    "/path/to/file.py", "file", "file.py", "name2", 2, "file"
+                                    "/path/to/file.py",
+                                    "file",
+                                    "file.py",
+                                    "name2",
+                                    2,
+                                    "file",
                                 ),
                             ),
                         )
@@ -642,10 +611,20 @@ thread_metadata = {
                             "1",
                             (
                                 (
-                                    "/path/to/file.py", "file", "file.py", "name3", 3, "file"
+                                    "/path/to/file.py",
+                                    "file",
+                                    "file.py",
+                                    "name3",
+                                    3,
+                                    "file",
                                 ),
                                 (
-                                    "/path/to/file.py", "file", "file.py", "name4", 4, "file"
+                                    "/path/to/file.py",
+                                    "file",
+                                    "file.py",
+                                    "name4",
+                                    4,
+                                    "file",
                                 ),
                             ),
                         )
@@ -710,11 +689,7 @@ thread_metadata = {
                     [
                         (
                             "1",
-                            (
-                                (
-                                    "/path/to/file.py", "file", "file.py", "name1", 1
-                                ),
-                            ),
+                            (("/path/to/file.py", "file", "file.py", "name1", 1),),
                         )
                     ],
                 ),
@@ -724,12 +699,8 @@ thread_metadata = {
                         (
                             "1",
                             (
-                                (
-                                    "/path/to/file.py", "file", "file.py", "name2", 2
-                                ),
-                                (
-                                    "/path/to/file.py", "file", "file.py", "name3", 3
-                                ),
+                                ("/path/to/file.py", "file", "file.py", "name2", 2),
+                                ("/path/to/file.py", "file", "file.py", "name3", 3),
                             ),
                         )
                     ],

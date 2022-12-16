@@ -356,9 +356,7 @@ class SampleBuffer(object):
     def __init__(self, capacity):
         # type: (int) -> None
 
-        self.buffer = [
-            None
-        ] * capacity  # type: List[Optional[Tuple[int, RawSample]]]
+        self.buffer = [None] * capacity  # type: List[Optional[Tuple[int, RawSample]]]
         self.capacity = capacity  # type: int
         self.idx = 0  # type: int
 
