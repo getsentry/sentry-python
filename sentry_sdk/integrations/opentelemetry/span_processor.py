@@ -56,6 +56,13 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         @add_global_event_processor
         def link_trace_context_to_error_event(event, hint):
             # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+            hub = Hub.current
+            if not hub:
+                return
+
+            if hub.client and hub.client.options["instrumenter"] != INSTRUMENTER.OTEL:
+                return
+
             if hasattr(event, "type") and event["type"] == "transaction":
                 return event
 
