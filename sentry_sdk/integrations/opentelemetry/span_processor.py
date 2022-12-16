@@ -11,6 +11,10 @@ from opentelemetry.trace import (  # type: ignore
     Span as OTelSpan,
     SpanKind,
 )
+from opentelemetry.trace.span import (
+    INVALID_SPAN_ID,
+    INVALID_TRACE_ID,
+)
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations.opentelemetry.consts import (
@@ -63,11 +67,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
             trace_id = format_trace_id(ctx.trace_id)
             span_id = format_span_id(ctx.span_id)
 
-            invalid_span = (
-                trace_id == "00000000000000000000000000000000"
-                or span_id == "0000000000000000"
-            )
-            if invalid_span:
+            if trace_id == INVALID_TRACE_ID or span_id == INVALID_SPAN_ID:
                 return event
 
             sentry_span = self.otel_span_map.get(span_id, None)
