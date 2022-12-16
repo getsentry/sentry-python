@@ -239,7 +239,7 @@ def extract_frame(frame, cwd):
         os.path.join(cwd, abs_path),
         module,
         filename_for_module(module, abs_path) or None,
-        get_frame_name(frame) or "<unknown>",
+        get_frame_name(frame),
         frame.f_lineno,
     )
 
