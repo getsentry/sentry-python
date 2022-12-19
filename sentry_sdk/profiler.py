@@ -61,7 +61,7 @@ if MYPY:
     RawStack = Tuple[RawFrame, ...]
     RawSample = Sequence[Tuple[str, Tuple[StackId, RawStack]]]
 
-    ProcessedStack = Tuple[int, ...]
+    ProcessedStack = List[int]
 
     ProcessedSample = TypedDict(
         "ProcessedSample",
@@ -284,7 +284,7 @@ def get_frame_name(frame):
     return name
 
 
-MAX_PROFILE_DURATION_NS = 30 * 1_000_000_000  # 30 seconds
+MAX_PROFILE_DURATION_NS = int(3e10)  # 30 seconds
 
 
 class Profile(object):
@@ -347,7 +347,7 @@ class Profile(object):
                         )
 
                 self.indexed_stacks[stack_id] = len(self.indexed_stacks)
-                self.stacks.append(tuple(self.indexed_frames[frame] for frame in stack))
+                self.stacks.append([self.indexed_frames[frame] for frame in stack])
 
             self.samples.append(
                 {
@@ -530,7 +530,6 @@ class ThreadScheduler(Scheduler):
             Take a sample of the stack on all the threads in the process.
             This should be called at a regular interval to collect samples.
             """
-
             # no profiles taking place, so we can stop early
             if not self.new_profiles and not self.active_profiles:
                 return
