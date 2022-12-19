@@ -32,9 +32,14 @@ FRAMEWORKS_NEEDING_POSTGRES = ["django"]
 
 MATRIX_DEFINITION = """
     strategy:
+      fail-fast: false
       matrix:
         python-version: [{{ python-version }}]
-        os: [ubuntu-latest]
+        # python3.6 reached EOL and is no longer being supported on
+        # new versions of hosted runners on Github Actions
+        # ubuntu-20.04 is the last version that supported python3.6
+        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
+        os: [ubuntu-20.04]
 """
 
 
@@ -77,7 +82,7 @@ def get_yaml_files_hash():
     """Calculate a hash of all the yaml configuration files"""
 
     hasher = hashlib.md5()
-    path_pattern = (OUT_DIR / f"test-integration-*.yml").as_posix()
+    path_pattern = (OUT_DIR / "test-integration-*.yml").as_posix()
     for file in glob(path_pattern):
         with open(file, "rb") as f:
             buf = f.read()
@@ -127,7 +132,7 @@ def main(fail_on_changes):
                 if python_version not in python_versions[framework]:
                     python_versions[framework].append(python_version)
 
-        except ValueError as err:
+        except ValueError:
             print(f"ERROR reading line {line}")
 
     for framework in python_versions:
