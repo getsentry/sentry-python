@@ -2,10 +2,13 @@ from datetime import datetime
 from mock import MagicMock
 import mock
 import time
-from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
+from sentry_sdk.integrations.opentelemetry.span_processor import (
+    SentrySpanProcessor,
+    link_trace_context_to_error_event,
+)
 from sentry_sdk.tracing import Span, Transaction
 
-from opentelemetry.trace import SpanKind
+from opentelemetry.trace import SpanKind, SpanContext
 
 
 def test_is_sentry_span():
@@ -403,3 +406,56 @@ def test_on_end_sentry_span():
         fake_sentry_span, otel_span
     )
     fake_sentry_span.finish.assert_called_once()
+
+
+def test_link_trace_context_to_error_event():
+    """
+    Test that the trace context is added to the error event.
+    """
+    fake_client = MagicMock()
+    fake_client.options = {"instrumenter": "otel"}
+    fake_client
+
+    current_hub = MagicMock()
+    current_hub.client = fake_client
+
+    fake_hub = MagicMock()
+    fake_hub.current = current_hub
+
+    span_id = "1234567890abcdef"
+    trace_id = "1234567890abcdef1234567890abcdef"
+
+    fake_trace_context = {
+        "bla": "blub",
+        "foo": "bar",
+        "baz": 123,
+    }
+
+    sentry_span = MagicMock()
+    sentry_span.get_trace_context = MagicMock(return_value=fake_trace_context)
+
+    otel_span_map = {
+        span_id: sentry_span,
+    }
+
+    span_context = SpanContext(
+        trace_id=int(trace_id, 16),
+        span_id=int(span_id, 16),
+        is_remote=True,
+    )
+    otel_span = MagicMock()
+    otel_span.get_span_context = MagicMock(return_value=span_context)
+
+    fake_event = {"event_id": "1234567890abcdef1234567890abcdef"}
+
+    with mock.patch(
+        "sentry_sdk.integrations.opentelemetry.span_processor.get_current_span",
+        return_value=otel_span,
+    ):
+        event = link_trace_context_to_error_event(fake_event, otel_span_map)
+
+        assert event
+        assert event == fake_event  # the event is changed in place inside the function
+        assert "contexts" in event
+        assert "trace" in event["contexts"]
+        assert event["contexts"]["trace"] == fake_trace_context
