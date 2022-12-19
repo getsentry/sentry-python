@@ -196,11 +196,10 @@ def extract_stack(
         # Make sure to keep in mind that the stack is ordered from the inner most
         # from to the outer most frame so be careful with the indexing.
         stack = tuple(
-            prev_stack[prev_depth - (depth - i)]
-            if prev_depth >= depth - i
-            and frame is prev_frames[prev_depth - (depth - i)]
+            prev_stack[i]
+            if i >= 0 and frame is prev_frames[i]
             else extract_frame(frame, cwd)
-            for i, frame in enumerate(frames)
+            for i, frame in zip(range(prev_depth - depth, prev_depth), frames)
         )
 
     # Instead of mapping the stack into frame ids and hashing
