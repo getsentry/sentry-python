@@ -260,9 +260,13 @@ def get_frame_name(frame):
     # if it was a method, we can get the class name by inspecting
     # the f_locals for the `self` argument
     try:
-        # the co_varnames start with the frame's positional arguments
-        # and we expect the first to be `self` if its an instance method
-        if co_varnames and co_varnames[0] == "self":
+        if (
+            # the co_varnames start with the frame's positional arguments
+            # and we expect the first to be `self` if its an instance method
+            co_varnames
+            and co_varnames[0] == "self"
+            and "self" in frame.f_locals
+        ):
             for cls in frame.f_locals["self"].__class__.__mro__:
                 if name in cls.__dict__:
                     return "{}.{}".format(cls.__name__, name)
@@ -272,9 +276,13 @@ def get_frame_name(frame):
     # if it was a class method, (decorated with `@classmethod`)
     # we can get the class name by inspecting the f_locals for the `cls` argument
     try:
-        # the co_varnames start with the frame's positional arguments
-        # and we expect the first to be `cls` if its a class method
-        if co_varnames and co_varnames[0] == "cls":
+        if (
+            # the co_varnames start with the frame's positional arguments
+            # and we expect the first to be `cls` if its a class method
+            co_varnames
+            and co_varnames[0] == "cls"
+            and "cls" in frame.f_locals
+        ):
             for cls in frame.f_locals["cls"].__mro__:
                 if name in cls.__dict__:
                     return "{}.{}".format(cls.__name__, name)
