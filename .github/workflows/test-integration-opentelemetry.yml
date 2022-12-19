@@ -1,4 +1,4 @@
-name: Test beam
+name: Test opentelemetry
 
 on:
   push:
@@ -24,14 +24,14 @@ env:
 
 jobs:
   test:
-    name: beam, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: opentelemetry, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
 
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7"]
+        python-version: ["3.7","3.8","3.9","3.10"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -48,20 +48,20 @@ jobs:
         run: |
           pip install codecov "tox>=3,<4"
 
-      - name: Test beam
+      - name: Test opentelemetry
         timeout-minutes: 45
         shell: bash
         run: |
           set -x # print commands that are executed
           coverage erase
 
-          ./scripts/runtox.sh "${{ matrix.python-version }}-beam" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "${{ matrix.python-version }}-opentelemetry" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
           codecov --file coverage.xml
 
   check_required_tests:
-    name: All beam tests passed or skipped
+    name: All opentelemetry tests passed or skipped
     needs: test
     # Always run this, even if a dependent job failed
     if: always()

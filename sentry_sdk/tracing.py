@@ -856,43 +856,43 @@ class Transaction(Span):
 
 class NoOpSpan(Span):
     def __repr__(self):
-        # type: () -> Any
+        # type: () -> str
         return self.__class__.__name__
 
     def __enter__(self):
-        # type: () -> Any
+        # type: () -> NoOpSpan
         return self
 
     def __exit__(self, ty, value, tb):
-        # type: (Any, Any, Any) -> Any
+        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         pass
 
     def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
-        # type: (str, **Any) -> Any
-        pass
+        # type: (str, **Any) -> NoOpSpan
+        return NoOpSpan()
 
     def new_span(self, **kwargs):
-        # type: (**Any) -> Any
+        # type: (**Any) -> NoOpSpan
         pass
 
     def set_tag(self, key, value):
-        # type: (Any, Any) -> Any
+        # type: (str, Any) -> None
         pass
 
     def set_data(self, key, value):
-        # type: (Any, Any) -> Any
+        # type: (str, Any) -> None
         pass
 
     def set_status(self, value):
-        # type: (Any) -> Any
+        # type: (str) -> None
         pass
 
     def set_http_status(self, http_status):
-        # type: (Any) -> Any
+        # type: (int) -> None
         pass
 
     def finish(self, hub=None, end_timestamp=None):
-        # type: (Any, Any) -> Any
+        # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
         pass
 
 
