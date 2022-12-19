@@ -11,6 +11,7 @@ from sentry_sdk.profiler import (
     EventScheduler,
     SampleBuffer,
     SleepScheduler,
+    extract_frame,
     extract_stack,
     get_frame_name,
     setup_profiler,
@@ -211,6 +212,33 @@ class GetFrame(GetFrameBase):
 )
 def test_get_frame_name(frame, frame_name):
     assert get_frame_name(frame) == frame_name
+
+
+@pytest.mark.parametrize(
+    ("get_frame", "function"),
+    [
+        pytest.param(lambda: get_frame(depth=1), "get_frame", id="simple"),
+    ],
+)
+def test_extract_frame(get_frame, function):
+    cwd = os.getcwd()
+    frame = get_frame()
+    extracted_frame = extract_frame(frame, cwd)
+
+    # the abs_path should be equal toe the normalized path of the co_filename
+    assert extracted_frame[0] == os.path.normpath(frame.f_code.co_filename)
+
+    # the module should be pull from this test module
+    assert extracted_frame[1] == __name__
+
+    # the filename should be the file starting after the cwd
+    assert extracted_frame[2] == __file__[len(cwd) + 1:]
+
+    assert extracted_frame[3] == function
+
+    # the lineno will shift over time as this file is modified so just check
+    # that it is an int
+    assert isinstance(extracted_frame[4], int)
 
 
 @pytest.mark.parametrize(
