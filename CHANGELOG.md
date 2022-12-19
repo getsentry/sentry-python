@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.12.1
+
+### Various fixes & improvements
+
+- Link errors to OTel spans (#1787) by @antonpirker
+
 ## 1.12.0
 
 ### Basic OTel support
