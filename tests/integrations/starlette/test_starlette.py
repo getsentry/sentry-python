@@ -19,7 +19,6 @@ from sentry_sdk.integrations.starlette import (
     StarletteIntegration,
     StarletteRequestExtractor,
 )
-from sentry_sdk.utils import AnnotatedValue
 
 starlette = pytest.importorskip("starlette")
 from starlette.authentication import (
@@ -42,6 +41,16 @@ BODY_FORM = """--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="usern
     "{{image_data}}", str(base64.b64encode(open(PICTURE, "rb").read()))
 )
 
+FORM_RECEIVE_MESSAGES = [
+    {"type": "http.request", "body": BODY_FORM.encode("utf-8")},
+    {"type": "http.disconnect"},
+]
+
+JSON_RECEIVE_MESSAGES = [
+    {"type": "http.request", "body": json.dumps(BODY_JSON).encode("utf-8")},
+    {"type": "http.disconnect"},
+]
+
 PARSED_FORM = starlette.datastructures.FormData(
     [
         ("username", "Jane"),
@@ -56,11 +65,6 @@ PARSED_FORM = starlette.datastructures.FormData(
         ),
     ]
 )
-PARSED_BODY = {
-    "username": "Jane",
-    "password": "hello123",
-    "photo": AnnotatedValue("", {"rem": [["!raw", "x"]]}),
-}
 
 # Dummy ASGI scope for creating mock Starlette requests
 SCOPE = {
@@ -82,6 +86,10 @@ SCOPE = {
     "server": ("172.28.0.10", 8000),
     "type": "http",
 }
+
+
+async def _mock_receive(msg):
+    return msg
 
 
 def starlette_app_factory(middleware=None, debug=True):
@@ -216,18 +224,14 @@ class SamplePartialReceiveSendMiddleware:
 
 @pytest.mark.asyncio
 async def test_starlettrequestextractor_content_length(sentry_init):
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(json.dumps(BODY_JSON)),
-    ):
-        scope = SCOPE.copy()
-        scope["headers"] = [
-            [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
-        ]
-        starlette_request = starlette.requests.Request(scope)
-        extractor = StarletteRequestExtractor(starlette_request)
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
+    ]
+    starlette_request = starlette.requests.Request(scope)
+    extractor = StarletteRequestExtractor(starlette_request)
 
-        assert await extractor.content_length() == len(json.dumps(BODY_JSON))
+    assert await extractor.content_length() == len(json.dumps(BODY_JSON))
 
 
 @pytest.mark.asyncio
@@ -243,48 +247,16 @@ async def test_starlettrequestextractor_cookies(sentry_init):
 
 @pytest.mark.asyncio
 async def test_starlettrequestextractor_json(sentry_init):
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(json.dumps(BODY_JSON)),
-    ):
-        starlette_request = starlette.requests.Request(SCOPE)
-        extractor = StarletteRequestExtractor(starlette_request)
+    starlette_request = starlette.requests.Request(SCOPE)
 
-        assert extractor.is_json()
-        assert await extractor.json() == BODY_JSON
+    # Mocking async `_receive()` that works in Python 3.7+
+    side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
 
+    extractor = StarletteRequestExtractor(starlette_request)
 
-@pytest.mark.asyncio
-async def test_starlettrequestextractor_parsed_body_json(sentry_init):
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(json.dumps(BODY_JSON)),
-    ):
-        starlette_request = starlette.requests.Request(SCOPE)
-        extractor = StarletteRequestExtractor(starlette_request)
-
-        parsed_body = await extractor.parsed_body()
-        assert parsed_body == BODY_JSON
-
-
-@pytest.mark.asyncio
-async def test_starlettrequestextractor_parsed_body_form(sentry_init):
-    scope = SCOPE.copy()
-    scope["headers"] = [
-        [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
-    ]
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(BODY_FORM),
-    ):
-        starlette_request = starlette.requests.Request(scope)
-        extractor = StarletteRequestExtractor(starlette_request)
-
-        parsed_body = await extractor.parsed_body()
-        assert parsed_body.keys() == PARSED_BODY.keys()
-        assert parsed_body["username"] == PARSED_BODY["username"]
-        assert parsed_body["password"] == PARSED_BODY["password"]
-        assert parsed_body["photo"].metadata == PARSED_BODY["photo"].metadata
+    assert extractor.is_json()
+    assert await extractor.json() == BODY_JSON
 
 
 @pytest.mark.asyncio
@@ -295,30 +267,62 @@ async def test_starlettrequestextractor_form(sentry_init):
     ]
     # TODO add test for content-type: "application/x-www-form-urlencoded"
 
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(BODY_FORM),
-    ):
-        starlette_request = starlette.requests.Request(scope)
-        extractor = StarletteRequestExtractor(starlette_request)
+    starlette_request = starlette.requests.Request(scope)
 
-        form_data = await extractor.form()
-        assert form_data.keys() == PARSED_FORM.keys()
-        assert form_data["username"] == PARSED_FORM["username"]
-        assert form_data["password"] == PARSED_FORM["password"]
-        assert form_data["photo"].filename == PARSED_FORM["photo"].filename
+    # Mocking async `_receive()` that works in Python 3.7+
+    side_effect = [_mock_receive(msg) for msg in FORM_RECEIVE_MESSAGES]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
+
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    form_data = await extractor.form()
+    assert form_data.keys() == PARSED_FORM.keys()
+    assert form_data["username"] == PARSED_FORM["username"]
+    assert form_data["password"] == PARSED_FORM["password"]
+    assert form_data["photo"].filename == PARSED_FORM["photo"].filename
+
+    # Make sure we still can read the body
+    # after alreading it with extractor.form() above.
+    body = await extractor.request.body()
+    assert body
 
 
 @pytest.mark.asyncio
-async def test_starlettrequestextractor_raw_data(sentry_init):
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(json.dumps(BODY_JSON)),
-    ):
-        starlette_request = starlette.requests.Request(SCOPE)
-        extractor = StarletteRequestExtractor(starlette_request)
+async def test_starlettrequestextractor_body_consumed_twice(
+    sentry_init, capture_events
+):
+    """
+    Starlette does cache when you read the request data via `request.json()`
+    or `request.body()`, but it does NOT when using `request.form()`.
+    So we have an edge case when the Sentry Starlette reads the body using `.form()`
+    and the user wants to read the body using `.body()`.
+    Because the underlying stream can not be consumed twice and is not cached.
 
-        assert await extractor.raw_data() == bytes(json.dumps(BODY_JSON), "utf-8")
+    We have fixed this in `StarletteRequestExtractor.form()` by consuming the body
+    first with `.body()` (to put it into the `_body` cache and then consume it with `.form()`.
+
+    If this behavior is changed in Starlette and the `request.form()` in Starlette
+    is also caching the body, this test will fail.
+
+    See also https://github.com/encode/starlette/discussions/1933
+    """
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
+    ]
+
+    starlette_request = starlette.requests.Request(scope)
+
+    # Mocking async `_receive()` that works in Python 3.7+
+    side_effect = [_mock_receive(msg) for msg in FORM_RECEIVE_MESSAGES]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
+
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    await extractor.request.form()
+
+    with pytest.raises(RuntimeError):
+        await extractor.request.body()
 
 
 @pytest.mark.asyncio
@@ -333,22 +337,23 @@ async def test_starlettrequestextractor_extract_request_info_too_big(sentry_init
         [b"content-length", str(len(BODY_FORM)).encode()],
         [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
     ]
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(BODY_FORM),
-    ):
-        starlette_request = starlette.requests.Request(scope)
-        extractor = StarletteRequestExtractor(starlette_request)
+    starlette_request = starlette.requests.Request(scope)
 
-        request_info = await extractor.extract_request_info()
+    # Mocking async `_receive()` that works in Python 3.7+
+    side_effect = [_mock_receive(msg) for msg in FORM_RECEIVE_MESSAGES]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
 
-        assert request_info
-        assert request_info["cookies"] == {
-            "tasty_cookie": "strawberry",
-            "yummy_cookie": "choco",
-        }
-        # Because request is too big only the AnnotatedValue is extracted.
-        assert request_info["data"].metadata == {"rem": [["!config", "x"]]}
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    request_info = await extractor.extract_request_info()
+
+    assert request_info
+    assert request_info["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+    # Because request is too big only the AnnotatedValue is extracted.
+    assert request_info["data"].metadata == {"rem": [["!config", "x"]]}
 
 
 @pytest.mark.asyncio
@@ -364,21 +369,22 @@ async def test_starlettrequestextractor_extract_request_info(sentry_init):
         [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
     ]
 
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(json.dumps(BODY_JSON)),
-    ):
-        starlette_request = starlette.requests.Request(scope)
-        extractor = StarletteRequestExtractor(starlette_request)
+    starlette_request = starlette.requests.Request(scope)
 
-        request_info = await extractor.extract_request_info()
+    # Mocking async `_receive()` that works in Python 3.7+
+    side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
 
-        assert request_info
-        assert request_info["cookies"] == {
-            "tasty_cookie": "strawberry",
-            "yummy_cookie": "choco",
-        }
-        assert request_info["data"] == BODY_JSON
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    request_info = await extractor.extract_request_info()
+
+    assert request_info
+    assert request_info["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+    assert request_info["data"] == BODY_JSON
 
 
 @pytest.mark.asyncio
@@ -394,18 +400,19 @@ async def test_starlettrequestextractor_extract_request_info_no_pii(sentry_init)
         [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
     ]
 
-    with mock.patch(
-        "starlette.requests.Request.stream",
-        return_value=AsyncIterator(json.dumps(BODY_JSON)),
-    ):
-        starlette_request = starlette.requests.Request(scope)
-        extractor = StarletteRequestExtractor(starlette_request)
+    starlette_request = starlette.requests.Request(scope)
 
-        request_info = await extractor.extract_request_info()
+    # Mocking async `_receive()` that works in Python 3.7+
+    side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
 
-        assert request_info
-        assert "cookies" not in request_info
-        assert request_info["data"] == BODY_JSON
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    request_info = await extractor.extract_request_info()
+
+    assert request_info
+    assert "cookies" not in request_info
+    assert request_info["data"] == BODY_JSON
 
 
 @pytest.mark.parametrize(

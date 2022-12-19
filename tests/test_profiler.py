@@ -82,7 +82,35 @@ def get_frame(depth=1):
     return inspect.currentframe()
 
 
-class GetFrame:
+class GetFrameBase:
+    def inherited_instance_method(self):
+        return inspect.currentframe()
+
+    def inherited_instance_method_wrapped(self):
+        def wrapped():
+            self
+            return inspect.currentframe()
+
+        return wrapped
+
+    @classmethod
+    def inherited_class_method(cls):
+        return inspect.currentframe()
+
+    @classmethod
+    def inherited_class_method_wrapped(cls):
+        def wrapped():
+            cls
+            return inspect.currentframe()
+
+        return wrapped
+
+    @staticmethod
+    def inherited_static_method():
+        return inspect.currentframe()
+
+
+class GetFrame(GetFrameBase):
     def instance_method(self):
         return inspect.currentframe()
 
@@ -149,6 +177,32 @@ class GetFrame:
             id="static_method",
             marks=pytest.mark.skip(reason="unsupported"),
         ),
+        pytest.param(
+            GetFrame().inherited_instance_method(),
+            "GetFrameBase.inherited_instance_method",
+            id="inherited_instance_method",
+        ),
+        pytest.param(
+            GetFrame().inherited_instance_method_wrapped()(),
+            "wrapped",
+            id="instance_method_wrapped",
+        ),
+        pytest.param(
+            GetFrame().inherited_class_method(),
+            "GetFrameBase.inherited_class_method",
+            id="inherited_class_method",
+        ),
+        pytest.param(
+            GetFrame().inherited_class_method_wrapped()(),
+            "wrapped",
+            id="inherited_class_method_wrapped",
+        ),
+        pytest.param(
+            GetFrame().inherited_static_method(),
+            "GetFrameBase.static_method",
+            id="inherited_static_method",
+            marks=pytest.mark.skip(reason="unsupported"),
+        ),
     ],
 )
 def test_get_frame_name(frame, frame_name):
@@ -195,8 +249,8 @@ class DummySampleBuffer(SampleBuffer):
 
     def make_sampler(self):
         def _sample_stack(*args, **kwargs):
-            print("writing", self.sample_data[0])
-            self.write(self.sample_data.pop(0))
+            ts, sample = self.sample_data.pop(0)
+            self.write(ts, sample)
 
         return _sample_stack
 
@@ -211,7 +265,22 @@ class DummySampleBuffer(SampleBuffer):
 )
 def test_thread_scheduler_takes_first_samples(scheduler_class):
     sample_buffer = DummySampleBuffer(
-        capacity=1, sample_data=[(0, [(0, (RawFrameData("name", "file", 1),))])]
+        capacity=1,
+        sample_data=[
+            (
+                0,
+                [
+                    (
+                        0,
+                        (
+                            RawFrameData(
+                                "/path/to/file.py", "file.py", "name", 1, "file"
+                            ),
+                        ),
+                    )
+                ],
+            )
+        ],
     )
     scheduler = scheduler_class(sample_buffer=sample_buffer, frequency=1000)
     assert scheduler.start_profiling()
@@ -237,7 +306,22 @@ def test_thread_scheduler_takes_first_samples(scheduler_class):
 def test_thread_scheduler_takes_more_samples(scheduler_class):
     sample_buffer = DummySampleBuffer(
         capacity=10,
-        sample_data=[(i, [(0, (RawFrameData("name", "file", 1),))]) for i in range(3)],
+        sample_data=[
+            (
+                i,
+                [
+                    (
+                        0,
+                        (
+                            RawFrameData(
+                                "/path/to/file.py", "file.py", "name", 1, "file"
+                            ),
+                        ),
+                    )
+                ],
+            )
+            for i in range(3)
+        ],
     )
     scheduler = scheduler_class(sample_buffer=sample_buffer, frequency=1000)
     assert scheduler.start_profiling()
@@ -330,7 +414,21 @@ thread_metadata = {
             10,
             0,
             1,
-            [(2, [("1", (RawFrameData("name", "file", 1),))])],
+            [
+                (
+                    2,
+                    [
+                        (
+                            "1",
+                            (
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name", 1, "file"
+                                ),
+                            ),
+                        )
+                    ],
+                )
+            ],
             {
                 "frames": [],
                 "samples": [],
@@ -343,13 +441,29 @@ thread_metadata = {
             10,
             0,
             1,
-            [(0, [("1", (RawFrameData("name", "file", 1),))])],
+            [
+                (
+                    0,
+                    [
+                        (
+                            "1",
+                            (
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name", 1, "file"
+                                ),
+                            ),
+                        )
+                    ],
+                )
+            ],
             {
                 "frames": [
                     {
+                        "abs_path": "/path/to/file.py",
                         "function": "name",
-                        "filename": "file",
+                        "filename": "file.py",
                         "lineno": 1,
+                        "module": "file",
                     },
                 ],
                 "samples": [
@@ -369,15 +483,41 @@ thread_metadata = {
             0,
             1,
             [
-                (0, [("1", (RawFrameData("name", "file", 1),))]),
-                (1, [("1", (RawFrameData("name", "file", 1),))]),
+                (
+                    0,
+                    [
+                        (
+                            "1",
+                            (
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name", 1, "file"
+                                ),
+                            ),
+                        )
+                    ],
+                ),
+                (
+                    1,
+                    [
+                        (
+                            "1",
+                            (
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name", 1, "file"
+                                ),
+                            ),
+                        )
+                    ],
+                ),
             ],
             {
                 "frames": [
                     {
+                        "abs_path": "/path/to/file.py",
                         "function": "name",
-                        "filename": "file",
+                        "filename": "file.py",
                         "lineno": 1,
+                        "module": "file",
                     },
                 ],
                 "samples": [
@@ -402,15 +542,31 @@ thread_metadata = {
             0,
             1,
             [
-                (0, [("1", (RawFrameData("name1", "file", 1),))]),
+                (
+                    0,
+                    [
+                        (
+                            "1",
+                            (
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name1", 1, "file"
+                                ),
+                            ),
+                        )
+                    ],
+                ),
                 (
                     1,
                     [
                         (
                             "1",
                             (
-                                RawFrameData("name1", "file", 1),
-                                RawFrameData("name2", "file", 2),
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name1", 1, "file"
+                                ),
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name2", 2, "file"
+                                ),
                             ),
                         )
                     ],
@@ -419,14 +575,18 @@ thread_metadata = {
             {
                 "frames": [
                     {
+                        "abs_path": "/path/to/file.py",
                         "function": "name1",
-                        "filename": "file",
+                        "filename": "file.py",
                         "lineno": 1,
+                        "module": "file",
                     },
                     {
+                        "abs_path": "/path/to/file.py",
                         "function": "name2",
-                        "filename": "file",
+                        "filename": "file.py",
                         "lineno": 2,
+                        "module": "file",
                     },
                 ],
                 "samples": [
@@ -457,8 +617,12 @@ thread_metadata = {
                         (
                             "1",
                             (
-                                RawFrameData("name1", "file", 1),
-                                RawFrameData("name2", "file", 2),
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name1", 1, "file"
+                                ),
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name2", 2, "file"
+                                ),
                             ),
                         )
                     ],
@@ -469,8 +633,12 @@ thread_metadata = {
                         (
                             "1",
                             (
-                                RawFrameData("name3", "file", 3),
-                                RawFrameData("name4", "file", 4),
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name3", 3, "file"
+                                ),
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name4", 4, "file"
+                                ),
                             ),
                         )
                     ],
@@ -479,24 +647,32 @@ thread_metadata = {
             {
                 "frames": [
                     {
+                        "abs_path": "/path/to/file.py",
                         "function": "name1",
-                        "filename": "file",
+                        "filename": "file.py",
                         "lineno": 1,
+                        "module": "file",
                     },
                     {
+                        "abs_path": "/path/to/file.py",
                         "function": "name2",
-                        "filename": "file",
+                        "filename": "file.py",
                         "lineno": 2,
+                        "module": "file",
                     },
                     {
+                        "abs_path": "/path/to/file.py",
                         "function": "name3",
-                        "filename": "file",
+                        "filename": "file.py",
                         "lineno": 3,
+                        "module": "file",
                     },
                     {
+                        "abs_path": "/path/to/file.py",
                         "function": "name4",
-                        "filename": "file",
+                        "filename": "file.py",
                         "lineno": 4,
+                        "module": "file",
                     },
                 ],
                 "samples": [
@@ -521,15 +697,31 @@ thread_metadata = {
             0,
             1,
             [
-                (0, [("1", (RawFrameData("name1", "file", 1),))]),
+                (
+                    0,
+                    [
+                        (
+                            "1",
+                            (
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name1", 1, "file"
+                                ),
+                            ),
+                        )
+                    ],
+                ),
                 (
                     1,
                     [
                         (
                             "1",
                             (
-                                RawFrameData("name2", "file", 2),
-                                RawFrameData("name3", "file", 3),
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name2", 2, "file"
+                                ),
+                                RawFrameData(
+                                    "/path/to/file.py", "file.py", "name3", 3, "file"
+                                ),
                             ),
                         )
                     ],
@@ -538,14 +730,18 @@ thread_metadata = {
             {
                 "frames": [
                     {
+                        "abs_path": "/path/to/file.py",
                         "function": "name2",
-                        "filename": "file",
+                        "filename": "file.py",
                         "lineno": 2,
+                        "module": "file",
                     },
                     {
+                        "abs_path": "/path/to/file.py",
                         "function": "name3",
-                        "filename": "file",
+                        "filename": "file.py",
                         "lineno": 3,
+                        "module": "file",
                     },
                 ],
                 "samples": [
@@ -564,7 +760,7 @@ thread_metadata = {
 )
 def test_sample_buffer(capacity, start_ns, stop_ns, samples, profile):
     buffer = SampleBuffer(capacity)
-    for sample in samples:
-        buffer.write(sample)
+    for ts, sample in samples:
+        buffer.write(ts, sample)
     result = buffer.slice_profile(start_ns, stop_ns)
     assert result == profile

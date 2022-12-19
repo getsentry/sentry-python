@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.12.1
+
+### Various fixes & improvements
+
+- Link errors to OTel spans (#1787) by @antonpirker
+
+## 1.12.0
+
+### Basic OTel support
+
+This adds support to automatically integrate OpenTelemetry performance tracing with Sentry.
+
+See the documentation on how to set it up:
+https://docs.sentry.io/platforms/python/performance/instrumentation/opentelemetry/
+
+Give it a try and let us know if you have any feedback or problems with using it.
+
+By: @antonpirker (#1772, #1766, #1765)
+
+### Various fixes & improvements
+
+- Tox Cleanup (#1749) by @antonpirker
+- CI: Fix Github action checks (#1780) by @Zylphrex
+- Profiling: Introduce active thread id on scope (#1764) by @Zylphrex
+- Profiling: Eagerly hash stack for profiles (#1755) by @Zylphrex
+- Profiling: Resolve inherited method class names (#1756) by @Zylphrex
+
+## 1.11.1
+
+### Various fixes & improvements
+
+- Move set_transaction_name out of event processor in fastapi/starlette (#1751) by @sl0thentr0py
+- Expose proxy_headers as top level config and use in ProxyManager: https://docs.sentry.io/platforms/python/configuration/options/#proxy-headers (#1746) by @sl0thentr0py
+
+## 1.11.0
+
+### Various fixes & improvements
+
+- Fix signals problem on sentry.io (#1732) by @antonpirker
+- Fix reading FastAPI request body twice. (#1724) by @antonpirker
+- ref(profiling): Do not error if already setup (#1731) by @Zylphrex
+- ref(profiling): Use sleep scheduler by default (#1729) by @Zylphrex
+- feat(profiling): Extract more frame info (#1702) by @Zylphrex
+- Update actions/upload-artifact to v3.1.1 (#1718) by @mattgauntseo-sentry
+- Performance optimizations (#1725) by @antonpirker
+- feat(pymongo): add PyMongo integration (#1590) by @Agalin
+- Move relay to port 5333 to avoid collisions (#1716) by @sl0thentr0py
+- fix(utils): strip_string() checks text length counting bytes not chars (#1711) by @mgaligniana
+- chore: remove jira workflow (#1707) by @vladanpaunovic
+- build(deps): bump checkouts/data-schemas from `a214fbc` to `20ff3b9` (#1703) by @dependabot
+- perf(profiling): Tune the sample profile generation code for performance (#1694) by @Zylphrex
+
 ## 1.10.1
 
 ### Various fixes & improvements

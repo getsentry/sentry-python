@@ -13,6 +13,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 """
 
 import atexit
+import os
 import platform
 import random
 import signal
@@ -27,9 +28,16 @@ import sentry_sdk
 from sentry_sdk._compat import PY33
 from sentry_sdk._queue import Queue
 from sentry_sdk._types import MYPY
-from sentry_sdk.utils import nanosecond_time
+from sentry_sdk.utils import (
+    filename_for_module,
+    handle_in_app_impl,
+    logger,
+    nanosecond_time,
+)
 
-RawFrameData = namedtuple("RawFrameData", ["function", "abs_path", "lineno"])
+RawFrameData = namedtuple(
+    "RawFrameData", ["abs_path", "filename", "function", "lineno", "module"]
+)
 
 if MYPY:
     from types import FrameType
@@ -43,9 +51,12 @@ if MYPY:
     from typing import Sequence
     from typing import Tuple
     from typing_extensions import TypedDict
+    import sentry_sdk.scope
     import sentry_sdk.tracing
 
-    RawSampleData = Tuple[int, Sequence[Tuple[str, Sequence[RawFrameData]]]]
+    RawStack = Tuple[RawFrameData, ...]
+    RawSample = Sequence[Tuple[str, RawStack]]
+    RawSampleWithId = Sequence[Tuple[str, int, RawStack]]
 
     ProcessedStack = Tuple[int, ...]
 
@@ -61,9 +72,11 @@ if MYPY:
     ProcessedFrame = TypedDict(
         "ProcessedFrame",
         {
+            "abs_path": str,
+            "filename": Optional[str],
             "function": str,
-            "filename": str,
             "lineno": int,
+            "module": Optional[str],
         },
     )
 
@@ -83,7 +96,6 @@ if MYPY:
     )
 
 
-_sample_buffer = None  # type: Optional[SampleBuffer]
 _scheduler = None  # type: Optional[Scheduler]
 
 
@@ -94,33 +106,33 @@ def setup_profiler(options):
     `buffer_secs` determines the max time a sample will be buffered for
     `frequency` determines the number of samples to take per second (Hz)
     """
-    buffer_secs = 30
-    frequency = 101
+
+    global _scheduler
+
+    if _scheduler is not None:
+        logger.debug("profiling is already setup")
+        return
 
     if not PY33:
-        from sentry_sdk.utils import logger
-
         logger.warn("profiling is only supported on Python >= 3.3")
         return
 
-    global _sample_buffer
-    global _scheduler
-
-    assert _sample_buffer is None and _scheduler is None
+    buffer_secs = 30
+    frequency = 101
 
     # To buffer samples for `buffer_secs` at `frequency` Hz, we need
     # a capcity of `buffer_secs * frequency`.
-    _sample_buffer = SampleBuffer(capacity=buffer_secs * frequency)
+    buffer = SampleBuffer(capacity=buffer_secs * frequency)
 
-    profiler_mode = options["_experiments"].get("profiler_mode", SigprofScheduler.mode)
+    profiler_mode = options["_experiments"].get("profiler_mode", SleepScheduler.mode)
     if profiler_mode == SigprofScheduler.mode:
-        _scheduler = SigprofScheduler(sample_buffer=_sample_buffer, frequency=frequency)
+        _scheduler = SigprofScheduler(sample_buffer=buffer, frequency=frequency)
     elif profiler_mode == SigalrmScheduler.mode:
-        _scheduler = SigalrmScheduler(sample_buffer=_sample_buffer, frequency=frequency)
+        _scheduler = SigalrmScheduler(sample_buffer=buffer, frequency=frequency)
     elif profiler_mode == SleepScheduler.mode:
-        _scheduler = SleepScheduler(sample_buffer=_sample_buffer, frequency=frequency)
+        _scheduler = SleepScheduler(sample_buffer=buffer, frequency=frequency)
     elif profiler_mode == EventScheduler.mode:
-        _scheduler = EventScheduler(sample_buffer=_sample_buffer, frequency=frequency)
+        _scheduler = EventScheduler(sample_buffer=buffer, frequency=frequency)
     else:
         raise ValueError("Unknown profiler mode: {}".format(profiler_mode))
     _scheduler.setup()
@@ -131,13 +143,11 @@ def setup_profiler(options):
 def teardown_profiler():
     # type: () -> None
 
-    global _sample_buffer
     global _scheduler
 
     if _scheduler is not None:
         _scheduler.teardown()
 
-    _sample_buffer = None
     _scheduler = None
 
 
@@ -146,7 +156,7 @@ MAX_STACK_DEPTH = 128
 
 
 def extract_stack(frame, max_stack_depth=MAX_STACK_DEPTH):
-    # type: (Optional[FrameType], int) -> Sequence[RawFrameData]
+    # type: (Optional[FrameType], int) -> Tuple[RawFrameData, ...]
     """
     Extracts the stack starting the specified frame. The extracted stack
     assumes the specified frame is the top of the stack, and works back
@@ -162,13 +172,24 @@ def extract_stack(frame, max_stack_depth=MAX_STACK_DEPTH):
         stack.append(frame)
         frame = frame.f_back
 
-    return tuple(
-        RawFrameData(
-            function=get_frame_name(frame),
-            abs_path=frame.f_code.co_filename,
-            lineno=frame.f_lineno,
-        )
-        for frame in stack
+    return tuple(extract_frame(frame) for frame in stack)
+
+
+def extract_frame(frame):
+    # type: (FrameType) -> RawFrameData
+    abs_path = frame.f_code.co_filename
+
+    try:
+        module = frame.f_globals["__name__"]
+    except Exception:
+        module = None
+
+    return RawFrameData(
+        abs_path=os.path.abspath(abs_path),
+        filename=filename_for_module(module, abs_path) or None,
+        function=get_frame_name(frame),
+        lineno=frame.f_lineno,
+        module=module,
     )
 
 
@@ -193,7 +214,9 @@ def get_frame_name(frame):
             and f_code.co_varnames[0] == "self"
             and "self" in frame.f_locals
         ):
-            return "{}.{}".format(frame.f_locals["self"].__class__.__name__, name)
+            for cls in frame.f_locals["self"].__class__.__mro__:
+                if name in cls.__dict__:
+                    return "{}.{}".format(cls.__name__, name)
     except AttributeError:
         pass
 
@@ -207,7 +230,9 @@ def get_frame_name(frame):
             and f_code.co_varnames[0] == "cls"
             and "cls" in frame.f_locals
         ):
-            return "{}.{}".format(frame.f_locals["cls"].__name__, name)
+            for cls in frame.f_locals["cls"].__mro__:
+                if name in cls.__dict__:
+                    return "{}.{}".format(cls.__name__, name)
     except AttributeError:
         pass
 
@@ -243,18 +268,27 @@ class Profile(object):
         self.scheduler.stop_profiling()
         self._stop_ns = nanosecond_time()
 
-    def to_json(self, event_opt):
-        # type: (Any) -> Dict[str, Any]
+    def to_json(self, event_opt, options, scope):
+        # type: (Any, Dict[str, Any], Optional[sentry_sdk.scope.Scope]) -> Dict[str, Any]
         assert self._start_ns is not None
         assert self._stop_ns is not None
+
+        profile = self.scheduler.sample_buffer.slice_profile(
+            self._start_ns, self._stop_ns
+        )
+
+        handle_in_app_impl(
+            profile["frames"], options["in_app_exclude"], options["in_app_include"]
+        )
+
+        # the active thread id from the scope always take priorty if it exists
+        active_thread_id = None if scope is None else scope.active_thread_id
 
         return {
             "environment": event_opt.get("environment"),
             "event_id": uuid.uuid4().hex,
             "platform": "python",
-            "profile": self.scheduler.sample_buffer.slice_profile(
-                self._start_ns, self._stop_ns
-            ),
+            "profile": profile,
             "release": event_opt.get("release", ""),
             "timestamp": event_opt["timestamp"],
             "version": "1",
@@ -281,7 +315,11 @@ class Profile(object):
                     # because we end the transaction after the profile
                     "relative_end_ns": str(self._stop_ns - self._start_ns),
                     "trace_id": self.transaction.trace_id,
-                    "active_thread_id": str(self.transaction._active_thread_id),
+                    "active_thread_id": str(
+                        self.transaction._active_thread_id
+                        if active_thread_id is None
+                        else active_thread_id
+                    ),
                 }
             ],
         }
@@ -300,12 +338,14 @@ class SampleBuffer(object):
     def __init__(self, capacity):
         # type: (int) -> None
 
-        self.buffer = [None] * capacity  # type: List[Optional[RawSampleData]]
+        self.buffer = [
+            None
+        ] * capacity  # type: List[Optional[Tuple[int, RawSampleWithId]]]
         self.capacity = capacity  # type: int
         self.idx = 0  # type: int
 
-    def write(self, sample):
-        # type: (RawSampleData) -> None
+    def write(self, ts, raw_sample):
+        # type: (int, RawSample) -> None
         """
         Writing to the buffer is not thread safe. There is the possibility
         that parallel writes will overwrite one another.
@@ -318,7 +358,24 @@ class SampleBuffer(object):
         any synchronization mechanisms here like locks.
         """
         idx = self.idx
-        self.buffer[idx] = sample
+
+        sample = [
+            (
+                thread_id,
+                # Instead of mapping the stack into frame ids and hashing
+                # that as a tuple, we can directly hash the stack.
+                # This saves us from having to generate yet another list.
+                # Additionally, using the stack as the key directly is
+                # costly because the stack can be large, so we pre-hash
+                # the stack, and use the hash as the key as this will be
+                # needed a few times to improve performance.
+                hash(stack),
+                stack,
+            )
+            for thread_id, stack in raw_sample
+        ]
+
+        self.buffer[idx] = (ts, sample)
         self.idx = (idx + 1) % self.capacity
 
     def slice_profile(self, start_ns, stop_ns):
@@ -329,27 +386,13 @@ class SampleBuffer(object):
         frames = dict()  # type: Dict[RawFrameData, int]
         frames_list = list()  # type: List[ProcessedFrame]
 
-        # TODO: This is doing an naive iteration over the
-        # buffer and extracting the appropriate samples.
-        #
-        # Is it safe to assume that the samples are always in
-        # chronological order and binary search the buffer?
         for ts, sample in filter(None, self.buffer):
             if start_ns > ts or ts > stop_ns:
                 continue
 
             elapsed_since_start_ns = str(ts - start_ns)
 
-            for tid, stack in sample:
-                # Instead of mapping the stack into frame ids and hashing
-                # that as a tuple, we can directly hash the stack.
-                # This saves us from having to generate yet another list.
-                # Additionally, using the stack as the key directly is
-                # costly because the stack can be large, so we pre-hash
-                # the stack, and use the hash as the key as this will be
-                # needed a few times to improve performance.
-                hashed_stack = hash(stack)
-
+            for tid, hashed_stack, stack in sample:
                 # Check if the stack is indexed first, this lets us skip
                 # indexing frames if it's not necessary
                 if hashed_stack not in stacks:
@@ -358,9 +401,11 @@ class SampleBuffer(object):
                             frames[frame] = len(frames)
                             frames_list.append(
                                 {
-                                    "function": frame.function,
-                                    "filename": frame.abs_path,
+                                    "abs_path": frame.abs_path,
+                                    "function": frame.function or "<unknown>",
+                                    "filename": frame.filename,
                                     "lineno": frame.lineno,
+                                    "module": frame.module,
                                 }
                             )
 
@@ -403,13 +448,11 @@ class SampleBuffer(object):
             """
 
             self.write(
-                (
-                    nanosecond_time(),
-                    [
-                        (str(tid), extract_stack(frame))
-                        for tid, frame in sys._current_frames().items()
-                    ],
-                )
+                nanosecond_time(),
+                [
+                    (str(tid), extract_stack(frame))
+                    for tid, frame in sys._current_frames().items()
+                ],
             )
 
         return _sample_stack
@@ -700,7 +743,7 @@ def _should_profile(transaction, hub):
         return False
 
     # The profiler hasn't been properly initialized.
-    if _sample_buffer is None or _scheduler is None:
+    if _scheduler is None:
         return False
 
     hub = hub or sentry_sdk.Hub.current
