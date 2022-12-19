@@ -232,7 +232,7 @@ def test_extract_frame(get_frame, function):
     assert extracted_frame[1] == __name__
 
     # the filename should be the file starting after the cwd
-    assert extracted_frame[2] == __file__[len(cwd) + 1:]
+    assert extracted_frame[2] == __file__[len(cwd) + 1 :]
 
     assert extracted_frame[3] == function
 
