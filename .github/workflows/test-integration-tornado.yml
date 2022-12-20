@@ -46,7 +46,7 @@ jobs:
 
       - name: Setup Test Env
         run: |
-          pip install codecov "tox>=3,<4"
+          pip install codecov tox
 
       - name: Test tornado
         timeout-minutes: 45
