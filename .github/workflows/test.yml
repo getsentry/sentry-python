@@ -26,6 +26,14 @@ jobs:
       - run: |
           python --version
 
+      - name: Test x
+        timeout-minutes: 45
+        shell: bash
+        run: |
+          set -x # print commands that are executed
+
+          ./scripts/runtox.sh "3.11"
+
   test-py311-ubuntu2004:
     name: Test Python 3.11 Ubuntu 20.04
     runs-on: ubuntu-20.04
@@ -38,3 +46,11 @@ jobs:
 
       - run: |
           python --version
+
+      - name: Test x
+        timeout-minutes: 45
+        shell: bash
+        run: |
+          set -x # print commands that are executed
+
+          ./scripts/runtox.sh "3.11"
