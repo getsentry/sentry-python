@@ -17,6 +17,7 @@ represent the current tox.ini file. (And if not the CI run fails.)
 
 import configparser
 import hashlib
+import random
 import sys
 from collections import defaultdict
 from glob import glob
@@ -64,7 +65,9 @@ def write_yaml_file(
         elif template_line == "{{ services }}\n":
             if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
                 f = open(TEMPLATE_FILE_SERVICES, "r")
-                out += "".join(f.readlines())
+                services = "".join(f.readlines())
+                m = m.replace("{{ suffix }}", str(random.randint(1, 100)))
+                out += "".join(services)
                 f.close()
 
         else:

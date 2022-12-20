@@ -54,7 +54,7 @@ jobs:
     env:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test${{ matrix.python-version }}
+      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test_{{ suffix }}
 
     steps:
       - uses: actions/checkout@v3
