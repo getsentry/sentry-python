@@ -1,6 +1,6 @@
 mypy==0.971
 black==22.12.0
-flake8==5.0.4
+flake8==6.0.0
 types-certifi
 types-redis
 types-setuptools
