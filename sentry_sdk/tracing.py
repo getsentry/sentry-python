@@ -694,6 +694,7 @@ class Transaction(Span):
 
         contexts = {}
         contexts.update(self._contexts)
+        # TODO-anton: check what happens if trace context was already set with set_context()
         contexts.update({"trace": self.get_trace_context()})
 
         event = {
