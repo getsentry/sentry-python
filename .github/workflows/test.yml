@@ -26,6 +26,10 @@ jobs:
       - run: |
           python --version
 
+      - name: Setup Test Env
+        run: |
+          pip install "tox>=3,<4"
+
       - name: Test x
         timeout-minutes: 45
         shell: bash
@@ -46,6 +50,10 @@ jobs:
 
       - run: |
           python --version
+
+      - name: Setup Test Env
+        run: |
+          pip install "tox>=3,<4"
 
       - name: Test x
         timeout-minutes: 45
