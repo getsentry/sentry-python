@@ -15,4 +15,4 @@
     env:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test{{ test_db_suffix }}
+      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test${{ matrix.python-version }}
