@@ -40,6 +40,9 @@ MATRIX_DEFINITION = """
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
+        include:
+            - python-version: 3.11
+              os: ubuntu-latest
 """
 
 
