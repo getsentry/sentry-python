@@ -64,7 +64,9 @@ def write_yaml_file(
         elif template_line == "{{ services }}\n":
             if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
                 f = open(TEMPLATE_FILE_SERVICES, "r")
-                out += "".join(f.readlines())
+                services = f.readlines()
+                services = services.replace("{{ test_db_suffix }}", current_framework)
+                out += "".join(services)
                 f.close()
 
         else:
