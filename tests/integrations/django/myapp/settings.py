@@ -58,6 +58,12 @@ INSTALLED_APPS = [
 
 
 class TestMiddleware(MiddlewareMixin):
+    def __init__(self, get_response=None):
+        if get_response is None:
+            get_response = HttpResponse()
+
+        super().__init__(get_response)
+
     def process_request(self, request):
         # https://github.com/getsentry/sentry-python/issues/837 -- We should
         # not touch the resolver_match because apparently people rely on it.
@@ -122,7 +128,7 @@ try:
     import psycopg2  # noqa
 
     DATABASES["postgres"] = {
-        "ENGINE": "django.db.backends.postgresql_psycopg2",
+        "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ["SENTRY_PYTHON_TEST_POSTGRES_NAME"],
         "USER": os.environ["SENTRY_PYTHON_TEST_POSTGRES_USER"],
         "PASSWORD": os.environ["SENTRY_PYTHON_TEST_POSTGRES_PASSWORD"],
