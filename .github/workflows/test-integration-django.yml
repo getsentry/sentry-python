@@ -54,7 +54,7 @@ jobs:
     env:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test_{{ suffix }}
+      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
 
     steps:
       - uses: actions/checkout@v3
@@ -64,7 +64,7 @@ jobs:
 
       - name: Setup Test Env
         run: |
-          pip install codecov tox
+          pip install codecov tox==4.0.0
 
       - name: Test django
         timeout-minutes: 45
