@@ -46,7 +46,7 @@ jobs:
 
       - name: Setup Test Env
         run: |
-          pip install codecov tox==4.0.0
+          pip install codecov tox==4.0.0a2
 
       - name: Test sanic
         timeout-minutes: 45
