@@ -38,7 +38,7 @@ jobs:
 
       - name: Setup Test Env
         run: |
-          pip install codecov tox==4.0.0a2
+          pip install codecov tox==3.28.0
 
       - name: Test {{ framework }}
         timeout-minutes: 45
