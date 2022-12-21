@@ -46,7 +46,7 @@ jobs:
 
       - name: Setup Test Env
         run: |
-          pip install codecov tox
+          pip install codecov "tox<4"
 
       - name: Test opentelemetry
         timeout-minutes: 45
