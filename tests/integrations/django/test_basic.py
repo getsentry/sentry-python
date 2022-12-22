@@ -24,9 +24,6 @@ from sentry_sdk.integrations.executing import ExecutingIntegration
 
 from tests.integrations.django.myapp.wsgi import application
 
-# Vielleicht das hier das problem, dass in python groesser 3.8 ein neues pytest_django dabei ist und dann das hier nicht mehr funktioniert:
-# oder tox hat ein pytest_django requirement oder so, das dann nicht mehr passt.
-
 # Hack to prevent from experimental feature introduced in version `4.3.0` in `pytest-django` that
 # requires explicit database allow from failing the test
 pytest_mark_django_db_decorator = partial(pytest.mark.django_db)
