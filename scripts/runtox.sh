@@ -15,7 +15,5 @@ fi
 
 searchstring="$1"
 
-$TOXPATH --version
-
 export TOX_PARALLEL_NO_SPINNER=1
 exec $TOXPATH -p auto -e "$($TOXPATH -l | grep "$searchstring" | tr $'\n' ',')" -- "${@:2}"
