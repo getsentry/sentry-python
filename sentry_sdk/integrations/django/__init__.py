@@ -79,7 +79,7 @@ else:
         return request_user.is_authenticated
 
 
-TRANSACTION_STYLE_VALUES = ("function_name", "url")
+TRANSACTION_STYLE_VALUES = ("function_name", "method_and_path_pattern", "url")
 
 
 class DjangoIntegration(Integration):
@@ -330,14 +330,19 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         if transaction_style == "function_name":
             fn = resolve(request.path).func
             transaction_name = transaction_from_function(getattr(fn, "view_class", fn))
-
-        elif transaction_style == "url":
+        elif transaction_style in ("method_and_path_pattern", "url"):
             if hasattr(request, "urlconf"):
                 transaction_name = LEGACY_RESOLVER.resolve(
                     request.path_info, urlconf=request.urlconf
                 )
             else:
                 transaction_name = LEGACY_RESOLVER.resolve(request.path_info)
+
+            if (
+                transaction_name is not None
+                and transaction_style == "method_and_path_pattern"
+            ):
+                transaction_name = f"{request.method} {transaction_name}"
 
         if transaction_name is None:
             transaction_name = request.path_info

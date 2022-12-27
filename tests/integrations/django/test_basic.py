@@ -479,6 +479,7 @@ def test_django_connect_breadcrumbs(
             "component",
             b"ok",
         ),
+        ("method_and_path_pattern", "/message", "GET /message", "route", b"ok"),
         ("url", "/message", "/message", "route", b"ok"),
         ("url", "/404", "/404", "url", b"404"),
     ],
