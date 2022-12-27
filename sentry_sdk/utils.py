@@ -854,7 +854,7 @@ def strip_string(value, max_length=None):
     return value
 
 
-def _is_contextvars_broken():
+def _is_contextvars_broken() -> bool:
     # type: () -> bool
     """
     Returns whether gevent/eventlet have patched the stdlib in a way where thread locals are now more "correct" than contextvars.

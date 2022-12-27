@@ -42,12 +42,12 @@ def add_global_event_processor(processor):
     global_event_processors.append(processor)
 
 
-def _attr_setter(fn):
+def _attr_setter(fn: Callable) -> property:
     # type: (Any) -> Any
     return property(fset=fn, doc=fn.__doc__)
 
 
-def _disable_capture(fn):
+def _disable_capture(fn: Callable) -> Callable:
     # type: (F) -> F
     @wraps(fn)
     def wrapper(self, *args, **kwargs):
@@ -100,7 +100,7 @@ class Scope(object):
         "_active_thread_id",
     )
 
-    def __init__(self):
+    def __init__(self) -> None:
         # type: () -> None
         self._event_processors = []  # type: List[EventProcessor]
         self._error_processors = []  # type: List[ErrorProcessor]
@@ -108,7 +108,7 @@ class Scope(object):
         self._name = None  # type: Optional[str]
         self.clear()
 
-    def clear(self):
+    def clear(self) -> None:
         # type: () -> None
         """Clears the entire scope."""
         self._level = None  # type: Optional[str]
@@ -293,7 +293,7 @@ class Scope(object):
         """Removes a specific extra key."""
         self._extras.pop(key, None)
 
-    def clear_breadcrumbs(self):
+    def clear_breadcrumbs(self) -> None:
         # type: () -> None
         """Clears breadcrumb buffer."""
         self._breadcrumbs = deque()  # type: Deque[Breadcrumb]
