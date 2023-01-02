@@ -300,6 +300,22 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     assert crumb["data"]["db.params"] == {"my_foo": 10}
 
 
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+def test_response_trace(sentry_init, client, capture_events, render_span_tree):
+    pytest.importorskip("rest_framework")
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+    content, status, headers = client.get(reverse("rest_json_response"))
+    assert status == "200 OK"
+
+    assert '- op="django.response": description="render"' in render_span_tree(events[0])
+
+
 @pytest.mark.parametrize(
     "query",
     [
