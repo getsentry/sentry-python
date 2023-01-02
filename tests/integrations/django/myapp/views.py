@@ -34,7 +34,6 @@ try:
     def rest_json_response(request):
         return Response(dict(ok=True))
 
-
 except ImportError:
     pass
 
