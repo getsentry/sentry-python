@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 from sentry_sdk import Hub
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 
@@ -62,7 +63,7 @@ def _sentry_request_created(service_id, request, operation_name, **kwargs):
     description = "aws.%s.%s" % (service_id, operation_name)
     span = hub.start_span(
         hub=hub,
-        op="aws.request",
+        op=OP.HTTP_CLIENT,
         description=description,
     )
     span.set_tag("aws.service_id", service_id)
@@ -92,7 +93,7 @@ def _sentry_after_call(context, parsed, **kwargs):
         return
 
     streaming_span = span.start_child(
-        op="aws.request.stream",
+        op=OP.HTTP_CLIENT_STREAM,
         description=span.description,
     )
 

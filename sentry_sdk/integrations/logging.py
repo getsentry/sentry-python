@@ -24,6 +24,16 @@ if MYPY:
 
 DEFAULT_LEVEL = logging.INFO
 DEFAULT_EVENT_LEVEL = logging.ERROR
+LOGGING_TO_EVENT_LEVEL = {
+    logging.NOTSET: "notset",
+    logging.DEBUG: "debug",
+    logging.INFO: "info",
+    logging.WARN: "warning",  # WARN is same a WARNING
+    logging.WARNING: "warning",
+    logging.ERROR: "error",
+    logging.FATAL: "fatal",
+    logging.CRITICAL: "fatal",  # CRITICAL is same as FATAL
+}
 
 # Capturing events from those loggers causes recursion errors. We cannot allow
 # the user to unconditionally create events from those loggers under any
@@ -78,7 +88,7 @@ class LoggingIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        old_callhandlers = logging.Logger.callHandlers  # type: ignore
+        old_callhandlers = logging.Logger.callHandlers
 
         def sentry_patched_callhandlers(self, record):
             # type: (Any, LogRecord) -> Any
@@ -110,7 +120,7 @@ def _breadcrumb_from_record(record):
     # type: (LogRecord) -> Dict[str, Any]
     return {
         "type": "log",
-        "level": _logging_to_event_level(record.levelname),
+        "level": _logging_to_event_level(record),
         "category": record.name,
         "message": record.message,
         "timestamp": datetime.datetime.utcfromtimestamp(record.created),
@@ -118,9 +128,11 @@ def _breadcrumb_from_record(record):
     }
 
 
-def _logging_to_event_level(levelname):
-    # type: (str) -> str
-    return {"critical": "fatal"}.get(levelname.lower(), levelname.lower())
+def _logging_to_event_level(record):
+    # type: (LogRecord) -> str
+    return LOGGING_TO_EVENT_LEVEL.get(
+        record.levelno, record.levelname.lower() if record.levelname else ""
+    )
 
 
 COMMON_RECORD_ATTRS = frozenset(
@@ -220,9 +232,29 @@ class EventHandler(logging.Handler, object):
 
         hint["log_record"] = record
 
-        event["level"] = _logging_to_event_level(record.levelname)
+        event["level"] = _logging_to_event_level(record)
         event["logger"] = record.name
-        event["logentry"] = {"message": to_string(record.msg), "params": record.args}
+
+        # Log records from `warnings` module as separate issues
+        record_caputured_from_warnings_module = (
+            record.name == "py.warnings" and record.msg == "%s"
+        )
+        if record_caputured_from_warnings_module:
+            # use the actual message and not "%s" as the message
+            # this prevents grouping all warnings under one "%s" issue
+            msg = record.args[0]  # type: ignore
+
+            event["logentry"] = {
+                "message": msg,
+                "params": (),
+            }
+
+        else:
+            event["logentry"] = {
+                "message": to_string(record.msg),
+                "params": record.args,
+            }
+
         event["extra"] = _extra_from_record(record)
 
         hub.capture_event(event, hint=hint)

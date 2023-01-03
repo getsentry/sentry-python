@@ -76,6 +76,8 @@ class RavenResolver(object):
             result.replace("^", "")
             .replace("$", "")
             .replace("?", "")
+            .replace("\\A", "")
+            .replace("\\Z", "")
             .replace("//", "/")
             .replace("\\", "")
         )
@@ -125,10 +127,10 @@ class RavenResolver(object):
         path,  # type: str
         urlconf=None,  # type: Union[None, Tuple[URLPattern, URLPattern, URLResolver], Tuple[URLPattern]]
     ):
-        # type: (...) -> str
+        # type: (...) -> Optional[str]
         resolver = get_resolver(urlconf)
         match = self._resolve(resolver, path)
-        return match or path
+        return match
 
 
 LEGACY_RESOLVER = RavenResolver()

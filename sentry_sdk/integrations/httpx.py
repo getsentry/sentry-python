@@ -1,5 +1,7 @@
 from sentry_sdk import Hub
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.utils import logger
 
 from sentry_sdk._types import MYPY
 
@@ -40,11 +42,16 @@ def _install_httpx_client():
             return real_send(self, request, **kwargs)
 
         with hub.start_span(
-            op="http", description="%s %s" % (request.method, request.url)
+            op=OP.HTTP_CLIENT, description="%s %s" % (request.method, request.url)
         ) as span:
             span.set_data("method", request.method)
             span.set_data("url", str(request.url))
             for key, value in hub.iter_trace_propagation_headers():
+                logger.debug(
+                    "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
+                        key=key, value=value, url=request.url
+                    )
+                )
                 request.headers[key] = value
             rv = real_send(self, request, **kwargs)
 
@@ -67,11 +74,16 @@ def _install_httpx_async_client():
             return await real_send(self, request, **kwargs)
 
         with hub.start_span(
-            op="http", description="%s %s" % (request.method, request.url)
+            op=OP.HTTP_CLIENT, description="%s %s" % (request.method, request.url)
         ) as span:
             span.set_data("method", request.method)
             span.set_data("url", str(request.url))
             for key, value in hub.iter_trace_propagation_headers():
+                logger.debug(
+                    "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
+                        key=key, value=value, url=request.url
+                    )
+                )
                 request.headers[key] = value
             rv = await real_send(self, request, **kwargs)
 

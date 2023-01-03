@@ -1,6 +1,10 @@
-black==21.7b0
-flake8==3.9.2
-flake8-import-order==0.18.1
-mypy==0.782
-flake8-bugbear==21.4.3
-pep8-naming==0.11.1
+mypy==0.971
+black==22.10.0
+flake8==5.0.4
+types-certifi
+types-redis
+types-setuptools
+pymongo # There is no separate types module.
+flake8-bugbear==22.9.23
+pep8-naming==0.13.2
+pre-commit # local linting

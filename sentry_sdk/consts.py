@@ -32,12 +32,46 @@ if MYPY:
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
             "smart_transaction_trimming": Optional[bool],
+            "propagate_tracestate": Optional[bool],
+            "custom_measurements": Optional[bool],
+            "profiles_sample_rate": Optional[float],
+            "profiler_mode": Optional[str],
         },
         total=False,
     )
 
 DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
+
+
+class INSTRUMENTER:
+    SENTRY = "sentry"
+    OTEL = "otel"
+
+
+class OP:
+    DB = "db"
+    DB_REDIS = "db.redis"
+    EVENT_DJANGO = "event.django"
+    FUNCTION = "function"
+    FUNCTION_AWS = "function.aws"
+    FUNCTION_GCP = "function.gcp"
+    HTTP_CLIENT = "http.client"
+    HTTP_CLIENT_STREAM = "http.client.stream"
+    HTTP_SERVER = "http.server"
+    MIDDLEWARE_DJANGO = "middleware.django"
+    MIDDLEWARE_STARLETTE = "middleware.starlette"
+    MIDDLEWARE_STARLETTE_RECEIVE = "middleware.starlette.receive"
+    MIDDLEWARE_STARLETTE_SEND = "middleware.starlette.send"
+    QUEUE_SUBMIT_CELERY = "queue.submit.celery"
+    QUEUE_TASK_CELERY = "queue.task.celery"
+    QUEUE_TASK_RQ = "queue.task.rq"
+    SUBPROCESS = "subprocess"
+    SUBPROCESS_WAIT = "subprocess.wait"
+    SUBPROCESS_COMMUNICATE = "subprocess.communicate"
+    TEMPLATE_RENDER = "template.render"
+    VIEW_RENDER = "view.render"
+    WEBSOCKET_SERVER = "websocket.server"
 
 
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
@@ -51,7 +85,7 @@ class ClientConstructor(object):
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
         server_name=None,  # type: Optional[str]
-        shutdown_timeout=2,  # type: int
+        shutdown_timeout=2,  # type: float
         integrations=[],  # type: Sequence[Integration]  # noqa: B006
         in_app_include=[],  # type: List[str]  # noqa: B006
         in_app_exclude=[],  # type: List[str]  # noqa: B006
@@ -75,7 +109,10 @@ class ClientConstructor(object):
         traces_sampler=None,  # type: Optional[TracesSampler]
         auto_enabling_integrations=True,  # type: bool
         auto_session_tracking=True,  # type: bool
+        send_client_reports=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
+        proxy_headers=None,  # type: Optional[Dict[str, str]]
+        instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
     ):
         # type: (...) -> None
         pass
@@ -99,9 +136,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.3.1"
-SDK_INFO = {
-    "name": "sentry.python",
-    "version": VERSION,
-    "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
-}
+VERSION = "1.12.1"

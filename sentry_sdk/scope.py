@@ -81,6 +81,7 @@ class Scope(object):
         # note that for legacy reasons, _transaction is the transaction *name*,
         # not a Transaction object (the object is stored in _span)
         "_transaction",
+        "_transaction_info",
         "_user",
         "_tags",
         "_contexts",
@@ -93,6 +94,10 @@ class Scope(object):
         "_session",
         "_attachments",
         "_force_auto_session_tracking",
+        # The thread that is handling the bulk of the work. This can just
+        # be the main thread, but that's not always true. For web frameworks,
+        # this would be the thread handling the request.
+        "_active_thread_id",
     )
 
     def __init__(self):
@@ -109,6 +114,7 @@ class Scope(object):
         self._level = None  # type: Optional[str]
         self._fingerprint = None  # type: Optional[List[str]]
         self._transaction = None  # type: Optional[str]
+        self._transaction_info = {}  # type: Dict[str, str]
         self._user = None  # type: Optional[Dict[str, Any]]
 
         self._tags = {}  # type: Dict[str, Any]
@@ -122,6 +128,8 @@ class Scope(object):
         self._span = None  # type: Optional[Span]
         self._session = None  # type: Optional[Session]
         self._force_auto_session_tracking = None  # type: Optional[bool]
+
+        self._active_thread_id = None  # type: Optional[int]
 
     @_attr_setter
     def level(self, value):
@@ -150,47 +158,60 @@ class Scope(object):
         if self._span is None:
             return None
 
-        # the span on the scope is itself a transaction
-        if isinstance(self._span, Transaction):
-            return self._span
+        # there is an orphan span on the scope
+        if self._span.containing_transaction is None:
+            return None
 
-        # the span on the scope isn't a transaction but belongs to one
-        if self._span._containing_transaction:
-            return self._span._containing_transaction
-
-        # there's a span (not a transaction) on the scope, but it was started on
-        # its own, not as the descendant of a transaction (this is deprecated
-        # behavior, but as long as the start_span function exists, it can still
-        # happen)
-        return None
+        # there is either a transaction (which is its own containing
+        # transaction) or a non-orphan span on the scope
+        return self._span.containing_transaction
 
     @transaction.setter
     def transaction(self, value):
         # type: (Any) -> None
         # would be type: (Optional[str]) -> None, see https://github.com/python/mypy/issues/3004
-        """When set this forces a specific transaction name to be set."""
+        """When set this forces a specific transaction name to be set.
+
+        Deprecated: use set_transaction_name instead."""
+
         # XXX: the docstring above is misleading. The implementation of
         # apply_to_event prefers an existing value of event.transaction over
         # anything set in the scope.
         # XXX: note that with the introduction of the Scope.transaction getter,
         # there is a semantic and type mismatch between getter and setter. The
-        # getter returns a transaction, the setter sets a transaction name.
+        # getter returns a Transaction, the setter sets a transaction name.
         # Without breaking version compatibility, we could make the setter set a
         # transaction name or transaction (self._span) depending on the type of
         # the value argument.
+
+        logger.warning(
+            "Assigning to scope.transaction directly is deprecated: use scope.set_transaction_name() instead."
+        )
         self._transaction = value
-        span = self._span
-        if span and isinstance(span, Transaction):
-            span.name = value
+        if self._span and self._span.containing_transaction:
+            self._span.containing_transaction.name = value
+
+    def set_transaction_name(self, name, source=None):
+        # type: (str, Optional[str]) -> None
+        """Set the transaction name and optionally the transaction source."""
+        self._transaction = name
+
+        if self._span and self._span.containing_transaction:
+            self._span.containing_transaction.name = name
+            if source:
+                self._span.containing_transaction.source = source
+
+        if source:
+            self._transaction_info["source"] = source
 
     @_attr_setter
     def user(self, value):
-        # type: (Dict[str, Any]) -> None
+        # type: (Optional[Dict[str, Any]]) -> None
         """When set a specific user is bound to the scope. Deprecated in favor of set_user."""
         self.set_user(value)
 
     def set_user(self, value):
-        # type: (Dict[str, Any]) -> None
+        # type: (Optional[Dict[str, Any]]) -> None
         """Sets a user for the scope."""
         self._user = value
         if self._session is not None:
@@ -212,6 +233,17 @@ class Scope(object):
             transaction = span
             if transaction.name:
                 self._transaction = transaction.name
+
+    @property
+    def active_thread_id(self):
+        # type: () -> Optional[int]
+        """Get/set the current active thread id."""
+        return self._active_thread_id
+
+    def set_active_thread_id(self, active_thread_id):
+        # type: (Optional[int]) -> None
+        """Set the current active thread id."""
+        self._active_thread_id = active_thread_id
 
     def set_tag(
         self,
@@ -370,6 +402,9 @@ class Scope(object):
         if event.get("transaction") is None and self._transaction is not None:
             event["transaction"] = self._transaction
 
+        if event.get("transaction_info") is None and self._transaction_info is not None:
+            event["transaction_info"] = self._transaction_info
+
         if event.get("fingerprint") is None and self._fingerprint is not None:
             event["fingerprint"] = self._fingerprint
 
@@ -413,6 +448,8 @@ class Scope(object):
             self._fingerprint = scope._fingerprint
         if scope._transaction is not None:
             self._transaction = scope._transaction
+        if scope._transaction_info is not None:
+            self._transaction_info.update(scope._transaction_info)
         if scope._user is not None:
             self._user = scope._user
         if scope._tags:
@@ -427,6 +464,8 @@ class Scope(object):
             self._span = scope._span
         if scope._attachments:
             self._attachments.extend(scope._attachments)
+        if scope._active_thread_id is not None:
+            self._active_thread_id = scope._active_thread_id
 
     def update_from_kwargs(
         self,
@@ -459,6 +498,7 @@ class Scope(object):
         rv._name = self._name
         rv._fingerprint = self._fingerprint
         rv._transaction = self._transaction
+        rv._transaction_info = dict(self._transaction_info)
         rv._user = self._user
 
         rv._tags = dict(self._tags)
@@ -474,6 +514,8 @@ class Scope(object):
         rv._session = self._session
         rv._force_auto_session_tracking = self._force_auto_session_tracking
         rv._attachments = list(self._attachments)
+
+        rv._active_thread_id = self._active_thread_id
 
         return rv
 

@@ -2,14 +2,16 @@ import sys
 import weakref
 
 from sentry_sdk._compat import reraise
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
 )
-from sentry_sdk.tracing import Transaction
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, Transaction, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -65,9 +67,7 @@ class AioHttpIntegration(Integration):
         try:
             version = tuple(map(int, AIOHTTP_VERSION.split(".")[:2]))
         except (TypeError, ValueError):
-            raise DidNotEnable(
-                "AIOHTTP version unparseable: {}".format(AIOHTTP_VERSION)
-            )
+            raise DidNotEnable("AIOHTTP version unparsable: {}".format(AIOHTTP_VERSION))
 
         if version < (3, 4):
             raise DidNotEnable("AIOHTTP 3.4 or newer required.")
@@ -93,37 +93,40 @@ class AioHttpIntegration(Integration):
             weak_request = weakref.ref(request)
 
             with Hub(hub) as hub:
-                # Scope data will not leak between requests because aiohttp
-                # create a task to wrap each request.
-                with hub.configure_scope() as scope:
-                    scope.clear_breadcrumbs()
-                    scope.add_event_processor(_make_request_processor(weak_request))
+                with auto_session_tracking(hub, session_mode="request"):
+                    # Scope data will not leak between requests because aiohttp
+                    # create a task to wrap each request.
+                    with hub.configure_scope() as scope:
+                        scope.clear_breadcrumbs()
+                        scope.add_event_processor(_make_request_processor(weak_request))
 
-                transaction = Transaction.continue_from_headers(
-                    request.headers,
-                    op="http.server",
-                    # If this transaction name makes it to the UI, AIOHTTP's
-                    # URL resolver did not find a route or died trying.
-                    name="generic AIOHTTP request",
-                )
-                with hub.start_transaction(
-                    transaction, custom_sampling_context={"aiohttp_request": request}
-                ):
-                    try:
-                        response = await old_handle(self, request)
-                    except HTTPException as e:
-                        transaction.set_http_status(e.status_code)
-                        raise
-                    except asyncio.CancelledError:
-                        transaction.set_status("cancelled")
-                        raise
-                    except Exception:
-                        # This will probably map to a 500 but seems like we
-                        # have no way to tell. Do not set span status.
-                        reraise(*_capture_exception(hub))
+                    transaction = Transaction.continue_from_headers(
+                        request.headers,
+                        op=OP.HTTP_SERVER,
+                        # If this transaction name makes it to the UI, AIOHTTP's
+                        # URL resolver did not find a route or died trying.
+                        name="generic AIOHTTP request",
+                        source=TRANSACTION_SOURCE_ROUTE,
+                    )
+                    with hub.start_transaction(
+                        transaction,
+                        custom_sampling_context={"aiohttp_request": request},
+                    ):
+                        try:
+                            response = await old_handle(self, request)
+                        except HTTPException as e:
+                            transaction.set_http_status(e.status_code)
+                            raise
+                        except (asyncio.CancelledError, ConnectionResetError):
+                            transaction.set_status("cancelled")
+                            raise
+                        except Exception:
+                            # This will probably map to a 500 but seems like we
+                            # have no way to tell. Do not set span status.
+                            reraise(*_capture_exception(hub))
 
-                    transaction.set_http_status(response.status)
-                    return response
+                        transaction.set_http_status(response.status)
+                        return response
 
         Application._handle = sentry_app_handle
 
@@ -150,7 +153,10 @@ class AioHttpIntegration(Integration):
 
             if name is not None:
                 with Hub.current.configure_scope() as scope:
-                    scope.transaction = name
+                    scope.set_transaction_name(
+                        name,
+                        source=SOURCE_FOR_STYLE[integration.transaction_style],
+                    )
 
             return rv
 
@@ -216,11 +222,8 @@ def get_aiohttp_request_data(hub, request):
     if bytes_body is not None:
         # we have body to show
         if not request_body_within_bounds(hub.client, len(bytes_body)):
+            return AnnotatedValue.removed_because_over_size_limit()
 
-            return AnnotatedValue(
-                "",
-                {"rem": [["!config", "x", 0, len(bytes_body)]], "len": len(bytes_body)},
-            )
         encoding = request.charset or "utf-8"
         return bytes_body.decode(encoding, "replace")
 

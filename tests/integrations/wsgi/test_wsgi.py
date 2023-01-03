@@ -1,8 +1,12 @@
+import sys
+
 from werkzeug.test import Client
+
 import pytest
 
 import sentry_sdk
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from collections import Counter
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -219,7 +223,6 @@ def test_session_mode_defaults_to_request_mode_in_wsgi_handler(
 
     traces_sampler = mock.Mock(return_value=True)
     sentry_init(send_default_pii=True, traces_sampler=traces_sampler)
-
     app = SentryWsgiMiddleware(app)
     envelopes = capture_envelopes()
 
@@ -236,3 +239,87 @@ def test_session_mode_defaults_to_request_mode_in_wsgi_handler(
     aggregates = sess_event["aggregates"]
     assert len(aggregates) == 1
     assert aggregates[0]["exited"] == 1
+
+
+def test_auto_session_tracking_with_aggregates(sentry_init, capture_envelopes):
+    """
+    Test for correct session aggregates in auto session tracking.
+    """
+
+    def sample_app(environ, start_response):
+        if environ["REQUEST_URI"] != "/dogs/are/great/":
+            1 / 0
+
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    traces_sampler = mock.Mock(return_value=True)
+    sentry_init(send_default_pii=True, traces_sampler=traces_sampler)
+    app = SentryWsgiMiddleware(sample_app)
+    envelopes = capture_envelopes()
+    assert len(envelopes) == 0
+
+    client = Client(app)
+    client.get("/dogs/are/great/")
+    client.get("/dogs/are/great/")
+    try:
+        client.get("/trigger/an/error/")
+    except ZeroDivisionError:
+        pass
+
+    sentry_sdk.flush()
+
+    count_item_types = Counter()
+    for envelope in envelopes:
+        count_item_types[envelope.items[0].type] += 1
+
+    assert count_item_types["transaction"] == 3
+    assert count_item_types["event"] == 1
+    assert count_item_types["sessions"] == 1
+    assert len(envelopes) == 5
+
+    session_aggregates = envelopes[-1].items[0].payload.json["aggregates"]
+    assert session_aggregates[0]["exited"] == 2
+    assert session_aggregates[0]["crashed"] == 1
+    assert len(session_aggregates) == 1
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 3), reason="Profiling is only supported in Python >= 3.3"
+)
+@pytest.mark.parametrize(
+    "profiles_sample_rate,profile_count",
+    [
+        pytest.param(1.0, 1, id="profiler sampled at 1.0"),
+        pytest.param(0.75, 1, id="profiler sampled at 0.75"),
+        pytest.param(0.25, 0, id="profiler not sampled at 0.25"),
+        pytest.param(None, 0, id="profiler not enabled"),
+    ],
+)
+def test_profile_sent(
+    capture_envelopes,
+    sentry_init,
+    teardown_profiling,
+    profiles_sample_rate,
+    profile_count,
+):
+    def test_app(environ, start_response):
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": profiles_sample_rate},
+    )
+    app = SentryWsgiMiddleware(test_app)
+    envelopes = capture_envelopes()
+
+    with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
+        client = Client(app)
+        client.get("/")
+
+    count_item_types = Counter()
+    for envelope in envelopes:
+        for item in envelope.items:
+            count_item_types[item.type] += 1
+    assert count_item_types["profile"] == profile_count

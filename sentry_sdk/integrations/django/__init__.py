@@ -6,10 +6,12 @@ import threading
 import weakref
 
 from sentry_sdk._types import MYPY
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
-from sentry_sdk.tracing import record_sql_queries
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
+from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
@@ -42,6 +44,7 @@ from sentry_sdk.integrations.django.templates import (
     patch_templates,
 )
 from sentry_sdk.integrations.django.middleware import patch_django_middlewares
+from sentry_sdk.integrations.django.signals_handlers import patch_signals
 from sentry_sdk.integrations.django.views import patch_views
 
 
@@ -58,6 +61,7 @@ if MYPY:
     from django.http.request import QueryDict
     from django.utils.datastructures import MultiValueDict
 
+    from sentry_sdk.scope import Scope
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from sentry_sdk._types import Event, Hint, EventProcessor, NotImplementedType
 
@@ -67,7 +71,6 @@ if DJANGO_VERSION < (1, 10):
     def is_authenticated(request_user):
         # type: (Any) -> bool
         return request_user.is_authenticated()
-
 
 else:
 
@@ -82,7 +85,7 @@ TRANSACTION_STYLE_VALUES = ("function_name", "url")
 class DjangoIntegration(Integration):
     identifier = "django"
 
-    transaction_style = None
+    transaction_style = ""
     middleware_spans = None
 
     def __init__(self, transaction_style="url", middleware_spans=True):
@@ -99,8 +102,8 @@ class DjangoIntegration(Integration):
     def setup_once():
         # type: () -> None
 
-        if DJANGO_VERSION < (1, 6):
-            raise DidNotEnable("Django 1.6 or newer is required.")
+        if DJANGO_VERSION < (1, 8):
+            raise DidNotEnable("Django 1.8 or newer is required.")
 
         install_sql_hook()
         # Patch in our custom middleware.
@@ -201,7 +204,7 @@ class DjangoIntegration(Integration):
             # querysets. This might be surprising to the user but it's likely
             # less annoying.
 
-            return u"<%s from %s at 0x%x>" % (
+            return "<%s from %s at 0x%x>" % (
                 value.__class__.__name__,
                 value.__module__,
                 id(value),
@@ -211,6 +214,7 @@ class DjangoIntegration(Integration):
         patch_django_middlewares()
         patch_views()
         patch_templates()
+        patch_signals()
 
 
 _DRF_PATCHED = False
@@ -319,6 +323,36 @@ def _patch_django_asgi_handler():
     patch_django_asgi_handler_impl(ASGIHandler)
 
 
+def _set_transaction_name_and_source(scope, transaction_style, request):
+    # type: (Scope, str, WSGIRequest) -> None
+    try:
+        transaction_name = None
+        if transaction_style == "function_name":
+            fn = resolve(request.path).func
+            transaction_name = transaction_from_function(getattr(fn, "view_class", fn))
+
+        elif transaction_style == "url":
+            if hasattr(request, "urlconf"):
+                transaction_name = LEGACY_RESOLVER.resolve(
+                    request.path_info, urlconf=request.urlconf
+                )
+            else:
+                transaction_name = LEGACY_RESOLVER.resolve(request.path_info)
+
+        if transaction_name is None:
+            transaction_name = request.path_info
+            source = TRANSACTION_SOURCE_URL
+        else:
+            source = SOURCE_FOR_STYLE[transaction_style]
+
+        scope.set_transaction_name(
+            transaction_name,
+            source=source,
+        )
+    except Exception:
+        pass
+
+
 def _before_get_response(request):
     # type: (WSGIRequest) -> None
     hub = Hub.current
@@ -330,20 +364,35 @@ def _before_get_response(request):
 
     with hub.configure_scope() as scope:
         # Rely on WSGI middleware to start a trace
-        try:
-            if integration.transaction_style == "function_name":
-                fn = resolve(request.path).func
-                scope.transaction = transaction_from_function(
-                    getattr(fn, "view_class", fn)
-                )
-            elif integration.transaction_style == "url":
-                scope.transaction = LEGACY_RESOLVER.resolve(request.path_info)
-        except Exception:
-            pass
+        _set_transaction_name_and_source(scope, integration.transaction_style, request)
 
         scope.add_event_processor(
             _make_event_processor(weakref.ref(request), integration)
         )
+
+
+def _attempt_resolve_again(request, scope, transaction_style):
+    # type: (WSGIRequest, Scope, str) -> None
+    """
+    Some django middlewares overwrite request.urlconf
+    so we need to respect that contract,
+    so we try to resolve the url again.
+    """
+    if not hasattr(request, "urlconf"):
+        return
+
+    _set_transaction_name_and_source(scope, transaction_style, request)
+
+
+def _after_get_response(request):
+    # type: (WSGIRequest) -> None
+    hub = Hub.current
+    integration = hub.get_integration(DjangoIntegration)
+    if integration is None or integration.transaction_style != "url":
+        return
+
+    with hub.configure_scope() as scope:
+        _attempt_resolve_again(request, scope, integration.transaction_style)
 
 
 def _patch_get_response():
@@ -358,7 +407,9 @@ def _patch_get_response():
     def sentry_patched_get_response(self, request):
         # type: (Any, WSGIRequest) -> Union[HttpResponse, BaseException]
         _before_get_response(request)
-        return old_get_response(self, request)
+        rv = old_get_response(self, request)
+        _after_get_response(request)
+        return rv
 
     BaseHandler.get_response = sentry_patched_get_response
 
@@ -403,6 +454,10 @@ def _got_request_exception(request=None, **kwargs):
     hub = Hub.current
     integration = hub.get_integration(DjangoIntegration)
     if integration is not None:
+
+        if request is not None and integration.transaction_style == "url":
+            with hub.configure_scope() as scope:
+                _attempt_resolve_again(request, scope, integration.transaction_style)
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
@@ -482,8 +537,16 @@ def install_sql_hook():
         from django.db.backends.util import CursorWrapper
 
     try:
+        # django 1.6 and 1.7 compatability
+        from django.db.backends import BaseDatabaseWrapper
+    except ImportError:
+        # django 1.8 or later
+        from django.db.backends.base.base import BaseDatabaseWrapper
+
+    try:
         real_execute = CursorWrapper.execute
         real_executemany = CursorWrapper.executemany
+        real_connect = BaseDatabaseWrapper.connect
     except AttributeError:
         # This won't work on Django versions < 1.6
         return
@@ -510,6 +573,19 @@ def install_sql_hook():
         ):
             return real_executemany(self, sql, param_list)
 
+    def connect(self):
+        # type: (BaseDatabaseWrapper) -> None
+        hub = Hub.current
+        if hub.get_integration(DjangoIntegration) is None:
+            return real_connect(self)
+
+        with capture_internal_exceptions():
+            hub.add_breadcrumb(message="connect", category="query")
+
+        with hub.start_span(op=OP.DB, description="connect"):
+            return real_connect(self)
+
     CursorWrapper.execute = execute
     CursorWrapper.executemany = executemany
+    BaseDatabaseWrapper.connect = connect
     ignore_logger("django.db.backends")

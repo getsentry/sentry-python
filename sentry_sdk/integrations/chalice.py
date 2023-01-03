@@ -4,6 +4,7 @@ from sentry_sdk._compat import reraise
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
+from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -65,7 +66,11 @@ def _get_view_function_response(app, view_function, function_args):
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
                 configured_time = app.lambda_context.get_remaining_time_in_millis()
-                scope.transaction = app.lambda_context.function_name
+                scope.set_transaction_name(
+                    app.lambda_context.function_name,
+                    source=TRANSACTION_SOURCE_COMPONENT,
+                )
+
                 scope.add_event_processor(
                     _make_request_event_processor(
                         app.current_request.to_dict(),

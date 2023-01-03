@@ -81,6 +81,9 @@ def init_sdk(timeout_warning=False, **extra_init_args):
         transport=TestTransport,
         integrations=[GcpIntegration(timeout_warning=timeout_warning)],
         shutdown_timeout=10,
+        # excepthook -> dedupe -> event_processor client report gets added
+        # which we don't really care about for these tests
+        send_client_reports=False,
         **extra_init_args
     )
 
@@ -139,6 +142,8 @@ def run_cloud_function():
                     return_value = json.loads(line)
                 else:
                     continue
+
+            stream.close()
 
         return envelope, event, return_value
 
@@ -248,8 +253,9 @@ def test_performance_no_error(run_cloud_function):
     )
 
     assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == "serverless.function"
+    assert envelope["contexts"]["trace"]["op"] == "function.gcp"
     assert envelope["transaction"].startswith("Google Cloud function")
+    assert envelope["transaction_info"] == {"source": "component"}
     assert envelope["transaction"] in envelope["request"]["url"]
 
 
@@ -273,7 +279,7 @@ def test_performance_error(run_cloud_function):
     )
 
     assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == "serverless.function"
+    assert envelope["contexts"]["trace"]["op"] == "function.gcp"
     assert envelope["transaction"].startswith("Google Cloud function")
     assert envelope["transaction"] in envelope["request"]["url"]
     assert event["level"] == "error"

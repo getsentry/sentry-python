@@ -66,11 +66,11 @@ else:
 # Can be overwritten if wanting to send more bytes, e.g. with a custom server.
 # When changing this, keep in mind that events may be a little bit larger than
 # this value due to attached metadata, so keep the number conservative.
-MAX_EVENT_BYTES = 10 ** 6
+MAX_EVENT_BYTES = 10**6
 
 MAX_DATABAG_DEPTH = 5
 MAX_DATABAG_BREADTH = 10
-CYCLE_MARKER = u"<cyclic>"
+CYCLE_MARKER = "<cyclic>"
 
 
 global_repr_processors = []  # type: List[ReprProcessor]
@@ -228,7 +228,7 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
             capture_internal_exception(sys.exc_info())
 
             if is_databag:
-                return u"<failed to serialize, use init(debug=True) to see error logs>"
+                return "<failed to serialize, use init(debug=True) to see error logs>"
 
             return None
         finally:
@@ -273,6 +273,8 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
                 if result is not NotImplemented:
                     return _flatten_annotated(result)
 
+        sentry_repr = getattr(type(obj), "__sentry_repr__", None)
+
         if obj is None or isinstance(obj, (bool, number_types)):
             if should_repr_strings or (
                 isinstance(obj, float) and (math.isinf(obj) or math.isnan(obj))
@@ -280,6 +282,9 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
                 return safe_repr(obj)
             else:
                 return obj
+
+        elif callable(sentry_repr):
+            return sentry_repr(obj)
 
         elif isinstance(obj, datetime):
             return (

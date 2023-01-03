@@ -1,3 +1,4 @@
 import pytest
 
-pytest.importorskip("starlette")
+asyncio = pytest.importorskip("asyncio")
+pytest_asyncio = pytest.importorskip("pytest_asyncio")

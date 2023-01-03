@@ -12,6 +12,7 @@ pip-log.txt
 /build
 /dist
 /dist-serverless
+sentry-python-serverless*.zip
 .cache
 .idea
 .eggs

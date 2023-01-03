@@ -1,7 +1,9 @@
+# coding: utf-8
 import sys
 
 import pytest
 import logging
+import warnings
 
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 
@@ -114,6 +116,45 @@ def test_logging_level(sentry_init, capture_events):
     assert not events
 
 
+def test_custom_log_level_names(sentry_init, capture_events):
+    levels = {
+        logging.DEBUG: "debug",
+        logging.INFO: "info",
+        logging.WARN: "warning",
+        logging.WARNING: "warning",
+        logging.ERROR: "error",
+        logging.CRITICAL: "fatal",
+        logging.FATAL: "fatal",
+    }
+
+    # set custom log level names
+    # fmt: off
+    logging.addLevelName(logging.DEBUG, u"custom level debüg: ")
+    # fmt: on
+    logging.addLevelName(logging.INFO, "")
+    logging.addLevelName(logging.WARN, "custom level warn: ")
+    logging.addLevelName(logging.WARNING, "custom level warning: ")
+    logging.addLevelName(logging.ERROR, None)
+    logging.addLevelName(logging.CRITICAL, "custom level critical: ")
+    logging.addLevelName(logging.FATAL, "custom level 🔥: ")
+
+    for logging_level, sentry_level in levels.items():
+        logger.setLevel(logging_level)
+        sentry_init(
+            integrations=[LoggingIntegration(event_level=logging_level)],
+            default_integrations=False,
+        )
+        events = capture_events()
+
+        logger.log(logging_level, "Trying level %s", logging_level)
+        assert events
+        assert events[0]["level"] == sentry_level
+        assert events[0]["logentry"]["message"] == "Trying level %s"
+        assert events[0]["logentry"]["params"] == [logging_level]
+
+        del events[:]
+
+
 def test_logging_filters(sentry_init, capture_events):
     sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
     events = capture_events()
@@ -134,6 +175,36 @@ def test_logging_filters(sentry_init, capture_events):
 
     (event,) = events
     assert event["logentry"]["message"] == "hi"
+
+
+def test_logging_captured_warnings(sentry_init, capture_events, recwarn):
+    sentry_init(
+        integrations=[LoggingIntegration(event_level="WARNING")],
+        default_integrations=False,
+    )
+    events = capture_events()
+
+    logging.captureWarnings(True)
+    warnings.warn("first")
+    warnings.warn("second")
+    logging.captureWarnings(False)
+
+    warnings.warn("third")
+
+    assert len(events) == 2
+
+    assert events[0]["level"] == "warning"
+    # Captured warnings start with the path where the warning was raised
+    assert "UserWarning: first" in events[0]["logentry"]["message"]
+    assert events[0]["logentry"]["params"] == []
+
+    assert events[1]["level"] == "warning"
+    assert "UserWarning: second" in events[1]["logentry"]["message"]
+    assert events[1]["logentry"]["params"] == []
+
+    # Using recwarn suppresses the "third" warning in the test output
+    assert len(recwarn) == 1
+    assert str(recwarn[0].message) == "third"
 
 
 def test_ignore_logger(sentry_init, capture_events):

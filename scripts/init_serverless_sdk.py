@@ -11,15 +11,24 @@ import re
 
 import sentry_sdk
 from sentry_sdk._types import MYPY
+from sentry_sdk.utils import Dsn
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 
 if MYPY:
     from typing import Any
 
 
+def extension_relay_dsn(original_dsn):
+    dsn = Dsn(original_dsn)
+    dsn.host = "localhost"
+    dsn.port = 5333
+    dsn.scheme = "http"
+    return str(dsn)
+
+
 # Configure Sentry SDK
 sentry_sdk.init(
-    dsn=os.environ["SENTRY_DSN"],
+    dsn=extension_relay_dsn(os.environ["SENTRY_DSN"]),
     integrations=[AwsLambdaIntegration(timeout_warning=True)],
     traces_sample_rate=float(os.environ["SENTRY_TRACES_SAMPLE_RATE"]),
 )
@@ -51,16 +60,23 @@ class AWSLambdaModuleLoader:
             # Supported python versions are 2.7, 3.6, 3.7, 3.8
             if py_version >= (3, 5):
                 import importlib.util
-                spec = importlib.util.spec_from_file_location(module_name, module_file_path)
+
+                spec = importlib.util.spec_from_file_location(
+                    module_name, module_file_path
+                )
                 self.lambda_function_module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(self.lambda_function_module)
             elif py_version[0] < 3:
                 import imp
-                self.lambda_function_module = imp.load_source(module_name, module_file_path)
+
+                self.lambda_function_module = imp.load_source(
+                    module_name, module_file_path
+                )
             else:
                 raise ValueError("Python version %s is not supported." % py_version)
         else:
             import importlib
+
             self.lambda_function_module = importlib.import_module(module_path)
 
     def get_lambda_handler(self):
