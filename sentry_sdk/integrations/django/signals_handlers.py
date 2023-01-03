@@ -4,6 +4,7 @@ from __future__ import absolute_import
 from django.dispatch import Signal
 
 from sentry_sdk import Hub
+from sentry_sdk._functools import wraps
 from sentry_sdk._types import MYPY
 from sentry_sdk.consts import OP
 
@@ -52,6 +53,7 @@ def patch_signals():
 
         def sentry_receiver_wrapper(receiver):
             # type: (Callable[..., Any]) -> Callable[..., Any]
+            @wraps(receiver)
             def wrapper(*args, **kwargs):
                 # type: (Any, Any) -> Any
                 signal_name = _get_receiver_name(receiver)
