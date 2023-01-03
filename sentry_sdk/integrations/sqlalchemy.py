@@ -1,5 +1,7 @@
 from __future__ import absolute_import
 
+import re
+
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -28,7 +30,9 @@ class SqlalchemyIntegration(Integration):
         # type: () -> None
 
         try:
-            version = tuple(map(int, SQLALCHEMY_VERSION.split("b")[0].split(".")))
+            version = tuple(
+                map(int, re.split("b|rc", SQLALCHEMY_VERSION)[0].split("."))
+            )
         except (TypeError, ValueError):
             raise DidNotEnable(
                 "Unparsable SQLAlchemy version: {}".format(SQLALCHEMY_VERSION)
