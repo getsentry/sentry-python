@@ -7,7 +7,11 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+    format_timestamp,
+)
 
 try:
     from rq.queue import Queue
@@ -128,6 +132,11 @@ def _make_event_processor(weak_job):
                     "kwargs": job.kwargs,
                     "description": job.description,
                 }
+
+                if job.enqueued_at:
+                    extra["rq-job"]["enqueued_at"] = format_timestamp(job.enqueued_at)
+                if job.started_at:
+                    extra["rq-job"]["started_at"] = format_timestamp(job.started_at)
 
         if "exc_info" in hint:
             with capture_internal_exceptions():
