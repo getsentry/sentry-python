@@ -110,16 +110,20 @@ def starlette_app_factory(middleware=None, debug=True):
         return starlette.responses.JSONResponse({"status": "ok"})
 
     def _thread_ids_sync(request):
-        return starlette.responses.JSONResponse({
-            "main": threading.main_thread().ident,
-            "active": threading.current_thread().ident,
-        })
+        return starlette.responses.JSONResponse(
+            {
+                "main": threading.main_thread().ident,
+                "active": threading.current_thread().ident,
+            }
+        )
 
     async def _thread_ids_async(request):
-        return starlette.responses.JSONResponse({
-            "main": threading.main_thread().ident,
-            "active": threading.current_thread().ident,
-        })
+        return starlette.responses.JSONResponse(
+            {
+                "main": threading.main_thread().ident,
+                "active": threading.current_thread().ident,
+            }
+        )
 
     app = starlette.applications.Starlette(
         debug=debug,

@@ -163,10 +163,12 @@ def csrf_hello_not_exempt(*args, **kwargs):
 
 
 def thread_ids_sync(*args, **kwargs):
-    response = json.dumps({
-        "main": threading.main_thread().ident,
-        "active": threading.current_thread().ident,
-    })
+    response = json.dumps(
+        {
+            "main": threading.main_thread().ident,
+            "active": threading.current_thread().ident,
+        }
+    )
     return HttpResponse(response)
 
 
@@ -186,7 +188,7 @@ if VERSION >= (3, 1):
     )
 
     exec(
-            """async def thread_ids_async(request):
+        """async def thread_ids_async(request):
     response = json.dumps({
         "main": threading.main_thread().ident,
         "active": threading.current_thread().ident,
