@@ -32,7 +32,9 @@ def patch_views():
     def sentry_patched_render(self):
         # type: (SimpleTemplateResponse) -> Any
         hub = Hub.current
-        with hub.start_span(op=OP.VIEW_RESPONSE_RENDER, description="serialize response"):
+        with hub.start_span(
+            op=OP.VIEW_RESPONSE_RENDER, description="serialize response"
+        ):
             return old_render(self)
 
     @_functools.wraps(old_make_view_atomic)
