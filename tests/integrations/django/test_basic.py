@@ -313,8 +313,9 @@ def test_response_trace(sentry_init, client, capture_events, render_span_tree):
     content, status, headers = client.get(reverse("rest_json_response"))
     assert status == "200 OK"
 
-    assert '- op="view.response.render": description="serialize response"' in render_span_tree(
-        events[0]
+    assert (
+        '- op="view.response.render": description="serialize response"'
+        in render_span_tree(events[0])
     )
 
 
