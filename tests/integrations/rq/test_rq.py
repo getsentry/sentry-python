@@ -62,6 +62,10 @@ def test_basic(sentry_init, capture_events):
     assert exception["stacktrace"]["frames"][-1]["vars"]["foo"] == "42"
 
     assert event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
+
+    # < 0.9 doesn't persist started_at correctly
+    started_at = None if tuple(map(int, rq.VERSION.split("."))) < (0, 9) else job.started_at
+
     assert event["extra"]["rq-job"] == {
         "args": [],
         "description": "tests.integrations.rq.test_rq.crashing_job(foo=42)",
@@ -69,7 +73,7 @@ def test_basic(sentry_init, capture_events):
         "job_id": event["extra"]["rq-job"]["job_id"],
         "kwargs": {"foo": 42},
         "enqueued_at": str(job.enqueued_at),
-        "started_at": str(job.started_at),
+        "started_at": str(started_at),
     }
 
 
