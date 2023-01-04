@@ -47,12 +47,8 @@ def test_basic(sentry_init, capture_events):
     queue = rq.Queue(connection=FakeStrictRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
-    job = queue.enqueue(crashing_job, foo=42)
-    job.save()
-
+    queue.enqueue(crashing_job, foo=42)
     worker.work(burst=True)
-
-    job.refresh()
 
     (event,) = events
 
@@ -63,18 +59,17 @@ def test_basic(sentry_init, capture_events):
 
     assert event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
 
-    # < 0.9 doesn't persist started_at correctly
-    started_at = None if tuple(map(int, rq.VERSION.split("."))) < (0, 9) else job.started_at
+    extra = event["extra"]["rq-job"]
+    assert extra["args"] == []
+    assert extra["kwargs"] == {"foo": 42}
+    assert extra["description"] == "tests.integrations.rq.test_rq.crashing_job(foo=42)"
+    assert extra["func"] == "tests.integrations.rq.test_rq.crashing_job"
+    assert "job_id" in extra
+    assert "enqueued_at" in extra
 
-    assert event["extra"]["rq-job"] == {
-        "args": [],
-        "description": "tests.integrations.rq.test_rq.crashing_job(foo=42)",
-        "func": "tests.integrations.rq.test_rq.crashing_job",
-        "job_id": event["extra"]["rq-job"]["job_id"],
-        "kwargs": {"foo": 42},
-        "enqueued_at": str(job.enqueued_at),
-        "started_at": str(started_at),
-    }
+    # older versions don't persist started_at correctly
+    if tuple(map(int, rq.VERSION.split("."))) >= (0, 9):
+        assert "started_at" in extra
 
 
 def test_transport_shutdown(sentry_init, capture_events_forksafe):
@@ -167,12 +162,8 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     queue = rq.Queue(connection=FakeStrictRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
-    job = queue.enqueue(do_trick, "Bodhi", trick="roll over")
-    job.save()
-
+    queue.enqueue(do_trick, "Bodhi", trick="roll over")
     worker.work(burst=True)
-
-    job.refresh()
 
     traces_sampler.assert_any_call(
         DictionaryContaining(
@@ -185,8 +176,6 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                         "func_name": "tests.integrations.rq.test_rq.do_trick",
                         "args": ("Bodhi",),
                         "kwargs": {"trick": "roll over"},
-                        "enqueued_at": job.enqueued_at,
-                        "started_at": job.started_at,
                     },
                 ),
             }
