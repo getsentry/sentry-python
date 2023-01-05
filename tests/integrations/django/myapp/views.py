@@ -11,6 +11,7 @@ from django.views.generic import ListView
 
 try:
     from rest_framework.decorators import api_view
+    from rest_framework.response import Response
 
     @api_view(["POST"])
     def rest_framework_exc(request):
@@ -28,6 +29,10 @@ try:
     @api_view(["GET"])
     def rest_permission_denied_exc(request):
         raise PermissionDenied("bye")
+
+    @api_view(["GET"])
+    def rest_json_response(request):
+        return Response(dict(ok=True))
 
 except ImportError:
     pass

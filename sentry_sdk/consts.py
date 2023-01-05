@@ -71,6 +71,7 @@ class OP:
     SUBPROCESS_COMMUNICATE = "subprocess.communicate"
     TEMPLATE_RENDER = "template.render"
     VIEW_RENDER = "view.render"
+    VIEW_RESPONSE_RENDER = "view.response.render"
     WEBSOCKET_SERVER = "websocket.server"
 
 
