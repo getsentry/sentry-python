@@ -528,7 +528,7 @@ class ThreadScheduler(Scheduler):
         # the value in a list to allow updating this value each sample.
         last_sample = [
             {}
-        ]  # type: List[Dict[int, Tuple[StackId, RawStack, Deque[FrameType]]]]
+        ]  # type: List[Dict[int, Tuple[RawStackId, RawStack, Deque[FrameType]]]]
 
         def _sample_stack(*args, **kwargs):
             # type: (*Any, **Any) -> None
