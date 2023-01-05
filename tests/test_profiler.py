@@ -6,7 +6,6 @@ import threading
 import pytest
 
 from sentry_sdk.profiler import (
-    EventScheduler,
     Profile,
     SleepScheduler,
     extract_frame,
@@ -32,7 +31,7 @@ def test_profiler_invalid_mode(teardown_profiling):
         setup_profiler({"_experiments": {"profiler_mode": "magic"}})
 
 
-@pytest.mark.parametrize("mode", ["sleep", "event"])
+@pytest.mark.parametrize("mode", ["sleep"])
 def test_profiler_valid_mode(mode, teardown_profiling):
     # should not raise any exceptions
     setup_profiler({"_experiments": {"profiler_mode": mode}})
@@ -259,10 +258,7 @@ def get_scheduler_threads(scheduler):
 @minimum_python_33
 @pytest.mark.parametrize(
     ("scheduler_class",),
-    [
-        pytest.param(SleepScheduler, id="sleep scheduler"),
-        pytest.param(EventScheduler, id="event scheduler"),
-    ],
+    [pytest.param(SleepScheduler, id="sleep scheduler")],
 )
 def test_thread_scheduler_single_background_thread(scheduler_class):
     scheduler = scheduler_class(frequency=1000)
@@ -580,10 +576,7 @@ thread_metadata = {
 )
 @pytest.mark.parametrize(
     ("scheduler_class",),
-    [
-        pytest.param(SleepScheduler, id="sleep scheduler"),
-        pytest.param(EventScheduler, id="event scheduler"),
-    ],
+    [pytest.param(SleepScheduler, id="sleep scheduler")],
 )
 def test_profile_processing(
     DictionaryContaining,  # noqa: N803

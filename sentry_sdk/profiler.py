@@ -131,8 +131,6 @@ def setup_profiler(options):
     profiler_mode = options["_experiments"].get("profiler_mode", SleepScheduler.mode)
     if profiler_mode == SleepScheduler.mode:
         _scheduler = SleepScheduler(frequency=frequency)
-    elif profiler_mode == EventScheduler.mode:
-        _scheduler = EventScheduler(frequency=frequency)
     else:
         raise ValueError("Unknown profiler mode: {}".format(profiler_mode))
     _scheduler.setup()
@@ -628,27 +626,6 @@ class SleepScheduler(ThreadScheduler):
             # after sleeping, make sure to take the current
             # timestamp so we can use it next iteration
             last = time.perf_counter()
-
-
-class EventScheduler(ThreadScheduler):
-    """
-    This scheduler uses threading.Event to wait the required interval before
-    calling the sampling function.
-    """
-
-    mode = "event"
-    name = "sentry.profiler.EventScheduler"
-
-    def run(self):
-        # type: () -> None
-
-        while True:
-            if self.event.is_set():
-                break
-
-            self.sampler()
-
-            self.event.wait(timeout=self.interval)
 
 
 def _should_profile(transaction, hub):
