@@ -538,6 +538,9 @@ class ThreadScheduler(Scheduler):
             """
             # no profiles taking place, so we can stop early
             if not self.new_profiles and not self.active_profiles:
+                # make sure to clear the cache if we're not profiling so we dont
+                # keep a reference to the last stack of frames around
+                last_sample[0] = {}
                 return
 
             # This is the number of profiles we want to pop off.
