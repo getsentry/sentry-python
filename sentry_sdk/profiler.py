@@ -49,7 +49,13 @@ if MYPY:
     import sentry_sdk.scope
     import sentry_sdk.tracing
 
-    StackId = int
+    ThreadId = str
+
+    # The exact value of this id is not very meaningful. The purpose
+    # of this id is to give us a compact and unique identifier for a
+    # raw stack that can be used as a key to a dictionary so that it
+    # can be used during the sampled format generation.
+    RawStackId = Tuple[int, int]
 
     RawFrame = Tuple[
         str,  # abs_path
@@ -59,18 +65,18 @@ if MYPY:
         int,  # lineno
     ]
     RawStack = Tuple[RawFrame, ...]
-    RawSample = Sequence[Tuple[str, Tuple[StackId, RawStack]]]
-
-    ProcessedStack = List[int]
+    RawSample = Sequence[Tuple[str, Tuple[RawStackId, RawStack]]]
 
     ProcessedSample = TypedDict(
         "ProcessedSample",
         {
             "elapsed_since_start_ns": str,
-            "thread_id": str,
+            "thread_id": ThreadId,
             "stack_id": int,
         },
     )
+
+    ProcessedStack = List[int]
 
     ProcessedFrame = TypedDict(
         "ProcessedFrame",
@@ -94,7 +100,7 @@ if MYPY:
             "frames": List[ProcessedFrame],
             "stacks": List[ProcessedStack],
             "samples": List[ProcessedSample],
-            "thread_metadata": Dict[str, ProcessedThreadMetadata],
+            "thread_metadata": Dict[ThreadId, ProcessedThreadMetadata],
         },
     )
 
@@ -152,10 +158,10 @@ MAX_STACK_DEPTH = 128
 def extract_stack(
     frame,  # type: Optional[FrameType]
     cwd,  # type: str
-    prev_cache=None,  # type: Optional[Tuple[StackId, RawStack, Deque[FrameType]]]
+    prev_cache=None,  # type: Optional[Tuple[RawStackId, RawStack, Deque[FrameType]]]
     max_stack_depth=MAX_STACK_DEPTH,  # type: int
 ):
-    # type: (...) -> Tuple[StackId, RawStack, Deque[FrameType]]
+    # type: (...) -> Tuple[RawStackId, RawStack, Deque[FrameType]]
     """
     Extracts the stack starting the specified frame. The extracted stack
     assumes the specified frame is the top of the stack, and works back
@@ -199,7 +205,11 @@ def extract_stack(
     # costly because the stack can be large, so we pre-hash
     # the stack, and use the hash as the key as this will be
     # needed a few times to improve performance.
-    stack_id = hash(stack)
+    #
+    # To Reduce the likelihood of hash collisions, we include
+    # the stack depth. This means that only stacks of the same
+    # depth can suffer from hash collisions.
+    stack_id = len(stack), hash(stack)
 
     return stack_id, stack, frames
 
@@ -301,7 +311,7 @@ class Profile(object):
         self.active = False  # type: bool
 
         self.indexed_frames = {}  # type: Dict[RawFrame, int]
-        self.indexed_stacks = {}  # type: Dict[StackId, int]
+        self.indexed_stacks = {}  # type: Dict[RawStackId, int]
         self.frames = []  # type: List[ProcessedFrame]
         self.stacks = []  # type: List[ProcessedStack]
         self.samples = []  # type: List[ProcessedSample]
