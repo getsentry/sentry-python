@@ -1,4 +1,5 @@
 import inspect
+import os
 import platform
 import sys
 import threading
@@ -8,9 +9,9 @@ import pytest
 
 from sentry_sdk.profiler import (
     EventScheduler,
-    RawFrameData,
     SampleBuffer,
     SleepScheduler,
+    extract_frame,
     extract_stack,
     get_frame_name,
     setup_profiler,
@@ -24,6 +25,10 @@ minimum_python_33 = pytest.mark.skipif(
 unix_only = pytest.mark.skipif(
     platform.system().lower() not in {"linux", "darwin"}, reason="UNIX only"
 )
+
+
+def process_test_sample(sample):
+    return [(tid, (stack, stack)) for tid, stack in sample]
 
 
 @minimum_python_33
@@ -210,6 +215,33 @@ def test_get_frame_name(frame, frame_name):
 
 
 @pytest.mark.parametrize(
+    ("get_frame", "function"),
+    [
+        pytest.param(lambda: get_frame(depth=1), "get_frame", id="simple"),
+    ],
+)
+def test_extract_frame(get_frame, function):
+    cwd = os.getcwd()
+    frame = get_frame()
+    extracted_frame = extract_frame(frame, cwd)
+
+    # the abs_path should be equal toe the normalized path of the co_filename
+    assert extracted_frame[0] == os.path.normpath(frame.f_code.co_filename)
+
+    # the module should be pull from this test module
+    assert extracted_frame[1] == __name__
+
+    # the filename should be the file starting after the cwd
+    assert extracted_frame[2] == __file__[len(cwd) + 1 :]
+
+    assert extracted_frame[3] == function
+
+    # the lineno will shift over time as this file is modified so just check
+    # that it is an int
+    assert isinstance(extracted_frame[4], int)
+
+
+@pytest.mark.parametrize(
     ("depth", "max_stack_depth", "actual_depth"),
     [
         pytest.param(1, 128, 1, id="less than"),
@@ -227,15 +259,33 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
 
     # increase the max_depth by the `base_stack_depth` to account
     # for the extra frames pytest will add
-    stack = extract_stack(frame, max_stack_depth + base_stack_depth)
+    _, stack, _ = extract_stack(
+        frame, os.getcwd(), max_stack_depth=max_stack_depth + base_stack_depth
+    )
     assert len(stack) == base_stack_depth + actual_depth
 
     for i in range(actual_depth):
-        assert stack[i].function == "get_frame", i
+        assert stack[i][3] == "get_frame", i
 
     # index 0 contains the inner most frame on the stack, so the lamdba
     # should be at index `actual_depth`
-    assert stack[actual_depth].function == "<lambda>", actual_depth
+    assert stack[actual_depth][3] == "<lambda>", actual_depth
+
+
+def test_extract_stack_with_cache():
+    frame = get_frame(depth=1)
+
+    prev_cache = extract_stack(frame, os.getcwd())
+    _, stack1, _ = prev_cache
+    _, stack2, _ = extract_stack(frame, os.getcwd(), prev_cache)
+
+    assert len(stack1) == len(stack2)
+    for i, (frame1, frame2) in enumerate(zip(stack1, stack2)):
+        # DO NOT use `==` for the assertion here since we are
+        # testing for identity, and using `==` would test for
+        # equality which would always pass since we're extract
+        # the same stack.
+        assert frame1 is frame2, i
 
 
 def get_scheduler_threads(scheduler):
@@ -250,7 +300,7 @@ class DummySampleBuffer(SampleBuffer):
     def make_sampler(self):
         def _sample_stack(*args, **kwargs):
             ts, sample = self.sample_data.pop(0)
-            self.write(ts, sample)
+            self.write(ts, process_test_sample(sample))
 
         return _sample_stack
 
@@ -272,11 +322,7 @@ def test_thread_scheduler_takes_first_samples(scheduler_class):
                 [
                     (
                         0,
-                        (
-                            RawFrameData(
-                                "/path/to/file.py", "file.py", "name", 1, "file"
-                            ),
-                        ),
+                        (("/path/to/file.py", "file", "file.py", "name", 1),),
                     )
                 ],
             )
@@ -312,11 +358,7 @@ def test_thread_scheduler_takes_more_samples(scheduler_class):
                 [
                     (
                         0,
-                        (
-                            RawFrameData(
-                                "/path/to/file.py", "file.py", "name", 1, "file"
-                            ),
-                        ),
+                        (("/path/to/file.py", "file", "file.py", "name", 1),),
                     )
                 ],
             )
@@ -420,11 +462,7 @@ thread_metadata = {
                     [
                         (
                             "1",
-                            (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name", 1, "file"
-                                ),
-                            ),
+                            (("/path/to/file.py", "file", "file.py", "name", 1),),
                         )
                     ],
                 )
@@ -447,11 +485,7 @@ thread_metadata = {
                     [
                         (
                             "1",
-                            (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name", 1, "file"
-                                ),
-                            ),
+                            (("/path/to/file.py", "file", "file.py", "name", 1),),
                         )
                     ],
                 )
@@ -488,11 +522,7 @@ thread_metadata = {
                     [
                         (
                             "1",
-                            (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name", 1, "file"
-                                ),
-                            ),
+                            (("/path/to/file.py", "file", "file.py", "name", 1),),
                         )
                     ],
                 ),
@@ -501,11 +531,7 @@ thread_metadata = {
                     [
                         (
                             "1",
-                            (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name", 1, "file"
-                                ),
-                            ),
+                            (("/path/to/file.py", "file", "file.py", "name", 1),),
                         )
                     ],
                 ),
@@ -547,11 +573,7 @@ thread_metadata = {
                     [
                         (
                             "1",
-                            (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name1", 1, "file"
-                                ),
-                            ),
+                            (("/path/to/file.py", "file", "file.py", "name1", 1),),
                         )
                     ],
                 ),
@@ -561,12 +583,8 @@ thread_metadata = {
                         (
                             "1",
                             (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name1", 1, "file"
-                                ),
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name2", 2, "file"
-                                ),
+                                ("/path/to/file.py", "file", "file.py", "name1", 1),
+                                ("/path/to/file.py", "file", "file.py", "name2", 2),
                             ),
                         )
                     ],
@@ -617,11 +635,14 @@ thread_metadata = {
                         (
                             "1",
                             (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name1", 1, "file"
-                                ),
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name2", 2, "file"
+                                ("/path/to/file.py", "file", "file.py", "name1", 1),
+                                (
+                                    "/path/to/file.py",
+                                    "file",
+                                    "file.py",
+                                    "name2",
+                                    2,
+                                    "file",
                                 ),
                             ),
                         )
@@ -633,11 +654,21 @@ thread_metadata = {
                         (
                             "1",
                             (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name3", 3, "file"
+                                (
+                                    "/path/to/file.py",
+                                    "file",
+                                    "file.py",
+                                    "name3",
+                                    3,
+                                    "file",
                                 ),
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name4", 4, "file"
+                                (
+                                    "/path/to/file.py",
+                                    "file",
+                                    "file.py",
+                                    "name4",
+                                    4,
+                                    "file",
                                 ),
                             ),
                         )
@@ -702,11 +733,7 @@ thread_metadata = {
                     [
                         (
                             "1",
-                            (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name1", 1, "file"
-                                ),
-                            ),
+                            (("/path/to/file.py", "file", "file.py", "name1", 1),),
                         )
                     ],
                 ),
@@ -716,12 +743,8 @@ thread_metadata = {
                         (
                             "1",
                             (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name2", 2, "file"
-                                ),
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name3", 3, "file"
-                                ),
+                                ("/path/to/file.py", "file", "file.py", "name2", 2),
+                                ("/path/to/file.py", "file", "file.py", "name3", 3),
                             ),
                         )
                     ],
@@ -761,6 +784,6 @@ thread_metadata = {
 def test_sample_buffer(capacity, start_ns, stop_ns, samples, profile):
     buffer = SampleBuffer(capacity)
     for ts, sample in samples:
-        buffer.write(ts, sample)
+        buffer.write(ts, process_test_sample(sample))
     result = buffer.slice_profile(start_ns, stop_ns)
     assert result == profile

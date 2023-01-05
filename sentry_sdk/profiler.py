@@ -21,7 +21,7 @@ import sys
 import threading
 import time
 import uuid
-from collections import deque, namedtuple
+from collections import deque
 from contextlib import contextmanager
 
 import sentry_sdk
@@ -33,10 +33,6 @@ from sentry_sdk.utils import (
     handle_in_app_impl,
     logger,
     nanosecond_time,
-)
-
-RawFrameData = namedtuple(
-    "RawFrameData", ["abs_path", "filename", "function", "lineno", "module"]
 )
 
 if MYPY:
@@ -54,9 +50,17 @@ if MYPY:
     import sentry_sdk.scope
     import sentry_sdk.tracing
 
-    RawStack = Tuple[RawFrameData, ...]
-    RawSample = Sequence[Tuple[str, RawStack]]
-    RawSampleWithId = Sequence[Tuple[str, int, RawStack]]
+    StackId = int
+
+    RawFrame = Tuple[
+        str,  # abs_path
+        Optional[str],  # module
+        Optional[str],  # filename
+        str,  # function
+        int,  # lineno
+    ]
+    RawStack = Tuple[RawFrame, ...]
+    RawSample = Sequence[Tuple[str, Tuple[StackId, RawStack]]]
 
     ProcessedStack = Tuple[int, ...]
 
@@ -155,8 +159,13 @@ def teardown_profiler():
 MAX_STACK_DEPTH = 128
 
 
-def extract_stack(frame, max_stack_depth=MAX_STACK_DEPTH):
-    # type: (Optional[FrameType], int) -> Tuple[RawFrameData, ...]
+def extract_stack(
+    frame,  # type: Optional[FrameType]
+    cwd,  # type: str
+    prev_cache=None,  # type: Optional[Tuple[StackId, RawStack, Deque[FrameType]]]
+    max_stack_depth=MAX_STACK_DEPTH,  # type: int
+):
+    # type: (...) -> Tuple[StackId, RawStack, Deque[FrameType]]
     """
     Extracts the stack starting the specified frame. The extracted stack
     assumes the specified frame is the top of the stack, and works back
@@ -166,17 +175,47 @@ def extract_stack(frame, max_stack_depth=MAX_STACK_DEPTH):
     only the first `MAX_STACK_DEPTH` frames will be returned.
     """
 
-    stack = deque(maxlen=max_stack_depth)  # type: Deque[FrameType]
+    frames = deque(maxlen=max_stack_depth)  # type: Deque[FrameType]
 
     while frame is not None:
-        stack.append(frame)
+        frames.append(frame)
         frame = frame.f_back
 
-    return tuple(extract_frame(frame) for frame in stack)
+    if prev_cache is None:
+        stack = tuple(extract_frame(frame, cwd) for frame in frames)
+    else:
+        _, prev_stack, prev_frames = prev_cache
+        prev_depth = len(prev_frames)
+        depth = len(frames)
+
+        # We want to match the frame found in this sample to the frames found in the
+        # previous sample. If they are the same (using the `is` operator), we can
+        # skip the expensive work of extracting the frame information and reuse what
+        # we extracted during the last sample.
+        #
+        # Make sure to keep in mind that the stack is ordered from the inner most
+        # from to the outer most frame so be careful with the indexing.
+        stack = tuple(
+            prev_stack[i]
+            if i >= 0 and frame is prev_frames[i]
+            else extract_frame(frame, cwd)
+            for i, frame in zip(range(prev_depth - depth, prev_depth), frames)
+        )
+
+    # Instead of mapping the stack into frame ids and hashing
+    # that as a tuple, we can directly hash the stack.
+    # This saves us from having to generate yet another list.
+    # Additionally, using the stack as the key directly is
+    # costly because the stack can be large, so we pre-hash
+    # the stack, and use the hash as the key as this will be
+    # needed a few times to improve performance.
+    stack_id = hash(stack)
+
+    return stack_id, stack, frames
 
 
-def extract_frame(frame):
-    # type: (FrameType) -> RawFrameData
+def extract_frame(frame, cwd):
+    # type: (FrameType, str) -> RawFrame
     abs_path = frame.f_code.co_filename
 
     try:
@@ -184,12 +223,23 @@ def extract_frame(frame):
     except Exception:
         module = None
 
-    return RawFrameData(
-        abs_path=os.path.abspath(abs_path),
-        filename=filename_for_module(module, abs_path) or None,
-        function=get_frame_name(frame),
-        lineno=frame.f_lineno,
-        module=module,
+    # namedtuples can be many times slower when initialing
+    # and accessing attribute so we opt to use a tuple here instead
+    return (
+        # This originally was `os.path.abspath(abs_path)` but that had
+        # a large performance overhead.
+        #
+        # According to docs, this is equivalent to
+        # `os.path.normpath(os.path.join(os.getcwd(), path))`.
+        # The `os.getcwd()` call is slow here, so we precompute it.
+        #
+        # Additionally, since we are using normalized path already,
+        # we skip calling `os.path.normpath` entirely.
+        os.path.join(cwd, abs_path),
+        module,
+        filename_for_module(module, abs_path) or None,
+        get_frame_name(frame),
+        frame.f_lineno,
     )
 
 
@@ -200,6 +250,8 @@ def get_frame_name(frame):
     # we should consider using instead where possible
 
     f_code = frame.f_code
+    co_varnames = f_code.co_varnames
+
     # co_name only contains the frame name.  If the frame was a method,
     # the class name will NOT be included.
     name = f_code.co_name
@@ -210,8 +262,8 @@ def get_frame_name(frame):
         if (
             # the co_varnames start with the frame's positional arguments
             # and we expect the first to be `self` if its an instance method
-            f_code.co_varnames
-            and f_code.co_varnames[0] == "self"
+            co_varnames
+            and co_varnames[0] == "self"
             and "self" in frame.f_locals
         ):
             for cls in frame.f_locals["self"].__class__.__mro__:
@@ -226,8 +278,8 @@ def get_frame_name(frame):
         if (
             # the co_varnames start with the frame's positional arguments
             # and we expect the first to be `cls` if its a class method
-            f_code.co_varnames
-            and f_code.co_varnames[0] == "cls"
+            co_varnames
+            and co_varnames[0] == "cls"
             and "cls" in frame.f_locals
         ):
             for cls in frame.f_locals["cls"].__mro__:
@@ -338,13 +390,11 @@ class SampleBuffer(object):
     def __init__(self, capacity):
         # type: (int) -> None
 
-        self.buffer = [
-            None
-        ] * capacity  # type: List[Optional[Tuple[int, RawSampleWithId]]]
+        self.buffer = [None] * capacity  # type: List[Optional[Tuple[int, RawSample]]]
         self.capacity = capacity  # type: int
         self.idx = 0  # type: int
 
-    def write(self, ts, raw_sample):
+    def write(self, ts, sample):
         # type: (int, RawSample) -> None
         """
         Writing to the buffer is not thread safe. There is the possibility
@@ -359,32 +409,16 @@ class SampleBuffer(object):
         """
         idx = self.idx
 
-        sample = [
-            (
-                thread_id,
-                # Instead of mapping the stack into frame ids and hashing
-                # that as a tuple, we can directly hash the stack.
-                # This saves us from having to generate yet another list.
-                # Additionally, using the stack as the key directly is
-                # costly because the stack can be large, so we pre-hash
-                # the stack, and use the hash as the key as this will be
-                # needed a few times to improve performance.
-                hash(stack),
-                stack,
-            )
-            for thread_id, stack in raw_sample
-        ]
-
         self.buffer[idx] = (ts, sample)
         self.idx = (idx + 1) % self.capacity
 
     def slice_profile(self, start_ns, stop_ns):
         # type: (int, int) -> ProcessedProfile
         samples = []  # type: List[ProcessedSample]
-        stacks = dict()  # type: Dict[int, int]
-        stacks_list = list()  # type: List[ProcessedStack]
-        frames = dict()  # type: Dict[RawFrameData, int]
-        frames_list = list()  # type: List[ProcessedFrame]
+        stacks = {}  # type: Dict[StackId, int]
+        stacks_list = []  # type: List[ProcessedStack]
+        frames = {}  # type: Dict[RawFrame, int]
+        frames_list = []  # type: List[ProcessedFrame]
 
         for ts, sample in filter(None, self.buffer):
             if start_ns > ts or ts > stop_ns:
@@ -392,7 +426,7 @@ class SampleBuffer(object):
 
             elapsed_since_start_ns = str(ts - start_ns)
 
-            for tid, hashed_stack, stack in sample:
+            for tid, (hashed_stack, stack) in sample:
                 # Check if the stack is indexed first, this lets us skip
                 # indexing frames if it's not necessary
                 if hashed_stack not in stacks:
@@ -401,11 +435,11 @@ class SampleBuffer(object):
                             frames[frame] = len(frames)
                             frames_list.append(
                                 {
-                                    "abs_path": frame.abs_path,
-                                    "function": frame.function or "<unknown>",
-                                    "filename": frame.filename,
-                                    "lineno": frame.lineno,
-                                    "module": frame.module,
+                                    "abs_path": frame[0],
+                                    "module": frame[1],
+                                    "filename": frame[2],
+                                    "function": frame[3],
+                                    "lineno": frame[4],
                                 }
                             )
 
@@ -439,6 +473,14 @@ class SampleBuffer(object):
 
     def make_sampler(self):
         # type: () -> Callable[..., None]
+        cwd = os.getcwd()
+
+        # In Python3+, we can use the `nonlocal` keyword to rebind the value,
+        # but this is not possible in Python2. To get around this, we wrap
+        # the value in a list to allow updating this value each sample.
+        last_sample = [
+            {}
+        ]  # type: List[Dict[int, Tuple[StackId, RawStack, Deque[FrameType]]]]
 
         def _sample_stack(*args, **kwargs):
             # type: (*Any, **Any) -> None
@@ -447,13 +489,20 @@ class SampleBuffer(object):
             This should be called at a regular interval to collect samples.
             """
 
-            self.write(
-                nanosecond_time(),
-                [
-                    (str(tid), extract_stack(frame))
-                    for tid, frame in sys._current_frames().items()
-                ],
-            )
+            now = nanosecond_time()
+            raw_sample = {
+                tid: extract_stack(frame, cwd, last_sample[0].get(tid))
+                for tid, frame in sys._current_frames().items()
+            }
+
+            last_sample[0] = raw_sample
+
+            sample = [
+                (str(tid), (stack_id, stack))
+                for tid, (stack_id, stack, _) in raw_sample.items()
+            ]
+
+            self.write(now, sample)
 
         return _sample_stack
 
