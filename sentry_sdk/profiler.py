@@ -435,8 +435,6 @@ class Scheduler(object):
 
     def __init__(self, frequency):
         # type: (int) -> None
-        # self.sample_buffer = sample_buffer
-        # self.sampler = sample_buffer.make_sampler()
         self.interval = 1.0 / frequency
 
     def __enter__(self):
