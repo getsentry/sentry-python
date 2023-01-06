@@ -26,6 +26,8 @@ minimum_python_33 = pytest.mark.skipif(
     sys.version_info < (3, 3), reason="Profiling is only supported in Python >= 3.3"
 )
 
+requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
+
 
 def process_test_sample(sample):
     return [(tid, (stack, stack)) for tid, stack in sample]
@@ -34,10 +36,10 @@ def process_test_sample(sample):
 @pytest.mark.parametrize(
     "mode",
     [
-        pytest.param("magic"),
+        pytest.param("foo"),
         pytest.param(
             "gevent",
-            marks=pytest.mark.skipif(gevent is None, reason="gevent not installed"),
+            marks=pytest.mark.skipif(gevent is not None, reason="gevent not enabled"),
         ),
     ],
 )
@@ -51,10 +53,7 @@ def test_profiler_invalid_mode(mode, teardown_profiling):
     [
         pytest.param("thread"),
         pytest.param("sleep"),
-        pytest.param(
-            "gevent",
-            marks=pytest.mark.skipif(gevent is None, reason="gevent not installed"),
-        ),
+        pytest.param("gevent", marks=requires_gevent),
     ],
 )
 def test_profiler_valid_mode(mode, teardown_profiling):
@@ -284,9 +283,9 @@ def get_scheduler_threads(scheduler):
         pytest.param(
             GeventScheduler,
             marks=[
-                pytest.mark.skipif(gevent is None, reason="gevent not installed"),
+                requires_gevent,
                 pytest.mark.skip(
-                    reason="cannot find this thread via threading.enuerate()"
+                    reason="cannot find this thread via threading.enumerate()"
                 ),
             ],
             id="gevent scheduler",
@@ -611,11 +610,7 @@ thread_metadata = {
     ("scheduler_class",),
     [
         pytest.param(ThreadScheduler, id="thread scheduler"),
-        pytest.param(
-            GeventScheduler,
-            marks=pytest.mark.skipif(gevent is None, reason="gevent not installed"),
-            id="gevent scheduler",
-        ),
+        pytest.param(GeventScheduler, marks=requires_gevent, id="gevent scheduler"),
     ],
 )
 def test_profile_processing(
