@@ -63,7 +63,7 @@ setup(
         "starlette": ["starlette>=0.19.1"],
         "fastapi": ["fastapi>=0.79.0"],
         "pymongo": ["pymongo>=3.1"],
-        "opentelemetry": ["opentelemetry-distro>=0.350b0"],
+        "opentelemetry": ["opentelemetry-distro>=0.35b0"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
