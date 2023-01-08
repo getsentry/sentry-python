@@ -32,7 +32,7 @@ try:
 
         from sentry_sdk._types import Event
 except ImportError:
-    raise DidNotEnable("Starlette is not installed")
+    raise DidNotEnable("Starlite is not installed")
 
 
 _DEFAULT_TRANSACTION_NAME = "generic Starlite request"
