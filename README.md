@@ -30,7 +30,7 @@ pip install --upgrade sentry-sdk
 import sentry_sdk
 
 sentry_sdk.init(
-    "https://12927b5f211046b575ee51fd8b1ac34f@o1.ingest.sentry.io/1",
+    dsn="https://12927b5f211046b575ee51fd8b1ac34f@o1.ingest.sentry.io/1",
 
     # Set traces_sample_rate to 1.0 to capture 100%
     # of transactions for performance monitoring.
@@ -38,6 +38,22 @@ sentry_sdk.init(
     traces_sample_rate=1.0,
 )
 ```
+
+### self-signed CA Certificate
+```python
+import sentry_sdk
+
+sentry_sdk.init(
+    dsn="https://12927b5f211046b575ee51fd8b1ac34f@o1.ingest.sentry.io/1",
+
+    # Set traces_sample_rate to 1.0 to capture 100%
+    # of transactions for performance monitoring.
+    # We recommend adjusting this value in production.
+    traces_sample_rate=1.0,
+
+    # Set the path to your self-signed CA cert.
+    ca_certs="~/ca.cert"
+)
 
 ### Usage
 
