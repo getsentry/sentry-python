@@ -1,13 +1,13 @@
-from typing import TYPE_CHECKING, Any, Awaitable, Dict, Optional, Union
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import event_from_exception, transaction_from_function
-from sentry_sdk.consts import OP
 
 try:
     from starlite import Request, Starlite, State
@@ -18,6 +18,8 @@ try:
     from starlite.utils import ConnectionDataExtractor, is_async_callable
 
     if TYPE_CHECKING:
+        from typing import Any, Awaitable, Dict, List, Optional, Union
+
         from starlite.types import (
             ASGIApp,
             HTTPReceiveMessage,
@@ -93,7 +95,7 @@ def patch_app_init() -> None:
 def patch_middlewares() -> None:
     old__resolve_middleware_stack = BaseRouteHandler.resolve_middleware
 
-    def resolve_middleware_wrapper(self: Any) -> list["Middleware"]:
+    def resolve_middleware_wrapper(self: "Any") -> List["Middleware"]:
         return [
             enable_span_for_middleware(middleware)
             for middleware in old__resolve_middleware_stack(self)
@@ -127,7 +129,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 # Creating spans for the "receive" callback
                 async def _sentry_receive(
                     *args, **kwargs
-                ) -> Awaitable[Union["HTTPReceiveMessage", "WebSocketReceiveMessage"]]:
+                ) -> "Awaitable[Union[HTTPReceiveMessage, WebSocketReceiveMessage]]":
                     hub = Hub.current
                     with hub.start_span(
                         op=OP.MIDDLEWARE_STARLITE_RECEIVE,
@@ -191,7 +193,7 @@ def patch_http_route_handle() -> None:
 
             request_data = await body
 
-            def event_processor(event: "Event", _: Dict[str, Any]) -> "Event":
+            def event_processor(event: "Event", _: "Dict[str, Any]") -> "Event":
                 route_handler = scope.get("route_handler")
 
                 request_info = event.get("request", {})
@@ -223,7 +225,7 @@ def patch_http_route_handle() -> None:
     HTTPRoute.handle = handle_wrapper
 
 
-def retrieve_user_from_scope(scope: "Scope") -> Optional[Dict[str, Any]]:
+def retrieve_user_from_scope(scope: "Scope") -> "Optional[Dict[str, Any]]":
     scope_user = scope.get("user", {})
     if not scope_user or not _should_send_default_pii():
         return None
