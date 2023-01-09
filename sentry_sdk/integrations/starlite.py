@@ -95,7 +95,7 @@ def patch_app_init() -> None:
 def patch_middlewares() -> None:
     old__resolve_middleware_stack = BaseRouteHandler.resolve_middleware
 
-    def resolve_middleware_wrapper(self: "Any") -> List["Middleware"]:
+    def resolve_middleware_wrapper(self: "Any") -> "List[Middleware]":
         return [
             enable_span_for_middleware(middleware)
             for middleware in old__resolve_middleware_stack(self)
