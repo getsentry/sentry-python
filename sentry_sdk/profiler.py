@@ -679,7 +679,7 @@ def start_profiling(transaction, hub=None):
     # if profiling was not enabled, this should be a noop
     if _should_profile(transaction, hub):
         assert _scheduler is not None
-        with Profile(_scheduler, transaction):
+        with Profile(_scheduler, transaction, hub):
             yield
     else:
         yield
