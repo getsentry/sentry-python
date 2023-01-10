@@ -9,7 +9,7 @@ starlite = pytest.importorskip("starlite")
 
 from typing import Any, Dict
 
-from starlite import AbstractMiddleware, LoggingConfig, Starlite, get
+from starlite import AbstractMiddleware, LoggingConfig, Starlite, get, Controller
 from starlite.middleware import LoggingMiddlewareConfig, RateLimitConfig
 from starlite.middleware.session.memory_backend import MemoryBackendConfig
 from starlite.status_codes import HTTP_500_INTERNAL_SERVER_ERROR
@@ -61,12 +61,19 @@ class SamplePartialReceiveSendMiddleware(AbstractMiddleware):
 
 
 def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
+    class MyController(Controller):
+        path = "/controller"
+
+        @get("error")
+        async def controller_error(self) -> None:
+            raise Exception("Whoa")
+
     @get("/some_url")
     async def homepage_handler() -> Dict[str, Any]:
         1 / 0
         return {"status": "ok"}
 
-    @get("/custom_error")
+    @get("/custom_error", name="custom_name")
     async def custom_error() -> Any:
         raise Exception("Too Hot")
 
@@ -83,7 +90,13 @@ def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
     logging_config = LoggingConfig()
 
     app = Starlite(
-        route_handlers=[homepage_handler, custom_error, message, message_with_id],
+        route_handlers=[
+            homepage_handler,
+            custom_error,
+            message,
+            message_with_id,
+            MyController,
+        ],
         debug=debug,
         middleware=middleware,
         logging_config=logging_config,
@@ -94,10 +107,26 @@ def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
 
 
 @pytest.mark.parametrize(
-    "test_url,expected_error,expected_message",
+    "test_url,expected_error,expected_message,expected_tx_name",
     [
-        ("/some_url", ZeroDivisionError, "division by zero"),
-        ("/custom_error", Exception, "Too Hot"),
+        (
+            "/some_url",
+            ZeroDivisionError,
+            "division by zero",
+            "tests.integrations.starlite.test_starlite.starlite_app_factory.<locals>.homepage_handler",
+        ),
+        (
+            "/custom_error",
+            Exception,
+            "Too Hot",
+            "custom_name",
+        ),
+        (
+            "/controller/error",
+            Exception,
+            "Whoa",
+            "tests.integrations.starlite.test_starlite.starlite_app_factory.<locals>.MyController.controller_error",
+        ),
     ],
 )
 def test_catch_exceptions(
@@ -107,6 +136,7 @@ def test_catch_exceptions(
     test_url,
     expected_error,
     expected_message,
+    expected_tx_name,
 ):
     sentry_init(integrations=[StarliteIntegration()])
     starlite_app = starlite_app_factory()
@@ -125,6 +155,7 @@ def test_catch_exceptions(
 
     (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "starlite"
+    assert event["transaction"] == expected_tx_name
 
 
 def test_middleware_spans(sentry_init, capture_events):

@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel  # type: ignore
-
+from functools import partial
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -15,7 +15,7 @@ try:
     from starlite.middleware import DefineMiddleware  # type: ignore
     from starlite.plugins.base import get_plugin_for_value  # type: ignore
     from starlite.routes.http import HTTPRoute  # type: ignore
-    from starlite.utils import ConnectionDataExtractor, is_async_callable  # type: ignore
+    from starlite.utils import ConnectionDataExtractor, is_async_callable, Ref  # type: ignore
 
     if TYPE_CHECKING:
         from typing import Any, Dict, List, Optional, Union
@@ -204,9 +204,19 @@ def patch_http_route_handle() -> None:
                 if request_data is not None:
                     request_info["data"] = request_data
 
-                tx_name = route_handler.name or transaction_from_function(
-                    route_handler.fn
-                )
+                func = None
+                if route_handler.name is not None:
+                    tx_name = route_handler.name
+                elif isinstance(route_handler.fn, Ref):
+                    if isinstance(route_handler.fn.value, partial):
+                        func = route_handler.fn.value.func
+                    else:
+                        func = route_handler.fn.value
+                else:
+                    func = route_handler.fn
+                if func is not None:
+                    tx_name = transaction_from_function(func)
+
                 tx_info = {"source": SOURCE_FOR_STYLE["endpoint"]}
 
                 if not tx_name:
