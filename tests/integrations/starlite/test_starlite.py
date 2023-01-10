@@ -1,12 +1,9 @@
-import base64
 import functools
-import os
 
 import pytest
 
 from sentry_sdk import capture_exception, capture_message, last_event_id
 from sentry_sdk.integrations.starlite import StarliteIntegration
-from sentry_sdk.utils import AnnotatedValue
 
 starlite = pytest.importorskip("starlite")
 
