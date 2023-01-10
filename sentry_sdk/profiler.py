@@ -299,7 +299,7 @@ class Profile(object):
         self,
         scheduler,  # type: Scheduler
         transaction,  # type: sentry_sdk.tracing.Transaction
-        hub=None, # type: Optional[sentry_sdk.Hub]
+        hub=None,  # type: Optional[sentry_sdk.Hub]
     ):
         # type: (...) -> None
         self.scheduler = scheduler
