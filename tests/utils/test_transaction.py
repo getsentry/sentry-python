@@ -48,7 +48,7 @@ def test_transaction_from_function():
     )
 
 
-@pytest.mark.skipif(sys.version_info < (3, 4))
+@pytest.mark.skipif(sys.version_info < (3, 4), reason="Require python 3.4 or higher")
 def test_transaction_from_function_partialmethod():
     x = transaction_from_function
 
