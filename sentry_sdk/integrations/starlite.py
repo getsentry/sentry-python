@@ -264,7 +264,7 @@ def exception_handler(exc: Exception, scope: "Scope", _: "State") -> None:
     event, hint = event_from_exception(
         exc,
         client_options=hub.client.options if hub.client else None,
-        mechanism={"type": StarliteIntegration.identifier, "handled": True},
+        mechanism={"type": StarliteIntegration.identifier, "handled": False},
     )
 
     hub.capture_event(event, hint=hint)
