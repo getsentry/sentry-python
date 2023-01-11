@@ -59,5 +59,5 @@ def test_transaction_from_function_partialmethod():
 
     assert (
         x(MyPartialClass.my_partial_method)
-        == "partialmethod(<function tests.utils.test_transaction.MyClass.my_partial_method>)"
+        == "partialmethod(<function tests.utils.test_transaction.test_transaction_from_function_partialmethod.<locals>.MyPartialClass.my_partial_method>)"
     )
