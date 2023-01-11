@@ -34,9 +34,9 @@ Make sure that you have Python 3 installed. Version 3.7 or higher is required to
 ```bash
 cd sentry-python
 
-python -m venv .env
+python -m venv .venv
 
-source .env/bin/activate
+source .venv/bin/activate
 ```
 
 ### Install `sentry-python` in editable mode
@@ -88,10 +88,10 @@ specific tests:
 cd sentry-python
 
 # create virtual environment
-python -m venv .env
+python -m venv .venv
 
 # activate virtual environment
-source .env/bin/activate
+source .venv/bin/activate
 
 # install sentry-python
 pip install -e .

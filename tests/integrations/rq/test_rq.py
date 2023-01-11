@@ -58,13 +58,18 @@ def test_basic(sentry_init, capture_events):
     assert exception["stacktrace"]["frames"][-1]["vars"]["foo"] == "42"
 
     assert event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
-    assert event["extra"]["rq-job"] == {
-        "args": [],
-        "description": "tests.integrations.rq.test_rq.crashing_job(foo=42)",
-        "func": "tests.integrations.rq.test_rq.crashing_job",
-        "job_id": event["extra"]["rq-job"]["job_id"],
-        "kwargs": {"foo": 42},
-    }
+
+    extra = event["extra"]["rq-job"]
+    assert extra["args"] == []
+    assert extra["kwargs"] == {"foo": 42}
+    assert extra["description"] == "tests.integrations.rq.test_rq.crashing_job(foo=42)"
+    assert extra["func"] == "tests.integrations.rq.test_rq.crashing_job"
+    assert "job_id" in extra
+    assert "enqueued_at" in extra
+
+    # older versions don't persist started_at correctly
+    if tuple(map(int, rq.VERSION.split("."))) >= (0, 9):
+        assert "started_at" in extra
 
 
 def test_transport_shutdown(sentry_init, capture_events_forksafe):
