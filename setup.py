@@ -61,6 +61,7 @@ setup(
         "chalice": ["chalice>=1.16.0"],
         "httpx": ["httpx>=0.16.0"],
         "starlette": ["starlette>=0.19.1"],
+        "starlite": ["starlite>=1.48"],
         "fastapi": ["fastapi>=0.79.0"],
         "pymongo": ["pymongo>=3.1"],
         "opentelemetry": ["opentelemetry-distro>=0.350b0"],
