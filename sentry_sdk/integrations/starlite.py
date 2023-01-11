@@ -234,9 +234,8 @@ def patch_http_route_handle() -> None:
 
 def retrieve_user_from_scope(scope: "Scope") -> "Optional[Dict[str, Any]]":
     scope_user = scope.get("user", {})
-    if not scope_user or not _should_send_default_pii():
+    if not scope_user:
         return None
-
     if isinstance(scope_user, dict):
         return scope_user
     if isinstance(scope_user, BaseModel):
@@ -256,7 +255,9 @@ def exception_handler(exc: Exception, scope: "Scope", _: "State") -> None:
     if hub.get_integration(StarliteIntegration) is None:
         return
 
-    user_info = retrieve_user_from_scope(scope)
+    user_info: "Optional[Dict[str, Any]]" = None
+    if _should_send_default_pii():
+        user_info = retrieve_user_from_scope(scope)
     if user_info and isinstance(user_info, dict):
         with hub.configure_scope() as sentry_scope:
             sentry_scope.set_user(user_info)
