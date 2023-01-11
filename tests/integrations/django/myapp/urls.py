@@ -81,6 +81,9 @@ try:
     )
     urlpatterns.append(path("rest-hello", views.rest_hello, name="rest_hello"))
     urlpatterns.append(
+        path("rest-json-response", views.rest_json_response, name="rest_json_response")
+    )
+    urlpatterns.append(
         path(
             "rest-permission-denied-exc",
             views.rest_permission_denied_exc,
