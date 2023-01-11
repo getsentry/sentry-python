@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel  # type: ignore
-from functools import partial
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -208,10 +207,7 @@ def patch_http_route_handle() -> None:
                 if route_handler.name is not None:
                     tx_name = route_handler.name
                 elif isinstance(route_handler.fn, Ref):
-                    if isinstance(route_handler.fn.value, partial):
-                        func = route_handler.fn.value.func
-                    else:
-                        func = route_handler.fn.value
+                    func = route_handler.fn.value
                 else:
                     func = route_handler.fn
                 if func is not None:
