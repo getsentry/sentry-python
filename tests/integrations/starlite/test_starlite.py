@@ -64,7 +64,7 @@ def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
     class MyController(Controller):
         path = "/controller"
 
-        @get("error")
+        @get("/error")
         async def controller_error(self) -> None:
             raise Exception("Whoa")
 
@@ -125,7 +125,7 @@ def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
             "/controller/error",
             Exception,
             "Whoa",
-            "tests.integrations.starlite.test_starlite.starlite_app_factory.<locals>.MyController.controller_error",
+            "partial(<function tests.integrations.starlite.test_starlite.starlite_app_factory.<locals>.MyController.controller_error>)",
         ),
     ],
 )
