@@ -9,7 +9,14 @@ import sys
 import threading
 import time
 from datetime import datetime
-from functools import partial, partialmethod
+from functools import partial
+
+try:
+    from functools import partialmethod
+
+    _PARTIALMETHOD_AVAILABLE = True
+except ImportError:
+    _PARTIALMETHOD_AVAILABLE = False
 
 import sentry_sdk
 from sentry_sdk._compat import PY2, PY33, PY37, implements_str, text_type, urlparse
@@ -985,8 +992,10 @@ def qualname_from_function(func):
 
     prefix, suffix = "", ""
 
-    if hasattr(func, "_partialmethod") and isinstance(
-        func._partialmethod, partialmethod  # type: ignore
+    if (
+        _PARTIALMETHOD_AVAILABLE
+        and hasattr(func, "_partialmethod")
+        and isinstance(func._partialmethod, partialmethod)  # type: ignore
     ):
         prefix, suffix = "partialmethod(<function ", ">)"
         func = func._partialmethod.func  # type: ignore
