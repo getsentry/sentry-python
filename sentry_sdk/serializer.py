@@ -15,7 +15,14 @@ from sentry_sdk.utils import (
 
 import sentry_sdk.utils
 
-from sentry_sdk._compat import text_type, PY2, string_types, number_types, iteritems
+from sentry_sdk._compat import (
+    text_type,
+    PY2,
+    string_types,
+    number_types,
+    iteritems,
+    binary_sequence_types,
+)
 
 from sentry_sdk._types import MYPY
 
@@ -47,7 +54,7 @@ if PY2:
     # https://github.com/python/cpython/blob/master/Lib/collections/__init__.py#L49
     from collections import Mapping, Sequence, Set
 
-    serializable_str_types = string_types
+    serializable_str_types = string_types + binary_sequence_types
 
 else:
     # New in 3.3
@@ -55,7 +62,7 @@ else:
     from collections.abc import Mapping, Sequence, Set
 
     # Bytes are technically not strings in Python 3, but we can serialize them
-    serializable_str_types = (str, bytes)
+    serializable_str_types = string_types + binary_sequence_types
 
 
 # Maximum length of JSON-serialized event payloads that can be safely sent
@@ -350,7 +357,7 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
         if should_repr_strings:
             obj = safe_repr(obj)
         else:
-            if isinstance(obj, bytes):
+            if isinstance(obj, bytes) or isinstance(obj, bytearray):
                 obj = obj.decode("utf-8", "replace")
 
             if not isinstance(obj, string_types):

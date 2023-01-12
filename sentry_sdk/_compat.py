@@ -26,6 +26,7 @@ if PY2:
     number_types = (int, long, float)  # noqa
     int_types = (int, long)  # noqa
     iteritems = lambda x: x.iteritems()  # noqa: B301
+    binary_sequence_types = (bytearray, memoryview)
 
     def implements_str(cls):
         # type: (T) -> T
@@ -44,6 +45,7 @@ else:
     number_types = (int, float)  # type: Tuple[type, type]
     int_types = (int,)
     iteritems = lambda x: x.items()
+    binary_sequence_types = (bytes, bytearray, memoryview)
 
     def implements_str(x):
         # type: (T) -> T
