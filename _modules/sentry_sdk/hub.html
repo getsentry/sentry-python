@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>sentry_sdk.hub &#8212; sentry-python 1.12.1 documentation</title>
+    <title>sentry_sdk.hub &#8212; sentry-python 1.13.0 documentation</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css" />
     <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
@@ -148,7 +148,7 @@
 
 <span class="k">def</span> <span class="nf">_init</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="c1"># type: (*Optional[str], **Any) -&gt; ContextManager[Any]</span>
-    <span class="sd">&quot;&quot;&quot;Initializes the SDK and optionally integrations.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Initializes the SDK and optionally integrations.</span>
 
 <span class="sd">    This takes the same arguments as the client constructor.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -183,7 +183,7 @@
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">current</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; Hub</span>
-        <span class="sd">&quot;&quot;&quot;Returns the current instance of the hub.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the current instance of the hub.&quot;&quot;&quot;</span>
         <span class="n">rv</span> <span class="o">=</span> <span class="n">_local</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">rv</span> <span class="o">=</span> <span class="n">Hub</span><span class="p">(</span><span class="n">GLOBAL_HUB</span><span class="p">)</span>
@@ -193,7 +193,7 @@
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; Hub</span>
-        <span class="sd">&quot;&quot;&quot;Returns the main instance of the hub.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the main instance of the hub.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">GLOBAL_HUB</span>
 
 
@@ -246,7 +246,7 @@
 
 
 <div class="viewcode-block" id="Hub"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub">[docs]</a><span class="k">class</span> <span class="nc">Hub</span><span class="p">(</span><span class="n">with_metaclass</span><span class="p">(</span><span class="n">HubMeta</span><span class="p">)):</span>  <span class="c1"># type: ignore</span>
-    <span class="sd">&quot;&quot;&quot;The hub wraps the concurrency management of the SDK.  Each thread has</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The hub wraps the concurrency management of the SDK.  Each thread has</span>
 <span class="sd">    its own hub but the hub might transfer with the flow of execution if</span>
 <span class="sd">    context vars are available.</span>
 
@@ -301,7 +301,7 @@
         <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span>  <span class="c1"># type: Callable[[], T]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; T</span>
-        <span class="sd">&quot;&quot;&quot;Runs a callback in the context of the hub.  Alternatively the</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Runs a callback in the context of the hub.  Alternatively the</span>
 <span class="sd">        with statement can be used on the hub directly.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">with</span> <span class="bp">self</span><span class="p">:</span>
@@ -311,7 +311,7 @@
         <span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span>  <span class="c1"># type: Union[str, Type[Integration]]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Any</span>
-        <span class="sd">&quot;&quot;&quot;Returns the integration for this hub by name or class.  If there</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the integration for this hub by name or class.  If there</span>
 <span class="sd">        is no client bound or the client does not have that integration</span>
 <span class="sd">        then `None` is returned.</span>
 
@@ -334,25 +334,25 @@
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">client</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; Optional[Client]</span>
-        <span class="sd">&quot;&quot;&quot;Returns the current client on the hub.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the current client on the hub.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">scope</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; Scope</span>
-        <span class="sd">&quot;&quot;&quot;Returns the current scope on the hub.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the current scope on the hub.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
 
 <div class="viewcode-block" id="Hub.last_event_id"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.last_event_id">[docs]</a>    <span class="k">def</span> <span class="nf">last_event_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; Optional[str]</span>
-        <span class="sd">&quot;&quot;&quot;Returns the last event ID.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the last event ID.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span></div>
 
 <div class="viewcode-block" id="Hub.bind_client"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.bind_client">[docs]</a>    <span class="k">def</span> <span class="nf">bind_client</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">new</span>  <span class="c1"># type: Optional[Client]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
-        <span class="sd">&quot;&quot;&quot;Binds a new client to the hub.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Binds a new client to the hub.&quot;&quot;&quot;</span>
         <span class="n">top</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">new</span><span class="p">,</span> <span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span></div>
 
@@ -364,7 +364,7 @@
         <span class="o">**</span><span class="n">scope_args</span>  <span class="c1"># type: Any</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Optional[str]</span>
-        <span class="sd">&quot;&quot;&quot;Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`.&quot;&quot;&quot;</span>
         <span class="n">client</span><span class="p">,</span> <span class="n">top_scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="n">scope</span> <span class="o">=</span> <span class="n">_update_scope</span><span class="p">(</span><span class="n">top_scope</span><span class="p">,</span> <span class="n">scope</span><span class="p">,</span> <span class="n">scope_args</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -383,7 +383,7 @@
         <span class="o">**</span><span class="n">scope_args</span>  <span class="c1"># type: Any</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Optional[str]</span>
-        <span class="sd">&quot;&quot;&quot;Captures a message.  The message is just a string.  If no level</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Captures a message.  The message is just a string.  If no level</span>
 <span class="sd">        is provided the default level is `info`.</span>
 
 <span class="sd">        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).</span>
@@ -403,7 +403,7 @@
         <span class="o">**</span><span class="n">scope_args</span>  <span class="c1"># type: Any</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Optional[str]</span>
-        <span class="sd">&quot;&quot;&quot;Captures an exception.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Captures an exception.</span>
 
 <span class="sd">        :param error: An exception to catch. If `None`, `sys.exc_info()` will be used.</span>
 
@@ -429,7 +429,7 @@
         <span class="bp">self</span><span class="p">,</span> <span class="n">exc_info</span>  <span class="c1"># type: Any</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Any</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Capture an exception that is likely caused by a bug in the SDK</span>
 <span class="sd">        itself.</span>
 
@@ -444,7 +444,7 @@
         <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Adds a breadcrumb.</span>
 
 <span class="sd">        :param crumb: Dictionary with the data as the sentry v7/v8 protocol expects.</span>
@@ -490,7 +490,7 @@
         <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Span</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Create and start timing a new span whose parent is the currently active</span>
 <span class="sd">        span or transaction, if any. The return value is a span instance,</span>
 <span class="sd">        typically used as a context manager to start and stop timing in a `with`</span>
@@ -540,7 +540,7 @@
         <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Union[Transaction, NoOpSpan]</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Start and return a transaction.</span>
 
 <span class="sd">        Start an existing transaction if given, otherwise create and start a new</span>
@@ -611,7 +611,7 @@
         <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Pushes a new layer on the scope stack.</span>
 
 <span class="sd">        :param callback: If provided, this method pushes a scope, calls</span>
@@ -633,7 +633,7 @@
 
 <div class="viewcode-block" id="Hub.pop_scope_unsafe"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.pop_scope_unsafe">[docs]</a>    <span class="k">def</span> <span class="nf">pop_scope_unsafe</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: () -&gt; Tuple[Optional[Client], Scope]</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Pops a scope layer from the stack.</span>
 
 <span class="sd">        Try to use the context manager :py:meth:`push_scope` instead.</span>
@@ -661,7 +661,7 @@
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
 
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Reconfigures the scope.</span>
 
 <span class="sd">        :param callback: If provided, call the callback with the current scope.</span>
@@ -690,7 +690,7 @@
         <span class="bp">self</span><span class="p">,</span> <span class="n">session_mode</span><span class="o">=</span><span class="s2">&quot;application&quot;</span>  <span class="c1"># type: str</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
-        <span class="sd">&quot;&quot;&quot;Starts a new session.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Starts a new session.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">end_session</span><span class="p">()</span>
         <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="n">scope</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="n">Session</span><span class="p">(</span>
@@ -702,7 +702,7 @@
 
 <div class="viewcode-block" id="Hub.end_session"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.end_session">[docs]</a>    <span class="k">def</span> <span class="nf">end_session</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
-        <span class="sd">&quot;&quot;&quot;Ends the current session if there is one.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Ends the current session if there is one.&quot;&quot;&quot;</span>
         <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="n">session</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_session</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="kc">None</span>
@@ -714,7 +714,7 @@
 
 <div class="viewcode-block" id="Hub.stop_auto_session_tracking"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.stop_auto_session_tracking">[docs]</a>    <span class="k">def</span> <span class="nf">stop_auto_session_tracking</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
-        <span class="sd">&quot;&quot;&quot;Stops automatic session tracking.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Stops automatic session tracking.</span>
 
 <span class="sd">        This temporarily session tracking for the current scope when called.</span>
 <span class="sd">        To resume session tracking call `resume_auto_session_tracking`.</span>
@@ -725,7 +725,7 @@
 
 <div class="viewcode-block" id="Hub.resume_auto_session_tracking"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.resume_auto_session_tracking">[docs]</a>    <span class="k">def</span> <span class="nf">resume_auto_session_tracking</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
-        <span class="sd">&quot;&quot;&quot;Resumes automatic session tracking for the current scope if</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Resumes automatic session tracking for the current scope if</span>
 <span class="sd">        disabled earlier.  This requires that generally automatic session</span>
 <span class="sd">        tracking is enabled.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -738,7 +738,7 @@
         <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
     <span class="p">):</span>
         <span class="c1"># type: (...) -&gt; None</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Alias for :py:meth:`sentry_sdk.Client.flush`</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
@@ -747,7 +747,7 @@
 
 <div class="viewcode-block" id="Hub.iter_trace_propagation_headers"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.iter_trace_propagation_headers">[docs]</a>    <span class="k">def</span> <span class="nf">iter_trace_propagation_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="c1"># type: (Optional[Span]) -&gt; Generator[Tuple[str, str], None, None]</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return HTTP headers which allow propagation of trace data. Data taken</span>
 <span class="sd">        from the span representing the request, if available, or the current</span>
 <span class="sd">        span on the scope if not.</span>
@@ -767,7 +767,7 @@
 
 <div class="viewcode-block" id="Hub.trace_propagation_meta"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.trace_propagation_meta">[docs]</a>    <span class="k">def</span> <span class="nf">trace_propagation_meta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="c1"># type: (Optional[Span]) -&gt; str</span>
-        <span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return meta tags which should be injected into the HTML template</span>
 <span class="sd">        to allow propagation of trace data.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -839,7 +839,7 @@
       &copy;2019, Sentry Team and Contributors.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 5.2.3</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 5.3.0</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
     </div>
