@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.13.0
+
+### Various fixes & improvements
+
+- fix(serializer): Add support for `byterray` and `memoryview` built-in types (#1833) by @Tarty
+- Feat: add Starlite integration (#1748) by @gazorby
+- Added Python 3.11 to test suite (#1795) by @antonpirker
+- Update test/linting dependencies (#1801) by @antonpirker
+- ref(profiling): Remove sample buffer from profiler (#1791) by @Zylphrex
+- Auto publish to internal pypi on release (#1823) by @asottile-sentry
+- perf(profiling): Performance tweaks to profile sampler (#1789) by @Zylphrex
+- Add span for Django SimpleTemplateResponse rendering (#1818) by @chdsbd
+- Add enqueued_at and started_at to rq job extra (#1024) by @kruvasyan
+- Remove sanic v22 pin (#1819) by @sl0thentr0py
+- Use @wraps for Django Signal receivers (#1815) by @meanmail
+- Handle `"rc"` in SQLAlchemy version. (#1812) by @peterschutt
+- doc: Use .venv (not .env) as a virtual env location in CONTRIBUTING.md (#1790) by @tonyo
+- build(deps): bump sphinx from 5.2.3 to 5.3.0 (#1686) by @dependabot
+
 ## 1.12.1
 
 ### Various fixes & improvements
