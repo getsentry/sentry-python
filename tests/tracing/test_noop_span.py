@@ -11,7 +11,9 @@ from sentry_sdk.tracing import NoOpSpan
 def test_noop_start_transaction(sentry_init):
     sentry_init(instrumenter="otel", debug=True)
 
-    with sentry_sdk.start_transaction(op="task", name="test_transaction_name") as transaction:
+    with sentry_sdk.start_transaction(
+        op="task", name="test_transaction_name"
+    ) as transaction:
         assert isinstance(transaction, NoOpSpan)
         assert sentry_sdk.Hub.current.scope.span is transaction
 
