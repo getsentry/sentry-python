@@ -1,5 +1,52 @@
 # Changelog
 
+## 1.13.0
+
+### Various fixes & improvements
+
+- Add Starlite integration (#1748) by @gazorby
+
+  Adding support for the [Starlite](https://starlite-api.github.io/starlite/1.48/) framework. Unhandled errors are captured. Performance spans for Starlite middleware are also captured. Thanks @gazorby for the great work!
+
+  Usage:
+
+  ```python
+  from starlite import Starlite, get
+
+  import sentry_sdk
+  from sentry_sdk.integrations.starlite import StarliteIntegration
+
+  sentry_sdk.init(
+      dsn="...",
+      traces_sample_rate=1.0,
+      integrations=[
+          StarliteIntegration(),
+      ],
+  )
+
+  @get("/")
+  def hello_world() -> dict[str, str]:
+      """Keeping the tradition alive with hello world."""
+      bla = 1/0  # causing an error
+      return {"hello": "world"}
+
+  app = Starlite(route_handlers=[hello_world])
+  ```
+
+- Profiling: Remove sample buffer from profiler (#1791) by @Zylphrex
+- Profiling: Performance tweaks to profile sampler (#1789) by @Zylphrex
+- Add span for Django SimpleTemplateResponse rendering (#1818) by @chdsbd
+- Use @wraps for Django Signal receivers (#1815) by @meanmail
+- Add enqueued_at and started_at to rq job extra (#1024) by @kruvasyan
+- Remove sanic v22 pin (#1819) by @sl0thentr0py
+- Add support for `byterray` and `memoryview` built-in types (#1833) by @Tarty
+- Handle `"rc"` in SQLAlchemy version. (#1812) by @peterschutt
+- Doc: Use .venv (not .env) as a virtual env location in CONTRIBUTING.md (#1790) by @tonyo
+- Auto publish to internal pypi on release (#1823) by @asottile-sentry
+- Added Python 3.11 to test suite (#1795) by @antonpirker
+- Update test/linting dependencies (#1801) by @antonpirker
+- Deps: bump sphinx from 5.2.3 to 5.3.0 (#1686) by @dependabot
+
 ## 1.12.1
 
 ### Various fixes & improvements
