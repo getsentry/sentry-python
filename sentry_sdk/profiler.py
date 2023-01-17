@@ -46,7 +46,6 @@ if MYPY:
     from typing import Sequence
     from typing import Tuple
     from typing_extensions import TypedDict
-    import sentry_sdk.scope
     import sentry_sdk.tracing
 
     ThreadId = str
@@ -329,10 +328,13 @@ class Profile(object):
         self,
         scheduler,  # type: Scheduler
         transaction,  # type: sentry_sdk.tracing.Transaction
+        hub=None,  # type: Optional[sentry_sdk.Hub]
     ):
         # type: (...) -> None
         self.scheduler = scheduler
         self.transaction = transaction
+        self.hub = hub
+        self.active_thread_id = None  # type: Optional[int]
         self.start_ns = 0  # type: int
         self.stop_ns = 0  # type: int
         self.active = False  # type: bool
@@ -347,6 +349,14 @@ class Profile(object):
 
     def __enter__(self):
         # type: () -> None
+        hub = self.hub or sentry_sdk.Hub.current
+
+        _, scope = hub._stack[-1]
+        old_profile = scope.profile
+        scope.profile = self
+
+        self._context_manager_state = (hub, scope, old_profile)
+
         self.start_ns = nanosecond_time()
         self.scheduler.start_profiling(self)
 
@@ -354,6 +364,11 @@ class Profile(object):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         self.scheduler.stop_profiling(self)
         self.stop_ns = nanosecond_time()
+
+        _, scope, old_profile = self._context_manager_state
+        del self._context_manager_state
+
+        scope.profile = old_profile
 
     def write(self, ts, sample):
         # type: (int, RawSample) -> None
@@ -414,17 +429,13 @@ class Profile(object):
             "thread_metadata": thread_metadata,
         }
 
-    def to_json(self, event_opt, options, scope):
-        # type: (Any, Dict[str, Any], Optional[sentry_sdk.scope.Scope]) -> Dict[str, Any]
-
+    def to_json(self, event_opt, options):
+        # type: (Any, Dict[str, Any]) -> Dict[str, Any]
         profile = self.process()
 
         handle_in_app_impl(
             profile["frames"], options["in_app_exclude"], options["in_app_include"]
         )
-
-        # the active thread id from the scope always take priorty if it exists
-        active_thread_id = None if scope is None else scope.active_thread_id
 
         return {
             "environment": event_opt.get("environment"),
@@ -459,8 +470,8 @@ class Profile(object):
                     "trace_id": self.transaction.trace_id,
                     "active_thread_id": str(
                         self.transaction._active_thread_id
-                        if active_thread_id is None
-                        else active_thread_id
+                        if self.active_thread_id is None
+                        else self.active_thread_id
                     ),
                 }
             ],
@@ -739,7 +750,7 @@ def start_profiling(transaction, hub=None):
     # if profiling was not enabled, this should be a noop
     if _should_profile(transaction, hub):
         assert _scheduler is not None
-        with Profile(_scheduler, transaction):
+        with Profile(_scheduler, transaction, hub):
             yield
     else:
         yield

@@ -433,9 +433,7 @@ class _Client(object):
 
             if is_transaction:
                 if profile is not None:
-                    envelope.add_profile(
-                        profile.to_json(event_opt, self.options, scope)
-                    )
+                    envelope.add_profile(profile.to_json(event_opt, self.options))
                 envelope.add_transaction(event_opt)
             else:
                 envelope.add_event(event_opt)
