@@ -217,7 +217,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
 
         sentry_trace_data = get_value(SENTRY_TRACE_KEY, parent_context)
         trace_data["parent_sampled"] = (
-            sentry_trace_data[2] if sentry_trace_data else None
+            sentry_trace_data["parent_sampled"] if sentry_trace_data else None
         )
 
         baggage = get_value(SENTRY_BAGGAGE_KEY, parent_context)
