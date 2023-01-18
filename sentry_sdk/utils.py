@@ -21,7 +21,6 @@ except ImportError:
 import sentry_sdk
 from sentry_sdk._compat import PY2, PY33, PY37, implements_str, text_type, urlparse
 from sentry_sdk._types import MYPY
-from sentry_sdk.consts import SENSITIVE_DATA_SUBSTITUTE
 
 if MYPY:
     from types import FrameType, TracebackType
@@ -375,6 +374,8 @@ class AnnotatedValue(object):
     def removed_because_contains_sensitive_data(cls):
         # type: () -> AnnotatedValue
         """The actual value was removed because it contained sensitive information."""
+        from sentry_sdk.consts import SENSITIVE_DATA_SUBSTITUTE
+
         return AnnotatedValue(
             value=SENSITIVE_DATA_SUBSTITUTE,
             metadata={
