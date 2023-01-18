@@ -1,3 +1,6 @@
+import json
+import threading
+
 from django import VERSION
 from django.contrib.auth import login
 from django.contrib.auth.models import User
@@ -159,6 +162,16 @@ def csrf_hello_not_exempt(*args, **kwargs):
     return HttpResponse("ok")
 
 
+def thread_ids_sync(*args, **kwargs):
+    response = json.dumps(
+        {
+            "main": threading.main_thread().ident,
+            "active": threading.current_thread().ident,
+        }
+    )
+    return HttpResponse(response)
+
+
 if VERSION >= (3, 1):
     # Use exec to produce valid Python 2
     exec(
@@ -173,6 +186,16 @@ if VERSION >= (3, 1):
     await asyncio.sleep(1)
     return HttpResponse('Hello World')"""
     )
+
+    exec(
+        """async def thread_ids_async(request):
+    response = json.dumps({
+        "main": threading.main_thread().ident,
+        "active": threading.current_thread().ident,
+    })
+    return HttpResponse(response)"""
+    )
 else:
     async_message = None
     my_async_view = None
+    thread_ids_async = None
