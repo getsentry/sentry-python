@@ -478,13 +478,13 @@ class DjangoRequestExtractor(RequestExtractor):
         return self.request.META
 
     def cookies(self):
-        # type: () -> Dict[str, str]
+        # type: () -> Dict[str, Union[str, AnnotatedValue]]
         privacy_cookies = [
             django_settings.CSRF_COOKIE_NAME,
             django_settings.SESSION_COOKIE_NAME,
         ]
 
-        clean_cookies = {}
+        clean_cookies = {}  # type: Dict[str, Union[str, AnnotatedValue]]
         for (key, val) in self.request.COOKIES.items():
             if key in privacy_cookies:
                 clean_cookies[
