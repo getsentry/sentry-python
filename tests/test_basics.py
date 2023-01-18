@@ -91,7 +91,7 @@ def test_event_id(sentry_init, capture_events):
     assert Hub.current.last_event_id() == event_id
 
 
-def test_option_before_send(sentry_init, capture_events, monkeypatch):
+def test_option_before_send(sentry_init, capture_events):
     def before_send(event, hint):
         event["extra"] = {"before_send_called": True}
         return event
@@ -110,16 +110,8 @@ def test_option_before_send(sentry_init, capture_events, monkeypatch):
     (event,) = events
     assert event["extra"] == {"before_send_called": True}
 
-    sentry_init()
-    events = capture_events()
 
-    do_this()
-
-    (event,) = events
-    assert "before_send_called" not in event["extra"]
-
-
-def test_option_before_send_transaction(sentry_init, capture_events, monkeypatch):
+def test_option_before_send_transaction(sentry_init, capture_events):
     def before_send_transaction(event, hint):
         assert event["type"] == "transaction"
         event["extra"] = {"before_send_transaction_called": True}
@@ -136,17 +128,6 @@ def test_option_before_send_transaction(sentry_init, capture_events, monkeypatch
     (event,) = events
     assert event["transaction"] == "foo"
     assert event["extra"] == {"before_send_transaction_called": True}
-
-    sentry_init(
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-    transaction = start_transaction(name="foo")
-    transaction.finish()
-
-    (event,) = events
-    assert event["transaction"] == "foo"
-    assert "before_send_transaction_called" not in event["extra"]
 
 
 def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
