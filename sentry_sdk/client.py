@@ -257,7 +257,7 @@ class _Client(object):
                 logger.info("before send transaction dropped event (%s)", event)
                 if self.transport:
                     self.transport.record_lost_event(
-                        "before_send_transaction", data_category="error"
+                        "before_send", data_category="transaction"
                     )
             event = new_event  # type: ignore
 
