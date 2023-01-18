@@ -7,3 +7,5 @@ coverage:
       python:
         target: 90%
 comment: false
+ignore:
+  - "tests"
