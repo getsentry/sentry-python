@@ -9,3 +9,4 @@ coverage:
 comment: false
 ignore:
   - "tests"
+  - "sentry_sdk/_types.py"
