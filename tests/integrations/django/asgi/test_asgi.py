@@ -1,3 +1,5 @@
+import json
+
 import django
 import pytest
 from channels.testing import HttpCommunicator
@@ -68,6 +70,41 @@ async def test_async_views(sentry_init, capture_events, application):
         "query_string": None,
         "url": "/async_message",
     }
+
+
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
+async def test_active_thread_id(sentry_init, capture_envelopes, endpoint, application):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": 1.0},
+    )
+
+    envelopes = capture_envelopes()
+
+    comm = HttpCommunicator(application, "GET", endpoint)
+    response = await comm.get_response()
+    assert response["status"] == 200, response["body"]
+
+    await comm.wait()
+
+    data = json.loads(response["body"])
+
+    envelopes = [envelope for envelope in envelopes]
+    assert len(envelopes) == 1
+
+    profiles = [item for item in envelopes[0].items if item.type == "profile"]
+    assert len(profiles) == 1
+
+    for profile in profiles:
+        transactions = profile.payload.json["transactions"]
+        assert len(transactions) == 1
+        assert str(data["active"]) == transactions[0]["active_thread_id"]
 
 
 @pytest.mark.asyncio

@@ -27,6 +27,7 @@ if MYPY:
         Type,
     )
 
+    from sentry_sdk.profiler import Profile
     from sentry_sdk.tracing import Span
     from sentry_sdk.session import Session
 
@@ -94,10 +95,7 @@ class Scope(object):
         "_session",
         "_attachments",
         "_force_auto_session_tracking",
-        # The thread that is handling the bulk of the work. This can just
-        # be the main thread, but that's not always true. For web frameworks,
-        # this would be the thread handling the request.
-        "_active_thread_id",
+        "_profile",
     )
 
     def __init__(self):
@@ -129,7 +127,7 @@ class Scope(object):
         self._session = None  # type: Optional[Session]
         self._force_auto_session_tracking = None  # type: Optional[bool]
 
-        self._active_thread_id = None  # type: Optional[int]
+        self._profile = None  # type: Optional[Profile]
 
     @_attr_setter
     def level(self, value):
@@ -235,15 +233,15 @@ class Scope(object):
                 self._transaction = transaction.name
 
     @property
-    def active_thread_id(self):
-        # type: () -> Optional[int]
-        """Get/set the current active thread id."""
-        return self._active_thread_id
+    def profile(self):
+        # type: () -> Optional[Profile]
+        return self._profile
 
-    def set_active_thread_id(self, active_thread_id):
-        # type: (Optional[int]) -> None
-        """Set the current active thread id."""
-        self._active_thread_id = active_thread_id
+    @profile.setter
+    def profile(self, profile):
+        # type: (Optional[Profile]) -> None
+
+        self._profile = profile
 
     def set_tag(
         self,
@@ -464,8 +462,8 @@ class Scope(object):
             self._span = scope._span
         if scope._attachments:
             self._attachments.extend(scope._attachments)
-        if scope._active_thread_id is not None:
-            self._active_thread_id = scope._active_thread_id
+        if scope._profile:
+            self._profile = scope._profile
 
     def update_from_kwargs(
         self,
@@ -515,7 +513,7 @@ class Scope(object):
         rv._force_auto_session_tracking = self._force_auto_session_tracking
         rv._attachments = list(self._attachments)
 
-        rv._active_thread_id = self._active_thread_id
+        rv._profile = self._profile
 
         return rv
 

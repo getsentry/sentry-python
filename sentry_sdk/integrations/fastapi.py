@@ -1,3 +1,6 @@
+import asyncio
+import threading
+
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable
@@ -62,6 +65,26 @@ def patch_get_request_handler():
 
     def _sentry_get_request_handler(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+        dependant = kwargs.get("dependant")
+        if (
+            dependant
+            and dependant.call is not None
+            and not asyncio.iscoroutinefunction(dependant.call)
+        ):
+            old_call = dependant.call
+
+            def _sentry_call(*args, **kwargs):
+                # type: (*Any, **Any) -> Any
+                hub = Hub.current
+                with hub.configure_scope() as sentry_scope:
+                    if sentry_scope.profile is not None:
+                        sentry_scope.profile.active_thread_id = (
+                            threading.current_thread().ident
+                        )
+                    return old_call(*args, **kwargs)
+
+            dependant.call = _sentry_call
+
         old_app = old_get_request_handler(*args, **kwargs)
 
         async def _sentry_app(*args, **kwargs):

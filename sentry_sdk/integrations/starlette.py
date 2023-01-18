@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import asyncio
 import functools
+import threading
 
 from sentry_sdk._compat import iteritems
 from sentry_sdk._types import MYPY
@@ -410,6 +411,11 @@ def patch_request_response():
                     return old_func(*args, **kwargs)
 
                 with hub.configure_scope() as sentry_scope:
+                    if sentry_scope.profile is not None:
+                        sentry_scope.profile.active_thread_id = (
+                            threading.current_thread().ident
+                        )
+
                     request = args[0]
 
                     _set_transaction_name_and_source(
