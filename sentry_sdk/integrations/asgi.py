@@ -109,7 +109,7 @@ class SentryAsgiMiddleware:
             )
 
         asgi_middleware_while_using_starlette_or_fastapi = (
-            "starlette" in _get_installed_modules() and mechanism_type == "asgi"
+            mechanism_type == "asgi" and "starlette" in _get_installed_modules()
         )
         if asgi_middleware_while_using_starlette_or_fastapi:
             logger.warning(
