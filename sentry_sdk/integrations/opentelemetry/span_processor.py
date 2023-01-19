@@ -98,7 +98,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         if not hub:
             return
 
-        if not hub.client.dsn:
+        if not hub.client or (hub.client and not hub.client.dsn):
             return
 
         if hub.client and hub.client.options["instrumenter"] != INSTRUMENTER.OTEL:
