@@ -1,3 +1,4 @@
+import re
 import sys
 import pytest
 
@@ -60,6 +61,25 @@ def test_bytes_serialization_repr(message_normalizer):
     binary = b"abc123\x80\xf0\x9f\x8d\x95"
     result = message_normalizer(binary, should_repr_strings=True)
     assert result == r"b'abc123\x80\xf0\x9f\x8d\x95'"
+
+
+def test_bytearray_serialization_decode(message_normalizer):
+    binary = bytearray(b"abc123\x80\xf0\x9f\x8d\x95")
+    result = message_normalizer(binary, should_repr_strings=False)
+    assert result == "abc123\ufffd\U0001f355"
+
+
+@pytest.mark.xfail(sys.version_info < (3,), reason="Known safe_repr bugs in Py2.7")
+def test_bytearray_serialization_repr(message_normalizer):
+    binary = bytearray(b"abc123\x80\xf0\x9f\x8d\x95")
+    result = message_normalizer(binary, should_repr_strings=True)
+    assert result == r"bytearray(b'abc123\x80\xf0\x9f\x8d\x95')"
+
+
+def test_memoryview_serialization_repr(message_normalizer):
+    binary = memoryview(b"abc123\x80\xf0\x9f\x8d\x95")
+    result = message_normalizer(binary, should_repr_strings=False)
+    assert re.match(r"^<memory at 0x\w+>$", result)
 
 
 def test_serialize_sets(extra_normalizer):

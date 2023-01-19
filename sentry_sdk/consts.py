@@ -20,6 +20,7 @@ if MYPY:
         Event,
         EventProcessor,
         TracesSampler,
+        TransactionProcessor,
     )
 
     # Experiments are feature flags to enable and disable certain unstable SDK
@@ -63,6 +64,9 @@ class OP:
     MIDDLEWARE_STARLETTE = "middleware.starlette"
     MIDDLEWARE_STARLETTE_RECEIVE = "middleware.starlette.receive"
     MIDDLEWARE_STARLETTE_SEND = "middleware.starlette.send"
+    MIDDLEWARE_STARLITE = "middleware.starlite"
+    MIDDLEWARE_STARLITE_RECEIVE = "middleware.starlite.receive"
+    MIDDLEWARE_STARLITE_SEND = "middleware.starlite.send"
     QUEUE_SUBMIT_CELERY = "queue.submit.celery"
     QUEUE_TASK_CELERY = "queue.task.celery"
     QUEUE_TASK_RQ = "queue.task.rq"
@@ -114,6 +118,7 @@ class ClientConstructor(object):
         _experiments={},  # type: Experiments  # noqa: B006
         proxy_headers=None,  # type: Optional[Dict[str, str]]
         instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
+        before_send_transaction=None,  # type: Optional[TransactionProcessor]
     ):
         # type: (...) -> None
         pass
@@ -137,4 +142,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.12.1"
+VERSION = "1.13.0"
