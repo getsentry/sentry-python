@@ -7,3 +7,6 @@ coverage:
       python:
         target: 90%
 comment: false
+ignore:
+  - "tests"
+  - "sentry_sdk/_types.py"

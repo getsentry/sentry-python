@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import asyncio
 import functools
+import threading
 
 from sentry_sdk._compat import iteritems
 from sentry_sdk._types import MYPY
@@ -167,62 +168,66 @@ def patch_exception_middleware(middleware_class):
     """
     old_middleware_init = middleware_class.__init__
 
-    def _sentry_middleware_init(self, *args, **kwargs):
-        # type: (Any, Any, Any) -> None
-        old_middleware_init(self, *args, **kwargs)
+    not_yet_patched = "_sentry_middleware_init" not in str(old_middleware_init)
 
-        # Patch existing exception handlers
-        old_handlers = self._exception_handlers.copy()
+    if not_yet_patched:
 
-        async def _sentry_patched_exception_handler(self, *args, **kwargs):
+        def _sentry_middleware_init(self, *args, **kwargs):
             # type: (Any, Any, Any) -> None
-            exp = args[0]
+            old_middleware_init(self, *args, **kwargs)
 
-            is_http_server_error = (
-                hasattr(exp, "status_code") and exp.status_code >= 500
-            )
-            if is_http_server_error:
-                _capture_exception(exp, handled=True)
+            # Patch existing exception handlers
+            old_handlers = self._exception_handlers.copy()
 
-            # Find a matching handler
-            old_handler = None
-            for cls in type(exp).__mro__:
-                if cls in old_handlers:
-                    old_handler = old_handlers[cls]
-                    break
+            async def _sentry_patched_exception_handler(self, *args, **kwargs):
+                # type: (Any, Any, Any) -> None
+                exp = args[0]
 
-            if old_handler is None:
-                return
+                is_http_server_error = (
+                    hasattr(exp, "status_code") and exp.status_code >= 500
+                )
+                if is_http_server_error:
+                    _capture_exception(exp, handled=True)
 
-            if _is_async_callable(old_handler):
-                return await old_handler(self, *args, **kwargs)
-            else:
-                return old_handler(self, *args, **kwargs)
+                # Find a matching handler
+                old_handler = None
+                for cls in type(exp).__mro__:
+                    if cls in old_handlers:
+                        old_handler = old_handlers[cls]
+                        break
 
-        for key in self._exception_handlers.keys():
-            self._exception_handlers[key] = _sentry_patched_exception_handler
+                if old_handler is None:
+                    return
 
-    middleware_class.__init__ = _sentry_middleware_init
+                if _is_async_callable(old_handler):
+                    return await old_handler(self, *args, **kwargs)
+                else:
+                    return old_handler(self, *args, **kwargs)
 
-    old_call = middleware_class.__call__
+            for key in self._exception_handlers.keys():
+                self._exception_handlers[key] = _sentry_patched_exception_handler
 
-    async def _sentry_exceptionmiddleware_call(self, scope, receive, send):
-        # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
-        # Also add the user (that was eventually set by be Authentication middle
-        # that was called before this middleware). This is done because the authentication
-        # middleware sets the user in the scope and then (in the same function)
-        # calls this exception middelware. In case there is no exception (or no handler
-        # for the type of exception occuring) then the exception bubbles up and setting the
-        # user information into the sentry scope is done in auth middleware and the
-        # ASGI middleware will then send everything to Sentry and this is fine.
-        # But if there is an exception happening that the exception middleware here
-        # has a handler for, it will send the exception directly to Sentry, so we need
-        # the user information right now.
-        # This is why we do it here.
-        _add_user_to_sentry_scope(scope)
-        await old_call(self, scope, receive, send)
+        middleware_class.__init__ = _sentry_middleware_init
 
-    middleware_class.__call__ = _sentry_exceptionmiddleware_call
+        old_call = middleware_class.__call__
+
+        async def _sentry_exceptionmiddleware_call(self, scope, receive, send):
+            # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
+            # Also add the user (that was eventually set by be Authentication middle
+            # that was called before this middleware). This is done because the authentication
+            # middleware sets the user in the scope and then (in the same function)
+            # calls this exception middelware. In case there is no exception (or no handler
+            # for the type of exception occuring) then the exception bubbles up and setting the
+            # user information into the sentry scope is done in auth middleware and the
+            # ASGI middleware will then send everything to Sentry and this is fine.
+            # But if there is an exception happening that the exception middleware here
+            # has a handler for, it will send the exception directly to Sentry, so we need
+            # the user information right now.
+            # This is why we do it here.
+            _add_user_to_sentry_scope(scope)
+            await old_call(self, scope, receive, send)
+
+        middleware_class.__call__ = _sentry_exceptionmiddleware_call
 
 
 def _add_user_to_sentry_scope(scope):
@@ -267,12 +272,16 @@ def patch_authentication_middleware(middleware_class):
     """
     old_call = middleware_class.__call__
 
-    async def _sentry_authenticationmiddleware_call(self, scope, receive, send):
-        # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
-        await old_call(self, scope, receive, send)
-        _add_user_to_sentry_scope(scope)
+    not_yet_patched = "_sentry_authenticationmiddleware_call" not in str(old_call)
 
-    middleware_class.__call__ = _sentry_authenticationmiddleware_call
+    if not_yet_patched:
+
+        async def _sentry_authenticationmiddleware_call(self, scope, receive, send):
+            # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
+            await old_call(self, scope, receive, send)
+            _add_user_to_sentry_scope(scope)
+
+        middleware_class.__call__ = _sentry_authenticationmiddleware_call
 
 
 def patch_middlewares():
@@ -403,6 +412,11 @@ def patch_request_response():
                     return old_func(*args, **kwargs)
 
                 with hub.configure_scope() as sentry_scope:
+                    if sentry_scope.profile is not None:
+                        sentry_scope.profile.active_thread_id = (
+                            threading.current_thread().ident
+                        )
+
                     request = args[0]
 
                     _set_transaction_name_and_source(
