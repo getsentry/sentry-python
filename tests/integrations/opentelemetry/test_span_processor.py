@@ -9,6 +9,7 @@ from sentry_sdk.integrations.opentelemetry.span_processor import (
 from sentry_sdk.tracing import Span, Transaction
 
 from opentelemetry.trace import SpanKind, SpanContext
+from sentry_sdk.tracing_utils import extract_sentrytrace_data
 
 
 def test_is_sentry_span():
@@ -103,7 +104,9 @@ def test_get_trace_data_with_sentry_trace():
     with mock.patch(
         "sentry_sdk.integrations.opentelemetry.span_processor.get_value",
         side_effect=[
-            ("1234567890abcdef1234567890abcdef", "1234567890abcdef", True),
+            extract_sentrytrace_data(
+                "1234567890abcdef1234567890abcdef-1234567890abcdef-1"
+            ),
             None,
         ],
     ):
@@ -118,7 +121,9 @@ def test_get_trace_data_with_sentry_trace():
     with mock.patch(
         "sentry_sdk.integrations.opentelemetry.span_processor.get_value",
         side_effect=[
-            ("1234567890abcdef1234567890abcdef", "1234567890abcdef", False),
+            extract_sentrytrace_data(
+                "1234567890abcdef1234567890abcdef-1234567890abcdef-0"
+            ),
             None,
         ],
     ):
@@ -150,7 +155,9 @@ def test_get_trace_data_with_sentry_trace_and_baggage():
     with mock.patch(
         "sentry_sdk.integrations.opentelemetry.span_processor.get_value",
         side_effect=[
-            ("1234567890abcdef1234567890abcdef", "1234567890abcdef", True),
+            extract_sentrytrace_data(
+                "1234567890abcdef1234567890abcdef-1234567890abcdef-1"
+            ),
             baggage,
         ],
     ):
