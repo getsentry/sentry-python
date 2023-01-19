@@ -32,14 +32,12 @@ try:
     from starlette.applications import Starlette  # type: ignore
     from starlette.datastructures import UploadFile  # type: ignore
     from starlette.middleware import Middleware  # type: ignore
-    from starlette.middleware.authentication import (
+    from starlette.middleware.authentication import (  # type: ignore
         AuthenticationMiddleware,
-    )  # type: ignore
+    )
     from starlette.requests import Request  # type: ignore
     from starlette.routing import Match  # type: ignore
-    from starlette.types import ASGIApp, Receive
-    from starlette.types import Scope as StarletteScope  # type: ignore
-    from starlette.types import Send
+    from starlette.types import ASGIApp, Receive, Scope as StarletteScope, Send  # type: ignore
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
 
