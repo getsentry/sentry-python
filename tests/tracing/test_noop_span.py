@@ -11,10 +11,13 @@ from sentry_sdk.tracing import NoOpSpan
 def test_noop_start_transaction(sentry_init):
     sentry_init(instrumenter="otel", debug=True)
 
-    transaction = sentry_sdk.start_transaction(op="task", name="test_transaction_name")
-    assert isinstance(transaction, NoOpSpan)
+    with sentry_sdk.start_transaction(
+        op="task", name="test_transaction_name"
+    ) as transaction:
+        assert isinstance(transaction, NoOpSpan)
+        assert sentry_sdk.Hub.current.scope.span is transaction
 
-    transaction.name = "new name"
+        transaction.name = "new name"
 
 
 def test_noop_start_span(sentry_init):
@@ -22,6 +25,7 @@ def test_noop_start_span(sentry_init):
 
     with sentry_sdk.start_span(op="http", description="GET /") as span:
         assert isinstance(span, NoOpSpan)
+        assert sentry_sdk.Hub.current.scope.span is span
 
         span.set_tag("http.status_code", "418")
         span.set_data("http.entity_type", "teapot")
@@ -35,6 +39,7 @@ def test_noop_transaction_start_child(sentry_init):
 
     with transaction.start_child(op="child_task") as child:
         assert isinstance(child, NoOpSpan)
+        assert sentry_sdk.Hub.current.scope.span is child
 
 
 def test_noop_span_start_child(sentry_init):
@@ -44,3 +49,4 @@ def test_noop_span_start_child(sentry_init):
 
     with span.start_child(op="child_task") as child:
         assert isinstance(child, NoOpSpan)
+        assert sentry_sdk.Hub.current.scope.span is child

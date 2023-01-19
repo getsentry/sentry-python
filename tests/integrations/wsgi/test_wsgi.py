@@ -297,8 +297,8 @@ def test_auto_session_tracking_with_aggregates(sentry_init, capture_envelopes):
     ],
 )
 def test_profile_sent(
-    capture_envelopes,
     sentry_init,
+    capture_envelopes,
     teardown_profiling,
     profiles_sample_rate,
     profile_count,
