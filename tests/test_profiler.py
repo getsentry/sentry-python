@@ -27,6 +27,7 @@ def requires_python_version(major, minor, reason=None):
         reason = "Requires Python {}.{}".format(major, minor)
     return pytest.mark.skipif(sys.version_info < (major, minor), reason=reason)
 
+
 requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
 
 
