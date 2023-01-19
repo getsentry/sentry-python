@@ -154,6 +154,22 @@ def test_in_app(empty):
     ) == [{"module": "foo", "in_app": False}, {"module": "bar", "in_app": True}]
 
 
+def test_default_in_app():
+    assert handle_in_app_impl(
+        [{"module": "foo"}, {"module": "bar"}], in_app_include=None, in_app_exclude=None
+    ) == [
+        {"module": "foo", "in_app": True},
+        {"module": "bar", "in_app": True},
+    ]
+
+    assert handle_in_app_impl(
+        [{"module": "foo"}, {"module": "bar"}],
+        in_app_include=None,
+        in_app_exclude=None,
+        default_in_app=False,
+    ) == [{"module": "foo"}, {"module": "bar"}]
+
+
 def test_iter_stacktraces():
     assert set(
         iter_event_stacktraces(

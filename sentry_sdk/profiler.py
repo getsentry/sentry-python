@@ -439,7 +439,10 @@ class Profile(object):
         profile = self.process()
 
         handle_in_app_impl(
-            profile["frames"], options["in_app_exclude"], options["in_app_include"]
+            profile["frames"],
+            options["in_app_exclude"],
+            options["in_app_include"],
+            default_in_app=False,  # Do not default a frame to `in_app: True`
         )
 
         return {
