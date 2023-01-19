@@ -9,12 +9,18 @@ from sentry_sdk._types import MYPY
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.integrations._wsgi_common import (_is_json_content_type,
-                                                  request_body_within_bounds)
+from sentry_sdk.integrations._wsgi_common import (
+    _is_json_content_type,
+    request_body_within_bounds,
+)
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
-from sentry_sdk.utils import (AnnotatedValue, capture_internal_exceptions,
-                              event_from_exception, transaction_from_function)
+from sentry_sdk.utils import (
+    AnnotatedValue,
+    capture_internal_exceptions,
+    event_from_exception,
+    transaction_from_function,
+)
 
 if MYPY:
     from typing import Any, Awaitable, Callable, Dict, Optional
@@ -26,8 +32,9 @@ try:
     from starlette.applications import Starlette  # type: ignore
     from starlette.datastructures import UploadFile  # type: ignore
     from starlette.middleware import Middleware  # type: ignore
-    from starlette.middleware.authentication import \
-        AuthenticationMiddleware  # type: ignore
+    from starlette.middleware.authentication import (
+        AuthenticationMiddleware,
+    )  # type: ignore
     from starlette.requests import Request  # type: ignore
     from starlette.routing import Match  # type: ignore
     from starlette.types import ASGIApp, Receive
@@ -38,8 +45,7 @@ except ImportError:
 
 try:
     # Starlette 0.20
-    from starlette.middleware.exceptions import \
-        ExceptionMiddleware  # type: ignore
+    from starlette.middleware.exceptions import ExceptionMiddleware  # type: ignore
 except ImportError:
     # Startlette 0.19.1
     from starlette.exceptions import ExceptionMiddleware  # type: ignore
@@ -167,6 +173,7 @@ def patch_exception_middleware(middleware_class):
     not_yet_patched = "_sentry_middleware_init" not in str(old_middleware_init)
 
     if not_yet_patched:
+
         def _sentry_middleware_init(self, *args, **kwargs):
             # type: (Any, Any, Any) -> None
             old_middleware_init(self, *args, **kwargs)
