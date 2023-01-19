@@ -6,8 +6,9 @@ import threading
 import pytest
 
 from sentry_sdk.profiler import (
+    GeventScheduler,
     Profile,
-    SleepScheduler,
+    ThreadScheduler,
     extract_frame,
     extract_stack,
     get_frame_name,
@@ -15,23 +16,46 @@ from sentry_sdk.profiler import (
 )
 from sentry_sdk.tracing import Transaction
 
+try:
+    import gevent
+except ImportError:
+    gevent = None
+
 
 minimum_python_33 = pytest.mark.skipif(
     sys.version_info < (3, 3), reason="Profiling is only supported in Python >= 3.3"
 )
+
+requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
 
 
 def process_test_sample(sample):
     return [(tid, (stack, stack)) for tid, stack in sample]
 
 
-@minimum_python_33
-def test_profiler_invalid_mode(teardown_profiling):
+@pytest.mark.parametrize(
+    "mode",
+    [
+        pytest.param("foo"),
+        pytest.param(
+            "gevent",
+            marks=pytest.mark.skipif(gevent is not None, reason="gevent not enabled"),
+        ),
+    ],
+)
+def test_profiler_invalid_mode(mode, teardown_profiling):
     with pytest.raises(ValueError):
-        setup_profiler({"_experiments": {"profiler_mode": "magic"}})
+        setup_profiler({"_experiments": {"profiler_mode": mode}})
 
 
-@pytest.mark.parametrize("mode", ["sleep"])
+@pytest.mark.parametrize(
+    "mode",
+    [
+        pytest.param("thread"),
+        pytest.param("sleep"),
+        pytest.param("gevent", marks=requires_gevent),
+    ],
+)
 def test_profiler_valid_mode(mode, teardown_profiling):
     # should not raise any exceptions
     setup_profiler({"_experiments": {"profiler_mode": mode}})
@@ -56,7 +80,6 @@ class GetFrameBase:
 
     def inherited_instance_method_wrapped(self):
         def wrapped():
-            self
             return inspect.currentframe()
 
         return wrapped
@@ -68,7 +91,6 @@ class GetFrameBase:
     @classmethod
     def inherited_class_method_wrapped(cls):
         def wrapped():
-            cls
             return inspect.currentframe()
 
         return wrapped
@@ -84,7 +106,6 @@ class GetFrame(GetFrameBase):
 
     def instance_method_wrapped(self):
         def wrapped():
-            self
             return inspect.currentframe()
 
         return wrapped
@@ -96,7 +117,6 @@ class GetFrame(GetFrameBase):
     @classmethod
     def class_method_wrapped(cls):
         def wrapped():
-            cls
             return inspect.currentframe()
 
         return wrapped
@@ -258,7 +278,19 @@ def get_scheduler_threads(scheduler):
 @minimum_python_33
 @pytest.mark.parametrize(
     ("scheduler_class",),
-    [pytest.param(SleepScheduler, id="sleep scheduler")],
+    [
+        pytest.param(ThreadScheduler, id="thread scheduler"),
+        pytest.param(
+            GeventScheduler,
+            marks=[
+                requires_gevent,
+                pytest.mark.skip(
+                    reason="cannot find this thread via threading.enumerate()"
+                ),
+            ],
+            id="gevent scheduler",
+        ),
+    ],
 )
 def test_thread_scheduler_single_background_thread(scheduler_class):
     scheduler = scheduler_class(frequency=1000)
@@ -576,7 +608,10 @@ thread_metadata = {
 )
 @pytest.mark.parametrize(
     ("scheduler_class",),
-    [pytest.param(SleepScheduler, id="sleep scheduler")],
+    [
+        pytest.param(ThreadScheduler, id="thread scheduler"),
+        pytest.param(GeventScheduler, marks=requires_gevent, id="gevent scheduler"),
+    ],
 )
 def test_profile_processing(
     DictionaryContaining,  # noqa: N803

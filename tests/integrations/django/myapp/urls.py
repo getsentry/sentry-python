@@ -58,6 +58,7 @@ urlpatterns = [
         views.csrf_hello_not_exempt,
         name="csrf_hello_not_exempt",
     ),
+    path("sync/thread_ids", views.thread_ids_sync, name="thread_ids_sync"),
 ]
 
 # async views
@@ -66,6 +67,11 @@ if views.async_message is not None:
 
 if views.my_async_view is not None:
     urlpatterns.append(path("my_async_view", views.my_async_view, name="my_async_view"))
+
+if views.thread_ids_async is not None:
+    urlpatterns.append(
+        path("async/thread_ids", views.thread_ids_async, name="thread_ids_async")
+    )
 
 # rest framework
 try:
