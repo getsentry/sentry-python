@@ -9,18 +9,12 @@ from sentry_sdk._types import MYPY
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.integrations._wsgi_common import (
-    _is_json_content_type,
-    request_body_within_bounds,
-)
+from sentry_sdk.integrations._wsgi_common import (_is_json_content_type,
+                                                  request_body_within_bounds)
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
-from sentry_sdk.utils import (
-    AnnotatedValue,
-    capture_internal_exceptions,
-    event_from_exception,
-    transaction_from_function,
-)
+from sentry_sdk.utils import (AnnotatedValue, capture_internal_exceptions,
+                              event_from_exception, transaction_from_function)
 
 if MYPY:
     from typing import Any, Awaitable, Callable, Dict, Optional
@@ -32,18 +26,20 @@ try:
     from starlette.applications import Starlette  # type: ignore
     from starlette.datastructures import UploadFile  # type: ignore
     from starlette.middleware import Middleware  # type: ignore
-    from starlette.middleware.authentication import (  # type: ignore
-        AuthenticationMiddleware,
-    )
+    from starlette.middleware.authentication import \
+        AuthenticationMiddleware  # type: ignore
     from starlette.requests import Request  # type: ignore
     from starlette.routing import Match  # type: ignore
-    from starlette.types import ASGIApp, Receive, Scope as StarletteScope, Send  # type: ignore
+    from starlette.types import ASGIApp, Receive
+    from starlette.types import Scope as StarletteScope  # type: ignore
+    from starlette.types import Send
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
 
 try:
     # Starlette 0.20
-    from starlette.middleware.exceptions import ExceptionMiddleware  # type: ignore
+    from starlette.middleware.exceptions import \
+        ExceptionMiddleware  # type: ignore
 except ImportError:
     # Startlette 0.19.1
     from starlette.exceptions import ExceptionMiddleware  # type: ignore
@@ -210,23 +206,23 @@ def patch_exception_middleware(middleware_class):
 
         old_call = middleware_class.__call__
 
-    async def _sentry_exceptionmiddleware_call(self, scope, receive, send):
-        # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
-        # Also add the user (that was eventually set by be Authentication middle
-        # that was called before this middleware). This is done because the authentication
-        # middleware sets the user in the scope and then (in the same function)
-        # calls this exception middelware. In case there is no exception (or no handler
-        # for the type of exception occuring) then the exception bubbles up and setting the
-        # user information into the sentry scope is done in auth middleware and the
-        # ASGI middleware will then send everything to Sentry and this is fine.
-        # But if there is an exception happening that the exception middleware here
-        # has a handler for, it will send the exception directly to Sentry, so we need
-        # the user information right now.
-        # This is why we do it here.
-        _add_user_to_sentry_scope(scope)
-        await old_call(self, scope, receive, send)
+        async def _sentry_exceptionmiddleware_call(self, scope, receive, send):
+            # type: (Dict[str, Any], Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
+            # Also add the user (that was eventually set by be Authentication middle
+            # that was called before this middleware). This is done because the authentication
+            # middleware sets the user in the scope and then (in the same function)
+            # calls this exception middelware. In case there is no exception (or no handler
+            # for the type of exception occuring) then the exception bubbles up and setting the
+            # user information into the sentry scope is done in auth middleware and the
+            # ASGI middleware will then send everything to Sentry and this is fine.
+            # But if there is an exception happening that the exception middleware here
+            # has a handler for, it will send the exception directly to Sentry, so we need
+            # the user information right now.
+            # This is why we do it here.
+            _add_user_to_sentry_scope(scope)
+            await old_call(self, scope, receive, send)
 
-    middleware_class.__call__ = _sentry_exceptionmiddleware_call
+        middleware_class.__call__ = _sentry_exceptionmiddleware_call
 
 
 def _add_user_to_sentry_scope(scope):
