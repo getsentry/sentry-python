@@ -6,5 +6,5 @@ types-redis
 types-setuptools
 pymongo # There is no separate types module.
 flake8-bugbear==22.12.6
-pep8-naming==0.13.2
+pep8-naming==0.13.3
 pre-commit # local linting
