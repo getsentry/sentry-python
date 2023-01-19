@@ -371,7 +371,7 @@ class AnnotatedValue(object):
         )
 
     @classmethod
-    def removed_because_contains_sensitive_data(cls):
+    def substituted_because_contains_sensitive_data(cls):
         # type: () -> AnnotatedValue
         """The actual value was removed because it contained sensitive information."""
         from sentry_sdk.consts import SENSITIVE_DATA_SUBSTITUTE

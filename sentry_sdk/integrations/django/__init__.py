@@ -489,7 +489,7 @@ class DjangoRequestExtractor(RequestExtractor):
             if key in privacy_cookies:
                 clean_cookies[
                     key
-                ] = AnnotatedValue.removed_because_contains_sensitive_data()
+                ] = AnnotatedValue.substituted_because_contains_sensitive_data()
             else:
                 clean_cookies[key] = val
 
