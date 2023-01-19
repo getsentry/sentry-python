@@ -248,6 +248,19 @@ class _Client(object):
                     )
             event = new_event  # type: ignore
 
+        before_send_transaction = self.options["before_send_transaction"]
+        if before_send_transaction is not None and event.get("type") == "transaction":
+            new_event = None
+            with capture_internal_exceptions():
+                new_event = before_send_transaction(event, hint or {})
+            if new_event is None:
+                logger.info("before send transaction dropped event (%s)", event)
+                if self.transport:
+                    self.transport.record_lost_event(
+                        "before_send", data_category="transaction"
+                    )
+            event = new_event  # type: ignore
+
         return event
 
     def _is_ignored_error(self, event, hint):
@@ -433,9 +446,7 @@ class _Client(object):
 
             if is_transaction:
                 if profile is not None:
-                    envelope.add_profile(
-                        profile.to_json(event_opt, self.options, scope)
-                    )
+                    envelope.add_profile(profile.to_json(event_opt, self.options))
                 envelope.add_transaction(event_opt)
             else:
                 envelope.add_event(event_opt)
