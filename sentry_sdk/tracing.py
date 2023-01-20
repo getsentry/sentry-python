@@ -709,6 +709,7 @@ class Transaction(Span):
 
         if hub.client is not None and self._profile is not None:
             event["profile"] = self._profile
+            contexts.update({"profile": self._profile.get_profile_context()})
 
         if has_custom_measurements_enabled():
             event["measurements"] = self._measurements
