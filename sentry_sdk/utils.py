@@ -370,6 +370,24 @@ class AnnotatedValue(object):
             },
         )
 
+    @classmethod
+    def substituted_because_contains_sensitive_data(cls):
+        # type: () -> AnnotatedValue
+        """The actual value was removed because it contained sensitive information."""
+        from sentry_sdk.consts import SENSITIVE_DATA_SUBSTITUTE
+
+        return AnnotatedValue(
+            value=SENSITIVE_DATA_SUBSTITUTE,
+            metadata={
+                "rem": [  # Remark
+                    [
+                        "!config",  # Because of SDK configuration (in this case the config is the hard coded removal of certain django cookies)
+                        "s",  # The fields original value was substituted
+                    ]
+                ]
+            },
+        )
+
 
 if MYPY:
     from typing import TypeVar
