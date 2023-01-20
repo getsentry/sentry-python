@@ -102,7 +102,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
             return
 
         try:
-            _ = Dsn(hub.client.dsn)
+            _ = Dsn(hub.client.dsn or "")
         except Exception:
             return
 
