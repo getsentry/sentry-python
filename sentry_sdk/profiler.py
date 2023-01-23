@@ -103,6 +103,11 @@ if MYPY:
         },
     )
 
+    ProfileContext = TypedDict(
+        "ProfileContext",
+        {"profile_id": str},
+    )
+
 try:
     from gevent.monkey import is_module_patched  # type: ignore
 except ImportError:
@@ -343,6 +348,7 @@ class Profile(object):
         self.start_ns = 0  # type: int
         self.stop_ns = 0  # type: int
         self.active = False  # type: bool
+        self.event_id = uuid.uuid4().hex  # type: str
 
         self.indexed_frames = {}  # type: Dict[RawFrame, int]
         self.indexed_stacks = {}  # type: Dict[RawStackId, int]
@@ -351,6 +357,10 @@ class Profile(object):
         self.samples = []  # type: List[ProcessedSample]
 
         transaction._profile = self
+
+    def get_profile_context(self):
+        # type: () -> ProfileContext
+        return {"profile_id": self.event_id}
 
     def __enter__(self):
         # type: () -> None
@@ -447,7 +457,7 @@ class Profile(object):
 
         return {
             "environment": event_opt.get("environment"),
-            "event_id": uuid.uuid4().hex,
+            "event_id": self.event_id,
             "platform": "python",
             "profile": profile,
             "release": event_opt.get("release", ""),

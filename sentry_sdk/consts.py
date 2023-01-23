@@ -44,6 +44,8 @@ if MYPY:
 DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
 
+SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
+
 
 class INSTRUMENTER:
     SENTRY = "sentry"
@@ -142,4 +144,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.13.0"
+VERSION = "1.14.0"
