@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.14.0
+
+### Various fixes & improvements
+
+- Removed code coverage target (#1862) by @antonpirker
+- feat(profiling): Add profile context to transaction (#1860) by @Zylphrex
+- Always remove Django session related cookies. (#1842) by @antonpirker
+- Make sure to noop when there is no DSN (#1852) by @antonpirker
+- feat(profiling): Use co_qualname in python 3.11 (#1831) by @Zylphrex
+- Fix middleware being patched multiple times when using FastAPI (#1841) by @JohnnyDeuss
+- fix(opentelemetry): Use dict for sentry-trace context instead of tuple (#1847) by @AbhiPrasad
+- fix extra dependency (#1825) by @bernardotorres
+- Avoid import of pkg_resource with Starlette integration (#1836) by @mgu
+- Add `before_send_transaction` (#1840) by @antonpirker
+- feat(profiling): Enable profiling for ASGI frameworks (#1824) by @Zylphrex
+- feat(profiling): Better gevent support (#1822) by @Zylphrex
+- fix(otel): NoOpSpan updates scope (#1834) by @Zylphrex
+
 ## 1.13.0
 
 ### Various fixes & improvements
