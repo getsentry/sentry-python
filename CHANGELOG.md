@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.14.0
+
+### Various fixes & improvements
+
+- Add `before_send_transaction` (#1840) by @antonpirker
+
+  Adds a hook (similar to `before_send`) that is called for all transaction events (performance releated data).
+
+  Usage:
+
+  ```python
+    import sentry_sdk
+
+    def strip_sensitive_data(event, hint):
+        # modify event here (or return `None` if you want to drop the event entirely)
+        return event
+
+    sentry_sdk.init(
+        # ...
+        before_send_transaction=strip_sensitive_data,
+    )
+  ```
+
+  See also: https://docs.sentry.io/platforms/python/configuration/filtering/#using-platformidentifier-namebefore-send-transaction-
+
+- Django: Always remove values of Django session related cookies. (#1842) by @antonpirker
+- Profiling: Enable profiling for ASGI frameworks (#1824) by @Zylphrex
+- Profiling: Better gevent support (#1822) by @Zylphrex
+- Profiling: Add profile context to transaction (#1860) by @Zylphrex
+- Profiling: Use co_qualname in python 3.11 (#1831) by @Zylphrex
+- OpenTelemetry: fix Use dict for sentry-trace context instead of tuple (#1847) by @AbhiPrasad
+- OpenTelemetry: fix extra dependency (#1825) by @bernardotorres
+- OpenTelemetry: fix NoOpSpan updates scope (#1834) by @Zylphrex
+- OpenTelemetry: Make sure to noop when there is no DSN (#1852) by @antonpirker
+- FastAPI: Fix middleware being patched multiple times (#1841) by @JohnnyDeuss
+- Starlette: Avoid import of pkg_resource with Starlette integration (#1836) by @mgu
+- Removed code coverage target (#1862) by @antonpirker
+
 ## 1.13.0
 
 ### Various fixes & improvements

@@ -98,6 +98,14 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         if not hub:
             return
 
+        if not hub.client or (hub.client and not hub.client.dsn):
+            return
+
+        try:
+            _ = Dsn(hub.client.dsn or "")
+        except Exception:
+            return
+
         if hub.client and hub.client.options["instrumenter"] != INSTRUMENTER.OTEL:
             return
 
@@ -217,7 +225,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
 
         sentry_trace_data = get_value(SENTRY_TRACE_KEY, parent_context)
         trace_data["parent_sampled"] = (
-            sentry_trace_data[2] if sentry_trace_data else None
+            sentry_trace_data["parent_sampled"] if sentry_trace_data else None
         )
 
         baggage = get_value(SENTRY_BAGGAGE_KEY, parent_context)

@@ -24,7 +24,7 @@ from collections import deque
 from contextlib import contextmanager
 
 import sentry_sdk
-from sentry_sdk._compat import PY33
+from sentry_sdk._compat import PY33, PY311
 from sentry_sdk._types import MYPY
 from sentry_sdk.utils import (
     filename_for_module,
@@ -101,6 +101,11 @@ if MYPY:
             "samples": List[ProcessedSample],
             "thread_metadata": Dict[ThreadId, ProcessedThreadMetadata],
         },
+    )
+
+    ProfileContext = TypedDict(
+        "ProfileContext",
+        {"profile_id": str},
     )
 
 try:
@@ -269,55 +274,60 @@ def extract_frame(frame, cwd):
     )
 
 
-def get_frame_name(frame):
-    # type: (FrameType) -> str
+if PY311:
 
-    # in 3.11+, there is a frame.f_code.co_qualname that
-    # we should consider using instead where possible
+    def get_frame_name(frame):
+        # type: (FrameType) -> str
+        return frame.f_code.co_qualname  # type: ignore
 
-    f_code = frame.f_code
-    co_varnames = f_code.co_varnames
+else:
 
-    # co_name only contains the frame name.  If the frame was a method,
-    # the class name will NOT be included.
-    name = f_code.co_name
+    def get_frame_name(frame):
+        # type: (FrameType) -> str
 
-    # if it was a method, we can get the class name by inspecting
-    # the f_locals for the `self` argument
-    try:
-        if (
-            # the co_varnames start with the frame's positional arguments
-            # and we expect the first to be `self` if its an instance method
-            co_varnames
-            and co_varnames[0] == "self"
-            and "self" in frame.f_locals
-        ):
-            for cls in frame.f_locals["self"].__class__.__mro__:
-                if name in cls.__dict__:
-                    return "{}.{}".format(cls.__name__, name)
-    except AttributeError:
-        pass
+        f_code = frame.f_code
+        co_varnames = f_code.co_varnames
 
-    # if it was a class method, (decorated with `@classmethod`)
-    # we can get the class name by inspecting the f_locals for the `cls` argument
-    try:
-        if (
-            # the co_varnames start with the frame's positional arguments
-            # and we expect the first to be `cls` if its a class method
-            co_varnames
-            and co_varnames[0] == "cls"
-            and "cls" in frame.f_locals
-        ):
-            for cls in frame.f_locals["cls"].__mro__:
-                if name in cls.__dict__:
-                    return "{}.{}".format(cls.__name__, name)
-    except AttributeError:
-        pass
+        # co_name only contains the frame name.  If the frame was a method,
+        # the class name will NOT be included.
+        name = f_code.co_name
 
-    # nothing we can do if it is a staticmethod (decorated with @staticmethod)
+        # if it was a method, we can get the class name by inspecting
+        # the f_locals for the `self` argument
+        try:
+            if (
+                # the co_varnames start with the frame's positional arguments
+                # and we expect the first to be `self` if its an instance method
+                co_varnames
+                and co_varnames[0] == "self"
+                and "self" in frame.f_locals
+            ):
+                for cls in frame.f_locals["self"].__class__.__mro__:
+                    if name in cls.__dict__:
+                        return "{}.{}".format(cls.__name__, name)
+        except AttributeError:
+            pass
 
-    # we've done all we can, time to give up and return what we have
-    return name
+        # if it was a class method, (decorated with `@classmethod`)
+        # we can get the class name by inspecting the f_locals for the `cls` argument
+        try:
+            if (
+                # the co_varnames start with the frame's positional arguments
+                # and we expect the first to be `cls` if its a class method
+                co_varnames
+                and co_varnames[0] == "cls"
+                and "cls" in frame.f_locals
+            ):
+                for cls in frame.f_locals["cls"].__mro__:
+                    if name in cls.__dict__:
+                        return "{}.{}".format(cls.__name__, name)
+        except AttributeError:
+            pass
+
+        # nothing we can do if it is a staticmethod (decorated with @staticmethod)
+
+        # we've done all we can, time to give up and return what we have
+        return name
 
 
 MAX_PROFILE_DURATION_NS = int(3e10)  # 30 seconds
@@ -338,6 +348,7 @@ class Profile(object):
         self.start_ns = 0  # type: int
         self.stop_ns = 0  # type: int
         self.active = False  # type: bool
+        self.event_id = uuid.uuid4().hex  # type: str
 
         self.indexed_frames = {}  # type: Dict[RawFrame, int]
         self.indexed_stacks = {}  # type: Dict[RawStackId, int]
@@ -346,6 +357,10 @@ class Profile(object):
         self.samples = []  # type: List[ProcessedSample]
 
         transaction._profile = self
+
+    def get_profile_context(self):
+        # type: () -> ProfileContext
+        return {"profile_id": self.event_id}
 
     def __enter__(self):
         # type: () -> None
@@ -439,7 +454,7 @@ class Profile(object):
 
         return {
             "environment": event_opt.get("environment"),
-            "event_id": uuid.uuid4().hex,
+            "event_id": self.event_id,
             "platform": "python",
             "profile": profile,
             "release": event_opt.get("release", ""),

@@ -22,9 +22,11 @@ except ImportError:
     gevent = None
 
 
-minimum_python_33 = pytest.mark.skipif(
-    sys.version_info < (3, 3), reason="Profiling is only supported in Python >= 3.3"
-)
+def requires_python_version(major, minor, reason=None):
+    if reason is None:
+        reason = "Requires Python {}.{}".format(major, minor)
+    return pytest.mark.skipif(sys.version_info < (major, minor), reason=reason)
+
 
 requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
 
@@ -33,6 +35,7 @@ def process_test_sample(sample):
     return [(tid, (stack, stack)) for tid, stack in sample]
 
 
+@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     "mode",
     [
@@ -146,7 +149,9 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().instance_method_wrapped()(),
-            "wrapped",
+            "wrapped"
+            if sys.version_info < (3, 11)
+            else "GetFrame.instance_method_wrapped.<locals>.wrapped",
             id="instance_method_wrapped",
         ),
         pytest.param(
@@ -156,14 +161,15 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().class_method_wrapped()(),
-            "wrapped",
+            "wrapped"
+            if sys.version_info < (3, 11)
+            else "GetFrame.class_method_wrapped.<locals>.wrapped",
             id="class_method_wrapped",
         ),
         pytest.param(
             GetFrame().static_method(),
-            "GetFrame.static_method",
+            "static_method" if sys.version_info < (3, 11) else "GetFrame.static_method",
             id="static_method",
-            marks=pytest.mark.skip(reason="unsupported"),
         ),
         pytest.param(
             GetFrame().inherited_instance_method(),
@@ -172,7 +178,9 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().inherited_instance_method_wrapped()(),
-            "wrapped",
+            "wrapped"
+            if sys.version_info < (3, 11)
+            else "GetFrameBase.inherited_instance_method_wrapped.<locals>.wrapped",
             id="instance_method_wrapped",
         ),
         pytest.param(
@@ -182,14 +190,17 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().inherited_class_method_wrapped()(),
-            "wrapped",
+            "wrapped"
+            if sys.version_info < (3, 11)
+            else "GetFrameBase.inherited_class_method_wrapped.<locals>.wrapped",
             id="inherited_class_method_wrapped",
         ),
         pytest.param(
             GetFrame().inherited_static_method(),
-            "GetFrameBase.static_method",
+            "inherited_static_method"
+            if sys.version_info < (3, 11)
+            else "GetFrameBase.inherited_static_method",
             id="inherited_static_method",
-            marks=pytest.mark.skip(reason="unsupported"),
         ),
     ],
 )
@@ -275,7 +286,7 @@ def get_scheduler_threads(scheduler):
     return [thread for thread in threading.enumerate() if thread.name == scheduler.name]
 
 
-@minimum_python_33
+@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("scheduler_class",),
     [
