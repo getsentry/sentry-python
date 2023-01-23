@@ -4,6 +4,8 @@ coverage:
       default: false
     patch:
       default: false
+      python:
+        target: 65%
 comment: false
 ignore:
   - "tests"
