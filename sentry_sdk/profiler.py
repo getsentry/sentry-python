@@ -344,15 +344,19 @@ class Profile(object):
     ):
         # type: (...) -> None
         self.scheduler = _scheduler if scheduler is None else scheduler
-        self.transaction = transaction
         self.hub = hub
 
-        self.sampled = transaction.sampled  # type: Optional[bool]
+        self.event_id = uuid.uuid4().hex  # type: str
+
+        self._transaction_sampled = transaction.sampled  # type: Optional[bool]
+        self.sampled = None  # type: Optional[bool]
+
+        self._default_active_thread_id = threading.current_thread().ident or 0  # type: int
         self.active_thread_id = None  # type: Optional[int]
+
         self.start_ns = 0  # type: int
         self.stop_ns = 0  # type: int
         self.active = False  # type: bool
-        self.event_id = uuid.uuid4().hex  # type: str
 
         self.indexed_frames = {}  # type: Dict[RawFrame, int]
         self.indexed_stacks = {}  # type: Dict[RawStackId, int]
@@ -376,7 +380,7 @@ class Profile(object):
 
         # The corresponding transaction was not sampled,
         # so don't generate a profile for it.
-        if not self.transaction.sampled:
+        if not self._transaction_sampled:
             self.sampled = False
             return
 
@@ -544,7 +548,7 @@ class Profile(object):
             "transactions": [
                 {
                     "id": event_opt["event_id"],
-                    "name": self.transaction.name,
+                    "name": event_opt["transaction"],
                     # we start the transaction before the profile and this is
                     # the transaction start time relative to the profile, so we
                     # hardcode it to 0 until we can start the profile before
@@ -552,9 +556,9 @@ class Profile(object):
                     # use the duration of the profile instead of the transaction
                     # because we end the transaction after the profile
                     "relative_end_ns": str(self.stop_ns - self.start_ns),
-                    "trace_id": self.transaction.trace_id,
+                    "trace_id": event_opt["contexts"]["trace"]["trace_id"],
                     "active_thread_id": str(
-                        self.transaction._active_thread_id
+                        self._default_active_thread_id
                         if self.active_thread_id is None
                         else self.active_thread_id
                     ),

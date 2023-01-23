@@ -567,7 +567,6 @@ class Transaction(Span):
         "_contexts",
         "_profile",
         "_baggage",
-        "_active_thread_id",
     )
 
     def __init__(
@@ -606,11 +605,6 @@ class Transaction(Span):
         self._contexts = {}  # type: Dict[str, Any]
         self._profile = None  # type: Optional[sentry_sdk.profiler.Profile]
         self._baggage = baggage
-        # for profiling, we want to know on which thread a transaction is started
-        # to accurately show the active thread in the UI
-        self._active_thread_id = (
-            threading.current_thread().ident
-        )  # used by profiling.py
 
     def __repr__(self):
         # type: () -> str
@@ -726,6 +720,7 @@ class Transaction(Span):
         if self._profile is not None and self._profile.sampled:
             event["profile"] = self._profile
             contexts.update({"profile": self._profile.get_profile_context()})
+            self._profile = None
 
         if has_custom_measurements_enabled():
             event["measurements"] = self._measurements
