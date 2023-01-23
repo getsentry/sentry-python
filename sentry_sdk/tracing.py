@@ -628,6 +628,22 @@ class Transaction(Span):
             )
         )
 
+    def __enter__(self):
+        # type: () -> Transaction
+        super(Transaction, self).__enter__()
+
+        if self._profile is not None:
+            self._profile.__enter__()
+
+        return self
+
+    def __exit__(self, ty, value, tb):
+        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+        if self._profile is not None:
+            self._profile.__exit__(ty, value, tb)
+
+        super(Transaction, self).__exit__(ty, value, tb)
+
     @property
     def containing_transaction(self):
         # type: () -> Transaction
@@ -707,7 +723,7 @@ class Transaction(Span):
             "spans": finished_spans,
         }  # type: Event
 
-        if hub.client is not None and self._profile is not None:
+        if self._profile is not None and self._profile.sampled:
             event["profile"] = self._profile
             contexts.update({"profile": self._profile.get_profile_context()})
 

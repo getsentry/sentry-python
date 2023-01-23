@@ -12,7 +12,6 @@ from sentry_sdk._compat import PY2, reraise, iteritems
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk.profiler import start_profiling
 
 from sentry_sdk._types import MYPY
 
@@ -132,7 +131,7 @@ class SentryWsgiMiddleware(object):
 
                     with hub.start_transaction(
                         transaction, custom_sampling_context={"wsgi_environ": environ}
-                    ), start_profiling(transaction, hub):
+                    ):
                         try:
                             rv = self.app(
                                 environ,

@@ -5,6 +5,8 @@ import threading
 
 import pytest
 
+from collections import Counter
+from sentry_sdk import start_transaction
 from sentry_sdk.profiler import (
     GeventScheduler,
     Profile,
@@ -62,6 +64,39 @@ def test_profiler_invalid_mode(mode, teardown_profiling):
 def test_profiler_valid_mode(mode, teardown_profiling):
     # should not raise any exceptions
     setup_profiler({"_experiments": {"profiler_mode": mode}})
+
+
+@pytest.mark.parametrize(
+    ("profiles_sample_rate", "profile_count"),
+    [
+        pytest.param(1.0, 1, id="profiling enabled"),
+        pytest.param(0.0, 0, id="profiling disabled"),
+    ],
+)
+def test_profiled_transaction(
+    sentry_init,
+    capture_envelopes,
+    teardown_profiling,
+    profiles_sample_rate,
+    profile_count,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": profiles_sample_rate},
+    )
+
+    envelopes = capture_envelopes()
+
+    with start_transaction(name="profiling"):
+        pass
+
+    count_item_types = Counter()
+    for envelope in envelopes:
+        for item in envelope.items:
+            count_item_types[item.type] += 1
+
+    assert count_item_types["transaction"] == 1
+    assert count_item_types["profile"] == profile_count
 
 
 def get_frame(depth=1):
@@ -635,7 +670,7 @@ def test_profile_processing(
 ):
     with scheduler_class(frequency=1000) as scheduler:
         transaction = Transaction()
-        profile = Profile(scheduler, transaction)
+        profile = Profile(transaction, scheduler=scheduler)
         profile.start_ns = start_ns
         for ts, sample in samples:
             profile.write(ts, process_test_sample(sample))
