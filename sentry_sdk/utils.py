@@ -773,8 +773,8 @@ def handle_in_app(event, in_app_exclude=None, in_app_include=None):
     return event
 
 
-def handle_in_app_impl(frames, in_app_exclude, in_app_include):
-    # type: (Any, Optional[List[str]], Optional[List[str]]) -> Optional[Any]
+def handle_in_app_impl(frames, in_app_exclude, in_app_include, default_in_app=True):
+    # type: (Any, Optional[List[str]], Optional[List[str]], bool) -> Optional[Any]
     if not frames:
         return None
 
@@ -795,7 +795,7 @@ def handle_in_app_impl(frames, in_app_exclude, in_app_include):
         elif _module_in_set(module, in_app_exclude):
             frame["in_app"] = False
 
-    if not any_in_app:
+    if default_in_app and not any_in_app:
         for frame in frames:
             if frame.get("in_app") is None:
                 frame["in_app"] = True
