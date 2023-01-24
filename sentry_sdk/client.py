@@ -241,7 +241,7 @@ class _Client(object):
             with capture_internal_exceptions():
                 new_event = before_send(event, hint or {})
             if new_event is None:
-                logger.info("before send dropped event (%s)", event)
+                logger.info("before send dropped event")
                 if self.transport:
                     self.transport.record_lost_event(
                         "before_send", data_category="error"
@@ -254,7 +254,7 @@ class _Client(object):
             with capture_internal_exceptions():
                 new_event = before_send_transaction(event, hint or {})
             if new_event is None:
-                logger.info("before send transaction dropped event (%s)", event)
+                logger.info("before send transaction dropped event")
                 if self.transport:
                     self.transport.record_lost_event(
                         "before_send", data_category="transaction"
