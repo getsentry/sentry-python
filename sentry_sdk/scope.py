@@ -370,9 +370,9 @@ class Scope(object):
         # type: (...) -> Optional[Event]
         """Applies the information contained on the scope to the given event."""
 
-        def _drop(event, cause, ty):
-            # type: (Dict[str, Any], Any, str) -> Optional[Any]
-            logger.info("%s (%s) dropped event (%s)", ty, cause, event)
+        def _drop(cause, ty):
+            # type: (Any, str) -> Optional[Any]
+            logger.info("%s (%s) dropped event", ty, cause)
             return None
 
         is_transaction = event.get("type") == "transaction"
@@ -425,7 +425,7 @@ class Scope(object):
             for error_processor in self._error_processors:
                 new_event = error_processor(event, exc_info)
                 if new_event is None:
-                    return _drop(event, error_processor, "error processor")
+                    return _drop(error_processor, "error processor")
                 event = new_event
 
         for event_processor in chain(global_event_processors, self._event_processors):
@@ -433,7 +433,7 @@ class Scope(object):
             with capture_internal_exceptions():
                 new_event = event_processor(event, hint)
             if new_event is None:
-                return _drop(event, event_processor, "event processor")
+                return _drop(event_processor, "event processor")
             event = new_event
 
         return event
