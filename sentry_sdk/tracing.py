@@ -1,6 +1,5 @@
 import uuid
 import random
-import threading
 import time
 
 from datetime import datetime, timedelta

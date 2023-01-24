@@ -21,7 +21,6 @@ import threading
 import time
 import uuid
 from collections import deque
-from contextlib import contextmanager
 
 import sentry_sdk
 from sentry_sdk._compat import PY33, PY311
@@ -39,7 +38,6 @@ if MYPY:
     from typing import Callable
     from typing import Deque
     from typing import Dict
-    from typing import Generator
     from typing import List
     from typing import Optional
     from typing import Set
@@ -357,7 +355,9 @@ class Profile(object):
 
         # Various framework integrations are capable of overwriting the active thread id.
         # If it is set to `None` at the end of the profile, we fall back to the default.
-        self._default_active_thread_id = threading.current_thread().ident or 0  # type: int
+        self._default_active_thread_id = (
+            threading.current_thread().ident or 0
+        )  # type: int
         self.active_thread_id = None  # type: Optional[int]
 
         self.start_ns = 0  # type: int
