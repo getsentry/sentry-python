@@ -78,7 +78,7 @@ async def test_async_views(sentry_init, capture_events, application):
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_active_thread_id(sentry_init, capture_envelopes, endpoint, application):
+async def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, endpoint, application):
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,

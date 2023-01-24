@@ -348,9 +348,15 @@ class Profile(object):
 
         self.event_id = uuid.uuid4().hex  # type: str
 
+        # Here, we assume that the sampling decision on the transaction has been finalized.
+        #
+        # We cannot keep a reference to the transaction around here because it'll create
+        # a reference cycle. So we opt to pull out just the necessary attributes.
         self._transaction_sampled = transaction.sampled  # type: Optional[bool]
         self.sampled = None  # type: Optional[bool]
 
+        # Various framework integrations are capable of overwriting the active thread id.
+        # If it is set to `None` at the end of the profile, we fall back to the default.
         self._default_active_thread_id = threading.current_thread().ident or 0  # type: int
         self.active_thread_id = None  # type: Optional[int]
 
