@@ -629,7 +629,7 @@ class ThreadScheduler(Scheduler):
         super(ThreadScheduler, self).__init__(frequency=frequency)
 
         # used to signal to the thread that it should stop
-        self.event = threading.Event()
+        self.running = False
 
         # make sure the thread is a daemon here otherwise this
         # can keep the application running after other threads
@@ -638,21 +638,19 @@ class ThreadScheduler(Scheduler):
 
     def setup(self):
         # type: () -> None
+        self.running = True
         self.thread.start()
 
     def teardown(self):
         # type: () -> None
-        self.event.set()
+        self.running = False
         self.thread.join()
 
     def run(self):
         # type: () -> None
         last = time.perf_counter()
 
-        while True:
-            if self.event.is_set():
-                break
-
+        while self.running:
             self.sampler()
 
             # some time may have elapsed since the last time
@@ -694,7 +692,7 @@ class GeventScheduler(Scheduler):
         super(GeventScheduler, self).__init__(frequency=frequency)
 
         # used to signal to the thread that it should stop
-        self.event = threading.Event()
+        self.running = False
 
         # Using gevent's ThreadPool allows us to bypass greenlets and spawn
         # native threads.
@@ -702,21 +700,19 @@ class GeventScheduler(Scheduler):
 
     def setup(self):
         # type: () -> None
+        self.running = True
         self.pool.spawn(self.run)
 
     def teardown(self):
         # type: () -> None
-        self.event.set()
+        self.running = False
         self.pool.join()
 
     def run(self):
         # type: () -> None
         last = time.perf_counter()
 
-        while True:
-            if self.event.is_set():
-                break
-
+        while self.running:
             self.sampler()
 
             # some time may have elapsed since the last time
