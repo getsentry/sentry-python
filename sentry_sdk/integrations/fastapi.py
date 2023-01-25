@@ -1,3 +1,6 @@
+import asyncio
+import threading
+
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable
@@ -11,7 +14,7 @@ from sentry_sdk.utils import transaction_from_function
 if MYPY:
     from typing import Any, Callable, Dict
 
-    from sentry_sdk._types import Event
+    from sentry_sdk.scope import Scope
 
 try:
     import fastapi  # type: ignore
@@ -31,8 +34,8 @@ class FastApiIntegration(StarletteIntegration):
         patch_get_request_handler()
 
 
-def _set_transaction_name_and_source(event, transaction_style, request):
-    # type: (Event, str, Any) -> None
+def _set_transaction_name_and_source(scope, transaction_style, request):
+    # type: (Scope, str, Any) -> None
     name = ""
 
     if transaction_style == "endpoint":
@@ -48,12 +51,12 @@ def _set_transaction_name_and_source(event, transaction_style, request):
                 name = path
 
     if not name:
-        event["transaction"] = _DEFAULT_TRANSACTION_NAME
-        event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
-        return
+        name = _DEFAULT_TRANSACTION_NAME
+        source = TRANSACTION_SOURCE_ROUTE
+    else:
+        source = SOURCE_FOR_STYLE[transaction_style]
 
-    event["transaction"] = name
-    event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
+    scope.set_transaction_name(name, source=source)
 
 
 def patch_get_request_handler():
@@ -62,6 +65,26 @@ def patch_get_request_handler():
 
     def _sentry_get_request_handler(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+        dependant = kwargs.get("dependant")
+        if (
+            dependant
+            and dependant.call is not None
+            and not asyncio.iscoroutinefunction(dependant.call)
+        ):
+            old_call = dependant.call
+
+            def _sentry_call(*args, **kwargs):
+                # type: (*Any, **Any) -> Any
+                hub = Hub.current
+                with hub.configure_scope() as sentry_scope:
+                    if sentry_scope.profile is not None:
+                        sentry_scope.profile.active_thread_id = (
+                            threading.current_thread().ident
+                        )
+                    return old_call(*args, **kwargs)
+
+            dependant.call = _sentry_call
+
         old_app = old_get_request_handler(*args, **kwargs)
 
         async def _sentry_app(*args, **kwargs):
@@ -73,6 +96,11 @@ def patch_get_request_handler():
 
             with hub.configure_scope() as sentry_scope:
                 request = args[0]
+
+                _set_transaction_name_and_source(
+                    sentry_scope, integration.transaction_style, request
+                )
+
                 extractor = StarletteRequestExtractor(request)
                 info = await extractor.extract_request_info()
 
@@ -89,10 +117,6 @@ def patch_get_request_handler():
                             if "data" in info:
                                 request_info["data"] = info["data"]
                         event["request"] = request_info
-
-                        _set_transaction_name_and_source(
-                            event, integration.transaction_style, req
-                        )
 
                         return event
 

@@ -91,7 +91,79 @@ def test_event_id(sentry_init, capture_events):
     assert Hub.current.last_event_id() == event_id
 
 
-def test_option_callback(sentry_init, capture_events, monkeypatch):
+def test_option_before_send(sentry_init, capture_events):
+    def before_send(event, hint):
+        event["extra"] = {"before_send_called": True}
+        return event
+
+    def do_this():
+        try:
+            raise ValueError("aha!")
+        except Exception:
+            capture_exception()
+
+    sentry_init(before_send=before_send)
+    events = capture_events()
+
+    do_this()
+
+    (event,) = events
+    assert event["extra"] == {"before_send_called": True}
+
+
+def test_option_before_send_discard(sentry_init, capture_events):
+    def before_send_discard(event, hint):
+        return None
+
+    def do_this():
+        try:
+            raise ValueError("aha!")
+        except Exception:
+            capture_exception()
+
+    sentry_init(before_send=before_send_discard)
+    events = capture_events()
+
+    do_this()
+
+    assert len(events) == 0
+
+
+def test_option_before_send_transaction(sentry_init, capture_events):
+    def before_send_transaction(event, hint):
+        assert event["type"] == "transaction"
+        event["extra"] = {"before_send_transaction_called": True}
+        return event
+
+    sentry_init(
+        before_send_transaction=before_send_transaction,
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+    transaction = start_transaction(name="foo")
+    transaction.finish()
+
+    (event,) = events
+    assert event["transaction"] == "foo"
+    assert event["extra"] == {"before_send_transaction_called": True}
+
+
+def test_option_before_send_transaction_discard(sentry_init, capture_events):
+    def before_send_transaction_discard(event, hint):
+        return None
+
+    sentry_init(
+        before_send_transaction=before_send_transaction_discard,
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+    transaction = start_transaction(name="foo")
+    transaction.finish()
+
+    assert len(events) == 0
+
+
+def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
     drop_events = False
     drop_breadcrumbs = False
     reports = []

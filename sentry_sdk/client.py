@@ -20,6 +20,7 @@ from sentry_sdk.serializer import serialize
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import (
     DEFAULT_OPTIONS,
+    INSTRUMENTER,
     VERSION,
     ClientConstructor,
 )
@@ -85,6 +86,9 @@ def _get_options(*args, **kwargs):
 
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
+
+    if rv["instrumenter"] is None:
+        rv["instrumenter"] = INSTRUMENTER.SENTRY
 
     return rv
 
@@ -237,10 +241,23 @@ class _Client(object):
             with capture_internal_exceptions():
                 new_event = before_send(event, hint or {})
             if new_event is None:
-                logger.info("before send dropped event (%s)", event)
+                logger.info("before send dropped event")
                 if self.transport:
                     self.transport.record_lost_event(
                         "before_send", data_category="error"
+                    )
+            event = new_event  # type: ignore
+
+        before_send_transaction = self.options["before_send_transaction"]
+        if before_send_transaction is not None and event.get("type") == "transaction":
+            new_event = None
+            with capture_internal_exceptions():
+                new_event = before_send_transaction(event, hint or {})
+            if new_event is None:
+                logger.info("before send transaction dropped event")
+                if self.transport:
+                    self.transport.record_lost_event(
+                        "before_send", data_category="transaction"
                     )
             event = new_event  # type: ignore
 
