@@ -72,6 +72,8 @@ class OP:
     QUEUE_SUBMIT_CELERY = "queue.submit.celery"
     QUEUE_TASK_CELERY = "queue.task.celery"
     QUEUE_TASK_RQ = "queue.task.rq"
+    QUEUE_SUBMIT_HUEY = "queue.submit.huey"
+    QUEUE_TASK_HUEY = "queue.task.huey"
     SUBPROCESS = "subprocess"
     SUBPROCESS_WAIT = "subprocess.wait"
     SUBPROCESS_COMMUNICATE = "subprocess.communicate"
