@@ -6,13 +6,14 @@ import threading
 import weakref
 
 from sentry_sdk._types import MYPY
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
 from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import (
+    AnnotatedValue,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
     logger,
@@ -28,6 +29,7 @@ from sentry_sdk.integrations._wsgi_common import RequestExtractor
 
 try:
     from django import VERSION as DJANGO_VERSION
+    from django.conf import settings as django_settings
     from django.core import signals
 
     try:
@@ -476,8 +478,20 @@ class DjangoRequestExtractor(RequestExtractor):
         return self.request.META
 
     def cookies(self):
-        # type: () -> Dict[str, str]
-        return self.request.COOKIES
+        # type: () -> Dict[str, Union[str, AnnotatedValue]]
+        privacy_cookies = [
+            django_settings.CSRF_COOKIE_NAME,
+            django_settings.SESSION_COOKIE_NAME,
+        ]
+
+        clean_cookies = {}  # type: Dict[str, Union[str, AnnotatedValue]]
+        for (key, val) in self.request.COOKIES.items():
+            if key in privacy_cookies:
+                clean_cookies[key] = SENSITIVE_DATA_SUBSTITUTE
+            else:
+                clean_cookies[key] = val
+
+        return clean_cookies
 
     def raw_data(self):
         # type: () -> bytes

@@ -1,5 +1,117 @@
 # Changelog
 
+## 1.14.0
+
+### Various fixes & improvements
+
+- Add `before_send_transaction` (#1840) by @antonpirker
+
+  Adds a hook (similar to `before_send`) that is called for all transaction events (performance releated data).
+
+  Usage:
+
+  ```python
+    import sentry_sdk
+
+    def strip_sensitive_data(event, hint):
+        # modify event here (or return `None` if you want to drop the event entirely)
+        return event
+
+    sentry_sdk.init(
+        # ...
+        before_send_transaction=strip_sensitive_data,
+    )
+  ```
+
+  See also: https://docs.sentry.io/platforms/python/configuration/filtering/#using-platformidentifier-namebefore-send-transaction-
+
+- Django: Always remove values of Django session related cookies. (#1842) by @antonpirker
+- Profiling: Enable profiling for ASGI frameworks (#1824) by @Zylphrex
+- Profiling: Better gevent support (#1822) by @Zylphrex
+- Profiling: Add profile context to transaction (#1860) by @Zylphrex
+- Profiling: Use co_qualname in python 3.11 (#1831) by @Zylphrex
+- OpenTelemetry: fix Use dict for sentry-trace context instead of tuple (#1847) by @AbhiPrasad
+- OpenTelemetry: fix extra dependency (#1825) by @bernardotorres
+- OpenTelemetry: fix NoOpSpan updates scope (#1834) by @Zylphrex
+- OpenTelemetry: Make sure to noop when there is no DSN (#1852) by @antonpirker
+- FastAPI: Fix middleware being patched multiple times (#1841) by @JohnnyDeuss
+- Starlette: Avoid import of pkg_resource with Starlette integration (#1836) by @mgu
+- Removed code coverage target (#1862) by @antonpirker
+
+## 1.13.0
+
+### Various fixes & improvements
+
+- Add Starlite integration (#1748) by @gazorby
+
+  Adding support for the [Starlite](https://starlite-api.github.io/starlite/1.48/) framework. Unhandled errors are captured. Performance spans for Starlite middleware are also captured. Thanks @gazorby for the great work!
+
+  Usage:
+
+  ```python
+  from starlite import Starlite, get
+
+  import sentry_sdk
+  from sentry_sdk.integrations.starlite import StarliteIntegration
+
+  sentry_sdk.init(
+      dsn="...",
+      traces_sample_rate=1.0,
+      integrations=[
+          StarliteIntegration(),
+      ],
+  )
+
+  @get("/")
+  def hello_world() -> dict[str, str]:
+      """Keeping the tradition alive with hello world."""
+      bla = 1/0  # causing an error
+      return {"hello": "world"}
+
+  app = Starlite(route_handlers=[hello_world])
+  ```
+
+- Profiling: Remove sample buffer from profiler (#1791) by @Zylphrex
+- Profiling: Performance tweaks to profile sampler (#1789) by @Zylphrex
+- Add span for Django SimpleTemplateResponse rendering (#1818) by @chdsbd
+- Use @wraps for Django Signal receivers (#1815) by @meanmail
+- Add enqueued_at and started_at to rq job extra (#1024) by @kruvasyan
+- Remove sanic v22 pin (#1819) by @sl0thentr0py
+- Add support for `byterray` and `memoryview` built-in types (#1833) by @Tarty
+- Handle `"rc"` in SQLAlchemy version. (#1812) by @peterschutt
+- Doc: Use .venv (not .env) as a virtual env location in CONTRIBUTING.md (#1790) by @tonyo
+- Auto publish to internal pypi on release (#1823) by @asottile-sentry
+- Added Python 3.11 to test suite (#1795) by @antonpirker
+- Update test/linting dependencies (#1801) by @antonpirker
+- Deps: bump sphinx from 5.2.3 to 5.3.0 (#1686) by @dependabot
+
+## 1.12.1
+
+### Various fixes & improvements
+
+- Link errors to OTel spans (#1787) by @antonpirker
+
+## 1.12.0
+
+### Basic OTel support
+
+This adds support to automatically integrate OpenTelemetry performance tracing with Sentry.
+
+See the documentation on how to set it up:
+https://docs.sentry.io/platforms/python/performance/instrumentation/opentelemetry/
+
+Give it a try and let us know if you have any feedback or problems with using it.
+
+By: @antonpirker (#1772, #1766, #1765)
+
+### Various fixes & improvements
+
+- Tox Cleanup (#1749) by @antonpirker
+- CI: Fix Github action checks (#1780) by @Zylphrex
+- Profiling: Introduce active thread id on scope (#1764) by @Zylphrex
+- Profiling: Eagerly hash stack for profiles (#1755) by @Zylphrex
+- Profiling: Resolve inherited method class names (#1756) by @Zylphrex
+
 ## 1.11.1
 
 ### Various fixes & improvements

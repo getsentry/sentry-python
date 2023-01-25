@@ -187,7 +187,6 @@ def _install_subprocess():
         env = None
 
         with hub.start_span(op=OP.SUBPROCESS, description=description) as span:
-
             for k, v in hub.iter_trace_propagation_headers(span):
                 if env is None:
                     env = _init_argument(

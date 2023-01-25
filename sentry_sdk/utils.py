@@ -3,35 +3,42 @@ import json
 import linecache
 import logging
 import os
+import re
+import subprocess
 import sys
 import threading
-import subprocess
-import re
 import time
-
 from datetime import datetime
+from functools import partial
+
+try:
+    from functools import partialmethod
+
+    _PARTIALMETHOD_AVAILABLE = True
+except ImportError:
+    _PARTIALMETHOD_AVAILABLE = False
 
 import sentry_sdk
-from sentry_sdk._compat import urlparse, text_type, implements_str, PY2, PY33, PY37
-
+from sentry_sdk._compat import PY2, PY33, PY37, implements_str, text_type, urlparse
 from sentry_sdk._types import MYPY
 
 if MYPY:
-    from types import FrameType
-    from types import TracebackType
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import ContextManager
-    from typing import Iterator
-    from typing import List
-    from typing import Optional
-    from typing import Set
-    from typing import Tuple
-    from typing import Union
-    from typing import Type
+    from types import FrameType, TracebackType
+    from typing import (
+        Any,
+        Callable,
+        ContextManager,
+        Dict,
+        Iterator,
+        List,
+        Optional,
+        Set,
+        Tuple,
+        Type,
+        Union,
+    )
 
-    from sentry_sdk._types import ExcInfo, EndpointType
+    from sentry_sdk._types import EndpointType, ExcInfo
 
 
 epoch = datetime(1970, 1, 1)
@@ -358,6 +365,24 @@ class AnnotatedValue(object):
                     [
                         "!config",  # Because of configured maximum size
                         "x",  # The fields original value was removed
+                    ]
+                ]
+            },
+        )
+
+    @classmethod
+    def substituted_because_contains_sensitive_data(cls):
+        # type: () -> AnnotatedValue
+        """The actual value was removed because it contained sensitive information."""
+        from sentry_sdk.consts import SENSITIVE_DATA_SUBSTITUTE
+
+        return AnnotatedValue(
+            value=SENSITIVE_DATA_SUBSTITUTE,
+            metadata={
+                "rem": [  # Remark
+                    [
+                        "!config",  # Because of SDK configuration (in this case the config is the hard coded removal of certain django cookies)
+                        "s",  # The fields original value was substituted
                     ]
                 ]
             },
@@ -748,8 +773,8 @@ def handle_in_app(event, in_app_exclude=None, in_app_include=None):
     return event
 
 
-def handle_in_app_impl(frames, in_app_exclude, in_app_include):
-    # type: (Any, Optional[List[str]], Optional[List[str]]) -> Optional[Any]
+def handle_in_app_impl(frames, in_app_exclude, in_app_include, default_in_app=True):
+    # type: (Any, Optional[List[str]], Optional[List[str]], bool) -> Optional[Any]
     if not frames:
         return None
 
@@ -770,7 +795,7 @@ def handle_in_app_impl(frames, in_app_exclude, in_app_include):
         elif _module_in_set(module, in_app_exclude):
             frame["in_app"] = False
 
-    if not any_in_app:
+    if default_in_app and not any_in_app:
         for frame in frames:
             if frame.get("in_app") is None:
                 frame["in_app"] = True
@@ -968,9 +993,12 @@ Please refer to https://docs.sentry.io/platforms/python/contextvars/ for more in
 """
 
 
-def transaction_from_function(func):
+def qualname_from_function(func):
     # type: (Callable[..., Any]) -> Optional[str]
-    # Methods in Python 2
+    """Return the qualified name of func. Works with regular function, lambda, partial and partialmethod."""
+    func_qualname = None  # type: Optional[str]
+
+    # Python 2
     try:
         return "%s.%s.%s" % (
             func.im_class.__module__,  # type: ignore
@@ -980,24 +1008,36 @@ def transaction_from_function(func):
     except Exception:
         pass
 
-    func_qualname = (
-        getattr(func, "__qualname__", None) or getattr(func, "__name__", None) or None
-    )  # type: Optional[str]
+    prefix, suffix = "", ""
 
-    if not func_qualname:
-        # No idea what it is
-        return None
+    if (
+        _PARTIALMETHOD_AVAILABLE
+        and hasattr(func, "_partialmethod")
+        and isinstance(func._partialmethod, partialmethod)  # type: ignore
+    ):
+        prefix, suffix = "partialmethod(<function ", ">)"
+        func = func._partialmethod.func  # type: ignore
+    elif isinstance(func, partial) and hasattr(func.func, "__name__"):
+        prefix, suffix = "partial(<function ", ">)"
+        func = func.func
 
-    # Methods in Python 3
-    # Functions
-    # Classes
-    try:
-        return "%s.%s" % (func.__module__, func_qualname)
-    except Exception:
-        pass
+    if hasattr(func, "__qualname__"):
+        func_qualname = func.__qualname__
+    elif hasattr(func, "__name__"):  # Python 2.7 has no __qualname__
+        func_qualname = func.__name__
 
-    # Possibly a lambda
+    # Python 3: methods, functions, classes
+    if func_qualname is not None:
+        if hasattr(func, "__module__"):
+            func_qualname = func.__module__ + "." + func_qualname
+        func_qualname = prefix + func_qualname + suffix
+
     return func_qualname
+
+
+def transaction_from_function(func):
+    # type: (Callable[..., Any]) -> Optional[str]
+    return qualname_from_function(func)
 
 
 disable_capture_event = ContextVar("disable_capture_event")
