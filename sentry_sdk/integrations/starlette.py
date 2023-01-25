@@ -2,7 +2,6 @@ from __future__ import absolute_import
 
 import asyncio
 import functools
-import threading
 
 from sentry_sdk._compat import iteritems
 from sentry_sdk._types import MYPY

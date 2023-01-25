@@ -112,6 +112,7 @@ if MYPY:
 try:
     from gevent.monkey import is_module_patched  # type: ignore
 except ImportError:
+
     def is_module_patched(*args, **kwargs):
         # type: (*Any, **Any) -> bool
         # unable to import from gevent means no modules have been patched
@@ -121,6 +122,7 @@ except ImportError:
 try:
     from gevent import get_hub as get_gevent_hub  # type: ignore
 except ImportError:
+
     def get_gevent_hub():
         # type: () -> Any
         return None

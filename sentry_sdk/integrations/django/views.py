@@ -1,5 +1,3 @@
-import threading
-
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
 from sentry_sdk._types import MYPY

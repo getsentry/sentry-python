@@ -1,5 +1,4 @@
 import asyncio
-import threading
 
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii

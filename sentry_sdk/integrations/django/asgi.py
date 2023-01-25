@@ -7,7 +7,6 @@ Since this file contains `async def` it is conditionally imported in
 """
 
 import asyncio
-import threading
 
 from sentry_sdk import Hub, _functools
 from sentry_sdk._types import MYPY
