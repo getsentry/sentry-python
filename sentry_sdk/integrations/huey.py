@@ -6,7 +6,8 @@ from datetime import datetime
 from sentry_sdk._compat import reraise
 from sentry_sdk._types import MYPY
 from sentry_sdk import Hub
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
@@ -68,8 +69,8 @@ def _make_event_processor(task):
             extra = event.setdefault("extra", {})
             extra["huey-job"] = {
                 "task": task.name,
-                "args": task.args,
-                "kwargs": task.kwargs,
+                "args": task.args if _should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE,
+                "kwargs": task.kwargs if _should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE,
                 "retry": (task.default_retries or 0) - task.retries,
             }
 
