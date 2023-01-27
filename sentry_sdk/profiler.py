@@ -118,6 +118,13 @@ except ImportError:
         return False
 
 
+try:
+    from gevent.monkey import get_original
+    thread_sleep = get_original("time", "sleep")
+except ImportError:
+    thread_sleep = time.sleep
+
+
 _scheduler = None  # type: Optional[Scheduler]
 
 
@@ -658,7 +665,7 @@ class ThreadScheduler(Scheduler):
             # not sleep for too long
             elapsed = time.perf_counter() - last
             if elapsed < self.interval:
-                time.sleep(self.interval - elapsed)
+                thread_sleep(self.interval - elapsed)
 
             # after sleeping, make sure to take the current
             # timestamp so we can use it next iteration
@@ -720,7 +727,7 @@ class GeventScheduler(Scheduler):
             # not sleep for too long
             elapsed = time.perf_counter() - last
             if elapsed < self.interval:
-                time.sleep(self.interval - elapsed)
+                thread_sleep(self.interval - elapsed)
 
             # after sleeping, make sure to take the current
             # timestamp so we can use it next iteration
