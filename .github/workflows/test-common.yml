@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: Test Python ${{ matrix.python-version }}, ${{ matrix.os }}, ${{ matrix.variant }}
+    name: Test Python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
@@ -30,7 +30,6 @@ jobs:
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
         python-version: ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10"]
-        variant: ["base", "gevent"]
     services:
       postgres:
         image: postgres
@@ -66,7 +65,19 @@ jobs:
           set -x # print commands that are executed
           coverage erase
 
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-${{ matrix.variant }}$" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --ignore=tests/integrations
+          ./scripts/runtox.sh "py${{ matrix.python-version }}$" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --ignore=tests/integrations
+          coverage combine .coverage*
+          coverage xml -i
+          codecov --file coverage.xml
+
+      - name: Run Gevent Tests
+        timeout-minutes: 45
+        shell: bash
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-gevent" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --ignore=tests/integrations
           coverage combine .coverage*
           coverage xml -i
           codecov --file coverage.xml
