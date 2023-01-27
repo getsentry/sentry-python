@@ -31,11 +31,6 @@ def requires_python_version(major, minor, reason=None):
 requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
 
 
-@requires_gevent
-def test_gevent():
-    assert 0, "gevent is installed"
-
-
 def process_test_sample(sample):
     return [(tid, (stack, stack)) for tid, stack in sample]
 
