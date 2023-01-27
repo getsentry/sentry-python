@@ -1,4 +1,5 @@
 import inspect
+import mock
 import os
 import sys
 import threading
@@ -18,6 +19,7 @@ from sentry_sdk.profiler import (
     setup_profiler,
 )
 from sentry_sdk.tracing import Transaction
+from sentry_sdk._queue import Queue
 
 try:
     import gevent
@@ -70,8 +72,9 @@ def test_profiler_valid_mode(mode, teardown_profiling):
 @pytest.mark.parametrize(
     ("profiles_sample_rate", "profile_count"),
     [
-        pytest.param(1.0, 1, id="profiling enabled"),
-        pytest.param(0.0, 0, id="profiling disabled"),
+        pytest.param(1.0, 1, id="100%"),
+        pytest.param(0.0, 0, id="0%"),
+        pytest.param(None, 0, id="disabled"),
     ],
 )
 def test_profiled_transaction(
@@ -318,33 +321,78 @@ def test_extract_stack_with_cache():
         assert frame1 is frame2, i
 
 
-current_thread = threading.current_thread()
+def test_get_current_thread_id_explicit_thread():
+    event = threading.Event()
+    results = Queue(maxsize=1)
 
+    def target():
+        event.wait()
+        results.put(get_current_thread_id(threading.main_thread()))
 
-@pytest.mark.parametrize(
-    ("thread", "expected_thread_id"),
-    [
-        pytest.param(
-            current_thread,
-            current_thread.ident,
-            id="explicit thread",
-        ),
-        pytest.param(
-            None,
-            current_thread.ident,
-            id="current thread",
-        ),
-    ],
-)
-def test_get_current_thread_id(thread, expected_thread_id):
-    assert get_current_thread_id(thread=thread) == expected_thread_id
+    thread = threading.Thread(target=target)
+    thread.start()
+
+    thread_id = threading.main_thread().ident
+
+    event.set()
+
+    thread.join()
+
+    assert thread_id == results.get()
 
 
 @requires_gevent
-def test_get_current_thread_id_gevent():
-    job = gevent.spawn(get_current_thread_id)
-    job.join()
-    assert job.value == gevent.hub.get_hub().thread_ident
+def test_get_current_thread_id_gevent_in_thread():
+    event = threading.Event()
+    results = Queue(maxsize=1)
+
+    def target():
+        event.wait()
+        job = gevent.spawn(get_current_thread_id)
+        job.join()
+        results.put(job.value)
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread_id = thread.ident
+    event.set()
+    thread.join()
+    assert thread_id == results.get()
+
+
+def test_get_current_thread_id_running_thread():
+    event = threading.Event()
+    results = Queue(maxsize=1)
+
+    def target():
+        event.wait()
+        results.put(get_current_thread_id())
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread_id = thread.ident
+    event.set()
+    thread.join()
+    assert thread_id == results.get()
+
+
+def test_get_current_thread_id_main_thread():
+    event = threading.Event()
+    results = Queue(maxsize=1)
+
+    def target():
+        event.wait()
+        # mock that somehow the current thread doesn't exist
+        with mock.patch("threading.current_thread", side_effect=[None]):
+            results.put(get_current_thread_id())
+
+    thread_id = threading.main_thread().ident
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    event.set()
+    thread.join()
+    assert thread_id == results.get()
 
 
 def get_scheduler_threads(scheduler):
