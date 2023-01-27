@@ -13,6 +13,7 @@ from sentry_sdk.profiler import (
     ThreadScheduler,
     extract_frame,
     extract_stack,
+    get_current_thread_id,
     get_frame_name,
     setup_profiler,
 )
@@ -315,6 +316,35 @@ def test_extract_stack_with_cache():
         # equality which would always pass since we're extract
         # the same stack.
         assert frame1 is frame2, i
+
+
+current_thread = threading.current_thread()
+
+
+@pytest.mark.parametrize(
+    ("thread", "expected_thread_id"),
+    [
+        pytest.param(
+            current_thread,
+            current_thread.ident,
+            id="explicit thread",
+        ),
+        pytest.param(
+            None,
+            current_thread.ident,
+            id="current thread",
+        ),
+    ],
+)
+def test_get_current_thread_id(thread, expected_thread_id):
+    assert get_current_thread_id(thread=thread) == expected_thread_id
+
+
+@requires_gevent
+def test_get_current_thread_id_gevent():
+    job = gevent.spawn(get_current_thread_id)
+    job.join()
+    assert job.value == gevent.hub.get_hub().thread_ident
 
 
 def get_scheduler_threads(scheduler):
