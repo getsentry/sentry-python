@@ -322,77 +322,67 @@ def test_extract_stack_with_cache():
 
 
 def test_get_current_thread_id_explicit_thread():
-    event = threading.Event()
     results = Queue(maxsize=1)
 
-    def target():
-        event.wait()
-        results.put(get_current_thread_id(threading.main_thread()))
+    def target1():
+        pass
 
-    thread = threading.Thread(target=target)
-    thread.start()
+    def target2():
+        results.put(get_current_thread_id(thread1))
 
-    thread_id = threading.main_thread().ident
+    thread1 = threading.Thread(target=target1)
+    thread1.start()
 
-    event.set()
+    thread2 = threading.Thread(target=target2)
+    thread2.start()
 
-    thread.join()
+    thread2.join()
+    thread1.join()
 
-    assert thread_id == results.get()
+    assert thread1.ident == results.get(timeout=1)
 
 
 @requires_gevent
 def test_get_current_thread_id_gevent_in_thread():
-    event = threading.Event()
     results = Queue(maxsize=1)
 
     def target():
-        event.wait()
         job = gevent.spawn(get_current_thread_id)
         job.join()
         results.put(job.value)
 
     thread = threading.Thread(target=target)
     thread.start()
-    thread_id = thread.ident
-    event.set()
     thread.join()
-    assert thread_id == results.get()
+    assert thread.ident == results.get(timeout=1)
 
 
 def test_get_current_thread_id_running_thread():
-    event = threading.Event()
     results = Queue(maxsize=1)
 
     def target():
-        event.wait()
         results.put(get_current_thread_id())
 
     thread = threading.Thread(target=target)
     thread.start()
-    thread_id = thread.ident
-    event.set()
     thread.join()
-    assert thread_id == results.get()
+    assert thread.ident == results.get(timeout=1)
 
 
 def test_get_current_thread_id_main_thread():
-    event = threading.Event()
     results = Queue(maxsize=1)
 
     def target():
-        event.wait()
         # mock that somehow the current thread doesn't exist
         with mock.patch("threading.current_thread", side_effect=[None]):
             results.put(get_current_thread_id())
 
-    thread_id = threading.main_thread().ident
+    thread_id = threading.main_thread().ident if sys.version_info >= (3, 4) else None
 
     thread = threading.Thread(target=target)
     thread.start()
-    event.set()
     thread.join()
-    assert thread_id == results.get()
+    assert thread_id == results.get(timeout=1)
 
 
 def get_scheduler_threads(scheduler):
