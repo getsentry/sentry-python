@@ -6,7 +6,7 @@ from sentry_sdk.integrations.arq import ArqIntegration
 from arq.connections import ArqRedis
 from arq.jobs import Job
 from arq.utils import timestamp_ms
-from arq.worker import Worker
+from arq.worker import Retry, Worker
 
 from fakeredis.aioredis import FakeRedis
 
@@ -28,7 +28,7 @@ def patch_fakeredis_info_command():
 
 @pytest.fixture
 def init_arq(sentry_init):
-    def inner(functions):
+    def inner(functions, allow_abort_jobs=False):
         sentry_init(
             integrations=[ArqIntegration()],
             traces_sample_rate=1.0,
@@ -38,7 +38,9 @@ def init_arq(sentry_init):
 
         server = FakeRedis()
         pool = ArqRedis(pool_or_conn=server.connection_pool)
-        return pool, Worker(functions, redis_pool=pool)
+        return pool, Worker(
+            functions, redis_pool=pool, allow_abort_jobs=allow_abort_jobs
+        )
 
     return inner
 
@@ -62,6 +64,37 @@ async def test_job_result(init_arq):
 
     assert result == 4
     assert job_result.result == 4
+
+
+@pytest.mark.asyncio
+async def test_job_retry(capture_events, init_arq):
+    async def retry_job(ctx):
+        if ctx["job_try"] < 2:
+            raise Retry
+
+    retry_job.__qualname__ = retry_job.__name__
+
+    pool, worker = init_arq([retry_job])
+
+    job = await pool.enqueue_job("retry_job")
+
+    events = capture_events()
+
+    await worker.run_job(job.job_id, timestamp_ms())
+
+    event = events.pop(0)
+    assert event["contexts"]["trace"]["status"] == "aborted"
+    assert event["transaction"] == "retry_job"
+    assert event["tags"]["arq_task_id"] == job.job_id
+    assert event["extra"]["arq-job"]["retry"] == 1
+
+    await worker.run_job(job.job_id, timestamp_ms())
+
+    event = events.pop(0)
+    assert event["contexts"]["trace"]["status"] == "ok"
+    assert event["transaction"] == "retry_job"
+    assert event["tags"]["arq_task_id"] == job.job_id
+    assert event["extra"]["arq-job"]["retry"] == 2
 
 
 @pytest.mark.asyncio
