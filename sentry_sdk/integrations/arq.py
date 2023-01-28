@@ -21,9 +21,9 @@ except ImportError:
     raise DidNotEnable("Arq is not installed")
 
 if MYPY:
-    from typing import Any, Optional
+    from typing import Any, Dict, Optional
 
-    from sentry_sdk._types import EventProcessor, Event, Hint
+    from sentry_sdk._types import EventProcessor, Event, ExcInfo, Hint
 
     from arq.jobs import Job
     from arq.typing import WorkerCoroutine
@@ -103,7 +103,7 @@ def patch_run_job():
 
 
 def _capture_exception(exc_info):
-    # (ExcInfo) -> None
+    # type: (ExcInfo) -> None
     hub = Hub.current
 
     if hub.scope.transaction is not None:
@@ -122,7 +122,7 @@ def _capture_exception(exc_info):
 
 
 def _make_event_processor(ctx, *args, **kwargs):
-    # type: (dict, *Any, **Any) -> EventProcessor
+    # type: (Dict[Any, Any], *Any, **Any) -> EventProcessor
     def event_processor(event, hint):
         # type: (Event, Hint) -> Optional[Event]
 
@@ -156,7 +156,7 @@ def _make_event_processor(ctx, *args, **kwargs):
 def _wrap_coroutine(name, coroutine):
     # type: (str, WorkerCoroutine) -> WorkerCoroutine
     async def _sentry_coroutine(ctx, *args, **kwargs):
-        # type: (dict, *Any, **Any) -> Any
+        # type: (Dict[Any, Any], *Any, **Any) -> Any
         hub = Hub.current
         if hub.get_integration(ArqIntegration) is None:
             return await coroutine(*args, **kwargs)
@@ -178,6 +178,7 @@ def _wrap_coroutine(name, coroutine):
 
 
 def patch_func():
+    # type: () -> None
     old_func = arq.worker.func
 
     def _sentry_func(*args, **kwargs):
