@@ -97,6 +97,46 @@ async def test_job_retry(capture_events, init_arq):
     assert event["extra"]["arq-job"]["retry"] == 2
 
 
+@pytest.mark.parametrize("job_fails", [True, False], ids=["error", "success"])
+@pytest.mark.asyncio
+async def test_job_transaction(capture_events, init_arq, job_fails):
+    async def division(_, a, b=0):
+        return a / b
+
+    division.__qualname__ = division.__name__
+
+    pool, worker = init_arq([division])
+
+    events = capture_events()
+
+    job = await pool.enqueue_job("division", 1, b=int(not job_fails))
+    await worker.run_job(job.job_id, timestamp_ms())
+
+    if job_fails:
+        error_event = events.pop(0)
+        assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+        assert error_event["exception"]["values"][0]["mechanism"]["type"] == "arq"
+
+    (event,) = events
+    assert event["type"] == "transaction"
+    assert event["transaction"] == "division"
+    assert event["transaction_info"] == {"source": "task"}
+
+    if job_fails:
+        assert event["contexts"]["trace"]["status"] == "internal_error"
+    else:
+        assert event["contexts"]["trace"]["status"] == "ok"
+
+    assert "arq_task_id" in event["tags"]
+    assert "arq_task_retry" in event["tags"]
+
+    extra = event["extra"]["arq-job"]
+    assert extra["task"] == "division"
+    assert extra["args"] == [1]
+    assert extra["kwargs"] == {"b": int(not job_fails)}
+    assert extra["retry"] == 1
+
+
 @pytest.mark.asyncio
 async def test_enqueue_job(capture_events, init_arq):
     async def dummy_job(_):

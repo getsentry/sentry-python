@@ -1,5 +1,8 @@
 from __future__ import absolute_import
 
+import sys
+
+from sentry_sdk._compat import reraise
 from sentry_sdk._types import MYPY
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SENSITIVE_DATA_SUBSTITUTE
@@ -7,7 +10,7 @@ from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
-from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
 try:
     import arq.worker
@@ -99,6 +102,25 @@ def patch_run_job():
     Worker.run_job = _sentry_run_job
 
 
+def _capture_exception(exc_info):
+    # (ExcInfo) -> None
+    hub = Hub.current
+
+    if hub.scope.transaction is not None:
+        if exc_info[0] in ARQ_CONTROL_FLOW_EXCEPTIONS:
+            hub.scope.transaction.set_status("aborted")
+            return
+
+        hub.scope.transaction.set_status("internal_error")
+
+    event, hint = event_from_exception(
+        exc_info,
+        client_options=hub.client.options if hub.client else None,
+        mechanism={"type": ArqIntegration.identifier, "handled": False},
+    )
+    hub.capture_event(event, hint=hint)
+
+
 def _make_event_processor(ctx, *args, **kwargs):
     # type: (dict, *Any, **Any) -> EventProcessor
     def event_processor(event, hint):
@@ -143,7 +165,14 @@ def _wrap_coroutine(name, coroutine):
             _make_event_processor({**ctx, "job_name": name}, *args, **kwargs)
         )
 
-        return await coroutine(ctx, *args, **kwargs)
+        try:
+            result = await coroutine(ctx, *args, **kwargs)
+        except Exception:
+            exc_info = sys.exc_info()
+            _capture_exception(exc_info)
+            reraise(*exc_info)
+
+        return result
 
     return _sentry_coroutine
 
