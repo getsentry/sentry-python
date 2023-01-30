@@ -14,7 +14,6 @@ from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.modules import _get_installed_modules
-from sentry_sdk.profiler import start_profiling
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
@@ -176,7 +175,7 @@ class SentryAsgiMiddleware:
 
                     with hub.start_transaction(
                         transaction, custom_sampling_context={"asgi_scope": scope}
-                    ), start_profiling(transaction, hub):
+                    ):
                         # XXX: Would be cool to have correct span status, but we
                         # would have to wrap send(). That is a bit hard to do with
                         # the current abstraction over ASGI 2/3.

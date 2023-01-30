@@ -21,7 +21,6 @@ import threading
 import time
 import uuid
 from collections import deque
-from contextlib import contextmanager
 
 import sentry_sdk
 from sentry_sdk._compat import PY33, PY311
@@ -39,14 +38,15 @@ if MYPY:
     from typing import Callable
     from typing import Deque
     from typing import Dict
-    from typing import Generator
     from typing import List
     from typing import Optional
     from typing import Set
     from typing import Sequence
     from typing import Tuple
     from typing_extensions import TypedDict
+
     import sentry_sdk.tracing
+    from sentry_sdk._types import SamplingContext
 
     ThreadId = str
 
@@ -108,9 +108,19 @@ if MYPY:
         {"profile_id": str},
     )
 
+
 try:
-    from gevent.monkey import is_module_patched  # type: ignore
+    from gevent import get_hub as get_gevent_hub  # type: ignore
+    from gevent.monkey import get_original, is_module_patched  # type: ignore
+
+    thread_sleep = get_original("time", "sleep")
 except ImportError:
+
+    def get_gevent_hub():
+        # type: () -> Any
+        return None
+
+    thread_sleep = time.sleep
 
     def is_module_patched(*args, **kwargs):
         # type: (*Any, **Any) -> bool
@@ -118,12 +128,9 @@ except ImportError:
         return False
 
 
-try:
-    from gevent.monkey import get_original
-
-    thread_sleep = get_original("time", "sleep")
-except ImportError:
-    thread_sleep = time.sleep
+def is_gevent():
+    # type: () -> bool
+    return is_module_patched("threading") or is_module_patched("_thread")
 
 
 _scheduler = None  # type: Optional[Scheduler]
@@ -131,7 +138,6 @@ _scheduler = None  # type: Optional[Scheduler]
 
 def setup_profiler(options):
     # type: (Dict[str, Any]) -> None
-
     """
     `buffer_secs` determines the max time a sample will be buffered for
     `frequency` determines the number of samples to take per second (Hz)
@@ -149,7 +155,7 @@ def setup_profiler(options):
 
     frequency = 101
 
-    if is_module_patched("threading") or is_module_patched("_thread"):
+    if is_gevent():
         # If gevent has patched the threading modules then we cannot rely on
         # them to spawn a native thread for sampling.
         # Instead we default to the GeventScheduler which is capable of
@@ -341,22 +347,80 @@ else:
 MAX_PROFILE_DURATION_NS = int(3e10)  # 30 seconds
 
 
+def get_current_thread_id(thread=None):
+    # type: (Optional[threading.Thread]) -> Optional[int]
+    """
+    Try to get the id of the current thread, with various fall backs.
+    """
+
+    # if a thread is specified, that takes priority
+    if thread is not None:
+        try:
+            thread_id = thread.ident
+            if thread_id is not None:
+                return thread_id
+        except AttributeError:
+            pass
+
+    # if the app is using gevent, we should look at the gevent hub first
+    # as the id there differs from what the threading module reports
+    if is_gevent():
+        gevent_hub = get_gevent_hub()
+        if gevent_hub is not None:
+            try:
+                # this is undocumented, so wrap it in try except to be safe
+                return gevent_hub.thread_ident
+            except AttributeError:
+                pass
+
+    # use the current thread's id if possible
+    try:
+        current_thread_id = threading.current_thread().ident
+        if current_thread_id is not None:
+            return current_thread_id
+    except AttributeError:
+        pass
+
+    # if we can't get the current thread id, fall back to the main thread id
+    try:
+        main_thread_id = threading.main_thread().ident
+        if main_thread_id is not None:
+            return main_thread_id
+    except AttributeError:
+        pass
+
+    # we've tried everything, time to give up
+    return None
+
+
 class Profile(object):
     def __init__(
         self,
-        scheduler,  # type: Scheduler
         transaction,  # type: sentry_sdk.tracing.Transaction
         hub=None,  # type: Optional[sentry_sdk.Hub]
+        scheduler=None,  # type: Optional[Scheduler]
     ):
         # type: (...) -> None
-        self.scheduler = scheduler
-        self.transaction = transaction
+        self.scheduler = _scheduler if scheduler is None else scheduler
         self.hub = hub
+
+        self.event_id = uuid.uuid4().hex  # type: str
+
+        # Here, we assume that the sampling decision on the transaction has been finalized.
+        #
+        # We cannot keep a reference to the transaction around here because it'll create
+        # a reference cycle. So we opt to pull out just the necessary attributes.
+        self._transaction_sampled = transaction.sampled  # type: Optional[bool]
+        self.sampled = None  # type: Optional[bool]
+
+        # Various framework integrations are capable of overwriting the active thread id.
+        # If it is set to `None` at the end of the profile, we fall back to the default.
+        self._default_active_thread_id = get_current_thread_id() or 0  # type: int
         self.active_thread_id = None  # type: Optional[int]
+
         self.start_ns = 0  # type: int
         self.stop_ns = 0  # type: int
         self.active = False  # type: bool
-        self.event_id = uuid.uuid4().hex  # type: str
 
         self.indexed_frames = {}  # type: Dict[RawFrame, int]
         self.indexed_stacks = {}  # type: Dict[RawStackId, int]
@@ -366,12 +430,79 @@ class Profile(object):
 
         transaction._profile = self
 
+    def update_active_thread_id(self):
+        # type: () -> None
+        self.active_thread_id = get_current_thread_id()
+
+    def _set_initial_sampling_decision(self, sampling_context):
+        # type: (SamplingContext) -> None
+        """
+        Sets the profile's sampling decision according to the following
+        precdence rules:
+
+        1. If the transaction to be profiled is not sampled, that decision
+        will be used, regardless of anything else.
+
+        2. Use `profiles_sample_rate` to decide.
+        """
+
+        # The corresponding transaction was not sampled,
+        # so don't generate a profile for it.
+        if not self._transaction_sampled:
+            self.sampled = False
+            return
+
+        # The profiler hasn't been properly initialized.
+        if self.scheduler is None:
+            self.sampled = False
+            return
+
+        hub = self.hub or sentry_sdk.Hub.current
+        client = hub.client
+
+        # The client is None, so we can't get the sample rate.
+        if client is None:
+            self.sampled = False
+            return
+
+        options = client.options
+        sample_rate = options["_experiments"].get("profiles_sample_rate")
+
+        # The profiles_sample_rate option was not set, so profiling
+        # was never enabled.
+        if sample_rate is None:
+            self.sampled = False
+            return
+
+        # Now we roll the dice. random.random is inclusive of 0, but not of 1,
+        # so strict < is safe here. In case sample_rate is a boolean, cast it
+        # to a float (True becomes 1.0 and False becomes 0.0)
+        self.sampled = random.random() < float(sample_rate)
+
     def get_profile_context(self):
         # type: () -> ProfileContext
         return {"profile_id": self.event_id}
 
-    def __enter__(self):
+    def start(self):
         # type: () -> None
+        if not self.sampled:
+            return
+
+        assert self.scheduler, "No scheduler specified"
+        self.start_ns = nanosecond_time()
+        self.scheduler.start_profiling(self)
+
+    def stop(self):
+        # type: () -> None
+        if not self.sampled:
+            return
+
+        assert self.scheduler, "No scheduler specified"
+        self.scheduler.stop_profiling(self)
+        self.stop_ns = nanosecond_time()
+
+    def __enter__(self):
+        # type: () -> Profile
         hub = self.hub or sentry_sdk.Hub.current
 
         _, scope = hub._stack[-1]
@@ -380,13 +511,13 @@ class Profile(object):
 
         self._context_manager_state = (hub, scope, old_profile)
 
-        self.start_ns = nanosecond_time()
-        self.scheduler.start_profiling(self)
+        self.start()
+
+        return self
 
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
-        self.scheduler.stop_profiling(self)
-        self.stop_ns = nanosecond_time()
+        self.stop()
 
         _, scope, old_profile = self._context_manager_state
         del self._context_manager_state
@@ -485,7 +616,7 @@ class Profile(object):
             "transactions": [
                 {
                     "id": event_opt["event_id"],
-                    "name": self.transaction.name,
+                    "name": event_opt["transaction"],
                     # we start the transaction before the profile and this is
                     # the transaction start time relative to the profile, so we
                     # hardcode it to 0 until we can start the profile before
@@ -493,9 +624,9 @@ class Profile(object):
                     # use the duration of the profile instead of the transaction
                     # because we end the transaction after the profile
                     "relative_end_ns": str(self.stop_ns - self.start_ns),
-                    "trace_id": self.transaction.trace_id,
+                    "trace_id": event_opt["contexts"]["trace"]["trace_id"],
                     "active_thread_id": str(
-                        self.transaction._active_thread_id
+                        self._default_active_thread_id
                         if self.active_thread_id is None
                         else self.active_thread_id
                     ),
@@ -733,46 +864,3 @@ class GeventScheduler(Scheduler):
             # after sleeping, make sure to take the current
             # timestamp so we can use it next iteration
             last = time.perf_counter()
-
-
-def _should_profile(transaction, hub):
-    # type: (sentry_sdk.tracing.Transaction, sentry_sdk.Hub) -> bool
-
-    # The corresponding transaction was not sampled,
-    # so don't generate a profile for it.
-    if not transaction.sampled:
-        return False
-
-    # The profiler hasn't been properly initialized.
-    if _scheduler is None:
-        return False
-
-    client = hub.client
-
-    # The client is None, so we can't get the sample rate.
-    if client is None:
-        return False
-
-    options = client.options
-    profiles_sample_rate = options["_experiments"].get("profiles_sample_rate")
-
-    # The profiles_sample_rate option was not set, so profiling
-    # was never enabled.
-    if profiles_sample_rate is None:
-        return False
-
-    return random.random() < float(profiles_sample_rate)
-
-
-@contextmanager
-def start_profiling(transaction, hub=None):
-    # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
-    hub = hub or sentry_sdk.Hub.current
-
-    # if profiling was not enabled, this should be a noop
-    if _should_profile(transaction, hub):
-        assert _scheduler is not None
-        with Profile(_scheduler, transaction, hub):
-            yield
-    else:
-        yield

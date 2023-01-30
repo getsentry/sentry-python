@@ -2,7 +2,6 @@ from __future__ import absolute_import
 
 import asyncio
 import functools
-import threading
 
 from sentry_sdk._compat import iteritems
 from sentry_sdk._types import MYPY
@@ -413,9 +412,7 @@ def patch_request_response():
 
                 with hub.configure_scope() as sentry_scope:
                     if sentry_scope.profile is not None:
-                        sentry_scope.profile.active_thread_id = (
-                            threading.current_thread().ident
-                        )
+                        sentry_scope.profile.update_active_thread_id()
 
                     request = args[0]
 
