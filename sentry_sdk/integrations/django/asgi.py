@@ -89,10 +89,14 @@ def wrap_async_view(hub, callback):
     async def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
 
-        with hub.start_span(
-            op=OP.VIEW_RENDER, description=request.resolver_match.view_name
-        ):
-            return await callback(request, *args, **kwargs)
+        with hub.configure_scope() as sentry_scope:
+            if sentry_scope.profile is not None:
+                sentry_scope.profile.update_active_thread_id()
+
+            with hub.start_span(
+                op=OP.VIEW_RENDER, description=request.resolver_match.view_name
+            ):
+                return await callback(request, *args, **kwargs)
 
     return sentry_wrapped_callback
 

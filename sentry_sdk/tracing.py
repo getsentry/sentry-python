@@ -1,12 +1,11 @@
 import uuid
 import random
-import threading
 import time
 
 from datetime import datetime, timedelta
 
 import sentry_sdk
-
+from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.utils import logger
 from sentry_sdk._types import MYPY
 
@@ -23,6 +22,9 @@ if MYPY:
 
     import sentry_sdk.profiler
     from sentry_sdk._types import Event, SamplingContext, MeasurementUnit
+
+BAGGAGE_HEADER_NAME = "baggage"
+SENTRY_TRACE_HEADER_NAME = "sentry-trace"
 
 
 # Transaction source
@@ -123,6 +125,7 @@ class Span(object):
         status=None,  # type: Optional[str]
         transaction=None,  # type: Optional[str] # deprecated
         containing_transaction=None,  # type: Optional[Transaction]
+        start_timestamp=None,  # type: Optional[datetime]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -137,7 +140,7 @@ class Span(object):
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
-        self.start_timestamp = datetime.utcnow()
+        self.start_timestamp = start_timestamp or datetime.utcnow()
         try:
             # TODO: For Python 3.7+, we could use a clock with ns resolution:
             # self._start_timestamp_monotonic = time.perf_counter_ns()
@@ -204,8 +207,8 @@ class Span(object):
         # referencing themselves)
         return self._containing_transaction
 
-    def start_child(self, **kwargs):
-        # type: (**Any) -> Span
+    def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
+        # type: (str, **Any) -> Span
         """
         Start a sub-span from the current span or transaction.
 
@@ -213,6 +216,13 @@ class Span(object):
         trace id, sampling decision, transaction pointer, and span recorder are
         inherited from the current span/transaction.
         """
+        hub = self.hub or sentry_sdk.Hub.current
+        client = hub.client
+        configuration_instrumenter = client and client.options["instrumenter"]
+
+        if instrumenter != configuration_instrumenter:
+            return NoOpSpan()
+
         kwargs.setdefault("sampled", self.sampled)
 
         child = Span(
@@ -278,10 +288,12 @@ class Span(object):
 
         # TODO-neel move away from this kwargs stuff, it's confusing and opaque
         # make more explicit
-        baggage = Baggage.from_incoming_header(headers.get("baggage"))
-        kwargs.update({"baggage": baggage})
+        baggage = Baggage.from_incoming_header(headers.get(BAGGAGE_HEADER_NAME))
+        kwargs.update({BAGGAGE_HEADER_NAME: baggage})
 
-        sentrytrace_kwargs = extract_sentrytrace_data(headers.get("sentry-trace"))
+        sentrytrace_kwargs = extract_sentrytrace_data(
+            headers.get(SENTRY_TRACE_HEADER_NAME)
+        )
 
         if sentrytrace_kwargs is not None:
             kwargs.update(sentrytrace_kwargs)
@@ -308,7 +320,7 @@ class Span(object):
         `sentry_tracestate` value, this will cause one to be generated and
         stored.
         """
-        yield "sentry-trace", self.to_traceparent()
+        yield SENTRY_TRACE_HEADER_NAME, self.to_traceparent()
 
         tracestate = self.to_tracestate() if has_tracestate_enabled(self) else None
         # `tracestate` will only be `None` if there's no client or no DSN
@@ -320,7 +332,7 @@ class Span(object):
         if self.containing_transaction:
             baggage = self.containing_transaction.get_baggage().serialize()
             if baggage:
-                yield "baggage", baggage
+                yield BAGGAGE_HEADER_NAME, baggage
 
     @classmethod
     def from_traceparent(
@@ -344,7 +356,9 @@ class Span(object):
         if not traceparent:
             return None
 
-        return cls.continue_from_headers({"sentry-trace": traceparent}, **kwargs)
+        return cls.continue_from_headers(
+            {SENTRY_TRACE_HEADER_NAME: traceparent}, **kwargs
+        )
 
     def to_traceparent(self):
         # type: () -> str
@@ -455,8 +469,8 @@ class Span(object):
         # type: () -> bool
         return self.status == "ok"
 
-    def finish(self, hub=None):
-        # type: (Optional[sentry_sdk.Hub]) -> Optional[str]
+    def finish(self, hub=None, end_timestamp=None):
+        # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
         # XXX: would be type: (Optional[sentry_sdk.Hub]) -> None, but that leads
         # to incompatible return types for Span.finish and Transaction.finish.
         if self.timestamp is not None:
@@ -466,8 +480,13 @@ class Span(object):
         hub = hub or self.hub or sentry_sdk.Hub.current
 
         try:
-            duration_seconds = time.perf_counter() - self._start_timestamp_monotonic
-            self.timestamp = self.start_timestamp + timedelta(seconds=duration_seconds)
+            if end_timestamp:
+                self.timestamp = end_timestamp
+            else:
+                duration_seconds = time.perf_counter() - self._start_timestamp_monotonic
+                self.timestamp = self.start_timestamp + timedelta(
+                    seconds=duration_seconds
+                )
         except AttributeError:
             self.timestamp = datetime.utcnow()
 
@@ -544,9 +563,9 @@ class Transaction(Span):
         # tracestate data from other vendors, of the form `dogs=yes,cats=maybe`
         "_third_party_tracestate",
         "_measurements",
+        "_contexts",
         "_profile",
         "_baggage",
-        "_active_thread_id",
     )
 
     def __init__(
@@ -569,7 +588,9 @@ class Transaction(Span):
                 "instead of Span(transaction=...)."
             )
             name = kwargs.pop("transaction")
+
         Span.__init__(self, **kwargs)
+
         self.name = name
         self.source = source
         self.sample_rate = None  # type: Optional[float]
@@ -580,13 +601,9 @@ class Transaction(Span):
         self._sentry_tracestate = sentry_tracestate
         self._third_party_tracestate = third_party_tracestate
         self._measurements = {}  # type: Dict[str, Any]
+        self._contexts = {}  # type: Dict[str, Any]
         self._profile = None  # type: Optional[sentry_sdk.profiler.Profile]
         self._baggage = baggage
-        # for profiling, we want to know on which thread a transaction is started
-        # to accurately show the active thread in the UI
-        self._active_thread_id = (
-            threading.current_thread().ident
-        )  # used by profiling.py
 
     def __repr__(self):
         # type: () -> str
@@ -604,6 +621,22 @@ class Transaction(Span):
             )
         )
 
+    def __enter__(self):
+        # type: () -> Transaction
+        super(Transaction, self).__enter__()
+
+        if self._profile is not None:
+            self._profile.__enter__()
+
+        return self
+
+    def __exit__(self, ty, value, tb):
+        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+        if self._profile is not None:
+            self._profile.__exit__(ty, value, tb)
+
+        super(Transaction, self).__exit__(ty, value, tb)
+
     @property
     def containing_transaction(self):
         # type: () -> Transaction
@@ -613,8 +646,8 @@ class Transaction(Span):
         # reference.
         return self
 
-    def finish(self, hub=None):
-        # type: (Optional[sentry_sdk.Hub]) -> Optional[str]
+    def finish(self, hub=None, end_timestamp=None):
+        # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
         if self.timestamp is not None:
             # This transaction is already finished, ignore.
             return None
@@ -646,13 +679,14 @@ class Transaction(Span):
             )
             self.name = "<unlabeled transaction>"
 
-        Span.finish(self, hub)
+        Span.finish(self, hub, end_timestamp)
 
         if not self.sampled:
             # At this point a `sampled = None` should have already been resolved
             # to a concrete decision.
             if self.sampled is None:
                 logger.warning("Discarding transaction without sampling decision.")
+
             return None
 
         finished_spans = [
@@ -667,19 +701,25 @@ class Transaction(Span):
         # to be garbage collected
         self._span_recorder = None
 
+        contexts = {}
+        contexts.update(self._contexts)
+        contexts.update({"trace": self.get_trace_context()})
+
         event = {
             "type": "transaction",
             "transaction": self.name,
             "transaction_info": {"source": self.source},
-            "contexts": {"trace": self.get_trace_context()},
+            "contexts": contexts,
             "tags": self._tags,
             "timestamp": self.timestamp,
             "start_timestamp": self.start_timestamp,
             "spans": finished_spans,
         }  # type: Event
 
-        if hub.client is not None and self._profile is not None:
+        if self._profile is not None and self._profile.sampled:
             event["profile"] = self._profile
+            contexts.update({"profile": self._profile.get_profile_context()})
+            self._profile = None
 
         if has_custom_measurements_enabled():
             event["measurements"] = self._measurements
@@ -695,6 +735,10 @@ class Transaction(Span):
             return
 
         self._measurements[name] = {"value": value, "unit": unit}
+
+    def set_context(self, key, value):
+        # type: (str, Any) -> None
+        self._contexts[key] = value
 
     def to_json(self):
         # type: () -> Dict[str, Any]
@@ -819,6 +863,40 @@ class Transaction(Span):
                     sample_rate=float(sample_rate),
                 )
             )
+
+
+class NoOpSpan(Span):
+    def __repr__(self):
+        # type: () -> str
+        return self.__class__.__name__
+
+    def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
+        # type: (str, **Any) -> NoOpSpan
+        return NoOpSpan()
+
+    def new_span(self, **kwargs):
+        # type: (**Any) -> NoOpSpan
+        pass
+
+    def set_tag(self, key, value):
+        # type: (str, Any) -> None
+        pass
+
+    def set_data(self, key, value):
+        # type: (str, Any) -> None
+        pass
+
+    def set_status(self, value):
+        # type: (str) -> None
+        pass
+
+    def set_http_status(self, http_status):
+        # type: (int) -> None
+        pass
+
+    def finish(self, hub=None, end_timestamp=None):
+        # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
+        pass
 
 
 # Circular imports

@@ -27,6 +27,7 @@ if MYPY:
         Type,
     )
 
+    from sentry_sdk.profiler import Profile
     from sentry_sdk.tracing import Span
     from sentry_sdk.session import Session
 
@@ -94,6 +95,7 @@ class Scope(object):
         "_session",
         "_attachments",
         "_force_auto_session_tracking",
+        "_profile",
     )
 
     def __init__(self):
@@ -124,6 +126,8 @@ class Scope(object):
         self._span = None  # type: Optional[Span]
         self._session = None  # type: Optional[Session]
         self._force_auto_session_tracking = None  # type: Optional[bool]
+
+        self._profile = None  # type: Optional[Profile]
 
     @_attr_setter
     def level(self, value):
@@ -227,6 +231,17 @@ class Scope(object):
             transaction = span
             if transaction.name:
                 self._transaction = transaction.name
+
+    @property
+    def profile(self):
+        # type: () -> Optional[Profile]
+        return self._profile
+
+    @profile.setter
+    def profile(self, profile):
+        # type: (Optional[Profile]) -> None
+
+        self._profile = profile
 
     def set_tag(
         self,
@@ -355,9 +370,9 @@ class Scope(object):
         # type: (...) -> Optional[Event]
         """Applies the information contained on the scope to the given event."""
 
-        def _drop(event, cause, ty):
-            # type: (Dict[str, Any], Any, str) -> Optional[Any]
-            logger.info("%s (%s) dropped event (%s)", ty, cause, event)
+        def _drop(cause, ty):
+            # type: (Any, str) -> Optional[Any]
+            logger.info("%s (%s) dropped event", ty, cause)
             return None
 
         is_transaction = event.get("type") == "transaction"
@@ -410,7 +425,7 @@ class Scope(object):
             for error_processor in self._error_processors:
                 new_event = error_processor(event, exc_info)
                 if new_event is None:
-                    return _drop(event, error_processor, "error processor")
+                    return _drop(error_processor, "error processor")
                 event = new_event
 
         for event_processor in chain(global_event_processors, self._event_processors):
@@ -418,7 +433,7 @@ class Scope(object):
             with capture_internal_exceptions():
                 new_event = event_processor(event, hint)
             if new_event is None:
-                return _drop(event, event_processor, "event processor")
+                return _drop(event_processor, "event processor")
             event = new_event
 
         return event
@@ -447,6 +462,8 @@ class Scope(object):
             self._span = scope._span
         if scope._attachments:
             self._attachments.extend(scope._attachments)
+        if scope._profile:
+            self._profile = scope._profile
 
     def update_from_kwargs(
         self,
@@ -495,6 +512,8 @@ class Scope(object):
         rv._session = self._session
         rv._force_auto_session_tracking = self._force_auto_session_tracking
         rv._attachments = list(self._attachments)
+
+        rv._profile = self._profile
 
         return rv
 

@@ -6,7 +6,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import Scope
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.tracing import SENTRY_TRACE_HEADER_NAME, SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -101,8 +101,11 @@ def _add_sentry_trace(sender, template, context, **extra):
     sentry_span = Hub.current.scope.span
     context["sentry_trace"] = (
         Markup(
-            '<meta name="sentry-trace" content="%s" />'
-            % (sentry_span.to_traceparent(),)
+            '<meta name="%s" content="%s" />'
+            % (
+                SENTRY_TRACE_HEADER_NAME,
+                sentry_span.to_traceparent(),
+            )
         )
         if sentry_span
         else ""

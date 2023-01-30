@@ -297,8 +297,8 @@ def test_auto_session_tracking_with_aggregates(sentry_init, capture_envelopes):
     ],
 )
 def test_profile_sent(
-    capture_envelopes,
     sentry_init,
+    capture_envelopes,
     teardown_profiling,
     profiles_sample_rate,
     profile_count,
@@ -323,3 +323,36 @@ def test_profile_sent(
         for item in envelope.items:
             count_item_types[item.type] += 1
     assert count_item_types["profile"] == profile_count
+
+
+def test_profile_context_sent(sentry_init, capture_envelopes, teardown_profiling):
+    def test_app(environ, start_response):
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": 1.0},
+    )
+    app = SentryWsgiMiddleware(test_app)
+    envelopes = capture_envelopes()
+
+    client = Client(app)
+    client.get("/")
+
+    transaction = None
+    profile = None
+    for envelope in envelopes:
+        for item in envelope.items:
+            if item.type == "profile":
+                assert profile is None  # should only have 1 profile
+                profile = item
+            elif item.type == "transaction":
+                assert transaction is None  # should only have 1 transaction
+                transaction = item
+
+    assert transaction is not None
+    assert profile is not None
+    assert transaction.payload.json["contexts"]["profile"] == {
+        "profile_id": profile.payload.json["event_id"],
+    }
