@@ -8,6 +8,7 @@ from sentry_sdk._compat import with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
+from sentry_sdk.profiler import Profile
 from sentry_sdk.tracing import NoOpSpan, Span, Transaction
 from sentry_sdk.session import Session
 from sentry_sdk.utils import (
@@ -547,6 +548,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         }
         sampling_context.update(custom_sampling_context)
         transaction._set_initial_sampling_decision(sampling_context=sampling_context)
+
+        profile = Profile(transaction, hub=self)
+        profile._set_initial_sampling_decision(sampling_context=sampling_context)
 
         # we don't bother to keep spans if we already know we're not going to
         # send the transaction

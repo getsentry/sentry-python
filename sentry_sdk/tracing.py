@@ -1,6 +1,5 @@
 import uuid
 import random
-import threading
 import time
 
 from datetime import datetime, timedelta
@@ -567,7 +566,6 @@ class Transaction(Span):
         "_contexts",
         "_profile",
         "_baggage",
-        "_active_thread_id",
     )
 
     def __init__(
@@ -606,11 +604,6 @@ class Transaction(Span):
         self._contexts = {}  # type: Dict[str, Any]
         self._profile = None  # type: Optional[sentry_sdk.profiler.Profile]
         self._baggage = baggage
-        # for profiling, we want to know on which thread a transaction is started
-        # to accurately show the active thread in the UI
-        self._active_thread_id = (
-            threading.current_thread().ident
-        )  # used by profiling.py
 
     def __repr__(self):
         # type: () -> str
@@ -627,6 +620,22 @@ class Transaction(Span):
                 self.source,
             )
         )
+
+    def __enter__(self):
+        # type: () -> Transaction
+        super(Transaction, self).__enter__()
+
+        if self._profile is not None:
+            self._profile.__enter__()
+
+        return self
+
+    def __exit__(self, ty, value, tb):
+        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+        if self._profile is not None:
+            self._profile.__exit__(ty, value, tb)
+
+        super(Transaction, self).__exit__(ty, value, tb)
 
     @property
     def containing_transaction(self):
@@ -707,9 +716,10 @@ class Transaction(Span):
             "spans": finished_spans,
         }  # type: Event
 
-        if hub.client is not None and self._profile is not None:
+        if self._profile is not None and self._profile.sampled:
             event["profile"] = self._profile
             contexts.update({"profile": self._profile.get_profile_context()})
+            self._profile = None
 
         if has_custom_measurements_enabled():
             event["measurements"] = self._measurements
