@@ -22,11 +22,11 @@ try:
 
 except ImportError:
     # Python 2
-    from cgi import parse_qs
-    from urllib import unquote
-    from urllib import urlencode
-    from urlparse import urlsplit
-    from urlparse import urlunsplit
+    from cgi import parse_qs  # type: ignore
+    from urllib import unquote  # type: ignore
+    from urllib import urlencode  # type: ignore
+    from urlparse import urlsplit  # type: ignore
+    from urlparse import urlunsplit  # type: ignore
 
 
 from datetime import datetime
@@ -1146,9 +1146,7 @@ def from_base64(base64_string):
     return utf8_string
 
 
-Components = namedtuple(  # type: ignore
-    typename="Components", field_names=["scheme", "netloc", "path", "query", "fragment"]
-)
+Components = namedtuple("Components", ["scheme", "netloc", "path", "query", "fragment"])
 
 
 def sanitize_url(url):
@@ -1176,7 +1174,7 @@ def sanitize_url(url):
     )
 
     safe_url = urlunsplit(
-        Components(  # type: ignore
+        Components(
             scheme=parsed_url.scheme,
             netloc=netloc,
             query=query_string,
@@ -1188,9 +1186,7 @@ def sanitize_url(url):
     return safe_url
 
 
-ParsedUrl = namedtuple(  # type: ignore
-    typename="ParsedUrl", field_names=["url", "query", "fragment"]
-)
+ParsedUrl = namedtuple("ParsedUrl", ["url", "query", "fragment"])
 
 
 def parse_url(url, sanitize=True):
@@ -1204,7 +1200,7 @@ def parse_url(url, sanitize=True):
 
     parsed_url = urlsplit(url)
     base_url = urlunsplit(
-        Components(  # type: ignore
+        Components(
             scheme=parsed_url.scheme,
             netloc=parsed_url.netloc,
             query="",

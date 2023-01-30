@@ -2,11 +2,13 @@ from __future__ import absolute_import
 
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP
+from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 
 from sentry_sdk._functools import partial
 from sentry_sdk._types import MYPY
+from sentry_sdk.utils import parse_url
 
 if MYPY:
     from typing import Any
@@ -66,9 +68,15 @@ def _sentry_request_created(service_id, request, operation_name, **kwargs):
         op=OP.HTTP_CLIENT,
         description=description,
     )
+
+    sanitize = not _should_send_default_pii()
+    parsed_url = parse_url(request.url, sanitize=sanitize)
+
     span.set_tag("aws.service_id", service_id)
     span.set_tag("aws.operation_name", operation_name)
-    span.set_data("aws.request.url", request.url)
+    span.set_data("aws.request.url", parsed_url.url)
+    span.set_data("http.query", parsed_url.query)
+    span.set_data("http.fragment", parsed_url.fragment)
 
     # We do it in order for subsequent http calls/retries be
     # attached to this span.
