@@ -1,4 +1,5 @@
 import pytest
+import re
 
 from sentry_sdk.utils import parse_url, sanitize_url
 
@@ -50,7 +51,12 @@ from sentry_sdk.utils import parse_url, sanitize_url
     ],
 )
 def test_sanitize_url(url, expected_result):
-    assert sanitize_url(url) == expected_result
+    # sort parts because old Python versions (<3.6) don't preserve order
+    sanitized_url = sanitize_url(url)
+    parts = sorted(re.split(r"\&|\?", sanitized_url))
+    expected_parts = sorted(re.split(r"\&|\?", expected_result))
+
+    assert parts == expected_parts
 
 
 @pytest.mark.parametrize(
@@ -188,5 +194,11 @@ def test_sanitize_url(url, expected_result):
 )
 def test_parse_url(url, sanitize, expected_url, expected_query, expected_fragment):
     assert parse_url(url, sanitize=sanitize).url == expected_url
-    assert parse_url(url, sanitize=sanitize).query == expected_query
     assert parse_url(url, sanitize=sanitize).fragment == expected_fragment
+
+    # sort parts because old Python versions (<3.6) don't preserve order
+    sanitized_query = parse_url(url, sanitize=sanitize).query
+    query_parts = sorted(re.split(r"\&|\?", sanitized_query))
+    expected_query_parts = sorted(re.split(r"\&|\?", expected_query))
+
+    assert query_parts == expected_query_parts
