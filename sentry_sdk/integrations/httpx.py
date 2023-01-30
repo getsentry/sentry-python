@@ -2,7 +2,7 @@ from sentry_sdk import Hub
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.utils import logger, sanitize_url
+from sentry_sdk.utils import logger, parse_url
 
 from sentry_sdk._types import MYPY
 
@@ -42,18 +42,18 @@ def _install_httpx_client():
         if hub.get_integration(HttpxIntegration) is None:
             return real_send(self, request, **kwargs)
 
+        sanitize = not _should_send_default_pii()
+        parsed_url = parse_url(request.url, sanitize=sanitize)
+
         with hub.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s"
-            % (
-                request.method,
-                request.url
-                if _should_send_default_pii()
-                else sanitize_url(request.url),
-            ),
+            description="%s %s" % (request.method, parsed_url.url),
         ) as span:
             span.set_data("method", request.method)
-            span.set_data("url", str(request.url))
+            span.set_data("url", parsed_url.url)
+            span.set_data("http.query", parsed_url.query)
+            span.set_data("http.fragment", parsed_url.fragment)
+
             for key, value in hub.iter_trace_propagation_headers():
                 logger.debug(
                     "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
@@ -66,6 +66,7 @@ def _install_httpx_client():
             span.set_data("status_code", rv.status_code)
             span.set_http_status(rv.status_code)
             span.set_data("reason", rv.reason_phrase)
+
             return rv
 
     Client.send = send
@@ -81,18 +82,18 @@ def _install_httpx_async_client():
         if hub.get_integration(HttpxIntegration) is None:
             return await real_send(self, request, **kwargs)
 
+        sanitize = not _should_send_default_pii()
+        parsed_url = parse_url(request.url, sanitize=sanitize)
+
         with hub.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s"
-            % (
-                request.method,
-                request.url
-                if _should_send_default_pii()
-                else sanitize_url(request.url),
-            ),
+            description="%s %s" % (request.method, parsed_url.url),
         ) as span:
             span.set_data("method", request.method)
-            span.set_data("url", str(request.url))
+            span.set_data("url", parsed_url.url)
+            span.set_data("http.query", parsed_url.query)
+            span.set_data("http.fragment", parsed_url.fragment)
+
             for key, value in hub.iter_trace_propagation_headers():
                 logger.debug(
                     "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
@@ -105,6 +106,7 @@ def _install_httpx_async_client():
             span.set_data("status_code", rv.status_code)
             span.set_http_status(rv.status_code)
             span.set_data("reason", rv.reason_phrase)
+
             return rv
 
     AsyncClient.send = send

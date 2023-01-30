@@ -11,8 +11,8 @@ from sentry_sdk.tracing_utils import EnvironHeaders
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     logger,
-    sanitize_url,
     safe_repr,
+    parse_url,
 )
 
 from sentry_sdk._types import MYPY
@@ -84,17 +84,18 @@ def _install_httplib():
                 url,
             )
 
+        sanitize = not _should_send_default_pii()
+        parsed_url = parse_url(real_url, sanitize=sanitize)
+
         span = hub.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s"
-            % (
-                method,
-                real_url if _should_send_default_pii() else sanitize_url(real_url),
-            ),
+            description="%s %s" % (method, parsed_url.url),
         )
 
         span.set_data("method", method)
-        span.set_data("url", real_url)
+        span.set_data("url", parsed_url.url)
+        span.set_data("http.query", parsed_url.query)
+        span.set_data("http.fragment", parsed_url.fragment)
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 

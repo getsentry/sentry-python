@@ -10,6 +10,8 @@ import threading
 import time
 from collections import namedtuple
 
+from sentry_sdk.consts import SENSITIVE_DATA_SUBSTITUTE
+
 try:
     # Python 3
     from urllib.parse import parse_qs
@@ -61,12 +63,6 @@ if MYPY:
 
 
 epoch = datetime(1970, 1, 1)
-
-
-Components = namedtuple(  # type: ignore
-    typename="Components", field_names=["scheme", "netloc", "path", "query", "fragment"]
-)
-
 
 # The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
@@ -1150,6 +1146,11 @@ def from_base64(base64_string):
     return utf8_string
 
 
+Components = namedtuple(  # type: ignore
+    typename="Components", field_names=["scheme", "netloc", "path", "query", "fragment"]
+)
+
+
 def sanitize_url(url):
     # type: (str) -> str
     """
@@ -1161,12 +1162,18 @@ def sanitize_url(url):
     # strip username:password (netloc can be usr:pwd@example.com)
     netloc_parts = parsed_url.netloc.split("@")
     if len(netloc_parts) > 1:
-        netloc = "%s:%s@" + netloc_parts[-1]
+        netloc = "%s:%s@%s" % (
+            SENSITIVE_DATA_SUBSTITUTE,
+            SENSITIVE_DATA_SUBSTITUTE,
+            netloc_parts[-1],
+        )
     else:
         netloc = parsed_url.netloc
 
     # strip values from query string
-    query_string = unquote(urlencode({key: "%s" for key in query_params}))
+    query_string = unquote(
+        urlencode({key: SENSITIVE_DATA_SUBSTITUTE for key in query_params})
+    )
 
     safe_url = urlunsplit(
         Components(  # type: ignore
@@ -1181,6 +1188,34 @@ def sanitize_url(url):
     return safe_url
 
 
+ParsedUrl = namedtuple(  # type: ignore
+    typename="ParsedUrl", field_names=["url", "query", "fragment"]
+)
+
+
+def parse_url(url, sanitize=True):
+
+    # type: (str, bool) -> ParsedUrl
+    """
+    Splits a URL into a url (including path), query and fragment. If sanitize is True, the url will be
+    sanitized to remove sensitive data.
+    """
+    url = sanitize_url(url) if sanitize else url
+
+    parsed_url = urlsplit(url)
+    base_url = urlunsplit(
+        Components(  # type: ignore
+            scheme=parsed_url.scheme,
+            netloc=parsed_url.netloc,
+            query="",
+            path=parsed_url.path,
+            fragment="",
+        )
+    )
+
+    return ParsedUrl(url=base_url, query=parsed_url.query, fragment=parsed_url.fragment)
+
+
 if PY37:
 
     def nanosecond_time():
@@ -1191,12 +1226,10 @@ elif PY33:
 
     def nanosecond_time():
         # type: () -> int
-
         return int(time.perf_counter() * 1e9)
 
 else:
 
     def nanosecond_time():
         # type: () -> int
-
         raise AttributeError
