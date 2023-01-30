@@ -43,7 +43,7 @@ def _install_httpx_client():
             return real_send(self, request, **kwargs)
 
         sanitize = not _should_send_default_pii()
-        parsed_url = parse_url(request.url, sanitize=sanitize)
+        parsed_url = parse_url(str(request.url, sanitize=sanitize))
 
         with hub.start_span(
             op=OP.HTTP_CLIENT,
@@ -57,7 +57,7 @@ def _install_httpx_client():
             for key, value in hub.iter_trace_propagation_headers():
                 logger.debug(
                     "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
-                        key=key, value=value, url=request.url
+                        key=key, value=value, url=str(request.url)
                     )
                 )
                 request.headers[key] = value
