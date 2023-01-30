@@ -10,8 +10,6 @@ import threading
 import time
 from collections import namedtuple
 
-from sentry_sdk.consts import SENSITIVE_DATA_SUBSTITUTE
-
 try:
     # Python 3
     from urllib.parse import parse_qs
@@ -1156,6 +1154,8 @@ def sanitize_url(url):
     """
     parsed_url = urlsplit(url)
     query_params = parse_qs(parsed_url.query, keep_blank_values=True)
+
+    from sentry_sdk.consts import SENSITIVE_DATA_SUBSTITUTE
 
     # strip username:password (netloc can be usr:pwd@example.com)
     netloc_parts = parsed_url.netloc.split("@")
