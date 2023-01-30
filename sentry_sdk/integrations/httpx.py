@@ -57,7 +57,7 @@ def _install_httpx_client():
             for key, value in hub.iter_trace_propagation_headers():
                 logger.debug(
                     "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
-                        key=key, value=value, url=str(request.url)
+                        key=key, value=value, url=request.url
                     )
                 )
                 request.headers[key] = value
