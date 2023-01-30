@@ -43,7 +43,7 @@ def _install_httpx_client():
             return real_send(self, request, **kwargs)
 
         sanitize = not _should_send_default_pii()
-        parsed_url = parse_url(str(request.url, sanitize=sanitize))
+        parsed_url = parse_url(str(request.url), sanitize=sanitize)
 
         with hub.start_span(
             op=OP.HTTP_CLIENT,
@@ -83,7 +83,7 @@ def _install_httpx_async_client():
             return await real_send(self, request, **kwargs)
 
         sanitize = not _should_send_default_pii()
-        parsed_url = parse_url(request.url, sanitize=sanitize)
+        parsed_url = parse_url(str(request.url), sanitize=sanitize)
 
         with hub.start_span(
             op=OP.HTTP_CLIENT,
