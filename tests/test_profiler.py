@@ -3,6 +3,7 @@ import mock
 import os
 import sys
 import threading
+import time
 
 import pytest
 
@@ -83,7 +84,7 @@ def test_profiler_setup_twice(teardown_profiling):
     [
         pytest.param(1.00, 1, id="profiler sampled at 1.00"),
         pytest.param(0.75, 1, id="profiler sampled at 0.75"),
-        pytest.param(0.25, 1, id="profiler sampled at 0.75"),
+        pytest.param(0.25, 1, id="profiler sampled at 0.25"),
         pytest.param(0.00, 0, id="profiler sampled at 0.00"),
         pytest.param(None, 0, id="profiler not enabled"),
     ],
