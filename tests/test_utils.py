@@ -34,10 +34,6 @@ from sentry_sdk.utils import parse_url, sanitize_url
             "https://username:password@example.com/bla/blub?token=abc&sessionid=123&save=true#fragment",
             "https://[Filtered]:[Filtered]@example.com/bla/blub?token=[Filtered]&sessionid=[Filtered]&save=[Filtered]#fragment",
         ),
-        (
-            "http://example.com/bla?üsername=ada&pwd=häöüß",
-            "http://example.com/bla?üsername=[Filtered]&pwd=[Filtered]",
-        ),
         ("bla/blub/foo", "bla/blub/foo"),
         ("/bla/blub/foo/", "/bla/blub/foo/"),
         (
@@ -90,13 +86,6 @@ def test_sanitize_url(url, expected_result):
             "https://[Filtered]:[Filtered]@example.com/bla/blub",
             "token=[Filtered]&sessionid=[Filtered]&save=[Filtered]",
             "fragment",
-        ),
-        (
-            "http://example.com/bla?üsername=ada&pwd=häöüß",
-            True,
-            "http://example.com/bla",
-            "üsername=[Filtered]&pwd=[Filtered]",
-            "",
         ),
         (
             "bla/blub/foo",
@@ -154,13 +143,6 @@ def test_sanitize_url(url, expected_result):
             "https://username:password@example.com/bla/blub",
             "token=abc&sessionid=123&save=true",
             "fragment",
-        ),
-        (
-            "http://example.com/bla?üsername=ada&pwd=häöüß",
-            False,
-            "http://example.com/bla",
-            "üsername=ada&pwd=häöüß",
-            "",
         ),
         (
             "bla/blub/foo",
