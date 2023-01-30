@@ -84,7 +84,7 @@ def test_profiler_setup_twice(teardown_profiling):
     [
         pytest.param(1.00, 1, id="profiler sampled at 1.00"),
         pytest.param(0.75, 1, id="profiler sampled at 0.75"),
-        pytest.param(0.25, 1, id="profiler sampled at 0.25"),
+        pytest.param(0.25, 0, id="profiler sampled at 0.25"),
         pytest.param(0.00, 0, id="profiler sampled at 0.00"),
         pytest.param(None, 0, id="profiler not enabled"),
     ],
@@ -111,6 +111,9 @@ def test_profiled_transaction(
     for envelope in envelopes:
         for item in envelope.items:
             items[item.type].append(item)
+
+    assert len(items["transaction"]) == 1
+    assert len(items["profile"]) == profile_count
 
 
 def test_profile_context(
