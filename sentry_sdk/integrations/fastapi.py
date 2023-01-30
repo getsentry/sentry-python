@@ -1,5 +1,4 @@
 import asyncio
-import threading
 
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
@@ -78,9 +77,7 @@ def patch_get_request_handler():
                 hub = Hub.current
                 with hub.configure_scope() as sentry_scope:
                     if sentry_scope.profile is not None:
-                        sentry_scope.profile.active_thread_id = (
-                            threading.current_thread().ident
-                        )
+                        sentry_scope.profile.update_active_thread_id()
                     return old_call(*args, **kwargs)
 
             dependant.call = _sentry_call
