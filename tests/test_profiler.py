@@ -1,20 +1,25 @@
 import inspect
+import mock
 import os
 import sys
 import threading
 
 import pytest
 
+from collections import Counter
+from sentry_sdk import start_transaction
 from sentry_sdk.profiler import (
     GeventScheduler,
     Profile,
     ThreadScheduler,
     extract_frame,
     extract_stack,
+    get_current_thread_id,
     get_frame_name,
     setup_profiler,
 )
 from sentry_sdk.tracing import Transaction
+from sentry_sdk._queue import Queue
 
 try:
     import gevent
@@ -62,6 +67,40 @@ def test_profiler_invalid_mode(mode, teardown_profiling):
 def test_profiler_valid_mode(mode, teardown_profiling):
     # should not raise any exceptions
     setup_profiler({"_experiments": {"profiler_mode": mode}})
+
+
+@pytest.mark.parametrize(
+    ("profiles_sample_rate", "profile_count"),
+    [
+        pytest.param(1.0, 1, id="100%"),
+        pytest.param(0.0, 0, id="0%"),
+        pytest.param(None, 0, id="disabled"),
+    ],
+)
+def test_profiled_transaction(
+    sentry_init,
+    capture_envelopes,
+    teardown_profiling,
+    profiles_sample_rate,
+    profile_count,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": profiles_sample_rate},
+    )
+
+    envelopes = capture_envelopes()
+
+    with start_transaction(name="profiling"):
+        pass
+
+    count_item_types = Counter()
+    for envelope in envelopes:
+        for item in envelope.items:
+            count_item_types[item.type] += 1
+
+    assert count_item_types["transaction"] == 1
+    assert count_item_types["profile"] == profile_count
 
 
 def get_frame(depth=1):
@@ -286,6 +325,70 @@ def test_extract_stack_with_cache():
         # equality which would always pass since we're extract
         # the same stack.
         assert frame1 is frame2, i
+
+
+def test_get_current_thread_id_explicit_thread():
+    results = Queue(maxsize=1)
+
+    def target1():
+        pass
+
+    def target2():
+        results.put(get_current_thread_id(thread1))
+
+    thread1 = threading.Thread(target=target1)
+    thread1.start()
+
+    thread2 = threading.Thread(target=target2)
+    thread2.start()
+
+    thread2.join()
+    thread1.join()
+
+    assert thread1.ident == results.get(timeout=1)
+
+
+@requires_gevent
+def test_get_current_thread_id_gevent_in_thread():
+    results = Queue(maxsize=1)
+
+    def target():
+        job = gevent.spawn(get_current_thread_id)
+        job.join()
+        results.put(job.value)
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+    assert thread.ident == results.get(timeout=1)
+
+
+def test_get_current_thread_id_running_thread():
+    results = Queue(maxsize=1)
+
+    def target():
+        results.put(get_current_thread_id())
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+    assert thread.ident == results.get(timeout=1)
+
+
+def test_get_current_thread_id_main_thread():
+    results = Queue(maxsize=1)
+
+    def target():
+        # mock that somehow the current thread doesn't exist
+        with mock.patch("threading.current_thread", side_effect=[None]):
+            results.put(get_current_thread_id())
+
+    thread_id = threading.main_thread().ident if sys.version_info >= (3, 4) else None
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+    assert thread_id == results.get(timeout=1)
 
 
 def get_scheduler_threads(scheduler):
@@ -641,7 +744,7 @@ def test_profile_processing(
 ):
     with scheduler_class(frequency=1000) as scheduler:
         transaction = Transaction()
-        profile = Profile(scheduler, transaction)
+        profile = Profile(transaction, scheduler=scheduler)
         profile.start_ns = start_ns
         for ts, sample in samples:
             profile.write(ts, process_test_sample(sample))

@@ -7,7 +7,6 @@ Since this file contains `async def` it is conditionally imported in
 """
 
 import asyncio
-import threading
 
 from sentry_sdk import Hub, _functools
 from sentry_sdk._types import MYPY
@@ -92,7 +91,7 @@ def wrap_async_view(hub, callback):
 
         with hub.configure_scope() as sentry_scope:
             if sentry_scope.profile is not None:
-                sentry_scope.profile.active_thread_id = threading.current_thread().ident
+                sentry_scope.profile.update_active_thread_id()
 
             with hub.start_span(
                 op=OP.VIEW_RENDER, description=request.resolver_match.view_name
