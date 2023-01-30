@@ -302,7 +302,13 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
 
     # index 0 contains the inner most frame on the stack, so the lamdba
     # should be at index `actual_depth`
-    assert stack[actual_depth][3] == "<lambda>", actual_depth
+    if sys.version_info >= (3, 11):
+        assert (
+            stack[actual_depth][3]
+            == "test_extract_stack_with_max_depth.<locals>.<lambda>"
+        ), actual_depth
+    else:
+        assert stack[actual_depth][3] == "<lambda>", actual_depth
 
 
 def test_extract_stack_with_cache():
