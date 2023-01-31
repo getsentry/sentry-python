@@ -43,6 +43,7 @@ if MYPY:
     from typing import Set
     from typing import Sequence
     from typing import Tuple
+    from typing_extensions import Literal
     from typing_extensions import TypedDict
 
     import sentry_sdk.tracing
@@ -108,6 +109,34 @@ if MYPY:
         {"profile_id": str},
     )
 
+    MeasurementUnit = Literal["byte"]
+
+    MeasurementKey = Literal["memory"]
+
+    MeasurementValue = TypedDict(
+        "MeasurementValue",
+        {
+            "elapsed_since_start_ns": str,
+            "value": float,
+        },
+    )
+
+    RawMeasurement = Tuple[MeasurementKey, MeasurementValue]
+
+    Measurement = TypedDict(
+        "Measurement",
+        {
+            "unit": MeasurementUnit,
+            "values": List[MeasurementValue],
+        },
+    )
+
+
+try:
+    import psutil  # type: ignore
+except ImportError:
+    psutil = None
+
 
 try:
     from gevent import get_hub as get_gevent_hub  # type: ignore
@@ -133,6 +162,7 @@ def is_gevent():
     return is_module_patched("threading") or is_module_patched("_thread")
 
 
+_process = None  # type: Optional[psutil.Process]
 _scheduler = None  # type: Optional[Scheduler]
 
 # The default sampling frequency to use. This is set at 101 in order to
@@ -147,7 +177,14 @@ PROFILE_MINIMUM_SAMPLES = 2
 
 def setup_profiler(options):
     # type: (Dict[str, Any]) -> bool
+    global _process
     global _scheduler
+
+    if _process is None and psutil is not None:
+        try:
+            _process = psutil.Process()  # keep a reference to the current process
+        except psutil.Error:
+            _process = None
 
     if _scheduler is not None:
         logger.debug("profiling is already setup")
@@ -195,11 +232,13 @@ def teardown_profiler():
     # type: () -> None
 
     global _scheduler
+    global _process
 
     if _scheduler is not None:
         _scheduler.teardown()
 
     _scheduler = None
+    _process = None
 
 
 # We want to impose a stack depth limit so that samples aren't too large.
@@ -350,6 +389,36 @@ else:
         return name
 
 
+def get_measurements(ts):
+    # type: (int) -> Sequence[RawMeasurement]
+
+    global _process
+
+    measurements = []  # type: List[RawMeasurement]
+
+    if _process is None:
+        return measurements
+
+    now = str(ts)
+
+    try:
+        measurements.append(
+            (
+                "memory",
+                {
+                    "elapsed_since_start_ns": now,
+                    "value": _process.memory_info().rss,
+                },
+            )
+        )
+    except (AttributeError, psutil.Error):
+        # Looks like we won't be able to to get any measurements from the process,
+        # so let's remove it and stop collecting it from this point onwards
+        _process = None
+
+    return measurements
+
+
 MAX_PROFILE_DURATION_NS = int(3e10)  # 30 seconds
 
 
@@ -432,6 +501,12 @@ class Profile(object):
         self.frames = []  # type: List[ProcessedFrame]
         self.stacks = []  # type: List[ProcessedStack]
         self.samples = []  # type: List[ProcessedSample]
+        self.measurements = {
+            "memory": {
+                "unit": "byte",
+                "values": [],
+            },
+        }  # type: Dict[MeasurementKey, Measurement]
 
         self.unique_samples = 0
 
@@ -533,8 +608,8 @@ class Profile(object):
 
         scope.profile = old_profile
 
-    def write(self, ts, sample):
-        # type: (int, RawSample) -> None
+    def write(self, ts, sample, measurements):
+        # type: (int, RawSample, Sequence[RawMeasurement]) -> None
         if not self.active:
             return
 
@@ -577,6 +652,11 @@ class Profile(object):
                     "stack_id": self.indexed_stacks[stack_id],
                 }
             )
+
+        for key, value in measurements:
+            measurement = self.measurements.get(key)
+            if measurement is not None:
+                measurement["values"].append(value)
 
     def process(self):
         # type: () -> ProcessedProfile
@@ -647,6 +727,7 @@ class Profile(object):
                     ),
                 }
             ],
+            "measurements": self.measurements,
         }
 
     def valid(self):
@@ -731,6 +812,8 @@ class Scheduler(object):
 
             now = nanosecond_time()
 
+            measurements = get_measurements(now)
+
             raw_sample = {
                 tid: extract_stack(frame, cwd, last_sample[0].get(tid))
                 for tid, frame in sys._current_frames().items()
@@ -762,7 +845,7 @@ class Scheduler(object):
 
             for profile in self.active_profiles:
                 if profile.active:
-                    profile.write(now, sample)
+                    profile.write(now, sample, measurements)
                 else:
                     # If a thread is marked inactive, we buffer it
                     # to `inactive_profiles` so it can be removed.
