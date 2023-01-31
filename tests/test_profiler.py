@@ -6,7 +6,7 @@ import threading
 
 import pytest
 
-from collections import Counter
+from collections import defaultdict
 from sentry_sdk import start_transaction
 from sentry_sdk.profiler import (
     GeventScheduler,
@@ -37,6 +37,7 @@ requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled"
 
 
 def process_test_sample(sample):
+    # insert a mock hashable for the stack
     return [(tid, (stack, stack)) for tid, stack in sample]
 
 
@@ -69,12 +70,22 @@ def test_profiler_valid_mode(mode, teardown_profiling):
     setup_profiler({"_experiments": {"profiler_mode": mode}})
 
 
+@requires_python_version(3, 3)
+def test_profiler_setup_twice(teardown_profiling):
+    # setting up the first time should return True to indicate success
+    assert setup_profiler({"_experiments": {}})
+    # setting up the second time should return False to indicate no-op
+    assert not setup_profiler({"_experiments": {}})
+
+
 @pytest.mark.parametrize(
     ("profiles_sample_rate", "profile_count"),
     [
-        pytest.param(1.0, 1, id="100%"),
-        pytest.param(0.0, 0, id="0%"),
-        pytest.param(None, 0, id="disabled"),
+        pytest.param(1.00, 1, id="profiler sampled at 1.00"),
+        pytest.param(0.75, 1, id="profiler sampled at 0.75"),
+        pytest.param(0.25, 0, id="profiler sampled at 0.25"),
+        pytest.param(0.00, 0, id="profiler sampled at 0.00"),
+        pytest.param(None, 0, id="profiler not enabled"),
     ],
 )
 def test_profiled_transaction(
@@ -91,16 +102,47 @@ def test_profiled_transaction(
 
     envelopes = capture_envelopes()
 
+    with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
+        with start_transaction(name="profiling"):
+            pass
+
+    items = defaultdict(list)
+    for envelope in envelopes:
+        for item in envelope.items:
+            items[item.type].append(item)
+
+    assert len(items["transaction"]) == 1
+    assert len(items["profile"]) == profile_count
+
+
+def test_profile_context(
+    sentry_init,
+    capture_envelopes,
+    teardown_profiling,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": 1.0},
+    )
+
+    envelopes = capture_envelopes()
+
     with start_transaction(name="profiling"):
         pass
 
-    count_item_types = Counter()
+    items = defaultdict(list)
     for envelope in envelopes:
         for item in envelope.items:
-            count_item_types[item.type] += 1
+            items[item.type].append(item)
 
-    assert count_item_types["transaction"] == 1
-    assert count_item_types["profile"] == profile_count
+    assert len(items["transaction"]) == 1
+    assert len(items["profile"]) == 1
+
+    transaction = items["transaction"][0]
+    profile = items["profile"][0]
+    assert transaction.payload.json["contexts"]["profile"] == {
+        "profile_id": profile.payload.json["event_id"],
+    }
 
 
 def get_frame(depth=1):
@@ -429,6 +471,41 @@ def test_thread_scheduler_single_background_thread(scheduler_class):
     assert len(get_scheduler_threads(scheduler)) == 0
 
 
+@pytest.mark.parametrize(
+    ("scheduler_class",),
+    [
+        pytest.param(ThreadScheduler, id="thread scheduler"),
+        pytest.param(GeventScheduler, marks=requires_gevent, id="gevent scheduler"),
+    ],
+)
+@mock.patch("sentry_sdk.profiler.MAX_PROFILE_DURATION_NS", int(1))
+def test_max_profile_duration_reached(scheduler_class):
+    sample = [
+        (
+            "1",
+            (("/path/to/file.py", "file", "file.py", "name", 1),),
+        )
+    ]
+
+    with scheduler_class(frequency=1000) as scheduler:
+        transaction = Transaction(sampled=True)
+        with Profile(transaction, scheduler=scheduler) as profile:
+            # profile just started, it's active
+            assert profile.active
+
+            # write a sample at the start time, so still active
+            profile.write(profile.start_ns + 0, process_test_sample(sample))
+            assert profile.active
+
+            # write a sample at max time, so still active
+            profile.write(profile.start_ns + 1, process_test_sample(sample))
+            assert profile.active
+
+            # write a sample PAST the max time, so now inactive
+            profile.write(profile.start_ns + 2, process_test_sample(sample))
+            assert not profile.active
+
+
 current_thread = threading.current_thread()
 thread_metadata = {
     str(current_thread.ident): {
@@ -438,12 +515,9 @@ thread_metadata = {
 
 
 @pytest.mark.parametrize(
-    ("capacity", "start_ns", "stop_ns", "samples", "expected"),
+    ("samples", "expected"),
     [
         pytest.param(
-            10,
-            0,
-            1,
             [],
             {
                 "frames": [],
@@ -454,12 +528,9 @@ thread_metadata = {
             id="empty",
         ),
         pytest.param(
-            10,
-            1,
-            2,
             [
                 (
-                    0,
+                    6,
                     [
                         (
                             "1",
@@ -477,9 +548,6 @@ thread_metadata = {
             id="single sample out of range",
         ),
         pytest.param(
-            10,
-            0,
-            1,
             [
                 (
                     0,
@@ -514,9 +582,6 @@ thread_metadata = {
             id="single sample in range",
         ),
         pytest.param(
-            10,
-            0,
-            1,
             [
                 (
                     0,
@@ -565,9 +630,6 @@ thread_metadata = {
             id="two identical stacks",
         ),
         pytest.param(
-            10,
-            0,
-            1,
             [
                 (
                     0,
@@ -626,9 +688,6 @@ thread_metadata = {
             id="two identical frames",
         ),
         pytest.param(
-            10,
-            0,
-            1,
             [
                 (
                     0,
@@ -733,28 +792,27 @@ thread_metadata = {
         pytest.param(GeventScheduler, marks=requires_gevent, id="gevent scheduler"),
     ],
 )
+@mock.patch("sentry_sdk.profiler.MAX_PROFILE_DURATION_NS", int(5))
 def test_profile_processing(
     DictionaryContaining,  # noqa: N803
     scheduler_class,
-    capacity,
-    start_ns,
-    stop_ns,
     samples,
     expected,
 ):
     with scheduler_class(frequency=1000) as scheduler:
-        transaction = Transaction()
-        profile = Profile(transaction, scheduler=scheduler)
-        profile.start_ns = start_ns
-        for ts, sample in samples:
-            profile.write(ts, process_test_sample(sample))
-        profile.stop_ns = stop_ns
+        transaction = Transaction(sampled=True)
+        with Profile(transaction, scheduler=scheduler) as profile:
+            for ts, sample in samples:
+                # force the sample to be written at a time relative to the
+                # start of the profile
+                now = profile.start_ns + ts
+                profile.write(now, process_test_sample(sample))
 
-        processed = profile.process()
+            processed = profile.process()
 
-        assert processed["thread_metadata"] == DictionaryContaining(
-            expected["thread_metadata"]
-        )
-        assert processed["frames"] == expected["frames"]
-        assert processed["stacks"] == expected["stacks"]
-        assert processed["samples"] == expected["samples"]
+            assert processed["thread_metadata"] == DictionaryContaining(
+                expected["thread_metadata"]
+            )
+            assert processed["frames"] == expected["frames"]
+            assert processed["stacks"] == expected["stacks"]
+            assert processed["samples"] == expected["samples"]
