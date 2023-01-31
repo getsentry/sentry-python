@@ -651,7 +651,11 @@ class Profile(object):
 
     def valid(self):
         # type: () -> bool
-        return self.sampled is not None and self.sampled and self.unique_samples >= PROFILE_MINIMUM_SAMPLES
+        return (
+            self.sampled is not None
+            and self.sampled
+            and self.unique_samples >= PROFILE_MINIMUM_SAMPLES
+        )
 
 
 class Scheduler(object):

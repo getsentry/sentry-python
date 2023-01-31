@@ -1,4 +1,3 @@
-import mock
 import sys
 
 from werkzeug.test import Client

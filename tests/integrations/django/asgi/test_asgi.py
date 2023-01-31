@@ -1,5 +1,4 @@
 import json
-import mock
 
 import django
 import pytest
@@ -7,6 +6,11 @@ from channels.testing import HttpCommunicator
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.django import DjangoIntegration
 from tests.integrations.django.myapp.asgi import channels_application
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 APPS = [channels_application]
 if django.VERSION >= (3, 0):

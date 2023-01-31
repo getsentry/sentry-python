@@ -1,5 +1,4 @@
 import inspect
-import mock
 import os
 import sys
 import threading
@@ -20,6 +19,11 @@ from sentry_sdk.profiler import (
 )
 from sentry_sdk.tracing import Transaction
 from sentry_sdk._queue import Queue
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 try:
     import gevent
