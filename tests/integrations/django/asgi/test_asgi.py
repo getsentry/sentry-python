@@ -1,4 +1,5 @@
 import json
+import mock
 
 import django
 import pytest
@@ -78,6 +79,7 @@ async def test_async_views(sentry_init, capture_events, application):
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
+@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
 async def test_active_thread_id(
     sentry_init, capture_envelopes, teardown_profiling, endpoint, application
 ):

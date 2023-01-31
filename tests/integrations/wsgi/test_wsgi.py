@@ -1,3 +1,4 @@
+import mock
 import sys
 
 from werkzeug.test import Client
@@ -287,6 +288,7 @@ def test_auto_session_tracking_with_aggregates(sentry_init, capture_envelopes):
 @pytest.mark.skipif(
     sys.version_info < (3, 3), reason="Profiling is only supported in Python >= 3.3"
 )
+@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
 def test_profile_sent(
     sentry_init,
     capture_envelopes,
