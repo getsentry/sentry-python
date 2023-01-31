@@ -137,7 +137,7 @@ _scheduler = None  # type: Optional[Scheduler]
 
 
 def setup_profiler(options):
-    # type: (Dict[str, Any]) -> None
+    # type: (Dict[str, Any]) -> bool
     """
     `buffer_secs` determines the max time a sample will be buffered for
     `frequency` determines the number of samples to take per second (Hz)
@@ -147,11 +147,11 @@ def setup_profiler(options):
 
     if _scheduler is not None:
         logger.debug("profiling is already setup")
-        return
+        return False
 
     if not PY33:
         logger.warn("profiling is only supported on Python >= 3.3")
-        return
+        return False
 
     frequency = 101
 
@@ -183,6 +183,8 @@ def setup_profiler(options):
     _scheduler.setup()
 
     atexit.register(teardown_profiler)
+
+    return True
 
 
 def teardown_profiler():
@@ -410,8 +412,7 @@ class Profile(object):
         #
         # We cannot keep a reference to the transaction around here because it'll create
         # a reference cycle. So we opt to pull out just the necessary attributes.
-        self._transaction_sampled = transaction.sampled  # type: Optional[bool]
-        self.sampled = None  # type: Optional[bool]
+        self.sampled = transaction.sampled  # type: Optional[bool]
 
         # Various framework integrations are capable of overwriting the active thread id.
         # If it is set to `None` at the end of the profile, we fall back to the default.
@@ -448,7 +449,7 @@ class Profile(object):
 
         # The corresponding transaction was not sampled,
         # so don't generate a profile for it.
-        if not self._transaction_sampled:
+        if not self.sampled:
             self.sampled = False
             return
 
@@ -485,19 +486,21 @@ class Profile(object):
 
     def start(self):
         # type: () -> None
-        if not self.sampled:
+        if not self.sampled or self.active:
             return
 
         assert self.scheduler, "No scheduler specified"
+        self.active = True
         self.start_ns = nanosecond_time()
         self.scheduler.start_profiling(self)
 
     def stop(self):
         # type: () -> None
-        if not self.sampled:
+        if not self.sampled or not self.active:
             return
 
         assert self.scheduler, "No scheduler specified"
+        self.active = False
         self.scheduler.stop_profiling(self)
         self.stop_ns = nanosecond_time()
 
@@ -526,11 +529,15 @@ class Profile(object):
 
     def write(self, ts, sample):
         # type: (int, RawSample) -> None
+        if not self.active:
+            return
+
         if ts < self.start_ns:
             return
 
         offset = ts - self.start_ns
         if offset > MAX_PROFILE_DURATION_NS:
+            self.stop()
             return
 
         elapsed_since_start_ns = str(offset)
@@ -666,12 +673,11 @@ class Scheduler(object):
 
     def start_profiling(self, profile):
         # type: (Profile) -> None
-        profile.active = True
         self.new_profiles.append(profile)
 
     def stop_profiling(self, profile):
         # type: (Profile) -> None
-        profile.active = False
+        pass
 
     def make_sampler(self):
         # type: () -> Callable[..., None]
