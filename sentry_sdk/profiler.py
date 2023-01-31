@@ -110,22 +110,22 @@ if MYPY:
 
 
 try:
-    from gevent.monkey import is_module_patched  # type: ignore
-except ImportError:
-
-    def is_module_patched(*args, **kwargs):
-        # type: (*Any, **Any) -> bool
-        # unable to import from gevent means no modules have been patched
-        return False
-
-
-try:
     from gevent import get_hub as get_gevent_hub  # type: ignore
+    from gevent.monkey import get_original, is_module_patched  # type: ignore
+
+    thread_sleep = get_original("time", "sleep")
 except ImportError:
 
     def get_gevent_hub():
         # type: () -> Any
         return None
+
+    thread_sleep = time.sleep
+
+    def is_module_patched(*args, **kwargs):
+        # type: (*Any, **Any) -> bool
+        # unable to import from gevent means no modules have been patched
+        return False
 
 
 def is_gevent():
@@ -797,7 +797,7 @@ class ThreadScheduler(Scheduler):
             # not sleep for too long
             elapsed = time.perf_counter() - last
             if elapsed < self.interval:
-                time.sleep(self.interval - elapsed)
+                thread_sleep(self.interval - elapsed)
 
             # after sleeping, make sure to take the current
             # timestamp so we can use it next iteration
@@ -859,7 +859,7 @@ class GeventScheduler(Scheduler):
             # not sleep for too long
             elapsed = time.perf_counter() - last
             if elapsed < self.interval:
-                time.sleep(self.interval - elapsed)
+                thread_sleep(self.interval - elapsed)
 
             # after sleeping, make sure to take the current
             # timestamp so we can use it next iteration
