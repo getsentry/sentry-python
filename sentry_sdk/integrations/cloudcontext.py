@@ -1,6 +1,4 @@
 import json
-
-import os
 import urllib3  # type: ignore
 
 from sentry_sdk.integrations import Integration
@@ -41,10 +39,22 @@ class CloudContextIntegration(Integration):
 
     identifier = "cloudcontext"
 
+    aws_token = None
+    http = urllib3.PoolManager()
+
     @classmethod
     def _is_aws(cls):
         # type: () -> bool
-        return True if os.environ.get("AWS_DEFAULT_REGION") is not None else False
+        try:
+            r = cls.http.request(
+                "PUT",
+                AWS_TOKEN_URL,
+                headers={"X-aws-ec2-metadata-token-ttl-seconds": "60"},
+            )
+            cls.aws_token = r.data
+            return True
+        except Exception:
+            return False
 
     @classmethod
     def _get_aws_context(cls):
@@ -52,27 +62,22 @@ class CloudContextIntegration(Integration):
         ctx = {
             "cloud.provider": CLOUD_PROVIDER.AWS,
             "cloud.platform": CLOUD_PLATFORM.AWS_EC2,
-            "cloud.region": os.environ.get("AWS_REGION", ""),
         }
 
         try:
-            http = urllib3.PoolManager()
-            r = http.request(
-                "PUT",
-                AWS_TOKEN_URL,
-                headers={"X-aws-ec2-metadata-token-ttl-seconds": "60"},
+            r = cls.http.request(
+                "GET",
+                AWS_METADATA_URL,
+                headers={"X-aws-ec2-metadata-token": cls.aws_token},
             )
-            token = r.data
 
-            r = http.request(
-                "GET", AWS_METADATA_URL, headers={"X-aws-ec2-metadata-token:": token}
-            )
             if r.status == 200:
                 data = json.loads(r.data.decode("utf-8"))
                 ctx.update(
                     {
                         "cloud.account.id": data["accountId"],
                         "cloud.availability_zone": data["availabilityZone"],
+                        "cloud.region": data["region"],
                     }
                 )
         except Exception:
