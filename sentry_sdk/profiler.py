@@ -135,14 +135,18 @@ def is_gevent():
 
 _scheduler = None  # type: Optional[Scheduler]
 
+# The default sampling frequency to use. This is set at 101 in order to
+# mitigate the effects of lockstep sampling.
+DEFAULT_SAMPLING_FREQUENCY = 101
+
+
+# The minimum number of unique samples that must exist in a profile to be
+# considered valid.
+PROFILE_MINIMUM_SAMPLES = 2
+
 
 def setup_profiler(options):
     # type: (Dict[str, Any]) -> bool
-    """
-    `buffer_secs` determines the max time a sample will be buffered for
-    `frequency` determines the number of samples to take per second (Hz)
-    """
-
     global _scheduler
 
     if _scheduler is not None:
@@ -153,7 +157,7 @@ def setup_profiler(options):
         logger.warn("profiling is only supported on Python >= 3.3")
         return False
 
-    frequency = 101
+    frequency = DEFAULT_SAMPLING_FREQUENCY
 
     if is_gevent():
         # If gevent has patched the threading modules then we cannot rely on
@@ -429,6 +433,8 @@ class Profile(object):
         self.stacks = []  # type: List[ProcessedStack]
         self.samples = []  # type: List[ProcessedSample]
 
+        self.unique_samples = 0
+
         transaction._profile = self
 
     def update_active_thread_id(self):
@@ -540,6 +546,8 @@ class Profile(object):
             self.stop()
             return
 
+        self.unique_samples += 1
+
         elapsed_since_start_ns = str(offset)
 
         for tid, (stack_id, stack) in sample:
@@ -640,6 +648,14 @@ class Profile(object):
                 }
             ],
         }
+
+    def valid(self):
+        # type: () -> bool
+        return (
+            self.sampled is not None
+            and self.sampled
+            and self.unique_samples >= PROFILE_MINIMUM_SAMPLES
+        )
 
 
 class Scheduler(object):
