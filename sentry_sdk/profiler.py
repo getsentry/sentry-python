@@ -111,7 +111,7 @@ if MYPY:
 
     MeasurementUnit = Literal["byte"]
 
-    MeasurementKey = Literal["memory"]
+    MeasurementKey = Literal["memory_footprint"]
 
     MeasurementValue = TypedDict(
         "MeasurementValue",
@@ -404,7 +404,7 @@ def get_measurements(ts):
     try:
         measurements.append(
             (
-                "memory",
+                "memory_footprint",
                 {
                     "elapsed_since_start_ns": now,
                     "value": _process.memory_info().rss,
@@ -502,7 +502,7 @@ class Profile(object):
         self.stacks = []  # type: List[ProcessedStack]
         self.samples = []  # type: List[ProcessedSample]
         self.measurements = {
-            "memory": {
+            "memory_footprint": {
                 "unit": "byte",
                 "values": [],
             },
