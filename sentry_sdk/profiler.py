@@ -608,8 +608,8 @@ class Profile(object):
 
         scope.profile = old_profile
 
-    def write(self, ts, sample, measurements):
-        # type: (int, RawSample, Sequence[RawMeasurement]) -> None
+    def write(self, ts, sample, measurements=None):
+        # type: (int, RawSample, Optional[Sequence[RawMeasurement]]) -> None
         if not self.active:
             return
 
@@ -653,10 +653,11 @@ class Profile(object):
                 }
             )
 
-        for key, value in measurements:
-            measurement = self.measurements.get(key)
-            if measurement is not None:
-                measurement["values"].append(value)
+        if measurements:
+            for key, value in measurements:
+                measurement = self.measurements.get(key)
+                if measurement is not None:
+                    measurement["values"].append(value)
 
     def process(self):
         # type: () -> ProcessedProfile
