@@ -689,7 +689,7 @@ class Profile(object):
             default_in_app=False,  # Do not default a frame to `in_app: True`
         )
 
-        return {
+        profile_json = {
             "environment": event_opt.get("environment"),
             "event_id": self.event_id,
             "platform": "python",
@@ -727,8 +727,13 @@ class Profile(object):
                     ),
                 }
             ],
-            "measurements": self.measurements,
         }
+
+        measurements = {k: v for k, v in self.measurements.items() if v["values"]}
+        if measurements:
+            profile_json["measurements"] = measurements
+
+        return profile_json
 
     def valid(self):
         # type: () -> bool
