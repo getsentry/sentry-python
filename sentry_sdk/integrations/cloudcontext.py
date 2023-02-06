@@ -61,7 +61,7 @@ class CloudContextIntegration(Integration):
     aws_token = ""
     http = urllib3.PoolManager()
 
-    gcp_metadata = {}
+    gcp_metadata = None
 
     def __init__(self, cloud_provider=""):
         # type: (str) -> None
@@ -120,6 +120,11 @@ class CloudContextIntegration(Integration):
                 GCP_METADATA_URL,
                 headers={"Metadata-Flavor": "Google"},
             )
+            print(r.data)
+            print("-----------------")
+            print(r.data.decode("utf-8"))
+            print("-----------------")
+            print(json.loads(r.data.decode("utf-8")))
             cls.gcp_metadata = json.loads(r.data.decode("utf-8"))
             return True
 
@@ -133,6 +138,19 @@ class CloudContextIntegration(Integration):
             "cloud.provider": CLOUD_PROVIDER.GCP,
             "cloud.platform": CLOUD_PLATFORM.GCP_COMPUTE_ENGINE,
         }
+
+        if cls.gcp_metadata is None:
+            r = cls.http.request(
+                "GET",
+                GCP_METADATA_URL,
+                headers={"Metadata-Flavor": "Google"},
+            )
+            print(r.data)
+            print("-----------------")
+            print(r.data.decode("utf-8"))
+            print("-----------------")
+            print(json.loads(r.data.decode("utf-8")))
+            cls.gcp_metadata = json.loads(r.data.decode("utf-8"))
 
         try:
             ctx["cloud.account.id"] = cls.gcp_metadata["project"]["projectId"]
@@ -156,6 +174,9 @@ class CloudContextIntegration(Integration):
         # type: () -> str
         if cls._is_aws():
             return CLOUD_PROVIDER.AWS
+
+        if cls._is_gcp():
+            return CLOUD_PROVIDER.GCP
 
         return ""
 
