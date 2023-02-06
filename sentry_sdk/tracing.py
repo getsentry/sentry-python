@@ -716,7 +716,7 @@ class Transaction(Span):
             "spans": finished_spans,
         }  # type: Event
 
-        if self._profile is not None and self._profile.sampled:
+        if self._profile is not None and self._profile.valid():
             event["profile"] = self._profile
             contexts.update({"profile": self._profile.get_profile_context()})
             self._profile = None

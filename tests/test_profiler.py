@@ -1,5 +1,4 @@
 import inspect
-import mock
 import os
 import sys
 import threading
@@ -20,6 +19,11 @@ from sentry_sdk.profiler import (
 )
 from sentry_sdk.tracing import Transaction
 from sentry_sdk._queue import Queue
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 try:
     import gevent
@@ -88,6 +92,7 @@ def test_profiler_setup_twice(teardown_profiling):
         pytest.param(None, 0, id="profiler not enabled"),
     ],
 )
+@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
 def test_profiled_transaction(
     sentry_init,
     capture_envelopes,
@@ -115,6 +120,7 @@ def test_profiled_transaction(
     assert len(items["profile"]) == profile_count
 
 
+@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
 def test_profile_context(
     sentry_init,
     capture_envelopes,
@@ -143,6 +149,32 @@ def test_profile_context(
     assert transaction.payload.json["contexts"]["profile"] == {
         "profile_id": profile.payload.json["event_id"],
     }
+
+
+def test_minimum_unique_samples_required(
+    sentry_init,
+    capture_envelopes,
+    teardown_profiling,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": 1.0},
+    )
+
+    envelopes = capture_envelopes()
+
+    with start_transaction(name="profiling"):
+        pass
+
+    items = defaultdict(list)
+    for envelope in envelopes:
+        for item in envelope.items:
+            items[item.type].append(item)
+
+    assert len(items["transaction"]) == 1
+    # because we dont leave any time for the profiler to
+    # take any samples, it should be not be sent
+    assert len(items["profile"]) == 0
 
 
 def get_frame(depth=1):
@@ -478,7 +510,7 @@ def test_thread_scheduler_single_background_thread(scheduler_class):
         pytest.param(GeventScheduler, marks=requires_gevent, id="gevent scheduler"),
     ],
 )
-@mock.patch("sentry_sdk.profiler.MAX_PROFILE_DURATION_NS", int(1))
+@mock.patch("sentry_sdk.profiler.MAX_PROFILE_DURATION_NS", 1)
 def test_max_profile_duration_reached(scheduler_class):
     sample = [
         (
@@ -792,7 +824,7 @@ thread_metadata = {
         pytest.param(GeventScheduler, marks=requires_gevent, id="gevent scheduler"),
     ],
 )
-@mock.patch("sentry_sdk.profiler.MAX_PROFILE_DURATION_NS", int(5))
+@mock.patch("sentry_sdk.profiler.MAX_PROFILE_DURATION_NS", 5)
 def test_profile_processing(
     DictionaryContaining,  # noqa: N803
     scheduler_class,
