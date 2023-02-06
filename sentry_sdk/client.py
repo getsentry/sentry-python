@@ -29,7 +29,6 @@ from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.profiler import setup_profiler
-from sentry_sdk.tracing_utils import has_tracestate_enabled, reinflate_tracestate
 
 from sentry_sdk._types import MYPY
 
@@ -410,13 +409,6 @@ class _Client(object):
 
         attachments = hint.get("attachments")
 
-        # this is outside of the `if` immediately below because even if we don't
-        # use the value, we want to make sure we remove it before the event is
-        # sent
-        raw_tracestate = (
-            event_opt.get("contexts", {}).get("trace", {}).pop("tracestate", "")
-        )
-
         dynamic_sampling_context = (
             event_opt.get("contexts", {})
             .get("trace", {})
@@ -432,14 +424,7 @@ class _Client(object):
                 "sent_at": format_timestamp(datetime.utcnow()),
             }
 
-            if has_tracestate_enabled():
-                tracestate_data = raw_tracestate and reinflate_tracestate(
-                    raw_tracestate.replace("sentry=", "")
-                )
-
-                if tracestate_data:
-                    headers["trace"] = tracestate_data
-            elif dynamic_sampling_context:
+            if dynamic_sampling_context:
                 headers["trace"] = dynamic_sampling_context
 
             envelope = Envelope(headers=headers)
