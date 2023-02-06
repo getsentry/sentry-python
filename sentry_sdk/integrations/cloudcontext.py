@@ -19,8 +19,18 @@ AWS_METADATA_URL = "http://{}/latest/dynamic/instance-identity/document".format(
     AWS_METADATA_HOST
 )
 
+GCP_METADATA_HOST = "metadata.google.internal"
+GCP_METADATA_URL = "http://{}/computeMetadata/v1/?recursive=true".format(
+    GCP_METADATA_HOST
+)
+
 
 class CLOUD_PROVIDER:
+    """
+    Name of the cloud provider.
+    see https://opentelemetry.io/docs/reference/specification/resource/semantic_conventions/cloud/
+    """
+
     ALIBABA = "alibaba_cloud"
     AWS = "aws"
     AZURE = "azure"
@@ -30,7 +40,13 @@ class CLOUD_PROVIDER:
 
 
 class CLOUD_PLATFORM:
+    """
+    The cloud platform.
+    see https://opentelemetry.io/docs/reference/specification/resource/semantic_conventions/cloud/
+    """
+
     AWS_EC2 = "aws_ec2"
+    GCP_COMPUTE_ENGINE = "gcp_compute_engine"
 
 
 class CloudContextIntegration(Integration):
@@ -44,6 +60,8 @@ class CloudContextIntegration(Integration):
 
     aws_token = ""
     http = urllib3.PoolManager()
+
+    gcp_metadata = {}
 
     def __init__(self, cloud_provider=""):
         # type: (str) -> None
@@ -60,6 +78,7 @@ class CloudContextIntegration(Integration):
             )
             cls.aws_token = r.data
             return True
+
         except Exception:
             return False
 
@@ -87,6 +106,46 @@ class CloudContextIntegration(Integration):
                         "cloud.region": data["region"],
                     }
                 )
+        except Exception:
+            pass
+
+        return ctx
+
+    @classmethod
+    def _is_gcp(cls):
+        # type: () -> bool
+        try:
+            r = cls.http.request(
+                "GET",
+                GCP_METADATA_URL,
+                headers={"Metadata-Flavor": "Google"},
+            )
+            cls.gcp_metadata = json.loads(r.data.decode("utf-8"))
+            return True
+
+        except Exception:
+            return False
+
+    @classmethod
+    def _get_gcp_context(cls):
+        # type: () -> Dict[str, str]
+        ctx = {
+            "cloud.provider": CLOUD_PROVIDER.GCP,
+            "cloud.platform": CLOUD_PLATFORM.GCP_COMPUTE_ENGINE,
+        }
+
+        try:
+            ctx["cloud.account.id"] = cls.gcp_metadata["project"]["projectId"]
+        except Exception:
+            pass
+
+        try:
+            ctx["cloud.zone"] = cls.gcp_metadata["instance"]["zone"].split("/")[-1]
+        except Exception:
+            pass
+
+        try:
+            ctx["cloud.region"] = cls.gcp_metadata["instance"]["region"].split("/")[-1]
         except Exception:
             pass
 
@@ -135,4 +194,5 @@ class CloudContextIntegration(Integration):
 
 context_getters = {
     CLOUD_PROVIDER.AWS: CloudContextIntegration._get_aws_context,
+    CLOUD_PROVIDER.GCP: CloudContextIntegration._get_gcp_context,
 }
