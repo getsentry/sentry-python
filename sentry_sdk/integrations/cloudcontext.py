@@ -3,6 +3,7 @@ import urllib3  # type: ignore
 
 from sentry_sdk.integrations import Integration
 from sentry_sdk.api import set_context
+from sentry_sdk.utils import logger
 
 from sentry_sdk._types import MYPY
 
@@ -39,8 +40,14 @@ class CloudContextIntegration(Integration):
 
     identifier = "cloudcontext"
 
-    aws_token = None
+    cloud_provider = ""
+
+    aws_token = ""
     http = urllib3.PoolManager()
+
+    def __init__(self, cloud_provider=""):
+        # type: (str) -> None
+        CloudContextIntegration.cloud_provider = cloud_provider
 
     @classmethod
     def _is_aws(cls):
@@ -96,19 +103,36 @@ class CloudContextIntegration(Integration):
     @classmethod
     def _get_cloud_context(cls):
         # type: () -> Dict[str, str]
-        getters = {
-            CLOUD_PROVIDER.AWS: cls._get_aws_context,
-        }
-
-        cloud_provider = CloudContextIntegration._get_cloud_provider()
-        if cloud_provider in getters.keys():
-            return getters[cloud_provider]()
+        cloud_provider = (
+            cls.cloud_provider
+            if cls.cloud_provider != ""
+            else CloudContextIntegration._get_cloud_provider()
+        )
+        if cloud_provider in context_getters.keys():
+            return context_getters[cloud_provider]()
 
         return {}
 
     @staticmethod
     def setup_once():
         # type: () -> None
+        cloud_provider = CloudContextIntegration.cloud_provider
+        unsupported_cloud_provider = (
+            cloud_provider != "" and cloud_provider not in context_getters.keys()
+        )
+
+        if unsupported_cloud_provider:
+            logger.warning(
+                "Invalid value for cloud_provider: %s (must be in %s). Falling back to autodetection...",
+                CloudContextIntegration.cloud_provider,
+                list(context_getters.keys()),
+            )
+
         context = CloudContextIntegration._get_cloud_context()
         if context != {}:
             set_context(CONTEXT_TYPE, context)
+
+
+context_getters = {
+    CLOUD_PROVIDER.AWS: CloudContextIntegration._get_aws_context,
+}
