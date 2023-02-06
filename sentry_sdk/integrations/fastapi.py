@@ -3,17 +3,20 @@ import asyncio
 from sentry_sdk._types import MYPY
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.integrations.starlette import (
-    StarletteIntegration,
-    StarletteRequestExtractor,
-)
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import transaction_from_function
 
 if MYPY:
     from typing import Any, Callable, Dict
-
     from sentry_sdk.scope import Scope
+
+try:
+    from sentry_sdk.integrations.starlette import (
+        StarletteIntegration,
+        StarletteRequestExtractor,
+    )
+except DidNotEnable:
+    raise DidNotEnable("Starlette is not installed")
 
 try:
     import fastapi  # type: ignore

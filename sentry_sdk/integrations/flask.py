@@ -261,6 +261,5 @@ def _add_user_to_event(event):
 
         try:
             user_info.setdefault("username", user.username)
-            user_info.setdefault("username", user.email)
         except Exception:
             pass

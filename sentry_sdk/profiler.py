@@ -110,22 +110,22 @@ if MYPY:
 
 
 try:
-    from gevent.monkey import is_module_patched  # type: ignore
-except ImportError:
-
-    def is_module_patched(*args, **kwargs):
-        # type: (*Any, **Any) -> bool
-        # unable to import from gevent means no modules have been patched
-        return False
-
-
-try:
     from gevent import get_hub as get_gevent_hub  # type: ignore
+    from gevent.monkey import get_original, is_module_patched  # type: ignore
+
+    thread_sleep = get_original("time", "sleep")
 except ImportError:
 
     def get_gevent_hub():
         # type: () -> Any
         return None
+
+    thread_sleep = time.sleep
+
+    def is_module_patched(*args, **kwargs):
+        # type: (*Any, **Any) -> bool
+        # unable to import from gevent means no modules have been patched
+        return False
 
 
 def is_gevent():
@@ -135,25 +135,29 @@ def is_gevent():
 
 _scheduler = None  # type: Optional[Scheduler]
 
+# The default sampling frequency to use. This is set at 101 in order to
+# mitigate the effects of lockstep sampling.
+DEFAULT_SAMPLING_FREQUENCY = 101
+
+
+# The minimum number of unique samples that must exist in a profile to be
+# considered valid.
+PROFILE_MINIMUM_SAMPLES = 2
+
 
 def setup_profiler(options):
-    # type: (Dict[str, Any]) -> None
-    """
-    `buffer_secs` determines the max time a sample will be buffered for
-    `frequency` determines the number of samples to take per second (Hz)
-    """
-
+    # type: (Dict[str, Any]) -> bool
     global _scheduler
 
     if _scheduler is not None:
         logger.debug("profiling is already setup")
-        return
+        return False
 
     if not PY33:
         logger.warn("profiling is only supported on Python >= 3.3")
-        return
+        return False
 
-    frequency = 101
+    frequency = DEFAULT_SAMPLING_FREQUENCY
 
     if is_gevent():
         # If gevent has patched the threading modules then we cannot rely on
@@ -183,6 +187,8 @@ def setup_profiler(options):
     _scheduler.setup()
 
     atexit.register(teardown_profiler)
+
+    return True
 
 
 def teardown_profiler():
@@ -410,8 +416,7 @@ class Profile(object):
         #
         # We cannot keep a reference to the transaction around here because it'll create
         # a reference cycle. So we opt to pull out just the necessary attributes.
-        self._transaction_sampled = transaction.sampled  # type: Optional[bool]
-        self.sampled = None  # type: Optional[bool]
+        self.sampled = transaction.sampled  # type: Optional[bool]
 
         # Various framework integrations are capable of overwriting the active thread id.
         # If it is set to `None` at the end of the profile, we fall back to the default.
@@ -427,6 +432,8 @@ class Profile(object):
         self.frames = []  # type: List[ProcessedFrame]
         self.stacks = []  # type: List[ProcessedStack]
         self.samples = []  # type: List[ProcessedSample]
+
+        self.unique_samples = 0
 
         transaction._profile = self
 
@@ -448,7 +455,7 @@ class Profile(object):
 
         # The corresponding transaction was not sampled,
         # so don't generate a profile for it.
-        if not self._transaction_sampled:
+        if not self.sampled:
             self.sampled = False
             return
 
@@ -485,19 +492,21 @@ class Profile(object):
 
     def start(self):
         # type: () -> None
-        if not self.sampled:
+        if not self.sampled or self.active:
             return
 
         assert self.scheduler, "No scheduler specified"
+        self.active = True
         self.start_ns = nanosecond_time()
         self.scheduler.start_profiling(self)
 
     def stop(self):
         # type: () -> None
-        if not self.sampled:
+        if not self.sampled or not self.active:
             return
 
         assert self.scheduler, "No scheduler specified"
+        self.active = False
         self.scheduler.stop_profiling(self)
         self.stop_ns = nanosecond_time()
 
@@ -526,12 +535,18 @@ class Profile(object):
 
     def write(self, ts, sample):
         # type: (int, RawSample) -> None
+        if not self.active:
+            return
+
         if ts < self.start_ns:
             return
 
         offset = ts - self.start_ns
         if offset > MAX_PROFILE_DURATION_NS:
+            self.stop()
             return
+
+        self.unique_samples += 1
 
         elapsed_since_start_ns = str(offset)
 
@@ -634,6 +649,14 @@ class Profile(object):
             ],
         }
 
+    def valid(self):
+        # type: () -> bool
+        return (
+            self.sampled is not None
+            and self.sampled
+            and self.unique_samples >= PROFILE_MINIMUM_SAMPLES
+        )
+
 
 class Scheduler(object):
     mode = "unknown"
@@ -666,12 +689,11 @@ class Scheduler(object):
 
     def start_profiling(self, profile):
         # type: (Profile) -> None
-        profile.active = True
         self.new_profiles.append(profile)
 
     def stop_profiling(self, profile):
         # type: (Profile) -> None
-        profile.active = False
+        pass
 
     def make_sampler(self):
         # type: () -> Callable[..., None]
@@ -797,7 +819,7 @@ class ThreadScheduler(Scheduler):
             # not sleep for too long
             elapsed = time.perf_counter() - last
             if elapsed < self.interval:
-                time.sleep(self.interval - elapsed)
+                thread_sleep(self.interval - elapsed)
 
             # after sleeping, make sure to take the current
             # timestamp so we can use it next iteration
@@ -859,7 +881,7 @@ class GeventScheduler(Scheduler):
             # not sleep for too long
             elapsed = time.perf_counter() - last
             if elapsed < self.interval:
-                time.sleep(self.interval - elapsed)
+                thread_sleep(self.interval - elapsed)
 
             # after sleeping, make sure to take the current
             # timestamp so we can use it next iteration
