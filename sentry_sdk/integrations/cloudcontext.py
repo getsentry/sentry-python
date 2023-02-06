@@ -120,11 +120,11 @@ class CloudContextIntegration(Integration):
                 GCP_METADATA_URL,
                 headers={"Metadata-Flavor": "Google"},
             )
-            print(r.data)
-            print("-----------------")
-            print(r.data.decode("utf-8"))
-            print("-----------------")
-            print(json.loads(r.data.decode("utf-8")))
+            logger.warning(r.data)
+            logger.warning("-----------------")
+            logger.warning(r.data.decode("utf-8"))
+            logger.warning("-----------------")
+            logger.warning(json.loads(r.data.decode("utf-8")))
             cls.gcp_metadata = json.loads(r.data.decode("utf-8"))
             return True
 
@@ -145,11 +145,11 @@ class CloudContextIntegration(Integration):
                 GCP_METADATA_URL,
                 headers={"Metadata-Flavor": "Google"},
             )
-            print(r.data)
-            print("-----------------")
-            print(r.data.decode("utf-8"))
-            print("-----------------")
-            print(json.loads(r.data.decode("utf-8")))
+            logger.warning(r.data)
+            logger.warning("-----------------")
+            logger.warning(r.data.decode("utf-8"))
+            logger.warning("-----------------")
+            logger.warning(json.loads(r.data.decode("utf-8")))
             cls.gcp_metadata = json.loads(r.data.decode("utf-8"))
 
         try:
