@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.15.0
+
+### Various fixes & improvements
+
+- ref(profiling): Do not send single sample profiles (#1879) by @Zylphrex
+- tests(profiling): Add additional test coverage for profiler (#1877) by @Zylphrex
+- fix(profiling): Always use builtin time.sleep (#1869) by @Zylphrex
+- Fix check for Starlette in FastAPI integration (#1868) by @antonpirker
+- tests: Add py3.11 to test-common (#1871) by @Zylphrex
+- Do not overwrite default for username with email address in FlaskIntegration (#1873) by @homeworkprod
+- feat(profiling): Enable profiling on all transactions (#1797) by @Zylphrex
+- Add Huey Integration (#1555) by @Zhenay
+- ref(profiling): Remove use of threading.Event (#1864) by @Zylphrex
+- Don't log whole event in before_send / event_processor drops (#1863) by @sl0thentr0py
+- fix(profiling): Defaul in_app decision to None (#1855) by @Zylphrex
+
 ## 1.14.0
 
 ### Various fixes & improvements
