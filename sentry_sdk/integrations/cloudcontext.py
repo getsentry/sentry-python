@@ -218,6 +218,8 @@ class CloudContextIntegration(Integration):
             set_context(CONTEXT_TYPE, context)
 
 
+# Map with the currently supported cloud providers
+# mapping to functions extracting the context
 context_getters = {
     CLOUD_PROVIDER.AWS: CloudContextIntegration._get_aws_context,
     CLOUD_PROVIDER.GCP: CloudContextIntegration._get_gcp_context,
