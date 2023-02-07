@@ -25,7 +25,7 @@ GCP_METADATA_URL = "http://{}/computeMetadata/v1/?recursive=true".format(
 )
 
 
-class CLOUD_PROVIDER:
+class CLOUD_PROVIDER:  # noqa: N801
     """
     Name of the cloud provider.
     see https://opentelemetry.io/docs/reference/specification/resource/semantic_conventions/cloud/
@@ -39,7 +39,7 @@ class CLOUD_PROVIDER:
     TENCENT = "tencent_cloud"
 
 
-class CLOUD_PLATFORM:
+class CLOUD_PLATFORM:  # noqa: N801
     """
     The cloud platform.
     see https://opentelemetry.io/docs/reference/specification/resource/semantic_conventions/cloud/
