@@ -101,15 +101,17 @@ class CloudContextIntegration(Integration):
                 headers={"X-aws-ec2-metadata-token": cls.aws_token},
             )
 
-            if r.status == 200:
-                data = json.loads(r.data.decode("utf-8"))
-                ctx.update(
-                    {
-                        "cloud.account.id": data["accountId"],
-                        "cloud.availability_zone": data["availabilityZone"],
-                        "cloud.region": data["region"],
-                    }
-                )
+            if r.status != 200:
+                return ctx
+
+            data = json.loads(r.data.decode("utf-8"))
+            ctx.update(
+                {
+                    "cloud.account.id": data["accountId"],
+                    "cloud.availability_zone": data["availabilityZone"],
+                    "cloud.region": data["region"],
+                }
+            )
         except Exception:
             pass
 
@@ -124,11 +126,10 @@ class CloudContextIntegration(Integration):
                 GCP_METADATA_URL,
                 headers={"Metadata-Flavor": "Google"},
             )
-            logger.warning(r.data)
-            logger.warning("-----------------")
-            logger.warning(r.data.decode("utf-8"))
-            logger.warning("-----------------")
-            logger.warning(json.loads(r.data.decode("utf-8")))
+
+            if r.status != 200:
+                return False
+
             cls.gcp_metadata = json.loads(r.data.decode("utf-8"))
             return True
 
@@ -149,11 +150,10 @@ class CloudContextIntegration(Integration):
                 GCP_METADATA_URL,
                 headers={"Metadata-Flavor": "Google"},
             )
-            logger.warning(r.data)
-            logger.warning("-----------------")
-            logger.warning(r.data.decode("utf-8"))
-            logger.warning("-----------------")
-            logger.warning(json.loads(r.data.decode("utf-8")))
+
+            if r.status != 200:
+                return ctx
+
             cls.gcp_metadata = json.loads(r.data.decode("utf-8"))
 
         try:
@@ -167,6 +167,7 @@ class CloudContextIntegration(Integration):
             pass
 
         try:
+            # only populated in google cloud run
             ctx["cloud.region"] = cls.gcp_metadata["instance"]["region"].split("/")[-1]
         except Exception:
             pass
