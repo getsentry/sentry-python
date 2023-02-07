@@ -172,6 +172,11 @@ class CloudContextIntegration(Integration):
         except Exception:
             pass
 
+        try:
+            ctx["host.id"] = cls.gcp_metadata["instance"]["id"]
+        except Exception:
+            pass
+
         return ctx
 
     @classmethod
