@@ -76,6 +76,10 @@ class CloudContextIntegration(Integration):
                 AWS_TOKEN_URL,
                 headers={"X-aws-ec2-metadata-token-ttl-seconds": "60"},
             )
+
+            if r.status != 200:
+                return False
+
             cls.aws_token = r.data
             return True
 
