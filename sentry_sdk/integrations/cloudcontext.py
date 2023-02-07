@@ -105,13 +105,32 @@ class CloudContextIntegration(Integration):
                 return ctx
 
             data = json.loads(r.data.decode("utf-8"))
-            ctx.update(
-                {
-                    "cloud.account.id": data["accountId"],
-                    "cloud.availability_zone": data["availabilityZone"],
-                    "cloud.region": data["region"],
-                }
-            )
+
+            try:
+                ctx["cloud.account.id"] = data["accountId"]
+            except Exception:
+                pass
+
+            try:
+                ctx["cloud.availability_zone"] = data["availabilityZone"]
+            except Exception:
+                pass
+
+            try:
+                ctx["cloud.region"] = data["region"]
+            except Exception:
+                pass
+
+            try:
+                ctx["host.id"] = data["instanceId"]
+            except Exception:
+                pass
+
+            try:
+                ctx["host.type"] = data["instanceType"]
+            except Exception:
+                pass
+
         except Exception:
             pass
 
