@@ -789,11 +789,9 @@ def handle_in_app_impl(frames, in_app_exclude, in_app_include, default_in_app=Tr
         module = frame.get("module")
         if not module:
             continue
-
         elif _module_in_set(module, in_app_include):
             frame["in_app"] = True
             any_in_app = True
-
         elif _module_in_set(module, in_app_exclude):
             frame["in_app"] = False
 
