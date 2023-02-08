@@ -779,6 +779,7 @@ def handle_in_app_impl(frames, in_app_exclude, in_app_include, default_in_app=Tr
         return None
 
     any_in_app = False
+
     for frame in frames:
         in_app = frame.get("in_app")
         if in_app is not None:
@@ -789,9 +790,27 @@ def handle_in_app_impl(frames, in_app_exclude, in_app_include, default_in_app=Tr
         module = frame.get("module")
         if not module:
             continue
+
+        # if frame["abs_path"] contains os.environ.get("VIRTUAL_ENV") then in_app = False
+        # if frame["abs_path"] matches [\/](?:dist|site)-packages[\/] then in_app = False
+
+        # check in go app for in app:
+        # if strings.Contains(f.Path, "/site-packages/") ||
+        #     strings.Contains(f.Path, "/dist-packages/") ||
+        #     strings.Contains(f.Path, "\\site-packages\\") ||
+        #     strings.Contains(f.Path, "\\dist-packages\\") {
+        #     return false
+        # }
+
+        # in app in the sentry backend:
+        # if ctx["platform"] == "python":
+        #     # This allows detecting a file that belongs to Python's 3rd party modules
+        #     scope.set_tag("stacktrace_link.in_app", "site-packages" not in str(ctx["abs_path"]))
+
         elif _module_in_set(module, in_app_include):
             frame["in_app"] = True
             any_in_app = True
+
         elif _module_in_set(module, in_app_exclude):
             frame["in_app"] = False
 
