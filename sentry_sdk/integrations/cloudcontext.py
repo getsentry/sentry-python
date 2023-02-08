@@ -163,36 +163,42 @@ class CloudContextIntegration(Integration):
             "cloud.platform": CLOUD_PLATFORM.GCP_COMPUTE_ENGINE,
         }
 
-        if cls.gcp_metadata is None:
-            r = cls.http.request(
-                "GET",
-                GCP_METADATA_URL,
-                headers={"Metadata-Flavor": "Google"},
-            )
-
-            if r.status != 200:
-                return ctx
-
-            cls.gcp_metadata = json.loads(r.data.decode("utf-8"))
-
         try:
-            ctx["cloud.account.id"] = cls.gcp_metadata["project"]["projectId"]
-        except Exception:
-            pass
+            if cls.gcp_metadata is None:
+                r = cls.http.request(
+                    "GET",
+                    GCP_METADATA_URL,
+                    headers={"Metadata-Flavor": "Google"},
+                )
 
-        try:
-            ctx["cloud.zone"] = cls.gcp_metadata["instance"]["zone"].split("/")[-1]
-        except Exception:
-            pass
+                if r.status != 200:
+                    return ctx
 
-        try:
-            # only populated in google cloud run
-            ctx["cloud.region"] = cls.gcp_metadata["instance"]["region"].split("/")[-1]
-        except Exception:
-            pass
+                cls.gcp_metadata = json.loads(r.data.decode("utf-8"))
 
-        try:
-            ctx["host.id"] = cls.gcp_metadata["instance"]["id"]
+            try:
+                ctx["cloud.account.id"] = cls.gcp_metadata["project"]["projectId"]
+            except Exception:
+                pass
+
+            try:
+                ctx["cloud.zone"] = cls.gcp_metadata["instance"]["zone"].split("/")[-1]
+            except Exception:
+                pass
+
+            try:
+                # only populated in google cloud run
+                ctx["cloud.region"] = cls.gcp_metadata["instance"]["region"].split("/")[
+                    -1
+                ]
+            except Exception:
+                pass
+
+            try:
+                ctx["host.id"] = cls.gcp_metadata["instance"]["id"]
+            except Exception:
+                pass
+
         except Exception:
             pass
 
