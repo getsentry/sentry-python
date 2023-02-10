@@ -792,6 +792,10 @@ def handle_in_app_impl(frames, in_app_exclude, in_app_include):
             frame["in_app"] = False
 
         else:
+            abs_path = frame.get("abs_path")
+            if abs_path is None:
+                continue
+
             external_source = (
                 re.search(r"[\\/](?:dist|site)-packages[\\/]", frame["abs_path"])
                 is not None

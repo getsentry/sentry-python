@@ -396,6 +396,38 @@ def test_parse_invalid_dsn(dsn):
                 "in_app": False,
             },
         ],
+        [
+            {
+                "module": "fastapi.routing",
+            },
+            None,
+            None,
+            {
+                "module": "fastapi.routing",
+            },
+        ],
+        [
+            {
+                "module": "fastapi.routing",
+            },
+            ["fastapi"],
+            None,
+            {
+                "module": "fastapi.routing",
+                "in_app": True,
+            },
+        ],
+        [
+            {
+                "module": "fastapi.routing",
+            },
+            None,
+            ["fastapi"],
+            {
+                "module": "fastapi.routing",
+                "in_app": False,
+            },
+        ],
     ],
 )
 def test_handle_in_app_impl(frame, in_app_include, in_app_exclude, resulting_frame):
