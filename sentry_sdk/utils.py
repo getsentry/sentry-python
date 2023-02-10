@@ -800,7 +800,8 @@ def handle_in_app_impl(frames, in_app_exclude, in_app_include):
                 re.search(r"[\\/](?:dist|site)-packages[\\/]", frame["abs_path"])
                 is not None
             )
-            frame["in_app"] = not external_source
+            if external_source:
+                frame["in_app"] = False
 
     return frames
 
