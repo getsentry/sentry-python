@@ -761,20 +761,21 @@ def iter_event_frames(event):
             yield frame
 
 
-def handle_in_app(event, in_app_exclude=None, in_app_include=None):
-    # type: (Dict[str, Any], Optional[List[str]], Optional[List[str]]) -> Dict[str, Any]
+def handle_in_app(event, in_app_exclude=None, in_app_include=None, project_root=None):
+    # type: (Dict[str, Any], Optional[List[str]], Optional[List[str]], Optional[str]) -> Dict[str, Any]
     for stacktrace in iter_event_stacktraces(event):
         handle_in_app_impl(
             stacktrace.get("frames"),
             in_app_exclude=in_app_exclude,
             in_app_include=in_app_include,
+            project_root=project_root,
         )
 
     return event
 
 
-def handle_in_app_impl(frames, in_app_exclude, in_app_include):
-    # type: (Any, Optional[List[str]], Optional[List[str]]) -> Optional[Any]
+def handle_in_app_impl(frames, in_app_exclude, in_app_include, project_root=None):
+    # type: (Any, Optional[List[str]], Optional[List[str]], Optional[str]) -> Optional[Any]
     if not frames:
         return None
 
@@ -785,9 +786,11 @@ def handle_in_app_impl(frames, in_app_exclude, in_app_include):
 
         module = frame.get("module")
 
+        # check if module in frame is in the list of modules to include
         if _module_in_list(module, in_app_include):
             frame["in_app"] = True
 
+        # check if module in frame is in the list of modules to exclude
         elif _module_in_list(module, in_app_exclude):
             frame["in_app"] = False
 
@@ -796,12 +799,19 @@ def handle_in_app_impl(frames, in_app_exclude, in_app_include):
             if abs_path is None:
                 continue
 
+            # check if frame is in 'site-packages' or 'dist-packages'
             external_source = (
                 re.search(r"[\\/](?:dist|site)-packages[\\/]", frame["abs_path"])
                 is not None
             )
             if external_source:
                 frame["in_app"] = False
+
+            # check if frame is in the project root
+            else:
+                if project_root is not None:
+                    if abs_path.startswith(project_root):
+                        frame["in_app"] = True
 
     return frames
 

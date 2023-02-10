@@ -134,12 +134,13 @@ def test_parse_invalid_dsn(dsn):
 
 
 @pytest.mark.parametrize(
-    "frame,in_app_include,in_app_exclude,resulting_frame",
+    "frame,in_app_include,in_app_exclude,project_root,resulting_frame",
     [
         [
             {
                 "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
             },
+            None,
             None,
             None,
             {
@@ -152,6 +153,7 @@ def test_parse_invalid_dsn(dsn):
                 "module": "fastapi.routing",
                 "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
             },
+            None,
             None,
             None,
             {
@@ -166,6 +168,7 @@ def test_parse_invalid_dsn(dsn):
                 "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
                 "in_app": True,
             },
+            None,
             None,
             None,
             {
@@ -178,6 +181,7 @@ def test_parse_invalid_dsn(dsn):
             {
                 "abs_path": "C:\\Users\\winuser\\AppData\\Roaming\\Python\\Python35\\site-packages\\fastapi\\routing.py",
             },
+            None,
             None,
             None,
             {
@@ -190,6 +194,7 @@ def test_parse_invalid_dsn(dsn):
                 "module": "fastapi.routing",
                 "abs_path": "/usr/lib/python2.7/dist-packages/fastapi/routing.py",
             },
+            None,
             None,
             None,
             {
@@ -202,6 +207,7 @@ def test_parse_invalid_dsn(dsn):
             {
                 "abs_path": "/home/ubuntu/fastapi/main.py",
             },
+            None,
             None,
             None,
             {
@@ -213,6 +219,7 @@ def test_parse_invalid_dsn(dsn):
                 "module": "main",
                 "abs_path": "/home/ubuntu/fastapi/main.py",
             },
+            None,
             None,
             None,
             {
@@ -227,6 +234,7 @@ def test_parse_invalid_dsn(dsn):
             },
             ["fastapi"],
             None,
+            None,
             {
                 "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
                 "in_app": False,  # because there is no module set
@@ -238,6 +246,7 @@ def test_parse_invalid_dsn(dsn):
                 "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
             },
             ["fastapi"],
+            None,
             None,
             {
                 "module": "fastapi.routing",
@@ -253,6 +262,7 @@ def test_parse_invalid_dsn(dsn):
             },
             ["fastapi"],
             None,
+            None,
             {
                 "module": "fastapi.routing",
                 "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
@@ -265,6 +275,7 @@ def test_parse_invalid_dsn(dsn):
             },
             ["fastapi"],
             None,
+            None,
             {
                 "abs_path": "C:\\Users\\winuser\\AppData\\Roaming\\Python\\Python35\\site-packages\\fastapi\\routing.py",
                 "in_app": False,  # because there is no module set
@@ -276,6 +287,7 @@ def test_parse_invalid_dsn(dsn):
                 "abs_path": "/usr/lib/python2.7/dist-packages/fastapi/routing.py",
             },
             ["fastapi"],
+            None,
             None,
             {
                 "module": "fastapi.routing",
@@ -288,6 +300,7 @@ def test_parse_invalid_dsn(dsn):
                 "abs_path": "/home/ubuntu/fastapi/main.py",
             },
             ["fastapi"],
+            None,
             None,
             {
                 "abs_path": "/home/ubuntu/fastapi/main.py",
@@ -299,6 +312,7 @@ def test_parse_invalid_dsn(dsn):
                 "abs_path": "/home/ubuntu/fastapi/main.py",
             },
             ["fastapi"],
+            None,
             None,
             {
                 "module": "main",
@@ -312,6 +326,7 @@ def test_parse_invalid_dsn(dsn):
             },
             None,
             ["main"],
+            None,
             {
                 "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
                 "in_app": False,
@@ -324,6 +339,7 @@ def test_parse_invalid_dsn(dsn):
             },
             None,
             ["main"],
+            None,
             {
                 "module": "fastapi.routing",
                 "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
@@ -338,6 +354,7 @@ def test_parse_invalid_dsn(dsn):
             },
             None,
             ["main"],
+            None,
             {
                 "module": "fastapi.routing",
                 "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
@@ -350,6 +367,7 @@ def test_parse_invalid_dsn(dsn):
             },
             None,
             ["main"],
+            None,
             {
                 "abs_path": "C:\\Users\\winuser\\AppData\\Roaming\\Python\\Python35\\site-packages\\fastapi\\routing.py",
                 "in_app": False,
@@ -362,6 +380,7 @@ def test_parse_invalid_dsn(dsn):
             },
             None,
             ["main"],
+            None,
             {
                 "module": "fastapi.routing",
                 "abs_path": "/usr/lib/python2.7/dist-packages/fastapi/routing.py",
@@ -374,6 +393,7 @@ def test_parse_invalid_dsn(dsn):
             },
             None,
             ["main"],
+            None,
             {
                 "abs_path": "/home/ubuntu/fastapi/main.py",
             },
@@ -385,6 +405,7 @@ def test_parse_invalid_dsn(dsn):
             },
             None,
             ["main"],
+            None,
             {
                 "module": "main",
                 "abs_path": "/home/ubuntu/fastapi/main.py",
@@ -397,6 +418,7 @@ def test_parse_invalid_dsn(dsn):
             },
             None,
             None,
+            None,
             {
                 "module": "fastapi.routing",
             },
@@ -406,6 +428,7 @@ def test_parse_invalid_dsn(dsn):
                 "module": "fastapi.routing",
             },
             ["fastapi"],
+            None,
             None,
             {
                 "module": "fastapi.routing",
@@ -418,16 +441,65 @@ def test_parse_invalid_dsn(dsn):
             },
             None,
             ["fastapi"],
+            None,
             {
                 "module": "fastapi.routing",
+                "in_app": False,
+            },
+        ],
+        # with project_root set
+        [
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+            },
+            None,
+            None,
+            "/home/ubuntu/fastapi",
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+                "in_app": True,
+            },
+        ],
+        [
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+            },
+            ["main"],
+            None,
+            "/home/ubuntu/fastapi",
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+                "in_app": True,
+            },
+        ],
+        [
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+            },
+            None,
+            ["main"],
+            "/home/ubuntu/fastapi",
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
                 "in_app": False,
             },
         ],
     ],
 )
-def test_handle_in_app_impl(frame, in_app_include, in_app_exclude, resulting_frame):
+def test_handle_in_app_impl(
+    frame, in_app_include, in_app_exclude, project_root, resulting_frame
+):
     new_frames = handle_in_app_impl(
-        [frame], in_app_include=in_app_include, in_app_exclude=in_app_exclude
+        [frame],
+        in_app_include=in_app_include,
+        in_app_exclude=in_app_exclude,
+        project_root=project_root,
     )
 
     assert new_frames[0] == resulting_frame

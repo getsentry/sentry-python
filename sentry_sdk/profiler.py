@@ -598,14 +598,15 @@ class Profile(object):
             "thread_metadata": thread_metadata,
         }
 
-    def to_json(self, event_opt, options):
-        # type: (Any, Dict[str, Any]) -> Dict[str, Any]
+    def to_json(self, event_opt, options, configuration):
+        # type: (Any, Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         profile = self.process()
 
         handle_in_app_impl(
             profile["frames"],
             options["in_app_exclude"],
             options["in_app_include"],
+            configuration["project_root"],
         )
 
         return {
