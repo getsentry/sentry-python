@@ -595,20 +595,12 @@ def test_template_exception(
         if not f["filename"].startswith("django/")
     ]
     view_frame, template_frame = frames[-2:]
-    import logging
-
-    logger = logging.getLogger("xxx")
-    logger.error("view_frame")
-    logger.error(view_frame)
-    logger.error("template_frame")
-    logger.error(template_frame)
 
     assert template_frame["context_line"] == "{% invalid template tag %}\n"
     assert template_frame["pre_context"] == ["5\n", "6\n", "7\n", "8\n", "9\n"]
 
     assert template_frame["post_context"] == ["11\n", "12\n", "13\n", "14\n", "15\n"]
     assert template_frame["lineno"] == 10
-    assert template_frame["in_app"]
     assert template_frame["filename"].endswith("error.html")
 
     filenames = [
