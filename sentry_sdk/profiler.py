@@ -606,7 +606,6 @@ class Profile(object):
             profile["frames"],
             options["in_app_exclude"],
             options["in_app_include"],
-            default_in_app=False,  # Do not default a frame to `in_app: True`
         )
 
         return {

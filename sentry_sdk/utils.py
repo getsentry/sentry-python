@@ -773,32 +773,30 @@ def handle_in_app(event, in_app_exclude=None, in_app_include=None):
     return event
 
 
-def handle_in_app_impl(frames, in_app_exclude, in_app_include, default_in_app=True):
-    # type: (Any, Optional[List[str]], Optional[List[str]], bool) -> Optional[Any]
+def handle_in_app_impl(frames, in_app_exclude, in_app_include):
+    # type: (Any, Optional[List[str]], Optional[List[str]]) -> Optional[Any]
     if not frames:
         return None
 
-    any_in_app = False
     for frame in frames:
-        in_app = frame.get("in_app")
-        if in_app is not None:
-            if in_app:
-                any_in_app = True
+        current_in_app = frame.get("in_app")
+        if current_in_app is not None:
             continue
 
         module = frame.get("module")
-        if not module:
-            continue
-        elif _module_in_set(module, in_app_include):
+
+        if _module_in_list(module, in_app_include):
             frame["in_app"] = True
-            any_in_app = True
-        elif _module_in_set(module, in_app_exclude):
+
+        elif _module_in_list(module, in_app_exclude):
             frame["in_app"] = False
 
-    if default_in_app and not any_in_app:
-        for frame in frames:
-            if frame.get("in_app") is None:
-                frame["in_app"] = True
+        else:
+            external_source = (
+                re.search(r"[\\/](?:dist|site)-packages[\\/]", frame["abs_path"])
+                is not None
+            )
+            frame["in_app"] = not external_source
 
     return frames
 
@@ -846,13 +844,18 @@ def event_from_exception(
     )
 
 
-def _module_in_set(name, set):
+def _module_in_list(name, items):
     # type: (str, Optional[List[str]]) -> bool
-    if not set:
+    if name is None:
         return False
-    for item in set or ():
+
+    if not items:
+        return False
+
+    for item in items:
         if item == name or name.startswith(item + "."):
             return True
+
     return False
 
 
