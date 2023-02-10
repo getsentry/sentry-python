@@ -206,7 +206,6 @@ def test_parse_invalid_dsn(dsn):
             None,
             {
                 "abs_path": "/home/ubuntu/fastapi/main.py",
-                "in_app": True,
             },
         ],
         [
@@ -219,7 +218,6 @@ def test_parse_invalid_dsn(dsn):
             {
                 "module": "main",
                 "abs_path": "/home/ubuntu/fastapi/main.py",
-                "in_app": True,
             },
         ],
         # include
@@ -293,7 +291,6 @@ def test_parse_invalid_dsn(dsn):
             None,
             {
                 "abs_path": "/home/ubuntu/fastapi/main.py",
-                "in_app": True,
             },
         ],
         [
@@ -306,7 +303,6 @@ def test_parse_invalid_dsn(dsn):
             {
                 "module": "main",
                 "abs_path": "/home/ubuntu/fastapi/main.py",
-                "in_app": True,
             },
         ],
         # exclude
@@ -380,7 +376,6 @@ def test_parse_invalid_dsn(dsn):
             ["main"],
             {
                 "abs_path": "/home/ubuntu/fastapi/main.py",
-                "in_app": True,  # because there is no module set
             },
         ],
         [
