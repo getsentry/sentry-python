@@ -11,10 +11,10 @@ from sentry_sdk.utils import (
     safe_repr,
     exceptions_from_error_tuple,
     filename_for_module,
-    handle_in_app_impl,
     iter_event_stacktraces,
     to_base64,
     from_base64,
+    set_in_app_in_frames,
     strip_string,
     AnnotatedValue,
 )
@@ -492,10 +492,10 @@ def test_parse_invalid_dsn(dsn):
         ],
     ],
 )
-def test_handle_in_app_impl(
+def test_set_in_app_in_frames(
     frame, in_app_include, in_app_exclude, project_root, resulting_frame
 ):
-    new_frames = handle_in_app_impl(
+    new_frames = set_in_app_in_frames(
         [frame],
         in_app_include=in_app_include,
         in_app_exclude=in_app_exclude,

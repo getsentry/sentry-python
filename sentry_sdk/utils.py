@@ -764,7 +764,7 @@ def iter_event_frames(event):
 def handle_in_app(event, in_app_exclude=None, in_app_include=None, project_root=None):
     # type: (Dict[str, Any], Optional[List[str]], Optional[List[str]], Optional[str]) -> Dict[str, Any]
     for stacktrace in iter_event_stacktraces(event):
-        handle_in_app_impl(
+        set_in_app_in_frames(
             stacktrace.get("frames"),
             in_app_exclude=in_app_exclude,
             in_app_include=in_app_include,
@@ -774,7 +774,7 @@ def handle_in_app(event, in_app_exclude=None, in_app_include=None, project_root=
     return event
 
 
-def handle_in_app_impl(frames, in_app_exclude, in_app_include, project_root=None):
+def set_in_app_in_frames(frames, in_app_exclude, in_app_include, project_root=None):
     # type: (Any, Optional[List[str]], Optional[List[str]], Optional[str]) -> Optional[Any]
     if not frames:
         return None

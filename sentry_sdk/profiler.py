@@ -27,9 +27,9 @@ from sentry_sdk._compat import PY33, PY311
 from sentry_sdk._types import MYPY
 from sentry_sdk.utils import (
     filename_for_module,
-    handle_in_app_impl,
     logger,
     nanosecond_time,
+    set_in_app_in_frames,
 )
 
 if MYPY:
@@ -630,7 +630,7 @@ class Profile(object):
         # type: (Any, Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         profile = self.process()
 
-        handle_in_app_impl(
+        set_in_app_in_frames(
             profile["frames"],
             options["in_app_exclude"],
             options["in_app_include"],
