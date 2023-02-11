@@ -780,6 +780,7 @@ def handle_in_app_impl(frames, in_app_exclude, in_app_include, project_root=None
         return None
 
     for frame in frames:
+        # if frame has already been marked as in_app, skip it
         current_in_app = frame.get("in_app")
         if current_in_app is not None:
             continue
@@ -789,29 +790,25 @@ def handle_in_app_impl(frames, in_app_exclude, in_app_include, project_root=None
         # check if module in frame is in the list of modules to include
         if _module_in_list(module, in_app_include):
             frame["in_app"] = True
+            continue
 
         # check if module in frame is in the list of modules to exclude
-        elif _module_in_list(module, in_app_exclude):
+        if _module_in_list(module, in_app_exclude):
             frame["in_app"] = False
+            continue
 
-        else:
-            abs_path = frame.get("abs_path")
-            if abs_path is None:
-                continue
+        # if frame has no abs_path, skip further checks
+        abs_path = frame.get("abs_path")
+        if abs_path is None:
+            continue
 
-            # check if frame is in 'site-packages' or 'dist-packages'
-            external_source = (
-                re.search(r"[\\/](?:dist|site)-packages[\\/]", frame["abs_path"])
-                is not None
-            )
-            if external_source:
-                frame["in_app"] = False
+        if _is_external_source(abs_path):
+            frame["in_app"] = False
+            continue
 
-            # check if frame is in the project root
-            else:
-                if project_root is not None:
-                    if abs_path.startswith(project_root):
-                        frame["in_app"] = True
+        if _is_in_project_root(abs_path, project_root):
+            frame["in_app"] = True
+            continue
 
     return frames
 
@@ -870,6 +867,25 @@ def _module_in_list(name, items):
     for item in items:
         if item == name or name.startswith(item + "."):
             return True
+
+    return False
+
+
+def _is_external_source(abs_path):
+    # check if frame is in 'site-packages' or 'dist-packages'
+    external_source = (
+        re.search(r"[\\/](?:dist|site)-packages[\\/]", abs_path) is not None
+    )
+    return external_source
+
+
+def _is_in_project_root(abs_path, project_root):
+    if project_root is None:
+        return False
+
+    # check if path is in the project root
+    if abs_path.startswith(project_root):
+        return True
 
     return False
 
