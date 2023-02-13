@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.utils import logger
+from sentry_sdk.utils import logger, perf_counter
 from sentry_sdk._types import MYPY
 
 
@@ -142,11 +142,7 @@ class Span(object):
         self._containing_transaction = containing_transaction
         self.start_timestamp = start_timestamp or datetime.utcnow()
         try:
-            # TODO: For Python 3.7+, we could use a clock with ns resolution:
-            # self._start_timestamp_monotonic = time.perf_counter_ns()
-
-            # Python 3.3+
-            self._start_timestamp_monotonic = time.perf_counter()
+            self._start_timestamp_monotonic = perf_counter()
         except AttributeError:
             pass
 
@@ -483,11 +479,20 @@ class Span(object):
             if end_timestamp:
                 self.timestamp = end_timestamp
             else:
-                duration_seconds = time.perf_counter() - self._start_timestamp_monotonic
-                self.timestamp = self.start_timestamp + timedelta(
-                    seconds=duration_seconds
-                )
-        except AttributeError:
+                end_timestamp_monotonic, unit = perf_counter()
+
+                if unit == "s":
+                    elapsed_seconds = end_timestamp_monotonic - self._start_timestamp_monotonic[0]
+                    duration = timedelta(seconds=elapsed_seconds)
+                elif unit == "ns":
+                    elapsed_nanoseconds = end_timestamp_monotonic - self._start_timestamp_monotonic[0]
+                    duration = timedelta(microseconds=elapsed_nanoseconds / 1000)
+                else:
+                    # An unexpected unit was encountered, use the fallback
+                    raise ValueError
+
+                self.timestamp = self.start_timestamp + duration
+        except (AttributeError, ValueError):
             self.timestamp = datetime.utcnow()
 
         maybe_create_breadcrumbs_from_span(hub, self)

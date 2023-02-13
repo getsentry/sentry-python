@@ -37,8 +37,11 @@ if MYPY:
         Type,
         Union,
     )
+    from typing_extensions import Literal
 
     from sentry_sdk._types import EndpointType, ExcInfo
+
+    TimeUnit = Literal["s", "ns"]
 
 
 epoch = datetime(1970, 1, 1)
@@ -1132,16 +1135,26 @@ if PY37:
         # type: () -> int
         return time.perf_counter_ns()
 
+    def perf_counter():
+        # type: () -> Tuple[float, TimeUnit]
+        return time.perf_counter_ns(), 'ns'
+
 elif PY33:
 
     def nanosecond_time():
         # type: () -> int
-
         return int(time.perf_counter() * 1e9)
+
+    def perf_counter():
+        # type: () -> Tuple[float, TimeUnit]
+        return time.perf_counter(), 's'
 
 else:
 
     def nanosecond_time():
         # type: () -> int
+        raise AttributeError
 
+    def perf_counter():
+        # type: () -> Tuple[float, TimeUnit]
         raise AttributeError

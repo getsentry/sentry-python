@@ -427,6 +427,15 @@ class Profile(object):
         self.active_thread_id = None  # type: Optional[int]
 
         self.start_ns = 0  # type: int
+        try:
+            start_timestamp_monotonic, unit = transaction._start_timestamp_monotonic
+            if unit == "s":
+                self.start_ns = int(start_timestamp_monotonic * 1e9)
+            elif unit == "ns":
+                self.start_ns = int(start_timestamp_monotonic)
+        except AttributeError:
+            pass
+
         self.stop_ns = 0  # type: int
         self.active = False  # type: bool
 
@@ -524,7 +533,8 @@ class Profile(object):
         assert self.scheduler, "No scheduler specified"
         logger.debug("[Profiling] Starting profile")
         self.active = True
-        self.start_ns = nanosecond_time()
+        if not self.start_ns:
+            self.start_ns = nanosecond_time()
         self.scheduler.start_profiling(self)
 
     def stop(self):
@@ -643,7 +653,7 @@ class Profile(object):
             "platform": "python",
             "profile": profile,
             "release": event_opt.get("release", ""),
-            "timestamp": event_opt["timestamp"],
+            "timestamp": event_opt["start_timestamp"],
             "version": "1",
             "device": {
                 "architecture": platform.machine(),
