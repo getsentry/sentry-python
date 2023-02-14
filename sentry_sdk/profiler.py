@@ -698,7 +698,8 @@ class Scheduler(object):
 
         self.sampler = self.make_sampler()
 
-        self.new_profiles = deque()  # type: Deque[Profile]
+        # cap the number of new profiles so this list doesn't grow infinitely
+        self.new_profiles = deque(maxlen=128)  # type: Deque[Profile]
         self.active_profiles = set()  # type: Set[Profile]
 
     def __enter__(self):
@@ -828,15 +829,39 @@ class ThreadScheduler(Scheduler):
         # have exited
         self.thread = threading.Thread(name=self.name, target=self.run, daemon=True)
 
+        self.lock = threading.Lock()
+
     def setup(self):
         # type: () -> None
-        self.running = True
-        self.thread.start()
+        """
+        We choose to delay the start of the profiler thread to the first profile
+        because when running uWSGI with master mode (which is recommended), the
+        profiler thread gets started on the master process but does not get forked
+        to the worker process.
+
+        By delaying the start of the profiler thread, we can ensure it is running
+        on the correct processes.
+        """
+        pass
 
     def teardown(self):
         # type: () -> None
-        self.running = False
-        self.thread.join()
+        try:
+            if self.running:
+                self.running = False
+                self.thread.join()
+        except RuntimeError:
+            pass
+
+    def start_profiling(self, profile):
+        # type: (Profile) -> None
+        if not self.running:
+            with self.lock:
+                if not self.running:
+                    self.running = True
+                    self.thread.start()
+
+        super(ThreadScheduler, self).start_profiling(profile)
 
     def run(self):
         # type: () -> None
@@ -879,6 +904,9 @@ class GeventScheduler(Scheduler):
 
         # This can throw an ImportError that must be caught if `gevent` is
         # not installed.
+        #
+        # Using gevent's ThreadPool allows us to bypass greenlets and spawn
+        # native threads.
         from gevent.threadpool import ThreadPool  # type: ignore
 
         super(GeventScheduler, self).__init__(frequency=frequency)
@@ -886,19 +914,45 @@ class GeventScheduler(Scheduler):
         # used to signal to the thread that it should stop
         self.running = False
 
-        # Using gevent's ThreadPool allows us to bypass greenlets and spawn
-        # native threads.
-        self.pool = ThreadPool(1)
+        self.make_thread = lambda: ThreadPool(1)
+        self.thread = None
+
+        # This uses the patched threading module because it is used in
+        # start_profiling which is called from a greenlet and we want
+        # only 1 greenlet to start the thread pool
+        self.lock = threading.Lock()
 
     def setup(self):
         # type: () -> None
-        self.running = True
-        self.pool.spawn(self.run)
+        """
+        We choose to delay the start of the profiler thread to the first profile
+        because when running uWSGI with master mode (which is recommended), the
+        profiler thread gets started on the master process but does not get forked
+        to the worker process.
+
+        By delaying the start of the profiler thread, we can ensure it is running
+        on the correct processes.
+        """
+        pass
 
     def teardown(self):
         # type: () -> None
-        self.running = False
-        self.pool.join()
+        if self.running:
+            self.running = False
+            if self.thread:
+                self.thread.join()
+
+    def start_profiling(self, profile):
+        # type: (Profile) -> None
+        if not self.running:
+            with self.lock:
+                if not self.running:
+                    self.running = True
+                    thread = self.make_thread()
+                    thread.spawn(self.run)
+                    self.thread = thread
+
+        super(GeventScheduler, self).start_profiling(profile)
 
     def run(self):
         # type: () -> None
