@@ -1,7 +1,7 @@
 import uuid
 import random
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
