@@ -1,6 +1,5 @@
 import uuid
 import random
-import time
 
 from datetime import datetime, timedelta
 
@@ -482,10 +481,14 @@ class Span(object):
                 end_timestamp_monotonic, unit = perf_counter()
 
                 if unit == "s":
-                    elapsed_seconds = end_timestamp_monotonic - self._start_timestamp_monotonic[0]
+                    elapsed_seconds = (
+                        end_timestamp_monotonic - self._start_timestamp_monotonic[0]
+                    )
                     duration = timedelta(seconds=elapsed_seconds)
                 elif unit == "ns":
-                    elapsed_nanoseconds = end_timestamp_monotonic - self._start_timestamp_monotonic[0]
+                    elapsed_nanoseconds = (
+                        end_timestamp_monotonic - self._start_timestamp_monotonic[0]
+                    )
                     duration = timedelta(microseconds=elapsed_nanoseconds / 1000)
                 else:
                     # An unexpected unit was encountered, use the fallback

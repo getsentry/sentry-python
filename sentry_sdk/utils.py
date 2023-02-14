@@ -1137,7 +1137,7 @@ if PY37:
 
     def perf_counter():
         # type: () -> Tuple[float, TimeUnit]
-        return time.perf_counter_ns(), 'ns'
+        return time.perf_counter_ns(), "ns"
 
 elif PY33:
 
@@ -1147,7 +1147,7 @@ elif PY33:
 
     def perf_counter():
         # type: () -> Tuple[float, TimeUnit]
-        return time.perf_counter(), 's'
+        return time.perf_counter(), "s"
 
 else:
 
