@@ -479,7 +479,9 @@ class Span(object):
                 self.timestamp = end_timestamp
             else:
                 elapsed = nanosecond_time() - self._start_timestamp_monotonic
-                self.timestamp = self.start_timestamp + timedelta(microseconds=elapsed / 1000)
+                self.timestamp = self.start_timestamp + timedelta(
+                    microseconds=elapsed / 1000
+                )
         except (AttributeError, ValueError):
             self.timestamp = datetime.utcnow()
 

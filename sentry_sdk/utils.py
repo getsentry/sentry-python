@@ -1138,7 +1138,6 @@ elif PY33:
         # type: () -> int
         return int(time.perf_counter() * 1e9)
 
-
 else:
 
     def nanosecond_time():
