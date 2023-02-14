@@ -8,7 +8,7 @@ import subprocess
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import partial
 
 try:
@@ -1129,6 +1129,54 @@ def from_base64(base64_string):
     return utf8_string
 
 
+class PerfCounter(object):
+    __slots__ = ("value", "unit")
+
+    def __init__(self, value, unit):
+        # type: (float, Literal["s", "ns"]) -> None
+        self.value = value
+        self.unit = unit
+
+    @staticmethod
+    def from_second(value):
+        # type: (float) -> PerfCounter
+        return PerfCounter(value, unit="s")
+
+    @staticmethod
+    def from_nanosecond(value):
+        # type: (float) -> PerfCounter
+        return PerfCounter(value, unit="ns")
+
+    def __sub__(self, other):
+        # type: (PerfCounter) -> PerfCounter
+        if self.unit == other.unit:
+            return PerfCounter(value=self.value - other.value, unit=self.unit)
+
+        raise ValueError("Mismatched units in PerfCounter")
+
+    def as_timedelta(self):
+        # type: () -> timedelta
+
+        if self.unit == "ns":
+            return timedelta(microseconds=self.value / 1000)
+
+        elif self.unit == "s":
+            return timedelta(seconds=self.value)
+
+        raise ValueError("Unknown unit: {}".format(self.unit))
+
+    def total_nanoseconds(self):
+        # type: () -> int
+
+        if self.unit == "ns":
+            return int(self.value)
+
+        elif self.unit == "s":
+            return int(self.value * 1e9)
+
+        raise ValueError("Unknown unit: {}".format(self.unit))
+
+
 if PY37:
 
     def nanosecond_time():
@@ -1136,8 +1184,8 @@ if PY37:
         return time.perf_counter_ns()
 
     def perf_counter():
-        # type: () -> Tuple[float, TimeUnit]
-        return time.perf_counter_ns(), "ns"
+        # type: () -> PerfCounter
+        return PerfCounter.from_nanosecond(time.perf_counter_ns())
 
 elif PY33:
 
@@ -1146,8 +1194,8 @@ elif PY33:
         return int(time.perf_counter() * 1e9)
 
     def perf_counter():
-        # type: () -> Tuple[float, TimeUnit]
-        return time.perf_counter(), "s"
+        # type: () -> PerfCounter
+        return PerfCounter.from_second(time.perf_counter())
 
 else:
 
@@ -1156,5 +1204,5 @@ else:
         raise AttributeError
 
     def perf_counter():
-        # type: () -> Tuple[float, TimeUnit]
+        # type: () -> PerfCounter
         raise AttributeError

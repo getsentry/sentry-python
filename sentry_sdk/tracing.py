@@ -478,23 +478,8 @@ class Span(object):
             if end_timestamp:
                 self.timestamp = end_timestamp
             else:
-                end_timestamp_monotonic, unit = perf_counter()
-
-                if unit == "s":
-                    elapsed_seconds = (
-                        end_timestamp_monotonic - self._start_timestamp_monotonic[0]
-                    )
-                    duration = timedelta(seconds=elapsed_seconds)
-                elif unit == "ns":
-                    elapsed_nanoseconds = (
-                        end_timestamp_monotonic - self._start_timestamp_monotonic[0]
-                    )
-                    duration = timedelta(microseconds=elapsed_nanoseconds / 1000)
-                else:
-                    # An unexpected unit was encountered, use the fallback
-                    raise ValueError
-
-                self.timestamp = self.start_timestamp + duration
+                elapsed = perf_counter() - self._start_timestamp_monotonic
+                self.timestamp = self.start_timestamp + elapsed.as_timedelta()
         except (AttributeError, ValueError):
             self.timestamp = datetime.utcnow()
 

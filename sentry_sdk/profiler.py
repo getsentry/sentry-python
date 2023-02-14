@@ -428,11 +428,7 @@ class Profile(object):
 
         self.start_ns = 0  # type: int
         try:
-            start_timestamp_monotonic, unit = transaction._start_timestamp_monotonic
-            if unit == "s":
-                self.start_ns = int(start_timestamp_monotonic * 1e9)
-            elif unit == "ns":
-                self.start_ns = int(start_timestamp_monotonic)
+            self.start_ns = transaction._start_timestamp_monotonic.total_nanoseconds()
         except AttributeError:
             pass
 
