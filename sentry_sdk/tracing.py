@@ -1,11 +1,11 @@
 import uuid
 import random
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.utils import logger, perf_counter
+from sentry_sdk.utils import logger, nanosecond_time
 from sentry_sdk._types import MYPY
 
 
@@ -141,7 +141,7 @@ class Span(object):
         self._containing_transaction = containing_transaction
         self.start_timestamp = start_timestamp or datetime.utcnow()
         try:
-            self._start_timestamp_monotonic = perf_counter()
+            self._start_timestamp_monotonic = nanosecond_time()
         except AttributeError:
             pass
 
@@ -478,8 +478,8 @@ class Span(object):
             if end_timestamp:
                 self.timestamp = end_timestamp
             else:
-                elapsed = perf_counter() - self._start_timestamp_monotonic
-                self.timestamp = self.start_timestamp + elapsed.as_timedelta()
+                elapsed = nanosecond_time() - self._start_timestamp_monotonic
+                self.timestamp = self.start_timestamp + timedelta(microseconds=elapsed / 1000)
         except (AttributeError, ValueError):
             self.timestamp = datetime.utcnow()
 

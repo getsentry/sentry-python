@@ -428,7 +428,7 @@ class Profile(object):
 
         self.start_ns = 0  # type: int
         try:
-            self.start_ns = transaction._start_timestamp_monotonic.total_nanoseconds()
+            self.start_ns = transaction._start_timestamp_monotonic
         except AttributeError:
             pass
 
