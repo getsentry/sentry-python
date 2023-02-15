@@ -90,6 +90,13 @@ def _get_options(*args, **kwargs):
     if rv["instrumenter"] is None:
         rv["instrumenter"] = INSTRUMENTER.SENTRY
 
+    try:
+        project_root = os.getcwd()
+    except Exception:
+        project_root = None
+
+    rv["project_root"] = project_root
+
     return rv
 
 
@@ -104,14 +111,6 @@ class _Client(object):
         # type: (*Any, **Any) -> None
         self.options = get_options(*args, **kwargs)  # type: Dict[str, Any]
 
-        try:
-            project_root = os.getcwd()
-        except Exception:
-            project_root = None
-
-        self.configuration = {
-            "project_root": project_root,
-        }
         self._init_impl()
 
     def __getstate__(self):
@@ -234,7 +233,7 @@ class _Client(object):
             event,
             self.options["in_app_exclude"],
             self.options["in_app_include"],
-            self.configuration["project_root"],
+            self.options["project_root"],
         )
 
         # Postprocess the event here so that annotated types do
@@ -458,9 +457,7 @@ class _Client(object):
 
             if is_transaction:
                 if profile is not None:
-                    envelope.add_profile(
-                        profile.to_json(event_opt, self.options, self.configuration)
-                    )
+                    envelope.add_profile(profile.to_json(event_opt, self.options))
                 envelope.add_transaction(event_opt)
             else:
                 envelope.add_event(event_opt)

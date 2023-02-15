@@ -626,7 +626,7 @@ class Profile(object):
             "thread_metadata": thread_metadata,
         }
 
-    def to_json(self, event_opt, options, configuration):
+    def to_json(self, event_opt, options):
         # type: (Any, Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         profile = self.process()
 
@@ -634,7 +634,7 @@ class Profile(object):
             profile["frames"],
             options["in_app_exclude"],
             options["in_app_include"],
-            configuration["project_root"],
+            options["project_root"],
         )
 
         return {
