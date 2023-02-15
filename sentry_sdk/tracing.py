@@ -86,7 +86,7 @@ class Span(object):
         "op",
         "description",
         "start_timestamp",
-        "_start_timestamp_monotonic",
+        "_start_timestamp_monotonic_ns",
         "status",
         "timestamp",
         "_tags",
@@ -141,7 +141,9 @@ class Span(object):
         self._containing_transaction = containing_transaction
         self.start_timestamp = start_timestamp or datetime.utcnow()
         try:
-            self._start_timestamp_monotonic = nanosecond_time()
+            # profiling depends on this value and requires that
+            # it is measured in nanoseconds
+            self._start_timestamp_monotonic_ns = nanosecond_time()
         except AttributeError:
             pass
 
@@ -478,11 +480,11 @@ class Span(object):
             if end_timestamp:
                 self.timestamp = end_timestamp
             else:
-                elapsed = nanosecond_time() - self._start_timestamp_monotonic
+                elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
                 self.timestamp = self.start_timestamp + timedelta(
                     microseconds=elapsed / 1000
                 )
-        except (AttributeError, ValueError):
+        except AttributeError:
             self.timestamp = datetime.utcnow()
 
         maybe_create_breadcrumbs_from_span(hub, self)
