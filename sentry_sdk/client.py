@@ -90,12 +90,13 @@ def _get_options(*args, **kwargs):
     if rv["instrumenter"] is None:
         rv["instrumenter"] = INSTRUMENTER.SENTRY
 
-    try:
-        project_root = os.getcwd()
-    except Exception:
-        project_root = None
+    if rv["project_root"] is None:
+        try:
+            project_root = os.getcwd()
+        except Exception:
+            project_root = None
 
-    rv["project_root"] = project_root
+        rv["project_root"] = project_root
 
     return rv
 
