@@ -140,7 +140,7 @@ def test_sanitize_url(url, expected_result):
         (
             "https://username:password@example.com/bla/blub?token=abc&sessionid=123&save=true#fragment",
             False,
-            "https://username:password@example.com/bla/blub",
+            "https://[Filtered]:[Filtered]@example.com/bla/blub",
             "token=abc&sessionid=123&save=true",
             "fragment",
         ),

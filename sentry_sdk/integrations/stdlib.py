@@ -4,7 +4,7 @@ import sys
 import platform
 from sentry_sdk.consts import OP
 
-from sentry_sdk.hub import Hub, _should_send_default_pii
+from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing_utils import EnvironHeaders
@@ -84,8 +84,7 @@ def _install_httplib():
                 url,
             )
 
-        sanitize = not _should_send_default_pii()
-        parsed_url = parse_url(real_url, sanitize=sanitize)
+        parsed_url = parse_url(real_url, sanitize=False)
 
         span = hub.start_span(
             op=OP.HTTP_CLIENT,

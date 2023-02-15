@@ -2,7 +2,6 @@ from __future__ import absolute_import
 
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP
-from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 
@@ -69,8 +68,7 @@ def _sentry_request_created(service_id, request, operation_name, **kwargs):
         description=description,
     )
 
-    sanitize = not _should_send_default_pii()
-    parsed_url = parse_url(request.url, sanitize=sanitize)
+    parsed_url = parse_url(request.url, sanitize=False)
 
     span.set_tag("aws.service_id", service_id)
     span.set_tag("aws.operation_name", operation_name)

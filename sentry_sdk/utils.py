@@ -1184,10 +1184,10 @@ def from_base64(base64_string):
 Components = namedtuple("Components", ["scheme", "netloc", "path", "query", "fragment"])
 
 
-def sanitize_url(url):
-    # type: (str) -> str
+def sanitize_url(url, remove_authority=True, remove_query_values=True):
+    # type: (str, bool, bool) -> str
     """
-    Removes all query parameter values and username:password from a given URL.
+    Removes the authority and query parameter values from a given URL.
     """
     parsed_url = urlsplit(url)
     query_params = parse_qs(parsed_url.query, keep_blank_values=True)
@@ -1195,20 +1195,26 @@ def sanitize_url(url):
     from sentry_sdk.consts import SENSITIVE_DATA_SUBSTITUTE
 
     # strip username:password (netloc can be usr:pwd@example.com)
-    netloc_parts = parsed_url.netloc.split("@")
-    if len(netloc_parts) > 1:
-        netloc = "%s:%s@%s" % (
-            SENSITIVE_DATA_SUBSTITUTE,
-            SENSITIVE_DATA_SUBSTITUTE,
-            netloc_parts[-1],
-        )
+    if remove_authority:
+        netloc_parts = parsed_url.netloc.split("@")
+        if len(netloc_parts) > 1:
+            netloc = "%s:%s@%s" % (
+                SENSITIVE_DATA_SUBSTITUTE,
+                SENSITIVE_DATA_SUBSTITUTE,
+                netloc_parts[-1],
+            )
+        else:
+            netloc = parsed_url.netloc
     else:
         netloc = parsed_url.netloc
 
     # strip values from query string
-    query_string = unquote(
-        urlencode({key: SENSITIVE_DATA_SUBSTITUTE for key in query_params})
-    )
+    if remove_query_values:
+        query_string = unquote(
+            urlencode({key: SENSITIVE_DATA_SUBSTITUTE for key in query_params})
+        )
+    else:
+        query_string = parsed_url.query
 
     safe_url = urlunsplit(
         Components(
@@ -1230,10 +1236,11 @@ def parse_url(url, sanitize=True):
 
     # type: (str, bool) -> ParsedUrl
     """
-    Splits a URL into a url (including path), query and fragment. If sanitize is True, the url will be
-    sanitized to remove sensitive data.
+    Splits a URL into a url (including path), query and fragment. If sanitize is True, the query
+    parameters will be sanitized to remove sensitive data. The autority (username and password)
+    in the URL will always be removed.
     """
-    url = sanitize_url(url) if sanitize else url
+    url = sanitize_url(url, remove_authority=True, remove_query_values=sanitize)
 
     parsed_url = urlsplit(url)
     base_url = urlunsplit(
