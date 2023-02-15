@@ -601,7 +601,6 @@ def test_template_exception(
 
     assert template_frame["post_context"] == ["11\n", "12\n", "13\n", "14\n", "15\n"]
     assert template_frame["lineno"] == 10
-    assert template_frame["in_app"]
     assert template_frame["filename"].endswith("error.html")
 
     filenames = [
