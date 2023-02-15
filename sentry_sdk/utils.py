@@ -637,13 +637,14 @@ def single_exception_from_error_tuple(
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> Dict[str, Any]
+    mechanism = mechanism or {"type": "generic", "handled": True}
+
     if exc_value is not None:
         errno = get_errno(exc_value)
     else:
         errno = None
 
     if errno is not None:
-        mechanism = mechanism or {"type": "generic"}
         mechanism.setdefault("meta", {}).setdefault("errno", {}).setdefault(
             "number", errno
         )

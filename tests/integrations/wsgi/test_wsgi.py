@@ -140,6 +140,10 @@ def test_transaction_with_error(
     assert error_event["transaction"] == "generic WSGI request"
     assert error_event["contexts"]["trace"]["op"] == "http.server"
     assert error_event["exception"]["values"][0]["type"] == "Exception"
+    assert error_event["exception"]["values"][0]["mechanism"] == {
+        "type": "wsgi",
+        "handled": False,
+    }
     assert (
         error_event["exception"]["values"][0]["value"]
         == "Fetch aborted. The ball was not returned."
