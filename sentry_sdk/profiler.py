@@ -426,11 +426,10 @@ class Profile(object):
         self._default_active_thread_id = get_current_thread_id() or 0  # type: int
         self.active_thread_id = None  # type: Optional[int]
 
-        self.start_ns = 0  # type: int
         try:
-            self.start_ns = transaction._start_timestamp_monotonic_ns
+            self.start_ns = transaction._start_timestamp_monotonic_ns  # type: int
         except AttributeError:
-            pass
+            self.start_ns = 0
 
         self.stop_ns = 0  # type: int
         self.active = False  # type: bool
