@@ -68,6 +68,8 @@ logger = logging.getLogger("sentry_sdk.errors")
 MAX_STRING_LENGTH = 1024
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
+SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
+
 
 def json_dumps(data):
     # type: (Any) -> bytes
@@ -392,8 +394,6 @@ class AnnotatedValue(object):
     def substituted_because_contains_sensitive_data(cls):
         # type: () -> AnnotatedValue
         """The actual value was removed because it contained sensitive information."""
-        from sentry_sdk.consts import SENSITIVE_DATA_SUBSTITUTE
-
         return AnnotatedValue(
             value=SENSITIVE_DATA_SUBSTITUTE,
             metadata={
@@ -1191,8 +1191,6 @@ def sanitize_url(url, remove_authority=True, remove_query_values=True):
     """
     parsed_url = urlsplit(url)
     query_params = parse_qs(parsed_url.query, keep_blank_values=True)
-
-    from sentry_sdk.consts import SENSITIVE_DATA_SUBSTITUTE
 
     # strip username:password (netloc can be usr:pwd@example.com)
     if remove_authority:
