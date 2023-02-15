@@ -91,6 +91,22 @@ def test_event_id(sentry_init, capture_events):
     assert Hub.current.last_event_id() == event_id
 
 
+def test_generic_mechanism(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    try:
+        raise ValueError("aha!")
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+    assert event["exception"]["values"][0]["mechanism"] == {
+        "type": "generic",
+        "handled": True,
+    }
+
+
 def test_option_before_send(sentry_init, capture_events):
     def before_send(event, hint):
         event["extra"] = {"before_send_called": True}

@@ -90,6 +90,14 @@ def _get_options(*args, **kwargs):
     if rv["instrumenter"] is None:
         rv["instrumenter"] = INSTRUMENTER.SENTRY
 
+    if rv["project_root"] is None:
+        try:
+            project_root = os.getcwd()
+        except Exception:
+            project_root = None
+
+        rv["project_root"] = project_root
+
     return rv
 
 
@@ -103,6 +111,7 @@ class _Client(object):
     def __init__(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
         self.options = get_options(*args, **kwargs)  # type: Dict[str, Any]
+
         self._init_impl()
 
     def __getstate__(self):
@@ -222,7 +231,10 @@ class _Client(object):
             event["platform"] = "python"
 
         event = handle_in_app(
-            event, self.options["in_app_exclude"], self.options["in_app_include"]
+            event,
+            self.options["in_app_exclude"],
+            self.options["in_app_include"],
+            self.options["project_root"],
         )
 
         # Postprocess the event here so that annotated types do
