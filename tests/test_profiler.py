@@ -494,7 +494,17 @@ def test_thread_scheduler_single_background_thread(scheduler_class):
 
     scheduler.setup()
 
+    # setup but no profiles started so still no threads
+    assert len(get_scheduler_threads(scheduler)) == 0
+
+    scheduler.ensure_running()
+
     # the scheduler will start always 1 thread
+    assert len(get_scheduler_threads(scheduler)) == 1
+
+    scheduler.ensure_running()
+
+    # the scheduler still only has 1 thread
     assert len(get_scheduler_threads(scheduler)) == 1
 
     scheduler.teardown()
