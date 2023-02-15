@@ -90,8 +90,8 @@ class CloudResourceContextIntegration(Integration):
     def _get_aws_context(cls):
         # type: () -> Dict[str, str]
         ctx = {
-            "cloud.provider": CLOUD_PROVIDER.AWS,
-            "cloud.platform": CLOUD_PLATFORM.AWS_EC2,
+            "cloud_provider": CLOUD_PROVIDER.AWS,
+            "cloud_platform": CLOUD_PLATFORM.AWS_EC2,
         }
 
         try:
@@ -107,27 +107,27 @@ class CloudResourceContextIntegration(Integration):
             data = json.loads(r.data.decode("utf-8"))
 
             try:
-                ctx["cloud.account.id"] = data["accountId"]
+                ctx["cloud_account_id"] = data["accountId"]
             except Exception:
                 pass
 
             try:
-                ctx["cloud.availability_zone"] = data["availabilityZone"]
+                ctx["cloud_availability_zone"] = data["availabilityZone"]
             except Exception:
                 pass
 
             try:
-                ctx["cloud.region"] = data["region"]
+                ctx["cloud_region"] = data["region"]
             except Exception:
                 pass
 
             try:
-                ctx["host.id"] = data["instanceId"]
+                ctx["host_id"] = data["instanceId"]
             except Exception:
                 pass
 
             try:
-                ctx["host.type"] = data["instanceType"]
+                ctx["host_type"] = data["instanceType"]
             except Exception:
                 pass
 
@@ -159,8 +159,8 @@ class CloudResourceContextIntegration(Integration):
     def _get_gcp_context(cls):
         # type: () -> Dict[str, str]
         ctx = {
-            "cloud.provider": CLOUD_PROVIDER.GCP,
-            "cloud.platform": CLOUD_PLATFORM.GCP_COMPUTE_ENGINE,
+            "cloud_provider": CLOUD_PROVIDER.GCP,
+            "cloud_platform": CLOUD_PLATFORM.GCP_COMPUTE_ENGINE,
         }
 
         try:
@@ -177,12 +177,12 @@ class CloudResourceContextIntegration(Integration):
                 cls.gcp_metadata = json.loads(r.data.decode("utf-8"))
 
             try:
-                ctx["cloud.account.id"] = cls.gcp_metadata["project"]["projectId"]
+                ctx["cloud_account_id"] = cls.gcp_metadata["project"]["projectId"]
             except Exception:
                 pass
 
             try:
-                ctx["cloud.availability_zone"] = cls.gcp_metadata["instance"][
+                ctx["cloud_availability_zone"] = cls.gcp_metadata["instance"][
                     "zone"
                 ].split("/")[-1]
             except Exception:
@@ -190,14 +190,14 @@ class CloudResourceContextIntegration(Integration):
 
             try:
                 # only populated in google cloud run
-                ctx["cloud.region"] = cls.gcp_metadata["instance"]["region"].split("/")[
+                ctx["cloud_region"] = cls.gcp_metadata["instance"]["region"].split("/")[
                     -1
                 ]
             except Exception:
                 pass
 
             try:
-                ctx["host.id"] = cls.gcp_metadata["instance"]["id"]
+                ctx["host_id"] = cls.gcp_metadata["instance"]["id"]
             except Exception:
                 pass
 
