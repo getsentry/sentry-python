@@ -873,6 +873,7 @@ def _module_in_list(name, items):
 
 
 def _is_external_source(abs_path):
+    # type: (str) -> bool
     # check if frame is in 'site-packages' or 'dist-packages'
     external_source = (
         re.search(r"[\\/](?:dist|site)-packages[\\/]", abs_path) is not None
@@ -881,6 +882,7 @@ def _is_external_source(abs_path):
 
 
 def _is_in_project_root(abs_path, project_root):
+    # type: (str, Optional[str]) -> bool
     if project_root is None:
         return False
 
