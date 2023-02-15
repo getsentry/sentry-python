@@ -11,10 +11,10 @@ from sentry_sdk.utils import (
     safe_repr,
     exceptions_from_error_tuple,
     filename_for_module,
-    handle_in_app_impl,
     iter_event_stacktraces,
     to_base64,
     from_base64,
+    set_in_app_in_frames,
     strip_string,
     AnnotatedValue,
 )
@@ -133,41 +133,376 @@ def test_parse_invalid_dsn(dsn):
         dsn = Dsn(dsn)
 
 
-@pytest.mark.parametrize("empty", [None, []])
-def test_in_app(empty):
-    assert handle_in_app_impl(
-        [{"module": "foo"}, {"module": "bar"}],
-        in_app_include=["foo"],
-        in_app_exclude=empty,
-    ) == [{"module": "foo", "in_app": True}, {"module": "bar"}]
+@pytest.mark.parametrize(
+    "frame,in_app_include,in_app_exclude,project_root,resulting_frame",
+    [
+        [
+            {
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+            },
+            None,
+            None,
+            None,
+            {
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+                "in_app": False,
+            },
+        ],
+        [
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+            },
+            None,
+            None,
+            None,
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+                "in_app": False,
+            },
+        ],
+        [
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+                "in_app": True,
+            },
+            None,
+            None,
+            None,
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+                "in_app": True,
+            },
+        ],
+        [
+            {
+                "abs_path": "C:\\Users\\winuser\\AppData\\Roaming\\Python\\Python35\\site-packages\\fastapi\\routing.py",
+            },
+            None,
+            None,
+            None,
+            {
+                "abs_path": "C:\\Users\\winuser\\AppData\\Roaming\\Python\\Python35\\site-packages\\fastapi\\routing.py",
+                "in_app": False,
+            },
+        ],
+        [
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/usr/lib/python2.7/dist-packages/fastapi/routing.py",
+            },
+            None,
+            None,
+            None,
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/usr/lib/python2.7/dist-packages/fastapi/routing.py",
+                "in_app": False,
+            },
+        ],
+        [
+            {
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+            },
+            None,
+            None,
+            None,
+            {
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+            },
+        ],
+        [
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+            },
+            None,
+            None,
+            None,
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+            },
+        ],
+        # include
+        [
+            {
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+            },
+            ["fastapi"],
+            None,
+            None,
+            {
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+                "in_app": False,  # because there is no module set
+            },
+        ],
+        [
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+            },
+            ["fastapi"],
+            None,
+            None,
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+                "in_app": True,
+            },
+        ],
+        [
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+                "in_app": False,
+            },
+            ["fastapi"],
+            None,
+            None,
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+                "in_app": False,
+            },
+        ],
+        [
+            {
+                "abs_path": "C:\\Users\\winuser\\AppData\\Roaming\\Python\\Python35\\site-packages\\fastapi\\routing.py",
+            },
+            ["fastapi"],
+            None,
+            None,
+            {
+                "abs_path": "C:\\Users\\winuser\\AppData\\Roaming\\Python\\Python35\\site-packages\\fastapi\\routing.py",
+                "in_app": False,  # because there is no module set
+            },
+        ],
+        [
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/usr/lib/python2.7/dist-packages/fastapi/routing.py",
+            },
+            ["fastapi"],
+            None,
+            None,
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/usr/lib/python2.7/dist-packages/fastapi/routing.py",
+                "in_app": True,
+            },
+        ],
+        [
+            {
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+            },
+            ["fastapi"],
+            None,
+            None,
+            {
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+            },
+        ],
+        [
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+            },
+            ["fastapi"],
+            None,
+            None,
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+            },
+        ],
+        # exclude
+        [
+            {
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+            },
+            None,
+            ["main"],
+            None,
+            {
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+                "in_app": False,
+            },
+        ],
+        [
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+            },
+            None,
+            ["main"],
+            None,
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+                "in_app": False,
+            },
+        ],
+        [
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+                "in_app": True,
+            },
+            None,
+            ["main"],
+            None,
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/home/ubuntu/fastapi/.venv/lib/python3.10/site-packages/fastapi/routing.py",
+                "in_app": True,
+            },
+        ],
+        [
+            {
+                "abs_path": "C:\\Users\\winuser\\AppData\\Roaming\\Python\\Python35\\site-packages\\fastapi\\routing.py",
+            },
+            None,
+            ["main"],
+            None,
+            {
+                "abs_path": "C:\\Users\\winuser\\AppData\\Roaming\\Python\\Python35\\site-packages\\fastapi\\routing.py",
+                "in_app": False,
+            },
+        ],
+        [
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/usr/lib/python2.7/dist-packages/fastapi/routing.py",
+            },
+            None,
+            ["main"],
+            None,
+            {
+                "module": "fastapi.routing",
+                "abs_path": "/usr/lib/python2.7/dist-packages/fastapi/routing.py",
+                "in_app": False,
+            },
+        ],
+        [
+            {
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+            },
+            None,
+            ["main"],
+            None,
+            {
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+            },
+        ],
+        [
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+            },
+            None,
+            ["main"],
+            None,
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+                "in_app": False,
+            },
+        ],
+        [
+            {
+                "module": "fastapi.routing",
+            },
+            None,
+            None,
+            None,
+            {
+                "module": "fastapi.routing",
+            },
+        ],
+        [
+            {
+                "module": "fastapi.routing",
+            },
+            ["fastapi"],
+            None,
+            None,
+            {
+                "module": "fastapi.routing",
+                "in_app": True,
+            },
+        ],
+        [
+            {
+                "module": "fastapi.routing",
+            },
+            None,
+            ["fastapi"],
+            None,
+            {
+                "module": "fastapi.routing",
+                "in_app": False,
+            },
+        ],
+        # with project_root set
+        [
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+            },
+            None,
+            None,
+            "/home/ubuntu/fastapi",
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+                "in_app": True,
+            },
+        ],
+        [
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+            },
+            ["main"],
+            None,
+            "/home/ubuntu/fastapi",
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+                "in_app": True,
+            },
+        ],
+        [
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+            },
+            None,
+            ["main"],
+            "/home/ubuntu/fastapi",
+            {
+                "module": "main",
+                "abs_path": "/home/ubuntu/fastapi/main.py",
+                "in_app": False,
+            },
+        ],
+    ],
+)
+def test_set_in_app_in_frames(
+    frame, in_app_include, in_app_exclude, project_root, resulting_frame
+):
+    new_frames = set_in_app_in_frames(
+        [frame],
+        in_app_include=in_app_include,
+        in_app_exclude=in_app_exclude,
+        project_root=project_root,
+    )
 
-    assert handle_in_app_impl(
-        [{"module": "foo"}, {"module": "bar"}],
-        in_app_include=["foo"],
-        in_app_exclude=["foo"],
-    ) == [{"module": "foo", "in_app": True}, {"module": "bar"}]
-
-    assert handle_in_app_impl(
-        [{"module": "foo"}, {"module": "bar"}],
-        in_app_include=empty,
-        in_app_exclude=["foo"],
-    ) == [{"module": "foo", "in_app": False}, {"module": "bar", "in_app": True}]
-
-
-def test_default_in_app():
-    assert handle_in_app_impl(
-        [{"module": "foo"}, {"module": "bar"}], in_app_include=None, in_app_exclude=None
-    ) == [
-        {"module": "foo", "in_app": True},
-        {"module": "bar", "in_app": True},
-    ]
-
-    assert handle_in_app_impl(
-        [{"module": "foo"}, {"module": "bar"}],
-        in_app_include=None,
-        in_app_exclude=None,
-        default_in_app=False,
-    ) == [{"module": "foo"}, {"module": "bar"}]
+    assert new_frames[0] == resulting_frame
 
 
 def test_iter_stacktraces():

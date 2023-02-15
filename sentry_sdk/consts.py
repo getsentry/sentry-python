@@ -123,6 +123,7 @@ class ClientConstructor(object):
         proxy_headers=None,  # type: Optional[Dict[str, str]]
         instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
         before_send_transaction=None,  # type: Optional[TransactionProcessor]
+        project_root=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         pass
