@@ -1173,12 +1173,10 @@ elif PY33:
 
     def nanosecond_time():
         # type: () -> int
-
         return int(time.perf_counter() * 1e9)
 
 else:
 
     def nanosecond_time():
         # type: () -> int
-
         raise AttributeError
