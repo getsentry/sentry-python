@@ -27,9 +27,9 @@ from sentry_sdk._compat import PY33, PY311
 from sentry_sdk._types import MYPY
 from sentry_sdk.utils import (
     filename_for_module,
-    handle_in_app_impl,
     logger,
     nanosecond_time,
+    set_in_app_in_frames,
 )
 
 if MYPY:
@@ -150,11 +150,11 @@ def setup_profiler(options):
     global _scheduler
 
     if _scheduler is not None:
-        logger.debug("profiling is already setup")
+        logger.debug("[Profiling] Profiler is already setup")
         return False
 
     if not PY33:
-        logger.warn("profiling is only supported on Python >= 3.3")
+        logger.warn("[Profiling] Profiler requires Python >= 3.3")
         return False
 
     frequency = DEFAULT_SAMPLING_FREQUENCY
@@ -184,6 +184,9 @@ def setup_profiler(options):
     else:
         raise ValueError("Unknown profiler mode: {}".format(profiler_mode))
 
+    logger.debug(
+        "[Profiling] Setting up profiler in {mode} mode".format(mode=_scheduler.mode)
+    )
     _scheduler.setup()
 
     atexit.register(teardown_profiler)
@@ -440,6 +443,11 @@ class Profile(object):
     def update_active_thread_id(self):
         # type: () -> None
         self.active_thread_id = get_current_thread_id()
+        logger.debug(
+            "[Profiling] updating active thread id to {tid}".format(
+                tid=self.active_thread_id
+            )
+        )
 
     def _set_initial_sampling_decision(self, sampling_context):
         # type: (SamplingContext) -> None
@@ -456,11 +464,17 @@ class Profile(object):
         # The corresponding transaction was not sampled,
         # so don't generate a profile for it.
         if not self.sampled:
+            logger.debug(
+                "[Profiling] Discarding profile because transaction is discarded."
+            )
             self.sampled = False
             return
 
         # The profiler hasn't been properly initialized.
         if self.scheduler is None:
+            logger.debug(
+                "[Profiling] Discarding profile because profiler was not started."
+            )
             self.sampled = False
             return
 
@@ -478,6 +492,9 @@ class Profile(object):
         # The profiles_sample_rate option was not set, so profiling
         # was never enabled.
         if sample_rate is None:
+            logger.debug(
+                "[Profiling] Discarding profile because profiling was not enabled."
+            )
             self.sampled = False
             return
 
@@ -485,6 +502,15 @@ class Profile(object):
         # so strict < is safe here. In case sample_rate is a boolean, cast it
         # to a float (True becomes 1.0 and False becomes 0.0)
         self.sampled = random.random() < float(sample_rate)
+
+        if self.sampled:
+            logger.debug("[Profiling] Initializing profile")
+        else:
+            logger.debug(
+                "[Profiling] Discarding profile because it's not included in the random sample (sample rate = {sample_rate})".format(
+                    sample_rate=float(sample_rate)
+                )
+            )
 
     def get_profile_context(self):
         # type: () -> ProfileContext
@@ -496,6 +522,7 @@ class Profile(object):
             return
 
         assert self.scheduler, "No scheduler specified"
+        logger.debug("[Profiling] Starting profile")
         self.active = True
         self.start_ns = nanosecond_time()
         self.scheduler.start_profiling(self)
@@ -506,6 +533,7 @@ class Profile(object):
             return
 
         assert self.scheduler, "No scheduler specified"
+        logger.debug("[Profiling] Stopping profile")
         self.active = False
         self.scheduler.stop_profiling(self)
         self.stop_ns = nanosecond_time()
@@ -599,14 +627,14 @@ class Profile(object):
         }
 
     def to_json(self, event_opt, options):
-        # type: (Any, Dict[str, Any]) -> Dict[str, Any]
+        # type: (Any, Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         profile = self.process()
 
-        handle_in_app_impl(
+        set_in_app_in_frames(
             profile["frames"],
             options["in_app_exclude"],
             options["in_app_include"],
-            default_in_app=False,  # Do not default a frame to `in_app: True`
+            options["project_root"],
         )
 
         return {
@@ -651,11 +679,14 @@ class Profile(object):
 
     def valid(self):
         # type: () -> bool
-        return (
-            self.sampled is not None
-            and self.sampled
-            and self.unique_samples >= PROFILE_MINIMUM_SAMPLES
-        )
+        if self.sampled is None or not self.sampled:
+            return False
+
+        if self.unique_samples < PROFILE_MINIMUM_SAMPLES:
+            logger.debug("[Profiling] Discarding profile because insufficient samples.")
+            return False
+
+        return True
 
 
 class Scheduler(object):
