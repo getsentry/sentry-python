@@ -372,7 +372,7 @@ def test_setup_once(
 
             if set_context_called:
                 fake_set_context.assert_called_once_with(
-                    "cloud", cloud_resource_context
+                    "cloud_resource", cloud_resource_context
                 )
             else:
                 fake_set_context.assert_not_called()
