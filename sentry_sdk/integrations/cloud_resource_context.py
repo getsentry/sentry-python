@@ -182,7 +182,9 @@ class CloudResourceContextIntegration(Integration):
                 pass
 
             try:
-                ctx["cloud.zone"] = cls.gcp_metadata["instance"]["zone"].split("/")[-1]
+                ctx["cloud.availability_zone"] = cls.gcp_metadata["instance"][
+                    "zone"
+                ].split("/")[-1]
             except Exception:
                 pass
 

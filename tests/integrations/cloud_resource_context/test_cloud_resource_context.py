@@ -252,7 +252,7 @@ def test_is_gcp_exception():
                 "cloud.provider": "gcp",
                 "cloud.platform": "gcp_compute_engine",
                 "cloud.account.id": "my-project-internal",
-                "cloud.zone": "northamerica-northeast2-b",
+                "cloud.availability_zone": "northamerica-northeast2-b",
                 "host.id": 1535324527892303790,
             },
         ],
