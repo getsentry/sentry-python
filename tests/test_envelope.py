@@ -98,6 +98,15 @@ def test_envelope_headers(sentry_init, capture_envelopes, monkeypatch):
     assert envelopes[0].headers == {
         "event_id": "15210411201320122115110420122013",
         "sent_at": "2012-11-21T12:31:12.415908Z",
+        "trace": {
+            "trace_id": "12312012123120121231201212312012",
+            "sample_rate": "1.0",
+            "environment": "dogpark",
+            "release": "off.leash.park",
+            "public_key": "dogsarebadatkeepingsecrets",
+            "user_segment": "bigs",
+            "transaction": "/interactions/other-dogs/new-dog",
+        },
     }
 
 
