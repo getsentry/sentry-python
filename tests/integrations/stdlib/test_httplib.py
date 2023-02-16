@@ -45,6 +45,8 @@ def test_crumb_capture(sentry_init, capture_events):
         "method": "GET",
         "status_code": 200,
         "reason": "OK",
+        "http.fragment": "",
+        "http.query": "",
     }
 
 
@@ -71,6 +73,8 @@ def test_crumb_capture_hint(sentry_init, capture_events):
         "status_code": 200,
         "reason": "OK",
         "extra": "foo",
+        "http.fragment": "",
+        "http.query": "",
     }
 
     if platform.python_implementation() != "PyPy":
@@ -129,6 +133,8 @@ def test_httplib_misuse(sentry_init, capture_events, request):
         "method": "GET",
         "status_code": 200,
         "reason": "OK",
+        "http.fragment": "",
+        "http.query": "",
     }
 
 
