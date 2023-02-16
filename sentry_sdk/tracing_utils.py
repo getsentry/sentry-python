@@ -114,12 +114,14 @@ def has_tracing_enabled(options):
     # type: (Dict[str, Any]) -> bool
     """
     Returns True if either traces_sample_rate or traces_sampler is
-    defined, False otherwise.
+    defined and enable_tracing is set and not false.
     """
-
     return bool(
-        options.get("traces_sample_rate") is not None
-        or options.get("traces_sampler") is not None
+        options.get("enable_tracing") is not False
+        and (
+            options.get("traces_sample_rate") is not None
+            or options.get("traces_sampler") is not None
+        )
     )
 
 
