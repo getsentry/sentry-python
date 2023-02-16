@@ -4,7 +4,7 @@ import uuid
 import os
 
 import sentry_sdk
-from sentry_sdk import Hub, start_span, start_transaction
+from sentry_sdk import Hub, start_span, start_transaction, set_measurement
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import has_tracestate_enabled
 
@@ -249,7 +249,7 @@ def test_has_tracestate_enabled(sentry_init, tracestate_enabled):
 
 
 def test_set_meaurement(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0, _experiments={"custom_measurements": True})
+    sentry_init(traces_sample_rate=1.0)
 
     events = capture_events()
 
@@ -274,3 +274,17 @@ def test_set_meaurement(sentry_init, capture_events):
     assert event["measurements"]["metric.bar"] == {"value": 456, "unit": "second"}
     assert event["measurements"]["metric.baz"] == {"value": 420.69, "unit": "custom"}
     assert event["measurements"]["metric.foobar"] == {"value": 17.99, "unit": "percent"}
+
+
+def test_set_meaurement_public_api(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    with start_transaction(name="measuring stuff"):
+        set_measurement("metric.foo", 123)
+        set_measurement("metric.bar", 456, unit="second")
+
+    (event,) = events
+    assert event["measurements"]["metric.foo"] == {"value": 123, "unit": ""}
+    assert event["measurements"]["metric.bar"] == {"value": 456, "unit": "second"}

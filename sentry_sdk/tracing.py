@@ -718,19 +718,12 @@ class Transaction(Span):
             contexts.update({"profile": self._profile.get_profile_context()})
             self._profile = None
 
-        if has_custom_measurements_enabled():
-            event["measurements"] = self._measurements
+        event["measurements"] = self._measurements
 
         return hub.capture_event(event)
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
-        if not has_custom_measurements_enabled():
-            logger.debug(
-                "[Tracing] Experimental custom_measurements feature is disabled"
-            )
-            return
-
         self._measurements[name] = {"value": value, "unit": unit}
 
     def set_context(self, key, value):
@@ -908,5 +901,4 @@ from sentry_sdk.tracing_utils import (
     has_tracing_enabled,
     is_valid_sample_rate,
     maybe_create_breadcrumbs_from_span,
-    has_custom_measurements_enabled,
 )

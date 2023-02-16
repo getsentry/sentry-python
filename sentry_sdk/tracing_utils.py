@@ -414,13 +414,6 @@ def has_tracestate_enabled(span=None):
     return bool(options and options["_experiments"].get("propagate_tracestate"))
 
 
-def has_custom_measurements_enabled():
-    # type: () -> bool
-    client = sentry_sdk.Hub.current.client
-    options = client and client.options
-    return bool(options and options["_experiments"].get("custom_measurements"))
-
-
 class Baggage(object):
     __slots__ = ("sentry_items", "third_party_items", "mutable")
 
