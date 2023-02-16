@@ -34,6 +34,8 @@ def test_crumb_capture_and_hint(sentry_init, capture_events):
             assert crumb["data"] == {
                 "url": url,
                 "method": "GET",
+                "http.fragment": "",
+                "http.query": "",
                 "status_code": 200,
                 "reason": "OK",
                 "extra": "foo",
