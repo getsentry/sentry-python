@@ -1,4 +1,4 @@
-name: Test cloudre_source_context
+name: Test cloud_resource_context
 
 on:
   push:
@@ -24,7 +24,7 @@ env:
 
 jobs:
   test:
-    name: cloudre_source_context, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: cloud_resource_context, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
 
@@ -48,20 +48,20 @@ jobs:
         run: |
           pip install codecov "tox>=3,<4"
 
-      - name: Test cloudre_source_context
+      - name: Test cloud_resource_context
         timeout-minutes: 45
         shell: bash
         run: |
           set -x # print commands that are executed
           coverage erase
 
-          ./scripts/runtox.sh "${{ matrix.python-version }}-cloudre_source_context" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "${{ matrix.python-version }}-cloud_resource_context" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           coverage combine .coverage*
           coverage xml -i
           codecov --file coverage.xml
 
   check_required_tests:
-    name: All cloudre_source_context tests passed or skipped
+    name: All cloud_resource_context tests passed or skipped
     needs: test
     # Always run this, even if a dependent job failed
     if: always()
