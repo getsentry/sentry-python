@@ -8,6 +8,25 @@ import subprocess
 import sys
 import threading
 import time
+from collections import namedtuple
+
+try:
+    # Python 3
+    from urllib.parse import parse_qs
+    from urllib.parse import unquote
+    from urllib.parse import urlencode
+    from urllib.parse import urlsplit
+    from urllib.parse import urlunsplit
+
+except ImportError:
+    # Python 2
+    from cgi import parse_qs  # type: ignore
+    from urllib import unquote  # type: ignore
+    from urllib import urlencode  # type: ignore
+    from urlparse import urlsplit  # type: ignore
+    from urlparse import urlunsplit  # type: ignore
+
+
 from datetime import datetime
 from functools import partial
 
@@ -43,12 +62,13 @@ if MYPY:
 
 epoch = datetime(1970, 1, 1)
 
-
 # The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
 
 MAX_STRING_LENGTH = 1024
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
+
+SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
 
 
 def json_dumps(data):
@@ -374,8 +394,6 @@ class AnnotatedValue(object):
     def substituted_because_contains_sensitive_data(cls):
         # type: () -> AnnotatedValue
         """The actual value was removed because it contained sensitive information."""
-        from sentry_sdk.consts import SENSITIVE_DATA_SUBSTITUTE
-
         return AnnotatedValue(
             value=SENSITIVE_DATA_SUBSTITUTE,
             metadata={
@@ -1163,6 +1181,79 @@ def from_base64(base64_string):
     return utf8_string
 
 
+Components = namedtuple("Components", ["scheme", "netloc", "path", "query", "fragment"])
+
+
+def sanitize_url(url, remove_authority=True, remove_query_values=True):
+    # type: (str, bool, bool) -> str
+    """
+    Removes the authority and query parameter values from a given URL.
+    """
+    parsed_url = urlsplit(url)
+    query_params = parse_qs(parsed_url.query, keep_blank_values=True)
+
+    # strip username:password (netloc can be usr:pwd@example.com)
+    if remove_authority:
+        netloc_parts = parsed_url.netloc.split("@")
+        if len(netloc_parts) > 1:
+            netloc = "%s:%s@%s" % (
+                SENSITIVE_DATA_SUBSTITUTE,
+                SENSITIVE_DATA_SUBSTITUTE,
+                netloc_parts[-1],
+            )
+        else:
+            netloc = parsed_url.netloc
+    else:
+        netloc = parsed_url.netloc
+
+    # strip values from query string
+    if remove_query_values:
+        query_string = unquote(
+            urlencode({key: SENSITIVE_DATA_SUBSTITUTE for key in query_params})
+        )
+    else:
+        query_string = parsed_url.query
+
+    safe_url = urlunsplit(
+        Components(
+            scheme=parsed_url.scheme,
+            netloc=netloc,
+            query=query_string,
+            path=parsed_url.path,
+            fragment=parsed_url.fragment,
+        )
+    )
+
+    return safe_url
+
+
+ParsedUrl = namedtuple("ParsedUrl", ["url", "query", "fragment"])
+
+
+def parse_url(url, sanitize=True):
+
+    # type: (str, bool) -> ParsedUrl
+    """
+    Splits a URL into a url (including path), query and fragment. If sanitize is True, the query
+    parameters will be sanitized to remove sensitive data. The autority (username and password)
+    in the URL will always be removed.
+    """
+    url = sanitize_url(url, remove_authority=True, remove_query_values=sanitize)
+
+    parsed_url = urlsplit(url)
+    base_url = urlunsplit(
+        Components(
+            scheme=parsed_url.scheme,
+            netloc=parsed_url.netloc,
+            query="",
+            path=parsed_url.path,
+            fragment="",
+        )
+    )
+
+    return ParsedUrl(url=base_url, query=parsed_url.query, fragment=parsed_url.fragment)
+
+
 if PY37:
 
     def nanosecond_time():
@@ -1173,12 +1264,10 @@ elif PY33:
 
     def nanosecond_time():
         # type: () -> int
-
         return int(time.perf_counter() * 1e9)
 
 else:
 
     def nanosecond_time():
         # type: () -> int
-
         raise AttributeError
