@@ -7,6 +7,7 @@ from sentry_sdk.tracing import Span
 
 from sentry_sdk._functools import partial
 from sentry_sdk._types import MYPY
+from sentry_sdk.utils import parse_url
 
 if MYPY:
     from typing import Any
@@ -66,9 +67,14 @@ def _sentry_request_created(service_id, request, operation_name, **kwargs):
         op=OP.HTTP_CLIENT,
         description=description,
     )
+
+    parsed_url = parse_url(request.url, sanitize=False)
+
     span.set_tag("aws.service_id", service_id)
     span.set_tag("aws.operation_name", operation_name)
-    span.set_data("aws.request.url", request.url)
+    span.set_data("aws.request.url", parsed_url.url)
+    span.set_data("http.query", parsed_url.query)
+    span.set_data("http.fragment", parsed_url.fragment)
 
     # We do it in order for subsequent http calls/retries be
     # attached to this span.
