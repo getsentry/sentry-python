@@ -18,7 +18,7 @@ env:
 
 jobs:
   test:
-    name: Test Python ${{ matrix.python-version }}, ${{ matrix.os }}, ${{ matrix.variant }}
+    name: Test Python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     continue-on-error: true
