@@ -25,6 +25,7 @@ from sentry_sdk.scope import (  # noqa: F401
     global_event_processors,
 )
 from sentry_sdk.utils import get_sdk_name
+from sentry_sdk.tracing_utils import has_tracing_enabled
 
 
 def test_processors(sentry_init, capture_events):
@@ -89,6 +90,22 @@ def test_event_id(sentry_init, capture_events):
     assert new_event_id is not None
     assert new_event_id != event_id
     assert Hub.current.last_event_id() == event_id
+
+
+def test_generic_mechanism(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    try:
+        raise ValueError("aha!")
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+    assert event["exception"]["values"][0]["mechanism"] == {
+        "type": "generic",
+        "handled": True,
+    }
 
 
 def test_option_before_send(sentry_init, capture_events):
@@ -213,6 +230,32 @@ def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
     assert crumb["message"] == "Hello"
     assert crumb["data"] == {"foo": "bar"}
     assert crumb["type"] == "default"
+
+
+@pytest.mark.parametrize(
+    "enable_tracing, traces_sample_rate, tracing_enabled, updated_traces_sample_rate",
+    [
+        (None, None, False, None),
+        (False, 0.0, False, 0.0),
+        (False, 1.0, False, 1.0),
+        (None, 1.0, True, 1.0),
+        (True, 1.0, True, 1.0),
+        (None, 0.0, True, 0.0),  # We use this as - it's configured but turned off
+        (True, 0.0, True, 0.0),  # We use this as - it's configured but turned off
+        (True, None, True, 1.0),
+    ],
+)
+def test_option_enable_tracing(
+    sentry_init,
+    enable_tracing,
+    traces_sample_rate,
+    tracing_enabled,
+    updated_traces_sample_rate,
+):
+    sentry_init(enable_tracing=enable_tracing, traces_sample_rate=traces_sample_rate)
+    options = Hub.current.client.options
+    assert has_tracing_enabled(options) is tracing_enabled
+    assert options["traces_sample_rate"] == updated_traces_sample_rate
 
 
 def test_breadcrumb_arguments(sentry_init, capture_events):

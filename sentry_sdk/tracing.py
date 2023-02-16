@@ -1,12 +1,11 @@
 import uuid
 import random
-import time
 
 from datetime import datetime, timedelta
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.utils import logger
+from sentry_sdk.utils import logger, nanosecond_time
 from sentry_sdk._types import MYPY
 
 
@@ -87,7 +86,7 @@ class Span(object):
         "op",
         "description",
         "start_timestamp",
-        "_start_timestamp_monotonic",
+        "_start_timestamp_monotonic_ns",
         "status",
         "timestamp",
         "_tags",
@@ -142,11 +141,9 @@ class Span(object):
         self._containing_transaction = containing_transaction
         self.start_timestamp = start_timestamp or datetime.utcnow()
         try:
-            # TODO: For Python 3.7+, we could use a clock with ns resolution:
-            # self._start_timestamp_monotonic = time.perf_counter_ns()
-
-            # Python 3.3+
-            self._start_timestamp_monotonic = time.perf_counter()
+            # profiling depends on this value and requires that
+            # it is measured in nanoseconds
+            self._start_timestamp_monotonic_ns = nanosecond_time()
         except AttributeError:
             pass
 
@@ -420,9 +417,9 @@ class Span(object):
             if end_timestamp:
                 self.timestamp = end_timestamp
             else:
-                duration_seconds = time.perf_counter() - self._start_timestamp_monotonic
+                elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
                 self.timestamp = self.start_timestamp + timedelta(
-                    seconds=duration_seconds
+                    microseconds=elapsed / 1000
                 )
         except AttributeError:
             self.timestamp = datetime.utcnow()
