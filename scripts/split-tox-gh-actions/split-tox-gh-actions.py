@@ -30,8 +30,6 @@ TEMPLATE_FILE_SERVICES = TEMPLATE_DIR / "ci-yaml-services.txt"
 
 FRAMEWORKS_NEEDING_POSTGRES = ["django"]
 
-NON_FRAMEWORKS = {"base", "gevent"}
-
 MATRIX_DEFINITION = """
     strategy:
       fail-fast: false
@@ -110,7 +108,7 @@ def main(fail_on_changes):
 
     python_versions = defaultdict(list)
 
-    print("Parse tox.ini nevlist")
+    print("Parse tox.ini envlist")
 
     for line in lines:
         # normalize lines
@@ -126,9 +124,6 @@ def main(fail_on_changes):
                 (raw_python_versions, framework, _) = line.split("-")
             except ValueError:
                 (raw_python_versions, framework) = line.split("-")
-
-            if framework in NON_FRAMEWORKS:
-                continue
 
             # collect python versions to test the framework in
             for python_version in (
