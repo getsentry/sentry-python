@@ -98,6 +98,9 @@ def _get_options(*args, **kwargs):
 
         rv["project_root"] = project_root
 
+    if rv["enable_tracing"] is True and rv["traces_sample_rate"] is None:
+        rv["traces_sample_rate"] = 1.0
+
     return rv
 
 
