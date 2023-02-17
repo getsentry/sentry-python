@@ -63,13 +63,9 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
     envelopes = capture_envelopes()
 
     # make a parent transaction (normally this would be in a different service)
-    with start_transaction(
-        name="hi", sampled=True if sample_rate == 0 else None
-    ) as parent_transaction:
+    with start_transaction(name="hi", sampled=True if sample_rate == 0 else None):
         with start_span() as old_span:
             old_span.sampled = sampled
-            tracestate = parent_transaction._sentry_tracestate
-
             headers = dict(Hub.current.iter_trace_propagation_headers(old_span))
             headers["baggage"] = (
                 "other-vendor-value-1=foo;bar;baz, "
@@ -79,8 +75,7 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
                 "other-vendor-value-2=foo;bar;"
             )
 
-    # child transaction, to prove that we can read 'sentry-trace' and
-    # `tracestate` header data correctly
+    # child transaction, to prove that we can read 'sentry-trace' header data correctly
     child_transaction = Transaction.continue_from_headers(headers, name="WRONG")
     assert child_transaction is not None
     assert child_transaction.parent_sampled == sampled
@@ -88,7 +83,6 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
     assert child_transaction.same_process_as_parent is False
     assert child_transaction.parent_span_id == old_span.span_id
     assert child_transaction.span_id != old_span.span_id
-    assert child_transaction._sentry_tracestate == tracestate
 
     baggage = child_transaction._baggage
     assert baggage
