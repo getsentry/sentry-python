@@ -19,25 +19,25 @@ if MYPY:
 
     from sentry_sdk._types import EventProcessor
 
+# In Falcon 3.0 `falcon.api_helpers` is renamed to `falcon.app_helpers`
+# and `falcon.API` to `falcon.App`
+
 try:
     import falcon  # type: ignore
-    import falcon.api_helpers  # type: ignore
 
     from falcon import __version__ as FALCON_VERSION
 except ImportError:
     raise DidNotEnable("Falcon not installed")
 
-
-# In Falcon 3.0 `falcon.api_helpers` is renamed to `falcon.app_helpers`
-# and `falcon.API` to `falcon.App`
 try:
-    import falcon.app  # type: ignore
     import falcon.app_helpers  # type: ignore
 
     falcon_helpers = falcon.app_helpers
     falcon_app_class = falcon.App
     FALCON3 = True
 except ImportError:
+    import falcon.api_helpers  # type: ignore
+
     falcon_helpers = falcon.api_helpers
     falcon_app_class = falcon.API
     FALCON3 = False
