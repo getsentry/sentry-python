@@ -64,7 +64,6 @@ def test_outgoing_trace_headers(sentry_init, httpx_client):
     with start_transaction(
         name="/interactions/other-dogs/new-dog",
         op="greeting.sniff",
-        # make trace_id difference between transactions
         trace_id="01234567890123456789012345678901",
     ) as transaction:
         if asyncio.iscoroutinefunction(httpx_client.get):
