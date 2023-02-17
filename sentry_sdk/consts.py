@@ -44,8 +44,6 @@ if MYPY:
 DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
 
-SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
-
 
 class INSTRUMENTER:
     SENTRY = "sentry"
@@ -123,6 +121,8 @@ class ClientConstructor(object):
         proxy_headers=None,  # type: Optional[Dict[str, str]]
         instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
         before_send_transaction=None,  # type: Optional[TransactionProcessor]
+        project_root=None,  # type: Optional[str]
+        enable_tracing=None,  # type: Optional[bool]
     ):
         # type: (...) -> None
         pass
@@ -146,4 +146,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.14.0"
+VERSION = "1.15.0"

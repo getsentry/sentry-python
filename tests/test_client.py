@@ -401,7 +401,6 @@ def test_attach_stacktrace_in_app(sentry_init, capture_events):
     pytest_frames = [f for f in frames if f["module"].startswith("_pytest")]
     assert pytest_frames
     assert all(f["in_app"] is False for f in pytest_frames)
-    assert any(f["in_app"] for f in frames)
 
 
 def test_attach_stacktrace_disabled(sentry_init, capture_events):

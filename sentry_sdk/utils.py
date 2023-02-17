@@ -8,6 +8,25 @@ import subprocess
 import sys
 import threading
 import time
+from collections import namedtuple
+
+try:
+    # Python 3
+    from urllib.parse import parse_qs
+    from urllib.parse import unquote
+    from urllib.parse import urlencode
+    from urllib.parse import urlsplit
+    from urllib.parse import urlunsplit
+
+except ImportError:
+    # Python 2
+    from cgi import parse_qs  # type: ignore
+    from urllib import unquote  # type: ignore
+    from urllib import urlencode  # type: ignore
+    from urlparse import urlsplit  # type: ignore
+    from urlparse import urlunsplit  # type: ignore
+
+
 from datetime import datetime
 from functools import partial
 
@@ -43,12 +62,13 @@ if MYPY:
 
 epoch = datetime(1970, 1, 1)
 
-
 # The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
 
 MAX_STRING_LENGTH = 1024
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
+
+SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
 
 
 def json_dumps(data):
@@ -374,8 +394,6 @@ class AnnotatedValue(object):
     def substituted_because_contains_sensitive_data(cls):
         # type: () -> AnnotatedValue
         """The actual value was removed because it contained sensitive information."""
-        from sentry_sdk.consts import SENSITIVE_DATA_SUBSTITUTE
-
         return AnnotatedValue(
             value=SENSITIVE_DATA_SUBSTITUTE,
             metadata={
@@ -637,13 +655,14 @@ def single_exception_from_error_tuple(
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> Dict[str, Any]
+    mechanism = mechanism or {"type": "generic", "handled": True}
+
     if exc_value is not None:
         errno = get_errno(exc_value)
     else:
         errno = None
 
     if errno is not None:
-        mechanism = mechanism or {"type": "generic"}
         mechanism.setdefault("meta", {}).setdefault("errno", {}).setdefault(
             "number", errno
         )
@@ -761,44 +780,54 @@ def iter_event_frames(event):
             yield frame
 
 
-def handle_in_app(event, in_app_exclude=None, in_app_include=None):
-    # type: (Dict[str, Any], Optional[List[str]], Optional[List[str]]) -> Dict[str, Any]
+def handle_in_app(event, in_app_exclude=None, in_app_include=None, project_root=None):
+    # type: (Dict[str, Any], Optional[List[str]], Optional[List[str]], Optional[str]) -> Dict[str, Any]
     for stacktrace in iter_event_stacktraces(event):
-        handle_in_app_impl(
+        set_in_app_in_frames(
             stacktrace.get("frames"),
             in_app_exclude=in_app_exclude,
             in_app_include=in_app_include,
+            project_root=project_root,
         )
 
     return event
 
 
-def handle_in_app_impl(frames, in_app_exclude, in_app_include, default_in_app=True):
-    # type: (Any, Optional[List[str]], Optional[List[str]], bool) -> Optional[Any]
+def set_in_app_in_frames(frames, in_app_exclude, in_app_include, project_root=None):
+    # type: (Any, Optional[List[str]], Optional[List[str]], Optional[str]) -> Optional[Any]
     if not frames:
         return None
 
-    any_in_app = False
     for frame in frames:
-        in_app = frame.get("in_app")
-        if in_app is not None:
-            if in_app:
-                any_in_app = True
+        # if frame has already been marked as in_app, skip it
+        current_in_app = frame.get("in_app")
+        if current_in_app is not None:
             continue
 
         module = frame.get("module")
-        if not module:
-            continue
-        elif _module_in_set(module, in_app_include):
-            frame["in_app"] = True
-            any_in_app = True
-        elif _module_in_set(module, in_app_exclude):
-            frame["in_app"] = False
 
-    if default_in_app and not any_in_app:
-        for frame in frames:
-            if frame.get("in_app") is None:
-                frame["in_app"] = True
+        # check if module in frame is in the list of modules to include
+        if _module_in_list(module, in_app_include):
+            frame["in_app"] = True
+            continue
+
+        # check if module in frame is in the list of modules to exclude
+        if _module_in_list(module, in_app_exclude):
+            frame["in_app"] = False
+            continue
+
+        # if frame has no abs_path, skip further checks
+        abs_path = frame.get("abs_path")
+        if abs_path is None:
+            continue
+
+        if _is_external_source(abs_path):
+            frame["in_app"] = False
+            continue
+
+        if _is_in_project_root(abs_path, project_root):
+            frame["in_app"] = True
+            continue
 
     return frames
 
@@ -846,13 +875,39 @@ def event_from_exception(
     )
 
 
-def _module_in_set(name, set):
+def _module_in_list(name, items):
     # type: (str, Optional[List[str]]) -> bool
-    if not set:
+    if name is None:
         return False
-    for item in set or ():
+
+    if not items:
+        return False
+
+    for item in items:
         if item == name or name.startswith(item + "."):
             return True
+
+    return False
+
+
+def _is_external_source(abs_path):
+    # type: (str) -> bool
+    # check if frame is in 'site-packages' or 'dist-packages'
+    external_source = (
+        re.search(r"[\\/](?:dist|site)-packages[\\/]", abs_path) is not None
+    )
+    return external_source
+
+
+def _is_in_project_root(abs_path, project_root):
+    # type: (str, Optional[str]) -> bool
+    if project_root is None:
+        return False
+
+    # check if path is in the project root
+    if abs_path.startswith(project_root):
+        return True
+
     return False
 
 
@@ -1126,6 +1181,79 @@ def from_base64(base64_string):
     return utf8_string
 
 
+Components = namedtuple("Components", ["scheme", "netloc", "path", "query", "fragment"])
+
+
+def sanitize_url(url, remove_authority=True, remove_query_values=True):
+    # type: (str, bool, bool) -> str
+    """
+    Removes the authority and query parameter values from a given URL.
+    """
+    parsed_url = urlsplit(url)
+    query_params = parse_qs(parsed_url.query, keep_blank_values=True)
+
+    # strip username:password (netloc can be usr:pwd@example.com)
+    if remove_authority:
+        netloc_parts = parsed_url.netloc.split("@")
+        if len(netloc_parts) > 1:
+            netloc = "%s:%s@%s" % (
+                SENSITIVE_DATA_SUBSTITUTE,
+                SENSITIVE_DATA_SUBSTITUTE,
+                netloc_parts[-1],
+            )
+        else:
+            netloc = parsed_url.netloc
+    else:
+        netloc = parsed_url.netloc
+
+    # strip values from query string
+    if remove_query_values:
+        query_string = unquote(
+            urlencode({key: SENSITIVE_DATA_SUBSTITUTE for key in query_params})
+        )
+    else:
+        query_string = parsed_url.query
+
+    safe_url = urlunsplit(
+        Components(
+            scheme=parsed_url.scheme,
+            netloc=netloc,
+            query=query_string,
+            path=parsed_url.path,
+            fragment=parsed_url.fragment,
+        )
+    )
+
+    return safe_url
+
+
+ParsedUrl = namedtuple("ParsedUrl", ["url", "query", "fragment"])
+
+
+def parse_url(url, sanitize=True):
+
+    # type: (str, bool) -> ParsedUrl
+    """
+    Splits a URL into a url (including path), query and fragment. If sanitize is True, the query
+    parameters will be sanitized to remove sensitive data. The autority (username and password)
+    in the URL will always be removed.
+    """
+    url = sanitize_url(url, remove_authority=True, remove_query_values=sanitize)
+
+    parsed_url = urlsplit(url)
+    base_url = urlunsplit(
+        Components(
+            scheme=parsed_url.scheme,
+            netloc=parsed_url.netloc,
+            query="",
+            path=parsed_url.path,
+            fragment="",
+        )
+    )
+
+    return ParsedUrl(url=base_url, query=parsed_url.query, fragment=parsed_url.fragment)
+
+
 if PY37:
 
     def nanosecond_time():
@@ -1136,12 +1264,10 @@ elif PY33:
 
     def nanosecond_time():
         # type: () -> int
-
         return int(time.perf_counter() * 1e9)
 
 else:
 
     def nanosecond_time():
         # type: () -> int
-
         raise AttributeError

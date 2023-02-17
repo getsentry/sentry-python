@@ -8,7 +8,12 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing_utils import EnvironHeaders
-from sentry_sdk.utils import capture_internal_exceptions, logger, safe_repr
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    logger,
+    safe_repr,
+    parse_url,
+)
 
 from sentry_sdk._types import MYPY
 
@@ -79,12 +84,17 @@ def _install_httplib():
                 url,
             )
 
+        parsed_url = parse_url(real_url, sanitize=False)
+
         span = hub.start_span(
-            op=OP.HTTP_CLIENT, description="%s %s" % (method, real_url)
+            op=OP.HTTP_CLIENT,
+            description="%s %s" % (method, parsed_url.url),
         )
 
         span.set_data("method", method)
-        span.set_data("url", real_url)
+        span.set_data("url", parsed_url.url)
+        span.set_data("http.query", parsed_url.query)
+        span.set_data("http.fragment", parsed_url.fragment)
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 

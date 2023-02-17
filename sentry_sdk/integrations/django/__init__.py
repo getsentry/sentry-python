@@ -6,7 +6,7 @@ import threading
 import weakref
 
 from sentry_sdk._types import MYPY
-from sentry_sdk.consts import OP, SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
@@ -16,6 +16,7 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
+    SENSITIVE_DATA_SUBSTITUTE,
     logger,
     capture_internal_exceptions,
     event_from_exception,
