@@ -83,6 +83,13 @@ def test_profiler_setup_twice(teardown_profiling):
 
 
 @pytest.mark.parametrize(
+    "mode",
+    [
+        pytest.param("thread"),
+        pytest.param("gevent", marks=requires_gevent),
+    ],
+)
+@pytest.mark.parametrize(
     ("profiles_sample_rate", "profile_count"),
     [
         pytest.param(1.00, 1, id="profiler sampled at 1.00"),
@@ -99,10 +106,14 @@ def test_profiled_transaction(
     teardown_profiling,
     profiles_sample_rate,
     profile_count,
+    mode,
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"profiles_sample_rate": profiles_sample_rate},
+        _experiments={
+            "profiles_sample_rate": profiles_sample_rate,
+            "profiler_mode": mode,
+        },
     )
 
     envelopes = capture_envelopes()
