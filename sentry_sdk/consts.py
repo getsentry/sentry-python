@@ -33,8 +33,6 @@ if MYPY:
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
             "smart_transaction_trimming": Optional[bool],
-            "propagate_tracestate": Optional[bool],
-            "custom_measurements": Optional[bool],
             "profiles_sample_rate": Optional[float],
             "profiler_mode": Optional[str],
         },
