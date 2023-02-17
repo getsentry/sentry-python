@@ -56,7 +56,6 @@ jobs:
           coverage erase
 
           ./scripts/runtox.sh "${{ matrix.python-version }}-falcon" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          ls -la
           coverage combine .coverage*
           coverage xml -i
           codecov --file coverage.xml
