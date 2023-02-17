@@ -19,7 +19,7 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
 
     sentry_init(integrations=[HttpxIntegration()], before_breadcrumb=before_breadcrumb)
 
-    url = "http://somewhere.org/"
+    url = "http://example.com/"
     responses.add(responses.GET, url, status=200)
 
     with start_transaction():
@@ -58,7 +58,7 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
 def test_outgoing_trace_headers(sentry_init, httpx_client):
     sentry_init(traces_sample_rate=1.0, integrations=[HttpxIntegration()])
 
-    url = "http://somewhere.org/"
+    url = "http://example.com/"
     responses.add(responses.GET, url, status=200)
 
     with start_transaction(
