@@ -77,6 +77,8 @@ class OP:
     VIEW_RENDER = "view.render"
     VIEW_RESPONSE_RENDER = "view.response.render"
     WEBSOCKET_SERVER = "websocket.server"
+    SOCKET_CONNECTION = "socket.connection"
+    SOCKET_DNS = "socket.dns"
 
 
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
