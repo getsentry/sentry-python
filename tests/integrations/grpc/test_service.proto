@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package test_grpc_server;
+
+service TestService{
+  rpc TestServe(TestMessage) returns (TestMessage);
+}
+
+message TestMessage {
+  string text = 1;
+}

@@ -1,0 +1,59 @@
+from sentry_sdk import Hub
+from sentry_sdk._types import MYPY
+from sentry_sdk.consts import OP
+from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_CUSTOM
+
+if MYPY:
+    from typing import Callable
+
+try:
+    import grpc
+except ImportError:
+    raise DidNotEnable("grpcio is not installed")
+
+
+class ServerInterceptor(grpc.ServerInterceptor):
+    def __init__(self, find_name=None):
+        # type: (ServerInterceptor, Callable | None) -> ServerInterceptor
+        if find_name:
+            self._find_method_name = find_name
+        super(ServerInterceptor, self).__init__()
+
+    def intercept_service(self, continuation, handler_call_details):
+        handler = continuation(handler_call_details)
+        if not handler or not handler.unary_unary:
+            return handler
+
+        def behavior(request, context):
+            hub = Hub(Hub.current)
+
+            name = self._find_method_name(context)
+
+            if name:
+                meta_data = dict(context.invocation_metadata())
+
+                transaction = Transaction.continue_from_headers(
+                    meta_data,
+                    op=OP.GRPC_SERVER,
+                    name=name,
+                    source=TRANSACTION_SOURCE_CUSTOM,
+                )
+
+                with hub.start_transaction(transaction=transaction):
+                    try:
+                        return handler.unary_unary(request, context)
+                    except BaseException as e:
+                        raise e
+            else:
+                return handler.unary_unary(request, context)
+
+        return grpc.unary_unary_rpc_method_handler(
+            behavior,
+            request_deserializer=handler.request_deserializer,
+            response_serializer=handler.response_serializer,
+        )
+
+    @staticmethod
+    def _find_name(context):
+        return context._rpc_event.call_details.method.decode()

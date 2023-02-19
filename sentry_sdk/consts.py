@@ -79,6 +79,7 @@ class OP:
     WEBSOCKET_SERVER = "websocket.server"
     SOCKET_CONNECTION = "socket.connection"
     SOCKET_DNS = "socket.dns"
+    GRPC_SERVER = "grpc.server"
 
 
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`

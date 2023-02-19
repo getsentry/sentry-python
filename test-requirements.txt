@@ -13,3 +13,7 @@ executing
 asttokens
 responses
 ipdb
+grpcio-tools
+protobuf
+mypy-protobuf
+types-protobuf
