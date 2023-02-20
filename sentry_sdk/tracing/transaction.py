@@ -3,18 +3,17 @@ from datetime import datetime
 
 import sentry_sdk
 from sentry_sdk._types import MYPY
-from sentry_sdk.tracing import TRANSACTION_SOURCE_CUSTOM
+from sentry_sdk.tracing.consts import TRANSACTION_SOURCE_CUSTOM
 from sentry_sdk.tracing.span import Span
 from sentry_sdk.tracing.utils import has_tracing_enabled, is_valid_sample_rate
 from sentry_sdk.utils import logger
-
 
 if MYPY:
     from typing import Any, Dict, Optional
 
     import sentry_sdk.profiler
     from sentry_sdk._types import Event, MeasurementUnit, SamplingContext
-    from sentry_sdk.tracing import Baggage
+    from sentry_sdk.tracing.baggage import Baggage
 
 
 class Transaction(Span):

@@ -4,19 +4,15 @@ from datetime import datetime, timedelta
 import sentry_sdk
 from sentry_sdk._types import MYPY
 from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.tracing import (
-    Baggage,
-    Transaction,
-    BAGGAGE_HEADER_NAME,
-    SENTRY_TRACE_HEADER_NAME,
-)
+from sentry_sdk.tracing.baggage import Baggage
+from sentry_sdk.tracing.consts import BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME
+from sentry_sdk.tracing.transaction import Transaction
 from sentry_sdk.tracing.utils import (
     EnvironHeaders,
     extract_sentrytrace_data,
     maybe_create_breadcrumbs_from_span,
 )
 from sentry_sdk.utils import logger, nanosecond_time
-
 
 if MYPY:
     import typing

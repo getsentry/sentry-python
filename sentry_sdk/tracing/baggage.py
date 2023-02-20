@@ -3,7 +3,7 @@ import re
 import sentry_sdk
 from sentry_sdk._compat import PY2, iteritems
 from sentry_sdk._types import MYPY
-from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
+from sentry_sdk.tracing.consts import LOW_QUALITY_TRANSACTION_SOURCES
 from sentry_sdk.utils import Dsn, capture_internal_exceptions
 
 
@@ -16,7 +16,7 @@ else:
 if MYPY:
     from typing import Dict, Optional
 
-    from sentry_sdk.tracing import Transaction
+    from sentry_sdk.tracing.transaction import Transaction
 
 
 class Baggage(object):

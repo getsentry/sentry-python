@@ -7,7 +7,7 @@ import sentry_sdk
 from sentry_sdk._compat import PY2
 from sentry_sdk._types import MYPY
 from sentry_sdk.consts import OP
-from sentry_sdk.tracing import SENTRY_TRACE_REGEX
+from sentry_sdk.tracing.consts import SENTRY_TRACE_REGEX
 from sentry_sdk.utils import capture_internal_exceptions, logger, to_string
 
 
@@ -21,7 +21,7 @@ if MYPY:
     import typing
     from typing import Any, Dict, Generator, Optional, Union
 
-    from sentry_sdk.tracing import Span
+    from sentry_sdk.tracing.span import Span
 
 
 class EnvironHeaders(Mapping):  # type: ignore
