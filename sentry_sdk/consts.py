@@ -80,6 +80,7 @@ class OP:
     SOCKET_CONNECTION = "socket.connection"
     SOCKET_DNS = "socket.dns"
     GRPC_SERVER = "grpc.server"
+    GRPC_CLIENT = "grpc.client"
 
 
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`

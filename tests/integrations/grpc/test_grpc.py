@@ -7,6 +7,7 @@ import pytest
 
 from sentry_sdk import Hub, start_transaction
 from sentry_sdk.consts import OP
+from sentry_sdk.integrations.grpc.client import ClientInterceptor
 from sentry_sdk.integrations.grpc.server import ServerInterceptor
 from tests.integrations.grpc.test_service_pb2 import TestMessage
 from tests.integrations.grpc.test_service_pb2_grpc import (
@@ -68,8 +69,8 @@ def test_grpc_server_continues_transaction(sentry_init, capture_events_forksafe)
                         trace_id=transaction.trace_id,
                         parent_span_id=transaction.span_id,
                         sampled=1,
-                    )
-                )
+                    ),
+                ),
             )
             stub.TestServe(TestMessage(text="test"), metadata=metadata)
 
@@ -86,6 +87,70 @@ def test_grpc_server_continues_transaction(sentry_init, capture_events_forksafe)
     assert event["contexts"]["trace"]["op"] == OP.GRPC_SERVER
     assert event["contexts"]["trace"]["trace_id"] == transaction.trace_id
     assert span["op"] == "test"
+
+
+@pytest.mark.forked
+def test_grpc_client_starts_span(sentry_init, capture_events_forksafe):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events_forksafe()
+    interceptors = [ClientInterceptor()]
+
+    server = _set_up()
+
+    with grpc.insecure_channel(f"localhost:{PORT}") as channel:
+        channel = grpc.intercept_channel(channel, *interceptors)
+        stub = TestServiceStub(channel)
+
+        with start_transaction():
+            stub.TestServe(TestMessage(text="test"))
+
+    _tear_down(server=server)
+
+    events.write_file.close()
+    events.read_event()
+    local_transaction = events.read_event()
+    span = local_transaction["spans"][0]
+
+    assert len(local_transaction["spans"]) == 1
+    assert span["op"] == OP.GRPC_CLIENT
+    assert (
+        span["description"]
+        == "unary unary call to /test_grpc_server.TestService/TestServe"
+    )
+    assert span["data"] == {
+        "type": "unary unary",
+        "method": "/test_grpc_server.TestService/TestServe",
+        "code": "OK",
+    }
+
+
+@pytest.mark.forked
+def test_grpc_client_and_servers_interceptors_integration(
+    sentry_init, capture_events_forksafe
+):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events_forksafe()
+    interceptors = [ClientInterceptor()]
+
+    server = _set_up()
+
+    with grpc.insecure_channel(f"localhost:{PORT}") as channel:
+        channel = grpc.intercept_channel(channel, *interceptors)
+        stub = TestServiceStub(channel)
+
+        with start_transaction():
+            stub.TestServe(TestMessage(text="test"))
+
+    _tear_down(server=server)
+
+    events.write_file.close()
+    server_transaction = events.read_event()
+    local_transaction = events.read_event()
+
+    assert (
+        server_transaction["contexts"]["trace"]["trace_id"]
+        == local_transaction["contexts"]["trace"]["trace_id"]
+    )
 
 
 def _set_up():
