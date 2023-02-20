@@ -4,18 +4,13 @@ from datetime import datetime, timedelta
 import sentry_sdk
 from sentry_sdk._types import MYPY
 from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.tracing.baggage import Baggage
 from sentry_sdk.tracing.consts import BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME
 from sentry_sdk.tracing.transaction import Transaction
-from sentry_sdk.tracing.utils import (
-    EnvironHeaders,
-    extract_sentrytrace_data,
-    maybe_create_breadcrumbs_from_span,
-)
+from sentry_sdk.tracing.utils import maybe_create_breadcrumbs_from_span
+
 from sentry_sdk.utils import logger, nanosecond_time
 
 if MYPY:
-    import typing
     from typing import Any, Dict, Iterator, List, Optional, Tuple
 
     import sentry_sdk.profiler
@@ -210,69 +205,6 @@ class Span(object):
         logger.warning("Deprecated: use Span.start_child instead of Span.new_span.")
         return self.start_child(**kwargs)
 
-    @classmethod
-    def continue_from_environ(
-        cls,
-        environ,  # type: typing.Mapping[str, str]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> Transaction
-        """
-        Create a Transaction with the given params, then add in data pulled from
-        the 'sentry-trace' and 'baggage' headers from the environ (if any)
-        before returning the Transaction.
-
-        This is different from `continue_from_headers` in that it assumes header
-        names in the form "HTTP_HEADER_NAME" - such as you would get from a wsgi
-        environ - rather than the form "header-name".
-        """
-        if cls is Span:
-            logger.warning(
-                "Deprecated: use Transaction.continue_from_environ "
-                "instead of Span.continue_from_environ."
-            )
-        return Transaction.continue_from_headers(EnvironHeaders(environ), **kwargs)
-
-    @classmethod
-    def continue_from_headers(
-        cls,
-        headers,  # type: typing.Mapping[str, str]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> Transaction
-        """
-        Create a transaction with the given params (including any data pulled from
-        the 'sentry-trace' and 'baggage' headers).
-        """
-        # TODO move this to the Transaction class
-        if cls is Span:
-            logger.warning(
-                "Deprecated: use Transaction.continue_from_headers "
-                "instead of Span.continue_from_headers."
-            )
-
-        # TODO-neel move away from this kwargs stuff, it's confusing and opaque
-        # make more explicit
-        baggage = Baggage.from_incoming_header(headers.get(BAGGAGE_HEADER_NAME))
-        kwargs.update({BAGGAGE_HEADER_NAME: baggage})
-
-        sentrytrace_kwargs = extract_sentrytrace_data(
-            headers.get(SENTRY_TRACE_HEADER_NAME)
-        )
-
-        if sentrytrace_kwargs is not None:
-            kwargs.update(sentrytrace_kwargs)
-
-            # If there's an incoming sentry-trace but no incoming baggage header,
-            # for instance in traces coming from older SDKs,
-            # baggage will be empty and immutable and won't be populated as head SDK.
-            baggage.freeze()
-
-        transaction = Transaction(**kwargs)
-        transaction.same_process_as_parent = False
-
-        return transaction
-
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
         """
@@ -286,32 +218,6 @@ class Span(object):
             baggage = self.containing_transaction.get_baggage().serialize()
             if baggage:
                 yield BAGGAGE_HEADER_NAME, baggage
-
-    @classmethod
-    def from_traceparent(
-        cls,
-        traceparent,  # type: Optional[str]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> Optional[Transaction]
-        """
-        DEPRECATED: Use Transaction.continue_from_headers(headers, **kwargs)
-
-        Create a Transaction with the given params, then add in data pulled from
-        the given 'sentry-trace' header value before returning the Transaction.
-
-        """
-        logger.warning(
-            "Deprecated: Use Transaction.continue_from_headers(headers, **kwargs) "
-            "instead of from_traceparent(traceparent, **kwargs)"
-        )
-
-        if not traceparent:
-            return None
-
-        return cls.continue_from_headers(
-            {SENTRY_TRACE_HEADER_NAME: traceparent}, **kwargs
-        )
 
     def to_traceparent(self):
         # type: () -> str

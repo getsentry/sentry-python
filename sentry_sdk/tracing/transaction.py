@@ -3,13 +3,22 @@ from datetime import datetime
 
 import sentry_sdk
 from sentry_sdk._types import MYPY
-from sentry_sdk.tracing.consts import TRANSACTION_SOURCE_CUSTOM
+from sentry_sdk.tracing.consts import (
+    BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
+    TRANSACTION_SOURCE_CUSTOM,
+)
 from sentry_sdk.tracing.span import Span
-from sentry_sdk.tracing.utils import has_tracing_enabled, is_valid_sample_rate
+from sentry_sdk.tracing.utils import (
+    extract_sentrytrace_data,
+    has_tracing_enabled,
+    is_valid_sample_rate,
+    EnvironHeaders,
+)
 from sentry_sdk.utils import logger
 
 if MYPY:
-    from typing import Any, Dict, Optional
+    from typing import Any, Dict, Optional, Mapping
 
     import sentry_sdk.profiler
     from sentry_sdk._types import Event, MeasurementUnit, SamplingContext
@@ -310,3 +319,92 @@ class Transaction(Span):
                     sample_rate=float(sample_rate),
                 )
             )
+
+    @classmethod
+    def from_traceparent(
+        cls,
+        traceparent,  # type: Optional[str]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Optional[Transaction]
+        """
+        DEPRECATED: Use Transaction.continue_from_headers(headers, **kwargs)
+
+        Create a Transaction with the given params, then add in data pulled from
+        the given 'sentry-trace' header value before returning the Transaction.
+
+        """
+        logger.warning(
+            "Deprecated: Use Transaction.continue_from_headers(headers, **kwargs) "
+            "instead of from_traceparent(traceparent, **kwargs)"
+        )
+
+        if not traceparent:
+            return None
+
+        return cls.continue_from_headers(
+            {SENTRY_TRACE_HEADER_NAME: traceparent}, **kwargs
+        )
+
+    @classmethod
+    def continue_from_headers(
+        cls,
+        headers,  # type: Mapping[str, str]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Transaction
+        """
+        Create a transaction with the given params (including any data pulled from
+        the 'sentry-trace' and 'baggage' headers).
+        """
+        # TODO move this to the Transaction class
+        if cls is Span:
+            logger.warning(
+                "Deprecated: use Transaction.continue_from_headers "
+                "instead of Span.continue_from_headers."
+            )
+
+        # TODO-neel move away from this kwargs stuff, it's confusing and opaque
+        # make more explicit
+        baggage = Baggage.from_incoming_header(headers.get(BAGGAGE_HEADER_NAME))
+        kwargs.update({BAGGAGE_HEADER_NAME: baggage})
+
+        sentrytrace_kwargs = extract_sentrytrace_data(
+            headers.get(SENTRY_TRACE_HEADER_NAME)
+        )
+
+        if sentrytrace_kwargs is not None:
+            kwargs.update(sentrytrace_kwargs)
+
+            # If there's an incoming sentry-trace but no incoming baggage header,
+            # for instance in traces coming from older SDKs,
+            # baggage will be empty and immutable and won't be populated as head SDK.
+            baggage.freeze()
+
+        transaction = Transaction(**kwargs)
+        transaction.same_process_as_parent = False
+
+        return transaction
+
+    @classmethod
+    def continue_from_environ(
+        cls,
+        environ,  # type: Mapping[str, str]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Transaction
+        """
+        Create a Transaction with the given params, then add in data pulled from
+        the 'sentry-trace' and 'baggage' headers from the environ (if any)
+        before returning the Transaction.
+
+        This is different from `continue_from_headers` in that it assumes header
+        names in the form "HTTP_HEADER_NAME" - such as you would get from a wsgi
+        environ - rather than the form "header-name".
+        """
+        if cls is Span:
+            logger.warning(
+                "Deprecated: use Transaction.continue_from_environ "
+                "instead of Span.continue_from_environ."
+            )
+        return Transaction.continue_from_headers(EnvironHeaders(environ), **kwargs)
