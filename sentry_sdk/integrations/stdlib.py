@@ -7,7 +7,7 @@ from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.tracing_utils import EnvironHeaders
+from sentry_sdk.tracing.utils import EnvironHeaders
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     logger,

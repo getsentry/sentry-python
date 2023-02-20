@@ -1,5 +1,5 @@
 # coding: utf-8
-from sentry_sdk.tracing_utils import Baggage
+from sentry_sdk.tracing.utils import Baggage
 
 
 def test_third_party_baggage():

@@ -29,7 +29,7 @@ from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
 )
-from sentry_sdk.tracing_utils import Baggage, extract_sentrytrace_data
+from sentry_sdk.tracing.utils import Baggage, extract_sentrytrace_data
 from sentry_sdk._types import MYPY
 
 if MYPY:

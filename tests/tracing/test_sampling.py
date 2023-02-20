@@ -4,7 +4,7 @@ import pytest
 
 from sentry_sdk import Hub, start_span, start_transaction
 from sentry_sdk.tracing import Transaction
-from sentry_sdk.tracing_utils import is_valid_sample_rate
+from sentry_sdk.tracing.utils import is_valid_sample_rate
 from sentry_sdk.utils import logger
 
 try:

@@ -15,7 +15,7 @@ from sentry_sdk.integrations.opentelemetry.consts import (
 
 from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
 from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
-from sentry_sdk.tracing_utils import Baggage
+from sentry_sdk.tracing.utils import Baggage
 
 
 def test_extract_no_context_no_sentry_trace_header():

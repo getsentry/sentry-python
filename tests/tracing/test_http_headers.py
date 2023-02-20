@@ -1,7 +1,7 @@
 import pytest
 
 from sentry_sdk.tracing import Transaction
-from sentry_sdk.tracing_utils import extract_sentrytrace_data
+from sentry_sdk.tracing.utils import extract_sentrytrace_data
 
 
 try:

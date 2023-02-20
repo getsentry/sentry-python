@@ -170,6 +170,9 @@ class _Client(object):
             except ValueError as e:
                 logger.debug(str(e))
 
+        # TODO xxx add here the code to read tracing infromation from environmen variables.
+        # and possibly also create the root transaction here?
+
     @property
     def dsn(self):
         # type: () -> Optional[str]

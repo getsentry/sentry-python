@@ -25,7 +25,7 @@ from sentry_sdk.scope import (  # noqa: F401
     global_event_processors,
 )
 from sentry_sdk.utils import get_sdk_name
-from sentry_sdk.tracing_utils import has_tracing_enabled
+from sentry_sdk.tracing.utils import has_tracing_enabled
 
 
 def test_processors(sentry_init, capture_events):
