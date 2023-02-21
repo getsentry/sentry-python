@@ -11,7 +11,7 @@ if MYPY:
 
 
 try:
-    from httpx import AsyncClient, Client, Request, Response
+    from httpx import AsyncClient, Client, Request, Response  # type: ignore
 except ImportError:
     raise DidNotEnable("httpx is not installed")
 
@@ -73,7 +73,7 @@ def _install_httpx_client():
 
             return rv
 
-    Client.send = send  # type: ignore
+    Client.send = send
 
 
 def _install_httpx_async_client():
@@ -116,4 +116,4 @@ def _install_httpx_async_client():
 
             return rv
 
-    AsyncClient.send = send  # type: ignore
+    AsyncClient.send = send
