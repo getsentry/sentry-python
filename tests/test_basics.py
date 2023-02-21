@@ -1,6 +1,9 @@
+import asyncio
+import logging
 import os
 import sys
-import logging
+import urllib.request
+import httpx
 
 import pytest
 
@@ -16,16 +19,21 @@ from sentry_sdk import (
     last_event_id,
     Hub,
 )
-
 from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import _AUTO_ENABLING_INTEGRATIONS
+from sentry_sdk.integrations.httpx import HttpxIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.scope import (  # noqa: F401
     add_global_event_processor,
     global_event_processors,
 )
 from sentry_sdk.utils import get_sdk_name
-from sentry_sdk.tracing_utils import has_tracing_enabled
+from sentry_sdk.tracing_utils import has_tracing_enabled, should_propagate_trace
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 
 def test_processors(sentry_init, capture_events):
@@ -256,6 +264,190 @@ def test_option_enable_tracing(
     options = Hub.current.client.options
     assert has_tracing_enabled(options) is tracing_enabled
     assert options["traces_sample_rate"] == updated_traces_sample_rate
+
+
+@pytest.mark.parametrize(
+    "url, expected_propagation_decision",
+    [
+        ("http://example.com", True),
+        ("http://example.com/", False),
+        ("https://example.com", False),
+        ("http://www.example.com", False),
+        ("https://example.com:8080/foo?bar=baz", False),
+        ("http://bla.net", False),
+        ("https://bla.net", False),
+        ("http://www.bla.net", True),
+        ("https://www.bla.net", True),
+    ],
+)
+def test_should_propagate_trace(url, expected_propagation_decision):
+    trace_propagation_targets = [
+        "http://example.com",
+        r"https?:\/\/[\w\-]+(\.[\w\-]+)+\.net",  # matches http://bla.blub.net but not http://blub.net
+    ]
+
+    assert (
+        should_propagate_trace(url, trace_propagation_targets)
+        == expected_propagation_decision
+    )
+
+
+@pytest.mark.parametrize(
+    "url, expected_propagation_decision",
+    [
+        ("http://example.com", True),
+        ("https://example.com", True),
+        ("https://example.com:8080/foo?bar=baz", True),
+        ("http://bla.net", True),
+        ("http://www.bla.net", True),
+        ("http://evil.hacker.org/", True),
+    ],
+)
+def test_should_propagate_trace_empty(url, expected_propagation_decision):
+    trace_propagation_targets = []
+
+    assert (
+        should_propagate_trace(url, trace_propagation_targets)
+        == expected_propagation_decision
+    )
+
+
+@pytest.mark.parametrize(
+    "trace_propagation_targets,url,trace_propagated",
+    [
+        [[], "http://example.com/", True],
+        [["http://example.com"], "http://example.net/", False],
+        [["http://example.com/"], "http://example.com/", True],
+        [["http://example.com"], "http://example.com", True],
+        [
+            ["http://example.com", r"http?:\/\/[\w\-]+(\.[\w\-]+)+\.net"],
+            "http://example.net",
+            False,
+        ],
+        [
+            ["http://example.com", r"http?:\/\/[\w\-]+(\.[\w\-]+)+\.net"],
+            "http://good.example.net",
+            True,
+        ],
+        [
+            ["http://example.com", r"http?:\/\/[\w\-]+(\.[\w\-]+)+\.net\/.*"],
+            "http://good.example.net/some/thing",
+            True,
+        ],
+    ],
+)
+def test_option_trace_propagation_targets_stdlib(
+    sentry_init, trace_propagation_targets, url, trace_propagated
+):
+    sentry_init(
+        release="test",
+        trace_propagation_targets=trace_propagation_targets,
+        traces_sample_rate=1.0,
+    )
+
+    with mock.patch("http.client.HTTPConnection.putheader") as mock_putheader:
+        try:
+            urllib.request.urlopen(url)
+        except Exception:
+            pass
+
+        if trace_propagated:
+            mock_putheader.assert_has_calls(
+                [
+                    mock.call("Accept-Encoding", mock.ANY),
+                    mock.call("sentry-trace", mock.ANY),
+                    mock.call("Host", mock.ANY),
+                    mock.call("User-Agent", mock.ANY),
+                    mock.call("Connection", mock.ANY),
+                ],
+                any_order=True,
+            )
+            assert mock_putheader.call_count == 5
+        else:
+            mock.call("Accept-Encoding", mock.ANY),
+            mock.call("Host", mock.ANY),
+            mock.call("User-Agent", mock.ANY),
+            mock.call("Connection", mock.ANY),
+            assert mock_putheader.call_count == 4
+
+
+@pytest.mark.parametrize(
+    "httpx_client,trace_propagation_targets,url,trace_propagated",
+    [
+        [httpx.Client(), [], "http://example.com/", True],
+        [httpx.Client(), ["http://example.com"], "http://example.net/", False],
+        [httpx.Client(), ["http://example.com/"], "http://example.com/", True],
+        [httpx.Client(), ["http://example.com"], "http://example.com", True],
+        [
+            httpx.Client(),
+            ["http://example.com", r"http?:\/\/[\w\-]+(\.[\w\-]+)+\.net"],
+            "http://example.net",
+            False,
+        ],
+        [
+            httpx.Client(),
+            ["http://example.com", r"http?:\/\/[\w\-]+(\.[\w\-]+)+\.net"],
+            "http://good.example.net",
+            True,
+        ],
+        [
+            httpx.Client(),
+            ["http://example.com", r"http?:\/\/[\w\-]+(\.[\w\-]+)+\.net\/.*"],
+            "http://good.example.net/some/thing",
+            True,
+        ],
+        [httpx.AsyncClient(), [], "http://example.com/", True],
+        [httpx.AsyncClient(), ["http://example.com"], "http://example.net/", False],
+        [httpx.AsyncClient(), ["http://example.com/"], "http://example.com/", True],
+        [httpx.AsyncClient(), ["http://example.com"], "http://example.com", True],
+        [
+            httpx.AsyncClient(),
+            ["http://example.com", r"http?:\/\/[\w\-]+(\.[\w\-]+)+\.net"],
+            "http://example.net",
+            False,
+        ],
+        [
+            httpx.AsyncClient(),
+            ["http://example.com", r"http?:\/\/[\w\-]+(\.[\w\-]+)+\.net"],
+            "http://good.example.net",
+            True,
+        ],
+        [
+            httpx.AsyncClient(),
+            ["http://example.com", r"http?:\/\/[\w\-]+(\.[\w\-]+)+\.net\/.*"],
+            "http://good.example.net/some/thing",
+            True,
+        ],
+    ],
+)
+def test_option_trace_propagation_targets_httpx(
+    sentry_init,
+    httpx_client,
+    httpx_mock,
+    trace_propagation_targets,
+    url,
+    trace_propagated,
+):
+    httpx_mock.add_response()
+
+    sentry_init(
+        release="test",
+        trace_propagation_targets=trace_propagation_targets,
+        traces_sample_rate=1.0,
+        integrations=[HttpxIntegration()],
+    )
+
+    if asyncio.iscoroutinefunction(httpx_client.get):
+        asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+    else:
+        httpx_client.get(url)
+
+    request_headers = httpx_mock.get_request().headers
+
+    if trace_propagated:
+        assert "sentry-trace" in request_headers
+    else:
+        assert "sentry-trace" not in request_headers
 
 
 def test_breadcrumb_arguments(sentry_init, capture_events):

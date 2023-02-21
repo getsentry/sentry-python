@@ -27,10 +27,11 @@ else:
 if MYPY:
     import typing
 
-    from typing import Generator
-    from typing import Optional
     from typing import Any
     from typing import Dict
+    from typing import Generator
+    from typing import List
+    from typing import Optional
     from typing import Union
 
 
@@ -374,6 +375,24 @@ class Baggage(object):
             items.append(self.third_party_items)
 
         return ",".join(items)
+
+
+def should_propagate_trace(url, trace_propagation_targets):
+    # type: (str, List[str]) -> bool
+    """
+    Returns True if trace_propagation_targets are not set, or if the url matches any of the set targets. Otherwise, returns False.
+    """
+    if trace_propagation_targets is None or trace_propagation_targets == []:
+        return True
+
+    for target in trace_propagation_targets:
+        matched = re.match(target, url)
+        if (
+            matched and matched.end() == matched.endpos
+        ):  # if the target is a string, make sure the whole string is matched
+            return True
+
+    return False
 
 
 # Circular imports
