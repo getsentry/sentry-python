@@ -54,7 +54,8 @@ def _install_httpx_client():
             span.set_data("http.fragment", parsed_url.fragment)
 
             if should_propagate_trace(
-                str(request.url), hub.client.options["trace_propagation_targets"]
+                str(request.url),
+                hub.client.options["trace_propagation_targets"] if hub.client else [],
             ):
                 for key, value in hub.iter_trace_propagation_headers():
                     logger.debug(
@@ -97,7 +98,8 @@ def _install_httpx_async_client():
             span.set_data("http.fragment", parsed_url.fragment)
 
             if should_propagate_trace(
-                str(request.url), hub.client.options["trace_propagation_targets"]
+                str(request.url),
+                hub.client.options["trace_propagation_targets"] if hub.client else [],
             ):
                 for key, value in hub.iter_trace_propagation_headers():
                     logger.debug(

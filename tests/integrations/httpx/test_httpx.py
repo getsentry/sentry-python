@@ -187,7 +187,7 @@ def test_outgoing_trace_headers(sentry_init, httpx_client):
 def test_option_trace_propagation_targets(
     sentry_init,
     httpx_client,
-    httpx_mock,
+    httpx_mock,  # this comes from pytest-httpx
     trace_propagation_targets,
     url,
     trace_propagated,

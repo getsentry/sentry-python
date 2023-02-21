@@ -99,7 +99,8 @@ def _install_httplib():
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
         if should_propagate_trace(
-            real_url, hub.client.options["trace_propagation_targets"]
+            real_url,
+            hub.client.options["trace_propagation_targets"] if hub.client else [],
         ):
             for key, value in hub.iter_trace_propagation_headers(span):
                 logger.debug(
