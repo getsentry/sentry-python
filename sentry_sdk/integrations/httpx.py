@@ -73,7 +73,7 @@ def _install_httpx_client():
 
             return rv
 
-    setattr(Client, "send", send)
+    Client.send = send  # type: ignore
 
 
 def _install_httpx_async_client():
@@ -116,4 +116,4 @@ def _install_httpx_async_client():
 
             return rv
 
-    setattr(AsyncClient, "send", send)
+    AsyncClient.send = send  # type: ignore
