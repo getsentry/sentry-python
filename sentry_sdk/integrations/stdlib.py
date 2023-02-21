@@ -98,14 +98,6 @@ def _install_httplib():
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
-        print("\n//////////////////////////////")
-        print(
-            f'trace_propagation_targets: {hub.client.options["trace_propagation_targets"]}'
-        )
-        print(f"real_url: {real_url}")
-        print(
-            f'should be propagated: {should_propagate_trace(real_url, hub.client.options["trace_propagation_targets"])}'
-        )
         if should_propagate_trace(
             real_url, hub.client.options["trace_propagation_targets"]
         ):
