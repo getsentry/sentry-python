@@ -2,6 +2,7 @@ import inspect
 import os
 import sys
 import threading
+import time
 
 import pytest
 
@@ -186,6 +187,30 @@ def test_minimum_unique_samples_required(
     # because we dont leave any time for the profiler to
     # take any samples, it should be not be sent
     assert len(items["profile"]) == 0
+
+
+def test_profile_captured(
+    sentry_init,
+    capture_envelopes,
+    teardown_profiling,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": 1.0},
+    )
+
+    envelopes = capture_envelopes()
+
+    with start_transaction(name="profiling"):
+        time.sleep(0.05)
+
+    items = defaultdict(list)
+    for envelope in envelopes:
+        for item in envelope.items:
+            items[item.type].append(item)
+
+    assert len(items["transaction"]) == 1
+    assert len(items["profile"]) == 1
 
 
 def get_frame(depth=1):
