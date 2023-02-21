@@ -121,7 +121,7 @@ class ClientConstructor(object):
         before_send_transaction=None,  # type: Optional[TransactionProcessor]
         project_root=None,  # type: Optional[str]
         enable_tracing=None,  # type: Optional[bool]
-        trace_propagation_targets=[],  # type: Sequence[str]
+        trace_propagation_targets=[],  # type: Sequence[str]  # noqa: B006
     ):
         # type: (...) -> None
         pass
