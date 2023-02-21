@@ -108,7 +108,7 @@ def main(fail_on_changes):
 
     python_versions = defaultdict(list)
 
-    print("Parse tox.ini nevlist")
+    print("Parse tox.ini envlist")
 
     for line in lines:
         # normalize lines
