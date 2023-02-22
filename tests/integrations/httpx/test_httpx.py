@@ -5,6 +5,7 @@ import httpx
 import responses
 
 from sentry_sdk import capture_message, start_transaction
+from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.integrations.httpx import HttpxIntegration
 
 
@@ -88,7 +89,19 @@ def test_outgoing_trace_headers(sentry_init, httpx_client):
     [
         [
             httpx.Client(),
+            None,
+            "https://example.com/",
+            False,
+        ],
+        [
+            httpx.Client(),
             [],
+            "https://example.com/",
+            False,
+        ],
+        [
+            httpx.Client(),
+            [MATCH_ALL],
             "https://example.com/",
             True,
         ],
@@ -126,17 +139,23 @@ def test_outgoing_trace_headers(sentry_init, httpx_client):
             httpx.Client(),
             ["https://example.com", r"https?:\/\/[\w\-]+(\.[\w\-]+)+\.net"],
             "https://good.example.net/some/thing",
-            False,
-        ],
-        [
-            httpx.Client(),
-            ["https://example.com", r"https?:\/\/[\w\-]+(\.[\w\-]+)+\.net\/.*"],
-            "https://good.example.net/some/thing",
             True,
         ],
         [
             httpx.AsyncClient(),
+            None,
+            "https://example.com/",
+            False,
+        ],
+        [
+            httpx.AsyncClient(),
             [],
+            "https://example.com/",
+            False,
+        ],
+        [
+            httpx.AsyncClient(),
+            [MATCH_ALL],
             "https://example.com/",
             True,
         ],
@@ -173,12 +192,6 @@ def test_outgoing_trace_headers(sentry_init, httpx_client):
         [
             httpx.AsyncClient(),
             ["https://example.com", r"https?:\/\/[\w\-]+(\.[\w\-]+)+\.net"],
-            "https://good.example.net/some/thing",
-            False,
-        ],
-        [
-            httpx.AsyncClient(),
-            ["https://example.com", r"https?:\/\/[\w\-]+(\.[\w\-]+)+\.net\/.*"],
             "https://good.example.net/some/thing",
             True,
         ],

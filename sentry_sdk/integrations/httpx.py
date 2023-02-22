@@ -108,6 +108,7 @@ def _install_httpx_async_client():
                         )
                     )
                     request.headers[key] = value
+
             rv = await real_send(self, request, **kwargs)
 
             span.set_data("status_code", rv.status_code)

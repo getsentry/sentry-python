@@ -42,6 +42,8 @@ if MYPY:
 DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
 
+MATCH_ALL = r".*"
+
 
 class INSTRUMENTER:
     SENTRY = "sentry"
@@ -121,7 +123,7 @@ class ClientConstructor(object):
         before_send_transaction=None,  # type: Optional[TransactionProcessor]
         project_root=None,  # type: Optional[str]
         enable_tracing=None,  # type: Optional[bool]
-        trace_propagation_targets=[],  # type: Sequence[str]  # noqa: B006
+        trace_propagation_targets=[MATCH_ALL],  # type: Sequence[str]  # noqa: B006
     ):
         # type: (...) -> None
         pass

@@ -5,6 +5,7 @@ import os
 
 import sentry_sdk
 from sentry_sdk import Hub, start_span, start_transaction, set_measurement
+from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import should_propagate_trace
 
@@ -275,45 +276,30 @@ def test_set_meaurement_public_api(sentry_init, capture_events):
 
 
 @pytest.mark.parametrize(
-    "url, expected_propagation_decision",
+    "trace_propagation_targets,url,expected_propagation_decision",
     [
-        ("http://example.com", True),
-        ("http://example.com/", False),
-        ("https://example.com", False),
-        ("http://www.example.com", False),
-        ("https://example.com:8080/foo?bar=baz", False),
-        ("http://bla.net", False),
-        ("https://bla.net", False),
-        ("http://www.bla.net", True),
-        ("https://www.bla.net", True),
+        (None, "http://example.com", False),
+        ([], "http://example.com", False),
+        ([MATCH_ALL], "http://example.com", True),
+        (["localhost"], "localhost:8443/api/users", True),
+        (["localhost"], "http://localhost:8443/api/users", True),
+        (["localhost"], "mylocalhost:8080/api/users", True),
+        ([r"^/api"], "/api/envelopes", True),
+        ([r"^/api"], "/backend/api/envelopes", False),
+        ([r"myApi.com/v[2-4]"], "myApi.com/v2/projects", True),
+        ([r"myApi.com/v[2-4]"], "myApi.com/v1/projects", False),
+        ([r"https:\/\/.*"], "https://example.com", True),
+        (
+            [r"https://.*"],
+            "https://example.com",
+            True,
+        ),  # to show escaping is not needed
+        ([r"https://.*"], "http://example.com/insecure/", False),
     ],
 )
-def test_should_propagate_trace(url, expected_propagation_decision):
-    trace_propagation_targets = [
-        "http://example.com",
-        r"https?:\/\/[\w\-]+(\.[\w\-]+)+\.net",  # matches http://bla.blub.net but not http://blub.net
-    ]
-
-    assert (
-        should_propagate_trace(url, trace_propagation_targets)
-        == expected_propagation_decision
-    )
-
-
-@pytest.mark.parametrize(
-    "url, expected_propagation_decision",
-    [
-        ("http://example.com", True),
-        ("https://example.com", True),
-        ("https://example.com:8080/foo?bar=baz", True),
-        ("http://bla.net", True),
-        ("http://www.bla.net", True),
-        ("http://evil.hacker.org/", True),
-    ],
-)
-def test_should_propagate_trace_empty(url, expected_propagation_decision):
-    trace_propagation_targets = []
-
+def test_should_propagate_trace(
+    trace_propagation_targets, url, expected_propagation_decision
+):
     assert (
         should_propagate_trace(url, trace_propagation_targets)
         == expected_propagation_decision

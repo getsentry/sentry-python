@@ -4,6 +4,8 @@ import random
 import responses
 import pytest
 
+from sentry_sdk.consts import MATCH_ALL
+
 try:
     # py3
     from urllib.request import urlopen
@@ -249,6 +251,18 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
             [],
             "example.com",
             "/",
+            False,
+        ],
+        [
+            None,
+            "example.com",
+            "/",
+            False,
+        ],
+        [
+            [MATCH_ALL],
+            "example.com",
+            "/",
             True,
         ],
         [
@@ -283,12 +297,6 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
         ],
         [
             ["https://example.com", r"https?:\/\/[\w\-]+(\.[\w\-]+)+\.net"],
-            "good.example.net",
-            "/some/thing",
-            False,
-        ],
-        [
-            ["https://example.com", r"https?:\/\/[\w\-]+(\.[\w\-]+)+\.net\/.*"],
             "good.example.net",
             "/some/thing",
             True,

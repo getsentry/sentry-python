@@ -380,21 +380,14 @@ class Baggage(object):
 def should_propagate_trace(url, trace_propagation_targets):
     # type: (str, List[str]) -> bool
     """
-    Returns True if trace_propagation_targets are not set, or if the url matches any of the set targets. Otherwise, returns False.
+    Returns True if url matches given trace_propagation_targets. Otherwise, returns False.
     """
-    propagate_everywhere = (
-        trace_propagation_targets == []
-        or trace_propagation_targets is None  # if someone sets it to None by hand
-    )
-
-    if propagate_everywhere:
-        return True
+    if trace_propagation_targets is None:
+        return False
 
     for target in trace_propagation_targets:
-        matched = re.match(target, url)
-        if (
-            matched and matched.end() == matched.endpos
-        ):  # if the target is a string, make sure the whole string is matched
+        matched = re.search(target, url)
+        if matched:
             return True
 
     return False
