@@ -2,7 +2,7 @@ import os
 import subprocess
 import sys
 import platform
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import MATCH_ALL, OP
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
@@ -100,7 +100,9 @@ def _install_httplib():
 
         if should_propagate_trace(
             real_url,
-            hub.client.options["trace_propagation_targets"] if hub.client else [],
+            hub.client.options["trace_propagation_targets"]
+            if hub.client
+            else [MATCH_ALL],
         ):
             for key, value in hub.iter_trace_propagation_headers(span):
                 logger.debug(

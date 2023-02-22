@@ -1,5 +1,5 @@
 from sentry_sdk import Hub
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import MATCH_ALL, OP
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import logger, parse_url
@@ -55,7 +55,9 @@ def _install_httpx_client():
 
             if should_propagate_trace(
                 str(request.url),
-                hub.client.options["trace_propagation_targets"] if hub.client else [],
+                hub.client.options["trace_propagation_targets"]
+                if hub.client
+                else [MATCH_ALL],
             ):
                 for key, value in hub.iter_trace_propagation_headers():
                     logger.debug(
@@ -99,7 +101,9 @@ def _install_httpx_async_client():
 
             if should_propagate_trace(
                 str(request.url),
-                hub.client.options["trace_propagation_targets"] if hub.client else [],
+                hub.client.options["trace_propagation_targets"]
+                if hub.client
+                else [MATCH_ALL],
             ):
                 for key, value in hub.iter_trace_propagation_headers():
                     logger.debug(
