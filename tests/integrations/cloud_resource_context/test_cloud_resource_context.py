@@ -27,6 +27,17 @@ AWS_EC2_EXAMPLE_IMDSv2_PAYLOAD = {
     "version": "2017-09-30",
 }
 
+try:
+    # Python 3
+    AWS_EC2_EXAMPLE_IMDSv2_PAYLOAD_BYTES = bytes(
+        json.dumps(AWS_EC2_EXAMPLE_IMDSv2_PAYLOAD), "utf-8"
+    )
+except TypeError:
+    # Python 2
+    AWS_EC2_EXAMPLE_IMDSv2_PAYLOAD_BYTES = bytes(
+        json.dumps(AWS_EC2_EXAMPLE_IMDSv2_PAYLOAD)
+    ).encode("utf-8")
+
 GCP_GCE_EXAMPLE_METADATA_PLAYLOAD = {
     "instance": {
         "attributes": {},
@@ -85,6 +96,17 @@ GCP_GCE_EXAMPLE_METADATA_PLAYLOAD = {
         "projectId": "my-project-internal",
     },
 }
+
+try:
+    # Python 3
+    GCP_GCE_EXAMPLE_METADATA_PLAYLOAD_BYTES = bytes(
+        json.dumps(GCP_GCE_EXAMPLE_METADATA_PLAYLOAD), "utf-8"
+    )
+except TypeError:
+    # Python 2
+    GCP_GCE_EXAMPLE_METADATA_PLAYLOAD_BYTES = bytes(
+        json.dumps(GCP_GCE_EXAMPLE_METADATA_PLAYLOAD)
+    ).encode("utf-8")
 
 
 def test_is_aws_http_error():
@@ -156,7 +178,7 @@ def test_is_aw_exception():
         ],
         [
             200,
-            bytes(json.dumps(AWS_EC2_EXAMPLE_IMDSv2_PAYLOAD), "utf-8"),
+            AWS_EC2_EXAMPLE_IMDSv2_PAYLOAD_BYTES,
             {
                 "cloud.provider": "aws",
                 "cloud.platform": "aws_ec2",
@@ -247,7 +269,7 @@ def test_is_gcp_exception():
         ],
         [
             200,
-            bytes(json.dumps(GCP_GCE_EXAMPLE_METADATA_PLAYLOAD), "utf-8"),
+            GCP_GCE_EXAMPLE_METADATA_PLAYLOAD_BYTES,
             {
                 "cloud.provider": "gcp",
                 "cloud.platform": "gcp_compute_engine",
