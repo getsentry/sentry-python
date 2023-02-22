@@ -382,7 +382,12 @@ def should_propagate_trace(url, trace_propagation_targets):
     """
     Returns True if trace_propagation_targets are not set, or if the url matches any of the set targets. Otherwise, returns False.
     """
-    if trace_propagation_targets is None or trace_propagation_targets == []:
+    propagate_everywhere = (
+        trace_propagation_targets == []
+        or trace_propagation_targets is None  # if someone sets it to None by hand
+    )
+
+    if propagate_everywhere:
         return True
 
     for target in trace_propagation_targets:
