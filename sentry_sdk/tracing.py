@@ -1,13 +1,11 @@
 import uuid
 import random
-import threading
-import time
 
 from datetime import datetime, timedelta
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.utils import logger
+from sentry_sdk.utils import logger, nanosecond_time
 from sentry_sdk._types import MYPY
 
 
@@ -88,7 +86,7 @@ class Span(object):
         "op",
         "description",
         "start_timestamp",
-        "_start_timestamp_monotonic",
+        "_start_timestamp_monotonic_ns",
         "status",
         "timestamp",
         "_tags",
@@ -143,11 +141,9 @@ class Span(object):
         self._containing_transaction = containing_transaction
         self.start_timestamp = start_timestamp or datetime.utcnow()
         try:
-            # TODO: For Python 3.7+, we could use a clock with ns resolution:
-            # self._start_timestamp_monotonic = time.perf_counter_ns()
-
-            # Python 3.3+
-            self._start_timestamp_monotonic = time.perf_counter()
+            # profiling depends on this value and requires that
+            # it is measured in nanoseconds
+            self._start_timestamp_monotonic_ns = nanosecond_time()
         except AttributeError:
             pass
 
@@ -255,7 +251,7 @@ class Span(object):
         # type: (...) -> Transaction
         """
         Create a Transaction with the given params, then add in data pulled from
-        the 'sentry-trace', 'baggage' and 'tracestate' headers from the environ (if any)
+        the 'sentry-trace' and 'baggage' headers from the environ (if any)
         before returning the Transaction.
 
         This is different from `continue_from_headers` in that it assumes header
@@ -278,7 +274,7 @@ class Span(object):
         # type: (...) -> Transaction
         """
         Create a transaction with the given params (including any data pulled from
-        the 'sentry-trace', 'baggage' and 'tracestate' headers).
+        the 'sentry-trace' and 'baggage' headers).
         """
         # TODO move this to the Transaction class
         if cls is Span:
@@ -304,8 +300,6 @@ class Span(object):
             # baggage will be empty and immutable and won't be populated as head SDK.
             baggage.freeze()
 
-        kwargs.update(extract_tracestate_data(headers.get("tracestate")))
-
         transaction = Transaction(**kwargs)
         transaction.same_process_as_parent = False
 
@@ -314,21 +308,11 @@ class Span(object):
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
         """
-        Creates a generator which returns the span's `sentry-trace`, `baggage` and
-        `tracestate` headers.
-
-        If the span's containing transaction doesn't yet have a
-        `sentry_tracestate` value, this will cause one to be generated and
-        stored.
+        Creates a generator which returns the span's `sentry-trace` and `baggage` headers.
+        If the span's containing transaction doesn't yet have a `baggage` value,
+        this will cause one to be generated and stored.
         """
         yield SENTRY_TRACE_HEADER_NAME, self.to_traceparent()
-
-        tracestate = self.to_tracestate() if has_tracestate_enabled(self) else None
-        # `tracestate` will only be `None` if there's no client or no DSN
-        # TODO (kmclb) the above will be true once the feature is no longer
-        # behind a flag
-        if tracestate:
-            yield "tracestate", tracestate
 
         if self.containing_transaction:
             baggage = self.containing_transaction.get_baggage().serialize()
@@ -369,57 +353,6 @@ class Span(object):
         if self.sampled is False:
             sampled = "0"
         return "%s-%s-%s" % (self.trace_id, self.span_id, sampled)
-
-    def to_tracestate(self):
-        # type: () -> Optional[str]
-        """
-        Computes the `tracestate` header value using data from the containing
-        transaction.
-
-        If the containing transaction doesn't yet have a `sentry_tracestate`
-        value, this will cause one to be generated and stored.
-
-        If there is no containing transaction, a value will be generated but not
-        stored.
-
-        Returns None if there's no client and/or no DSN.
-        """
-
-        sentry_tracestate = self.get_or_set_sentry_tracestate()
-        third_party_tracestate = (
-            self.containing_transaction._third_party_tracestate
-            if self.containing_transaction
-            else None
-        )
-
-        if not sentry_tracestate:
-            return None
-
-        header_value = sentry_tracestate
-
-        if third_party_tracestate:
-            header_value = header_value + "," + third_party_tracestate
-
-        return header_value
-
-    def get_or_set_sentry_tracestate(self):
-        # type: (Span) -> Optional[str]
-        """
-        Read sentry tracestate off of the span's containing transaction.
-
-        If the transaction doesn't yet have a `_sentry_tracestate` value,
-        compute one and store it.
-        """
-        transaction = self.containing_transaction
-
-        if transaction:
-            if not transaction._sentry_tracestate:
-                transaction._sentry_tracestate = compute_tracestate_entry(self)
-
-            return transaction._sentry_tracestate
-
-        # orphan span - nowhere to store the value, so just return it
-        return compute_tracestate_entry(self)
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
@@ -484,9 +417,9 @@ class Span(object):
             if end_timestamp:
                 self.timestamp = end_timestamp
             else:
-                duration_seconds = time.perf_counter() - self._start_timestamp_monotonic
+                elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
                 self.timestamp = self.start_timestamp + timedelta(
-                    seconds=duration_seconds
+                    microseconds=elapsed / 1000
                 )
         except AttributeError:
             self.timestamp = datetime.utcnow()
@@ -532,15 +465,6 @@ class Span(object):
         if self.status:
             rv["status"] = self.status
 
-        # if the transaction didn't inherit a tracestate value, and no outgoing
-        # requests - whose need for headers would have caused a tracestate value
-        # to be created - were made as part of the transaction, the transaction
-        # still won't have a tracestate value, so compute one now
-        sentry_tracestate = self.get_or_set_sentry_tracestate()
-
-        if sentry_tracestate:
-            rv["tracestate"] = sentry_tracestate
-
         if self.containing_transaction:
             rv[
                 "dynamic_sampling_context"
@@ -556,26 +480,16 @@ class Transaction(Span):
         "parent_sampled",
         # used to create baggage value for head SDKs in dynamic sampling
         "sample_rate",
-        # the sentry portion of the `tracestate` header used to transmit
-        # correlation context for server-side dynamic sampling, of the form
-        # `sentry=xxxxx`, where `xxxxx` is the base64-encoded json of the
-        # correlation context data, missing trailing any =
-        "_sentry_tracestate",
-        # tracestate data from other vendors, of the form `dogs=yes,cats=maybe`
-        "_third_party_tracestate",
         "_measurements",
         "_contexts",
         "_profile",
         "_baggage",
-        "_active_thread_id",
     )
 
     def __init__(
         self,
         name="",  # type: str
         parent_sampled=None,  # type: Optional[bool]
-        sentry_tracestate=None,  # type: Optional[str]
-        third_party_tracestate=None,  # type: Optional[str]
         baggage=None,  # type: Optional[Baggage]
         source=TRANSACTION_SOURCE_CUSTOM,  # type: str
         **kwargs  # type: Any
@@ -597,20 +511,10 @@ class Transaction(Span):
         self.source = source
         self.sample_rate = None  # type: Optional[float]
         self.parent_sampled = parent_sampled
-        # if tracestate isn't inherited and set here, it will get set lazily,
-        # either the first time an outgoing request needs it for a header or the
-        # first time an event needs it for inclusion in the captured data
-        self._sentry_tracestate = sentry_tracestate
-        self._third_party_tracestate = third_party_tracestate
         self._measurements = {}  # type: Dict[str, Any]
         self._contexts = {}  # type: Dict[str, Any]
         self._profile = None  # type: Optional[sentry_sdk.profiler.Profile]
         self._baggage = baggage
-        # for profiling, we want to know on which thread a transaction is started
-        # to accurately show the active thread in the UI
-        self._active_thread_id = (
-            threading.current_thread().ident
-        )  # used by profiling.py
 
     def __repr__(self):
         # type: () -> str
@@ -627,6 +531,22 @@ class Transaction(Span):
                 self.source,
             )
         )
+
+    def __enter__(self):
+        # type: () -> Transaction
+        super(Transaction, self).__enter__()
+
+        if self._profile is not None:
+            self._profile.__enter__()
+
+        return self
+
+    def __exit__(self, ty, value, tb):
+        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+        if self._profile is not None:
+            self._profile.__exit__(ty, value, tb)
+
+        super(Transaction, self).__exit__(ty, value, tb)
 
     @property
     def containing_transaction(self):
@@ -707,23 +627,17 @@ class Transaction(Span):
             "spans": finished_spans,
         }  # type: Event
 
-        if hub.client is not None and self._profile is not None:
+        if self._profile is not None and self._profile.valid():
             event["profile"] = self._profile
             contexts.update({"profile": self._profile.get_profile_context()})
+            self._profile = None
 
-        if has_custom_measurements_enabled():
-            event["measurements"] = self._measurements
+        event["measurements"] = self._measurements
 
         return hub.capture_event(event)
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
-        if not has_custom_measurements_enabled():
-            logger.debug(
-                "[Tracing] Experimental custom_measurements feature is disabled"
-            )
-            return
-
         self._measurements[name] = {"value": value, "unit": unit}
 
     def set_context(self, key, value):
@@ -894,12 +808,8 @@ class NoOpSpan(Span):
 from sentry_sdk.tracing_utils import (
     Baggage,
     EnvironHeaders,
-    compute_tracestate_entry,
     extract_sentrytrace_data,
-    extract_tracestate_data,
-    has_tracestate_enabled,
     has_tracing_enabled,
     is_valid_sample_rate,
     maybe_create_breadcrumbs_from_span,
-    has_custom_measurements_enabled,
 )

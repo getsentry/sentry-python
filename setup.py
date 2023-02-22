@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="1.14.0",
+    version="1.15.0",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -36,7 +36,7 @@ setup(
     # PEP 561
     package_data={"sentry_sdk": ["py.typed"]},
     zip_safe=False,
-    license="BSD",
+    license="MIT",
     install_requires=[
         'urllib3>=1.25.7; python_version<="3.4"',
         'urllib3>=1.26.9; python_version=="3.5"',

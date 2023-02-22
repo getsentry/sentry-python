@@ -1,5 +1,3 @@
-import threading
-
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
 from sentry_sdk._types import MYPY
@@ -79,7 +77,7 @@ def _wrap_sync_view(hub, callback):
             # set the active thread id to the handler thread for sync views
             # this isn't necessary for async views since that runs on main
             if sentry_scope.profile is not None:
-                sentry_scope.profile.active_thread_id = threading.current_thread().ident
+                sentry_scope.profile.update_active_thread_id()
 
             with hub.start_span(
                 op=OP.VIEW_RENDER, description=request.resolver_match.view_name

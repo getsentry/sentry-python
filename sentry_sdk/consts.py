@@ -33,8 +33,6 @@ if MYPY:
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
             "smart_transaction_trimming": Optional[bool],
-            "propagate_tracestate": Optional[bool],
-            "custom_measurements": Optional[bool],
             "profiles_sample_rate": Optional[float],
             "profiler_mode": Optional[str],
         },
@@ -43,8 +41,6 @@ if MYPY:
 
 DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
-
-SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
 
 
 class INSTRUMENTER:
@@ -125,6 +121,8 @@ class ClientConstructor(object):
         proxy_headers=None,  # type: Optional[Dict[str, str]]
         instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
         before_send_transaction=None,  # type: Optional[TransactionProcessor]
+        project_root=None,  # type: Optional[str]
+        enable_tracing=None,  # type: Optional[bool]
     ):
         # type: (...) -> None
         pass
@@ -148,4 +146,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.14.0"
+VERSION = "1.15.0"

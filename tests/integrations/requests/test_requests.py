@@ -1,4 +1,5 @@
 import pytest
+import responses
 
 requests = pytest.importorskip("requests")
 
@@ -8,9 +9,13 @@ from sentry_sdk.integrations.stdlib import StdlibIntegration
 
 def test_crumb_capture(sentry_init, capture_events):
     sentry_init(integrations=[StdlibIntegration()])
+
+    url = "http://example.com/"
+    responses.add(responses.GET, url, status=200)
+
     events = capture_events()
 
-    response = requests.get("https://httpbin.org/status/418")
+    response = requests.get(url)
     capture_message("Testing!")
 
     (event,) = events
@@ -18,8 +23,10 @@ def test_crumb_capture(sentry_init, capture_events):
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
     assert crumb["data"] == {
-        "url": "https://httpbin.org/status/418",
+        "url": url,
         "method": "GET",
+        "http.fragment": "",
+        "http.query": "",
         "status_code": response.status_code,
         "reason": response.reason,
     }

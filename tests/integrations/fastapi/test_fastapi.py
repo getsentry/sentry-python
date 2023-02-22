@@ -12,6 +12,11 @@ from sentry_sdk import capture_message
 from sentry_sdk.integrations.starlette import StarletteIntegration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
+
 
 def fastapi_app_factory():
     app = FastAPI()
@@ -155,7 +160,8 @@ def test_legacy_setup(
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-def test_active_thread_id(sentry_init, capture_envelopes, endpoint):
+@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, endpoint):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"profiles_sample_rate": 1.0},
