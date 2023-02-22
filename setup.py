@@ -53,6 +53,7 @@ setup(
         "celery": ["celery>=3"],
         "huey": ["huey>=2"],
         "beam": ["apache-beam>=2.12"],
+        "arq": ["arq>=0.23"],
         "rq": ["rq>=0.6"],
         "aiohttp": ["aiohttp>=3.5"],
         "tornado": ["tornado>=5"],
