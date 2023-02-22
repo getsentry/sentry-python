@@ -2,6 +2,7 @@ import inspect
 import os
 import sys
 import threading
+import time
 
 import pytest
 
@@ -83,6 +84,13 @@ def test_profiler_setup_twice(teardown_profiling):
 
 
 @pytest.mark.parametrize(
+    "mode",
+    [
+        pytest.param("thread"),
+        pytest.param("gevent", marks=requires_gevent),
+    ],
+)
+@pytest.mark.parametrize(
     ("profiles_sample_rate", "profile_count"),
     [
         pytest.param(1.00, 1, id="profiler sampled at 1.00"),
@@ -99,10 +107,14 @@ def test_profiled_transaction(
     teardown_profiling,
     profiles_sample_rate,
     profile_count,
+    mode,
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"profiles_sample_rate": profiles_sample_rate},
+        _experiments={
+            "profiles_sample_rate": profiles_sample_rate,
+            "profiler_mode": mode,
+        },
     )
 
     envelopes = capture_envelopes()
@@ -175,6 +187,30 @@ def test_minimum_unique_samples_required(
     # because we dont leave any time for the profiler to
     # take any samples, it should be not be sent
     assert len(items["profile"]) == 0
+
+
+def test_profile_captured(
+    sentry_init,
+    capture_envelopes,
+    teardown_profiling,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": 1.0},
+    )
+
+    envelopes = capture_envelopes()
+
+    with start_transaction(name="profiling"):
+        time.sleep(0.05)
+
+    items = defaultdict(list)
+    for envelope in envelopes:
+        for item in envelope.items:
+            items[item.type].append(item)
+
+    assert len(items["transaction"]) == 1
+    assert len(items["profile"]) == 1
 
 
 def get_frame(depth=1):
@@ -494,7 +530,17 @@ def test_thread_scheduler_single_background_thread(scheduler_class):
 
     scheduler.setup()
 
+    # setup but no profiles started so still no threads
+    assert len(get_scheduler_threads(scheduler)) == 0
+
+    scheduler.ensure_running()
+
     # the scheduler will start always 1 thread
+    assert len(get_scheduler_threads(scheduler)) == 1
+
+    scheduler.ensure_running()
+
+    # the scheduler still only has 1 thread
     assert len(get_scheduler_threads(scheduler)) == 1
 
     scheduler.teardown()
