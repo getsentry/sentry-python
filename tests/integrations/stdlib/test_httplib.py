@@ -1,6 +1,7 @@
 import platform
 import sys
 import random
+import responses
 import pytest
 
 try:
@@ -29,9 +30,12 @@ from sentry_sdk.integrations.stdlib import StdlibIntegration
 
 def test_crumb_capture(sentry_init, capture_events):
     sentry_init(integrations=[StdlibIntegration()])
+
+    url = "http://example.com/"
+    responses.add(responses.GET, url, status=200)
+
     events = capture_events()
 
-    url = "https://httpbin.org/status/200"
     response = urlopen(url)
     assert response.getcode() == 200
     capture_message("Testing!")
@@ -45,6 +49,8 @@ def test_crumb_capture(sentry_init, capture_events):
         "method": "GET",
         "status_code": 200,
         "reason": "OK",
+        "http.fragment": "",
+        "http.query": "",
     }
 
 
@@ -54,9 +60,12 @@ def test_crumb_capture_hint(sentry_init, capture_events):
         return crumb
 
     sentry_init(integrations=[StdlibIntegration()], before_breadcrumb=before_breadcrumb)
+
+    url = "http://example.com/"
+    responses.add(responses.GET, url, status=200)
+
     events = capture_events()
 
-    url = "https://httpbin.org/status/200"
     response = urlopen(url)
     assert response.getcode() == 200
     capture_message("Testing!")
@@ -71,6 +80,8 @@ def test_crumb_capture_hint(sentry_init, capture_events):
         "status_code": 200,
         "reason": "OK",
         "extra": "foo",
+        "http.fragment": "",
+        "http.query": "",
     }
 
     if platform.python_implementation() != "PyPy":
@@ -84,7 +95,7 @@ def test_empty_realurl(sentry_init, capture_events):
     """
 
     sentry_init(dsn="")
-    HTTPConnection("httpbin.org", port=443).putrequest("POST", None)
+    HTTPConnection("example.com", port=443).putrequest("POST", None)
 
 
 def test_httplib_misuse(sentry_init, capture_events, request):
@@ -100,19 +111,19 @@ def test_httplib_misuse(sentry_init, capture_events, request):
     sentry_init()
     events = capture_events()
 
-    conn = HTTPSConnection("httpbin.org", 443)
+    conn = HTTPSConnection("httpstat.us", 443)
 
     # make sure we release the resource, even if the test fails
     request.addfinalizer(conn.close)
 
-    conn.request("GET", "/anything/foo")
+    conn.request("GET", "/200")
 
     with pytest.raises(Exception):
         # This raises an exception, because we didn't call `getresponse` for
         # the previous request yet.
         #
         # This call should not affect our breadcrumb.
-        conn.request("POST", "/anything/bar")
+        conn.request("POST", "/200")
 
     response = conn.getresponse()
     assert response._method == "GET"
@@ -125,10 +136,12 @@ def test_httplib_misuse(sentry_init, capture_events, request):
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
     assert crumb["data"] == {
-        "url": "https://httpbin.org/anything/foo",
+        "url": "https://httpstat.us/200",
         "method": "GET",
         "status_code": 200,
         "reason": "OK",
+        "http.fragment": "",
+        "http.query": "",
     }
 
 
