@@ -112,6 +112,7 @@ if MYPY:
 try:
     from gevent import get_hub as get_gevent_hub  # type: ignore
     from gevent.monkey import get_original, is_module_patched  # type: ignore
+    from gevent.threadpool import ThreadPool  # type: ignore
 
     thread_sleep = get_original("time", "sleep")
 except ImportError:
@@ -126,6 +127,8 @@ except ImportError:
         # type: (*Any, **Any) -> bool
         # unable to import from gevent means no modules have been patched
         return False
+
+    ThreadPool = None
 
 
 def is_gevent():
@@ -177,10 +180,7 @@ def setup_profiler(options):
     ):
         _scheduler = ThreadScheduler(frequency=frequency)
     elif profiler_mode == GeventScheduler.mode:
-        try:
-            _scheduler = GeventScheduler(frequency=frequency)
-        except ImportError:
-            raise ValueError("Profiler mode: {} is not available".format(profiler_mode))
+        _scheduler = GeventScheduler(frequency=frequency)
     else:
         raise ValueError("Unknown profiler mode: {}".format(profiler_mode))
 
@@ -703,7 +703,8 @@ class Scheduler(object):
 
         self.sampler = self.make_sampler()
 
-        self.new_profiles = deque()  # type: Deque[Profile]
+        # cap the number of new profiles at any time so it does not grow infinitely
+        self.new_profiles = deque(maxlen=128)  # type: Deque[Profile]
         self.active_profiles = set()  # type: Set[Profile]
 
     def __enter__(self):
@@ -723,8 +724,13 @@ class Scheduler(object):
         # type: () -> None
         raise NotImplementedError
 
+    def ensure_running(self):
+        # type: () -> None
+        raise NotImplementedError
+
     def start_profiling(self, profile):
         # type: (Profile) -> None
+        self.ensure_running()
         self.new_profiles.append(profile)
 
     def stop_profiling(self, profile):
@@ -827,21 +833,44 @@ class ThreadScheduler(Scheduler):
 
         # used to signal to the thread that it should stop
         self.running = False
-
-        # make sure the thread is a daemon here otherwise this
-        # can keep the application running after other threads
-        # have exited
-        self.thread = threading.Thread(name=self.name, target=self.run, daemon=True)
+        self.thread = None  # type: Optional[threading.Thread]
+        self.pid = None  # type: Optional[int]
+        self.lock = threading.Lock()
 
     def setup(self):
         # type: () -> None
-        self.running = True
-        self.thread.start()
+        pass
 
     def teardown(self):
         # type: () -> None
-        self.running = False
-        self.thread.join()
+        if self.running:
+            self.running = False
+            if self.thread is not None:
+                self.thread.join()
+
+    def ensure_running(self):
+        # type: () -> None
+        pid = os.getpid()
+
+        # is running on the right process
+        if self.running and self.pid == pid:
+            return
+
+        with self.lock:
+            # another thread may have tried to acquire the lock
+            # at the same time so it may start another thread
+            # make sure to check again before proceeding
+            if self.running and self.pid == pid:
+                return
+
+            self.pid = pid
+            self.running = True
+
+            # make sure the thread is a daemon here otherwise this
+            # can keep the application running after other threads
+            # have exited
+            self.thread = threading.Thread(name=self.name, target=self.run, daemon=True)
+            self.thread.start()
 
     def run(self):
         # type: () -> None
@@ -882,28 +911,52 @@ class GeventScheduler(Scheduler):
     def __init__(self, frequency):
         # type: (int) -> None
 
-        # This can throw an ImportError that must be caught if `gevent` is
-        # not installed.
-        from gevent.threadpool import ThreadPool  # type: ignore
+        if ThreadPool is None:
+            raise ValueError("Profiler mode: {} is not available".format(self.mode))
 
         super(GeventScheduler, self).__init__(frequency=frequency)
 
         # used to signal to the thread that it should stop
         self.running = False
+        self.thread = None  # type: Optional[ThreadPool]
+        self.pid = None  # type: Optional[int]
 
-        # Using gevent's ThreadPool allows us to bypass greenlets and spawn
-        # native threads.
-        self.pool = ThreadPool(1)
+        # This intentionally uses the gevent patched threading.Lock.
+        # The lock will be required when first trying to start profiles
+        # as we need to spawn the profiler thread from the greenlets.
+        self.lock = threading.Lock()
 
     def setup(self):
         # type: () -> None
-        self.running = True
-        self.pool.spawn(self.run)
+        pass
 
     def teardown(self):
         # type: () -> None
-        self.running = False
-        self.pool.join()
+        if self.running:
+            self.running = False
+            if self.thread is not None:
+                self.thread.join()
+
+    def ensure_running(self):
+        # type: () -> None
+        pid = os.getpid()
+
+        # is running on the right process
+        if self.running and self.pid == pid:
+            return
+
+        with self.lock:
+            # another thread may have tried to acquire the lock
+            # at the same time so it may start another thread
+            # make sure to check again before proceeding
+            if self.running and self.pid == pid:
+                return
+
+            self.pid = pid
+            self.running = True
+
+            self.thread = ThreadPool(1)
+            self.thread.spawn(self.run)
 
     def run(self):
         # type: () -> None
