@@ -112,6 +112,7 @@ if MYPY:
 try:
     from gevent import get_hub as get_gevent_hub  # type: ignore
     from gevent.monkey import get_original, is_module_patched  # type: ignore
+    from gevent.threadpool import ThreadPool  # type: ignore
 
     thread_sleep = get_original("time", "sleep")
 except ImportError:
@@ -126,6 +127,8 @@ except ImportError:
         # type: (*Any, **Any) -> bool
         # unable to import from gevent means no modules have been patched
         return False
+
+    ThreadPool = None
 
 
 def is_gevent():
@@ -177,10 +180,7 @@ def setup_profiler(options):
     ):
         _scheduler = ThreadScheduler(frequency=frequency)
     elif profiler_mode == GeventScheduler.mode:
-        try:
-            _scheduler = GeventScheduler(frequency=frequency)
-        except ImportError:
-            raise ValueError("Profiler mode: {} is not available".format(profiler_mode))
+        _scheduler = GeventScheduler(frequency=frequency)
     else:
         raise ValueError("Unknown profiler mode: {}".format(profiler_mode))
 
@@ -911,13 +911,10 @@ class GeventScheduler(Scheduler):
     def __init__(self, frequency):
         # type: (int) -> None
 
-        # This can throw an ImportError that must be caught if `gevent` is
-        # not installed.
-        from gevent.threadpool import ThreadPool  # type: ignore
+        if ThreadPool is None:
+            raise ValueError("Profiler mode: {} is not available".format(self.mode))
 
         super(GeventScheduler, self).__init__(frequency=frequency)
-
-        self.make_thread = lambda: ThreadPool(1)
 
         # used to signal to the thread that it should stop
         self.running = False
@@ -958,7 +955,7 @@ class GeventScheduler(Scheduler):
             self.pid = pid
             self.running = True
 
-            self.thread = self.make_thread()
+            self.thread = ThreadPool(1)
             self.thread.spawn(self.run)
 
     def run(self):
