@@ -89,7 +89,7 @@ def patch_run_job():
         if hub.get_integration(ArqIntegration) is None:
             return await old_run_job(self, job_id, score)
 
-        with hub.configure_scope() as scope:
+        with hub.push_scope() as scope:
             scope._name = "arq"
             scope.clear_breadcrumbs()
 
