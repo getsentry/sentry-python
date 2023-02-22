@@ -84,12 +84,12 @@ def patch_run_job():
 
     async def _sentry_run_job(self, job_id, score):
         # type: (Worker, str, int) -> None
-        hub = Hub.current
+        hub = Hub(Hub.current)
 
         if hub.get_integration(ArqIntegration) is None:
             return await old_run_job(self, job_id, score)
 
-        with hub.push_scope() as scope:
+        with hub.configure_scope() as scope:
             scope._name = "arq"
             scope.clear_breadcrumbs()
 
