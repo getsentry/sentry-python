@@ -5,6 +5,7 @@ import httpx
 import responses
 
 from sentry_sdk import capture_message, start_transaction
+from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.integrations.httpx import HttpxIntegration
 
 
@@ -81,3 +82,146 @@ def test_outgoing_trace_headers(sentry_init, httpx_client):
             parent_span_id=request_span.span_id,
             sampled=1,
         )
+
+
+@pytest.mark.parametrize(
+    "httpx_client,trace_propagation_targets,url,trace_propagated",
+    [
+        [
+            httpx.Client(),
+            None,
+            "https://example.com/",
+            False,
+        ],
+        [
+            httpx.Client(),
+            [],
+            "https://example.com/",
+            False,
+        ],
+        [
+            httpx.Client(),
+            [MATCH_ALL],
+            "https://example.com/",
+            True,
+        ],
+        [
+            httpx.Client(),
+            ["https://example.com/"],
+            "https://example.com/",
+            True,
+        ],
+        [
+            httpx.Client(),
+            ["https://example.com/"],
+            "https://example.com",
+            False,
+        ],
+        [
+            httpx.Client(),
+            ["https://example.com"],
+            "https://example.com",
+            True,
+        ],
+        [
+            httpx.Client(),
+            ["https://example.com", r"https?:\/\/[\w\-]+(\.[\w\-]+)+\.net"],
+            "https://example.net",
+            False,
+        ],
+        [
+            httpx.Client(),
+            ["https://example.com", r"https?:\/\/[\w\-]+(\.[\w\-]+)+\.net"],
+            "https://good.example.net",
+            True,
+        ],
+        [
+            httpx.Client(),
+            ["https://example.com", r"https?:\/\/[\w\-]+(\.[\w\-]+)+\.net"],
+            "https://good.example.net/some/thing",
+            True,
+        ],
+        [
+            httpx.AsyncClient(),
+            None,
+            "https://example.com/",
+            False,
+        ],
+        [
+            httpx.AsyncClient(),
+            [],
+            "https://example.com/",
+            False,
+        ],
+        [
+            httpx.AsyncClient(),
+            [MATCH_ALL],
+            "https://example.com/",
+            True,
+        ],
+        [
+            httpx.AsyncClient(),
+            ["https://example.com/"],
+            "https://example.com/",
+            True,
+        ],
+        [
+            httpx.AsyncClient(),
+            ["https://example.com/"],
+            "https://example.com",
+            False,
+        ],
+        [
+            httpx.AsyncClient(),
+            ["https://example.com"],
+            "https://example.com",
+            True,
+        ],
+        [
+            httpx.AsyncClient(),
+            ["https://example.com", r"https?:\/\/[\w\-]+(\.[\w\-]+)+\.net"],
+            "https://example.net",
+            False,
+        ],
+        [
+            httpx.AsyncClient(),
+            ["https://example.com", r"https?:\/\/[\w\-]+(\.[\w\-]+)+\.net"],
+            "https://good.example.net",
+            True,
+        ],
+        [
+            httpx.AsyncClient(),
+            ["https://example.com", r"https?:\/\/[\w\-]+(\.[\w\-]+)+\.net"],
+            "https://good.example.net/some/thing",
+            True,
+        ],
+    ],
+)
+def test_option_trace_propagation_targets(
+    sentry_init,
+    httpx_client,
+    httpx_mock,  # this comes from pytest-httpx
+    trace_propagation_targets,
+    url,
+    trace_propagated,
+):
+    httpx_mock.add_response()
+
+    sentry_init(
+        release="test",
+        trace_propagation_targets=trace_propagation_targets,
+        traces_sample_rate=1.0,
+        integrations=[HttpxIntegration()],
+    )
+
+    if asyncio.iscoroutinefunction(httpx_client.get):
+        asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+    else:
+        httpx_client.get(url)
+
+    request_headers = httpx_mock.get_request().headers
+
+    if trace_propagated:
+        assert "sentry-trace" in request_headers
+    else:
+        assert "sentry-trace" not in request_headers

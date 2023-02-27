@@ -1,3 +1,4 @@
+from mock import MagicMock
 import pytest
 import gc
 import uuid
@@ -5,7 +6,9 @@ import os
 
 import sentry_sdk
 from sentry_sdk import Hub, start_span, start_transaction, set_measurement
+from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.tracing import Span, Transaction
+from sentry_sdk.tracing_utils import should_propagate_trace
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -271,3 +274,35 @@ def test_set_meaurement_public_api(sentry_init, capture_events):
     (event,) = events
     assert event["measurements"]["metric.foo"] == {"value": 123, "unit": ""}
     assert event["measurements"]["metric.bar"] == {"value": 456, "unit": "second"}
+
+
+@pytest.mark.parametrize(
+    "trace_propagation_targets,url,expected_propagation_decision",
+    [
+        (None, "http://example.com", False),
+        ([], "http://example.com", False),
+        ([MATCH_ALL], "http://example.com", True),
+        (["localhost"], "localhost:8443/api/users", True),
+        (["localhost"], "http://localhost:8443/api/users", True),
+        (["localhost"], "mylocalhost:8080/api/users", True),
+        ([r"^/api"], "/api/envelopes", True),
+        ([r"^/api"], "/backend/api/envelopes", False),
+        ([r"myApi.com/v[2-4]"], "myApi.com/v2/projects", True),
+        ([r"myApi.com/v[2-4]"], "myApi.com/v1/projects", False),
+        ([r"https:\/\/.*"], "https://example.com", True),
+        (
+            [r"https://.*"],
+            "https://example.com",
+            True,
+        ),  # to show escaping is not needed
+        ([r"https://.*"], "http://example.com/insecure/", False),
+    ],
+)
+def test_should_propagate_trace(
+    trace_propagation_targets, url, expected_propagation_decision
+):
+    hub = MagicMock()
+    hub.client = MagicMock()
+    hub.client.options = {"trace_propagation_targets": trace_propagation_targets}
+
+    assert should_propagate_trace(hub, url) == expected_propagation_decision
