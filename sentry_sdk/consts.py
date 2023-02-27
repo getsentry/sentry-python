@@ -87,7 +87,6 @@ class ClientConstructor(object):
     def __init__(
         self,
         dsn=None,  # type: Optional[str]
-        with_locals=True,  # type: bool   # DEPRECATED in favor of `include_local_variables`
         max_breadcrumbs=DEFAULT_MAX_BREADCRUMBS,  # type: int
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
