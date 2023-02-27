@@ -71,7 +71,7 @@ def _get_options(*args, **kwargs):
 
     for key, value in iteritems(options):
         if key not in rv:
-            # Option "with_locals" was renamed to "include_local_variables
+            # Option "with_locals" was renamed to "include_local_variables"
             if key == "with_locals":
                 msg = (
                     "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. "
