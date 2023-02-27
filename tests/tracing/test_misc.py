@@ -1,3 +1,4 @@
+from mock import MagicMock
 import pytest
 import gc
 import uuid
@@ -300,7 +301,8 @@ def test_set_meaurement_public_api(sentry_init, capture_events):
 def test_should_propagate_trace(
     trace_propagation_targets, url, expected_propagation_decision
 ):
-    assert (
-        should_propagate_trace(url, trace_propagation_targets)
-        == expected_propagation_decision
-    )
+    hub = MagicMock()
+    hub.client = MagicMock()
+    hub.client.options = {"trace_propagation_targets": trace_propagation_targets}
+
+    assert should_propagate_trace(hub, url) == expected_propagation_decision
