@@ -98,11 +98,7 @@ def _install_httplib():
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
-        client = hub.client  # type: Any
-
-        if should_propagate_trace(
-            real_url, client.options["trace_propagation_targets"]
-        ):
+        if should_propagate_trace(hub, real_url):
             for key, value in hub.iter_trace_propagation_headers(span):
                 logger.debug(
                     "[Tracing] Adding `{key}` header {value} to outgoing request to {real_url}.".format(

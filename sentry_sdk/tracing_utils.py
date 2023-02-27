@@ -30,7 +30,6 @@ if MYPY:
     from typing import Any
     from typing import Dict
     from typing import Generator
-    from typing import List
     from typing import Optional
     from typing import Union
 
@@ -377,11 +376,14 @@ class Baggage(object):
         return ",".join(items)
 
 
-def should_propagate_trace(url, trace_propagation_targets):
-    # type: (str, List[str]) -> bool
+def should_propagate_trace(hub, url):
+    # type: (sentry_sdk.Hub, str) -> bool
     """
-    Returns True if url matches given trace_propagation_targets. Otherwise, returns False.
+    Returns True if url matches trace_propagation_targets configured in the given hub. Otherwise, returns False.
     """
+    client = hub.client  # type: Any
+    trace_propagation_targets = client.options["trace_propagation_targets"]
+
     if trace_propagation_targets is None:
         return False
 

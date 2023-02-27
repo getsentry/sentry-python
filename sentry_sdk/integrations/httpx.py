@@ -53,11 +53,7 @@ def _install_httpx_client():
             span.set_data("http.query", parsed_url.query)
             span.set_data("http.fragment", parsed_url.fragment)
 
-            client = hub.client  # type: Client
-
-            if should_propagate_trace(
-                str(request.url), client.options["trace_propagation_targets"]
-            ):
+            if should_propagate_trace(hub, str(request.url)):
                 for key, value in hub.iter_trace_propagation_headers():
                     logger.debug(
                         "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
@@ -98,11 +94,7 @@ def _install_httpx_async_client():
             span.set_data("http.query", parsed_url.query)
             span.set_data("http.fragment", parsed_url.fragment)
 
-            client = hub.client  # type: Any
-
-            if should_propagate_trace(
-                str(request.url), client.options["trace_propagation_targets"]
-            ):
+            if should_propagate_trace(hub, str(request.url)):
                 for key, value in hub.iter_trace_propagation_headers():
                     logger.debug(
                         "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
