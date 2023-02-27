@@ -219,7 +219,7 @@ class EventHandler(logging.Handler, object):
                     "values": [
                         {
                             "stacktrace": current_stacktrace(
-                                client_options["with_locals"]
+                                client_options["include_local_variables"]
                             ),
                             "crashed": False,
                             "current": True,

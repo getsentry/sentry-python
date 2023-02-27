@@ -100,6 +100,16 @@ def _get_options(*args, **kwargs):
     if rv["enable_tracing"] is True and rv["traces_sample_rate"] is None:
         rv["traces_sample_rate"] = 1.0
 
+    if "with_locals" in options:
+        logger.warning(
+            "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
+        )
+        rv["include_local_variables"] = options["with_locals"]
+
+        if "with_locals" in rv:
+            rv["include_local_variables"] = rv["with_locals"]
+            del rv["with_locals"]
+
     return rv
 
 
@@ -213,7 +223,7 @@ class _Client(object):
                     "values": [
                         {
                             "stacktrace": current_stacktrace(
-                                self.options["with_locals"]
+                                self.options["include_local_variables"]
                             ),
                             "crashed": False,
                             "current": True,

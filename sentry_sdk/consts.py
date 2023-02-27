@@ -87,7 +87,7 @@ class ClientConstructor(object):
     def __init__(
         self,
         dsn=None,  # type: Optional[str]
-        with_locals=True,  # type: bool
+        with_locals=True,  # type: bool   # DEPRECATED in favor of `include_local_variables`
         max_breadcrumbs=DEFAULT_MAX_BREADCRUMBS,  # type: int
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
@@ -123,6 +123,7 @@ class ClientConstructor(object):
         before_send_transaction=None,  # type: Optional[TransactionProcessor]
         project_root=None,  # type: Optional[str]
         enable_tracing=None,  # type: Optional[bool]
+        include_local_variables=True,  # type: Optional[bool]
     ):
         # type: (...) -> None
         pass
