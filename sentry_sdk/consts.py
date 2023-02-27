@@ -42,6 +42,8 @@ if MYPY:
 DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
 
+MATCH_ALL = r".*"
+
 
 class INSTRUMENTER:
     SENTRY = "sentry"
@@ -123,6 +125,9 @@ class ClientConstructor(object):
         project_root=None,  # type: Optional[str]
         enable_tracing=None,  # type: Optional[bool]
         include_local_variables=True,  # type: Optional[bool]
+        trace_propagation_targets=[  # noqa: B006
+            MATCH_ALL
+        ],  # type: Optional[Sequence[str]]
     ):
         # type: (...) -> None
         pass
@@ -146,4 +151,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.15.0"
+VERSION = "1.16.0"
