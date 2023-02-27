@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.16.0
+
+### Various fixes & improvements
+
+- Adds `trace_propagation_targets` option (#1916) by @antonpirker
+- feat(cloud): Adding Cloud Resource Context (#1882) by @antonpirker
+- fix(profiling): Start profiler thread lazily (#1903) by @Zylphrex
+- feat(arq): add arq integration (#1872) by @Zhenay
+- tests(gevent): Add workflow to test gevent (#1870) by @Zylphrex
+- Updated outdated HTTPX test matrix (#1917) by @antonpirker
+- Make set_measurement public api and remove experimental status (#1909) by @sl0thentr0py
+- feat(falcon): Update of Falcon Integration (#1733) by @antonpirker
+- Remove deprecated `tracestate` (#1907) by @antonpirker
+- Switch to MIT license (#1908) by @cleptric
+- Fixed checks for structured http data (#1905) by @antonpirker
+- Add enable_tracing to default traces_sample_rate to 1.0 (#1900) by @sl0thentr0py
+- feat(pii): Sanitize URLs in Span description and breadcrumbs (#1876) by @antonpirker
+- ref(profiling): Use the transaction timestamps to anchor the profile (#1898) by @Zylphrex
+- Better setting of in-app in stack frames (#1894) by @antonpirker
+- Mechanism should default to true unless set explicitly (#1889) by @sl0thentr0py
+- ref(profiling): Add debug logs to profiling (#1883) by @Zylphrex
+
 ## 1.15.0
 
 ### Various fixes & improvements
