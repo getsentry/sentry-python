@@ -90,9 +90,12 @@ class DjangoIntegration(Integration):
 
     transaction_style = ""
     middleware_spans = None
+    signals_spans = None
 
-    def __init__(self, transaction_style="url", middleware_spans=True):
-        # type: (str, bool) -> None
+    def __init__(
+        self, transaction_style="url", middleware_spans=True, signals_spans=False
+    ):
+        # type: (str, bool, bool) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -100,6 +103,7 @@ class DjangoIntegration(Integration):
             )
         self.transaction_style = transaction_style
         self.middleware_spans = middleware_spans
+        self.signals_spans = signals_spans
 
     @staticmethod
     def setup_once():

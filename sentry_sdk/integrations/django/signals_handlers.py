@@ -43,6 +43,7 @@ def _get_receiver_name(receiver):
 def patch_signals():
     # type: () -> None
     """Patch django signal receivers to create a span"""
+    from sentry_sdk.integrations.django import DjangoIntegration
 
     old_live_receivers = Signal._live_receivers
 
@@ -71,4 +72,7 @@ def patch_signals():
 
         return receivers
 
-    Signal._live_receivers = _sentry_live_receivers
+    hub = Hub.current
+    integration = hub.get_integration(DjangoIntegration)
+    if integration and integration.signals_spans:
+        Signal._live_receivers = _sentry_live_receivers
