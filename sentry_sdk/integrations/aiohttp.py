@@ -55,12 +55,10 @@ if TYPE_CHECKING:
 TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
 
 
-def create_trace_config() -> TraceConfig:
-    async def on_request_start(
-        session: ClientSession,
-        trace_config_ctx: "SimpleNamespace",
-        params: "TraceRequestStartParams",
-    ):
+def create_trace_config():
+    # type: () -> TraceConfig
+    async def on_request_start(session, trace_config_ctx, params):
+        # type: (ClientSession, SimpleNamespace, TraceRequestStartParams) -> None
         hub = Hub.current
         if hub.get_integration(AioHttpIntegration) is None:
             return
@@ -84,11 +82,8 @@ def create_trace_config() -> TraceConfig:
 
         trace_config_ctx.span = span
 
-    async def on_request_end(
-        session: ClientSession,
-        trace_config_ctx: "SimpleNamespace",
-        params: "TraceRequestEndParams",
-    ):
+    async def on_request_end(session, trace_config_ctx, params):
+        # type: (ClientSession, SimpleNamespace, TraceRequestEndParams) -> None
         if trace_config_ctx.span is None:
             return
 
@@ -223,6 +218,7 @@ class AioHttpIntegration(Integration):
         old_client_session_init = ClientSession.__init__
 
         def init(*args, **kwargs):
+            # type: (Any, Any) -> ClientSession
             hub = Hub.current
             if hub.get_integration(AioHttpIntegration) is None:
                 return old_client_session_init(*args, **kwargs)
