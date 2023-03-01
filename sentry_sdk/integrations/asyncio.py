@@ -32,7 +32,7 @@ def patch_asyncio():
             # type: (Any, Any) -> Any
 
             async def _coro_creating_hub_and_span():
-                # type: () -> None
+                # type: () -> Any
                 hub = Hub(Hub.current)
                 result = None
 
