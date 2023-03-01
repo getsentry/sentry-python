@@ -6,7 +6,7 @@ from sentry_sdk import Hub
 from sentry_sdk._compat import reraise
 
 
-class MONITOR_STATUS:
+class MonitorStatus:
     IN_PROGRESS = "in_progress"
     OK = "ok"
     ERROR = "error"
@@ -39,19 +39,19 @@ def monitor(monitor_id=None):
         @wraps(func)
         def wrapper(*args, **kwargs):
             _capture_monitor_event(
-                monitor_id=monitor_id, status=MONITOR_STATUS.IN_PROGRESS
+                monitor_id=monitor_id, status=MonitorStatus.IN_PROGRESS
             )
 
             try:
                 result = func(*args, **kwargs)
             except Exception:
                 _capture_monitor_event(
-                    monitor_id=monitor_id, status=MONITOR_STATUS.ERROR
+                    monitor_id=monitor_id, status=MonitorStatus.ERROR
                 )
                 exc_info = sys.exc_info()
                 reraise(*exc_info)
 
-            _capture_monitor_event(monitor_id=monitor_id, status=MONITOR_STATUS.OK)
+            _capture_monitor_event(monitor_id=monitor_id, status=MonitorStatus.OK)
             return result
 
         return wrapper
