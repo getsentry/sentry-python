@@ -29,9 +29,9 @@ try:
 except ImportError:
     raise DidNotEnable("AIOHTTP not installed")
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from aiohttp.web_request import Request
     from aiohttp.abc import AbstractMatchInfo
     from typing import Any

@@ -1,10 +1,10 @@
 try:
-    from typing import TYPE_CHECKING as MYPY
+    from typing import TYPE_CHECKING as TYPE_CHECKING
 except ImportError:
-    MYPY = False
+    TYPE_CHECKING = False
 
 
-if MYPY:
+if TYPE_CHECKING:
     from types import TracebackType
     from typing import Any
     from typing import Callable

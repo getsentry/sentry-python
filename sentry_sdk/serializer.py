@@ -24,9 +24,9 @@ from sentry_sdk._compat import (
     binary_sequence_types,
 )
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from datetime import timedelta
 
     from types import TracebackType

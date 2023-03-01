@@ -1,6 +1,6 @@
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     import sentry_sdk
 
     from typing import Optional

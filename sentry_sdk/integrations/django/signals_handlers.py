@@ -5,11 +5,11 @@ from django.dispatch import Signal
 
 from sentry_sdk import Hub
 from sentry_sdk._functools import wraps
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import List

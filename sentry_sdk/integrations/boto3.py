@@ -6,10 +6,10 @@ from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 
 from sentry_sdk._functools import partial
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import parse_url
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
     from typing import Optional
