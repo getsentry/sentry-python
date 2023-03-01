@@ -32,14 +32,18 @@ def patch_asyncio():
             # type: (Any, Any) -> Any
 
             async def _coro_creating_hub_and_span():
-                # type: () -> None
+                # type: () -> Any
                 hub = Hub(Hub.current)
+                result = None
+
                 with hub:
                     with hub.start_span(op=OP.FUNCTION, description=coro.__qualname__):
                         try:
-                            await coro
+                            result = await coro
                         except Exception:
                             reraise(*_capture_exception(hub))
+
+                return result
 
             # Trying to use user set task factory (if there is one)
             if orig_task_factory:
