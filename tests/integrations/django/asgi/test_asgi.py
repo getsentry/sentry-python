@@ -1,9 +1,16 @@
+import json
+
 import django
 import pytest
 from channels.testing import HttpCommunicator
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.django import DjangoIntegration
 from tests.integrations.django.myapp.asgi import channels_application
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 APPS = [channels_application]
 if django.VERSION >= (3, 0):
@@ -68,6 +75,44 @@ async def test_async_views(sentry_init, capture_events, application):
         "query_string": None,
         "url": "/async_message",
     }
+
+
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
+async def test_active_thread_id(
+    sentry_init, capture_envelopes, teardown_profiling, endpoint, application
+):
+    with mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0):
+        sentry_init(
+            integrations=[DjangoIntegration()],
+            traces_sample_rate=1.0,
+            _experiments={"profiles_sample_rate": 1.0},
+        )
+
+        envelopes = capture_envelopes()
+
+        comm = HttpCommunicator(application, "GET", endpoint)
+        response = await comm.get_response()
+        assert response["status"] == 200, response["body"]
+
+        await comm.wait()
+
+        data = json.loads(response["body"])
+
+        envelopes = [envelope for envelope in envelopes]
+        assert len(envelopes) == 1
+
+        profiles = [item for item in envelopes[0].items if item.type == "profile"]
+        assert len(profiles) == 1
+
+        for profile in profiles:
+            transactions = profile.payload.json["transactions"]
+            assert len(transactions) == 1
+            assert str(data["active"]) == transactions[0]["active_thread_id"]
 
 
 @pytest.mark.asyncio
@@ -175,10 +220,15 @@ async def test_async_middleware_spans(
         render_span_tree(transaction)
         == """\
 - op="http.server": description=null
-  - op="django.middleware": description="django.contrib.sessions.middleware.SessionMiddleware.__acall__"
-    - op="django.middleware": description="django.contrib.auth.middleware.AuthenticationMiddleware.__acall__"
-      - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.__acall__"
-        - op="django.middleware": description="tests.integrations.django.myapp.settings.TestMiddleware.__acall__"
-          - op="django.middleware": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
-          - op="django.view": description="async_message\""""
+  - op="event.django": description="django.db.reset_queries"
+  - op="event.django": description="django.db.close_old_connections"
+  - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.__acall__"
+    - op="middleware.django": description="django.contrib.auth.middleware.AuthenticationMiddleware.__acall__"
+      - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.__acall__"
+        - op="middleware.django": description="tests.integrations.django.myapp.settings.TestMiddleware.__acall__"
+          - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
+          - op="view.render": description="async_message"
+  - op="event.django": description="django.db.close_old_connections"
+  - op="event.django": description="django.core.cache.close_caches"
+  - op="event.django": description="django.core.handlers.base.reset_urlconf\""""
     )

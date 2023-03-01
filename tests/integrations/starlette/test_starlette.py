@@ -1,0 +1,875 @@
+import asyncio
+import base64
+import functools
+import json
+import os
+import threading
+
+import pytest
+
+from sentry_sdk import last_event_id, capture_exception
+from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
+
+from sentry_sdk import capture_message
+from sentry_sdk.integrations.starlette import (
+    StarletteIntegration,
+    StarletteRequestExtractor,
+)
+
+starlette = pytest.importorskip("starlette")
+from starlette.authentication import (
+    AuthCredentials,
+    AuthenticationBackend,
+    AuthenticationError,
+    SimpleUser,
+)
+from starlette.middleware import Middleware
+from starlette.middleware.authentication import AuthenticationMiddleware
+from starlette.testclient import TestClient
+
+STARLETTE_VERSION = tuple([int(x) for x in starlette.__version__.split(".")])
+
+PICTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "photo.jpg")
+
+BODY_JSON = {"some": "json", "for": "testing", "nested": {"numbers": 123}}
+
+BODY_FORM = """--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="username"\r\n\r\nJane\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="password"\r\n\r\nhello123\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="photo"; filename="photo.jpg"\r\nContent-Type: image/jpg\r\nContent-Transfer-Encoding: base64\r\n\r\n{{image_data}}\r\n--fd721ef49ea403a6--\r\n""".replace(
+    "{{image_data}}", str(base64.b64encode(open(PICTURE, "rb").read()))
+)
+
+FORM_RECEIVE_MESSAGES = [
+    {"type": "http.request", "body": BODY_FORM.encode("utf-8")},
+    {"type": "http.disconnect"},
+]
+
+JSON_RECEIVE_MESSAGES = [
+    {"type": "http.request", "body": json.dumps(BODY_JSON).encode("utf-8")},
+    {"type": "http.disconnect"},
+]
+
+PARSED_FORM = starlette.datastructures.FormData(
+    [
+        ("username", "Jane"),
+        ("password", "hello123"),
+        (
+            "photo",
+            starlette.datastructures.UploadFile(
+                filename="photo.jpg",
+                file=open(PICTURE, "rb"),
+                content_type="image/jpeg",
+            ),
+        ),
+    ]
+)
+
+# Dummy ASGI scope for creating mock Starlette requests
+SCOPE = {
+    "client": ("172.29.0.10", 34784),
+    "headers": [
+        [b"host", b"example.com"],
+        [b"user-agent", b"Mozilla/5.0 Gecko/20100101 Firefox/60.0"],
+        [b"content-type", b"application/json"],
+        [b"accept-language", b"en-US,en;q=0.5"],
+        [b"accept-encoding", b"gzip, deflate, br"],
+        [b"upgrade-insecure-requests", b"1"],
+        [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
+    ],
+    "http_version": "0.0",
+    "method": "GET",
+    "path": "/path",
+    "query_string": b"qs=hello",
+    "scheme": "http",
+    "server": ("172.28.0.10", 8000),
+    "type": "http",
+}
+
+
+async def _mock_receive(msg):
+    return msg
+
+
+def starlette_app_factory(middleware=None, debug=True):
+    async def _homepage(request):
+        1 / 0
+        return starlette.responses.JSONResponse({"status": "ok"})
+
+    async def _custom_error(request):
+        raise Exception("Too Hot")
+
+    async def _message(request):
+        capture_message("hi")
+        return starlette.responses.JSONResponse({"status": "ok"})
+
+    async def _message_with_id(request):
+        capture_message("hi")
+        return starlette.responses.JSONResponse({"status": "ok"})
+
+    def _thread_ids_sync(request):
+        return starlette.responses.JSONResponse(
+            {
+                "main": threading.main_thread().ident,
+                "active": threading.current_thread().ident,
+            }
+        )
+
+    async def _thread_ids_async(request):
+        return starlette.responses.JSONResponse(
+            {
+                "main": threading.main_thread().ident,
+                "active": threading.current_thread().ident,
+            }
+        )
+
+    app = starlette.applications.Starlette(
+        debug=debug,
+        routes=[
+            starlette.routing.Route("/some_url", _homepage),
+            starlette.routing.Route("/custom_error", _custom_error),
+            starlette.routing.Route("/message", _message),
+            starlette.routing.Route("/message/{message_id}", _message_with_id),
+            starlette.routing.Route("/sync/thread_ids", _thread_ids_sync),
+            starlette.routing.Route("/async/thread_ids", _thread_ids_async),
+        ],
+        middleware=middleware,
+    )
+
+    return app
+
+
+def async_return(result):
+    f = asyncio.Future()
+    f.set_result(result)
+    return f
+
+
+class BasicAuthBackend(AuthenticationBackend):
+    async def authenticate(self, conn):
+        if "Authorization" not in conn.headers:
+            return
+
+        auth = conn.headers["Authorization"]
+        try:
+            scheme, credentials = auth.split()
+            if scheme.lower() != "basic":
+                return
+            decoded = base64.b64decode(credentials).decode("ascii")
+        except (ValueError, UnicodeDecodeError):
+            raise AuthenticationError("Invalid basic auth credentials")
+
+        username, _, password = decoded.partition(":")
+
+        # TODO: You'd want to verify the username and password here.
+
+        return AuthCredentials(["authenticated"]), SimpleUser(username)
+
+
+class AsyncIterator:
+    def __init__(self, data):
+        self.iter = iter(bytes(data, "utf-8"))
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            return bytes([next(self.iter)])
+        except StopIteration:
+            raise StopAsyncIteration
+
+
+class SampleMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        # only handle http requests
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def do_stuff(message):
+            if message["type"] == "http.response.start":
+                # do something here.
+                pass
+
+            await send(message)
+
+        await self.app(scope, receive, do_stuff)
+
+
+class SampleReceiveSendMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        message = await receive()
+        assert message
+        assert message["type"] == "http.request"
+
+        send_output = await send({"type": "something-unimportant"})
+        assert send_output is None
+
+        await self.app(scope, receive, send)
+
+
+class SamplePartialReceiveSendMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        message = await receive()
+        assert message
+        assert message["type"] == "http.request"
+
+        send_output = await send({"type": "something-unimportant"})
+        assert send_output is None
+
+        async def my_receive(*args, **kwargs):
+            pass
+
+        async def my_send(*args, **kwargs):
+            pass
+
+        partial_receive = functools.partial(my_receive)
+        partial_send = functools.partial(my_send)
+
+        await self.app(scope, partial_receive, partial_send)
+
+
+@pytest.mark.asyncio
+async def test_starlettrequestextractor_content_length(sentry_init):
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
+    ]
+    starlette_request = starlette.requests.Request(scope)
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    assert await extractor.content_length() == len(json.dumps(BODY_JSON))
+
+
+@pytest.mark.asyncio
+async def test_starlettrequestextractor_cookies(sentry_init):
+    starlette_request = starlette.requests.Request(SCOPE)
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    assert extractor.cookies() == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+
+
+@pytest.mark.asyncio
+async def test_starlettrequestextractor_json(sentry_init):
+    starlette_request = starlette.requests.Request(SCOPE)
+
+    # Mocking async `_receive()` that works in Python 3.7+
+    side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
+
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    assert extractor.is_json()
+    assert await extractor.json() == BODY_JSON
+
+
+@pytest.mark.asyncio
+async def test_starlettrequestextractor_form(sentry_init):
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
+    ]
+    # TODO add test for content-type: "application/x-www-form-urlencoded"
+
+    starlette_request = starlette.requests.Request(scope)
+
+    # Mocking async `_receive()` that works in Python 3.7+
+    side_effect = [_mock_receive(msg) for msg in FORM_RECEIVE_MESSAGES]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
+
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    form_data = await extractor.form()
+    assert form_data.keys() == PARSED_FORM.keys()
+    assert form_data["username"] == PARSED_FORM["username"]
+    assert form_data["password"] == PARSED_FORM["password"]
+    assert form_data["photo"].filename == PARSED_FORM["photo"].filename
+
+    # Make sure we still can read the body
+    # after alreading it with extractor.form() above.
+    body = await extractor.request.body()
+    assert body
+
+
+@pytest.mark.asyncio
+async def test_starlettrequestextractor_body_consumed_twice(
+    sentry_init, capture_events
+):
+    """
+    Starlette does cache when you read the request data via `request.json()`
+    or `request.body()`, but it does NOT when using `request.form()`.
+    So we have an edge case when the Sentry Starlette reads the body using `.form()`
+    and the user wants to read the body using `.body()`.
+    Because the underlying stream can not be consumed twice and is not cached.
+
+    We have fixed this in `StarletteRequestExtractor.form()` by consuming the body
+    first with `.body()` (to put it into the `_body` cache and then consume it with `.form()`.
+
+    If this behavior is changed in Starlette and the `request.form()` in Starlette
+    is also caching the body, this test will fail.
+
+    See also https://github.com/encode/starlette/discussions/1933
+    """
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
+    ]
+
+    starlette_request = starlette.requests.Request(scope)
+
+    # Mocking async `_receive()` that works in Python 3.7+
+    side_effect = [_mock_receive(msg) for msg in FORM_RECEIVE_MESSAGES]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
+
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    await extractor.request.form()
+
+    with pytest.raises(RuntimeError):
+        await extractor.request.body()
+
+
+@pytest.mark.asyncio
+async def test_starlettrequestextractor_extract_request_info_too_big(sentry_init):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[StarletteIntegration()],
+    )
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
+        [b"content-length", str(len(BODY_FORM)).encode()],
+        [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
+    ]
+    starlette_request = starlette.requests.Request(scope)
+
+    # Mocking async `_receive()` that works in Python 3.7+
+    side_effect = [_mock_receive(msg) for msg in FORM_RECEIVE_MESSAGES]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
+
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    request_info = await extractor.extract_request_info()
+
+    assert request_info
+    assert request_info["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+    # Because request is too big only the AnnotatedValue is extracted.
+    assert request_info["data"].metadata == {"rem": [["!config", "x"]]}
+
+
+@pytest.mark.asyncio
+async def test_starlettrequestextractor_extract_request_info(sentry_init):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[StarletteIntegration()],
+    )
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-type", b"application/json"],
+        [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
+        [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
+    ]
+
+    starlette_request = starlette.requests.Request(scope)
+
+    # Mocking async `_receive()` that works in Python 3.7+
+    side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
+
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    request_info = await extractor.extract_request_info()
+
+    assert request_info
+    assert request_info["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+    assert request_info["data"] == BODY_JSON
+
+
+@pytest.mark.asyncio
+async def test_starlettrequestextractor_extract_request_info_no_pii(sentry_init):
+    sentry_init(
+        send_default_pii=False,
+        integrations=[StarletteIntegration()],
+    )
+    scope = SCOPE.copy()
+    scope["headers"] = [
+        [b"content-type", b"application/json"],
+        [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
+        [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
+    ]
+
+    starlette_request = starlette.requests.Request(scope)
+
+    # Mocking async `_receive()` that works in Python 3.7+
+    side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
+    starlette_request._receive = mock.Mock(side_effect=side_effect)
+
+    extractor = StarletteRequestExtractor(starlette_request)
+
+    request_info = await extractor.extract_request_info()
+
+    assert request_info
+    assert "cookies" not in request_info
+    assert request_info["data"] == BODY_JSON
+
+
+@pytest.mark.parametrize(
+    "url,transaction_style,expected_transaction,expected_source",
+    [
+        (
+            "/message",
+            "url",
+            "/message",
+            "route",
+        ),
+        (
+            "/message",
+            "endpoint",
+            "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message",
+            "component",
+        ),
+        (
+            "/message/123456",
+            "url",
+            "/message/{message_id}",
+            "route",
+        ),
+        (
+            "/message/123456",
+            "endpoint",
+            "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message_with_id",
+            "component",
+        ),
+    ],
+)
+def test_transaction_style(
+    sentry_init,
+    capture_events,
+    url,
+    transaction_style,
+    expected_transaction,
+    expected_source,
+):
+    sentry_init(
+        integrations=[StarletteIntegration(transaction_style=transaction_style)],
+    )
+    starlette_app = starlette_app_factory()
+
+    events = capture_events()
+
+    client = TestClient(starlette_app)
+    client.get(url)
+
+    (event,) = events
+    assert event["transaction"] == expected_transaction
+    assert event["transaction_info"] == {"source": expected_source}
+
+
+@pytest.mark.parametrize(
+    "test_url,expected_error,expected_message",
+    [
+        ("/some_url", ZeroDivisionError, "division by zero"),
+        ("/custom_error", Exception, "Too Hot"),
+    ],
+)
+def test_catch_exceptions(
+    sentry_init,
+    capture_exceptions,
+    capture_events,
+    test_url,
+    expected_error,
+    expected_message,
+):
+    sentry_init(integrations=[StarletteIntegration()])
+    starlette_app = starlette_app_factory()
+    exceptions = capture_exceptions()
+    events = capture_events()
+
+    client = TestClient(starlette_app)
+    try:
+        client.get(test_url)
+    except Exception:
+        pass
+
+    (exc,) = exceptions
+    assert isinstance(exc, expected_error)
+    assert str(exc) == expected_message
+
+    (event,) = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "starlette"
+
+
+def test_user_information_error(sentry_init, capture_events):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[StarletteIntegration()],
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        client.get("/custom_error", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
+
+    (event,) = events
+    user = event.get("user", None)
+    assert user
+    assert "username" in user
+    assert user["username"] == "Gabriela"
+
+
+def test_user_information_error_no_pii(sentry_init, capture_events):
+    sentry_init(
+        send_default_pii=False,
+        integrations=[StarletteIntegration()],
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        client.get("/custom_error", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
+
+    (event,) = events
+    assert "user" not in event
+
+
+def test_user_information_transaction(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        integrations=[StarletteIntegration()],
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    client.get("/message", auth=("Gabriela", "hello123"))
+
+    (_, transaction_event) = events
+    user = transaction_event.get("user", None)
+    assert user
+    assert "username" in user
+    assert user["username"] == "Gabriela"
+
+
+def test_user_information_transaction_no_pii(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+        integrations=[StarletteIntegration()],
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    client.get("/message", auth=("Gabriela", "hello123"))
+
+    (_, transaction_event) = events
+    assert "user" not in transaction_event
+
+
+def test_middleware_spans(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        client.get("/message", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
+
+    (_, transaction_event) = events
+
+    expected = [
+        "ServerErrorMiddleware",
+        "AuthenticationMiddleware",
+        "ExceptionMiddleware",
+    ]
+
+    idx = 0
+    for span in transaction_event["spans"]:
+        if span["op"] == "middleware.starlette":
+            assert span["description"] == expected[idx]
+            assert span["tags"]["starlette.middleware_name"] == expected[idx]
+            idx += 1
+
+
+def test_middleware_callback_spans(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+    )
+    starlette_app = starlette_app_factory(middleware=[Middleware(SampleMiddleware)])
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        client.get("/message", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
+
+    (_, transaction_event) = events
+
+    expected = [
+        {
+            "op": "middleware.starlette",
+            "description": "ServerErrorMiddleware",
+            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
+        },
+        {
+            "op": "middleware.starlette",
+            "description": "SampleMiddleware",
+            "tags": {"starlette.middleware_name": "SampleMiddleware"},
+        },
+        {
+            "op": "middleware.starlette",
+            "description": "ExceptionMiddleware",
+            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "SampleMiddleware.__call__.<locals>.do_stuff",
+            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "ServerErrorMiddleware.__call__.<locals>._send",
+            "tags": {"starlette.middleware_name": "SampleMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "_ASGIAdapter.send.<locals>.send"
+            if STARLETTE_VERSION < (0, 21)
+            else "_TestClientTransport.handle_request.<locals>.send",
+            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "SampleMiddleware.__call__.<locals>.do_stuff",
+            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "ServerErrorMiddleware.__call__.<locals>._send",
+            "tags": {"starlette.middleware_name": "SampleMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "_ASGIAdapter.send.<locals>.send"
+            if STARLETTE_VERSION < (0, 21)
+            else "_TestClientTransport.handle_request.<locals>.send",
+            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
+        },
+    ]
+
+    idx = 0
+    for span in transaction_event["spans"]:
+        assert span["op"] == expected[idx]["op"]
+        assert span["description"] == expected[idx]["description"]
+        assert span["tags"] == expected[idx]["tags"]
+        idx += 1
+
+
+def test_middleware_receive_send(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(SampleReceiveSendMiddleware)]
+    )
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        # NOTE: the assert statements checking
+        # for correct behaviour are in `SampleReceiveSendMiddleware`!
+        client.get("/message", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
+
+
+def test_middleware_partial_receive_send(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(SamplePartialReceiveSendMiddleware)]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        client.get("/message", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
+
+    (_, transaction_event) = events
+
+    expected = [
+        {
+            "op": "middleware.starlette",
+            "description": "ServerErrorMiddleware",
+            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
+        },
+        {
+            "op": "middleware.starlette",
+            "description": "SamplePartialReceiveSendMiddleware",
+            "tags": {"starlette.middleware_name": "SamplePartialReceiveSendMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.receive",
+            "description": "_ASGIAdapter.send.<locals>.receive"
+            if STARLETTE_VERSION < (0, 21)
+            else "_TestClientTransport.handle_request.<locals>.receive",
+            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "ServerErrorMiddleware.__call__.<locals>._send",
+            "tags": {"starlette.middleware_name": "SamplePartialReceiveSendMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "_ASGIAdapter.send.<locals>.send"
+            if STARLETTE_VERSION < (0, 21)
+            else "_TestClientTransport.handle_request.<locals>.send",
+            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
+        },
+        {
+            "op": "middleware.starlette",
+            "description": "ExceptionMiddleware",
+            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "functools.partial(<function SamplePartialReceiveSendMiddleware.__call__.<locals>.my_send at ",
+            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "functools.partial(<function SamplePartialReceiveSendMiddleware.__call__.<locals>.my_send at ",
+            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
+        },
+    ]
+
+    idx = 0
+    for span in transaction_event["spans"]:
+        assert span["op"] == expected[idx]["op"]
+        assert span["description"].startswith(expected[idx]["description"])
+        assert span["tags"] == expected[idx]["tags"]
+        idx += 1
+
+
+def test_last_event_id(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration()],
+    )
+    events = capture_events()
+
+    def handler(request, exc):
+        capture_exception(exc)
+        return starlette.responses.PlainTextResponse(last_event_id(), status_code=500)
+
+    app = starlette_app_factory(debug=False)
+    app.add_exception_handler(500, handler)
+
+    client = TestClient(SentryAsgiMiddleware(app), raise_server_exceptions=False)
+    response = client.get("/custom_error")
+    assert response.status_code == 500
+
+    event = events[0]
+    assert response.content.strip().decode("ascii") == event["event_id"]
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "Exception"
+    assert exception["value"] == "Too Hot"
+
+
+def test_legacy_setup(
+    sentry_init,
+    capture_events,
+):
+    # Check that behaviour does not change
+    # if the user just adds the new Integration
+    # and forgets to remove SentryAsgiMiddleware
+    sentry_init()
+    app = starlette_app_factory()
+    asgi_app = SentryAsgiMiddleware(app)
+
+    events = capture_events()
+
+    client = TestClient(asgi_app)
+    client.get("/message/123456")
+
+    (event,) = events
+    assert event["transaction"] == "/message/{message_id}"
+
+
+@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
+@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, endpoint):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": 1.0},
+    )
+    app = starlette_app_factory()
+    asgi_app = SentryAsgiMiddleware(app)
+
+    envelopes = capture_envelopes()
+
+    client = TestClient(asgi_app)
+    response = client.get(endpoint)
+    assert response.status_code == 200
+
+    data = json.loads(response.content)
+
+    envelopes = [envelope for envelope in envelopes]
+    assert len(envelopes) == 1
+
+    profiles = [item for item in envelopes[0].items if item.type == "profile"]
+    assert len(profiles) == 1
+
+    for profile in profiles:
+        transactions = profile.payload.json["transactions"]
+        assert len(transactions) == 1
+        assert str(data["active"]) == transactions[0]["active_thread_id"]

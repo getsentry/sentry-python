@@ -20,6 +20,7 @@ if MYPY:
         Event,
         EventProcessor,
         TracesSampler,
+        TransactionProcessor,
     )
 
     # Experiments are feature flags to enable and disable certain unstable SDK
@@ -32,13 +33,54 @@ if MYPY:
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
             "smart_transaction_trimming": Optional[bool],
-            "propagate_tracestate": Optional[bool],
+            "profiles_sample_rate": Optional[float],
+            "profiler_mode": Optional[str],
         },
         total=False,
     )
 
 DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
+
+MATCH_ALL = r".*"
+
+
+class INSTRUMENTER:
+    SENTRY = "sentry"
+    OTEL = "otel"
+
+
+class OP:
+    DB = "db"
+    DB_REDIS = "db.redis"
+    EVENT_DJANGO = "event.django"
+    FUNCTION = "function"
+    FUNCTION_AWS = "function.aws"
+    FUNCTION_GCP = "function.gcp"
+    HTTP_CLIENT = "http.client"
+    HTTP_CLIENT_STREAM = "http.client.stream"
+    HTTP_SERVER = "http.server"
+    MIDDLEWARE_DJANGO = "middleware.django"
+    MIDDLEWARE_STARLETTE = "middleware.starlette"
+    MIDDLEWARE_STARLETTE_RECEIVE = "middleware.starlette.receive"
+    MIDDLEWARE_STARLETTE_SEND = "middleware.starlette.send"
+    MIDDLEWARE_STARLITE = "middleware.starlite"
+    MIDDLEWARE_STARLITE_RECEIVE = "middleware.starlite.receive"
+    MIDDLEWARE_STARLITE_SEND = "middleware.starlite.send"
+    QUEUE_SUBMIT_ARQ = "queue.submit.arq"
+    QUEUE_TASK_ARQ = "queue.task.arq"
+    QUEUE_SUBMIT_CELERY = "queue.submit.celery"
+    QUEUE_TASK_CELERY = "queue.task.celery"
+    QUEUE_TASK_RQ = "queue.task.rq"
+    QUEUE_SUBMIT_HUEY = "queue.submit.huey"
+    QUEUE_TASK_HUEY = "queue.task.huey"
+    SUBPROCESS = "subprocess"
+    SUBPROCESS_WAIT = "subprocess.wait"
+    SUBPROCESS_COMMUNICATE = "subprocess.communicate"
+    TEMPLATE_RENDER = "template.render"
+    VIEW_RENDER = "view.render"
+    VIEW_RESPONSE_RENDER = "view.response.render"
+    WEBSOCKET_SERVER = "websocket.server"
 
 
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
@@ -78,6 +120,14 @@ class ClientConstructor(object):
         auto_session_tracking=True,  # type: bool
         send_client_reports=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
+        proxy_headers=None,  # type: Optional[Dict[str, str]]
+        instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
+        before_send_transaction=None,  # type: Optional[TransactionProcessor]
+        project_root=None,  # type: Optional[str]
+        enable_tracing=None,  # type: Optional[bool]
+        trace_propagation_targets=[  # noqa: B006
+            MATCH_ALL
+        ],  # type: Optional[Sequence[str]]
     ):
         # type: (...) -> None
         pass
@@ -101,9 +151,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.5.5"
-SDK_INFO = {
-    "name": "sentry.python",
-    "version": VERSION,
-    "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
-}
+VERSION = "1.16.0"

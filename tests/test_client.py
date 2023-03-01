@@ -35,13 +35,13 @@ else:
     from collections.abc import Mapping
 
 
-class EventCaptured(Exception):
+class EventCapturedError(Exception):
     pass
 
 
 class _TestTransport(Transport):
     def capture_event(self, event):
-        raise EventCaptured(event)
+        raise EventCapturedError(event)
 
 
 def test_transport_option(monkeypatch):
@@ -227,6 +227,16 @@ def test_transport_option(monkeypatch):
             "arg_https_proxy": "https://localhost/123",
             "expected_proxy_scheme": "https",
         },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "env_http_proxy": None,
+            "env_https_proxy": None,
+            "env_no_proxy": "sentry.io,example.com",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "https://localhost/123",
+            "expected_proxy_scheme": "https",
+            "arg_proxy_headers": {"Test-Header": "foo-bar"},
+        },
     ],
 )
 def test_proxy(monkeypatch, testcase):
@@ -241,11 +251,16 @@ def test_proxy(monkeypatch, testcase):
         kwargs["http_proxy"] = testcase["arg_http_proxy"]
     if testcase["arg_https_proxy"] is not None:
         kwargs["https_proxy"] = testcase["arg_https_proxy"]
+    if testcase.get("arg_proxy_headers") is not None:
+        kwargs["proxy_headers"] = testcase["arg_proxy_headers"]
     client = Client(testcase["dsn"], **kwargs)
     if testcase["expected_proxy_scheme"] is None:
         assert client.transport._pool.proxy is None
     else:
         assert client.transport._pool.proxy.scheme == testcase["expected_proxy_scheme"]
+
+        if testcase.get("arg_proxy_headers") is not None:
+            assert client.transport._pool.proxy_headers == testcase["arg_proxy_headers"]
 
 
 def test_simple_transport(sentry_init):
@@ -273,7 +288,7 @@ def test_ignore_errors(sentry_init, capture_events):
 
     e(ZeroDivisionError())
     e(MyDivisionError())
-    pytest.raises(EventCaptured, lambda: e(ValueError()))
+    pytest.raises(EventCapturedError, lambda: e(ValueError()))
 
 
 def test_with_locals_enabled(sentry_init, capture_events):
@@ -386,7 +401,6 @@ def test_attach_stacktrace_in_app(sentry_init, capture_events):
     pytest_frames = [f for f in frames if f["module"].startswith("_pytest")]
     assert pytest_frames
     assert all(f["in_app"] is False for f in pytest_frames)
-    assert any(f["in_app"] for f in frames)
 
 
 def test_attach_stacktrace_disabled(sentry_init, capture_events):
@@ -400,8 +414,8 @@ def test_attach_stacktrace_disabled(sentry_init, capture_events):
 
 def test_capture_event_works(sentry_init):
     sentry_init(transport=_TestTransport())
-    pytest.raises(EventCaptured, lambda: capture_event({}))
-    pytest.raises(EventCaptured, lambda: capture_event({}))
+    pytest.raises(EventCapturedError, lambda: capture_event({}))
+    pytest.raises(EventCapturedError, lambda: capture_event({}))
 
 
 @pytest.mark.parametrize("num_messages", [10, 20])
@@ -496,7 +510,9 @@ def test_scope_initialized_before_client(sentry_init, capture_events):
 def test_weird_chars(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
+    # fmt: off
     capture_message(u"föö".encode("latin1"))
+    # fmt: on
     (event,) = events
     assert json.loads(json.dumps(event)) == event
 
@@ -742,10 +758,10 @@ def test_errno_errors(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    class Foo(Exception):
+    class FooError(Exception):
         errno = 69
 
-    capture_exception(Foo())
+    capture_exception(FooError())
 
     (event,) = events
 
@@ -812,7 +828,7 @@ def test_dict_changed_during_iteration(sentry_init, capture_events):
     "dsn",
     [
         "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2",
-        u"http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2",
+        "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2",
     ],
 )
 def test_init_string_types(dsn, sentry_init):
@@ -885,3 +901,9 @@ def test_max_breadcrumbs_option(
     capture_message("dogs are great")
 
     assert len(events[0]["breadcrumbs"]["values"]) == expected_breadcrumbs
+
+
+def test_multiple_positional_args(sentry_init):
+    with pytest.raises(TypeError) as exinfo:
+        sentry_init(1, None)
+    assert "Only single positional argument is expected" in str(exinfo.value)

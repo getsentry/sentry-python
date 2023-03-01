@@ -30,6 +30,7 @@ if MYPY:
     EventProcessor = Callable[[Event, Hint], Optional[Event]]
     ErrorProcessor = Callable[[Event, ExcInfo], Optional[Event]]
     BreadcrumbProcessor = Callable[[Breadcrumb, BreadcrumbHint], Optional[Breadcrumb]]
+    TransactionProcessor = Callable[[Event, Hint], Optional[Event]]
 
     TracesSampler = Callable[[SamplingContext], Union[float, int, bool]]
 
@@ -45,6 +46,38 @@ if MYPY:
         "attachment",
         "session",
         "internal",
+        "profile",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
     EndpointType = Literal["store", "envelope"]
+
+    DurationUnit = Literal[
+        "nanosecond",
+        "microsecond",
+        "millisecond",
+        "second",
+        "minute",
+        "hour",
+        "day",
+        "week",
+    ]
+
+    InformationUnit = Literal[
+        "bit",
+        "byte",
+        "kilobyte",
+        "kibibyte",
+        "megabyte",
+        "mebibyte",
+        "gigabyte",
+        "gibibyte",
+        "terabyte",
+        "tebibyte",
+        "petabyte",
+        "pebibyte",
+        "exabyte",
+        "exbibyte",
+    ]
+
+    FractionUnit = Literal["ratio", "percent"]
+    MeasurementUnit = Union[DurationUnit, InformationUnit, FractionUnit, str]

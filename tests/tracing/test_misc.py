@@ -1,12 +1,14 @@
+from mock import MagicMock
 import pytest
 import gc
 import uuid
 import os
 
 import sentry_sdk
-from sentry_sdk import Hub, start_span, start_transaction
+from sentry_sdk import Hub, start_span, start_transaction, set_measurement
+from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.tracing import Span, Transaction
-from sentry_sdk.tracing_utils import has_tracestate_enabled
+from sentry_sdk.tracing_utils import should_propagate_trace
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -173,7 +175,7 @@ def test_circular_references(monkeypatch, sentry_init, request):
     #     request.addfinalizer(lambda: gc.set_debug(~gc.DEBUG_LEAK))
     #
     # immediately after the initial collection below, so we can see what new
-    # objects the garbage collecter has to clean up once `transaction.finish` is
+    # objects the garbage collector has to clean up once `transaction.finish` is
     # called and the serializer runs.)
     monkeypatch.setattr(
         sentry_sdk.client,
@@ -232,17 +234,75 @@ def test_circular_references(monkeypatch, sentry_init, request):
     assert gc.collect() == 0
 
 
-# TODO (kmclb) remove this test once tracestate is a real feature
-@pytest.mark.parametrize("tracestate_enabled", [True, False, None])
-def test_has_tracestate_enabled(sentry_init, tracestate_enabled):
-    experiments = (
-        {"propagate_tracestate": tracestate_enabled}
-        if tracestate_enabled is not None
-        else {}
-    )
-    sentry_init(_experiments=experiments)
+def test_set_meaurement(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
 
-    if tracestate_enabled is True:
-        assert has_tracestate_enabled() is True
-    else:
-        assert has_tracestate_enabled() is False
+    events = capture_events()
+
+    transaction = start_transaction(name="measuring stuff")
+
+    with pytest.raises(TypeError):
+        transaction.set_measurement()
+
+    with pytest.raises(TypeError):
+        transaction.set_measurement("metric.foo")
+
+    transaction.set_measurement("metric.foo", 123)
+    transaction.set_measurement("metric.bar", 456, unit="second")
+    transaction.set_measurement("metric.baz", 420.69, unit="custom")
+    transaction.set_measurement("metric.foobar", 12, unit="percent")
+    transaction.set_measurement("metric.foobar", 17.99, unit="percent")
+
+    transaction.finish()
+
+    (event,) = events
+    assert event["measurements"]["metric.foo"] == {"value": 123, "unit": ""}
+    assert event["measurements"]["metric.bar"] == {"value": 456, "unit": "second"}
+    assert event["measurements"]["metric.baz"] == {"value": 420.69, "unit": "custom"}
+    assert event["measurements"]["metric.foobar"] == {"value": 17.99, "unit": "percent"}
+
+
+def test_set_meaurement_public_api(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    with start_transaction(name="measuring stuff"):
+        set_measurement("metric.foo", 123)
+        set_measurement("metric.bar", 456, unit="second")
+
+    (event,) = events
+    assert event["measurements"]["metric.foo"] == {"value": 123, "unit": ""}
+    assert event["measurements"]["metric.bar"] == {"value": 456, "unit": "second"}
+
+
+@pytest.mark.parametrize(
+    "trace_propagation_targets,url,expected_propagation_decision",
+    [
+        (None, "http://example.com", False),
+        ([], "http://example.com", False),
+        ([MATCH_ALL], "http://example.com", True),
+        (["localhost"], "localhost:8443/api/users", True),
+        (["localhost"], "http://localhost:8443/api/users", True),
+        (["localhost"], "mylocalhost:8080/api/users", True),
+        ([r"^/api"], "/api/envelopes", True),
+        ([r"^/api"], "/backend/api/envelopes", False),
+        ([r"myApi.com/v[2-4]"], "myApi.com/v2/projects", True),
+        ([r"myApi.com/v[2-4]"], "myApi.com/v1/projects", False),
+        ([r"https:\/\/.*"], "https://example.com", True),
+        (
+            [r"https://.*"],
+            "https://example.com",
+            True,
+        ),  # to show escaping is not needed
+        ([r"https://.*"], "http://example.com/insecure/", False),
+    ],
+)
+def test_should_propagate_trace(
+    trace_propagation_targets, url, expected_propagation_decision
+):
+    hub = MagicMock()
+    hub.client = MagicMock()
+    hub.client.options = {"trace_propagation_targets": trace_propagation_targets}
+
+    assert should_propagate_trace(hub, url) == expected_propagation_decision

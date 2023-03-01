@@ -15,9 +15,11 @@ except ImportError:
     eventlet = None
 
 import sentry_sdk
-from sentry_sdk._compat import reraise, string_types, iteritems
-from sentry_sdk.transport import Transport
+from sentry_sdk._compat import iteritems, reraise, string_types
 from sentry_sdk.envelope import Envelope
+from sentry_sdk.integrations import _installed_integrations  # noqa: F401
+from sentry_sdk.profiler import teardown_profiler
+from sentry_sdk.transport import Transport
 from sentry_sdk.utils import capture_internal_exceptions
 
 from tests import _warning_recorder, _warning_recorder_mgr
@@ -38,7 +40,6 @@ except ImportError:
     @pytest.fixture
     def benchmark():
         return lambda x: x()
-
 
 else:
     del pytest_benchmark
@@ -164,6 +165,17 @@ def validate_event_schema(tmpdir):
             jsonschema.validate(instance=event, schema=SENTRY_EVENT_SCHEMA)
 
     return inner
+
+
+@pytest.fixture
+def reset_integrations():
+    """
+    Use with caution, sometimes we really need to start
+    with a clean slate to ensure monkeypatching works well,
+    but this also means some other stuff will be monkeypatched twice.
+    """
+    global _installed_integrations
+    _installed_integrations.clear()
 
 
 @pytest.fixture
@@ -389,7 +401,7 @@ def string_containing_matcher():
             try:
                 # the `unicode` type only exists in python 2, so if this blows up,
                 # we must be in py3 and have the `bytes` type
-                self.valid_types = (str, unicode)  # noqa
+                self.valid_types = (str, unicode)
             except NameError:
                 self.valid_types = (str, bytes)
 
@@ -543,3 +555,9 @@ def object_described_by_matcher():
             return not self.__eq__(test_obj)
 
     return ObjectDescribedBy
+
+
+@pytest.fixture
+def teardown_profiling():
+    yield
+    teardown_profiler()

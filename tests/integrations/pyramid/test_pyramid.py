@@ -26,12 +26,19 @@ def hi(request):
     return Response("hi")
 
 
+def hi_with_id(request):
+    capture_message("hi with id")
+    return Response("hi with id")
+
+
 @pytest.fixture
 def pyramid_config():
     config = pyramid.testing.setUp()
     try:
         config.add_route("hi", "/message")
         config.add_view(hi, route_name="hi")
+        config.add_route("hi_with_id", "/message/{message_id}")
+        config.add_view(hi_with_id, route_name="hi_with_id")
         yield config
     finally:
         pyramid.testing.tearDown()
@@ -89,13 +96,13 @@ def test_has_context(route, get_client, sentry_init, capture_events):
     sentry_init(integrations=[PyramidIntegration()])
     events = capture_events()
 
-    @route("/message/{msg}")
+    @route("/context_message/{msg}")
     def hi2(request):
         capture_message(request.matchdict["msg"])
         return Response("hi")
 
     client = get_client()
-    client.get("/message/yoo")
+    client.get("/context_message/yoo")
 
     (event,) = events
     assert event["message"] == "yoo"
@@ -104,26 +111,38 @@ def test_has_context(route, get_client, sentry_init, capture_events):
         "headers": {"Host": "localhost"},
         "method": "GET",
         "query_string": "",
-        "url": "http://localhost/message/yoo",
+        "url": "http://localhost/context_message/yoo",
     }
     assert event["transaction"] == "hi2"
 
 
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction",
-    [("route_name", "hi"), ("route_pattern", "/message")],
+    "url,transaction_style,expected_transaction,expected_source",
+    [
+        ("/message", "route_name", "hi", "component"),
+        ("/message", "route_pattern", "/message", "route"),
+        ("/message/123456", "route_name", "hi_with_id", "component"),
+        ("/message/123456", "route_pattern", "/message/{message_id}", "route"),
+    ],
 )
 def test_transaction_style(
-    sentry_init, get_client, capture_events, transaction_style, expected_transaction
+    sentry_init,
+    get_client,
+    capture_events,
+    url,
+    transaction_style,
+    expected_transaction,
+    expected_source,
 ):
     sentry_init(integrations=[PyramidIntegration(transaction_style=transaction_style)])
 
     events = capture_events()
     client = get_client()
-    client.get("/message")
+    client.get(url)
 
     (event,) = events
     assert event["transaction"] == expected_transaction
+    assert event["transaction_info"] == {"source": expected_source}
 
 
 def test_large_json_request(sentry_init, capture_events, route, get_client):
@@ -146,9 +165,9 @@ def test_large_json_request(sentry_init, capture_events, route, get_client):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
     }
-    assert len(event["request"]["data"]["foo"]["bar"]) == 512
+    assert len(event["request"]["data"]["foo"]["bar"]) == 1024
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
@@ -190,13 +209,11 @@ def test_files_and_form(sentry_init, capture_events, route, get_client):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
     }
-    assert len(event["request"]["data"]["foo"]) == 512
+    assert len(event["request"]["data"]["foo"]) == 1024
 
-    assert event["_meta"]["request"]["data"]["file"] == {
-        "": {"len": 0, "rem": [["!raw", "x", 0, 0]]}
-    }
+    assert event["_meta"]["request"]["data"]["file"] == {"": {"rem": [["!raw", "x"]]}}
     assert not event["request"]["data"]["file"]
 
 

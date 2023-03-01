@@ -1,4 +1,7 @@
+import sys
+
 from werkzeug.test import Client
+
 import pytest
 
 import sentry_sdk
@@ -137,6 +140,10 @@ def test_transaction_with_error(
     assert error_event["transaction"] == "generic WSGI request"
     assert error_event["contexts"]["trace"]["op"] == "http.server"
     assert error_event["exception"]["values"][0]["type"] == "Exception"
+    assert error_event["exception"]["values"][0]["mechanism"] == {
+        "type": "wsgi",
+        "handled": False,
+    }
     assert (
         error_event["exception"]["values"][0]["value"]
         == "Fetch aborted. The ball was not returned."
@@ -279,3 +286,33 @@ def test_auto_session_tracking_with_aggregates(sentry_init, capture_envelopes):
     assert session_aggregates[0]["exited"] == 2
     assert session_aggregates[0]["crashed"] == 1
     assert len(session_aggregates) == 1
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 3), reason="Profiling is only supported in Python >= 3.3"
+)
+@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+def test_profile_sent(
+    sentry_init,
+    capture_envelopes,
+    teardown_profiling,
+):
+    def test_app(environ, start_response):
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": 1.0},
+    )
+    app = SentryWsgiMiddleware(test_app)
+    envelopes = capture_envelopes()
+
+    client = Client(app)
+    client.get("/")
+
+    envelopes = [envelope for envelope in envelopes]
+    assert len(envelopes) == 1
+
+    profiles = [item for item in envelopes[0].items if item.type == "profile"]
+    assert len(profiles) == 1

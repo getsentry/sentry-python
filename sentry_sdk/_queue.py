@@ -21,15 +21,15 @@ from sentry_sdk._types import MYPY
 if MYPY:
     from typing import Any
 
-__all__ = ["Empty", "Full", "Queue"]
+__all__ = ["EmptyError", "FullError", "Queue"]
 
 
-class Empty(Exception):
+class EmptyError(Exception):
     "Exception raised by Queue.get(block=0)/get_nowait()."
     pass
 
 
-class Full(Exception):
+class FullError(Exception):
     "Exception raised by Queue.put(block=0)/put_nowait()."
     pass
 
@@ -134,16 +134,16 @@ class Queue(object):
         If optional args 'block' is true and 'timeout' is None (the default),
         block if necessary until a free slot is available. If 'timeout' is
         a non-negative number, it blocks at most 'timeout' seconds and raises
-        the Full exception if no free slot was available within that time.
+        the FullError exception if no free slot was available within that time.
         Otherwise ('block' is false), put an item on the queue if a free slot
-        is immediately available, else raise the Full exception ('timeout'
+        is immediately available, else raise the FullError exception ('timeout'
         is ignored in that case).
         """
         with self.not_full:
             if self.maxsize > 0:
                 if not block:
                     if self._qsize() >= self.maxsize:
-                        raise Full()
+                        raise FullError()
                 elif timeout is None:
                     while self._qsize() >= self.maxsize:
                         self.not_full.wait()
@@ -154,7 +154,7 @@ class Queue(object):
                     while self._qsize() >= self.maxsize:
                         remaining = endtime - time()
                         if remaining <= 0.0:
-                            raise Full
+                            raise FullError()
                         self.not_full.wait(remaining)
             self._put(item)
             self.unfinished_tasks += 1
@@ -166,15 +166,15 @@ class Queue(object):
         If optional args 'block' is true and 'timeout' is None (the default),
         block if necessary until an item is available. If 'timeout' is
         a non-negative number, it blocks at most 'timeout' seconds and raises
-        the Empty exception if no item was available within that time.
+        the EmptyError exception if no item was available within that time.
         Otherwise ('block' is false), return an item if one is immediately
-        available, else raise the Empty exception ('timeout' is ignored
+        available, else raise the EmptyError exception ('timeout' is ignored
         in that case).
         """
         with self.not_empty:
             if not block:
                 if not self._qsize():
-                    raise Empty()
+                    raise EmptyError()
             elif timeout is None:
                 while not self._qsize():
                     self.not_empty.wait()
@@ -185,7 +185,7 @@ class Queue(object):
                 while not self._qsize():
                     remaining = endtime - time()
                     if remaining <= 0.0:
-                        raise Empty()
+                        raise EmptyError()
                     self.not_empty.wait(remaining)
             item = self._get()
             self.not_full.notify()
@@ -195,7 +195,7 @@ class Queue(object):
         """Put an item into the queue without blocking.
 
         Only enqueue the item if a free slot is immediately available.
-        Otherwise raise the Full exception.
+        Otherwise raise the FullError exception.
         """
         return self.put(item, block=False)
 
@@ -203,7 +203,7 @@ class Queue(object):
         """Remove and return an item from the queue without blocking.
 
         Only get an item if one is immediately available. Otherwise
-        raise the Empty exception.
+        raise the EmptyError exception.
         """
         return self.get(block=False)
 

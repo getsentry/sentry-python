@@ -24,6 +24,11 @@ def app(sentry_init):
         capture_message("hi")
         return "ok"
 
+    @app.route("/message/<message_id>")
+    def hi_with_id(message_id):
+        capture_message("hi")
+        return "ok"
+
     @app.route("/message-named-route", name="hi")
     def named_hi():
         capture_message("hi")
@@ -55,20 +60,21 @@ def test_has_context(sentry_init, app, capture_events, get_client):
 
 
 @pytest.mark.parametrize(
-    "url,transaction_style,expected_transaction",
+    "url,transaction_style,expected_transaction,expected_source",
     [
-        ("/message", "endpoint", "hi"),
-        ("/message", "url", "/message"),
-        ("/message-named-route", "endpoint", "hi"),
+        ("/message", "endpoint", "hi", "component"),
+        ("/message", "url", "/message", "route"),
+        ("/message/123456", "url", "/message/<message_id>", "route"),
+        ("/message-named-route", "endpoint", "hi", "component"),
     ],
 )
 def test_transaction_style(
     sentry_init,
-    app,
-    capture_events,
+    url,
     transaction_style,
     expected_transaction,
-    url,
+    expected_source,
+    capture_events,
     get_client,
 ):
     sentry_init(
@@ -79,11 +85,14 @@ def test_transaction_style(
     events = capture_events()
 
     client = get_client()
-    response = client.get("/message")
+    response = client.get(url)
     assert response[1] == "200 OK"
 
     (event,) = events
+    # We use endswith() because in Python 2.7 it is "test_bottle.hi"
+    # and in later Pythons "test_bottle.app.<locals>.hi"
     assert event["transaction"].endswith(expected_transaction)
+    assert event["transaction_info"] == {"source": expected_source}
 
 
 @pytest.mark.parametrize("debug", (True, False), ids=["debug", "nodebug"])
@@ -141,9 +150,9 @@ def test_large_json_request(sentry_init, capture_events, app, get_client):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
     }
-    assert len(event["request"]["data"]["foo"]["bar"]) == 512
+    assert len(event["request"]["data"]["foo"]["bar"]) == 1024
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
@@ -191,12 +200,12 @@ def test_medium_formdata_request(sentry_init, capture_events, app, get_client):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
     }
-    assert len(event["request"]["data"]["foo"]) == 512
+    assert len(event["request"]["data"]["foo"]) == 1024
 
 
-@pytest.mark.parametrize("input_char", [u"a", b"a"])
+@pytest.mark.parametrize("input_char", ["a", b"a"])
 def test_too_large_raw_request(
     sentry_init, input_char, capture_events, app, get_client
 ):
@@ -225,9 +234,7 @@ def test_too_large_raw_request(
     assert response[1] == "200 OK"
 
     (event,) = events
-    assert event["_meta"]["request"]["data"] == {
-        "": {"len": 2000, "rem": [["!config", "x", 0, 2000]]}
-    }
+    assert event["_meta"]["request"]["data"] == {"": {"rem": [["!config", "x"]]}}
     assert not event["request"]["data"]
 
 
@@ -256,15 +263,14 @@ def test_files_and_form(sentry_init, capture_events, app, get_client):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
     }
-    assert len(event["request"]["data"]["foo"]) == 512
+    assert len(event["request"]["data"]["foo"]) == 1024
 
     assert event["_meta"]["request"]["data"]["file"] == {
         "": {
-            "len": -1,
-            "rem": [["!raw", "x", 0, -1]],
-        }  # bottle default content-length is -1
+            "rem": [["!raw", "x"]],
+        }
     }
     assert not event["request"]["data"]["file"]
 

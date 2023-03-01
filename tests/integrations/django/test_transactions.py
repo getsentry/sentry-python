@@ -30,7 +30,7 @@ example_url_conf = (
 def test_legacy_resolver_no_match():
     resolver = RavenResolver()
     result = resolver.resolve("/foo/bar", example_url_conf)
-    assert result == "/foo/bar"
+    assert result is None
 
 
 def test_legacy_resolver_complex_match():

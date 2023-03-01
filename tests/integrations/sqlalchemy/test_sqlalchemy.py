@@ -191,14 +191,6 @@ def test_too_large_event_truncated(sentry_init, capture_events):
     # Some spans are discarded.
     assert len(event["spans"]) == 1000
 
-    # Some spans have their descriptions truncated. Because the test always
-    # generates the same amount of descriptions and truncation is deterministic,
-    # the number here should never change across test runs.
-    #
-    # Which exact span descriptions are truncated depends on the span durations
-    # of each SQL query and is non-deterministic.
-    assert len(event["_meta"]["spans"]) == 537
-
     for i, span in enumerate(event["spans"]):
         description = span["description"]
 
@@ -222,5 +214,5 @@ def test_too_large_event_truncated(sentry_init, capture_events):
 
     # The _meta for other truncated fields should be there as well.
     assert event["_meta"]["message"] == {
-        "": {"len": 522, "rem": [["!limit", "x", 509, 512]]}
+        "": {"len": 1034, "rem": [["!limit", "x", 1021, 1024]]}
     }
