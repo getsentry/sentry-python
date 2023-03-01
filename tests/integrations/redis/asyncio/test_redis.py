@@ -3,16 +3,17 @@ import pytest
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.integrations.redis import RedisIntegration
 
-from fakeredis import FakeStrictRedis
+from fakeredis.aioredis import FakeRedis
 
 
-def test_basic(sentry_init, capture_events):
+@pytest.mark.asyncio
+async def test_async_basic(sentry_init, capture_events):
     sentry_init(integrations=[RedisIntegration()])
     events = capture_events()
 
-    connection = FakeStrictRedis()
+    connection = FakeRedis()
 
-    connection.get("foobar")
+    await connection.get("foobar")
     capture_message("hi")
 
     (event,) = events
@@ -32,18 +33,19 @@ def test_basic(sentry_init, capture_events):
 
 
 @pytest.mark.parametrize("is_transaction", [False, True])
-def test_redis_pipeline(sentry_init, capture_events, is_transaction):
+@pytest.mark.asyncio
+async def test_async_redis_pipeline(sentry_init, capture_events, is_transaction):
     sentry_init(integrations=[RedisIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
-    connection = FakeStrictRedis()
+    connection = FakeRedis()
     with start_transaction():
 
         pipeline = connection.pipeline(transaction=is_transaction)
         pipeline.get("foo")
         pipeline.set("bar", 1)
         pipeline.set("baz", 2)
-        pipeline.execute()
+        await pipeline.execute()
 
     (event,) = events
     (span,) = event["spans"]
