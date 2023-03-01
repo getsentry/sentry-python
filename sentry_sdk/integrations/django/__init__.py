@@ -93,7 +93,7 @@ class DjangoIntegration(Integration):
     signals_spans = None
 
     def __init__(
-        self, transaction_style="url", middleware_spans=True, signals_spans=False
+        self, transaction_style="url", middleware_spans=True, signals_spans=True
     ):
         # type: (str, bool, bool) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
