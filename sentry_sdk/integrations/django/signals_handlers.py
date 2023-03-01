@@ -67,12 +67,11 @@ def patch_signals():
 
             return wrapper
 
-        for idx, receiver in enumerate(receivers):
-            receivers[idx] = sentry_receiver_wrapper(receiver)
+        integration = hub.get_integration(DjangoIntegration)
+        if integration and integration.signals_spans:
+            for idx, receiver in enumerate(receivers):
+                receivers[idx] = sentry_receiver_wrapper(receiver)
 
         return receivers
 
-    hub = Hub.current
-    integration = hub.get_integration(DjangoIntegration)
-    if integration and integration.signals_spans:
-        Signal._live_receivers = _sentry_live_receivers
+    Signal._live_receivers = _sentry_live_receivers

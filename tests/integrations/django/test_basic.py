@@ -773,6 +773,65 @@ def test_middleware_spans_disabled(sentry_init, client, capture_events):
     assert transaction["spans"][1]["description"] == "django.db.close_old_connections"
 
 
+def test_signals_spans(sentry_init, client, capture_events, render_span_tree):
+    sentry_init(
+        integrations=[DjangoIntegration(middleware_spans=False)],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    _content, status, _headers = client.get(reverse("message"))
+
+    message, transaction = events
+
+    assert message["message"] == "hi"
+
+    if DJANGO_VERSION >= (1, 10):
+        import ipdb
+
+        ipdb.set_trace()
+        assert (
+            render_span_tree(transaction)
+            == """\
+- op="http.server": description=null
+  - op="event.django": description="django.db.reset_queries"
+  - op="event.django": description="django.db.close_old_connections"\
+"""
+        )
+
+    else:
+        assert (
+            render_span_tree(transaction)
+            == """\
+- op="http.server": description=null
+  - op="event.django": description="django.db.reset_queries"
+  - op="event.django": description="django.db.close_old_connections"\
+"""
+        )
+
+    assert transaction["spans"][0]["op"] == "event.django"
+    assert transaction["spans"][0]["description"] == "django.db.reset_queries"
+
+    assert transaction["spans"][1]["op"] == "event.django"
+    assert transaction["spans"][1]["description"] == "django.db.close_old_connections"
+
+
+def test_signals_spans_disabled(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration(middleware_spans=False, signals_spans=False)],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    _content, status, _headers = client.get(reverse("message"))
+
+    message, transaction = events
+
+    assert message["message"] == "hi"
+
+    assert not transaction["spans"]
+
+
 def test_csrf(sentry_init, client):
     """
     Assert that CSRF view decorator works even with the view wrapped in our own

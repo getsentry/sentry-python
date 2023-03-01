@@ -2,5 +2,6 @@
     "python.pythonPath": ".venv/bin/python",
     "python.formatting.provider": "black",
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true
+    "python.testing.pytestEnabled": true,
+    "esbonio.sphinx.confDir": ""
 }
