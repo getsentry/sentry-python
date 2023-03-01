@@ -4,6 +4,10 @@ except ImportError:
     TYPE_CHECKING = False
 
 
+# Re-exported for compat, since code out there in the wild might use this variable.
+MYPY = TYPE_CHECKING
+
+
 if TYPE_CHECKING:
     from types import TracebackType
     from typing import Any
