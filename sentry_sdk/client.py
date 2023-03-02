@@ -71,7 +71,18 @@ def _get_options(*args, **kwargs):
 
     for key, value in iteritems(options):
         if key not in rv:
+            # Option "with_locals" was renamed to "include_local_variables"
+            if key == "with_locals":
+                msg = (
+                    "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. "
+                    "Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
+                )
+                logger.warning(msg)
+                rv["include_local_variables"] = value
+                continue
+
             raise TypeError("Unknown option %r" % (key,))
+
         rv[key] = value
 
     if rv["dsn"] is None:
@@ -213,7 +224,7 @@ class _Client(object):
                     "values": [
                         {
                             "stacktrace": current_stacktrace(
-                                self.options["with_locals"]
+                                self.options["include_local_variables"]
                             ),
                             "crashed": False,
                             "current": True,
