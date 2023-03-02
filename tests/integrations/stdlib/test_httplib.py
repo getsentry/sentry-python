@@ -1,10 +1,8 @@
 import platform
-import sys
 import random
-import responses
-import pytest
+import sys
 
-from sentry_sdk.consts import MATCH_ALL
+import pytest
 
 try:
     # py3
@@ -25,25 +23,29 @@ try:
 except ImportError:
     import mock  # python < 3.3
 
+
 from sentry_sdk import capture_message, start_transaction
+from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.integrations.stdlib import StdlibIntegration
+
+from tests.conftest import create_mock_http_server
+
+PORT = create_mock_http_server()
 
 
 def test_crumb_capture(sentry_init, capture_events):
     sentry_init(integrations=[StdlibIntegration()])
-
-    url = "http://example.com/"
-    responses.add(responses.GET, url, status=200)
-
     events = capture_events()
 
-    response = urlopen(url)
-    assert response.getcode() == 200
+    url = "http://localhost:{}/some/random/url".format(PORT)
+    urlopen(url)
+
     capture_message("Testing!")
 
     (event,) = events
     (crumb,) = event["breadcrumbs"]["values"]
+
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
     assert crumb["data"] == {
@@ -62,14 +64,11 @@ def test_crumb_capture_hint(sentry_init, capture_events):
         return crumb
 
     sentry_init(integrations=[StdlibIntegration()], before_breadcrumb=before_breadcrumb)
-
-    url = "http://example.com/"
-    responses.add(responses.GET, url, status=200)
-
     events = capture_events()
 
+    url = "http://localhost:{}/some/random/url".format(PORT)
     response = urlopen(url)
-    assert response.getcode() == 200
+
     capture_message("Testing!")
 
     (event,) = events
@@ -113,7 +112,7 @@ def test_httplib_misuse(sentry_init, capture_events, request):
     sentry_init()
     events = capture_events()
 
-    conn = HTTPSConnection("httpstat.us", 443)
+    conn = HTTPConnection("localhost", PORT)
 
     # make sure we release the resource, even if the test fails
     request.addfinalizer(conn.close)
@@ -138,7 +137,7 @@ def test_httplib_misuse(sentry_init, capture_events, request):
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
     assert crumb["data"] == {
-        "url": "https://httpstat.us/200",
+        "url": "http://localhost:{}/200".format(PORT),
         "method": "GET",
         "status_code": 200,
         "reason": "OK",
