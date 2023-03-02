@@ -434,7 +434,7 @@ class _Client(object):
 
         # Transactions, events with attachments, and checkins should go to the /envelope/
         # endpoint.
-        if is_transaction or attachments:
+        if is_transaction or is_checkin or attachments:
 
             headers = {
                 "event_id": event_opt["event_id"],

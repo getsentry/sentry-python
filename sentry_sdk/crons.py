@@ -14,6 +14,7 @@ class MonitorStatus:
 
 def _create_checkin_event(monitor_id=None, status=None):
     checkin = {
+        "type": "check_in",
         "monitor_id": monitor_id,
         "check_in_id": uuid.uuid4().hex,
         "status": status,
@@ -29,6 +30,25 @@ def capture_checkin(monitor_id=None, status=None):
 
 
 def monitor(monitor_id=None):
+    """
+    Decorator to capture checkin events for a monitor.
+
+    Usage:
+    ```
+    from sentry_sdk.crons import monitor
+
+    app = Celery()
+
+    @app.task
+    @monitor(monitor_id='3475c0de-0258-44fc-8c88-07350cb7f9af')
+    def test(arg):
+        print(arg)
+    ```
+
+    This does not have to be used with Celery, but if you do use it with celery,
+    put the `monitor` decorator under Celery's `@app.task` decorator.
+    """
+
     def decorate(func):
         if not monitor_id:
             return func
