@@ -18,9 +18,11 @@ except ImportError:
 
 try:
     # Python 2
-    from httplib import HTTPServer  # type: ignore
-    from httplib import BaseHTTPRequestHandler  # type: ignore
-except ImportError:
+    import BaseHTTPServer
+
+    HTTPServer = BaseHTTPServer.HTTPServer
+    BaseHTTPRequestHandler = BaseHTTPServer.BaseHTTPRequestHandler
+except Exception:
     # Python 3
     from http.server import BaseHTTPRequestHandler, HTTPServer
 
