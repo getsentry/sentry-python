@@ -155,3 +155,19 @@ async def test_exception(
     assert error_event["exception"]["values"][0]["value"] == "division by zero"
     assert error_event["exception"]["values"][0]["mechanism"]["handled"] is False
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "asyncio"
+
+
+@minimum_python_36
+@pytest.mark.asyncio
+async def test_task_result(sentry_init):
+    sentry_init(
+        integrations=[
+            AsyncioIntegration(),
+        ],
+    )
+
+    async def add(a, b):
+        return a + b
+
+    result = await asyncio.create_task(add(1, 2))
+    assert result == 3, result
