@@ -1,4 +1,3 @@
-from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
 import socket
@@ -16,6 +15,15 @@ try:
     import eventlet
 except ImportError:
     eventlet = None
+
+try:
+    # Python 2
+    from httplib import HTTPServer  # type: ignore
+    from httplib import BaseHTTPRequestHandler  # type: ignore
+except ImportError:
+    # Python 3
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
 
 import sentry_sdk
 from sentry_sdk._compat import iteritems, reraise, string_types
