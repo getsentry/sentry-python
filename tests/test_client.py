@@ -1,6 +1,7 @@
 # coding: utf-8
 import os
 import json
+import mock
 import pytest
 import subprocess
 import sys
@@ -22,6 +23,7 @@ from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
 from sentry_sdk._compat import reraise, text_type, PY2
 from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
+from sentry_sdk.utils import logger
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS
 
@@ -291,8 +293,48 @@ def test_ignore_errors(sentry_init, capture_events):
     pytest.raises(EventCapturedError, lambda: e(ValueError()))
 
 
-def test_with_locals_enabled(sentry_init, capture_events):
-    sentry_init(with_locals=True)
+def test_with_locals_deprecation_enabled(sentry_init):
+    with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
+        sentry_init(with_locals=True)
+
+        client = Hub.current.client
+        assert "with_locals" not in client.options
+        assert "include_local_variables" in client.options
+        assert client.options["include_local_variables"]
+
+        fake_warning.assert_called_once_with(
+            "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
+        )
+
+
+def test_with_locals_deprecation_disabled(sentry_init):
+    with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
+        sentry_init(with_locals=False)
+
+        client = Hub.current.client
+        assert "with_locals" not in client.options
+        assert "include_local_variables" in client.options
+        assert not client.options["include_local_variables"]
+
+        fake_warning.assert_called_once_with(
+            "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
+        )
+
+
+def test_include_local_variables_deprecation(sentry_init):
+    with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
+        sentry_init(include_local_variables=False)
+
+        client = Hub.current.client
+        assert "with_locals" not in client.options
+        assert "include_local_variables" in client.options
+        assert not client.options["include_local_variables"]
+
+        fake_warning.assert_not_called()
+
+
+def test_include_local_variables_enabled(sentry_init, capture_events):
+    sentry_init(include_local_variables=True)
     events = capture_events()
     try:
         1 / 0
@@ -307,8 +349,8 @@ def test_with_locals_enabled(sentry_init, capture_events):
     )
 
 
-def test_with_locals_disabled(sentry_init, capture_events):
-    sentry_init(with_locals=False)
+def test_include_local_variables_disabled(sentry_init, capture_events):
+    sentry_init(include_local_variables=False)
     events = capture_events()
     try:
         1 / 0
@@ -372,7 +414,7 @@ def test_attach_stacktrace_enabled(sentry_init, capture_events):
 
 
 def test_attach_stacktrace_enabled_no_locals(sentry_init, capture_events):
-    sentry_init(attach_stacktrace=True, with_locals=False)
+    sentry_init(attach_stacktrace=True, include_local_variables=False)
     events = capture_events()
 
     def foo():
