@@ -249,7 +249,7 @@ def test_flask_large_json_request(sentry_init, capture_events, app):
 
     @app.route("/", methods=["POST"])
     def index():
-        assert request.get_json() == data
+        assert request.get_json(silent=True) == data
         assert request.get_data() == json.dumps(data).encode("ascii")
         assert not request.form
         capture_message("hi")
@@ -315,7 +315,7 @@ def test_flask_empty_json_request(sentry_init, capture_events, app, data):
 
     @app.route("/", methods=["POST"])
     def index():
-        assert request.get_json() == data
+        assert request.get_json(silent=True) == data
         assert request.get_data() == json.dumps(data).encode("ascii")
         assert not request.form
         capture_message("hi")
@@ -340,7 +340,7 @@ def test_flask_medium_formdata_request(sentry_init, capture_events, app):
     def index():
         assert request.form["foo"] == data["foo"]
         assert not request.get_data()
-        assert not request.get_json()
+        assert not request.get_json(silent=True)
         capture_message("hi")
         return "ok"
 
@@ -372,7 +372,7 @@ def test_flask_formdata_request_appear_transaction_body(
         assert request.form["username"] == data["username"]
         assert request.form["age"] == data["age"]
         assert not request.get_data()
-        assert not request.get_json()
+        assert not request.get_json(silent=True)
         set_tag("view", "yes")
         capture_message("hi")
         return "ok"
@@ -403,7 +403,7 @@ def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, ap
             assert request.get_data() == data
         else:
             assert request.get_data() == data.encode("ascii")
-        assert not request.get_json()
+        assert not request.get_json(silent=True)
         capture_message("hi")
         return "ok"
 
@@ -427,7 +427,7 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
     def index():
         assert list(request.form) == ["foo"]
         assert list(request.files) == ["file"]
-        assert not request.get_json()
+        assert not request.get_json(silent=True)
         capture_message("hi")
         return "ok"
 
