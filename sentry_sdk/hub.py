@@ -5,9 +5,11 @@ from datetime import datetime
 from contextlib import contextmanager
 
 from sentry_sdk._compat import with_metaclass
+from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
-from sentry_sdk.tracing import Span, Transaction
+from sentry_sdk.profiler import Profile
+from sentry_sdk.tracing import NoOpSpan, Span, Transaction
 from sentry_sdk.session import Session
 from sentry_sdk.utils import (
     exc_info_from_error,
@@ -16,9 +18,9 @@ from sentry_sdk.utils import (
     ContextVar,
 )
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Union
     from typing import Any
     from typing import Optional
@@ -96,6 +98,20 @@ class _InitGuard(object):
             c.close()
 
 
+def _check_python_deprecations():
+    # type: () -> None
+    version = sys.version_info[:2]
+
+    if version == (3, 4) or version == (3, 5):
+        logger.warning(
+            "sentry-sdk 2.0.0 will drop support for Python %s.",
+            "{}.{}".format(*version),
+        )
+        logger.warning(
+            "Please upgrade to the latest version to continue receiving upgrades and bugfixes."
+        )
+
+
 def _init(*args, **kwargs):
     # type: (*Optional[str], **Any) -> ContextManager[Any]
     """Initializes the SDK and optionally integrations.
@@ -104,22 +120,22 @@ def _init(*args, **kwargs):
     """
     client = Client(*args, **kwargs)  # type: ignore
     Hub.current.bind_client(client)
+    _check_python_deprecations()
     rv = _InitGuard(client)
     return rv
 
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     # Make mypy, PyCharm and other static analyzers think `init` is a type to
     # have nicer autocompletion for params.
     #
     # Use `ClientConstructor` to define the argument types of `init` and
     # `ContextManager[Any]` to tell static analyzers about the return type.
 
-    class init(ClientConstructor, ContextManager[Any]):  # noqa: N801
+    class init(ClientConstructor, _InitGuard):  # noqa: N801
         pass
-
 
 else:
     # Alias `init` for actual usage. Go through the lambda indirection to throw
@@ -207,7 +223,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     # Mypy doesn't pick up on the metaclass.
 
-    if MYPY:
+    if TYPE_CHECKING:
         current = None  # type: Hub
         main = None  # type: Hub
 
@@ -436,6 +452,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def start_span(
         self,
         span=None,  # type: Optional[Span]
+        instrumenter=INSTRUMENTER.SENTRY,  # type: str
         **kwargs  # type: Any
     ):
         # type: (...) -> Span
@@ -450,6 +467,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         for every incoming HTTP request. Use `start_transaction` to start a new
         transaction when one is not already in progress.
         """
+        configuration_instrumenter = self.client and self.client.options["instrumenter"]
+
+        if instrumenter != configuration_instrumenter:
+            return NoOpSpan()
+
         # TODO: consider removing this in a future release.
         # This is for backwards compatibility with releases before
         # start_transaction existed, to allow for a smoother transition.
@@ -480,9 +502,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def start_transaction(
         self,
         transaction=None,  # type: Optional[Transaction]
+        instrumenter=INSTRUMENTER.SENTRY,  # type: str
         **kwargs  # type: Any
     ):
-        # type: (...) -> Transaction
+        # type: (...) -> Union[Transaction, NoOpSpan]
         """
         Start and return a transaction.
 
@@ -505,6 +528,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         When the transaction is finished, it will be sent to Sentry with all its
         finished child spans.
         """
+        configuration_instrumenter = self.client and self.client.options["instrumenter"]
+
+        if instrumenter != configuration_instrumenter:
+            return NoOpSpan()
+
         custom_sampling_context = kwargs.pop("custom_sampling_context", {})
 
         # if we haven't been given a transaction, make one
@@ -521,6 +549,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         sampling_context.update(custom_sampling_context)
         transaction._set_initial_sampling_decision(sampling_context=sampling_context)
 
+        profile = Profile(transaction, hub=self)
+        profile._set_initial_sampling_decision(sampling_context=sampling_context)
+
         # we don't bother to keep spans if we already know we're not going to
         # send the transaction
         if transaction.sampled:
@@ -532,7 +563,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return transaction
 
     @overload
-    def push_scope(  # noqa: F811
+    def push_scope(
         self, callback=None  # type: Optional[None]
     ):
         # type: (...) -> ContextManager[Scope]
@@ -581,7 +612,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return rv
 
     @overload
-    def configure_scope(  # noqa: F811
+    def configure_scope(
         self, callback=None  # type: Optional[None]
     ):
         # type: (...) -> ContextManager[Scope]
@@ -596,7 +627,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def configure_scope(  # noqa
         self, callback=None  # type: Optional[Callable[[Scope], None]]
-    ):  # noqa
+    ):
         # type: (...) -> Optional[ContextManager[Scope]]
 
         """
@@ -702,6 +733,19 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         for header in span.iter_headers():
             yield header
+
+    def trace_propagation_meta(self, span=None):
+        # type: (Optional[Span]) -> str
+        """
+        Return meta tags which should be injected into the HTML template
+        to allow propagation of trace data.
+        """
+        meta = ""
+
+        for name, content in self.iter_trace_propagation_headers(span):
+            meta += '<meta name="%s" content="%s">' % (name, content)
+
+        return meta
 
 
 GLOBAL_HUB = Hub()

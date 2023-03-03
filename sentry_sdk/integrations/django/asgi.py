@@ -9,11 +9,12 @@ Since this file contains `async def` it is conditionally imported in
 import asyncio
 
 from sentry_sdk import Hub, _functools
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.consts import OP
 
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Union
     from typing import Callable
@@ -88,10 +89,14 @@ def wrap_async_view(hub, callback):
     async def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
 
-        with hub.start_span(
-            op="django.view", description=request.resolver_match.view_name
-        ):
-            return await callback(request, *args, **kwargs)
+        with hub.configure_scope() as sentry_scope:
+            if sentry_scope.profile is not None:
+                sentry_scope.profile.update_active_thread_id()
+
+            with hub.start_span(
+                op=OP.VIEW_RENDER, description=request.resolver_match.view_name
+            ):
+                return await callback(request, *args, **kwargs)
 
     return sentry_wrapped_callback
 
@@ -104,7 +109,7 @@ def _asgi_middleware_mixin_factory(_check_middleware_span):
     """
 
     class SentryASGIMixin:
-        if MYPY:
+        if TYPE_CHECKING:
             _inner = None
 
         def __init__(self, get_response):

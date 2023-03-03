@@ -5,9 +5,9 @@ we rely upon is that `update_wrapper` handles AttributeError gracefully.
 
 from functools import partial
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
 

@@ -1,6 +1,7 @@
 import sys
 
 from sentry_sdk._functools import partial
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import (
     ContextVar,
@@ -8,13 +9,13 @@ from sentry_sdk.utils import (
     event_from_exception,
 )
 from sentry_sdk._compat import PY2, reraise, iteritems
-from sentry_sdk.tracing import Transaction
+from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Callable
     from typing import Dict
     from typing import Iterator
@@ -45,7 +46,6 @@ if PY2:
     def wsgi_decoding_dance(s, charset="utf-8", errors="replace"):
         # type: (str, str, str) -> str
         return s.decode(charset, errors)
-
 
 else:
 
@@ -123,7 +123,10 @@ class SentryWsgiMiddleware(object):
                             )
 
                     transaction = Transaction.continue_from_environ(
-                        environ, op="http.server", name="generic WSGI request"
+                        environ,
+                        op=OP.HTTP_SERVER,
+                        name="generic WSGI request",
+                        source=TRANSACTION_SOURCE_ROUTE,
                     )
 
                     with hub.start_transaction(

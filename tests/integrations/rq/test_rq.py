@@ -58,13 +58,18 @@ def test_basic(sentry_init, capture_events):
     assert exception["stacktrace"]["frames"][-1]["vars"]["foo"] == "42"
 
     assert event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
-    assert event["extra"]["rq-job"] == {
-        "args": [],
-        "description": "tests.integrations.rq.test_rq.crashing_job(foo=42)",
-        "func": "tests.integrations.rq.test_rq.crashing_job",
-        "job_id": event["extra"]["rq-job"]["job_id"],
-        "kwargs": {"foo": 42},
-    }
+
+    extra = event["extra"]["rq-job"]
+    assert extra["args"] == []
+    assert extra["kwargs"] == {"foo": 42}
+    assert extra["description"] == "tests.integrations.rq.test_rq.crashing_job(foo=42)"
+    assert extra["func"] == "tests.integrations.rq.test_rq.crashing_job"
+    assert "job_id" in extra
+    assert "enqueued_at" in extra
+
+    # older versions don't persist started_at correctly
+    if tuple(map(int, rq.VERSION.split("."))) >= (0, 9):
+        assert "started_at" in extra
 
 
 def test_transport_shutdown(sentry_init, capture_events_forksafe):
@@ -101,7 +106,7 @@ def test_transaction_with_error(
     error_event, envelope = events
 
     assert error_event["transaction"] == "tests.integrations.rq.test_rq.chew_up_shoes"
-    assert error_event["contexts"]["trace"]["op"] == "rq.task"
+    assert error_event["contexts"]["trace"]["op"] == "queue.task.rq"
     assert error_event["exception"]["values"][0]["type"] == "Exception"
     assert (
         error_event["exception"]["values"][0]["value"]
@@ -136,7 +141,7 @@ def test_transaction_no_error(
     envelope = events[0]
 
     assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == "rq.task"
+    assert envelope["contexts"]["trace"]["op"] == "queue.task.rq"
     assert envelope["transaction"] == "tests.integrations.rq.test_rq.do_trick"
     assert envelope["extra"]["rq-job"] == DictionaryContaining(
         {

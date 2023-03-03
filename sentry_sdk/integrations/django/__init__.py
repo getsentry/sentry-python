@@ -5,14 +5,18 @@ import sys
 import threading
 import weakref
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
-from sentry_sdk.tracing_utils import RecordSqlQueries
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
+from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import (
+    AnnotatedValue,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
+    SENSITIVE_DATA_SUBSTITUTE,
     logger,
     capture_internal_exceptions,
     event_from_exception,
@@ -26,6 +30,7 @@ from sentry_sdk.integrations._wsgi_common import RequestExtractor
 
 try:
     from django import VERSION as DJANGO_VERSION
+    from django.conf import settings as django_settings
     from django.core import signals
 
     try:
@@ -42,10 +47,11 @@ from sentry_sdk.integrations.django.templates import (
     patch_templates,
 )
 from sentry_sdk.integrations.django.middleware import patch_django_middlewares
+from sentry_sdk.integrations.django.signals_handlers import patch_signals
 from sentry_sdk.integrations.django.views import patch_views
 
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
@@ -69,7 +75,6 @@ if DJANGO_VERSION < (1, 10):
         # type: (Any) -> bool
         return request_user.is_authenticated()
 
-
 else:
 
     def is_authenticated(request_user):
@@ -83,11 +88,14 @@ TRANSACTION_STYLE_VALUES = ("function_name", "url")
 class DjangoIntegration(Integration):
     identifier = "django"
 
-    transaction_style = None
+    transaction_style = ""
     middleware_spans = None
+    signals_spans = None
 
-    def __init__(self, transaction_style="url", middleware_spans=True):
-        # type: (str, bool) -> None
+    def __init__(
+        self, transaction_style="url", middleware_spans=True, signals_spans=True
+    ):
+        # type: (str, bool, bool) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -95,6 +103,7 @@ class DjangoIntegration(Integration):
             )
         self.transaction_style = transaction_style
         self.middleware_spans = middleware_spans
+        self.signals_spans = signals_spans
 
     @staticmethod
     def setup_once():
@@ -202,7 +211,7 @@ class DjangoIntegration(Integration):
             # querysets. This might be surprising to the user but it's likely
             # less annoying.
 
-            return u"<%s from %s at 0x%x>" % (
+            return "<%s from %s at 0x%x>" % (
                 value.__class__.__name__,
                 value.__module__,
                 id(value),
@@ -212,6 +221,7 @@ class DjangoIntegration(Integration):
         patch_django_middlewares()
         patch_views()
         patch_templates()
+        patch_signals()
 
 
 _DRF_PATCHED = False
@@ -320,6 +330,36 @@ def _patch_django_asgi_handler():
     patch_django_asgi_handler_impl(ASGIHandler)
 
 
+def _set_transaction_name_and_source(scope, transaction_style, request):
+    # type: (Scope, str, WSGIRequest) -> None
+    try:
+        transaction_name = None
+        if transaction_style == "function_name":
+            fn = resolve(request.path).func
+            transaction_name = transaction_from_function(getattr(fn, "view_class", fn))
+
+        elif transaction_style == "url":
+            if hasattr(request, "urlconf"):
+                transaction_name = LEGACY_RESOLVER.resolve(
+                    request.path_info, urlconf=request.urlconf
+                )
+            else:
+                transaction_name = LEGACY_RESOLVER.resolve(request.path_info)
+
+        if transaction_name is None:
+            transaction_name = request.path_info
+            source = TRANSACTION_SOURCE_URL
+        else:
+            source = SOURCE_FOR_STYLE[transaction_style]
+
+        scope.set_transaction_name(
+            transaction_name,
+            source=source,
+        )
+    except Exception:
+        pass
+
+
 def _before_get_response(request):
     # type: (WSGIRequest) -> None
     hub = Hub.current
@@ -331,24 +371,15 @@ def _before_get_response(request):
 
     with hub.configure_scope() as scope:
         # Rely on WSGI middleware to start a trace
-        try:
-            if integration.transaction_style == "function_name":
-                fn = resolve(request.path).func
-                scope.transaction = transaction_from_function(
-                    getattr(fn, "view_class", fn)
-                )
-            elif integration.transaction_style == "url":
-                scope.transaction = LEGACY_RESOLVER.resolve(request.path_info)
-        except Exception:
-            pass
+        _set_transaction_name_and_source(scope, integration.transaction_style, request)
 
         scope.add_event_processor(
             _make_event_processor(weakref.ref(request), integration)
         )
 
 
-def _attempt_resolve_again(request, scope):
-    # type: (WSGIRequest, Scope) -> None
+def _attempt_resolve_again(request, scope, transaction_style):
+    # type: (WSGIRequest, Scope, str) -> None
     """
     Some django middlewares overwrite request.urlconf
     so we need to respect that contract,
@@ -357,13 +388,7 @@ def _attempt_resolve_again(request, scope):
     if not hasattr(request, "urlconf"):
         return
 
-    try:
-        scope.transaction = LEGACY_RESOLVER.resolve(
-            request.path_info,
-            urlconf=request.urlconf,
-        )
-    except Exception:
-        pass
+    _set_transaction_name_and_source(scope, transaction_style, request)
 
 
 def _after_get_response(request):
@@ -374,7 +399,7 @@ def _after_get_response(request):
         return
 
     with hub.configure_scope() as scope:
-        _attempt_resolve_again(request, scope)
+        _attempt_resolve_again(request, scope, integration.transaction_style)
 
 
 def _patch_get_response():
@@ -439,7 +464,7 @@ def _got_request_exception(request=None, **kwargs):
 
         if request is not None and integration.transaction_style == "url":
             with hub.configure_scope() as scope:
-                _attempt_resolve_again(request, scope)
+                _attempt_resolve_again(request, scope, integration.transaction_style)
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
@@ -458,8 +483,20 @@ class DjangoRequestExtractor(RequestExtractor):
         return self.request.META
 
     def cookies(self):
-        # type: () -> Dict[str, str]
-        return self.request.COOKIES
+        # type: () -> Dict[str, Union[str, AnnotatedValue]]
+        privacy_cookies = [
+            django_settings.CSRF_COOKIE_NAME,
+            django_settings.SESSION_COOKIE_NAME,
+        ]
+
+        clean_cookies = {}  # type: Dict[str, Union[str, AnnotatedValue]]
+        for (key, val) in self.request.COOKIES.items():
+            if key in privacy_cookies:
+                clean_cookies[key] = SENSITIVE_DATA_SUBSTITUTE
+            else:
+                clean_cookies[key] = val
+
+        return clean_cookies
 
     def raw_data(self):
         # type: () -> bytes
@@ -539,7 +576,7 @@ def install_sql_hook():
         if hub.get_integration(DjangoIntegration) is None:
             return real_execute(self, sql, params)
 
-        with RecordSqlQueries(
+        with record_sql_queries(
             hub, self.cursor, sql, params, paramstyle="format", executemany=False
         ):
             return real_execute(self, sql, params)
@@ -550,7 +587,7 @@ def install_sql_hook():
         if hub.get_integration(DjangoIntegration) is None:
             return real_executemany(self, sql, param_list)
 
-        with RecordSqlQueries(
+        with record_sql_queries(
             hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
         ):
             return real_executemany(self, sql, param_list)
@@ -564,7 +601,7 @@ def install_sql_hook():
         with capture_internal_exceptions():
             hub.add_breadcrumb(message="connect", category="query")
 
-        with hub.start_span(op="db", description="connect"):
+        with hub.start_span(op=OP.DB, description="connect"):
             return real_connect(self)
 
     CursorWrapper.execute = execute

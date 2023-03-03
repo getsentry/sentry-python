@@ -3,13 +3,13 @@ import threading
 
 from time import sleep, time
 from sentry_sdk._compat import check_thread_support
-from sentry_sdk._queue import Queue, Full
+from sentry_sdk._queue import Queue, FullError
 from sentry_sdk.utils import logger
 from sentry_sdk.consts import DEFAULT_QUEUE_SIZE
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Optional
     from typing import Callable
@@ -81,7 +81,7 @@ class BackgroundWorker(object):
             if self._thread:
                 try:
                     self._queue.put_nowait(_TERMINATOR)
-                except Full:
+                except FullError:
                     logger.debug("background worker queue full, kill failed")
 
                 self._thread = None
@@ -114,7 +114,7 @@ class BackgroundWorker(object):
         try:
             self._queue.put_nowait(callback)
             return True
-        except Full:
+        except FullError:
             return False
 
     def _target(self):

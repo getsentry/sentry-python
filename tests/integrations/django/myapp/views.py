@@ -1,3 +1,6 @@
+import json
+import threading
+
 from django import VERSION
 from django.contrib.auth import login
 from django.contrib.auth.models import User
@@ -11,6 +14,7 @@ from django.views.generic import ListView
 
 try:
     from rest_framework.decorators import api_view
+    from rest_framework.response import Response
 
     @api_view(["POST"])
     def rest_framework_exc(request):
@@ -29,6 +33,9 @@ try:
     def rest_permission_denied_exc(request):
         raise PermissionDenied("bye")
 
+    @api_view(["GET"])
+    def rest_json_response(request):
+        return Response(dict(ok=True))
 
 except ImportError:
     pass
@@ -155,6 +162,16 @@ def csrf_hello_not_exempt(*args, **kwargs):
     return HttpResponse("ok")
 
 
+def thread_ids_sync(*args, **kwargs):
+    response = json.dumps(
+        {
+            "main": threading.main_thread().ident,
+            "active": threading.current_thread().ident,
+        }
+    )
+    return HttpResponse(response)
+
+
 if VERSION >= (3, 1):
     # Use exec to produce valid Python 2
     exec(
@@ -169,6 +186,16 @@ if VERSION >= (3, 1):
     await asyncio.sleep(1)
     return HttpResponse('Hello World')"""
     )
+
+    exec(
+        """async def thread_ids_async(request):
+    response = json.dumps({
+        "main": threading.main_thread().ident,
+        "active": threading.current_thread().ident,
+    })
+    return HttpResponse(response)"""
+    )
 else:
     async_message = None
     my_async_view = None
+    thread_ids_async = None

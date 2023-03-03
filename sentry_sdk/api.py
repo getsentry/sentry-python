@@ -3,9 +3,10 @@ import inspect
 from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.tracing import NoOpSpan
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
     from typing import Optional
@@ -15,7 +16,14 @@ if MYPY:
     from typing import ContextManager
     from typing import Union
 
-    from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint, ExcInfo
+    from sentry_sdk._types import (
+        Event,
+        Hint,
+        Breadcrumb,
+        BreadcrumbHint,
+        ExcInfo,
+        MeasurementUnit,
+    )
     from sentry_sdk.tracing import Span, Transaction
 
     T = TypeVar("T")
@@ -44,6 +52,7 @@ __all__ = [
     "set_extra",
     "set_user",
     "set_level",
+    "set_measurement",
 ]
 
 
@@ -108,7 +117,7 @@ def add_breadcrumb(
 
 
 @overload
-def configure_scope():  # noqa: F811
+def configure_scope():
     # type: () -> ContextManager[Scope]
     pass
 
@@ -130,7 +139,7 @@ def configure_scope(  # noqa: F811
 
 
 @overload
-def push_scope():  # noqa: F811
+def push_scope():
     # type: () -> ContextManager[Scope]
     pass
 
@@ -151,31 +160,31 @@ def push_scope(  # noqa: F811
     return Hub.current.push_scope(callback)
 
 
-@scopemethod  # noqa
+@scopemethod
 def set_tag(key, value):
     # type: (str, Any) -> None
     return Hub.current.scope.set_tag(key, value)
 
 
-@scopemethod  # noqa
+@scopemethod
 def set_context(key, value):
     # type: (str, Dict[str, Any]) -> None
     return Hub.current.scope.set_context(key, value)
 
 
-@scopemethod  # noqa
+@scopemethod
 def set_extra(key, value):
     # type: (str, Any) -> None
     return Hub.current.scope.set_extra(key, value)
 
 
-@scopemethod  # noqa
+@scopemethod
 def set_user(value):
     # type: (Optional[Dict[str, Any]]) -> None
     return Hub.current.scope.set_user(value)
 
 
-@scopemethod  # noqa
+@scopemethod
 def set_level(value):
     # type: (str) -> None
     return Hub.current.scope.set_level(value)
@@ -210,5 +219,12 @@ def start_transaction(
     transaction=None,  # type: Optional[Transaction]
     **kwargs  # type: Any
 ):
-    # type: (...) -> Transaction
+    # type: (...) -> Union[Transaction, NoOpSpan]
     return Hub.current.start_transaction(transaction, **kwargs)
+
+
+def set_measurement(name, value, unit=""):
+    # type: (str, float, MeasurementUnit) -> None
+    transaction = Hub.current.scope.transaction
+    if transaction is not None:
+        transaction.set_measurement(name, value, unit)

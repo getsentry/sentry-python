@@ -5,11 +5,11 @@ from threading import Thread, current_thread
 
 from sentry_sdk import Hub
 from sentry_sdk._compat import reraise
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import event_from_exception, capture_internal_exceptions
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import TypeVar
     from typing import Callable
@@ -51,7 +51,7 @@ class ThreadingIntegration(Integration):
                     new_run = _wrap_run(hub_, getattr(self.run, "__func__", self.run))
                     self.run = new_run  # type: ignore
 
-            return old_start(self, *a, **kw)  # type: ignore
+            return old_start(self, *a, **kw)
 
         Thread.start = sentry_start  # type: ignore
 
