@@ -229,7 +229,7 @@ class Span(object):
             trace_id=self.trace_id,
             parent_span_id=self.span_id,
             containing_transaction=self.containing_transaction,
-            **kwargs,
+            **kwargs
         )
 
         span_recorder = (
@@ -249,7 +249,7 @@ class Span(object):
     def continue_from_environ(
         cls,
         environ,  # type: typing.Mapping[str, str]
-        **kwargs,  # type: Any
+        **kwargs  # type: Any
     ):
         # type: (...) -> Transaction
         """
@@ -272,7 +272,7 @@ class Span(object):
     def continue_from_headers(
         cls,
         headers,  # type: typing.Mapping[str, str]
-        **kwargs,  # type: Any
+        **kwargs  # type: Any
     ):
         # type: (...) -> Transaction
         """
@@ -326,7 +326,7 @@ class Span(object):
     def from_traceparent(
         cls,
         traceparent,  # type: Optional[str]
-        **kwargs,  # type: Any
+        **kwargs  # type: Any
     ):
         # type: (...) -> Optional[Transaction]
         """
@@ -495,7 +495,7 @@ class Transaction(Span):
         parent_sampled=None,  # type: Optional[bool]
         baggage=None,  # type: Optional[Baggage]
         source=TRANSACTION_SOURCE_CUSTOM,  # type: str
-        **kwargs,  # type: Any
+        **kwargs  # type: Any
     ):
         # type: (...) -> None
         # TODO: consider removing this in a future release.
