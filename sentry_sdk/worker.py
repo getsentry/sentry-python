@@ -7,9 +7,9 @@ from sentry_sdk._queue import Queue, FullError
 from sentry_sdk.utils import logger
 from sentry_sdk.consts import DEFAULT_QUEUE_SIZE
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Optional
     from typing import Callable

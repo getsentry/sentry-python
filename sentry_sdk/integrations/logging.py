@@ -14,9 +14,9 @@ from sentry_sdk.utils import (
 from sentry_sdk.integrations import Integration
 from sentry_sdk._compat import iteritems
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from logging import LogRecord
     from typing import Any
     from typing import Dict
@@ -219,7 +219,7 @@ class EventHandler(logging.Handler, object):
                     "values": [
                         {
                             "stacktrace": current_stacktrace(
-                                client_options["with_locals"]
+                                client_options["include_local_variables"]
                             ),
                             "crashed": False,
                             "current": True,

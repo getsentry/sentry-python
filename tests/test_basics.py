@@ -1,6 +1,6 @@
+import logging
 import os
 import sys
-import logging
 
 import pytest
 
@@ -16,7 +16,6 @@ from sentry_sdk import (
     last_event_id,
     Hub,
 )
-
 from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import _AUTO_ENABLING_INTEGRATIONS
 from sentry_sdk.integrations.logging import LoggingIntegration

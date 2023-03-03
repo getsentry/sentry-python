@@ -30,9 +30,9 @@ from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.profiler import setup_profiler
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
@@ -71,7 +71,18 @@ def _get_options(*args, **kwargs):
 
     for key, value in iteritems(options):
         if key not in rv:
+            # Option "with_locals" was renamed to "include_local_variables"
+            if key == "with_locals":
+                msg = (
+                    "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. "
+                    "Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
+                )
+                logger.warning(msg)
+                rv["include_local_variables"] = value
+                continue
+
             raise TypeError("Unknown option %r" % (key,))
+
         rv[key] = value
 
     if rv["dsn"] is None:
@@ -213,7 +224,7 @@ class _Client(object):
                     "values": [
                         {
                             "stacktrace": current_stacktrace(
-                                self.options["with_locals"]
+                                self.options["include_local_variables"]
                             ),
                             "crashed": False,
                             "current": True,
@@ -512,9 +523,9 @@ class _Client(object):
         self.close()
 
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     # Make mypy, PyCharm and other static analyzers think `get_options` is a
     # type to have nicer autocompletion for params.
     #

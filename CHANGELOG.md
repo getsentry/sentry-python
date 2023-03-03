@@ -1,5 +1,77 @@
 # Changelog
 
+## 1.16.0
+
+### Various fixes & improvements
+
+- **New:** Add [arq](https://arq-docs.helpmanual.io/) Integration (#1872) by @Zhenay
+
+  This integration will create performance spans when arq jobs will be enqueued and when they will be run.
+  It will also capture errors in jobs and will link them to the performance spans.
+
+  Usage:
+
+  ```python
+  import asyncio
+
+  from httpx import AsyncClient
+  from arq import create_pool
+  from arq.connections import RedisSettings
+
+  import sentry_sdk
+  from sentry_sdk.integrations.arq import ArqIntegration
+  from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
+
+  sentry_sdk.init(
+      dsn="...",
+      integrations=[ArqIntegration()],
+  )
+
+  async def download_content(ctx, url):
+      session: AsyncClient = ctx['session']
+      response = await session.get(url)
+      print(f'{url}: {response.text:.80}...')
+      return len(response.text)
+
+  async def startup(ctx):
+      ctx['session'] = AsyncClient()
+
+  async def shutdown(ctx):
+      await ctx['session'].aclose()
+
+  async def main():
+      with sentry_sdk.start_transaction(name="testing_arq_tasks", source=TRANSACTION_SOURCE_COMPONENT):
+          redis = await create_pool(RedisSettings())
+          for url in ('https://facebook.com', 'https://microsoft.com', 'https://github.com', "asdf"
+                      ):
+              await redis.enqueue_job('download_content', url)
+
+  class WorkerSettings:
+      functions = [download_content]
+      on_startup = startup
+      on_shutdown = shutdown
+
+  if __name__ == '__main__':
+      asyncio.run(main())
+  ```
+
+- Update of [Falcon](https://falconframework.org/) Integration (#1733) by @bartolootrit
+- Adding [Cloud Resource Context](https://docs.sentry.io/platforms/python/configuration/integrations/cloudresourcecontext/) integration (#1882) by @antonpirker
+- Profiling: Use the transaction timestamps to anchor the profile (#1898) by @Zylphrex
+- Profiling: Add debug logs to profiling (#1883) by @Zylphrex
+- Profiling: Start profiler thread lazily (#1903) by @Zylphrex
+- Fixed checks for structured http data (#1905) by @antonpirker
+- Make `set_measurement` public api and remove experimental status (#1909) by @sl0thentr0py
+- Add `trace_propagation_targets` option (#1916) by @antonpirker
+- Add `enable_tracing` to default traces_sample_rate to 1.0 (#1900) by @sl0thentr0py
+- Remove deprecated `tracestate` (#1907) by @sl0thentr0py
+- Sanitize URLs in Span description and breadcrumbs (#1876) by @antonpirker
+- Mechanism should default to true unless set explicitly (#1889) by @sl0thentr0py
+- Better setting of in-app in stack frames (#1894) by @antonpirker
+- Add workflow to test gevent (#1870) by @Zylphrex
+- Updated outdated HTTPX test matrix (#1917) by @antonpirker
+- Switch to MIT license (#1908) by @cleptric
+
 ## 1.15.0
 
 ### Various fixes & improvements
