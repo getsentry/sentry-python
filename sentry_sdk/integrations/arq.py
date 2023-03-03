@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import sys
 
 from sentry_sdk._compat import reraise
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import _should_send_default_pii
@@ -24,7 +24,7 @@ try:
 except ImportError:
     raise DidNotEnable("Arq is not installed")
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any, Dict, Optional
 
     from sentry_sdk._types import EventProcessor, Event, ExcInfo, Hint

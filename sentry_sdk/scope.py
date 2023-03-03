@@ -3,12 +3,12 @@ from collections import deque
 from itertools import chain
 
 from sentry_sdk._functools import wraps
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import logger, capture_internal_exceptions
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.attachments import Attachment
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
     from typing import Optional

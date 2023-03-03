@@ -6,7 +6,7 @@ from django import VERSION as DJANGO_VERSION
 
 from sentry_sdk import Hub
 from sentry_sdk._functools import wraps
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.utils import (
     ContextVar,
@@ -14,7 +14,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
 )
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Optional
