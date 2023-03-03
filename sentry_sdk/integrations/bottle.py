@@ -11,9 +11,9 @@ from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from typing import Any
     from typing import Dict

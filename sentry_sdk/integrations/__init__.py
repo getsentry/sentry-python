@@ -6,9 +6,9 @@ from threading import Lock
 from sentry_sdk._compat import iteritems
 from sentry_sdk.utils import logger
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Callable
     from typing import Dict
     from typing import Iterator

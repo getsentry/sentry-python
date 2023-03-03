@@ -39,9 +39,9 @@ except ImportError:
 
 import sentry_sdk
 from sentry_sdk._compat import PY2, PY33, PY37, implements_str, text_type, urlparse
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from types import FrameType, TracebackType
     from typing import (
         Any,
@@ -407,7 +407,7 @@ class AnnotatedValue(object):
         )
 
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import TypeVar
 
     T = TypeVar("T")

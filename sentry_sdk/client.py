@@ -30,9 +30,9 @@ from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.profiler import setup_profiler
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
@@ -523,9 +523,9 @@ class _Client(object):
         self.close()
 
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     # Make mypy, PyCharm and other static analyzers think `get_options` is a
     # type to have nicer autocompletion for params.
     #

@@ -15,9 +15,9 @@ from sentry_sdk.utils import (
     parse_url,
 )
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
