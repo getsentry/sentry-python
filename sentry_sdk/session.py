@@ -1,10 +1,10 @@
 import uuid
 from datetime import datetime
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import format_timestamp
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Optional
     from typing import Union
     from typing import Any

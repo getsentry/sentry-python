@@ -4,9 +4,9 @@ from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import logger, parse_url
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
 
 

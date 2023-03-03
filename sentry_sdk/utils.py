@@ -39,9 +39,9 @@ except ImportError:
 
 import sentry_sdk
 from sentry_sdk._compat import PY2, PY33, PY37, implements_str, text_type, urlparse
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from types import FrameType, TracebackType
     from typing import (
         Any,
@@ -407,7 +407,7 @@ class AnnotatedValue(object):
         )
 
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import TypeVar
 
     T = TypeVar("T")
@@ -591,7 +591,7 @@ def filename_for_module(module, abs_path):
         return abs_path
 
 
-def serialize_frame(frame, tb_lineno=None, with_locals=True):
+def serialize_frame(frame, tb_lineno=None, include_local_variables=True):
     # type: (FrameType, Optional[int], bool) -> Dict[str, Any]
     f_code = getattr(frame, "f_code", None)
     if not f_code:
@@ -620,13 +620,13 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
         "context_line": context_line,
         "post_context": post_context,
     }  # type: Dict[str, Any]
-    if with_locals:
+    if include_local_variables:
         rv["vars"] = frame.f_locals
 
     return rv
 
 
-def current_stacktrace(with_locals=True):
+def current_stacktrace(include_local_variables=True):
     # type: (bool) -> Any
     __tracebackhide__ = True
     frames = []
@@ -634,7 +634,9 @@ def current_stacktrace(with_locals=True):
     f = sys._getframe()  # type: Optional[FrameType]
     while f is not None:
         if not should_hide_frame(f):
-            frames.append(serialize_frame(f, with_locals=with_locals))
+            frames.append(
+                serialize_frame(f, include_local_variables=include_local_variables)
+            )
         f = f.f_back
 
     frames.reverse()
@@ -668,12 +670,16 @@ def single_exception_from_error_tuple(
         )
 
     if client_options is None:
-        with_locals = True
+        include_local_variables = True
     else:
-        with_locals = client_options["with_locals"]
+        include_local_variables = client_options["include_local_variables"]
 
     frames = [
-        serialize_frame(tb.tb_frame, tb_lineno=tb.tb_lineno, with_locals=with_locals)
+        serialize_frame(
+            tb.tb_frame,
+            tb_lineno=tb.tb_lineno,
+            include_local_variables=include_local_variables,
+        )
         for tb in iter_stacks(tb)
     ]
 

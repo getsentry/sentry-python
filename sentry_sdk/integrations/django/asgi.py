@@ -9,12 +9,12 @@ Since this file contains `async def` it is conditionally imported in
 import asyncio
 
 from sentry_sdk import Hub, _functools
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Union
     from typing import Callable
@@ -109,7 +109,7 @@ def _asgi_middleware_mixin_factory(_check_middleware_span):
     """
 
     class SentryASGIMixin:
-        if MYPY:
+        if TYPE_CHECKING:
             _inner = None
 
         def __init__(self, get_response):
