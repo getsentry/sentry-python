@@ -178,7 +178,7 @@ class TestService(TestServiceServicer):
     events = []
 
     @staticmethod
-    def TestServe(request, context):
+    def TestServe(request, context):  # noqa: N802
         hub = Hub.current
         with hub.start_span(op="test", description="test"):
             pass
