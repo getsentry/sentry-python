@@ -1,3 +1,5 @@
+from functools import wraps
+import inspect
 import uuid
 import random
 
@@ -12,15 +14,16 @@ from sentry_sdk._types import TYPE_CHECKING
 if TYPE_CHECKING:
     import typing
 
-    from typing import Optional
     from typing import Any
     from typing import Dict
-    from typing import List
-    from typing import Tuple
     from typing import Iterator
+    from typing import List
+    from typing import Optional
+    from typing import Tuple
 
     import sentry_sdk.profiler
-    from sentry_sdk._types import Event, SamplingContext, MeasurementUnit
+    from sentry_sdk._types import Event, MeasurementUnit, SamplingContext
+
 
 BAGGAGE_HEADER_NAME = "baggage"
 SENTRY_TRACE_HEADER_NAME = "sentry-trace"
@@ -226,7 +229,7 @@ class Span(object):
             trace_id=self.trace_id,
             parent_span_id=self.span_id,
             containing_transaction=self.containing_transaction,
-            **kwargs
+            **kwargs,
         )
 
         span_recorder = (
@@ -246,7 +249,7 @@ class Span(object):
     def continue_from_environ(
         cls,
         environ,  # type: typing.Mapping[str, str]
-        **kwargs  # type: Any
+        **kwargs,  # type: Any
     ):
         # type: (...) -> Transaction
         """
@@ -269,7 +272,7 @@ class Span(object):
     def continue_from_headers(
         cls,
         headers,  # type: typing.Mapping[str, str]
-        **kwargs  # type: Any
+        **kwargs,  # type: Any
     ):
         # type: (...) -> Transaction
         """
@@ -323,7 +326,7 @@ class Span(object):
     def from_traceparent(
         cls,
         traceparent,  # type: Optional[str]
-        **kwargs  # type: Any
+        **kwargs,  # type: Any
     ):
         # type: (...) -> Optional[Transaction]
         """
@@ -492,7 +495,7 @@ class Transaction(Span):
         parent_sampled=None,  # type: Optional[bool]
         baggage=None,  # type: Optional[Baggage]
         source=TRANSACTION_SOURCE_CUSTOM,  # type: str
-        **kwargs  # type: Any
+        **kwargs,  # type: Any
     ):
         # type: (...) -> None
         # TODO: consider removing this in a future release.
@@ -801,6 +804,100 @@ class NoOpSpan(Span):
     def finish(self, hub=None, end_timestamp=None):
         # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
         pass
+
+
+def trace(
+    func=None,
+    *,
+    transaction_name=None,
+    op=None,
+):
+    # type: (Any, Optional[str],  Optional[str]) -> Any
+    """
+    Decorator to start a child span under the existing current transaction or
+    under a new transaction, if it doesn't exist.
+
+    Args:
+        transaction_name: the name of the new transaction if no transaction already
+            exists. If a transaction is found in current scope, this name is ignored.
+            If no transaction is found and no transaction name is provided, no action
+            is taken.
+        op: the name of the child. Defaults to the decorated function name.
+
+    Returns:
+        a decorated function executing within a Sentry transaction child
+
+    Usage:
+    from sentry_sdk.tracing import trace
+
+    @trace
+    def my_function():
+        ...
+
+    @trace(transaction_name="new_tx")
+    async def my_async_function():
+        ...
+
+    @trace(op="child_name")
+    def my_function():
+       ...
+    """
+
+    def start_child_decorator(func):
+        # type: (Any) -> Any
+
+        def _transaction_and_op():
+            # type: () -> Tuple[Optional[Transaction], str]
+
+            # Set transaction
+            transaction = sentry_sdk.Hub.current.scope.transaction
+            # If no current transaction we create one
+            if transaction_name and transaction is None:
+                transaction = sentry_sdk.start_transaction(name=transaction_name)
+            # Child name - defaults to the decorated function name
+            op_ = op or func.__name__
+            return transaction, op_
+
+        # Asynchronous case
+        if inspect.iscoroutinefunction(func):
+
+            @wraps(func)
+            async def func_with_tracing(*args, **kwargs):
+                # type: (*Any, **Any) -> Any
+
+                transaction, op_ = _transaction_and_op()
+                # If no transaction, do nothing
+                if transaction is None:
+                    return await func(*args, **kwargs)
+
+                # If we have a transaction, we decorate the function!
+                with transaction.start_child(op=op_):
+                    return await func(*args, **kwargs)
+
+        # Synchronous case
+        else:
+
+            @wraps(func)
+            def func_with_tracing(*args, **kwargs):
+                # type: (*Any, **Any) -> Any
+
+                transaction, op_ = _transaction_and_op()
+                # If no transaction, do nothing
+                if transaction is None:
+                    return func(*args, **kwargs)
+
+                # If we have a transaction, we decorate the function!
+                with transaction.start_child(op=op_):
+                    return func(*args, **kwargs)
+
+        return func_with_tracing
+
+    # This patterns allows usage of both @sentry_traced and @sentry_traced(...)
+    # See https://stackoverflow.com/questions/52126071/decorator-with-arguments-avoid-parenthesis-when-no-arguments/52126278
+    if func:
+        return start_child_decorator(func)
+    else:
+        return start_child_decorator
 
 
 # Circular imports
