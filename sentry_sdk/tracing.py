@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.utils import logger, nanosecond_time
+from sentry_sdk._compat import PY2
 from sentry_sdk._types import TYPE_CHECKING
 
 
@@ -858,8 +859,7 @@ def trace(
             return transaction, op_
 
         # Asynchronous case
-        if inspect.iscoroutinefunction(func):
-
+        if inspect.iscoroutinefunction(func) and not PY2:
             @wraps(func)
             async def func_with_tracing(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
