@@ -15,7 +15,7 @@ from sentry_sdk.utils import (
     to_string,
 )
 from sentry_sdk._compat import PY2, iteritems
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
 if PY2:
     from collections import Mapping
@@ -24,13 +24,13 @@ else:
     from collections.abc import Mapping
     from urllib.parse import quote, unquote
 
-if MYPY:
+if TYPE_CHECKING:
     import typing
 
-    from typing import Generator
-    from typing import Optional
     from typing import Any
     from typing import Dict
+    from typing import Generator
+    from typing import Optional
     from typing import Union
 
 
@@ -376,8 +376,27 @@ class Baggage(object):
         return ",".join(items)
 
 
+def should_propagate_trace(hub, url):
+    # type: (sentry_sdk.Hub, str) -> bool
+    """
+    Returns True if url matches trace_propagation_targets configured in the given hub. Otherwise, returns False.
+    """
+    client = hub.client  # type: Any
+    trace_propagation_targets = client.options["trace_propagation_targets"]
+
+    if trace_propagation_targets is None:
+        return False
+
+    for target in trace_propagation_targets:
+        matched = re.search(target, url)
+        if matched:
+            return True
+
+    return False
+
+
 # Circular imports
 from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
 
-if MYPY:
+if TYPE_CHECKING:
     from sentry_sdk.tracing import Span, Transaction

@@ -5,7 +5,7 @@ import sys
 import threading
 import weakref
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
@@ -51,7 +51,7 @@ from sentry_sdk.integrations.django.signals_handlers import patch_signals
 from sentry_sdk.integrations.django.views import patch_views
 
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
@@ -90,9 +90,12 @@ class DjangoIntegration(Integration):
 
     transaction_style = ""
     middleware_spans = None
+    signals_spans = None
 
-    def __init__(self, transaction_style="url", middleware_spans=True):
-        # type: (str, bool) -> None
+    def __init__(
+        self, transaction_style="url", middleware_spans=True, signals_spans=True
+    ):
+        # type: (str, bool, bool) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -100,6 +103,7 @@ class DjangoIntegration(Integration):
             )
         self.transaction_style = transaction_style
         self.middleware_spans = middleware_spans
+        self.signals_spans = signals_spans
 
     @staticmethod
     def setup_once():

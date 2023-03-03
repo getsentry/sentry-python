@@ -1,11 +1,12 @@
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import logger, parse_url
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
 
 
@@ -52,13 +53,15 @@ def _install_httpx_client():
             span.set_data("http.query", parsed_url.query)
             span.set_data("http.fragment", parsed_url.fragment)
 
-            for key, value in hub.iter_trace_propagation_headers():
-                logger.debug(
-                    "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
-                        key=key, value=value, url=request.url
+            if should_propagate_trace(hub, str(request.url)):
+                for key, value in hub.iter_trace_propagation_headers():
+                    logger.debug(
+                        "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
+                            key=key, value=value, url=request.url
+                        )
                     )
-                )
-                request.headers[key] = value
+                    request.headers[key] = value
+
             rv = real_send(self, request, **kwargs)
 
             span.set_data("status_code", rv.status_code)
@@ -91,13 +94,15 @@ def _install_httpx_async_client():
             span.set_data("http.query", parsed_url.query)
             span.set_data("http.fragment", parsed_url.fragment)
 
-            for key, value in hub.iter_trace_propagation_headers():
-                logger.debug(
-                    "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
-                        key=key, value=value, url=request.url
+            if should_propagate_trace(hub, str(request.url)):
+                for key, value in hub.iter_trace_propagation_headers():
+                    logger.debug(
+                        "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
+                            key=key, value=value, url=request.url
+                        )
                     )
-                )
-                request.headers[key] = value
+                    request.headers[key] = value
+
             rv = await real_send(self, request, **kwargs)
 
             span.set_data("status_code", rv.status_code)

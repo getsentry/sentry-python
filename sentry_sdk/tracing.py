@@ -6,10 +6,10 @@ from datetime import datetime, timedelta
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.utils import logger, nanosecond_time
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
 
-if MYPY:
+if TYPE_CHECKING:
     import typing
 
     from typing import Optional

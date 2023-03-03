@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="1.15.0",
+    version="1.16.0",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -53,6 +53,7 @@ setup(
         "celery": ["celery>=3"],
         "huey": ["huey>=2"],
         "beam": ["apache-beam>=2.12"],
+        "arq": ["arq>=0.23"],
         "rq": ["rq>=0.6"],
         "aiohttp": ["aiohttp>=3.5"],
         "tornado": ["tornado>=5"],

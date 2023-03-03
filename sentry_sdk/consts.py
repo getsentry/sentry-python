@@ -1,6 +1,6 @@
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     import sentry_sdk
 
     from typing import Optional
@@ -42,6 +42,8 @@ if MYPY:
 DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
 
+MATCH_ALL = r".*"
+
 
 class INSTRUMENTER:
     SENTRY = "sentry"
@@ -65,6 +67,8 @@ class OP:
     MIDDLEWARE_STARLITE = "middleware.starlite"
     MIDDLEWARE_STARLITE_RECEIVE = "middleware.starlite.receive"
     MIDDLEWARE_STARLITE_SEND = "middleware.starlite.send"
+    QUEUE_SUBMIT_ARQ = "queue.submit.arq"
+    QUEUE_TASK_ARQ = "queue.task.arq"
     QUEUE_SUBMIT_CELERY = "queue.submit.celery"
     QUEUE_TASK_CELERY = "queue.task.celery"
     QUEUE_TASK_RQ = "queue.task.rq"
@@ -89,7 +93,6 @@ class ClientConstructor(object):
     def __init__(
         self,
         dsn=None,  # type: Optional[str]
-        with_locals=True,  # type: bool
         max_breadcrumbs=DEFAULT_MAX_BREADCRUMBS,  # type: int
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
@@ -125,6 +128,10 @@ class ClientConstructor(object):
         before_send_transaction=None,  # type: Optional[TransactionProcessor]
         project_root=None,  # type: Optional[str]
         enable_tracing=None,  # type: Optional[bool]
+        include_local_variables=True,  # type: Optional[bool]
+        trace_propagation_targets=[  # noqa: B006
+            MATCH_ALL
+        ],  # type: Optional[Sequence[str]]
     ):
         # type: (...) -> None
         pass
@@ -148,4 +155,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.15.0"
+VERSION = "1.16.0"
