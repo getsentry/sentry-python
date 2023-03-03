@@ -808,7 +808,6 @@ class NoOpSpan(Span):
 
 def trace(
     func=None,
-    *,
     transaction_name=None,
     op=None,
 ):
