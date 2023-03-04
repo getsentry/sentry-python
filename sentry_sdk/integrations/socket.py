@@ -1,8 +1,13 @@
 import socket
 
 from sentry_sdk import Hub
+from sentry_sdk._types import MYPY
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration
+
+if MYPY:
+    from socket import AddressFamily, SocketKind
+    from typing import Tuple, Optional, Union, List
 
 __all__ = ["SocketIntegration"]
 
@@ -25,9 +30,9 @@ def _patch_create_connection():
     real_create_connection = socket.create_connection
 
     def create_connection(
-        address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None
+            address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None
     ):
-        # type: (tuple[str, None | int], float | None, tuple[bytearray | bytes | str, int] | None) -> socket
+        # type: (Tuple[Optional[str], int], Optional[float], Optional[Tuple[Union[bytearray, bytes, str], int]])-> socket.socket
         hub = Hub.current
         if hub.get_integration(SocketIntegration) is None:
             return real_create_connection(
@@ -35,7 +40,7 @@ def _patch_create_connection():
             )
 
         with hub.start_span(
-            op=OP.SOCKET_CONNECTION, description="%s:%s" % (address[0], address[1])
+                op=OP.SOCKET_CONNECTION, description="%s:%s" % (address[0], address[1])
         ) as span:
             span.set_data("address", address)
             span.set_data("timeout", timeout)
@@ -52,17 +57,18 @@ def _patch_getaddrinfo():
     # type: () -> None
     real_getaddrinfo = socket.getaddrinfo
 
-    def getaddrinfo(host, port, *args, **kwargs):
+    def getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+        # type: (Union[bytes, str, None], Union[str, int, None], int, int, int, int) -> List[Tuple[AddressFamily, SocketKind, int, str, Union[Tuple[str, int], Tuple[str, int, int, int]]]]
         hub = Hub.current
         if hub.get_integration(SocketIntegration) is None:
-            return real_getaddrinfo(host, port, *args, **kwargs)
+            return real_getaddrinfo(host, port, family, type, proto, flags)
 
         with hub.start_span(
-            op=OP.SOCKET_DNS, description="%s:%s" % (host, port)
+                op=OP.SOCKET_DNS, description="%s:%s" % (host, port)
         ) as span:
             span.set_data("host", host)
             span.set_data("port", port)
 
-            return real_getaddrinfo(host, port, *args, **kwargs)
+            return real_getaddrinfo(host, port, family, type, proto, flags)
 
     socket.getaddrinfo = getaddrinfo

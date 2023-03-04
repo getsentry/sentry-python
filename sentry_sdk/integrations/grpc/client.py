@@ -4,10 +4,13 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 
 if MYPY:
-    pass
+    from typing import Callable, Iterator, Union
 
 try:
     import grpc
+    from grpc import ClientCallDetails, Call
+    from grpc._interceptor import _UnaryOutcome
+    from google.protobuf.message import Message
 except ImportError:
     raise DidNotEnable("grpcio is not installed")
 
@@ -16,11 +19,12 @@ class ClientInterceptor(
     grpc.UnaryUnaryClientInterceptor, grpc.UnaryStreamClientInterceptor
 ):
     def intercept_unary_unary(self, continuation, client_call_details, request):
+        # type: (ClientInterceptor, Callable[[ClientCallDetails, Message], _UnaryOutcome], ClientCallDetails, Message) -> _UnaryOutcome
         hub = Hub.current
         method = client_call_details.method
 
         with hub.start_span(
-            op=OP.GRPC_CLIENT, description="unary unary call to %s" % method
+                op=OP.GRPC_CLIENT, description="unary unary call to %s" % method
         ) as span:
             span.set_data("type", "unary unary")
             span.set_data("method", method)
@@ -35,11 +39,12 @@ class ClientInterceptor(
             return response
 
     def intercept_unary_stream(self, continuation, client_call_details, request):
+        # type: (ClientInterceptor, Callable[[ClientCallDetails, Message], Iterator], ClientCallDetails, Message) -> Union[Iterator[Message], Call]
         hub = Hub.current
         method = client_call_details.method
 
         with hub.start_span(
-            op=OP.GRPC_CLIENT, description="unary stream call to %s" % method
+                op=OP.GRPC_CLIENT, description="unary stream call to %s" % method
         ) as span:
             span.set_data("type", "unary stream")
             span.set_data("method", method)
@@ -55,6 +60,7 @@ class ClientInterceptor(
 
     @staticmethod
     def _update_client_call_details_metadata_from_hub(client_call_details, hub):
+        # type: (ClientCallDetails, Hub) -> ClientCallDetails
         metadata = (
             list(client_call_details.metadata) if client_call_details.metadata else []
         )

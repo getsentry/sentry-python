@@ -5,27 +5,31 @@ from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_CUSTOM
 
 if MYPY:
-    from typing import Callable
+    from typing import Callable, Optional
+    from google.protobuf.message import Message
 
 try:
     import grpc
+    from grpc import ServicerContext, HandlerCallDetails, RpcMethodHandler
 except ImportError:
     raise DidNotEnable("grpcio is not installed")
 
 
 class ServerInterceptor(grpc.ServerInterceptor):
     def __init__(self, find_name=None):
-        # type: (ServerInterceptor, Callable | None) -> ServerInterceptor
+        # type: (ServerInterceptor, Optional[Callable[[ServicerContext], str]]) -> None
         if find_name:
             self._find_method_name = find_name
         super(ServerInterceptor, self).__init__()
 
     def intercept_service(self, continuation, handler_call_details):
+        # type: (ServerInterceptor, Callable[[HandlerCallDetails], RpcMethodHandler], HandlerCallDetails) -> RpcMethodHandler
         handler = continuation(handler_call_details)
         if not handler or not handler.unary_unary:
             return handler
 
         def behavior(request, context):
+            # type: (Message, ServicerContext) -> Message
             hub = Hub(Hub.current)
 
             name = self._find_method_name(context)
@@ -56,4 +60,5 @@ class ServerInterceptor(grpc.ServerInterceptor):
 
     @staticmethod
     def _find_name(context):
+        # type: (ServicerContext) -> str
         return context._rpc_event.call_details.method.decode()
