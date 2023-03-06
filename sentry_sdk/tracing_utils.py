@@ -1,9 +1,7 @@
 import contextlib
-import inspect
 import math
 import re
 from decimal import Decimal
-from functools import wraps
 from numbers import Real
 
 import sentry_sdk
@@ -14,7 +12,6 @@ from sentry_sdk.utils import (
     Dsn,
     capture_internal_exceptions,
     logger,
-    qualname_from_function,
     to_string,
 )
 
@@ -389,64 +386,6 @@ def should_propagate_trace(hub, url):
             return True
 
     return False
-
-
-def start_child_span_decorator(func):
-    # type: (Any) -> Any
-    """
-    Decorator to add child spans for functions.
-
-    For Python 2 there is duplicated code here: ``sentry_sdk.tracing_utils.start_child_span_decorator()``.
-
-    See also ``sentry_sdk.tracing.trace()``.
-    """
-
-    def _get_transaction():
-        # type: () -> Optional[Transaction]
-        transaction = sentry_sdk.Hub.current.scope.transaction
-        return transaction
-
-    # Asynchronous case
-    if inspect.iscoroutinefunction(func):
-
-        @wraps(func)
-        async def func_with_tracing(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
-
-            transaction = _get_transaction()
-
-            # If no transaction, do nothing
-            if transaction is None:
-                return await func(*args, **kwargs)
-
-            # If we have a transaction, we wrap the function.
-            with transaction.start_child(
-                op=OP.FUNCTION,
-                description=qualname_from_function(func),
-            ):
-                return await func(*args, **kwargs)
-
-    # Synchronous case
-    else:
-
-        @wraps(func)
-        def func_with_tracing(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
-
-            transaction = _get_transaction()
-
-            # If no transaction, do nothing
-            if transaction is None:
-                return func(*args, **kwargs)
-
-            # If we have a transaction, we decorate the function!
-            with transaction.start_child(
-                op=OP.FUNCTION,
-                description=qualname_from_function(func),
-            ):
-                return func(*args, **kwargs)
-
-    return func_with_tracing
 
 
 # Circular imports
