@@ -1,9 +1,9 @@
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk import _functools
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
 
 
