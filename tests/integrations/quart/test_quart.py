@@ -1,3 +1,6 @@
+import json
+import threading
+
 import pytest
 import pytest_asyncio
 
@@ -40,6 +43,20 @@ async def app():
     async def hi_with_id(message_id):
         capture_message("hi with id")
         return "ok with id"
+
+    @app.get("/sync/thread_ids")
+    def _thread_ids_sync():
+        return {
+            "main": str(threading.main_thread().ident),
+            "active": str(threading.current_thread().ident),
+        }
+
+    @app.get("/async/thread_ids")
+    async def _thread_ids_async():
+        return {
+            "main": str(threading.main_thread().ident),
+            "active": str(threading.current_thread().ident),
+        }
 
     return app
 
@@ -523,3 +540,30 @@ async def test_class_based_views(sentry_init, app, capture_events):
 
     assert event["message"] == "hi"
     assert event["transaction"] == "hello_class"
+
+
+@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
+async def test_active_thread_id(sentry_init, capture_envelopes, endpoint, app):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": 1.0},
+    )
+
+    envelopes = capture_envelopes()
+
+    async with app.test_client() as client:
+        response = await client.get(endpoint)
+        assert response.status_code == 200
+
+    data = json.loads(response.content)
+
+    envelopes = [envelope for envelope in envelopes]
+    assert len(envelopes) == 1
+
+    profiles = [item for item in envelopes[0].items if item.type == "profile"]
+    assert len(profiles) == 1
+
+    for profile in profiles:
+        transactions = profile.payload.json["transactions"]
+        assert len(transactions) == 1
+        assert str(data["active"]) == transactions[0]["active_thread_id"]
