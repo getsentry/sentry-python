@@ -6,7 +6,7 @@ import random
 from datetime import datetime, timedelta
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER
+from sentry_sdk.consts import INSTRUMENTER, OP
 from sentry_sdk.utils import logger, nanosecond_time
 from sentry_sdk._compat import PY2
 from sentry_sdk._types import TYPE_CHECKING
@@ -807,70 +807,47 @@ class NoOpSpan(Span):
         pass
 
 
-def trace(
-    func=None,
-    transaction_name=None,
-    op=None,
-):
-    # type: (Any, Optional[str],  Optional[str]) -> Any
+def trace(func=None):
+    # type: (Any) -> Any
     """
-    Decorator to start a child span under the existing current transaction or
-    under a new transaction, if it doesn't exist.
-
-    Args:
-        transaction_name: the name of the new transaction if no transaction already
-            exists. If a transaction is found in current scope, this name is ignored.
-            If no transaction is found and no transaction name is provided, no action
-            is taken.
-        op: the name of the child. Defaults to the decorated function name.
-
-    Returns:
-        a decorated function executing within a Sentry transaction child
+    Decorator to start a child span under the existing current transaction.
+    If there is no current transaction, than nothing will be traced.
 
     Usage:
-    from sentry_sdk.tracing import trace
+        import sentry_sdk
 
-    @trace
-    def my_function():
-        ...
+        @sentry_sdk.trace
+        def my_function():
+            ...
 
-    @trace(transaction_name="new_tx")
-    async def my_async_function():
-        ...
-
-    @trace(op="child_name")
-    def my_function():
-       ...
+        @senrty_sdk.trace
+        async def my_async_function():
+            ...
     """
 
     def start_child_decorator(func):
         # type: (Any) -> Any
 
-        def _transaction_and_op():
-            # type: () -> Tuple[Optional[Transaction], str]
-
-            # Set transaction
+        def _get_transaction():
+            # type: () -> Optional[Transaction]
             transaction = sentry_sdk.Hub.current.scope.transaction
-            # If no current transaction we create one
-            if transaction_name and transaction is None:
-                transaction = sentry_sdk.start_transaction(name=transaction_name)
-            # Child name - defaults to the decorated function name
-            op_ = op or func.__name__
-            return transaction, op_
+            return transaction
 
         # Asynchronous case
         if inspect.iscoroutinefunction(func) and not PY2:
+
             @wraps(func)
             async def func_with_tracing(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
 
-                transaction, op_ = _transaction_and_op()
+                transaction = _get_transaction()
+
                 # If no transaction, do nothing
                 if transaction is None:
                     return await func(*args, **kwargs)
 
-                # If we have a transaction, we decorate the function!
-                with transaction.start_child(op=op_):
+                # If we have a transaction, we wrap the function.
+                with transaction.start_child(op=OP.FUNCTION):
                     return await func(*args, **kwargs)
 
         # Synchronous case
@@ -880,13 +857,14 @@ def trace(
             def func_with_tracing(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
 
-                transaction, op_ = _transaction_and_op()
+                transaction = _get_transaction()
+
                 # If no transaction, do nothing
                 if transaction is None:
                     return func(*args, **kwargs)
 
                 # If we have a transaction, we decorate the function!
-                with transaction.start_child(op=op_):
+                with transaction.start_child(op=OP.FUNCTION):
                     return func(*args, **kwargs)
 
         return func_with_tracing
