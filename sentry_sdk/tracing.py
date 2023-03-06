@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER, OP
-from sentry_sdk.utils import logger, nanosecond_time
+from sentry_sdk.utils import logger, nanosecond_time, qualname_from_function
 from sentry_sdk._compat import PY2
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -847,7 +847,10 @@ def trace(func=None):
                     return await func(*args, **kwargs)
 
                 # If we have a transaction, we wrap the function.
-                with transaction.start_child(op=OP.FUNCTION):
+                with transaction.start_child(
+                    op=OP.FUNCTION,
+                    description=qualname_from_function(func),
+                ):
                     return await func(*args, **kwargs)
 
         # Synchronous case
@@ -864,7 +867,10 @@ def trace(func=None):
                     return func(*args, **kwargs)
 
                 # If we have a transaction, we decorate the function!
-                with transaction.start_child(op=OP.FUNCTION):
+                with transaction.start_child(
+                    op=OP.FUNCTION,
+                    description=qualname_from_function(func),
+                ):
                     return func(*args, **kwargs)
 
         return func_with_tracing
