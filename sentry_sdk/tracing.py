@@ -1,13 +1,11 @@
-from functools import wraps
-import inspect
 import uuid
 import random
 
 from datetime import datetime, timedelta
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER, OP
-from sentry_sdk.utils import logger, nanosecond_time, qualname_from_function
+from sentry_sdk.consts import INSTRUMENTER
+from sentry_sdk.utils import logger, nanosecond_time
 from sentry_sdk._compat import PY2
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -824,63 +822,17 @@ def trace(func=None):
         async def my_async_function():
             ...
     """
-
-    def start_child_decorator(func):
-        # type: (Any) -> Any
-
-        def _get_transaction():
-            # type: () -> Optional[Transaction]
-            transaction = sentry_sdk.Hub.current.scope.transaction
-            return transaction
-
-        # Asynchronous case
-        if inspect.iscoroutinefunction(func) and not PY2:
-
-            @wraps(func)
-            async def func_with_tracing(*args, **kwargs):
-                # type: (*Any, **Any) -> Any
-
-                transaction = _get_transaction()
-
-                # If no transaction, do nothing
-                if transaction is None:
-                    return await func(*args, **kwargs)
-
-                # If we have a transaction, we wrap the function.
-                with transaction.start_child(
-                    op=OP.FUNCTION,
-                    description=qualname_from_function(func),
-                ):
-                    return await func(*args, **kwargs)
-
-        # Synchronous case
-        else:
-
-            @wraps(func)
-            def func_with_tracing(*args, **kwargs):
-                # type: (*Any, **Any) -> Any
-
-                transaction = _get_transaction()
-
-                # If no transaction, do nothing
-                if transaction is None:
-                    return func(*args, **kwargs)
-
-                # If we have a transaction, we decorate the function!
-                with transaction.start_child(
-                    op=OP.FUNCTION,
-                    description=qualname_from_function(func),
-                ):
-                    return func(*args, **kwargs)
-
-        return func_with_tracing
+    if PY2:
+        from sentry_sdk.tracing_utils_python2 import start_child_span_decorator
+    else:
+        from sentry_sdk.tracing_utils import start_child_span_decorator
 
     # This patterns allows usage of both @sentry_traced and @sentry_traced(...)
     # See https://stackoverflow.com/questions/52126071/decorator-with-arguments-avoid-parenthesis-when-no-arguments/52126278
     if func:
-        return start_child_decorator(func)
+        return start_child_span_decorator(func)
     else:
-        return start_child_decorator
+        return start_child_span_decorator
 
 
 # Circular imports
