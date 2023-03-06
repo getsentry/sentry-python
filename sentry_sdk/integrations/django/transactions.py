@@ -7,9 +7,9 @@ from __future__ import absolute_import
 
 import re
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from django.urls.resolvers import URLResolver
     from typing import Dict
     from typing import List

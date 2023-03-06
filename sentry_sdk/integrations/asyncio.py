@@ -5,7 +5,7 @@ from sentry_sdk._compat import reraise
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import event_from_exception
 
 try:
@@ -15,7 +15,7 @@ except ImportError:
     raise DidNotEnable("asyncio not available")
 
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
 
     from sentry_sdk._types import ExcInfo

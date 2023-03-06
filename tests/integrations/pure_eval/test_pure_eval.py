@@ -8,8 +8,8 @@ from sentry_sdk.integrations.pure_eval import PureEvalIntegration
 
 
 @pytest.mark.parametrize("integrations", [[], [PureEvalIntegration()]])
-def test_with_locals_enabled(sentry_init, capture_events, integrations):
-    sentry_init(with_locals=True, integrations=integrations)
+def test_include_local_variables_enabled(sentry_init, capture_events, integrations):
+    sentry_init(include_local_variables=True, integrations=integrations)
     events = capture_events()
 
     def foo():
