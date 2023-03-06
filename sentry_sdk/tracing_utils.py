@@ -1,19 +1,21 @@
+import re
 import contextlib
 import math
-import re
-from decimal import Decimal
+
 from numbers import Real
+from decimal import Decimal
 
 import sentry_sdk
-from sentry_sdk._compat import PY2, iteritems
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
+
 from sentry_sdk.utils import (
-    Dsn,
     capture_internal_exceptions,
+    Dsn,
     logger,
     to_string,
 )
+from sentry_sdk._compat import PY2, iteritems
+from sentry_sdk._types import TYPE_CHECKING
 
 if PY2:
     from collections import Mapping
@@ -24,7 +26,12 @@ else:
 
 if TYPE_CHECKING:
     import typing
-    from typing import Any, Dict, Generator, Optional, Union
+
+    from typing import Any
+    from typing import Dict
+    from typing import Generator
+    from typing import Optional
+    from typing import Union
 
 
 SENTRY_TRACE_REGEX = re.compile(
