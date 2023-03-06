@@ -4,7 +4,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
-from sentry_sdk.utils import qualname_from_function
+from sentry_sdk.utils import logger, qualname_from_function
 
 
 if TYPE_CHECKING:
@@ -40,6 +40,11 @@ def start_child_span_decorator(func):
 
             # If no transaction, do nothing
             if transaction is None:
+                logger.warning(
+                    "No transaction found. Not creating a child span for %s. "
+                    "Please start a Sentry transaction before calling this function.",
+                    qualname_from_function(func),
+                )
                 return await func(*args, **kwargs)
 
             # If we have a transaction, we wrap the function.
@@ -60,6 +65,11 @@ def start_child_span_decorator(func):
 
             # If no transaction, do nothing
             if transaction is None:
+                logger.warning(
+                    "No transaction found. Not creating a child span for %s. "
+                    "Please start a Sentry transaction before calling this function.",
+                    qualname_from_function(func),
+                )
                 return func(*args, **kwargs)
 
             # If we have a transaction, we decorate the function!
