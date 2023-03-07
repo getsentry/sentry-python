@@ -818,7 +818,7 @@ def trace(func=None):
         def my_function():
             ...
 
-        @senrty_sdk.trace
+        @sentry_sdk.trace
         async def my_async_function():
             ...
     """
