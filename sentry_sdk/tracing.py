@@ -825,7 +825,7 @@ def trace(func=None):
     if PY2:
         from sentry_sdk.tracing_utils_py2 import start_child_span_decorator
     else:
-        from sentry_sdk.tracing_utils_py3 import start_child_span_decorator  # type: ignore
+        from sentry_sdk.tracing_utils_py3 import start_child_span_decorator
 
     # This patterns allows usage of both @sentry_traced and @sentry_traced(...)
     # See https://stackoverflow.com/questions/52126071/decorator-with-arguments-avoid-parenthesis-when-no-arguments/52126278
