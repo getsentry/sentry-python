@@ -823,7 +823,7 @@ def trace(func=None):
             ...
     """
     if PY2:
-        from sentry_sdk.tracing_utils_python2 import start_child_span_decorator  # type: ignore
+        from sentry_sdk.tracing_utils_python2 import start_child_span_decorator
     else:
         from sentry_sdk.tracing_utils_python3 import start_child_span_decorator  # type: ignore
 
