@@ -8,13 +8,17 @@ from sentry_sdk.utils import logger, qualname_from_function
 
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any, Optional, Union
 
-    from sentry_sdk.tracing import Transaction
+    from sentry_sdk.tracing import Span, Transaction
 
 
-def _get_transaction():
-    # type: () -> Optional[Transaction]
+def _get_running_span_or_transaction():
+    # type: () -> Optional[Union[Span, Transaction]]
+    current_span = sentry_sdk.Hub.current.scope.span
+    if current_span is not None:
+        return current_span
+
     transaction = sentry_sdk.Hub.current.scope.transaction
     return transaction
 
@@ -37,10 +41,10 @@ def start_child_span_decorator(func):
         async def func_with_tracing(*args, **kwargs):
             # type: (*Any, **Any) -> Any
 
-            transaction = _get_transaction()
+            span_or_trx = _get_running_span_or_transaction()
 
             # If no transaction, do nothing
-            if transaction is None:
+            if span_or_trx is None:
                 logger.warning(
                     "No transaction found. Not creating a child span for %s. "
                     "Please start a Sentry transaction before calling this function.",
@@ -49,7 +53,7 @@ def start_child_span_decorator(func):
                 return await func(*args, **kwargs)
 
             # If we have a transaction, we wrap the function.
-            with transaction.start_child(
+            with span_or_trx.start_child(
                 op=OP.FUNCTION,
                 description=qualname_from_function(func),
             ):
@@ -62,7 +66,7 @@ def start_child_span_decorator(func):
         def func_with_tracing(*args, **kwargs):
             # type: (*Any, **Any) -> Any
 
-            transaction = _get_transaction()
+            transaction = _get_running_span_or_transaction()
 
             # If no transaction, do nothing
             if transaction is None:

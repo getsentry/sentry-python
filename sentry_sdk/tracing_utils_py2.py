@@ -7,13 +7,17 @@ from sentry_sdk.utils import logger, qualname_from_function
 
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any, Optional, Union
 
-    from sentry_sdk.tracing import Transaction
+    from sentry_sdk.tracing import Span, Transaction
 
 
-def _get_transaction():
-    # type: () -> Optional[Transaction]
+def _get_running_span_or_transaction():
+    # type: () -> Optional[Union[Span, Transaction]]
+    current_span = sentry_sdk.Hub.current.scope.span
+    if current_span is not None:
+        return current_span
+
     transaction = sentry_sdk.Hub.current.scope.transaction
     return transaction
 
@@ -33,7 +37,7 @@ def start_child_span_decorator(func):
     def func_with_tracing(*args, **kwargs):
         # type: (*Any, **Any) -> Any
 
-        transaction = _get_transaction()
+        transaction = _get_running_span_or_transaction()
 
         # If no transaction, do nothing
         if transaction is None:
