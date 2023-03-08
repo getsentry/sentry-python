@@ -13,6 +13,12 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Transaction
 
 
+def _get_transaction():
+    # type: () -> Optional[Transaction]
+    transaction = sentry_sdk.Hub.current.scope.transaction
+    return transaction
+
+
 def start_child_span_decorator(func):
     # type: (Any) -> Any
     """
@@ -23,11 +29,6 @@ def start_child_span_decorator(func):
 
     See also ``sentry_sdk.tracing.trace()``.
     """
-
-    def _get_transaction():
-        # type: () -> Optional[Transaction]
-        transaction = sentry_sdk.Hub.current.scope.transaction
-        return transaction
 
     # Asynchronous case
     if inspect.iscoroutinefunction(func):
