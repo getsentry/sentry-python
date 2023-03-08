@@ -191,7 +191,10 @@ def setup_profiler(options):
     if options.get("profiler_mode") is not None:
         profiler_mode = options["profiler_mode"]
     else:
-        profiler_mode = options.get("_experiments", {}).get("profiler_mode") or default_profiler_mode
+        profiler_mode = (
+            options.get("_experiments", {}).get("profiler_mode")
+            or default_profiler_mode
+        )
 
     if (
         profiler_mode == ThreadScheduler.mode

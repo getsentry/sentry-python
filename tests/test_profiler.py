@@ -51,7 +51,9 @@ def non_experimental_options(mode=None, sample_rate=None):
 
 
 def experimental_options(mode=None, sample_rate=None):
-    return {"_experiments": {"profiler_mode": mode, "profiles_sample_rate": sample_rate}}
+    return {
+        "_experiments": {"profiler_mode": mode, "profiles_sample_rate": sample_rate}
+    }
 
 
 @requires_python_version(3, 3)
@@ -99,17 +101,17 @@ def test_profiler_valid_mode(mode, make_options, teardown_profiling):
 
 @requires_python_version(3, 3)
 @pytest.mark.parametrize(
-    "options",
+    "make_options",
     [
-        pytest.param(experimental_options(), id="experiment"),
-        pytest.param(non_experimental_options(), id="non experimental"),
+        pytest.param(experimental_options, id="experiment"),
+        pytest.param(non_experimental_options, id="non experimental"),
     ],
 )
-def test_profiler_setup_twice(options, teardown_profiling):
+def test_profiler_setup_twice(make_options, teardown_profiling):
     # setting up the first time should return True to indicate success
-    assert setup_profiler(options)
+    assert setup_profiler(make_options())
     # setting up the second time should return False to indicate no-op
-    assert not setup_profiler(options)
+    assert not setup_profiler(make_options())
 
 
 @pytest.mark.parametrize(
@@ -146,9 +148,12 @@ def test_profiles_sample_rate(
     make_options,
     mode,
 ):
+    options = make_options(mode=mode, sample_rate=profiles_sample_rate)
     sentry_init(
         traces_sample_rate=1.0,
-        **make_options(mode=mode, sample_rate=profiles_sample_rate),
+        profiler_mode=options.get("profiler_mode"),
+        profiles_sample_rate=options.get("profiles_sample_rate"),
+        _experiments=options.get("_experiments", {}),
     )
 
     envelopes = capture_envelopes()
@@ -184,12 +189,12 @@ def test_profiles_sample_rate(
         pytest.param(
             lambda ctx: 1 if ctx["transaction_context"]["name"] == "profiling" else 0,
             1,
-            id="profiler sampled for transaction name"
+            id="profiler sampled for transaction name",
         ),
         pytest.param(
             lambda ctx: 0 if ctx["transaction_context"]["name"] == "profiling" else 1,
             0,
-            id="profiler not sampled for transaction name"
+            id="profiler not sampled for transaction name",
         ),
     ],
 )
