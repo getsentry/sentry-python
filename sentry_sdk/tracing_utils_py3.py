@@ -10,16 +10,17 @@ from sentry_sdk.utils import logger, qualname_from_function
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
 
+    from sentry_sdk import Hub
     from sentry_sdk.tracing import Span, Transaction
 
 
-def _get_running_span_or_transaction():
-    # type: () -> Optional[Union[Span, Transaction]]
-    current_span = sentry_sdk.Hub.current.scope.span
+def _get_running_span_or_transaction(hub):
+    # type: (Hub) -> Optional[Union[Span, Transaction]]
+    current_span = hub.scope.span
     if current_span is not None:
         return current_span
 
-    transaction = sentry_sdk.Hub.current.scope.transaction
+    transaction = hub.scope.transaction
     return transaction
 
 
