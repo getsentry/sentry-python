@@ -10,7 +10,7 @@ from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import (
     should_propagate_trace,
-    _get_running_span_or_transaction,
+    get_running_span_or_transaction,
 )
 
 try:
@@ -317,12 +317,12 @@ def test_get_running_span_or_transaction():
 
     fake_hub.scope.span = mock.MagicMock()
     fake_hub.scope.transaction = None
-    assert _get_running_span_or_transaction(fake_hub) == fake_hub.scope.span
+    assert get_running_span_or_transaction(fake_hub) == fake_hub.scope.span
 
     fake_hub.scope.span = None
     fake_hub.scope.transaction = mock.MagicMock()
-    assert _get_running_span_or_transaction(fake_hub) == fake_hub.scope.transaction
+    assert get_running_span_or_transaction(fake_hub) == fake_hub.scope.transaction
 
     fake_hub.scope.span = None
     fake_hub.scope.transaction = None
-    assert _get_running_span_or_transaction(fake_hub) is None
+    assert get_running_span_or_transaction(fake_hub) is None
