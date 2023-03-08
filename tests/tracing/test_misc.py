@@ -8,7 +8,10 @@ import sentry_sdk
 from sentry_sdk import Hub, start_span, start_transaction, set_measurement
 from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.tracing import Span, Transaction
-from sentry_sdk.tracing_utils import should_propagate_trace
+from sentry_sdk.tracing_utils import (
+    should_propagate_trace,
+    _get_running_span_or_transaction,
+)
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -306,3 +309,20 @@ def test_should_propagate_trace(
     hub.client.options = {"trace_propagation_targets": trace_propagation_targets}
 
     assert should_propagate_trace(hub, url) == expected_propagation_decision
+
+
+def test_get_running_span_or_transaction():
+    fake_hub = mock.MagicMock()
+    fake_hub.scope = mock.MagicMock()
+
+    fake_hub.scope.span = mock.MagicMock()
+    fake_hub.scope.transaction = None
+    assert _get_running_span_or_transaction(fake_hub) == fake_hub.scope.span
+
+    fake_hub.scope.span = None
+    fake_hub.scope.transaction = mock.MagicMock()
+    assert _get_running_span_or_transaction(fake_hub) == fake_hub.scope.transaction
+
+    fake_hub.scope.span = None
+    fake_hub.scope.transaction = None
+    assert _get_running_span_or_transaction(fake_hub) is None

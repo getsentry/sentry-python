@@ -1,32 +1,13 @@
 import mock
 
-import sentry_sdk
 from sentry_sdk.tracing_utils_py2 import (
     start_child_span_decorator as start_child_span_decorator_py2,
-    _get_running_span_or_transaction,
 )
 from sentry_sdk.utils import logger
 
 
 def my_example_function():
     return "return_of_sync_function"
-
-
-def test_get_running_span_or_transaction():
-    fake_hub = mock.MagicMock()
-    fake_hub.scope = mock.MagicMock()
-    
-    fake_hub.scope.span = mock.MagicMock()
-    fake_hub.scope.transaction = None
-    assert _get_running_span_or_transaction(fake_hub) == fake_hub.scope.span
-
-    fake_hub.scope.span = None
-    fake_hub.scope.transaction = mock.MagicMock()
-    assert _get_running_span_or_transaction(fake_hub) == fake_hub.scope.transaction
-
-    fake_hub.scope.span = None
-    fake_hub.scope.transaction = None
-    assert _get_running_span_or_transaction(fake_hub) == None
 
 
 def test_trace_decorator_py2():

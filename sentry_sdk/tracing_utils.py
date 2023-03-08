@@ -33,6 +33,8 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Union
 
+    from sentry_sdk import Hub
+
 
 SENTRY_TRACE_REGEX = re.compile(
     "^[ \t]*"  # whitespace
@@ -393,6 +395,16 @@ def should_propagate_trace(hub, url):
             return True
 
     return False
+
+
+def _get_running_span_or_transaction(hub):
+    # type: (Hub) -> Optional[Union[Span, Transaction]]
+    current_span = hub.scope.span
+    if current_span is not None:
+        return current_span
+
+    transaction = hub.scope.transaction
+    return transaction
 
 
 # Circular imports
