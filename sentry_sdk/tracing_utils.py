@@ -101,7 +101,7 @@ def has_tracing_enabled(options):
 
 
 def is_valid_sample_rate(rate, source="Tracing"):
-    # type: (Any) -> bool
+    # type: (Any, str) -> bool
     """
     Checks the given sample rate to make sure it is valid type and value (a
     boolean or a number between 0 and 1, inclusive).
