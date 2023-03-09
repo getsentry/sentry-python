@@ -1,3 +1,4 @@
+from importlib import import_module
 import os
 import uuid
 import random
@@ -37,6 +38,7 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import Dict
     from typing import Optional
+    from typing import Sequence
 
     from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
@@ -136,6 +138,16 @@ class _Client(object):
         self.options = state["options"]
         self._init_impl()
 
+    def _trace_functions(self, functions_to_trace):
+        # type: (Sequence[str]) -> None
+        import ipdb
+
+        ipdb.set_trace()
+        for function in functions_to_trace:
+            module, cls = function.rsplit(".", 1)
+            func_obj = getattr(import_module(module), cls)
+            print(func_obj)
+
     def _init_impl(self):
         # type: () -> None
         old_debug = _client_init_debug.get(False)
@@ -180,6 +192,8 @@ class _Client(object):
                 setup_profiler(self.options)
             except ValueError as e:
                 logger.debug(str(e))
+
+        self._trace_functions(self.options.get("functions_to_trace", []))
 
     @property
     def dsn(self):

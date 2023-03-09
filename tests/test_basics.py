@@ -618,3 +618,23 @@ def test_event_processor_drop_records_client_report(
 )
 def test_get_sdk_name(installed_integrations, expected_name):
     assert get_sdk_name(installed_integrations) == expected_name
+
+
+def test_functions_to_trace(sentry_init):
+    functions_to_trace = [
+        "time.sleep",
+        "django.contrib.admin.something",
+        "myproject.somemodule.deprecated_function",
+    ]
+
+    # OR:
+    functions_to_trace = [
+        {"name": "time.sleep"},
+        {"name": "django.contrib.admin.something"},
+        {"name": "myproject.somemodule.deprecated_function", "op": "deprecated"},
+    ]
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        functions_to_trace=functions_to_trace,
+    )
