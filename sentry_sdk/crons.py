@@ -24,12 +24,19 @@ def _create_checkin_event(
     checkin = {
         "type": "check_in",
         "monitor_id": monitor_slug,
+        # "monitor_config": {
+        #     "schedule": "*/10 0 0 0 0",
+        #     "schedule_type": "cron",
+        # },
         "check_in_id": check_in_id,
         "status": status,
         "duration": duration,
         "environment": options["environment"],
         "release": options["release"],
     }
+
+    print("Checkin")
+    print(checkin)
 
     return checkin
 
@@ -49,7 +56,7 @@ def capture_checkin(monitor_slug=None, check_in_id=None, status=None, duration=N
     return checkin_event["check_in_id"]
 
 
-def monitor(monitor_slug=None):
+def monitor(monitor_slug=None, app=None):
     """
     Decorator to capture checkin events for a monitor.
 
