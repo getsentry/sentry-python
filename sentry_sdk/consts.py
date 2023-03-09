@@ -105,7 +105,7 @@ class ClientConstructor(object):
         send_default_pii=False,  # type: bool
         http_proxy=None,  # type: Optional[str]
         https_proxy=None,  # type: Optional[str]
-        ignore_errors=[],  # type: List[Union[type, str]]  # noqa: B006
+        ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
         request_bodies="medium",  # type: str
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
