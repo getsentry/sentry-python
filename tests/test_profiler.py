@@ -196,6 +196,9 @@ def test_profiles_sample_rate(
             0,
             id="profiler not sampled for transaction name",
         ),
+        pytest.param(lambda _: "1", 0, id="profiler not sampled because string sample rate"),
+        pytest.param(lambda _: True, 1, id="profiler sampled at True"),
+        pytest.param(lambda _: False, 0, id="profiler sampled at False"),
     ],
 )
 @mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)

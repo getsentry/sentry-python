@@ -100,7 +100,7 @@ def has_tracing_enabled(options):
     )
 
 
-def is_valid_sample_rate(rate):
+def is_valid_sample_rate(rate, source="Tracing"):
     # type: (Any) -> bool
     """
     Checks the given sample rate to make sure it is valid type and value (a
@@ -112,8 +112,8 @@ def is_valid_sample_rate(rate):
     # separately for NaN and Decimal does not derive from Real so need to check that too
     if not isinstance(rate, (Real, Decimal)) or math.isnan(rate):
         logger.warning(
-            "[Tracing] Given sample rate is invalid. Sample rate must be a boolean or a number between 0 and 1. Got {rate} of type {type}.".format(
-                rate=rate, type=type(rate)
+            "{source} Given sample rate is invalid. Sample rate must be a boolean or a number between 0 and 1. Got {rate} of type {type}.".format(
+                source=source, rate=rate, type=type(rate)
             )
         )
         return False
@@ -122,8 +122,8 @@ def is_valid_sample_rate(rate):
     rate = float(rate)
     if rate < 0 or rate > 1:
         logger.warning(
-            "[Tracing] Given sample rate is invalid. Sample rate must be between 0 and 1. Got {rate}.".format(
-                rate=rate
+            "{source} Given sample rate is invalid. Sample rate must be between 0 and 1. Got {rate}.".format(
+                source=source, rate=rate
             )
         )
         return False

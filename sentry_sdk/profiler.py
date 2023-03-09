@@ -25,6 +25,7 @@ from collections import deque
 import sentry_sdk
 from sentry_sdk._compat import PY33, PY311
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.tracing_utils import is_valid_sample_rate
 from sentry_sdk.utils import (
     filename_for_module,
     logger,
@@ -527,6 +528,13 @@ class Profile(object):
         if sample_rate is None:
             logger.debug(
                 "[Profiling] Discarding profile because profiling was not enabled."
+            )
+            self.sampled = False
+            return
+
+        if not is_valid_sample_rate(sample_rate, source="Profiling"):
+            logger.warning(
+                "[Profiling] Discarding profile because of invalid sample rate."
             )
             self.sampled = False
             return
