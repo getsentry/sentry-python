@@ -25,9 +25,9 @@ from collections import deque
 import sentry_sdk
 from sentry_sdk._compat import PY33, PY311
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.tracing_utils import is_valid_sample_rate
 from sentry_sdk.utils import (
     filename_for_module,
+    is_valid_sample_rate,
     logger,
     nanosecond_time,
     set_in_app_in_frames,
