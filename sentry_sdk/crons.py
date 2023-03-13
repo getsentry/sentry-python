@@ -23,7 +23,8 @@ def _create_checkin_event(
 
     checkin = {
         "type": "check_in",
-        "monitor_id": monitor_slug,
+        "monitor_slug": monitor_slug,
+        # TODO: Add schedule and schedule_type to monitor config
         # "monitor_config": {
         #     "schedule": "*/10 0 0 0 0",
         #     "schedule_type": "cron",
