@@ -73,13 +73,13 @@ def monitor(monitor_slug=None, app=None):
     app = Celery()
 
     @app.task
-    @sentry_sdk.monitor(monitor_slug='3475c0de-0258-44fc-8c88-07350cb7f9af')
+    @sentry_sdk.monitor(monitor_slug='my-fancy-slug')
     def test(arg):
         print(arg)
     ```
 
     This does not have to be used with Celery, but if you do use it with celery,
-    put the `@sentry_sdk.monitor` decorator under Celery's `@app.task` decorator.
+    put the `@sentry_sdk.monitor` decorator below Celery's `@app.task` decorator.
     """
 
     def decorate(func):
