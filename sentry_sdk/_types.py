@@ -85,3 +85,5 @@ if TYPE_CHECKING:
 
     FractionUnit = Literal["ratio", "percent"]
     MeasurementUnit = Union[DurationUnit, InformationUnit, FractionUnit, str]
+
+    ProfilerMode = Literal["sleep", "thread", "gevent", "unknown"]

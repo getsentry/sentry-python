@@ -1,7 +1,12 @@
 import pytest
 import re
 
-from sentry_sdk.utils import parse_url, sanitize_url
+from sentry_sdk.utils import is_valid_sample_rate, logger, parse_url, sanitize_url
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 
 @pytest.mark.parametrize(
@@ -184,3 +189,35 @@ def test_parse_url(url, sanitize, expected_url, expected_query, expected_fragmen
     expected_query_parts = sorted(re.split(r"\&|\?|\#", expected_query))
 
     assert query_parts == expected_query_parts
+
+
+@pytest.mark.parametrize(
+    "rate",
+    [0.0, 0.1231, 1.0, True, False],
+)
+def test_accepts_valid_sample_rate(rate):
+    with mock.patch.object(logger, "warning", mock.Mock()):
+        result = is_valid_sample_rate(rate, source="Testing")
+        assert logger.warning.called is False
+        assert result is True
+
+
+@pytest.mark.parametrize(
+    "rate",
+    [
+        "dogs are great",  # wrong type
+        (0, 1),  # wrong type
+        {"Maisey": "Charllie"},  # wrong type
+        [True, True],  # wrong type
+        {0.2012},  # wrong type
+        float("NaN"),  # wrong type
+        None,  # wrong type
+        -1.121,  # wrong value
+        1.231,  # wrong value
+    ],
+)
+def test_warns_on_invalid_sample_rate(rate, StringContaining):  # noqa: N803
+    with mock.patch.object(logger, "warning", mock.Mock()):
+        result = is_valid_sample_rate(rate, source="Testing")
+        logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))
+        assert result is False
