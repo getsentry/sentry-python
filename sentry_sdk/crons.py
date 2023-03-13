@@ -4,7 +4,12 @@ import uuid
 
 from sentry_sdk import Hub
 from sentry_sdk._compat import reraise
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import nanosecond_time
+
+
+if TYPE_CHECKING:
+    from typing import Any, Callable, Dict, Optional
 
 
 class MonitorStatus:
@@ -16,8 +21,9 @@ class MonitorStatus:
 def _create_checkin_event(
     monitor_slug=None, check_in_id=None, status=None, duration=None
 ):
-    options = Hub.current.client.options
-    check_in_id = check_in_id or uuid.uuid4().hex
+    # type: (Optional[str], Optional[str], Optional[str], Optional[float]) -> Dict[str, Any]
+    options = Hub.current.client.options if Hub.current.client else {}
+    check_in_id = check_in_id or uuid.uuid4().hex  # type: str
     # convert nanosecond to millisecond
     duration = int(duration * 0.000001) if duration is not None else duration
 
@@ -36,13 +42,11 @@ def _create_checkin_event(
         "release": options["release"],
     }
 
-    print("Checkin")
-    print(checkin)
-
     return checkin
 
 
 def capture_checkin(monitor_slug=None, check_in_id=None, status=None, duration=None):
+    # type: (Optional[str], Optional[str], Optional[str], Optional[float]) -> str
     hub = Hub.current
 
     check_in_id = check_in_id or uuid.uuid4().hex
@@ -58,6 +62,7 @@ def capture_checkin(monitor_slug=None, check_in_id=None, status=None, duration=N
 
 
 def monitor(monitor_slug=None, app=None):
+    # type: (Optional[str], Any) -> Callable[..., Any]
     """
     Decorator to capture checkin events for a monitor.
 
@@ -78,11 +83,13 @@ def monitor(monitor_slug=None, app=None):
     """
 
     def decorate(func):
+        # type: (Callable[..., Any]) -> Callable[..., Any]
         if not monitor_slug:
             return func
 
         @wraps(func)
         def wrapper(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
             start_timestamp = nanosecond_time()
             check_in_id = capture_checkin(
                 monitor_slug=monitor_slug, status=MonitorStatus.IN_PROGRESS
