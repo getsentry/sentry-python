@@ -395,16 +395,6 @@ def should_propagate_trace(hub, url):
     return False
 
 
-def get_running_span_or_transaction(hub):
-    # type: (sentry_sdk.Hub) -> Optional[Union[Span, Transaction]]
-    current_span = hub.scope.span
-    if current_span is not None:
-        return current_span
-
-    transaction = hub.scope.transaction
-    return transaction
-
-
 # Circular imports
 from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
 
