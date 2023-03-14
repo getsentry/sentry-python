@@ -19,6 +19,7 @@ if TYPE_CHECKING:
         BreadcrumbProcessor,
         Event,
         EventProcessor,
+        ProfilerMode,
         TracesSampler,
         TransactionProcessor,
     )
@@ -33,8 +34,9 @@ if TYPE_CHECKING:
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
             "smart_transaction_trimming": Optional[bool],
+            # TODO: Remvoe these 2 profiling related experiments
             "profiles_sample_rate": Optional[float],
-            "profiler_mode": Optional[str],
+            "profiler_mode": Optional[ProfilerMode],
         },
         total=False,
     )
@@ -115,6 +117,9 @@ class ClientConstructor(object):
         propagate_traces=True,  # type: bool
         traces_sample_rate=None,  # type: Optional[float]
         traces_sampler=None,  # type: Optional[TracesSampler]
+        profiles_sample_rate=None,  # type: Optional[float]
+        profiles_sampler=None,  # type: Optional[TracesSampler]
+        profiler_mode=None,  # type: Optional[ProfilerMode]
         auto_enabling_integrations=True,  # type: bool
         auto_session_tracking=True,  # type: bool
         send_client_reports=True,  # type: bool

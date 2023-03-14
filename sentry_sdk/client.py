@@ -28,7 +28,7 @@ from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.profiler import setup_profiler
+from sentry_sdk.profiler import has_profiling_enabled, setup_profiler
 
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -174,8 +174,7 @@ class _Client(object):
         finally:
             _client_init_debug.set(old_debug)
 
-        profiles_sample_rate = self.options["_experiments"].get("profiles_sample_rate")
-        if profiles_sample_rate is not None and profiles_sample_rate > 0:
+        if has_profiling_enabled(self.options):
             try:
                 setup_profiler(self.options)
             except ValueError as e:

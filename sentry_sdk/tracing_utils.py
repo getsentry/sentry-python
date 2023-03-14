@@ -1,9 +1,5 @@
 import re
 import contextlib
-import math
-
-from numbers import Real
-from decimal import Decimal
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -11,7 +7,6 @@ from sentry_sdk.consts import OP
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     Dsn,
-    logger,
     to_string,
 )
 from sentry_sdk._compat import PY2, iteritems
@@ -98,37 +93,6 @@ def has_tracing_enabled(options):
             or options.get("traces_sampler") is not None
         )
     )
-
-
-def is_valid_sample_rate(rate):
-    # type: (Any) -> bool
-    """
-    Checks the given sample rate to make sure it is valid type and value (a
-    boolean or a number between 0 and 1, inclusive).
-    """
-
-    # both booleans and NaN are instances of Real, so a) checking for Real
-    # checks for the possibility of a boolean also, and b) we have to check
-    # separately for NaN and Decimal does not derive from Real so need to check that too
-    if not isinstance(rate, (Real, Decimal)) or math.isnan(rate):
-        logger.warning(
-            "[Tracing] Given sample rate is invalid. Sample rate must be a boolean or a number between 0 and 1. Got {rate} of type {type}.".format(
-                rate=rate, type=type(rate)
-            )
-        )
-        return False
-
-    # in case rate is a boolean, it will get cast to 1 if it's True and 0 if it's False
-    rate = float(rate)
-    if rate < 0 or rate > 1:
-        logger.warning(
-            "[Tracing] Given sample rate is invalid. Sample rate must be between 0 and 1. Got {rate}.".format(
-                rate=rate
-            )
-        )
-        return False
-
-    return True
 
 
 @contextlib.contextmanager

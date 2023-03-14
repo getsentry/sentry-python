@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.utils import logger, nanosecond_time
+from sentry_sdk.utils import is_valid_sample_rate, logger, nanosecond_time
 from sentry_sdk._compat import PY2
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -724,7 +724,7 @@ class Transaction(Span):
         # Since this is coming from the user (or from a function provided by the
         # user), who knows what we might get. (The only valid values are
         # booleans or numbers between 0 and 1.)
-        if not is_valid_sample_rate(sample_rate):
+        if not is_valid_sample_rate(sample_rate, source="Tracing"):
             logger.warning(
                 "[Tracing] Discarding {transaction_description} because of invalid sample rate.".format(
                     transaction_description=transaction_description,
@@ -842,6 +842,5 @@ from sentry_sdk.tracing_utils import (
     EnvironHeaders,
     extract_sentrytrace_data,
     has_tracing_enabled,
-    is_valid_sample_rate,
     maybe_create_breadcrumbs_from_span,
 )
