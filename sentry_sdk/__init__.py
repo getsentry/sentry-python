@@ -7,6 +7,8 @@ from sentry_sdk.api import *  # noqa
 
 from sentry_sdk.consts import VERSION  # noqa
 
+from sentry_sdk.tracing import trace  # noqa
+
 __all__ = [  # noqa
     "Hub",
     "Scope",

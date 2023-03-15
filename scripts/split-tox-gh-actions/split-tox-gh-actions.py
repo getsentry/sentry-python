@@ -71,7 +71,11 @@ def write_yaml_file(
             out += template_line.replace("{{ framework }}", current_framework)
 
     # write rendered template
-    outfile_name = OUT_DIR / f"test-integration-{current_framework}.yml"
+    if current_framework == "common":
+        outfile_name = OUT_DIR / f"test-{current_framework}.yml"
+    else:
+        outfile_name = OUT_DIR / f"test-integration-{current_framework}.yml"
+
     print(f"Writing {outfile_name}")
     f = open(outfile_name, "w")
     f.writelines(out)
