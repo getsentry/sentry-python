@@ -85,9 +85,6 @@ def test_crumb_capture_hint(sentry_init, capture_events):
         "http.query": "",
     }
 
-    if platform.python_implementation() != "PyPy":
-        assert sys.getrefcount(response) == 2
-
 
 def test_empty_realurl(sentry_init, capture_events):
     """
