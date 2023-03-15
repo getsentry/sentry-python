@@ -2,7 +2,7 @@ import inspect
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk import get_current_span_or_transaction
+from sentry_sdk import get_current_span
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.utils import logger, qualname_from_function
@@ -30,7 +30,7 @@ def start_child_span_decorator(func):
         async def func_with_tracing(*args, **kwargs):
             # type: (*Any, **Any) -> Any
 
-            span_or_trx = get_current_span_or_transaction(sentry_sdk.Hub.current)
+            span_or_trx = get_current_span(sentry_sdk.Hub.current)
 
             if span_or_trx is None:
                 logger.warning(
@@ -53,7 +53,7 @@ def start_child_span_decorator(func):
         def func_with_tracing(*args, **kwargs):
             # type: (*Any, **Any) -> Any
 
-            span_or_trx = get_current_span_or_transaction(sentry_sdk.Hub.current)
+            span_or_trx = get_current_span(sentry_sdk.Hub.current)
 
             if span_or_trx is None:
                 logger.warning(

@@ -16,7 +16,7 @@ def test_trace_decorator_py2():
     fake_transaction.start_child = fake_start_child
 
     with mock.patch(
-        "sentry_sdk.tracing_utils_py2.get_current_span_or_transaction",
+        "sentry_sdk.tracing_utils_py2.get_current_span",
         return_value=fake_transaction,
     ):
         result = my_example_function()
@@ -34,7 +34,7 @@ def test_trace_decorator_py2_no_trx():
     fake_transaction = None
 
     with mock.patch(
-        "sentry_sdk.tracing_utils_py2.get_current_span_or_transaction",
+        "sentry_sdk.tracing_utils_py2.get_current_span",
         return_value=fake_transaction,
     ):
         with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
