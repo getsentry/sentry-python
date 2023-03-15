@@ -34,6 +34,7 @@ __all__ = [  # noqa
     "set_user",
     "set_level",
     "set_measurement",
+    "get_current_span",
 ]
 
 # Initialize the debug support after everything is loaded
