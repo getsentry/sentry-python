@@ -9,8 +9,9 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations.asyncio import AsyncioIntegration
 
 
-minimum_python_37 = pytest.mark.skipif(
-    sys.version_info < (3, 7), reason="Asyncio tests need Python >= 3.7"
+
+minimum_python_36 = pytest.mark.skipif(
+    sys.version_info < (3, 6), reason="Asyncio tests need Python >= 3.6"
 )
 
 
@@ -26,7 +27,7 @@ async def boom():
     1 / 0
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest.fixture(scope="session")
 def event_loop(request):
     """Create an instance of the default event loop for each test case."""
     loop = asyncio.get_event_loop_policy().new_event_loop()
@@ -34,7 +35,7 @@ def event_loop(request):
     loop.close()
 
 
-@minimum_python_37
+@minimum_python_36
 @pytest.mark.asyncio
 async def test_create_task(
     sentry_init,
@@ -79,7 +80,7 @@ async def test_create_task(
     )
 
 
-@minimum_python_37
+@minimum_python_36
 @pytest.mark.asyncio
 async def test_gather(
     sentry_init,
@@ -122,7 +123,7 @@ async def test_gather(
     )
 
 
-@minimum_python_37
+@minimum_python_36
 @pytest.mark.asyncio
 async def test_exception(
     sentry_init,
@@ -157,7 +158,7 @@ async def test_exception(
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "asyncio"
 
 
-@minimum_python_37
+@minimum_python_36
 @pytest.mark.asyncio
 async def test_task_result(sentry_init):
     sentry_init(
