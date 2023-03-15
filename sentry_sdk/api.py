@@ -241,4 +241,3 @@ def get_current_span(hub=None):
 
     current_span = hub.scope.span
     return current_span
-
