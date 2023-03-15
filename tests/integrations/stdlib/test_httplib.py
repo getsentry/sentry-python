@@ -1,6 +1,4 @@
-import platform
 import random
-import sys
 
 import pytest
 
@@ -67,7 +65,7 @@ def test_crumb_capture_hint(sentry_init, capture_events):
     events = capture_events()
 
     url = "http://localhost:{}/some/random/url".format(PORT)
-    response = urlopen(url)
+    urlopen(url)
 
     capture_message("Testing!")
 
