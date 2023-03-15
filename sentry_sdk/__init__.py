@@ -33,8 +33,6 @@ __all__ = [  # noqa
     "set_level",
     "set_measurement",
     "get_current_span",
-    "get_current_transaction",
-    "get_current_span_or_transaction",
 ]
 
 # Initialize the debug support after everything is loaded

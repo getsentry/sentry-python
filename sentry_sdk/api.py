@@ -54,8 +54,6 @@ __all__ = [
     "set_level",
     "set_measurement",
     "get_current_span",
-    "get_current_transaction",
-    "get_current_span_or_transaction",
 ]
 
 
@@ -243,32 +241,3 @@ def get_current_span(hub=None):
 
     current_span = hub.scope.span
     return current_span
-
-
-def get_current_transaction(hub=None):
-    # type: (Optional[Hub]) -> Optional[Transaction]
-    """
-    Returns the currently active transaction if there is one running, otherwise `None`
-    """
-    if hub is None:
-        hub = Hub.current
-
-    transaction = hub.scope.transaction
-    return transaction
-
-
-def get_current_span_or_transaction(hub=None):
-    # type: (Optional[Hub]) -> Optional[Union[Span, Transaction]]
-    """
-    Returns the currently active span if there is one running,
-    otherwise the currently active transaction if there is one running,
-    otherwise `None`
-    """
-    if hub is None:
-        hub = Hub.current
-
-    current_span = get_current_span(hub)
-    if current_span is not None:
-        return current_span
-
-    return get_current_transaction(hub)
