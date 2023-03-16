@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.17.0
+
+### Various fixes & improvements
+
+- Add support for Sentry Crons to Celery Beat (#1935) by @antonpirker
+- Add decorator for Sentry tracing (#1089) by @ynouri
+- Added top level API to get current span (#1954) by @antonpirker
+- feat(profiling): Add profiler options to init (#1947) by @Zylphrex
+- Start a real http server instead of mocking libs (#1938) by @antonpirker
+- feat(profiling): Set active thread id for quart (#1830) by @Zylphrex
+- 🎨 Fix type annotation for ignore_errors in sentry_sdk.init() (#1928) by @tiangolo
+- Update get_json function call for werkzeug 2.1.0+ (#1939) by @michielderoos
+- fix: Rename MYPY to TYPE_CHECKING (#1934) by @untitaker
+- Rename 'with_locals'  to 'include_local_variables' (#1924) by @antonpirker
+- Returning the tasks result. (#1931) by @antonpirker
+- Make Django signals tracing optional (#1929) by @antonpirker
+
 ## 1.16.0
 
 ### Various fixes & improvements
