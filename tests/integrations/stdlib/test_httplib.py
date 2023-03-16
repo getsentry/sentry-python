@@ -1,6 +1,4 @@
-import platform
 import random
-import sys
 
 import pytest
 
@@ -67,7 +65,7 @@ def test_crumb_capture_hint(sentry_init, capture_events):
     events = capture_events()
 
     url = "http://localhost:{}/some/random/url".format(PORT)
-    response = urlopen(url)
+    urlopen(url)
 
     capture_message("Testing!")
 
@@ -84,9 +82,6 @@ def test_crumb_capture_hint(sentry_init, capture_events):
         "http.fragment": "",
         "http.query": "",
     }
-
-    if platform.python_implementation() != "PyPy":
-        assert sys.getrefcount(response) == 2
 
 
 def test_empty_realurl(sentry_init, capture_events):

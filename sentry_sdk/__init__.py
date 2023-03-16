@@ -7,6 +7,8 @@ from sentry_sdk.api import *  # noqa
 
 from sentry_sdk.consts import VERSION  # noqa
 
+from sentry_sdk.tracing import trace  # noqa
+
 __all__ = [  # noqa
     "Hub",
     "Scope",
@@ -32,6 +34,7 @@ __all__ = [  # noqa
     "set_user",
     "set_level",
     "set_measurement",
+    "get_current_span",
 ]
 
 # Initialize the debug support after everything is loaded
