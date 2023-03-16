@@ -440,9 +440,11 @@ class _Client(object):
             .pop("dynamic_sampling_context", {})
         )
 
-        # Transactions or events with attachments should go to the /envelope/
+        is_checkin = event_opt.get("type") == "check_in"
+
+        # Transactions, events with attachments, and checkins should go to the /envelope/
         # endpoint.
-        if is_transaction or attachments:
+        if is_transaction or is_checkin or attachments:
 
             headers = {
                 "event_id": event_opt["event_id"],
@@ -458,11 +460,14 @@ class _Client(object):
                 if profile is not None:
                     envelope.add_profile(profile.to_json(event_opt, self.options))
                 envelope.add_transaction(event_opt)
+            elif is_checkin:
+                envelope.add_checkin(event_opt)
             else:
                 envelope.add_event(event_opt)
 
             for attachment in attachments or ():
                 envelope.add_item(attachment.to_envelope_item())
+
             self.transport.capture_envelope(envelope)
         else:
             # All other events go to the /store/ endpoint.
