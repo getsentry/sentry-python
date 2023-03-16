@@ -29,6 +29,7 @@ from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.profiler import has_profiling_enabled, setup_profiler
+from sentry_sdk.scrubber import EventScrubber
 
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -110,6 +111,9 @@ def _get_options(*args, **kwargs):
 
     if rv["enable_tracing"] is True and rv["traces_sample_rate"] is None:
         rv["traces_sample_rate"] = 1.0
+
+    if rv["event_scrubber"] is None:
+        rv["event_scrubber"] = EventScrubber()
 
     return rv
 
@@ -248,6 +252,11 @@ class _Client(object):
             self.options["in_app_include"],
             self.options["project_root"],
         )
+
+        if event is not None:
+            event_scrubber = self.options["event_scrubber"]
+            if event_scrubber and not self.options["send_default_pii"]:
+                event_scrubber.scrub_event(event)
 
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
