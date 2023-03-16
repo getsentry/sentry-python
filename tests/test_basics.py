@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import time
 
 import pytest
 
@@ -620,21 +621,49 @@ def test_get_sdk_name(installed_integrations, expected_name):
     assert get_sdk_name(installed_integrations) == expected_name
 
 
-def test_functions_to_trace(sentry_init):
-    functions_to_trace = [
-        "time.sleep",
-        "django.contrib.admin.something",
-        "myproject.somemodule.deprecated_function",
-    ]
+def _trace_me_baby_one_more_time(word, counter):
+    counter[word] = +1
+    return "My loneliness is killing me {}".format(word)
 
-    # OR:
+
+def test_functions_to_trace(sentry_init, capture_events):
     functions_to_trace = [
+        {"name": "tests.test_basics._trace_me_baby_one_more_time"},
         {"name": "time.sleep"},
-        {"name": "django.contrib.admin.something"},
-        {"name": "myproject.somemodule.deprecated_function", "op": "deprecated"},
+        {"name": "collections.Counter.most_common"},
     ]
 
     sentry_init(
         traces_sample_rate=1.0,
         functions_to_trace=functions_to_trace,
     )
+
+    events = capture_events()
+
+    with start_transaction(name="something"):
+        time.sleep(0)
+
+        from collections import Counter
+
+        c = Counter()
+
+        for word in ["one", "two"]:
+            _trace_me_baby_one_more_time(word, c)
+
+        print(c.most_common())
+
+    assert len(events) == 1
+
+    (event,) = events
+
+    assert len(event["spans"]) == 4
+    assert event["spans"][0]["description"] == "time.sleep"
+    assert (
+        event["spans"][1]["description"]
+        == "tests.test_basics._trace_me_baby_one_more_time"
+    )
+    assert (
+        event["spans"][2]["description"]
+        == "tests.test_basics._trace_me_baby_one_more_time"
+    )
+    assert event["spans"][3]["description"] == "collections.Counter.most_common"

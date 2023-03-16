@@ -18,6 +18,7 @@ from sentry_sdk.utils import (
     logger,
 )
 from sentry_sdk.serializer import serialize
+from sentry_sdk.tracing import trace
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import (
     DEFAULT_OPTIONS,
@@ -139,14 +140,46 @@ class _Client(object):
         self._init_impl()
 
     def _trace_functions(self, functions_to_trace):
-        # type: (Sequence[str]) -> None
-        import ipdb
+        # type: (Sequence[Dict[str, str]]) -> None
+        """
+        Instruments the functions given in the list `functions_to_trace` with the `@sentry_sdk.tracing.trace` decorator.
+        """
+        for item in functions_to_trace:
+            class_name = None
+            function_name = item["name"]
+            module, fn = function_name.rsplit(".", 1)
 
-        ipdb.set_trace()
-        for function in functions_to_trace:
-            module, cls = function.rsplit(".", 1)
-            func_obj = getattr(import_module(module), cls)
-            print(func_obj)
+            try:
+                # Try to import module and function
+                # ex: "mymodule.submodule.funcname"
+
+                module_obj = import_module(module)
+                func_obj = getattr(module_obj, fn)
+                setattr(module_obj, fn, trace(func_obj))
+
+            except ModuleNotFoundError:
+                try:
+                    # Try to import a class
+                    # ex: "mymodule.submodule.MyClassName.member_function"
+
+                    module, class_name = module.rsplit(".", 1)
+                    module_obj = import_module(module)
+                    class_obj = getattr(module_obj, class_name)
+                    func_obj = getattr(class_obj, fn)
+                    setattr(class_obj, fn, trace(func_obj))
+                    setattr(module_obj, class_name, class_obj)
+
+                except Exception:
+                    logger.warning(
+                        "Can not enable tracing for '%s'. Please check your `functions_to_trace` parameter.",
+                        function_name,
+                    )
+
+            except Exception:
+                logger.warning(
+                    "Can not enable tracing for '%s'. Please check your `functions_to_trace` parameter.",
+                    function_name,
+                )
 
     def _init_impl(self):
         # type: () -> None
