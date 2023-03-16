@@ -1,5 +1,94 @@
 # Changelog
 
+## 1.17.0
+
+### Various fixes & improvements
+
+- **New:** Monitor Celery Beat tasks with Sentry [Cron Monitoring](https://docs.sentry.io/product/crons/).
+
+  With this feature you can make sure that your Celery beat tasks run at the right time and see if they where successful or not.
+
+  > **Warning**
+  > Cron Monitoring is currently in beta. Beta features are still in-progress and may have bugs. We recognize the irony.
+  > If you have any questions or feedback, please email us at crons-feedback@sentry.io, reach out via Discord (#cronjobs), or open an issue.
+
+  Usage:
+
+  ```python
+  # File: tasks.py
+
+  from celery import Celery, signals
+  from celery.schedules import crontab
+
+  import sentry_sdk
+  from sentry_sdk.crons import monitor
+  from sentry_sdk.integrations.celery import CeleryIntegration
+
+
+  # 1. Setup your Celery beat configuration
+
+  app = Celery('mytasks', broker='redis://localhost:6379/0')
+  app.conf.beat_schedule = {
+      'set-in-beat-schedule': {
+          'task': 'tasks.tell_the_world',
+          'schedule': crontab(hour='10', minute='15'),
+          'args': ("in beat_schedule set", ),
+      },
+  }
+
+
+  # 2. Initialize Sentry either in `celeryd_init` or `beat_init` signal.
+
+  #@signals.celeryd_init.connect
+  @signals.beat_init.connect
+  def init_sentry(**kwargs):
+      sentry_sdk.init(
+          dsn='...',
+          integrations=[CeleryIntegration()],
+          environment="local.dev.grace",
+          release="v1.0.7-a1",
+      )
+
+
+  # 3. Link your Celery task to a Sentry Cron Monitor
+
+  @app.task
+  @monitor(monitor_slug='3b861d62-ff82-4aa0-9cd6-b2b6403bd0cf')
+  def tell_the_world(msg):
+      print(msg)
+  ```
+
+- **New:** Add decorator for Sentry tracing (#1089) by @ynouri
+
+  This allows you to use a decorator to setup custom performance instrumentation.
+
+  To learn more see [Custom Instrumentation](https://docs.sentry.io/platforms/python/performance/instrumentation/custom-instrumentation/).
+
+  Usage: Just add the new decorator to your function, and a span will be created for it:
+
+  ```python
+  import sentry_sdk
+
+  @sentry_sdk.trace
+  def my_complex_function():
+    # do stuff
+    ...
+  ```
+
+- Make Django signals tracing optional (#1929) by @antonpirker
+
+  See the [Django Guide](https://docs.sentry.io/platforms/python/guides/django) to learn more.
+
+- Deprecated `with_locals` in favor of `include_local_variables` (#1924) by @antonpirker
+- Added top level API to get current span (#1954) by @antonpirker
+- Profiling: Add profiler options to init (#1947) by @Zylphrex
+- Profiling: Set active thread id for quart (#1830) by @Zylphrex
+- Fix: Update `get_json` function call for werkzeug 2.1.0+ (#1939) by @michielderoos
+- Fix: Returning the tasks result. (#1931) by @antonpirker
+- Fix: Rename MYPY to TYPE_CHECKING (#1934) by @untitaker
+- Fix: Fix type annotation for ignore_errors in sentry_sdk.init() (#1928) by @tiangolo
+- Tests: Start a real http server instead of mocking libs (#1938) by @antonpirker
+
 ## 1.16.0
 
 ### Various fixes & improvements
