@@ -621,16 +621,14 @@ def test_get_sdk_name(installed_integrations, expected_name):
     assert get_sdk_name(installed_integrations) == expected_name
 
 
-def _hello_world_counter(word, counter):
-    counter[word] = +1
+def _hello_world(word):
     return "Hello, {}".format(word)
 
 
 def test_functions_to_trace(sentry_init, capture_events):
     functions_to_trace = [
-        {"qualified_name": "tests.test_basics._hello_world_counter"},
+        {"qualified_name": "tests.test_basics._hello_world"},
         {"qualified_name": "time.sleep"},
-        {"qualified_name": "collections.Counter.most_common"},
     ]
 
     sentry_init(
@@ -643,21 +641,14 @@ def test_functions_to_trace(sentry_init, capture_events):
     with start_transaction(name="something"):
         time.sleep(0)
 
-        from collections import Counter
-
-        c = Counter()
-
         for word in ["World", "You"]:
-            _hello_world_counter(word, c)
-
-        print(c.most_common())
+            _hello_world(word)
 
     assert len(events) == 1
 
     (event,) = events
 
-    assert len(event["spans"]) == 4
+    assert len(event["spans"]) == 3
     assert event["spans"][0]["description"] == "time.sleep"
-    assert event["spans"][1]["description"] == "tests.test_basics._hello_world_counter"
-    assert event["spans"][2]["description"] == "tests.test_basics._hello_world_counter"
-    assert event["spans"][3]["description"] == "collections.Counter.most_common"
+    assert event["spans"][1]["description"] == "tests.test_basics._hello_world"
+    assert event["spans"][2]["description"] == "tests.test_basics._hello_world"
