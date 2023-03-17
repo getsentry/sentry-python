@@ -621,16 +621,16 @@ def test_get_sdk_name(installed_integrations, expected_name):
     assert get_sdk_name(installed_integrations) == expected_name
 
 
-def _trace_me_baby_one_more_time(word, counter):
+def _hello_world_counter(word, counter):
     counter[word] = +1
-    return "My loneliness is killing me {}".format(word)
+    return "Hello, {}".format(word)
 
 
 def test_functions_to_trace(sentry_init, capture_events):
     functions_to_trace = [
-        {"name": "tests.test_basics._trace_me_baby_one_more_time"},
-        {"name": "time.sleep"},
-        {"name": "collections.Counter.most_common"},
+        {"qualified_name": "tests.test_basics._hello_world_counter"},
+        {"qualified_name": "time.sleep"},
+        {"qualified_name": "collections.Counter.most_common"},
     ]
 
     sentry_init(
@@ -647,8 +647,8 @@ def test_functions_to_trace(sentry_init, capture_events):
 
         c = Counter()
 
-        for word in ["one", "two"]:
-            _trace_me_baby_one_more_time(word, c)
+        for word in ["World", "You"]:
+            _hello_world_counter(word, c)
 
         print(c.most_common())
 
@@ -658,12 +658,6 @@ def test_functions_to_trace(sentry_init, capture_events):
 
     assert len(event["spans"]) == 4
     assert event["spans"][0]["description"] == "time.sleep"
-    assert (
-        event["spans"][1]["description"]
-        == "tests.test_basics._trace_me_baby_one_more_time"
-    )
-    assert (
-        event["spans"][2]["description"]
-        == "tests.test_basics._trace_me_baby_one_more_time"
-    )
+    assert event["spans"][1]["description"] == "tests.test_basics._hello_world_counter"
+    assert event["spans"][2]["description"] == "tests.test_basics._hello_world_counter"
     assert event["spans"][3]["description"] == "collections.Counter.most_common"

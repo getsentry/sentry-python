@@ -139,46 +139,46 @@ class _Client(object):
         self.options = state["options"]
         self._init_impl()
 
-    def _trace_functions(self, functions_to_trace):
+    def _setup_instrumentation(self, functions_to_trace):
         # type: (Sequence[Dict[str, str]]) -> None
         """
         Instruments the functions given in the list `functions_to_trace` with the `@sentry_sdk.tracing.trace` decorator.
         """
-        for item in functions_to_trace:
+        for function in functions_to_trace:
             class_name = None
-            function_name = item["name"]
-            module, fn = function_name.rsplit(".", 1)
+            function_qualname = function["qualified_name"]
+            module_name, function_name = function_qualname.rsplit(".", 1)
 
             try:
                 # Try to import module and function
                 # ex: "mymodule.submodule.funcname"
 
-                module_obj = import_module(module)
-                func_obj = getattr(module_obj, fn)
-                setattr(module_obj, fn, trace(func_obj))
+                module_obj = import_module(module_name)
+                function_obj = getattr(module_obj, function_name)
+                setattr(module_obj, function_name, trace(function_obj))
 
             except ModuleNotFoundError:
                 try:
                     # Try to import a class
                     # ex: "mymodule.submodule.MyClassName.member_function"
 
-                    module, class_name = module.rsplit(".", 1)
-                    module_obj = import_module(module)
+                    module_name, class_name = module_name.rsplit(".", 1)
+                    module_obj = import_module(module_name)
                     class_obj = getattr(module_obj, class_name)
-                    func_obj = getattr(class_obj, fn)
-                    setattr(class_obj, fn, trace(func_obj))
+                    function_obj = getattr(class_obj, function_name)
+                    setattr(class_obj, function_name, trace(function_obj))
                     setattr(module_obj, class_name, class_obj)
 
                 except Exception:
                     logger.warning(
                         "Can not enable tracing for '%s'. Please check your `functions_to_trace` parameter.",
-                        function_name,
+                        function_qualname,
                     )
 
             except Exception:
                 logger.warning(
                     "Can not enable tracing for '%s'. Please check your `functions_to_trace` parameter.",
-                    function_name,
+                    function_qualname,
                 )
 
     def _init_impl(self):
@@ -225,7 +225,7 @@ class _Client(object):
             except ValueError as e:
                 logger.debug(str(e))
 
-        self._trace_functions(self.options.get("functions_to_trace", []))
+        self._setup_instrumentation(self.options.get("functions_to_trace", []))
 
     @property
     def dsn(self):
