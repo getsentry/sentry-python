@@ -1,6 +1,6 @@
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     import sentry_sdk
 
     from typing import Optional
@@ -19,6 +19,7 @@ if MYPY:
         BreadcrumbProcessor,
         Event,
         EventProcessor,
+        ProfilerMode,
         TracesSampler,
         TransactionProcessor,
     )
@@ -33,8 +34,9 @@ if MYPY:
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
             "smart_transaction_trimming": Optional[bool],
+            # TODO: Remvoe these 2 profiling related experiments
             "profiles_sample_rate": Optional[float],
-            "profiler_mode": Optional[str],
+            "profiler_mode": Optional[ProfilerMode],
         },
         total=False,
     )
@@ -89,7 +91,6 @@ class ClientConstructor(object):
     def __init__(
         self,
         dsn=None,  # type: Optional[str]
-        with_locals=True,  # type: bool
         max_breadcrumbs=DEFAULT_MAX_BREADCRUMBS,  # type: int
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
@@ -106,7 +107,7 @@ class ClientConstructor(object):
         send_default_pii=False,  # type: bool
         http_proxy=None,  # type: Optional[str]
         https_proxy=None,  # type: Optional[str]
-        ignore_errors=[],  # type: List[Union[type, str]]  # noqa: B006
+        ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
         request_bodies="medium",  # type: str
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
@@ -116,6 +117,9 @@ class ClientConstructor(object):
         propagate_traces=True,  # type: bool
         traces_sample_rate=None,  # type: Optional[float]
         traces_sampler=None,  # type: Optional[TracesSampler]
+        profiles_sample_rate=None,  # type: Optional[float]
+        profiles_sampler=None,  # type: Optional[TracesSampler]
+        profiler_mode=None,  # type: Optional[ProfilerMode]
         auto_enabling_integrations=True,  # type: bool
         auto_session_tracking=True,  # type: bool
         send_client_reports=True,  # type: bool
@@ -125,6 +129,7 @@ class ClientConstructor(object):
         before_send_transaction=None,  # type: Optional[TransactionProcessor]
         project_root=None,  # type: Optional[str]
         enable_tracing=None,  # type: Optional[bool]
+        include_local_variables=True,  # type: Optional[bool]
         trace_propagation_targets=[  # noqa: B006
             MATCH_ALL
         ],  # type: Optional[Sequence[str]]
@@ -151,4 +156,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.16.0"
+VERSION = "1.17.0"

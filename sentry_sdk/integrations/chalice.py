@@ -9,14 +9,14 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
 )
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk._functools import wraps
 
 import chalice  # type: ignore
 from chalice import Chalice, ChaliceViewError
 from chalice.app import EventSourceHandler as ChaliceEventSourceHandler  # type: ignore
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
     from typing import TypeVar

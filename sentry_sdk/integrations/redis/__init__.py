@@ -5,9 +5,9 @@ from sentry_sdk.consts import OP
 from sentry_sdk.utils import capture_internal_exceptions, logger
 from sentry_sdk.integrations import Integration, DidNotEnable
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any, Sequence
     from sentry_sdk.tracing import Span
 

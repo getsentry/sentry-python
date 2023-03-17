@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
@@ -12,7 +12,7 @@ from sentry_sdk.utils import (
     event_from_exception,
 )
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Union
 
     from sentry_sdk._types import EventProcessor
@@ -173,7 +173,7 @@ class FlaskRequestExtractor(RequestExtractor):
 
     def json(self):
         # type: () -> Any
-        return self.request.get_json()
+        return self.request.get_json(silent=True)
 
     def size_of_file(self, file):
         # type: (FileStorage) -> int

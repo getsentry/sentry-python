@@ -1,5 +1,7 @@
-import os
 import json
+import os
+import socket
+from threading import Thread
 
 import pytest
 import jsonschema
@@ -13,6 +15,17 @@ try:
     import eventlet
 except ImportError:
     eventlet = None
+
+try:
+    # Python 2
+    import BaseHTTPServer
+
+    HTTPServer = BaseHTTPServer.HTTPServer
+    BaseHTTPRequestHandler = BaseHTTPServer.BaseHTTPRequestHandler
+except Exception:
+    # Python 3
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
 
 import sentry_sdk
 from sentry_sdk._compat import iteritems, reraise, string_types
@@ -561,3 +574,30 @@ def object_described_by_matcher():
 def teardown_profiling():
     yield
     teardown_profiler()
+
+
+class MockServerRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):  # noqa: N802
+        # Process an HTTP GET request and return a response with an HTTP 200 status.
+        self.send_response(200)
+        self.end_headers()
+        return
+
+
+def get_free_port():
+    s = socket.socket(socket.AF_INET, type=socket.SOCK_STREAM)
+    s.bind(("localhost", 0))
+    _, port = s.getsockname()
+    s.close()
+    return port
+
+
+def create_mock_http_server():
+    # Start a mock server to test outgoing http requests
+    mock_server_port = get_free_port()
+    mock_server = HTTPServer(("localhost", mock_server_port), MockServerRequestHandler)
+    mock_server_thread = Thread(target=mock_server.serve_forever)
+    mock_server_thread.setDaemon(True)
+    mock_server_thread.start()
+
+    return mock_server_port
