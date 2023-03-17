@@ -32,12 +32,16 @@ def _create_checkin_event(
         "release": options["release"],
     }
 
+    print("@@@@@@@@@@@@@@@@@@@@@@@@@")
+    print("checkin: ", checkin)
+
     return checkin
 
 
 def capture_checkin(monitor_slug=None, check_in_id=None, status=None, duration_ns=None):
     # type: (Optional[str], Optional[str], Optional[str], Optional[float]) -> str
     hub = Hub.current
+    print("@@@@@@@@@@@ capture_checkin @@@@@@@@@@@@@@")
 
     check_in_id = check_in_id or uuid.uuid4().hex
     checkin_event = _create_checkin_event(

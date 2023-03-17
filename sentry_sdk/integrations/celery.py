@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from importlib import import_module
 
 import sys
 from sentry_sdk.consts import OP
@@ -11,6 +12,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.tracing import Transaction
 from sentry_sdk._compat import reraise
+from sentry_sdk.crons import monitor
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk._types import TYPE_CHECKING
@@ -23,6 +25,8 @@ if TYPE_CHECKING:
     from typing import Optional
 
     from sentry_sdk._types import EventProcessor, Event, Hint, ExcInfo
+
+    from celery import Celery
 
     F = TypeVar("F", bound=Callable[..., Any])
 
@@ -46,9 +50,12 @@ CELERY_CONTROL_FLOW_EXCEPTIONS = (Retry, Ignore, Reject)
 class CeleryIntegration(Integration):
     identifier = "celery"
 
-    def __init__(self, propagate_traces=True):
-        # type: (bool) -> None
+    def __init__(self, propagate_traces=True, celery_app=None):
+        # type: (bool, Optional[Celery]) -> None
         self.propagate_traces = propagate_traces
+        self.celery_app = celery_app
+
+        _instrument_celery_beat_tasks(celery_app)
 
     @staticmethod
     def setup_once():
@@ -294,3 +301,43 @@ def _patch_worker_exit():
                     hub.flush()
 
     Worker.workloop = sentry_workloop
+
+
+from celery.signals import beat_init
+
+celerybeat_startup = None
+
+
+def _instrument_celery_beat_tasks(celery_app):
+    # type: (Celery) -> None
+
+    global celerybeat_startup
+
+    def celerybeat_startup(sender, **kwargs):
+        beat_init.disconnect(celerybeat_startup, dispatch_uid=1)
+
+        scheduler = sender.scheduler
+        schedules = scheduler.schedule
+
+        # TODO: what if the same task is mulitple times in the schedule? (with differenc schedules?)
+        for name in schedules:
+            # from celery.contrib import rdb
+            # rdb.set_trace()
+            if name.startswith("celery."):
+                continue
+
+            schedule_entry = schedules[name]
+            print(f"@@@@@@ {schedule_entry} @@@@@@@@@@")
+
+            task_qualname = schedule_entry.task
+
+            module_name, function_name = task_qualname.rsplit(".", 1)
+            module_obj = import_module(module_name)
+            function_obj = getattr(module_obj, function_name)
+            setattr(
+                module_obj,
+                function_name,
+                monitor(monitor_slug=task_qualname)(function_obj),
+            )
+
+    beat_init.connect(celerybeat_startup, dispatch_uid=1)

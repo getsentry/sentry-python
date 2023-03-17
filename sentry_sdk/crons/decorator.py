@@ -12,8 +12,8 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Optional
 
 
-def monitor(monitor_slug=None, app=None):
-    # type: (Optional[str], Any) -> Callable[..., Any]
+def monitor(monitor_slug=None):
+    # type: (Optional[str]) -> Callable[..., Any]
     """
     Decorator to capture checkin events for a monitor.
 
@@ -41,6 +41,7 @@ def monitor(monitor_slug=None, app=None):
         @wraps(func)
         def wrapper(*args, **kwargs):
             # type: (*Any, **Any) -> Any
+            print("im wrapper monitor_slug: ", monitor_slug)
             start_timestamp = nanosecond_time()
             check_in_id = capture_checkin(
                 monitor_slug=monitor_slug, status=MonitorStatus.IN_PROGRESS
