@@ -169,16 +169,18 @@ class _Client(object):
                     setattr(class_obj, function_name, trace(function_obj))
                     setattr(module_obj, class_name, class_obj)
 
-                except Exception:
+                except Exception as e:
                     logger.warning(
-                        "Can not enable tracing for '%s'. Please check your `functions_to_trace` parameter.",
+                        "Can not enable tracing for '%s'. (%s) Please check your `functions_to_trace` parameter.",
                         function_qualname,
+                        e,
                     )
 
-            except Exception:
+            except Exception as e:
                 logger.warning(
-                    "Can not enable tracing for '%s'. Please check your `functions_to_trace` parameter.",
+                    "Can not enable tracing for '%s'. (%s) Please check your `functions_to_trace` parameter.",
                     function_qualname,
+                    e,
                 )
 
     def _init_impl(self):
