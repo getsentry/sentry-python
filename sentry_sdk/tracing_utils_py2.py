@@ -30,7 +30,7 @@ def start_child_span_decorator(func):
 
         if span is None:
             logger.warning(
-                "Can not create child span for %s. "
+                "Can not create a child span for %s. "
                 "Please start a Sentry transaction before calling this function.",
                 qualname_from_function(func),
             )
