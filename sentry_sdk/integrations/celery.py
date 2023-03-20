@@ -443,7 +443,7 @@ def _instrument_celery_beat_tasks(celery_app):
 
     beat_init.connect(celerybeat_startup, dispatch_uid=1)
 
-    @task_prerun.connect
+    @task_prerun.connect  # type: ignore
     def celery_task_before_run(sender, **kwargs):
         # type: (celery.Task, Dict[Any, Any]) -> None
         headers = _get_headers_from_task(sender)
@@ -461,7 +461,7 @@ def _instrument_celery_beat_tasks(celery_app):
 
         sender.s().set(headers=headers)
 
-    @task_success.connect
+    @task_success.connect  # type: ignore
     def celery_task_success(sender, **kwargs):
         # type: (celery.Task, Dict[Any, Any]) -> None
         headers = _get_headers_from_task(sender)
@@ -476,7 +476,7 @@ def _instrument_celery_beat_tasks(celery_app):
             status=MonitorStatus.OK,
         )
 
-    @task_failure.connect
+    @task_failure.connect  # type: ignore
     def celery_task_failure(sender, **kwargs):
         # type: (celery.Task, Dict[Any, Any]) -> None
         headers = _get_headers_from_task(sender)
@@ -491,7 +491,7 @@ def _instrument_celery_beat_tasks(celery_app):
             status=MonitorStatus.ERROR,
         )
 
-    @task_retry.connect
+    @task_retry.connect  # type: ignore
     def celery_task_retry(sender, **kwargs):
         # type: (celery.Task, Dict[Any, Any]) -> None
         headers = _get_headers_from_task(sender)
