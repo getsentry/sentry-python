@@ -117,6 +117,14 @@ def _get_options(*args, **kwargs):
     return rv
 
 
+try:
+    # Python 3.6+
+    module_not_found_error = ModuleNotFoundError
+except Exception:
+    # Older Python versions
+    module_not_found_error = ImportError
+
+
 class _Client(object):
     """The client is internally responsible for capturing the events and
     forwarding them to sentry through the configured transport.  It takes
@@ -157,7 +165,7 @@ class _Client(object):
                 function_obj = getattr(module_obj, function_name)
                 setattr(module_obj, function_name, trace(function_obj))
 
-            except ModuleNotFoundError:
+            except module_not_found_error:
                 try:
                     # Try to import a class
                     # ex: "mymodule.submodule.MyClassName.member_function"
