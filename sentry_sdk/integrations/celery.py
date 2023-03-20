@@ -1,29 +1,35 @@
 from __future__ import absolute_import
-from importlib import import_module
-
+import datetime
+import functools
 import sys
-from sentry_sdk.consts import OP
+import tempfile
+import shutil
 
+from sentry_sdk.consts import OP
+from sentry_sdk.crons import capture_checkin, MonitorStatus
 from sentry_sdk.hub import Hub
-from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
+from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    nanosecond_time,
+    logger,
 )
-from sentry_sdk.tracing import Transaction
 from sentry_sdk._compat import reraise
-from sentry_sdk.crons import monitor
-from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk._functools import wraps
+from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import TypeVar
     from typing import Callable
+    from typing import Dict
     from typing import Optional
+    from typing import Tuple
+    from typing import TypeVar
 
+    from typing import Union
     from sentry_sdk._types import EventProcessor, Event, Hint, ExcInfo
 
     from celery import Celery
@@ -32,14 +38,24 @@ if TYPE_CHECKING:
 
 
 try:
+    import celery
+    import celery.beat
     from celery import VERSION as CELERY_VERSION
+    from celery.app.trace import task_has_custom
+    from celery.schedules import crontab, schedule, solar
+    from celery.signals import (
+        beat_init,
+        task_prerun,
+        task_failure,
+        task_success,
+        task_retry,
+    )
     from celery.exceptions import (  # type: ignore
         SoftTimeLimitExceeded,
         Retry,
         Ignore,
         Reject,
     )
-    from celery.app.trace import task_has_custom
 except ImportError:
     raise DidNotEnable("Celery not installed")
 
@@ -303,41 +319,198 @@ def _patch_worker_exit():
     Worker.workloop = sentry_workloop
 
 
-from celery.signals import beat_init
-
+# For the signals to properly register, they need to be top-level objects.
+# Since they are defined dynamically in initialize(), we have to declare them up top,
+# make them global, and override them.
 celerybeat_startup = None
+ping_monitor_before_task = None
+ping_monitor_on_success = None
+ping_monitor_on_failure = None
+ping_monitor_on_retry = None
+
+
+def _get_headers_from_task(task):  # type: (celery.Task) -> Dict
+    headers = task.request.headers or {}
+    headers.update(task.request.get("properties", {}).get("application_headers", {}))
+    return headers
 
 
 def _instrument_celery_beat_tasks(celery_app):
     # type: (Celery) -> None
 
     global celerybeat_startup
+    global ping_monitor_before_task
+    global ping_monitor_on_success
+    global ping_monitor_on_failure
+    global ping_monitor_on_retry
 
-    def celerybeat_startup(sender, **kwargs):
+    def celerybeat_startup(
+        sender, **kwargs
+    ):  # type: (celery.beat.Service, Dict) -> None
+        # To avoid recursion, since restarting celerybeat will result in this
+        # signal being called again, we disconnect the signal.
         beat_init.disconnect(celerybeat_startup, dispatch_uid=1)
 
-        scheduler = sender.scheduler
+        # Must use the cached_property from scheduler so as not to re-open the shelve database
+        scheduler = sender.scheduler  # type: celery.beat.Scheduler
+        # Also need to use the property here, including for django-celery-beat
         schedules = scheduler.schedule
 
-        # TODO: what if the same task is mulitple times in the schedule? (with differenc schedules?)
+        add_periodic_task_deferred = []
         for name in schedules:
-            # from celery.contrib import rdb
-            # rdb.set_trace()
             if name.startswith("celery."):
                 continue
 
-            schedule_entry = schedules[name]
-            print(f"@@@@@@ {schedule_entry} @@@@@@@@@@")
+            entry = schedules[name]  # type: celery.beat.ScheduleEntry
+            item = entry.schedule  # type: celery.schedules.schedule
 
-            task_qualname = schedule_entry.task
+            if isinstance(item, crontab):
+                sentry_schedule = (
+                    "{0._orig_minute} {0._orig_hour} {0._orig_day_of_week} {0._orig_day_of_month} "
+                    "{0._orig_month_of_year}"
+                ).format(item)
+                sentry_schedule_type = "cron"
 
-            module_name, function_name = task_qualname.rsplit(".", 1)
-            module_obj = import_module(module_name)
-            function_obj = getattr(module_obj, function_name)
-            setattr(
-                module_obj,
-                function_name,
-                monitor(monitor_slug=task_qualname)(function_obj),
+            elif isinstance(item, schedule):
+                freq = item.run_every  # type: datetime.timedelta
+                sentry_schedule = freq.total_seconds()
+                sentry_schedule_type = "interval"
+
+            elif isinstance(item, solar):
+                # We don't support solar schedules
+                logger.warning(
+                    "The CeleryIntegration does not support "
+                    "tasks using solar schedules. Task schedule '{}' will "
+                    "not be monitored".format(name)
+                )
+                continue
+
+            else:
+                logger.warning(
+                    "The CeleryIntegration does not support "
+                    "schedules of type `{}`".format(type(item))
+                )
+                continue
+
+            headers = entry.options.pop("headers", {})
+
+            headers.update(
+                {
+                    "headers": {
+                        "sentry-celerybeat-name": name,
+                        "sentry-celerybeat-schedule": sentry_schedule,
+                        "sentry-celerybeat-schedule-type": sentry_schedule_type,
+                    },
+                }
             )
 
+            add_periodic_task_deferred.append(
+                functools.partial(
+                    celery_app.add_periodic_task,
+                    entry.schedule,
+                    # Setting headers in the signature
+                    # works better than in periodic task options
+                    celery_app.tasks.get(entry.task).s().set(headers=headers),
+                    args=entry.args,
+                    kwargs=entry.kwargs,
+                    name=entry.name,
+                    **(entry.options or {}),
+                )
+            )
+
+        if isinstance(sender.scheduler, celery.beat.PersistentScheduler):
+            # The celerybeat-schedule file with shelve gets corrupted really easily, so we need
+            # to set up a tempfile instead.
+            new_schedule = tempfile.NamedTemporaryFile()
+            with open(sender.schedule_filename, "rb") as current_schedule:
+                shutil.copyfileobj(current_schedule, new_schedule)
+            # We need to stop and restart celerybeat to get the task updates in place.
+            # This isn't ideal, but seems to work.
+
+            sender.stop()
+            # Now, actually add all the periodic tasks to overwrite beat with the headers
+            for task in add_periodic_task_deferred:
+                task()
+            # Then, restart celerybeat, on the new schedule file (copied from the old one)
+            celery_app.Beat(schedule=new_schedule.name).run()
+
+        else:
+            # For django-celery, etc., we don't need to stop and restart celerybeat
+            for task in add_periodic_task_deferred:
+                task()
+
     beat_init.connect(celerybeat_startup, dispatch_uid=1)
+
+    @task_prerun.connect
+    def ping_monitor_before_task(sender, **kwargs):  # type: (celery.Task, Dict) -> None
+        headers = _get_headers_from_task(sender)
+        start_timestamp_ns = nanosecond_time()
+
+        check_in_id = capture_checkin(
+            monitor_slug=headers["sentry-celerybeat-name"],
+            schedule=headers["sentry-celerybeat-schedule"],
+            schedule_type=headers["sentry-celerybeat-schedule-type"],
+            status=MonitorStatus.IN_PROGRESS,
+        )
+
+        headers.update({"sentry-check-in-id": check_in_id})
+        headers.update({"sentry-start-timestamp-ns": start_timestamp_ns})
+
+        sender.s().set(headers=headers)
+
+    @task_success.connect
+    def ping_monitor_on_success(sender, **kwargs):  # type: (celery.Task, Dict) -> None
+        headers = _get_headers_from_task(sender)
+        start_timestamp_ns = headers["sentry-start-timestamp-ns"]
+
+        capture_checkin(
+            monitor_slug=headers["sentry-celerybeat-name"],
+            check_in_id=headers["sentry-check-in-id"],
+            schedule=headers["sentry-celerybeat-schedule"],
+            schedule_type=headers["sentry-celerybeat-schedule-type"],
+            duration_ns=nanosecond_time() - start_timestamp_ns,
+            status=MonitorStatus.OK,
+        )
+
+    @task_failure.connect
+    def ping_monitor_on_failure(
+        sender,  # type: celery.Task
+        task_id,  # type: str
+        exception,  # type: Exception
+        args,  # type: Tuple
+        kwargs,  # type: Dict
+        traceback,
+        einfo,  # type: ignore
+        **kwargs2,  # type: Dict
+    ):
+        headers = _get_headers_from_task(sender)
+        start_timestamp_ns = headers["sentry-start-timestamp-ns"]
+
+        capture_checkin(
+            monitor_slug=headers["sentry-celerybeat-name"],
+            check_in_id=headers["sentry-check-in-id"],
+            schedule=headers["sentry-celerybeat-schedule"],
+            schedule_type=headers["sentry-celerybeat-schedule-type"],
+            duration_ns=nanosecond_time() - start_timestamp_ns,
+            status=MonitorStatus.ERROR,
+        )
+
+    @task_retry.connect
+    def ping_monitor_on_retry(
+        sender,  # type: celery.Task
+        request,  # type: celery.worker.request.Request
+        reason,  # type: Union[Exception, str]
+        einfo,  # type: ignore
+        **kwargs,  # type: Dict
+    ):
+        headers = _get_headers_from_task(sender)
+        start_timestamp_ns = headers["sentry-start-timestamp-ns"]
+
+        capture_checkin(
+            monitor_slug=headers["sentry-celerybeat-name"],
+            check_in_id=headers["sentry-check-in-id"],
+            schedule=headers["sentry-celerybeat-schedule"],
+            schedule_type=headers["sentry-celerybeat-schedule-type"],
+            duration_ns=nanosecond_time() - start_timestamp_ns,
+            status=MonitorStatus.ERROR,
+        )

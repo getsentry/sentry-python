@@ -41,7 +41,6 @@ def monitor(monitor_slug=None):
         @wraps(func)
         def wrapper(*args, **kwargs):
             # type: (*Any, **Any) -> Any
-            print("im wrapper monitor_slug: ", monitor_slug)
             start_timestamp = nanosecond_time()
             check_in_id = capture_checkin(
                 monitor_slug=monitor_slug, status=MonitorStatus.IN_PROGRESS

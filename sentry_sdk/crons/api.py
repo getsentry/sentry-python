@@ -9,22 +9,25 @@ if TYPE_CHECKING:
 
 
 def _create_checkin_event(
-    monitor_slug=None, check_in_id=None, status=None, duration_ns=None
+    monitor_slug=None,
+    check_in_id=None,
+    schedule=None,
+    schedule_type=None,
+    status=None,
+    duration_ns=None,
 ):
-    # type: (Optional[str], Optional[str], Optional[str], Optional[float]) -> Dict[str, Any]
+    # type: (Optional[str], Optional[str], Optional[str], Optional[str], Optional[str], Optional[float]) -> Dict[str, Any]
     options = Hub.current.client.options if Hub.current.client else {}
     check_in_id = check_in_id or uuid.uuid4().hex  # type: str
-    # convert nanosecond to millisecond
     duration_ms = int(duration_ns * 0.000001) if duration_ns is not None else None
 
     checkin = {
         "type": "check_in",
         "monitor_slug": monitor_slug,
-        # TODO: Add schedule and schedule_type to monitor config
-        # "monitor_config": {
-        #     "schedule": "*/10 0 0 0 0",
-        #     "schedule_type": "cron",
-        # },
+        "monitor_config": {
+            "schedule": schedule,
+            "schedule_type": schedule_type,
+        },
         "check_in_id": check_in_id,
         "status": status,
         "duration": duration_ms,
@@ -32,21 +35,28 @@ def _create_checkin_event(
         "release": options["release"],
     }
 
-    print("@@@@@@@@@@@@@@@@@@@@@@@@@")
-    print("checkin: ", checkin)
+    print("sentry_sdk.crons.api._create_checkin_event: ", checkin)
 
     return checkin
 
 
-def capture_checkin(monitor_slug=None, check_in_id=None, status=None, duration_ns=None):
-    # type: (Optional[str], Optional[str], Optional[str], Optional[float]) -> str
+def capture_checkin(
+    monitor_slug=None,
+    check_in_id=None,
+    schedule=None,
+    schedule_type=None,
+    status=None,
+    duration_ns=None,
+):
+    # type: (Optional[str], Optional[str], Optional[str], Optional[str], Optional[str], Optional[float]) -> str
     hub = Hub.current
-    print("@@@@@@@@@@@ capture_checkin @@@@@@@@@@@@@@")
 
     check_in_id = check_in_id or uuid.uuid4().hex
     checkin_event = _create_checkin_event(
         monitor_slug=monitor_slug,
         check_in_id=check_in_id,
+        schedule=schedule,
+        schedule_type=schedule_type,
         status=status,
         duration_ns=duration_ns,
     )
