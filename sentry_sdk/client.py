@@ -122,7 +122,7 @@ try:
     module_not_found_error = ModuleNotFoundError
 except Exception:
     # Older Python versions
-    module_not_found_error = ImportError
+    module_not_found_error = ImportError  # type: ignore
 
 
 class _Client(object):
