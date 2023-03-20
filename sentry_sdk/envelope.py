@@ -68,6 +68,12 @@ class Envelope(object):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=profile), type="profile"))
 
+    def add_checkin(
+        self, checkin  # type: Any
+    ):
+        # type: (...) -> None
+        self.add_item(Item(payload=PayloadRef(json=checkin), type="check_in"))
+
     def add_session(
         self, session  # type: Union[Session, Any]
     ):
