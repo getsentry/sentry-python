@@ -26,6 +26,7 @@ import sentry_sdk
 from sentry_sdk._compat import PY33, PY311
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
+    capture_internal_exception,
     filename_for_module,
     is_valid_sample_rate,
     logger,
@@ -252,8 +253,16 @@ def extract_stack(
     frames = deque(maxlen=max_stack_depth)  # type: Deque[FrameType]
 
     while frame is not None:
+        try:
+            f_back = frame.f_back
+        except AttributeError:
+            capture_internal_exception(sys.exc_info())
+            # For some reason, the frame we got isn't a `FrameType` and doesn't
+            # have a `f_back`. When this happens, we continue with any frames
+            # that we've managed to extract up to this point.
+            break
         frames.append(frame)
-        frame = frame.f_back
+        frame = f_back
 
     if prev_cache is None:
         stack = tuple(extract_frame(frame, cwd) for frame in frames)
