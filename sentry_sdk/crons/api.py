@@ -35,8 +35,6 @@ def _create_check_in_event(
         "release": options["release"],
     }
 
-    print(check_in)
-
     return check_in
 
 

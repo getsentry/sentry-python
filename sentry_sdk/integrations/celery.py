@@ -413,12 +413,15 @@ def _patch_celery_beat_tasks(app):
         app.Beat(schedule=new_schedule_filename).run()
 
     beat_init.connect(celery_beat_init)
+    task_prerun.connect(celery_task_before_run)
+    task_success.connect(celery_task_success)
+    task_failure.connect(celery_task_failure)
+    task_retry.connect(celery_task_retry)
 
 
-@task_prerun.connect  # type: ignore
 def celery_task_before_run(sender, **kwargs):
     # type: (Task, Dict[Any, Any]) -> None
-    print(f"celery_task_before_run {sender}")
+    logger.debug("celery_task_before_run %s", sender)
     headers = _get_headers(sender)
     start_timestamp_ns = nanosecond_time()
 
@@ -435,10 +438,9 @@ def celery_task_before_run(sender, **kwargs):
     sender.s().set(headers=headers)
 
 
-@task_success.connect  # type: ignore
 def celery_task_success(sender, **kwargs):
     # type: (Task, Dict[Any, Any]) -> None
-    print(f"celery_task_success {sender}")
+    logger.debug("celery_task_success %s", sender)
     headers = _get_headers(sender)
     start_timestamp_ns = headers["sentry-monitor-start-timestamp-ns"]
 
@@ -452,10 +454,9 @@ def celery_task_success(sender, **kwargs):
     )
 
 
-@task_failure.connect  # type: ignore
 def celery_task_failure(sender, **kwargs):
     # type: (Task, Dict[Any, Any]) -> None
-    print(f"celery_task_failure {sender}")
+    logger.debug("celery_task_failure %s", sender)
     headers = _get_headers(sender)
     start_timestamp_ns = headers["sentry-monitor-start-timestamp-ns"]
 
@@ -469,10 +470,9 @@ def celery_task_failure(sender, **kwargs):
     )
 
 
-@task_retry.connect  # type: ignore
 def celery_task_retry(sender, **kwargs):
     # type: (Task, Dict[Any, Any]) -> None
-    print(f"celery_task_retry {sender}")
+    logger.debug("celery_task_retry %s", sender)
     headers = _get_headers(sender)
     start_timestamp_ns = headers["sentry-monitor-start-timestamp-ns"]
 
