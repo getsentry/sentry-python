@@ -18,9 +18,9 @@ from sentry_sdk.utils import (
     ContextVar,
 )
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Union
     from typing import Any
     from typing import Optional
@@ -125,9 +125,9 @@ def _init(*args, **kwargs):
     return rv
 
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     # Make mypy, PyCharm and other static analyzers think `init` is a type to
     # have nicer autocompletion for params.
     #
@@ -223,7 +223,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     # Mypy doesn't pick up on the metaclass.
 
-    if MYPY:
+    if TYPE_CHECKING:
         current = None  # type: Hub
         main = None  # type: Hub
 

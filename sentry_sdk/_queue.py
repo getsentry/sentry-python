@@ -16,9 +16,9 @@ import threading
 from collections import deque
 from time import time
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
 
 __all__ = ["EmptyError", "FullError", "Queue"]

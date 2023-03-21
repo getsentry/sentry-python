@@ -670,7 +670,7 @@ def test_does_not_capture_403(sentry_init, client, capture_events, endpoint):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
 
-    _content, status, _headers = client.get(reverse(endpoint))
+    _, status, _ = client.get(reverse(endpoint))
     assert status.lower() == "403 forbidden"
 
     assert not events
@@ -697,32 +697,14 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
 
     for url, expected_line in views_tests:
         events = capture_events()
-        _content, status, _headers = client.get(url)
+        client.get(url)
         transaction = events[0]
         assert expected_line in render_span_tree(transaction)
 
 
-def test_middleware_spans(sentry_init, client, capture_events, render_span_tree):
-    sentry_init(
-        integrations=[DjangoIntegration()],
-        traces_sample_rate=1.0,
-        _experiments={"record_sql_params": True},
-    )
-    events = capture_events()
-
-    _content, status, _headers = client.get(reverse("message"))
-
-    message, transaction = events
-
-    assert message["message"] == "hi"
-
-    if DJANGO_VERSION >= (1, 10):
-        assert (
-            render_span_tree(transaction)
-            == """\
+if DJANGO_VERSION >= (1, 10):
+    EXPECTED_MIDDLEWARE_SPANS = """\
 - op="http.server": description=null
-  - op="event.django": description="django.db.reset_queries"
-  - op="event.django": description="django.db.close_old_connections"
   - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.__call__"
     - op="middleware.django": description="django.contrib.auth.middleware.AuthenticationMiddleware.__call__"
       - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.__call__"
@@ -731,15 +713,9 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
             - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
             - op="view.render": description="message"\
 """
-        )
-
-    else:
-        assert (
-            render_span_tree(transaction)
-            == """\
+else:
+    EXPECTED_MIDDLEWARE_SPANS = """\
 - op="http.server": description=null
-  - op="event.django": description="django.db.reset_queries"
-  - op="event.django": description="django.db.close_old_connections"
   - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.process_request"
   - op="middleware.django": description="django.contrib.auth.middleware.AuthenticationMiddleware.process_request"
   - op="middleware.django": description="tests.integrations.django.myapp.settings.TestMiddleware.process_request"
@@ -749,28 +725,94 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
   - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.process_response"
   - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.process_response"\
 """
-        )
 
 
-def test_middleware_spans_disabled(sentry_init, client, capture_events):
+def test_middleware_spans(sentry_init, client, capture_events, render_span_tree):
     sentry_init(
-        integrations=[DjangoIntegration(middleware_spans=False)], traces_sample_rate=1.0
+        integrations=[
+            DjangoIntegration(signals_spans=False),
+        ],
+        traces_sample_rate=1.0,
     )
     events = capture_events()
 
-    _content, status, _headers = client.get(reverse("message"))
+    client.get(reverse("message"))
 
     message, transaction = events
 
     assert message["message"] == "hi"
+    assert render_span_tree(transaction) == EXPECTED_MIDDLEWARE_SPANS
 
-    assert len(transaction["spans"]) == 2
+
+def test_middleware_spans_disabled(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(middleware_spans=False, signals_spans=False),
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client.get(reverse("message"))
+
+    message, transaction = events
+
+    assert message["message"] == "hi"
+    assert not len(transaction["spans"])
+
+
+if DJANGO_VERSION >= (1, 10):
+    EXPECTED_SIGNALS_SPANS = """\
+- op="http.server": description=null
+  - op="event.django": description="django.db.reset_queries"
+  - op="event.django": description="django.db.close_old_connections"\
+"""
+else:
+    EXPECTED_SIGNALS_SPANS = """\
+- op="http.server": description=null
+  - op="event.django": description="django.db.reset_queries"
+  - op="event.django": description="django.db.close_old_connections"\
+"""
+
+
+def test_signals_spans(sentry_init, client, capture_events, render_span_tree):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(middleware_spans=False),
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client.get(reverse("message"))
+
+    message, transaction = events
+
+    assert message["message"] == "hi"
+    assert render_span_tree(transaction) == EXPECTED_SIGNALS_SPANS
 
     assert transaction["spans"][0]["op"] == "event.django"
     assert transaction["spans"][0]["description"] == "django.db.reset_queries"
 
     assert transaction["spans"][1]["op"] == "event.django"
     assert transaction["spans"][1]["description"] == "django.db.close_old_connections"
+
+
+def test_signals_spans_disabled(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(middleware_spans=False, signals_spans=False),
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client.get(reverse("message"))
+
+    message, transaction = events
+
+    assert message["message"] == "hi"
+    assert not transaction["spans"]
 
 
 def test_csrf(sentry_init, client):

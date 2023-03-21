@@ -21,9 +21,9 @@ try:
 except ImportError:
     raise DidNotEnable("RQ not installed")
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any, Callable, Dict
 
     from sentry_sdk._types import EventProcessor

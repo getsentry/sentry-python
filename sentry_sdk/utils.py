@@ -2,6 +2,7 @@ import base64
 import json
 import linecache
 import logging
+import math
 import os
 import re
 import subprocess
@@ -9,6 +10,8 @@ import sys
 import threading
 import time
 from collections import namedtuple
+from decimal import Decimal
+from numbers import Real
 
 try:
     # Python 3
@@ -39,9 +42,9 @@ except ImportError:
 
 import sentry_sdk
 from sentry_sdk._compat import PY2, PY33, PY37, implements_str, text_type, urlparse
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from types import FrameType, TracebackType
     from typing import (
         Any,
@@ -407,7 +410,7 @@ class AnnotatedValue(object):
         )
 
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import TypeVar
 
     T = TypeVar("T")
@@ -591,7 +594,7 @@ def filename_for_module(module, abs_path):
         return abs_path
 
 
-def serialize_frame(frame, tb_lineno=None, with_locals=True):
+def serialize_frame(frame, tb_lineno=None, include_local_variables=True):
     # type: (FrameType, Optional[int], bool) -> Dict[str, Any]
     f_code = getattr(frame, "f_code", None)
     if not f_code:
@@ -620,13 +623,13 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
         "context_line": context_line,
         "post_context": post_context,
     }  # type: Dict[str, Any]
-    if with_locals:
+    if include_local_variables:
         rv["vars"] = frame.f_locals
 
     return rv
 
 
-def current_stacktrace(with_locals=True):
+def current_stacktrace(include_local_variables=True):
     # type: (bool) -> Any
     __tracebackhide__ = True
     frames = []
@@ -634,7 +637,9 @@ def current_stacktrace(with_locals=True):
     f = sys._getframe()  # type: Optional[FrameType]
     while f is not None:
         if not should_hide_frame(f):
-            frames.append(serialize_frame(f, with_locals=with_locals))
+            frames.append(
+                serialize_frame(f, include_local_variables=include_local_variables)
+            )
         f = f.f_back
 
     frames.reverse()
@@ -668,12 +673,16 @@ def single_exception_from_error_tuple(
         )
 
     if client_options is None:
-        with_locals = True
+        include_local_variables = True
     else:
-        with_locals = client_options["with_locals"]
+        include_local_variables = client_options["include_local_variables"]
 
     frames = [
-        serialize_frame(tb.tb_frame, tb_lineno=tb.tb_lineno, with_locals=with_locals)
+        serialize_frame(
+            tb.tb_frame,
+            tb_lineno=tb.tb_lineno,
+            include_local_variables=include_local_variables,
+        )
         for tb in iter_stacks(tb)
     ]
 
@@ -1252,6 +1261,37 @@ def parse_url(url, sanitize=True):
     )
 
     return ParsedUrl(url=base_url, query=parsed_url.query, fragment=parsed_url.fragment)
+
+
+def is_valid_sample_rate(rate, source):
+    # type: (Any, str) -> bool
+    """
+    Checks the given sample rate to make sure it is valid type and value (a
+    boolean or a number between 0 and 1, inclusive).
+    """
+
+    # both booleans and NaN are instances of Real, so a) checking for Real
+    # checks for the possibility of a boolean also, and b) we have to check
+    # separately for NaN and Decimal does not derive from Real so need to check that too
+    if not isinstance(rate, (Real, Decimal)) or math.isnan(rate):
+        logger.warning(
+            "{source} Given sample rate is invalid. Sample rate must be a boolean or a number between 0 and 1. Got {rate} of type {type}.".format(
+                source=source, rate=rate, type=type(rate)
+            )
+        )
+        return False
+
+    # in case rate is a boolean, it will get cast to 1 if it's True and 0 if it's False
+    rate = float(rate)
+    if rate < 0 or rate > 1:
+        logger.warning(
+            "{source} Given sample rate is invalid. Sample rate must be between 0 and 1. Got {rate}.".format(
+                source=source, rate=rate
+            )
+        )
+        return False
+
+    return True
 
 
 if PY37:

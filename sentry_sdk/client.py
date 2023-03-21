@@ -28,11 +28,11 @@ from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.profiler import setup_profiler
+from sentry_sdk.profiler import has_profiling_enabled, setup_profiler
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
@@ -71,7 +71,18 @@ def _get_options(*args, **kwargs):
 
     for key, value in iteritems(options):
         if key not in rv:
+            # Option "with_locals" was renamed to "include_local_variables"
+            if key == "with_locals":
+                msg = (
+                    "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. "
+                    "Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
+                )
+                logger.warning(msg)
+                rv["include_local_variables"] = value
+                continue
+
             raise TypeError("Unknown option %r" % (key,))
+
         rv[key] = value
 
     if rv["dsn"] is None:
@@ -163,8 +174,7 @@ class _Client(object):
         finally:
             _client_init_debug.set(old_debug)
 
-        profiles_sample_rate = self.options["_experiments"].get("profiles_sample_rate")
-        if profiles_sample_rate is not None and profiles_sample_rate > 0:
+        if has_profiling_enabled(self.options):
             try:
                 setup_profiler(self.options)
             except ValueError as e:
@@ -213,7 +223,7 @@ class _Client(object):
                     "values": [
                         {
                             "stacktrace": current_stacktrace(
-                                self.options["with_locals"]
+                                self.options["include_local_variables"]
                             ),
                             "crashed": False,
                             "current": True,
@@ -430,9 +440,11 @@ class _Client(object):
             .pop("dynamic_sampling_context", {})
         )
 
-        # Transactions or events with attachments should go to the /envelope/
+        is_checkin = event_opt.get("type") == "check_in"
+
+        # Transactions, events with attachments, and checkins should go to the /envelope/
         # endpoint.
-        if is_transaction or attachments:
+        if is_transaction or is_checkin or attachments:
 
             headers = {
                 "event_id": event_opt["event_id"],
@@ -448,11 +460,14 @@ class _Client(object):
                 if profile is not None:
                     envelope.add_profile(profile.to_json(event_opt, self.options))
                 envelope.add_transaction(event_opt)
+            elif is_checkin:
+                envelope.add_checkin(event_opt)
             else:
                 envelope.add_event(event_opt)
 
             for attachment in attachments or ():
                 envelope.add_item(attachment.to_envelope_item())
+
             self.transport.capture_envelope(envelope)
         else:
             # All other events go to the /store/ endpoint.
@@ -512,9 +527,9 @@ class _Client(object):
         self.close()
 
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     # Make mypy, PyCharm and other static analyzers think `get_options` is a
     # type to have nicer autocompletion for params.
     #
