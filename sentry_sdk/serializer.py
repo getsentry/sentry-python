@@ -254,6 +254,8 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
         obj, is_databag, should_repr_strings, remaining_depth, remaining_breadth
     ):
         # type: (Any, Optional[bool], Optional[bool], Optional[int], Optional[int]) -> Any
+        if isinstance(obj, AnnotatedValue):
+            should_repr_strings = False
         if should_repr_strings is None:
             should_repr_strings = _should_repr_strings()
 
