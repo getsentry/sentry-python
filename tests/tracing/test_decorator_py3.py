@@ -53,7 +53,8 @@ def test_trace_decorator_sync_py3_no_trx():
 
             result2 = start_child_span_decorator_py3(my_example_function)()
             fake_warning.assert_called_once_with(
-                "No transaction found. Not creating a child span for %s. Please start a Sentry transaction before calling this function.",
+                "Can not create a child span for %s. "
+                "Please start a Sentry transaction before calling this function.",
                 "test_decorator_py3.my_example_function",
             )
             assert result2 == "return_of_sync_function"
@@ -95,7 +96,8 @@ async def test_trace_decorator_async_py3_no_trx():
 
             result2 = await start_child_span_decorator_py3(my_async_example_function)()
             fake_warning.assert_called_once_with(
-                "No transaction found. Not creating a child span for %s. Please start a Sentry transaction before calling this function.",
+                "Can not create a child span for %s. "
+                "Please start a Sentry transaction before calling this function.",
                 "test_decorator_py3.my_async_example_function",
             )
             assert result2 == "return_of_async_function"
