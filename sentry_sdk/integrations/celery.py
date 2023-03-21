@@ -1,10 +1,13 @@
 from __future__ import absolute_import
 
 import sys
+import shutil
+import functools
 
 from sentry_sdk.consts import OP
 from sentry_sdk._compat import reraise
 from sentry_sdk._functools import wraps
+from sentry_sdk.crons import capture_checkin, MonitorStatus
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
@@ -13,13 +16,18 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    nanosecond_time,
+    logger,
 )
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
+    from typing import Dict
     from typing import Optional
+    from typing import Tuple
     from typing import TypeVar
+    from typing import Union
 
     from sentry_sdk._types import EventProcessor, Event, Hint, ExcInfo
 
@@ -28,12 +36,22 @@ if TYPE_CHECKING:
 
 try:
     from celery import VERSION as CELERY_VERSION
+    from celery import Task, Celery
     from celery.app.trace import task_has_custom
+    from celery.beat import Service  # type: ignore
     from celery.exceptions import (  # type: ignore
         Ignore,
         Reject,
         Retry,
         SoftTimeLimitExceeded,
+    )
+    from celery.schedules import crontab, schedule  # type: ignore
+    from celery.signals import (  # type: ignore
+        beat_init,
+        task_prerun,
+        task_failure,
+        task_success,
+        task_retry,
     )
 except ImportError:
     raise DidNotEnable("Celery not installed")
@@ -45,9 +63,12 @@ CELERY_CONTROL_FLOW_EXCEPTIONS = (Retry, Ignore, Reject)
 class CeleryIntegration(Integration):
     identifier = "celery"
 
-    def __init__(self, propagate_traces=True):
-        # type: (bool) -> None
+    def __init__(self, propagate_traces=True, celery_app=None):
+        # type: (bool, Celery) -> None
         self.propagate_traces = propagate_traces
+
+        if celery_app is not None:
+            _patch_celery_beat_tasks(celery_app)
 
     @staticmethod
     def setup_once():
@@ -293,3 +314,173 @@ def _patch_worker_exit():
                     hub.flush()
 
     Worker.workloop = sentry_workloop
+
+
+def _get_headers(task):
+    # type: (Task) -> Dict[str, Any]
+    headers = task.request.get("headers") or {}
+    return headers
+
+
+# Nested functions do not work as Celery hook receiver,
+# so defining it here explicitly
+celery_beat_init = None
+
+
+def _patch_celery_beat_tasks(app):
+    # type: (Celery) -> None
+
+    global celery_beat_init
+
+    def celery_beat_init(sender, **kwargs):
+        # type: (Service, Dict[Any, Any]) -> None
+
+        # Because we restart Celery Beat,
+        # make sure that this will not be called infinitely
+        beat_init.disconnect(celery_beat_init)
+
+        add_updated_periodic_tasks = []
+
+        for name in sender.scheduler.schedule.keys():
+            # Ignore Celery's internal tasks
+            if name.startswith("celery."):
+                continue
+
+            schedule_entry = sender.scheduler.schedule[name]
+            celery_schedule = schedule_entry.schedule
+
+            monitor_name = name
+            monitor_schedule = None  # type: Optional[Union[str,Tuple[int, str]]]
+
+            if isinstance(celery_schedule, crontab):
+                monitor_schedule_type = "cron"
+                monitor_schedule = (
+                    "{0._orig_minute} "
+                    "{0._orig_hour} "
+                    "{0._orig_day_of_month} "
+                    "{0._orig_month_of_year} "
+                    "{0._orig_day_of_week}".format(celery_schedule)
+                )
+            elif isinstance(celery_schedule, schedule):
+                monitor_schedule_type = "interval"
+                monitor_schedule = (
+                    int(celery_schedule.seconds),
+                    "second",
+                )
+            else:
+                logger.warning(
+                    "Celery schedule type '%s' not supported by Sentry Crons.",
+                    type(celery_schedule),
+                )
+                continue
+
+            headers = schedule_entry.options.pop("headers", {})
+            headers.update(
+                {
+                    "headers": {
+                        "sentry-monitor-slug": monitor_name,
+                        "sentry-monitor-schedule": monitor_schedule,
+                        "sentry-monitor-schedule-type": monitor_schedule_type,
+                    },
+                }
+            )
+
+            task_signature = app.tasks.get(schedule_entry.task).s()
+            task_signature.set(headers=headers)
+
+            add_updated_periodic_tasks.append(
+                functools.partial(
+                    app.add_periodic_task,
+                    celery_schedule,
+                    task_signature,
+                    args=schedule_entry.args,
+                    kwargs=schedule_entry.kwargs,
+                    name=schedule_entry.name,
+                    **(schedule_entry.options or {}),
+                )
+            )
+
+        # Stop Celery Beat
+        sender.stop()
+
+        # Update tasks to include Monitor information in headers
+        for add_updated_periodic_task in add_updated_periodic_tasks:
+            add_updated_periodic_task()
+
+        # Start Celery Beat (with new (cloned) schedule, because old one is still in use)
+        new_schedule_filename = sender.schedule_filename + ".new"
+        shutil.copy2(sender.schedule_filename, new_schedule_filename)
+        app.Beat(schedule=new_schedule_filename).run()
+
+    beat_init.connect(celery_beat_init)
+
+
+@task_prerun.connect  # type: ignore
+def celery_task_before_run(sender, **kwargs):
+    # type: (Task, Dict[Any, Any]) -> None
+    print(f"celery_task_before_run {sender}")
+    headers = _get_headers(sender)
+    start_timestamp_ns = nanosecond_time()
+
+    check_in_id = capture_checkin(
+        monitor_slug=headers["sentry-monitor-slug"],
+        schedule=headers["sentry-monitor-schedule"],
+        schedule_type=headers["sentry-monitor-schedule-type"],
+        status=MonitorStatus.IN_PROGRESS,
+    )
+
+    headers.update({"sentry-monitor-check-in-id": check_in_id})
+    headers.update({"sentry-monitor-start-timestamp-ns": start_timestamp_ns})
+
+    sender.s().set(headers=headers)
+
+
+@task_success.connect  # type: ignore
+def celery_task_success(sender, **kwargs):
+    # type: (Task, Dict[Any, Any]) -> None
+    print(f"celery_task_success {sender}")
+    headers = _get_headers(sender)
+    start_timestamp_ns = headers["sentry-monitor-start-timestamp-ns"]
+
+    capture_checkin(
+        monitor_slug=headers["sentry-monitor-slug"],
+        check_in_id=headers["sentry-monitor-check-in-id"],
+        schedule=headers["sentry-monitor-schedule"],
+        schedule_type=headers["sentry-monitor-schedule-type"],
+        duration_ns=nanosecond_time() - start_timestamp_ns,
+        status=MonitorStatus.OK,
+    )
+
+
+@task_failure.connect  # type: ignore
+def celery_task_failure(sender, **kwargs):
+    # type: (Task, Dict[Any, Any]) -> None
+    print(f"celery_task_failure {sender}")
+    headers = _get_headers(sender)
+    start_timestamp_ns = headers["sentry-monitor-start-timestamp-ns"]
+
+    capture_checkin(
+        monitor_slug=headers["sentry-monitor-slug"],
+        check_in_id=headers["sentry-monitor-check-in-id"],
+        schedule=headers["sentry-monitor-schedule"],
+        schedule_type=headers["sentry-monitor-schedule-type"],
+        duration_ns=nanosecond_time() - start_timestamp_ns,
+        status=MonitorStatus.ERROR,
+    )
+
+
+@task_retry.connect  # type: ignore
+def celery_task_retry(sender, **kwargs):
+    # type: (Task, Dict[Any, Any]) -> None
+    print(f"celery_task_retry {sender}")
+    headers = _get_headers(sender)
+    start_timestamp_ns = headers["sentry-monitor-start-timestamp-ns"]
+
+    capture_checkin(
+        monitor_slug=headers["sentry-monitor-slug"],
+        check_in_id=headers["sentry-monitor-check-in-id"],
+        schedule=headers["sentry-monitor-schedule"],
+        schedule_type=headers["sentry-monitor-schedule-type"],
+        duration_ns=nanosecond_time() - start_timestamp_ns,
+        status=MonitorStatus.ERROR,
+    )
