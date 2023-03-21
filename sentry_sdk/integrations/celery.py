@@ -1,26 +1,25 @@
 from __future__ import absolute_import
 
 import sys
-from sentry_sdk.consts import OP
 
+from sentry_sdk.consts import OP
+from sentry_sdk._compat import reraise
+from sentry_sdk._functools import wraps
 from sentry_sdk.hub import Hub
-from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
+from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
 )
-from sentry_sdk.tracing import Transaction
-from sentry_sdk._compat import reraise
-from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk._functools import wraps
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import TypeVar
     from typing import Callable
     from typing import Optional
+    from typing import TypeVar
 
     from sentry_sdk._types import EventProcessor, Event, Hint, ExcInfo
 
@@ -29,13 +28,13 @@ if TYPE_CHECKING:
 
 try:
     from celery import VERSION as CELERY_VERSION
+    from celery.app.trace import task_has_custom
     from celery.exceptions import (  # type: ignore
-        SoftTimeLimitExceeded,
-        Retry,
         Ignore,
         Reject,
+        Retry,
+        SoftTimeLimitExceeded,
     )
-    from celery.app.trace import task_has_custom
 except ImportError:
     raise DidNotEnable("Celery not installed")
 
