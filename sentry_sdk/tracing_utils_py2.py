@@ -26,17 +26,17 @@ def start_child_span_decorator(func):
     def func_with_tracing(*args, **kwargs):
         # type: (*Any, **Any) -> Any
 
-        span_or_trx = get_current_span(sentry_sdk.Hub.current)
+        span = get_current_span(sentry_sdk.Hub.current)
 
-        if span_or_trx is None:
+        if span is None:
             logger.warning(
-                "No transaction found. Not creating a child span for %s. "
+                "Can not create a child span for %s. "
                 "Please start a Sentry transaction before calling this function.",
                 qualname_from_function(func),
             )
             return func(*args, **kwargs)
 
-        with span_or_trx.start_child(
+        with span.start_child(
             op=OP.FUNCTION,
             description=qualname_from_function(func),
         ):

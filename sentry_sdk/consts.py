@@ -134,6 +134,7 @@ class ClientConstructor(object):
             MATCH_ALL
         ],  # type: Optional[Sequence[str]]
         functions_to_trace=[],  # type: Sequence[str]  # noqa: B006
+        event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
     ):
         # type: (...) -> None
         pass
