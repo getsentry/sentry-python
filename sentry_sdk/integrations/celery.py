@@ -396,7 +396,7 @@ def _patch_celery_beat_tasks(app):
                     args=schedule_entry.args,
                     kwargs=schedule_entry.kwargs,
                     name=schedule_entry.name,
-                    **(schedule_entry.options or {}),
+                    **(schedule_entry.options or {})
                 )
             )
 
