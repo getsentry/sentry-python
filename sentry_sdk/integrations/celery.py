@@ -322,6 +322,22 @@ def _get_headers(task):
     return headers
 
 
+def _get_monitor_config(headers):
+    # type: (Dict[str, Any]) -> Dict[str, Any]
+    monitor_config = {}
+
+    if "sentry-monitor-schedule" in headers:
+        monitor_config["schedule"] = headers["sentry-monitor-schedule"]
+
+    if "sentry-monitor-schedule-type" in headers:
+        monitor_config["schedule_type"] = headers["sentry-monitor-schedule-type"]
+
+    if "sentry-monitor-timezone" in headers:
+        monitor_config["timezone"] = headers["sentry-monitor-timezone"]
+
+    return monitor_config
+
+
 # Nested functions do not work as Celery hook receiver,
 # so defining it here explicitly
 celery_beat_init = None
@@ -353,7 +369,7 @@ def _patch_celery_beat_tasks(app):
             monitor_schedule = None  # type: Optional[Union[str,Tuple[int, str]]]
 
             if isinstance(celery_schedule, crontab):
-                monitor_schedule_type = "cron"
+                monitor_schedule_type = "crontab"
                 monitor_schedule = (
                     "{0._orig_minute} "
                     "{0._orig_hour} "
@@ -381,6 +397,7 @@ def _patch_celery_beat_tasks(app):
                         "sentry-monitor-slug": monitor_name,
                         "sentry-monitor-schedule": monitor_schedule,
                         "sentry-monitor-schedule-type": monitor_schedule_type,
+                        "sentry-monitor-timezone": app.conf.timezone or "UTC",
                     },
                 }
             )
@@ -427,8 +444,7 @@ def celery_task_before_run(sender, **kwargs):
 
     check_in_id = capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
-        schedule=headers["sentry-monitor-schedule"],
-        schedule_type=headers["sentry-monitor-schedule-type"],
+        monitor_config=_get_monitor_config(headers),
         status=MonitorStatus.IN_PROGRESS,
     )
 
@@ -446,9 +462,8 @@ def celery_task_success(sender, **kwargs):
 
     capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
+        monitor_config=_get_monitor_config(headers),
         check_in_id=headers["sentry-monitor-check-in-id"],
-        schedule=headers["sentry-monitor-schedule"],
-        schedule_type=headers["sentry-monitor-schedule-type"],
         duration_ns=nanosecond_time() - start_timestamp_ns,
         status=MonitorStatus.OK,
     )
@@ -462,9 +477,8 @@ def celery_task_failure(sender, **kwargs):
 
     capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
+        monitor_config=_get_monitor_config(headers),
         check_in_id=headers["sentry-monitor-check-in-id"],
-        schedule=headers["sentry-monitor-schedule"],
-        schedule_type=headers["sentry-monitor-schedule-type"],
         duration_ns=nanosecond_time() - start_timestamp_ns,
         status=MonitorStatus.ERROR,
     )
@@ -478,9 +492,8 @@ def celery_task_retry(sender, **kwargs):
 
     capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
+        monitor_config=_get_monitor_config(headers),
         check_in_id=headers["sentry-monitor-check-in-id"],
-        schedule=headers["sentry-monitor-schedule"],
-        schedule_type=headers["sentry-monitor-schedule-type"],
         duration_ns=nanosecond_time() - start_timestamp_ns,
         status=MonitorStatus.ERROR,
     )
