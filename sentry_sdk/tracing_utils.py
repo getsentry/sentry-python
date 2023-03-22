@@ -213,18 +213,6 @@ class Baggage(object):
     SENTRY_PREFIX = "sentry-"
     SENTRY_PREFIX_REGEX = re.compile("^sentry-")
 
-    # DynamicSamplingContext
-    DSC_KEYS = [
-        "trace_id",
-        "public_key",
-        "sample_rate",
-        "release",
-        "environment",
-        "transaction",
-        "user_id",
-        "user_segment",
-    ]
-
     def __init__(
         self,
         sentry_items,  # type: Dict[str, str]
@@ -318,10 +306,8 @@ class Baggage(object):
         # type: () -> Dict[str, str]
         header = {}
 
-        for key in Baggage.DSC_KEYS:
-            item = self.sentry_items.get(key)
-            if item:
-                header[key] = item
+        for key, item in iteritems(self.sentry_items):
+            header[key] = item
 
         return header
 

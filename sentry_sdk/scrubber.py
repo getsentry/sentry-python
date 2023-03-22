@@ -42,6 +42,19 @@ DEFAULT_DENYLIST = [
     "x_api_key",
     "x_forwarded_for",
     "x_real_ip",
+    # other common names used in the wild
+    "aiohttp_session",  # aiohttp
+    "connect.sid",  # Express
+    "csrf_token",  # Pyramid
+    "csrf",  # (this is a cookie name used in accepted answers on stack overflow)
+    "_csrf",  # Express
+    "_csrf_token",  # Bottle
+    "PHPSESSID",  # PHP
+    "_session",  # Sanic
+    "symfony",  # Symfony
+    "user_session",  # Vue
+    "_xsrf",  # Tornado
+    "XSRF-TOKEN",  # Angular, Laravel
 ]
 
 
@@ -49,6 +62,7 @@ class EventScrubber(object):
     def __init__(self, denylist=None):
         # type: (Optional[List[str]]) -> None
         self.denylist = DEFAULT_DENYLIST if denylist is None else denylist
+        self.denylist = [x.lower() for x in self.denylist]
 
     def scrub_dict(self, d):
         # type: (Dict[str, Any]) -> None
