@@ -42,6 +42,19 @@ DEFAULT_DENYLIST = [
     "x_api_key",
     "x_forwarded_for",
     "x_real_ip",
+    # other common names used in the wild
+    "aiohttp_session",  # aiohttp
+    "connect.sid",  # Express
+    "csrf_token",  # Pyramid
+    "csrf",  # (this is a cookie name used in accepted answers on stack overflow)
+    "_csrf",  # Express
+    "_csrf_token",  # Bottle
+    "PHPSESSID",  # PHP
+    "_session",  # Sanic
+    "symfony",  # Symfony
+    "user_session",  # Vue
+    "_xsrf",  # Tornado
+    "XSRF-TOKEN",  # Angular, Laravel
 ]
 
 
