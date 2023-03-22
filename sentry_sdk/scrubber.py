@@ -49,12 +49,12 @@ DEFAULT_DENYLIST = [
     "csrf",  # (this is a cookie name used in accepted answers on stack overflow)
     "_csrf",  # Express
     "_csrf_token",  # Bottle
-    "PHPSESSID",  # PHP
+    "phpsessid",  # PHP
     "_session",  # Sanic
     "symfony",  # Symfony
     "user_session",  # Vue
     "_xsrf",  # Tornado
-    "XSRF-TOKEN",  # Angular, Laravel
+    "xsrf-token",  # Angular, Laravel
 ]
 
 
