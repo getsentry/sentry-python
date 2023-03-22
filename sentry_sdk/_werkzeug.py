@@ -1,5 +1,5 @@
 """
-Copyright © 2007 by the Pallets team.
+Copyright (c) 2007 by the Pallets team.
 
 Some rights reserved.
 
