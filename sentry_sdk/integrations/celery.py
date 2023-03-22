@@ -430,13 +430,13 @@ def _patch_celery_beat_tasks(app):
         app.Beat(schedule=new_schedule_filename).run()
 
     beat_init.connect(celery_beat_init)
-    task_prerun.connect(celery_task_before_run)
-    task_success.connect(celery_task_success)
-    task_failure.connect(celery_task_failure)
-    task_retry.connect(celery_task_retry)
+    task_prerun.connect(crons_task_before_run)
+    task_success.connect(crons_task_success)
+    task_failure.connect(crons_task_failure)
+    task_retry.connect(crons_task_retry)
 
 
-def celery_task_before_run(sender, **kwargs):
+def crons_task_before_run(sender, **kwargs):
     # type: (Task, Dict[Any, Any]) -> None
     logger.debug("celery_task_before_run %s", sender)
     headers = _get_headers(sender)
@@ -454,7 +454,7 @@ def celery_task_before_run(sender, **kwargs):
     sender.s().set(headers=headers)
 
 
-def celery_task_success(sender, **kwargs):
+def crons_task_success(sender, **kwargs):
     # type: (Task, Dict[Any, Any]) -> None
     logger.debug("celery_task_success %s", sender)
     headers = _get_headers(sender)
@@ -469,7 +469,7 @@ def celery_task_success(sender, **kwargs):
     )
 
 
-def celery_task_failure(sender, **kwargs):
+def crons_task_failure(sender, **kwargs):
     # type: (Task, Dict[Any, Any]) -> None
     logger.debug("celery_task_failure %s", sender)
     headers = _get_headers(sender)
@@ -484,7 +484,7 @@ def celery_task_failure(sender, **kwargs):
     )
 
 
-def celery_task_retry(sender, **kwargs):
+def crons_task_retry(sender, **kwargs):
     # type: (Task, Dict[Any, Any]) -> None
     logger.debug("celery_task_retry %s", sender)
     headers = _get_headers(sender)
