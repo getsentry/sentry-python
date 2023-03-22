@@ -1,6 +1,7 @@
 import sys
 
 from sentry_sdk._functools import partial
+from sentry_sdk._werkzeug import get_host, _get_headers
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import (
@@ -8,7 +9,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
 )
-from sentry_sdk._compat import PY2, reraise, iteritems
+from sentry_sdk._compat import PY2, reraise
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.integrations._wsgi_common import _filter_headers
@@ -52,35 +53,6 @@ else:
     def wsgi_decoding_dance(s, charset="utf-8", errors="replace"):
         # type: (str, str, str) -> str
         return s.encode("latin1").decode(charset, errors)
-
-
-def get_host(environ, use_x_forwarded_for=False):
-    # type: (Dict[str, str], bool) -> str
-    """Return the host for the given WSGI environment. Yanked from Werkzeug."""
-    if use_x_forwarded_for and "HTTP_X_FORWARDED_HOST" in environ:
-        rv = environ["HTTP_X_FORWARDED_HOST"]
-        if environ["wsgi.url_scheme"] == "http" and rv.endswith(":80"):
-            rv = rv[:-3]
-        elif environ["wsgi.url_scheme"] == "https" and rv.endswith(":443"):
-            rv = rv[:-4]
-    elif environ.get("HTTP_HOST"):
-        rv = environ["HTTP_HOST"]
-        if environ["wsgi.url_scheme"] == "http" and rv.endswith(":80"):
-            rv = rv[:-3]
-        elif environ["wsgi.url_scheme"] == "https" and rv.endswith(":443"):
-            rv = rv[:-4]
-    elif environ.get("SERVER_NAME"):
-        rv = environ["SERVER_NAME"]
-        if (environ["wsgi.url_scheme"], environ["SERVER_PORT"]) not in (
-            ("https", "443"),
-            ("http", "80"),
-        ):
-            rv += ":" + environ["SERVER_PORT"]
-    else:
-        # In spite of the WSGI spec, SERVER_NAME might not be present.
-        rv = "unknown"
-
-    return rv
 
 
 def get_request_url(environ, use_x_forwarded_for=False):
@@ -183,27 +155,6 @@ def _get_environ(environ):
     for key in keys:
         if key in environ:
             yield key, environ[key]
-
-
-# `get_headers` comes from `werkzeug.datastructures.EnvironHeaders`
-#
-# We need this function because Django does not give us a "pure" http header
-# dict. So we might as well use it for all WSGI integrations.
-def _get_headers(environ):
-    # type: (Dict[str, str]) -> Iterator[Tuple[str, str]]
-    """
-    Returns only proper HTTP headers.
-
-    """
-    for key, value in iteritems(environ):
-        key = str(key)
-        if key.startswith("HTTP_") and key not in (
-            "HTTP_CONTENT_TYPE",
-            "HTTP_CONTENT_LENGTH",
-        ):
-            yield key[5:].replace("_", "-").title(), value
-        elif key in ("CONTENT_TYPE", "CONTENT_LENGTH"):
-            yield key.replace("_", "-").title(), value
 
 
 def get_client_ip(environ):
