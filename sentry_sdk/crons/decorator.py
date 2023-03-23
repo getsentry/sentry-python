@@ -54,7 +54,7 @@ def monitor(monitor_slug=None, app=None):
                     monitor_slug=monitor_slug,
                     check_in_id=check_in_id,
                     status=MonitorStatus.ERROR,
-                    duration_s=duration_s,
+                    duration=duration_s,
                 )
                 exc_info = sys.exc_info()
                 reraise(*exc_info)
@@ -64,7 +64,7 @@ def monitor(monitor_slug=None, app=None):
                 monitor_slug=monitor_slug,
                 check_in_id=check_in_id,
                 status=MonitorStatus.OK,
-                duration_s=duration_s,
+                duration=duration_s,
             )
 
             return result

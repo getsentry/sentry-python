@@ -37,7 +37,7 @@ def capture_checkin(
     monitor_slug=None,
     check_in_id=None,
     status=None,
-    duration_s=None,
+    duration=None,
     monitor_config=None,
 ):
     # type: (Optional[str], Optional[str], Optional[str], Optional[float], Optional[Dict[str, Any]]) -> str
@@ -48,7 +48,7 @@ def capture_checkin(
         monitor_slug=monitor_slug,
         check_in_id=check_in_id,
         status=status,
-        duration_s=duration_s,
+        duration_s=duration,
         monitor_config=monitor_config,
     )
     hub.capture_event(check_in_event)

@@ -464,7 +464,7 @@ def crons_task_success(sender, **kwargs):
         monitor_slug=headers["sentry-monitor-slug"],
         monitor_config=_get_monitor_config(headers),
         check_in_id=headers["sentry-monitor-check-in-id"],
-        duration_s=now() - start_timestamp_s,
+        duration=now() - start_timestamp_s,
         status=MonitorStatus.OK,
     )
 
@@ -479,7 +479,7 @@ def crons_task_failure(sender, **kwargs):
         monitor_slug=headers["sentry-monitor-slug"],
         monitor_config=_get_monitor_config(headers),
         check_in_id=headers["sentry-monitor-check-in-id"],
-        duration_s=now() - start_timestamp_s,
+        duration=now() - start_timestamp_s,
         status=MonitorStatus.ERROR,
     )
 
@@ -494,6 +494,6 @@ def crons_task_retry(sender, **kwargs):
         monitor_slug=headers["sentry-monitor-slug"],
         monitor_config=_get_monitor_config(headers),
         check_in_id=headers["sentry-monitor-check-in-id"],
-        duration_s=now() - start_timestamp_s,
+        duration=now() - start_timestamp_s,
         status=MonitorStatus.ERROR,
     )

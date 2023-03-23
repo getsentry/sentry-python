@@ -115,7 +115,7 @@ def test_crons_task_success():
                     "schedule_type": "interval",
                     "timezone": "Europe/Vienna",
                 },
-                duration_s=300.4,
+                duration=300.4,
                 check_in_id="1234567890",
                 status=MonitorStatus.OK,
             )
@@ -148,7 +148,7 @@ def test_crons_task_failure():
                     "schedule_type": "interval",
                     "timezone": "Europe/Vienna",
                 },
-                duration_s=300.4,
+                duration=300.4,
                 check_in_id="1234567890",
                 status=MonitorStatus.ERROR,
             )
@@ -181,7 +181,7 @@ def test_crons_task_retry():
                     "schedule_type": "interval",
                     "timezone": "Europe/Vienna",
                 },
-                duration_s=300.4,
+                duration=300.4,
                 check_in_id="1234567890",
                 status=MonitorStatus.ERROR,
             )
