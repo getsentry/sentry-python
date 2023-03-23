@@ -1,5 +1,9 @@
 import mock
 
+import pytest
+
+pytest.importorskip("celery")
+
 from sentry_sdk.integrations.celery import (
     _get_headers,
     _get_monitor_config,
