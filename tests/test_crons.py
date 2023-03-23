@@ -36,7 +36,7 @@ def test_decorator(sentry_init):
         # Check for final checkin
         assert fake_capture_checking.call_args[1]["monitor_slug"] == "abc123"
         assert fake_capture_checking.call_args[1]["status"] == "ok"
-        assert fake_capture_checking.call_args[1]["duration_ns"]
+        assert fake_capture_checking.call_args[1]["duration_s"]
         assert fake_capture_checking.call_args[1]["check_in_id"]
 
 
@@ -61,7 +61,7 @@ def test_decorator_error(sentry_init):
         # Check for final checkin
         assert fake_capture_checking.call_args[1]["monitor_slug"] == "def456"
         assert fake_capture_checking.call_args[1]["status"] == "error"
-        assert fake_capture_checking.call_args[1]["duration_ns"]
+        assert fake_capture_checking.call_args[1]["duration_s"]
         assert fake_capture_checking.call_args[1]["check_in_id"]
 
 
@@ -72,7 +72,7 @@ def test_capture_checkin_simple(sentry_init):
         monitor_slug="abc123",
         check_in_id="112233",
         status=None,
-        duration_ns=None,
+        duration_s=None,
     )
     assert check_in_id == "112233"
 
@@ -86,7 +86,7 @@ def test_capture_checkin_new_id(sentry_init):
             monitor_slug="abc123",
             check_in_id=None,
             status=None,
-            duration_ns=None,
+            duration_s=None,
         )
 
         assert check_in_id == "a8098c1af86e11dabd1a00112444be1e"

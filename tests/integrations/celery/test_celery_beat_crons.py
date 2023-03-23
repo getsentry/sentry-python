@@ -90,7 +90,7 @@ def test_crons_task_success():
         "headers": {
             "sentry-monitor-slug": "test123",
             "sentry-monitor-check-in-id": "1234567890",
-            "sentry-monitor-start-timestamp-ns": 200,
+            "sentry-monitor-start-timestamp-s": 200.1,
             "sentry-monitor-schedule": [3, "day"],
             "sentry-monitor-schedule-type": "interval",
             "sentry-monitor-timezone": "Europe/Vienna",
@@ -101,9 +101,7 @@ def test_crons_task_success():
     with mock.patch(
         "sentry_sdk.integrations.celery.capture_checkin"
     ) as mock_capture_checkin:
-        with mock.patch(
-            "sentry_sdk.integrations.celery.nanosecond_time", return_value=500
-        ):
+        with mock.patch("sentry_sdk.integrations.celery.now", return_value=500.5):
             crons_task_success(fake_task)
 
             mock_capture_checkin.assert_called_once_with(
@@ -113,7 +111,7 @@ def test_crons_task_success():
                     "schedule_type": "interval",
                     "timezone": "Europe/Vienna",
                 },
-                duration_ns=300,
+                duration_s=300.4,
                 check_in_id="1234567890",
                 status=MonitorStatus.OK,
             )
@@ -125,7 +123,7 @@ def test_crons_task_failure():
         "headers": {
             "sentry-monitor-slug": "test123",
             "sentry-monitor-check-in-id": "1234567890",
-            "sentry-monitor-start-timestamp-ns": 200,
+            "sentry-monitor-start-timestamp-s": 200.1,
             "sentry-monitor-schedule": [3, "day"],
             "sentry-monitor-schedule-type": "interval",
             "sentry-monitor-timezone": "Europe/Vienna",
@@ -136,9 +134,7 @@ def test_crons_task_failure():
     with mock.patch(
         "sentry_sdk.integrations.celery.capture_checkin"
     ) as mock_capture_checkin:
-        with mock.patch(
-            "sentry_sdk.integrations.celery.nanosecond_time", return_value=500
-        ):
+        with mock.patch("sentry_sdk.integrations.celery.now", return_value=500.5):
             crons_task_failure(fake_task)
 
             mock_capture_checkin.assert_called_once_with(
@@ -148,7 +144,7 @@ def test_crons_task_failure():
                     "schedule_type": "interval",
                     "timezone": "Europe/Vienna",
                 },
-                duration_ns=300,
+                duration_s=300.4,
                 check_in_id="1234567890",
                 status=MonitorStatus.ERROR,
             )
@@ -160,7 +156,7 @@ def test_crons_task_retry():
         "headers": {
             "sentry-monitor-slug": "test123",
             "sentry-monitor-check-in-id": "1234567890",
-            "sentry-monitor-start-timestamp-ns": 200,
+            "sentry-monitor-start-timestamp-s": 200.1,
             "sentry-monitor-schedule": [3, "day"],
             "sentry-monitor-schedule-type": "interval",
             "sentry-monitor-timezone": "Europe/Vienna",
@@ -171,9 +167,7 @@ def test_crons_task_retry():
     with mock.patch(
         "sentry_sdk.integrations.celery.capture_checkin"
     ) as mock_capture_checkin:
-        with mock.patch(
-            "sentry_sdk.integrations.celery.nanosecond_time", return_value=500
-        ):
+        with mock.patch("sentry_sdk.integrations.celery.now", return_value=500.5):
             crons_task_retry(fake_task)
 
             mock_capture_checkin.assert_called_once_with(
@@ -183,7 +177,7 @@ def test_crons_task_retry():
                     "schedule_type": "interval",
                     "timezone": "Europe/Vienna",
                 },
-                duration_ns=300,
+                duration_s=300.4,
                 check_in_id="1234567890",
                 status=MonitorStatus.ERROR,
             )

@@ -16,8 +16,8 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    nanosecond_time,
     logger,
+    now,
 )
 
 if TYPE_CHECKING:
@@ -440,7 +440,7 @@ def crons_task_before_run(sender, **kwargs):
     # type: (Task, Dict[Any, Any]) -> None
     logger.debug("celery_task_before_run %s", sender)
     headers = _get_headers(sender)
-    start_timestamp_ns = nanosecond_time()
+    start_timestamp_s = now()
 
     check_in_id = capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
@@ -449,7 +449,7 @@ def crons_task_before_run(sender, **kwargs):
     )
 
     headers.update({"sentry-monitor-check-in-id": check_in_id})
-    headers.update({"sentry-monitor-start-timestamp-ns": start_timestamp_ns})
+    headers.update({"sentry-monitor-start-timestamp-s": start_timestamp_s})
 
     sender.s().set(headers=headers)
 
@@ -458,13 +458,13 @@ def crons_task_success(sender, **kwargs):
     # type: (Task, Dict[Any, Any]) -> None
     logger.debug("celery_task_success %s", sender)
     headers = _get_headers(sender)
-    start_timestamp_ns = headers["sentry-monitor-start-timestamp-ns"]
+    start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
 
     capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
         monitor_config=_get_monitor_config(headers),
         check_in_id=headers["sentry-monitor-check-in-id"],
-        duration_ns=nanosecond_time() - start_timestamp_ns,
+        duration_s=now() - start_timestamp_s,
         status=MonitorStatus.OK,
     )
 
@@ -473,13 +473,13 @@ def crons_task_failure(sender, **kwargs):
     # type: (Task, Dict[Any, Any]) -> None
     logger.debug("celery_task_failure %s", sender)
     headers = _get_headers(sender)
-    start_timestamp_ns = headers["sentry-monitor-start-timestamp-ns"]
+    start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
 
     capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
         monitor_config=_get_monitor_config(headers),
         check_in_id=headers["sentry-monitor-check-in-id"],
-        duration_ns=nanosecond_time() - start_timestamp_ns,
+        duration_s=now() - start_timestamp_s,
         status=MonitorStatus.ERROR,
     )
 
@@ -488,12 +488,12 @@ def crons_task_retry(sender, **kwargs):
     # type: (Task, Dict[Any, Any]) -> None
     logger.debug("celery_task_retry %s", sender)
     headers = _get_headers(sender)
-    start_timestamp_ns = headers["sentry-monitor-start-timestamp-ns"]
+    start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
 
     capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
         monitor_config=_get_monitor_config(headers),
         check_in_id=headers["sentry-monitor-check-in-id"],
-        duration_ns=nanosecond_time() - start_timestamp_ns,
+        duration_s=now() - start_timestamp_s,
         status=MonitorStatus.ERROR,
     )

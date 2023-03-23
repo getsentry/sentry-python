@@ -5,7 +5,7 @@ from sentry_sdk._compat import reraise
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.crons import capture_checkin
 from sentry_sdk.crons.consts import MonitorStatus
-from sentry_sdk.utils import nanosecond_time
+from sentry_sdk.utils import now
 
 
 if TYPE_CHECKING:
@@ -41,7 +41,7 @@ def monitor(monitor_slug=None, app=None):
         @wraps(func)
         def wrapper(*args, **kwargs):
             # type: (*Any, **Any) -> Any
-            start_timestamp = nanosecond_time()
+            start_timestamp = now()
             check_in_id = capture_checkin(
                 monitor_slug=monitor_slug, status=MonitorStatus.IN_PROGRESS
             )
@@ -49,22 +49,22 @@ def monitor(monitor_slug=None, app=None):
             try:
                 result = func(*args, **kwargs)
             except Exception:
-                duration_ns = nanosecond_time() - start_timestamp
+                duration_s = now() - start_timestamp
                 capture_checkin(
                     monitor_slug=monitor_slug,
                     check_in_id=check_in_id,
                     status=MonitorStatus.ERROR,
-                    duration_ns=duration_ns,
+                    duration_s=duration_s,
                 )
                 exc_info = sys.exc_info()
                 reraise(*exc_info)
 
-            duration_ns = nanosecond_time() - start_timestamp
+            duration_s = now() - start_timestamp
             capture_checkin(
                 monitor_slug=monitor_slug,
                 check_in_id=check_in_id,
                 status=MonitorStatus.OK,
-                duration_ns=duration_ns,
+                duration_s=duration_s,
             )
 
             return result

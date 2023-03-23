@@ -12,13 +12,12 @@ def _create_check_in_event(
     monitor_slug=None,
     check_in_id=None,
     status=None,
-    duration_ns=None,
+    duration_s=None,
     monitor_config=None,
 ):
     # type: (Optional[str], Optional[str], Optional[str], Optional[float], Optional[Dict[str, Any]]) -> Dict[str, Any]
     options = Hub.current.client.options if Hub.current.client else {}
     check_in_id = check_in_id or uuid.uuid4().hex  # type: str
-    duration_s = duration_ns / 1e9 if duration_ns is not None else None
 
     check_in = {
         "type": "check_in",
@@ -38,7 +37,7 @@ def capture_checkin(
     monitor_slug=None,
     check_in_id=None,
     status=None,
-    duration_ns=None,
+    duration_s=None,
     monitor_config=None,
 ):
     # type: (Optional[str], Optional[str], Optional[str], Optional[float], Optional[Dict[str, Any]]) -> str
@@ -49,7 +48,7 @@ def capture_checkin(
         monitor_slug=monitor_slug,
         check_in_id=check_in_id,
         status=status,
-        duration_ns=duration_ns,
+        duration_s=duration_s,
         monitor_config=monitor_config,
     )
     hub.capture_event(check_in_event)
