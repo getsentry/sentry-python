@@ -7,12 +7,15 @@ pytest.importorskip("celery")
 from sentry_sdk.integrations.celery import (
     _get_headers,
     _get_monitor_config,
+    _get_schedule_config,
+    _reinstall_patched_tasks,
     crons_task_before_run,
     crons_task_success,
     crons_task_failure,
     crons_task_retry,
 )
 from sentry_sdk.crons import MonitorStatus
+from celery.schedules import crontab, schedule
 
 
 def test_get_headers():
@@ -185,3 +188,52 @@ def test_crons_task_retry():
                 check_in_id="1234567890",
                 status=MonitorStatus.ERROR,
             )
+
+
+def test_get_schedule_config():
+    celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
+
+    (monitor_schedule_type, monitor_schedule) = _get_schedule_config(celery_schedule)
+    assert monitor_schedule_type == "crontab"
+    assert monitor_schedule == "*/10 12 3 * *"
+
+    celery_schedule = schedule(run_every=3)
+
+    (monitor_schedule_type, monitor_schedule) = _get_schedule_config(celery_schedule)
+    assert monitor_schedule_type == "interval"
+    assert monitor_schedule == (3, "second")
+
+    unknown_celery_schedule = mock.MagicMock()
+    (monitor_schedule_type, monitor_schedule) = _get_schedule_config(
+        unknown_celery_schedule
+    )
+    assert monitor_schedule_type is None
+    assert monitor_schedule is None
+
+
+def test_reinstall_patched_tasks():
+    fake_beat = mock.MagicMock()
+    fake_beat.run = mock.MagicMock()
+
+    app = mock.MagicMock()
+    app.Beat = mock.MagicMock(return_value=fake_beat)
+
+    sender = mock.MagicMock()
+    sender.schedule_filename = "test_schedule_filename"
+    sender.stop = mock.MagicMock()
+
+    add_updated_periodic_tasks = [mock.MagicMock(), mock.MagicMock(), mock.MagicMock()]
+
+    with mock.patch("sentry_sdk.integrations.celery.shutil.copy2") as mock_copy2:
+        _reinstall_patched_tasks(app, sender, add_updated_periodic_tasks)
+
+        sender.stop.assert_called_once_with()
+
+        add_updated_periodic_tasks[0].assert_called_once_with()
+        add_updated_periodic_tasks[1].assert_called_once_with()
+        add_updated_periodic_tasks[2].assert_called_once_with()
+
+        mock_copy2.assert_called_once_with(
+            "test_schedule_filename", "test_schedule_filename.new"
+        )
+        fake_beat.run.assert_called_once_with()

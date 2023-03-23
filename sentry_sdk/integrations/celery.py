@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
+    from typing import List
     from typing import Optional
     from typing import Tuple
     from typing import TypeVar
@@ -338,6 +339,51 @@ def _get_monitor_config(headers):
     return monitor_config
 
 
+def _get_schedule_config(celery_schedule):
+    # type: (Any) -> Tuple[Optional[str], Optional[Union[str, Tuple[int, str]]]]
+    monitor_schedule = None  # type: Optional[Union[str,Tuple[int, str]]]
+
+    if isinstance(celery_schedule, crontab):
+        monitor_schedule_type = "crontab"
+        monitor_schedule = (
+            "{0._orig_minute} "
+            "{0._orig_hour} "
+            "{0._orig_day_of_month} "
+            "{0._orig_month_of_year} "
+            "{0._orig_day_of_week}".format(celery_schedule)
+        )
+    elif isinstance(celery_schedule, schedule):
+        monitor_schedule_type = "interval"
+        monitor_schedule = (
+            int(celery_schedule.seconds),
+            "second",
+        )
+    else:
+        logger.warning(
+            "Celery schedule type '%s' not supported by Sentry Crons.",
+            type(celery_schedule),
+        )
+        return (None, None)
+
+    return (monitor_schedule_type, monitor_schedule)
+
+
+def _reinstall_patched_tasks(app, sender, add_updated_periodic_tasks):
+    # type: (Celery, Service, List[functools.partial[Any]]) -> None
+
+    # Stop Celery Beat
+    sender.stop()
+
+    # Update tasks to include Monitor information in headers
+    for add_updated_periodic_task in add_updated_periodic_tasks:
+        add_updated_periodic_task()
+
+    # Start Celery Beat (with new (cloned) schedule, because old one is still in use)
+    new_schedule_filename = sender.schedule_filename + ".new"
+    shutil.copy2(sender.schedule_filename, new_schedule_filename)
+    app.Beat(schedule=new_schedule_filename).run()
+
+
 # Nested functions do not work as Celery hook receiver,
 # so defining it here explicitly
 celery_beat_init = None
@@ -362,32 +408,15 @@ def _patch_celery_beat_tasks(app):
             if name.startswith("celery."):
                 continue
 
+            monitor_name = name
+
             schedule_entry = sender.scheduler.schedule[name]
             celery_schedule = schedule_entry.schedule
+            (monitor_schedule_type, monitor_schedule) = _get_schedule_config(
+                celery_schedule
+            )
 
-            monitor_name = name
-            monitor_schedule = None  # type: Optional[Union[str,Tuple[int, str]]]
-
-            if isinstance(celery_schedule, crontab):
-                monitor_schedule_type = "crontab"
-                monitor_schedule = (
-                    "{0._orig_minute} "
-                    "{0._orig_hour} "
-                    "{0._orig_day_of_month} "
-                    "{0._orig_month_of_year} "
-                    "{0._orig_day_of_week}".format(celery_schedule)
-                )
-            elif isinstance(celery_schedule, schedule):
-                monitor_schedule_type = "interval"
-                monitor_schedule = (
-                    int(celery_schedule.seconds),
-                    "second",
-                )
-            else:
-                logger.warning(
-                    "Celery schedule type '%s' not supported by Sentry Crons.",
-                    type(celery_schedule),
-                )
+            if monitor_schedule_type is None:
                 continue
 
             headers = schedule_entry.options.pop("headers", {})
@@ -417,17 +446,7 @@ def _patch_celery_beat_tasks(app):
                 )
             )
 
-        # Stop Celery Beat
-        sender.stop()
-
-        # Update tasks to include Monitor information in headers
-        for add_updated_periodic_task in add_updated_periodic_tasks:
-            add_updated_periodic_task()
-
-        # Start Celery Beat (with new (cloned) schedule, because old one is still in use)
-        new_schedule_filename = sender.schedule_filename + ".new"
-        shutil.copy2(sender.schedule_filename, new_schedule_filename)
-        app.Beat(schedule=new_schedule_filename).run()
+        _reinstall_patched_tasks(app, sender, add_updated_periodic_tasks)
 
     beat_init.connect(celery_beat_init)
     task_prerun.connect(crons_task_before_run)
