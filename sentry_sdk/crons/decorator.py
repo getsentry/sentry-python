@@ -12,8 +12,8 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Optional
 
 
-def monitor(monitor_slug=None, app=None):
-    # type: (Optional[str], Any) -> Callable[..., Any]
+def monitor(monitor_slug=None):
+    # type: (Optional[str]) -> Callable[..., Any]
     """
     Decorator to capture checkin events for a monitor.
 
