@@ -434,6 +434,12 @@ def _patch_celery_beat_tasks(app):
             task_signature = app.tasks.get(schedule_entry.task).s()
             task_signature.set(headers=headers)
 
+            logger.debug(
+                "Set up Sentry Celery Beat monitoring for %s (%s)",
+                task_signature,
+                monitor_name,
+            )
+
             add_updated_periodic_tasks.append(
                 functools.partial(
                     app.add_periodic_task,
@@ -459,6 +465,10 @@ def crons_task_before_run(sender, **kwargs):
     # type: (Task, Dict[Any, Any]) -> None
     logger.debug("celery_task_before_run %s", sender)
     headers = _get_headers(sender)
+
+    if "sentry-monitor-slug" not in headers:
+        return
+
     start_timestamp_s = now()
 
     check_in_id = capture_checkin(
@@ -477,6 +487,10 @@ def crons_task_success(sender, **kwargs):
     # type: (Task, Dict[Any, Any]) -> None
     logger.debug("celery_task_success %s", sender)
     headers = _get_headers(sender)
+
+    if "sentry-monitor-slug" not in headers:
+        return
+
     start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
 
     capture_checkin(
@@ -492,6 +506,10 @@ def crons_task_failure(sender, **kwargs):
     # type: (Task, Dict[Any, Any]) -> None
     logger.debug("celery_task_failure %s", sender)
     headers = _get_headers(sender)
+
+    if "sentry-monitor-slug" not in headers:
+        return
+
     start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
 
     capture_checkin(
@@ -507,6 +525,10 @@ def crons_task_retry(sender, **kwargs):
     # type: (Task, Dict[Any, Any]) -> None
     logger.debug("celery_task_retry %s", sender)
     headers = _get_headers(sender)
+
+    if "sentry-monitor-slug" not in headers:
+        return
+
     start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
 
     capture_checkin(

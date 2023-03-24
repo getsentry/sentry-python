@@ -26,8 +26,8 @@ def _create_check_in_event(
         "check_in_id": check_in_id,
         "status": status,
         "duration": duration_s,
-        "environment": options["environment"],
-        "release": options["release"],
+        "environment": options.get("environment", None),
+        "release": options.get("release", None),
     }
 
     return check_in
