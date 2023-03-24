@@ -323,6 +323,27 @@ def _get_headers(task):
     return headers
 
 
+def _get_humanized_interval(seconds):
+    # type: (float) -> Tuple[float, str]
+    TIME_UNITS = (
+        ("day", 60 * 60 * 24.0),
+        ("hour", 60 * 60.0),
+        ("minute", 60.0),
+        ("second", 1.0),
+    )
+
+    seconds = float(format(float(seconds), ".2f"))
+    for unit, divider in TIME_UNITS:
+        if seconds >= divider:
+            interval = seconds / float(divider)
+            if int(interval) != interval:  # only format if it's a float
+                interval = float(format(interval, ".2f"))
+
+            return (interval, unit)
+
+    return (0, "second")
+
+
 def _get_monitor_config(headers):
     # type: (Dict[str, Any]) -> Dict[str, Any]
     monitor_config = {}
@@ -354,10 +375,7 @@ def _get_schedule_config(celery_schedule):
         )
     elif isinstance(celery_schedule, schedule):
         monitor_schedule_type = "interval"
-        monitor_schedule = (
-            int(celery_schedule.seconds),
-            "second",
-        )
+        monitor_schedule = _get_humanized_interval(celery_schedule.seconds)
     else:
         logger.warning(
             "Celery schedule type '%s' not supported by Sentry Crons.",

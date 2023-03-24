@@ -6,6 +6,7 @@ pytest.importorskip("celery")
 
 from sentry_sdk.integrations.celery import (
     _get_headers,
+    _get_humanized_interval,
     _get_monitor_config,
     _get_schedule_config,
     _reinstall_patched_tasks,
@@ -36,6 +37,23 @@ def test_get_headers():
     )
 
     assert _get_headers(fake_task) == {"bla": "blub"}
+
+
+@pytest.mark.parametrize(
+    "seconds, expected_tuple",
+    [
+        (0, (0, "second")),
+        (0.00001, (0, "second")),
+        (1, (1, "second")),
+        (100, (1.67, "minute")),
+        (1000, (16.67, "minute")),
+        (10000, (2.78, "hour")),
+        (100000, (1.16, "day")),
+        (100000000, (1157.41, "day")),
+    ],
+)
+def test_get_humanized_interval(seconds, expected_tuple):
+    assert _get_humanized_interval(seconds) == expected_tuple
 
 
 def test_monitor_config():
