@@ -325,7 +325,7 @@ def _get_headers(task):
 
 def _get_humanized_interval(seconds):
     # type: (float) -> Tuple[float, str]
-    TIME_UNITS = (
+    TIME_UNITS = (  # noqa: N806
         ("day", 60 * 60 * 24.0),
         ("hour", 60 * 60.0),
         ("minute", 60.0),
@@ -344,29 +344,16 @@ def _get_humanized_interval(seconds):
     return (0, "second")
 
 
-def _get_monitor_config(headers):
-    # type: (Dict[str, Any]) -> Dict[str, Any]
-    monitor_config = {}
-
-    if "sentry-monitor-schedule" in headers:
-        monitor_config["schedule"] = headers["sentry-monitor-schedule"]
-
-    if "sentry-monitor-schedule-type" in headers:
-        monitor_config["schedule_type"] = headers["sentry-monitor-schedule-type"]
-
-    if "sentry-monitor-timezone" in headers:
-        monitor_config["timezone"] = headers["sentry-monitor-timezone"]
-
-    return monitor_config
-
-
-def _get_schedule_config(celery_schedule):
-    # type: (Any) -> Tuple[Optional[str], Optional[Union[str, Tuple[int, str]]]]
-    monitor_schedule = None  # type: Optional[Union[str,Tuple[int, str]]]
+def _get_monitor_config(celery_schedule, app):
+    # type: (Any, Celery) -> Dict[str, Any]
+    monitor_config = {}  # type: Dict[str, Any]
+    schedule_type = None  # type: Optional[str]
+    schedule_value = None  # type: Optional[Union[str, float]]
+    schedule_unit = None  # type: Optional[str]
 
     if isinstance(celery_schedule, crontab):
-        monitor_schedule_type = "crontab"
-        monitor_schedule = (
+        schedule_type = "crontab"
+        schedule_value = (
             "{0._orig_minute} "
             "{0._orig_hour} "
             "{0._orig_day_of_month} "
@@ -374,16 +361,28 @@ def _get_schedule_config(celery_schedule):
             "{0._orig_day_of_week}".format(celery_schedule)
         )
     elif isinstance(celery_schedule, schedule):
-        monitor_schedule_type = "interval"
-        monitor_schedule = _get_humanized_interval(celery_schedule.seconds)
+        schedule_type = "interval"
+        (schedule_value, schedule_unit) = _get_humanized_interval(
+            celery_schedule.seconds
+        )
+
     else:
         logger.warning(
             "Celery schedule type '%s' not supported by Sentry Crons.",
             type(celery_schedule),
         )
-        return (None, None)
+        return {}
 
-    return (monitor_schedule_type, monitor_schedule)
+    monitor_config["schedule"] = {}
+    monitor_config["schedule"]["type"] = schedule_type
+    monitor_config["schedule"]["value"] = schedule_value
+
+    if schedule_unit is not None:
+        monitor_config["schedule"]["unit"] = schedule_unit
+
+    monitor_config["timezone"] = app.conf.timezone or "UTC"
+
+    return monitor_config
 
 
 def _reinstall_patched_tasks(app, sender, add_updated_periodic_tasks):
@@ -430,11 +429,9 @@ def _patch_celery_beat_tasks(app):
 
             schedule_entry = sender.scheduler.schedule[name]
             celery_schedule = schedule_entry.schedule
-            (monitor_schedule_type, monitor_schedule) = _get_schedule_config(
-                celery_schedule
-            )
+            monitor_config = _get_monitor_config(celery_schedule, app)
 
-            if monitor_schedule_type is None:
+            if monitor_config is None:
                 continue
 
             headers = schedule_entry.options.pop("headers", {})
@@ -442,9 +439,7 @@ def _patch_celery_beat_tasks(app):
                 {
                     "headers": {
                         "sentry-monitor-slug": monitor_name,
-                        "sentry-monitor-schedule": monitor_schedule,
-                        "sentry-monitor-schedule-type": monitor_schedule_type,
-                        "sentry-monitor-timezone": app.conf.timezone or "UTC",
+                        "sentry-monitor-config": monitor_config,
                     },
                 }
             )
@@ -487,11 +482,15 @@ def crons_task_before_run(sender, **kwargs):
     if "sentry-monitor-slug" not in headers:
         return
 
+    monitor_config = (
+        headers["sentry-monitor-config"] if "sentry-monitor-config" in headers else {}
+    )
+
     start_timestamp_s = now()
 
     check_in_id = capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
-        monitor_config=_get_monitor_config(headers),
+        monitor_config=monitor_config,
         status=MonitorStatus.IN_PROGRESS,
     )
 
@@ -509,11 +508,15 @@ def crons_task_success(sender, **kwargs):
     if "sentry-monitor-slug" not in headers:
         return
 
+    monitor_config = (
+        headers["sentry-monitor-config"] if "sentry-monitor-config" in headers else {}
+    )
+
     start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
 
     capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
-        monitor_config=_get_monitor_config(headers),
+        monitor_config=monitor_config,
         check_in_id=headers["sentry-monitor-check-in-id"],
         duration=now() - start_timestamp_s,
         status=MonitorStatus.OK,
@@ -528,11 +531,15 @@ def crons_task_failure(sender, **kwargs):
     if "sentry-monitor-slug" not in headers:
         return
 
+    monitor_config = (
+        headers["sentry-monitor-config"] if "sentry-monitor-config" in headers else {}
+    )
+
     start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
 
     capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
-        monitor_config=_get_monitor_config(headers),
+        monitor_config=monitor_config,
         check_in_id=headers["sentry-monitor-check-in-id"],
         duration=now() - start_timestamp_s,
         status=MonitorStatus.ERROR,
@@ -547,11 +554,15 @@ def crons_task_retry(sender, **kwargs):
     if "sentry-monitor-slug" not in headers:
         return
 
+    monitor_config = (
+        headers["sentry-monitor-config"] if "sentry-monitor-config" in headers else {}
+    )
+
     start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
 
     capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
-        monitor_config=_get_monitor_config(headers),
+        monitor_config=monitor_config,
         check_in_id=headers["sentry-monitor-check-in-id"],
         duration=now() - start_timestamp_s,
         status=MonitorStatus.ERROR,

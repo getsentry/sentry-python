@@ -8,7 +8,6 @@ from sentry_sdk.integrations.celery import (
     _get_headers,
     _get_humanized_interval,
     _get_monitor_config,
-    _get_schedule_config,
     _reinstall_patched_tasks,
     crons_task_before_run,
     crons_task_success,
@@ -56,39 +55,19 @@ def test_get_humanized_interval(seconds, expected_tuple):
     assert _get_humanized_interval(seconds) == expected_tuple
 
 
-def test_monitor_config():
-    headers = {}
-    assert _get_monitor_config(headers) == {}
-
-    headers = {
-        "bla": "blub",
-        "foo": "bar",
-    }
-    assert _get_monitor_config(headers) == {}
-
-    headers = {
-        "bla": "blub",
-        "foo": "bar",
-        "sentry-monitor-schedule": [3, "day"],
-        "sentry-monitor-schedule-type": "interval",
-        "sentry-monitor-timezone": "Europe/Vienna",
-        "sentry-monitor-some-future-key": "some-future-value",
-    }
-    assert _get_monitor_config(headers) == {
-        "schedule": [3, "day"],
-        "schedule_type": "interval",
-        "timezone": "Europe/Vienna",
-    }
-
-
 def test_crons_task_before_run():
     fake_task = mock.MagicMock()
     fake_task.request = {
         "headers": {
             "sentry-monitor-slug": "test123",
-            "sentry-monitor-schedule": [3, "day"],
-            "sentry-monitor-schedule-type": "interval",
-            "sentry-monitor-timezone": "Europe/Vienna",
+            "sentry-monitor-config": {
+                "schedule": {
+                    "type": "interval",
+                    "value": 3,
+                    "unit": "day",
+                },
+                "timezone": "Europe/Vienna",
+            },
             "sentry-monitor-some-future-key": "some-future-value",
         },
     }
@@ -101,8 +80,11 @@ def test_crons_task_before_run():
         mock_capture_checkin.assert_called_once_with(
             monitor_slug="test123",
             monitor_config={
-                "schedule": [3, "day"],
-                "schedule_type": "interval",
+                "schedule": {
+                    "type": "interval",
+                    "value": 3,
+                    "unit": "day",
+                },
                 "timezone": "Europe/Vienna",
             },
             status=MonitorStatus.IN_PROGRESS,
@@ -116,9 +98,14 @@ def test_crons_task_success():
             "sentry-monitor-slug": "test123",
             "sentry-monitor-check-in-id": "1234567890",
             "sentry-monitor-start-timestamp-s": 200.1,
-            "sentry-monitor-schedule": [3, "day"],
-            "sentry-monitor-schedule-type": "interval",
-            "sentry-monitor-timezone": "Europe/Vienna",
+            "sentry-monitor-config": {
+                "schedule": {
+                    "type": "interval",
+                    "value": 3,
+                    "unit": "day",
+                },
+                "timezone": "Europe/Vienna",
+            },
             "sentry-monitor-some-future-key": "some-future-value",
         },
     }
@@ -132,8 +119,11 @@ def test_crons_task_success():
             mock_capture_checkin.assert_called_once_with(
                 monitor_slug="test123",
                 monitor_config={
-                    "schedule": [3, "day"],
-                    "schedule_type": "interval",
+                    "schedule": {
+                        "type": "interval",
+                        "value": 3,
+                        "unit": "day",
+                    },
                     "timezone": "Europe/Vienna",
                 },
                 duration=300.4,
@@ -149,9 +139,14 @@ def test_crons_task_failure():
             "sentry-monitor-slug": "test123",
             "sentry-monitor-check-in-id": "1234567890",
             "sentry-monitor-start-timestamp-s": 200.1,
-            "sentry-monitor-schedule": [3, "day"],
-            "sentry-monitor-schedule-type": "interval",
-            "sentry-monitor-timezone": "Europe/Vienna",
+            "sentry-monitor-config": {
+                "schedule": {
+                    "type": "interval",
+                    "value": 3,
+                    "unit": "day",
+                },
+                "timezone": "Europe/Vienna",
+            },
             "sentry-monitor-some-future-key": "some-future-value",
         },
     }
@@ -165,8 +160,11 @@ def test_crons_task_failure():
             mock_capture_checkin.assert_called_once_with(
                 monitor_slug="test123",
                 monitor_config={
-                    "schedule": [3, "day"],
-                    "schedule_type": "interval",
+                    "schedule": {
+                        "type": "interval",
+                        "value": 3,
+                        "unit": "day",
+                    },
                     "timezone": "Europe/Vienna",
                 },
                 duration=300.4,
@@ -182,9 +180,14 @@ def test_crons_task_retry():
             "sentry-monitor-slug": "test123",
             "sentry-monitor-check-in-id": "1234567890",
             "sentry-monitor-start-timestamp-s": 200.1,
-            "sentry-monitor-schedule": [3, "day"],
-            "sentry-monitor-schedule-type": "interval",
-            "sentry-monitor-timezone": "Europe/Vienna",
+            "sentry-monitor-config": {
+                "schedule": {
+                    "type": "interval",
+                    "value": 3,
+                    "unit": "day",
+                },
+                "timezone": "Europe/Vienna",
+            },
             "sentry-monitor-some-future-key": "some-future-value",
         },
     }
@@ -198,8 +201,11 @@ def test_crons_task_retry():
             mock_capture_checkin.assert_called_once_with(
                 monitor_slug="test123",
                 monitor_config={
-                    "schedule": [3, "day"],
-                    "schedule_type": "interval",
+                    "schedule": {
+                        "type": "interval",
+                        "value": 3,
+                        "unit": "day",
+                    },
                     "timezone": "Europe/Vienna",
                 },
                 duration=300.4,
@@ -208,25 +214,50 @@ def test_crons_task_retry():
             )
 
 
-def test_get_schedule_config():
+def test_get_monitor_config():
+    app = mock.MagicMock()
+    app.conf = mock.MagicMock()
+    app.conf.timezone = "Europe/Vienna"
+
     celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
 
-    (monitor_schedule_type, monitor_schedule) = _get_schedule_config(celery_schedule)
-    assert monitor_schedule_type == "crontab"
-    assert monitor_schedule == "*/10 12 3 * *"
+    monitor_config = _get_monitor_config(celery_schedule, app)
+    assert monitor_config == {
+        "schedule": {
+            "type": "crontab",
+            "value": "*/10 12 3 * *",
+        },
+        "timezone": "Europe/Vienna",
+    }
+    assert "unit" not in monitor_config["schedule"]
 
     celery_schedule = schedule(run_every=3)
 
-    (monitor_schedule_type, monitor_schedule) = _get_schedule_config(celery_schedule)
-    assert monitor_schedule_type == "interval"
-    assert monitor_schedule == (3, "second")
+    monitor_config = _get_monitor_config(celery_schedule, app)
+    assert monitor_config == {
+        "schedule": {
+            "type": "interval",
+            "value": 3,
+            "unit": "second",
+        },
+        "timezone": "Europe/Vienna",
+    }
 
     unknown_celery_schedule = mock.MagicMock()
-    (monitor_schedule_type, monitor_schedule) = _get_schedule_config(
-        unknown_celery_schedule
-    )
-    assert monitor_schedule_type is None
-    assert monitor_schedule is None
+    monitor_config = _get_monitor_config(unknown_celery_schedule, app)
+    assert monitor_config == {}
+
+
+def test_get_monitor_config_default_timezone():
+    app = mock.MagicMock()
+    app.conf = mock.MagicMock()
+    app.conf.timezone = None
+
+    celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
+
+    monitor_config = _get_monitor_config(celery_schedule, app)
+
+    assert monitor_config["timezone"] == "UTC"
 
 
 def test_reinstall_patched_tasks():
