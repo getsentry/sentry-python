@@ -1,5 +1,65 @@
 # Changelog
 
+## 1.18.0
+
+### Various fixes & improvements
+
+- **New:** Implement `EventScrubber` (#1943) by @sl0thentr0py
+
+  To learn more see our [Scrubbing Sensitive Data](https://docs.sentry.io/platforms/python/data-management/sensitive-data/#event-scrubber) documentation.
+
+  Add a new `EventScrubber` class that scrubs certain potentially sensitive interfaces with a `DEFAULT_DENYLIST`. The default scrubber is automatically run if `send_default_pii = False`:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.scrubber import EventScrubber
+  sentry_sdk.init(
+      # ...
+      send_default_pii=False,
+      event_scrubber=EventScrubber(),  # this is set by default
+  )
+  ```
+
+  You can also pass in a custom `denylist` to the `EventScrubber` class and filter additional fields that you want.
+
+  ```python
+  from sentry_sdk.scrubber import EventScrubber, DEFAULT_DENYLIST
+  # custom denylist
+  denylist = DEFAULT_DENYLIST + ["my_sensitive_var"]
+  sentry_sdk.init(
+      # ...
+      send_default_pii=False,
+      event_scrubber=EventScrubber(denylist=denylist),
+  )
+  ```
+
+- **New:** Added new `functions_to_trace` option for central way of performance instrumentation (#1960) by @antonpirker
+
+  To learn more see our [Tracing Options](https://docs.sentry.io/platforms/python/configuration/options/#functions-to-trace) documentation.
+
+  An optional list of functions that should be set up for performance monitoring. For each function in the list, a span will be created when the function is executed.
+
+  ```python
+  functions_to_trace = [
+      {"qualified_name": "tests.test_basics._hello_world_counter"},
+      {"qualified_name": "time.sleep"},
+      {"qualified_name": "collections.Counter.most_common"},
+  ]
+
+  sentry_sdk.init(
+      # ...
+      traces_sample_rate=1.0,
+      functions_to_trace=functions_to_trace,
+  )
+  ```
+
+- Updated denylist to include other widely used cookies/headers (#1972) by @antonpirker
+- Forward all `sentry-` baggage items (#1970) by @cleptric
+- Update OSS licensing (#1973) by @antonpirker
+- Profiling: Handle non frame types in profiler (#1965) by @Zylphrex
+- Tests: Bad arq dependency in tests (#1966) by @Zylphrex
+- Better naming (#1962) by @antonpirker
+
 ## 1.17.0
 
 ### Various fixes & improvements
