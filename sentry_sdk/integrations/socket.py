@@ -30,7 +30,7 @@ def _patch_create_connection():
     real_create_connection = socket.create_connection
 
     def create_connection(
-            address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None
+        address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None
     ):
         # type: (Tuple[Optional[str], int], Optional[float], Optional[Tuple[Union[bytearray, bytes, str], int]])-> socket.socket
         hub = Hub.current
@@ -40,7 +40,7 @@ def _patch_create_connection():
             )
 
         with hub.start_span(
-                op=OP.SOCKET_CONNECTION, description="%s:%s" % (address[0], address[1])
+            op=OP.SOCKET_CONNECTION, description="%s:%s" % (address[0], address[1])
         ) as span:
             span.set_data("address", address)
             span.set_data("timeout", timeout)
@@ -64,7 +64,7 @@ def _patch_getaddrinfo():
             return real_getaddrinfo(host, port, family, type, proto, flags)
 
         with hub.start_span(
-                op=OP.SOCKET_DNS, description="%s:%s" % (host, port)
+            op=OP.SOCKET_DNS, description="%s:%s" % (host, port)
         ) as span:
             span.set_data("host", host)
             span.set_data("port", port)

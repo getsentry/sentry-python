@@ -24,7 +24,7 @@ class ClientInterceptor(
         method = client_call_details.method
 
         with hub.start_span(
-                op=OP.GRPC_CLIENT, description="unary unary call to %s" % method
+            op=OP.GRPC_CLIENT, description="unary unary call to %s" % method
         ) as span:
             span.set_data("type", "unary unary")
             span.set_data("method", method)
@@ -44,7 +44,7 @@ class ClientInterceptor(
         method = client_call_details.method
 
         with hub.start_span(
-                op=OP.GRPC_CLIENT, description="unary stream call to %s" % method
+            op=OP.GRPC_CLIENT, description="unary stream call to %s" % method
         ) as span:
             span.set_data("type", "unary stream")
             span.set_data("method", method)

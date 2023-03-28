@@ -18,8 +18,8 @@ except ImportError:
 class ServerInterceptor(grpc.ServerInterceptor):
     def __init__(self, find_name=None):
         # type: (ServerInterceptor, Optional[Callable[[ServicerContext], str]]) -> None
-        if find_name:
-            self._find_method_name = find_name
+        self._find_method_name = find_name or ServerInterceptor._find_name
+
         super(ServerInterceptor, self).__init__()
 
     def intercept_service(self, continuation, handler_call_details):
@@ -35,10 +35,10 @@ class ServerInterceptor(grpc.ServerInterceptor):
             name = self._find_method_name(context)
 
             if name:
-                meta_data = dict(context.invocation_metadata())
+                metadata = dict(context.invocation_metadata())
 
                 transaction = Transaction.continue_from_headers(
-                    meta_data,
+                    metadata,
                     op=OP.GRPC_SERVER,
                     name=name,
                     source=TRANSACTION_SOURCE_CUSTOM,
