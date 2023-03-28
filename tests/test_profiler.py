@@ -46,6 +46,16 @@ def process_test_sample(sample):
     return [(tid, (stack, stack)) for tid, stack in sample]
 
 
+def non_experimental_options(mode=None, sample_rate=None):
+    return {"profiler_mode": mode, "profiles_sample_rate": sample_rate}
+
+
+def experimental_options(mode=None, sample_rate=None):
+    return {
+        "_experiments": {"profiler_mode": mode, "profiles_sample_rate": sample_rate}
+    }
+
+
 @requires_python_version(3, 3)
 @pytest.mark.parametrize(
     "mode",
@@ -57,9 +67,16 @@ def process_test_sample(sample):
         ),
     ],
 )
-def test_profiler_invalid_mode(mode, teardown_profiling):
+@pytest.mark.parametrize(
+    "make_options",
+    [
+        pytest.param(experimental_options, id="experiment"),
+        pytest.param(non_experimental_options, id="non experimental"),
+    ],
+)
+def test_profiler_invalid_mode(mode, make_options, teardown_profiling):
     with pytest.raises(ValueError):
-        setup_profiler({"_experiments": {"profiler_mode": mode}})
+        setup_profiler(make_options(mode))
 
 
 @pytest.mark.parametrize(
@@ -70,17 +87,31 @@ def test_profiler_invalid_mode(mode, teardown_profiling):
         pytest.param("gevent", marks=requires_gevent),
     ],
 )
-def test_profiler_valid_mode(mode, teardown_profiling):
+@pytest.mark.parametrize(
+    "make_options",
+    [
+        pytest.param(experimental_options, id="experiment"),
+        pytest.param(non_experimental_options, id="non experimental"),
+    ],
+)
+def test_profiler_valid_mode(mode, make_options, teardown_profiling):
     # should not raise any exceptions
-    setup_profiler({"_experiments": {"profiler_mode": mode}})
+    setup_profiler(make_options(mode))
 
 
 @requires_python_version(3, 3)
-def test_profiler_setup_twice(teardown_profiling):
+@pytest.mark.parametrize(
+    "make_options",
+    [
+        pytest.param(experimental_options, id="experiment"),
+        pytest.param(non_experimental_options, id="non experimental"),
+    ],
+)
+def test_profiler_setup_twice(make_options, teardown_profiling):
     # setting up the first time should return True to indicate success
-    assert setup_profiler({"_experiments": {}})
+    assert setup_profiler(make_options())
     # setting up the second time should return False to indicate no-op
-    assert not setup_profiler({"_experiments": {}})
+    assert not setup_profiler(make_options())
 
 
 @pytest.mark.parametrize(
@@ -100,21 +131,90 @@ def test_profiler_setup_twice(teardown_profiling):
         pytest.param(None, 0, id="profiler not enabled"),
     ],
 )
+@pytest.mark.parametrize(
+    "make_options",
+    [
+        pytest.param(experimental_options, id="experiment"),
+        pytest.param(non_experimental_options, id="non experimental"),
+    ],
+)
 @mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
-def test_profiled_transaction(
+def test_profiles_sample_rate(
     sentry_init,
     capture_envelopes,
     teardown_profiling,
     profiles_sample_rate,
     profile_count,
+    make_options,
+    mode,
+):
+    options = make_options(mode=mode, sample_rate=profiles_sample_rate)
+    sentry_init(
+        traces_sample_rate=1.0,
+        profiler_mode=options.get("profiler_mode"),
+        profiles_sample_rate=options.get("profiles_sample_rate"),
+        _experiments=options.get("_experiments", {}),
+    )
+
+    envelopes = capture_envelopes()
+
+    with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
+        with start_transaction(name="profiling"):
+            pass
+
+    items = defaultdict(list)
+    for envelope in envelopes:
+        for item in envelope.items:
+            items[item.type].append(item)
+
+    assert len(items["transaction"]) == 1
+    assert len(items["profile"]) == profile_count
+
+
+@pytest.mark.parametrize(
+    "mode",
+    [
+        pytest.param("thread"),
+        pytest.param("gevent", marks=requires_gevent),
+    ],
+)
+@pytest.mark.parametrize(
+    ("profiles_sampler", "profile_count"),
+    [
+        pytest.param(lambda _: 1.00, 1, id="profiler sampled at 1.00"),
+        pytest.param(lambda _: 0.75, 1, id="profiler sampled at 0.75"),
+        pytest.param(lambda _: 0.25, 0, id="profiler sampled at 0.25"),
+        pytest.param(lambda _: 0.00, 0, id="profiler sampled at 0.00"),
+        pytest.param(lambda _: None, 0, id="profiler not enabled"),
+        pytest.param(
+            lambda ctx: 1 if ctx["transaction_context"]["name"] == "profiling" else 0,
+            1,
+            id="profiler sampled for transaction name",
+        ),
+        pytest.param(
+            lambda ctx: 0 if ctx["transaction_context"]["name"] == "profiling" else 1,
+            0,
+            id="profiler not sampled for transaction name",
+        ),
+        pytest.param(
+            lambda _: "1", 0, id="profiler not sampled because string sample rate"
+        ),
+        pytest.param(lambda _: True, 1, id="profiler sampled at True"),
+        pytest.param(lambda _: False, 0, id="profiler sampled at False"),
+    ],
+)
+@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+def test_profiles_sampler(
+    sentry_init,
+    capture_envelopes,
+    teardown_profiling,
+    profiles_sampler,
+    profile_count,
     mode,
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "profiles_sample_rate": profiles_sample_rate,
-            "profiler_mode": mode,
-        },
+        profiles_sampler=profiles_sampler,
     )
 
     envelopes = capture_envelopes()

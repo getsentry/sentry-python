@@ -1,15 +1,28 @@
 """
-This file is originally based on code from https://github.com/nylas/nylas-perftools, which is published under the following license:
+This file is originally based on code from https://github.com/nylas/nylas-perftools,
+which is published under the following license:
 
 The MIT License (MIT)
 
 Copyright (c) 2014 Nylas
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 """
 
 import atexit
@@ -26,7 +39,9 @@ import sentry_sdk
 from sentry_sdk._compat import PY33, PY311
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
+    capture_internal_exception,
     filename_for_module,
+    is_valid_sample_rate,
     logger,
     nanosecond_time,
     set_in_app_in_frames,
@@ -46,7 +61,7 @@ if TYPE_CHECKING:
     from typing_extensions import TypedDict
 
     import sentry_sdk.tracing
-    from sentry_sdk._types import SamplingContext
+    from sentry_sdk._types import SamplingContext, ProfilerMode
 
     ThreadId = str
 
@@ -148,6 +163,23 @@ DEFAULT_SAMPLING_FREQUENCY = 101
 PROFILE_MINIMUM_SAMPLES = 2
 
 
+def has_profiling_enabled(options):
+    # type: (Dict[str, Any]) -> bool
+    profiles_sampler = options["profiles_sampler"]
+    if profiles_sampler is not None:
+        return True
+
+    profiles_sample_rate = options["profiles_sample_rate"]
+    if profiles_sample_rate is not None and profiles_sample_rate > 0:
+        return True
+
+    profiles_sample_rate = options["_experiments"].get("profiles_sample_rate")
+    if profiles_sample_rate is not None and profiles_sample_rate > 0:
+        return True
+
+    return False
+
+
 def setup_profiler(options):
     # type: (Dict[str, Any]) -> bool
     global _scheduler
@@ -171,7 +203,13 @@ def setup_profiler(options):
     else:
         default_profiler_mode = ThreadScheduler.mode
 
-    profiler_mode = options["_experiments"].get("profiler_mode", default_profiler_mode)
+    if options.get("profiler_mode") is not None:
+        profiler_mode = options["profiler_mode"]
+    else:
+        profiler_mode = (
+            options.get("_experiments", {}).get("profiler_mode")
+            or default_profiler_mode
+        )
 
     if (
         profiler_mode == ThreadScheduler.mode
@@ -228,8 +266,16 @@ def extract_stack(
     frames = deque(maxlen=max_stack_depth)  # type: Deque[FrameType]
 
     while frame is not None:
+        try:
+            f_back = frame.f_back
+        except AttributeError:
+            capture_internal_exception(sys.exc_info())
+            # For some reason, the frame we got isn't a `FrameType` and doesn't
+            # have a `f_back`. When this happens, we continue with any frames
+            # that we've managed to extract up to this point.
+            break
         frames.append(frame)
-        frame = frame.f_back
+        frame = f_back
 
     if prev_cache is None:
         stack = tuple(extract_frame(frame, cwd) for frame in frames)
@@ -491,13 +537,26 @@ class Profile(object):
             return
 
         options = client.options
-        sample_rate = options["_experiments"].get("profiles_sample_rate")
+
+        if callable(options.get("profiles_sampler")):
+            sample_rate = options["profiles_sampler"](sampling_context)
+        elif options["profiles_sample_rate"] is not None:
+            sample_rate = options["profiles_sample_rate"]
+        else:
+            sample_rate = options["_experiments"].get("profiles_sample_rate")
 
         # The profiles_sample_rate option was not set, so profiling
         # was never enabled.
         if sample_rate is None:
             logger.debug(
                 "[Profiling] Discarding profile because profiling was not enabled."
+            )
+            self.sampled = False
+            return
+
+        if not is_valid_sample_rate(sample_rate, source="Profiling"):
+            logger.warning(
+                "[Profiling] Discarding profile because of invalid sample rate."
             )
             self.sampled = False
             return
@@ -695,7 +754,7 @@ class Profile(object):
 
 
 class Scheduler(object):
-    mode = "unknown"
+    mode = "unknown"  # type: ProfilerMode
 
     def __init__(self, frequency):
         # type: (int) -> None
@@ -824,7 +883,7 @@ class ThreadScheduler(Scheduler):
     the sampler at a regular interval.
     """
 
-    mode = "thread"
+    mode = "thread"  # type: ProfilerMode
     name = "sentry.profiler.ThreadScheduler"
 
     def __init__(self, frequency):
@@ -905,7 +964,7 @@ class GeventScheduler(Scheduler):
        results in a sample containing only the sampler's code.
     """
 
-    mode = "gevent"
+    mode = "gevent"  # type: ProfilerMode
     name = "sentry.profiler.GeventScheduler"
 
     def __init__(self, frequency):

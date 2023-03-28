@@ -19,6 +19,7 @@ if TYPE_CHECKING:
         BreadcrumbProcessor,
         Event,
         EventProcessor,
+        ProfilerMode,
         TracesSampler,
         TransactionProcessor,
     )
@@ -33,8 +34,9 @@ if TYPE_CHECKING:
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
             "smart_transaction_trimming": Optional[bool],
+            # TODO: Remvoe these 2 profiling related experiments
             "profiles_sample_rate": Optional[float],
-            "profiler_mode": Optional[str],
+            "profiler_mode": Optional[ProfilerMode],
         },
         total=False,
     )
@@ -109,7 +111,7 @@ class ClientConstructor(object):
         send_default_pii=False,  # type: bool
         http_proxy=None,  # type: Optional[str]
         https_proxy=None,  # type: Optional[str]
-        ignore_errors=[],  # type: List[Union[type, str]]  # noqa: B006
+        ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
         request_bodies="medium",  # type: str
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
@@ -119,6 +121,9 @@ class ClientConstructor(object):
         propagate_traces=True,  # type: bool
         traces_sample_rate=None,  # type: Optional[float]
         traces_sampler=None,  # type: Optional[TracesSampler]
+        profiles_sample_rate=None,  # type: Optional[float]
+        profiles_sampler=None,  # type: Optional[TracesSampler]
+        profiler_mode=None,  # type: Optional[ProfilerMode]
         auto_enabling_integrations=True,  # type: bool
         auto_session_tracking=True,  # type: bool
         send_client_reports=True,  # type: bool
@@ -132,6 +137,8 @@ class ClientConstructor(object):
         trace_propagation_targets=[  # noqa: B006
             MATCH_ALL
         ],  # type: Optional[Sequence[str]]
+        functions_to_trace=[],  # type: Sequence[str]  # noqa: B006
+        event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
     ):
         # type: (...) -> None
         pass
@@ -155,4 +162,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.16.0"
+VERSION = "1.17.0"

@@ -53,6 +53,7 @@ __all__ = [
     "set_user",
     "set_level",
     "set_measurement",
+    "get_current_span",
 ]
 
 
@@ -228,3 +229,15 @@ def set_measurement(name, value, unit=""):
     transaction = Hub.current.scope.transaction
     if transaction is not None:
         transaction.set_measurement(name, value, unit)
+
+
+def get_current_span(hub=None):
+    # type: (Optional[Hub]) -> Optional[Span]
+    """
+    Returns the currently active span if there is one running, otherwise `None`
+    """
+    if hub is None:
+        hub = Hub.current
+
+    current_span = hub.scope.span
+    return current_span
