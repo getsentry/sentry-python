@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.18.0
+
+### Various fixes & improvements
+
+- Added new functions_to_trace option for celtral way of performance instrumentation (#1960) by @antonpirker
+- Update OSS licensing (#1973) by @antonpirker
+- Updated denylist to include other widely used cookies/headers (#1972) by @antonpirker
+- ref: Forward all `sentry-` baggage items (#1970) by @cleptric
+- Better naming (#1962) by @antonpirker
+- Implement EventScrubber (#1943) by @sl0thentr0py
+- fix(profiling): Handle non frame types in profiler (#1965) by @Zylphrex
+- fix(tests): Bad arq dependency in tests (#1966) by @Zylphrex
+
 ## 1.17.0
 
 ### Various fixes & improvements
