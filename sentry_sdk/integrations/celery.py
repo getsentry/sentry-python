@@ -324,31 +324,27 @@ def _get_headers(task):
 
 
 def _get_humanized_interval(seconds):
-    # type: (float) -> Tuple[float, str]
+    # type: (float) -> Tuple[int, str]
     TIME_UNITS = (  # noqa: N806
         ("day", 60 * 60 * 24.0),
         ("hour", 60 * 60.0),
         ("minute", 60.0),
-        ("second", 1.0),
     )
 
-    seconds = float(format(float(seconds), ".2f"))
+    seconds = float(seconds)
     for unit, divider in TIME_UNITS:
         if seconds >= divider:
-            interval = seconds / float(divider)
-            if int(interval) != interval:  # only format if it's a float
-                interval = float(format(interval, ".2f"))
-
+            interval = int(seconds / divider)
             return (interval, unit)
 
-    return (0, "second")
+    return (1, "minute")
 
 
 def _get_monitor_config(celery_schedule, app):
     # type: (Any, Celery) -> Dict[str, Any]
     monitor_config = {}  # type: Dict[str, Any]
     schedule_type = None  # type: Optional[str]
-    schedule_value = None  # type: Optional[Union[str, float]]
+    schedule_value = None  # type: Optional[Union[str, int]]
     schedule_unit = None  # type: Optional[str]
 
     if isinstance(celery_schedule, crontab):
