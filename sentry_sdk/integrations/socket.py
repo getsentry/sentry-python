@@ -28,11 +28,16 @@ def _get_span_description(host, port):
     # type: (Union[bytes, str, None], Union[str, int, None]) -> str
 
     try:
-        host = host.decode()
+        host = host.decode()  # type: ignore
     except (UnicodeDecodeError, AttributeError):
         pass
 
-    return "%s:%s" % (host, port)
+    description = "%s:%s" % (
+        host,  # type: str
+        port,
+    )
+
+    return description
 
 
 def _patch_create_connection():
