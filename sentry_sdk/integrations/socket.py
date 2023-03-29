@@ -41,7 +41,7 @@ def _patch_create_connection():
             )
 
         with hub.start_span(
-            op=OP.SOCKET_CONNECTION, description="%s:%s" % address,
+            op=OP.SOCKET_CONNECTION, description="%s:%s" % (address[0], address[1]),
         ) as span:
             span.set_data("address", address)
             span.set_data("timeout", timeout)
