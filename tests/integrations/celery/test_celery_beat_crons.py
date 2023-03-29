@@ -41,14 +41,14 @@ def test_get_headers():
 @pytest.mark.parametrize(
     "seconds, expected_tuple",
     [
-        (0, (0, "second")),
-        (0.00001, (0, "second")),
-        (1, (1, "second")),
-        (100, (1.67, "minute")),
-        (1000, (16.67, "minute")),
-        (10000, (2.78, "hour")),
-        (100000, (1.16, "day")),
-        (100000000, (1157.41, "day")),
+        (0, (1, "minute")),
+        (0.00001, (1, "minute")),
+        (1, (1, "minute")),
+        (100, (1, "minute")),
+        (1000, (16, "minute")),
+        (10000, (2, "hour")),
+        (100000, (1, "day")),
+        (100000000, (1157, "day")),
     ],
 )
 def test_get_humanized_interval(seconds, expected_tuple):
@@ -237,8 +237,8 @@ def test_get_monitor_config():
     assert monitor_config == {
         "schedule": {
             "type": "interval",
-            "value": 3,
-            "unit": "second",
+            "value": 1,
+            "unit": "minute",
         },
         "timezone": "Europe/Vienna",
     }
