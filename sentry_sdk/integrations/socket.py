@@ -24,6 +24,17 @@ class SocketIntegration(Integration):
         _patch_getaddrinfo()
 
 
+def _get_span_description(host, port):
+    # type: (Union[bytes, str, None], Union[str, int, None]) -> str
+
+    try:
+        host = host.decode()
+    except (UnicodeDecodeError, AttributeError):
+        pass
+
+    return "%s:%s" % (host, port)
+
+
 def _patch_create_connection():
     # type: () -> None
     real_create_connection = socket.create_connection
@@ -42,7 +53,7 @@ def _patch_create_connection():
 
         with hub.start_span(
             op=OP.SOCKET_CONNECTION,
-            description="%s:%s" % (address[0], address[1]),
+            description=_get_span_description(address[0], address[1]),
         ) as span:
             span.set_data("address", address)
             span.set_data("timeout", timeout)
@@ -66,7 +77,7 @@ def _patch_getaddrinfo():
             return real_getaddrinfo(host, port, family, type, proto, flags)
 
         with hub.start_span(
-            op=OP.SOCKET_DNS, description="%s:%s" % (host, port)
+            op=OP.SOCKET_DNS, description=_get_span_description(host, port)
         ) as span:
             span.set_data("host", host)
             span.set_data("port", port)
