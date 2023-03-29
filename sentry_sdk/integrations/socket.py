@@ -1,5 +1,4 @@
 import socket
-
 from sentry_sdk import Hub
 from sentry_sdk._types import MYPY
 from sentry_sdk.consts import OP
@@ -30,7 +29,9 @@ def _patch_create_connection():
     real_create_connection = socket.create_connection
 
     def create_connection(
-        address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None
+        address,
+        timeout=socket._GLOBAL_DEFAULT_TIMEOUT,  # type: ignore
+        source_address=None,
     ):
         # type: (Tuple[Optional[str], int], Optional[float], Optional[Tuple[Union[bytearray, bytes, str], int]])-> socket.socket
         hub = Hub.current
@@ -64,7 +65,7 @@ def _patch_getaddrinfo():
             return real_getaddrinfo(host, port, family, type, proto, flags)
 
         with hub.start_span(
-            op=OP.SOCKET_DNS, description="%s:%s" % (host, port)
+            op=OP.SOCKET_DNS, description="%r:%r" % (host, port)
         ) as span:
             span.set_data("host", host)
             span.set_data("port", port)

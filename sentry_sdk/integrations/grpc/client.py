@@ -4,19 +4,20 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 
 if MYPY:
-    from typing import Callable, Iterator, Union
+    from typing import Any, Callable, Iterator, Iterable, Union
 
 try:
     import grpc
     from grpc import ClientCallDetails, Call
     from grpc._interceptor import _UnaryOutcome
-    from google.protobuf.message import Message
+    from grpc.aio._interceptor import UnaryStreamCall
+    from google.protobuf.message import Message  # type: ignore
 except ImportError:
     raise DidNotEnable("grpcio is not installed")
 
 
 class ClientInterceptor(
-    grpc.UnaryUnaryClientInterceptor, grpc.UnaryStreamClientInterceptor
+    grpc.UnaryUnaryClientInterceptor, grpc.UnaryStreamClientInterceptor  # type: ignore
 ):
     def intercept_unary_unary(self, continuation, client_call_details, request):
         # type: (ClientInterceptor, Callable[[ClientCallDetails, Message], _UnaryOutcome], ClientCallDetails, Message) -> _UnaryOutcome
@@ -39,7 +40,7 @@ class ClientInterceptor(
             return response
 
     def intercept_unary_stream(self, continuation, client_call_details, request):
-        # type: (ClientInterceptor, Callable[[ClientCallDetails, Message], Iterator], ClientCallDetails, Message) -> Union[Iterator[Message], Call]
+        # type: (ClientInterceptor, Callable[[ClientCallDetails, Message], Union[Iterable[Any], UnaryStreamCall]], ClientCallDetails, Message) -> Union[Iterator[Message], Call]
         hub = Hub.current
         method = client_call_details.method
 
@@ -53,7 +54,9 @@ class ClientInterceptor(
                 client_call_details, hub
             )
 
-            response = continuation(client_call_details, request)
+            response = continuation(
+                client_call_details, request
+            )  # type: UnaryStreamCall
             span.set_data("code", response.code().name)
 
             return response
