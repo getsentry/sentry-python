@@ -1,5 +1,7 @@
 from __future__ import absolute_import
 
+import os
+
 from concurrent import futures
 
 import grpc
@@ -17,6 +19,7 @@ from tests.integrations.grpc.test_service_pb2_grpc import (
 )
 
 PORT = 50051
+PORT += os.getpid() % 100  # avoid port conflicts when running tests in parallel
 
 
 @pytest.mark.forked
