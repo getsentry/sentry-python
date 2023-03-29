@@ -41,7 +41,7 @@ def _patch_create_connection():
             )
 
         with hub.start_span(
-            op=OP.SOCKET_CONNECTION, description="%s:%s" % (address[0], address[1])
+            op=OP.SOCKET_CONNECTION, description="%s:%s" % address,
         ) as span:
             span.set_data("address", address)
             span.set_data("timeout", timeout)
@@ -65,7 +65,7 @@ def _patch_getaddrinfo():
             return real_getaddrinfo(host, port, family, type, proto, flags)
 
         with hub.start_span(
-            op=OP.SOCKET_DNS, description="%r:%r" % (host, port)
+            op=OP.SOCKET_DNS, description="%s:%s" % (host, port)
         ) as span:
             span.set_data("host", host)
             span.set_data("port", port)
