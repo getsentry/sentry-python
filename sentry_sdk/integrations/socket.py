@@ -32,10 +32,7 @@ def _get_span_description(host, port):
     except (UnicodeDecodeError, AttributeError):
         pass
 
-    description = "%s:%s" % (
-        host,  # type: str
-        port,
-    )
+    description = "%s:%s" % (host, port)  # type: ignore
 
     return description
 
