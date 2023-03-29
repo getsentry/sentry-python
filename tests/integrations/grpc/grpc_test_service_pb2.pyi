@@ -15,7 +15,7 @@ else:
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 @typing_extensions.final
-class TestMessage(google.protobuf.message.Message):
+class gRPCTestMessage(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     TEXT_FIELD_NUMBER: builtins.int
@@ -25,8 +25,6 @@ class TestMessage(google.protobuf.message.Message):
         *,
         text: builtins.str = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["text", b"text"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing_extensions.Literal["text", b"text"]) -> None: ...
 
-global___TestMessage = TestMessage
+global___gRPCTestMessage = gRPCTestMessage

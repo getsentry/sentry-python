@@ -11,11 +11,11 @@ from sentry_sdk import Hub, start_transaction
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc.client import ClientInterceptor
 from sentry_sdk.integrations.grpc.server import ServerInterceptor
-from tests.integrations.grpc.test_service_pb2 import TestMessage
-from tests.integrations.grpc.test_service_pb2_grpc import (
-    TestServiceServicer,
-    add_TestServiceServicer_to_server,
-    TestServiceStub,
+from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
+from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
+    gRPCTestServiceServicer,
+    add_gRPCTestServiceServicer_to_server,
+    gRPCTestServiceStub,
 )
 
 PORT = 50051
@@ -30,8 +30,8 @@ def test_grpc_server_starts_transaction(sentry_init, capture_events_forksafe):
     server = _set_up()
 
     with grpc.insecure_channel(f"localhost:{PORT}") as channel:
-        stub = TestServiceStub(channel)
-        stub.TestServe(TestMessage(text="test"))
+        stub = gRPCTestServiceStub(channel)
+        stub.TestServe(gRPCTestMessage(text="test"))
 
     _tear_down(server=server)
 
@@ -55,7 +55,7 @@ def test_grpc_server_continues_transaction(sentry_init, capture_events_forksafe)
     server = _set_up()
 
     with grpc.insecure_channel(f"localhost:{PORT}") as channel:
-        stub = TestServiceStub(channel)
+        stub = gRPCTestServiceStub(channel)
 
         with start_transaction() as transaction:
             metadata = (
@@ -75,7 +75,7 @@ def test_grpc_server_continues_transaction(sentry_init, capture_events_forksafe)
                     ),
                 ),
             )
-            stub.TestServe(TestMessage(text="test"), metadata=metadata)
+            stub.TestServe(gRPCTestMessage(text="test"), metadata=metadata)
 
     _tear_down(server=server)
 
@@ -102,10 +102,10 @@ def test_grpc_client_starts_span(sentry_init, capture_events_forksafe):
 
     with grpc.insecure_channel(f"localhost:{PORT}") as channel:
         channel = grpc.intercept_channel(channel, *interceptors)
-        stub = TestServiceStub(channel)
+        stub = gRPCTestServiceStub(channel)
 
         with start_transaction():
-            stub.TestServe(TestMessage(text="test"))
+            stub.TestServe(gRPCTestMessage(text="test"))
 
     _tear_down(server=server)
 
@@ -118,11 +118,11 @@ def test_grpc_client_starts_span(sentry_init, capture_events_forksafe):
     assert span["op"] == OP.GRPC_CLIENT
     assert (
         span["description"]
-        == "unary unary call to /test_grpc_server.TestService/TestServe"
+        == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
     )
     assert span["data"] == {
         "type": "unary unary",
-        "method": "/test_grpc_server.TestService/TestServe",
+        "method": "/grpc_test_server.gRPCTestService/TestServe",
         "code": "OK",
     }
 
@@ -139,10 +139,10 @@ def test_grpc_client_and_servers_interceptors_integration(
 
     with grpc.insecure_channel(f"localhost:{PORT}") as channel:
         channel = grpc.intercept_channel(channel, *interceptors)
-        stub = TestServiceStub(channel)
+        stub = gRPCTestServiceStub(channel)
 
         with start_transaction():
-            stub.TestServe(TestMessage(text="test"))
+            stub.TestServe(gRPCTestMessage(text="test"))
 
     _tear_down(server=server)
 
@@ -162,7 +162,7 @@ def _set_up():
         interceptors=[ServerInterceptor(find_name=_find_name)],
     )
 
-    add_TestServiceServicer_to_server(TestService, server)
+    add_gRPCTestServiceServicer_to_server(TestService, server)
     server.add_insecure_port(f"[::]:{PORT}")
     server.start()
 
@@ -177,7 +177,7 @@ def _find_name(request):
     return request.__class__
 
 
-class TestService(TestServiceServicer):
+class TestService(gRPCTestServiceServicer):
     events = []
 
     @staticmethod
@@ -186,4 +186,4 @@ class TestService(TestServiceServicer):
         with hub.start_span(op="test", description="test"):
             pass
 
-        return TestMessage(text=request.text)
+        return gRPCTestMessage(text=request.text)
