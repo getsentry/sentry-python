@@ -571,7 +571,7 @@ def test_failed_base64_conversion(input):
     if type(input) not in string_types:
         assert to_base64(input) is None
 
-
+# fmt: off
 def test_strip_string():
     # If value is None returns None.
     assert strip_string(None) is None
@@ -589,3 +589,4 @@ def test_strip_string():
     # If text has unicode characters, it counts bytes and not number of characters.
     text_with_unicode_character = u"éê"
     assert strip_string(text_with_unicode_character, max_length=2).value == u"é..."
+# fmt: on
