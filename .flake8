@@ -17,5 +17,5 @@ extend-ignore =
 extend-exclude=checkouts,lol*
 exclude =
   # gRCP generated files
-  test_service_pb2.py
-  test_service_pb2_grpc.py
+  grpc_test_service_pb2.py
+  grpc_test_service_pb2_grpc.py

@@ -25,6 +25,8 @@ class gRPCTestMessage(google.protobuf.message.Message):
         *,
         text: builtins.str = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["text", b"text"]) -> None: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["text", b"text"]
+    ) -> None: ...
 
 global___gRPCTestMessage = gRPCTestMessage
