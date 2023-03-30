@@ -38,8 +38,8 @@ def _create_checkin_event(
         "check_in_id": check_in_id,
         "status": status,
         "duration": duration,
-        "environment": options["environment"],
-        "release": options["release"],
+        "environment": options.get("environment"),
+        "release": options.get("release"),
     }
 
     return checkin

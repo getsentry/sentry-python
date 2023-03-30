@@ -86,3 +86,15 @@ def test_capture_checkin_new_id(sentry_init):
         )
 
         assert check_in_id == "a8098c1af86e11dabd1a00112444be1e"
+
+
+def test_capture_checkin_sdk_not_initialized():
+    # Tests that the capture_checkin does not raise an error when Sentry SDK is not initialized.
+    # sentry_init() is intentionally omitted.
+    check_in_id = capture_checkin(
+        monitor_slug="abc123",
+        check_in_id="112233",
+        status=None,
+        duration=None,
+    )
+    assert check_in_id == "112233"
