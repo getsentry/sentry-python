@@ -1,7 +1,7 @@
 import socket
 
 from sentry_sdk import start_transaction
-from sentry_sdk.integrations.socket import SocketIntegration
+from sentry_sdk.integrations.socket_ import SocketIntegration
 
 
 def test_getaddrinfo_trace(sentry_init, capture_events):

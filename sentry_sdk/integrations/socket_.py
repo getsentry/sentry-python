@@ -39,6 +39,8 @@ def _get_span_description(host, port):
 
 def _patch_create_connection():
     # type: () -> None
+    import ipdb
+    ipdb.set_trace()
     real_create_connection = socket.create_connection
 
     def create_connection(
