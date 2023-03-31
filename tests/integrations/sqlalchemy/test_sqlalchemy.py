@@ -8,6 +8,7 @@ from sqlalchemy.orm import relationship, sessionmaker
 
 from sentry_sdk import capture_message, start_transaction, configure_scope
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+from sentry_sdk.serializer import MAX_EVENT_BYTES
 from sentry_sdk.utils import json_dumps, MAX_STRING_LENGTH
 
 
@@ -180,7 +181,7 @@ def test_large_event_not_truncated(sentry_init, capture_events):
 
     (event,) = events
 
-    assert len(json_dumps(event)) == 1845267
+    assert len(json_dumps(event)) > MAX_EVENT_BYTES
 
     # Some spans are discarded.
     assert len(event["spans"]) == 1000
