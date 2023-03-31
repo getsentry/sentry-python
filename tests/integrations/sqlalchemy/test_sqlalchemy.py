@@ -143,7 +143,6 @@ def test_long_sql_query_preserved(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1,
         integrations=[SqlalchemyIntegration()],
-        _experiments={"smart_transaction_trimming": True},
     )
     events = capture_events()
 
@@ -162,7 +161,6 @@ def test_too_large_event_truncated(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1,
         integrations=[SqlalchemyIntegration()],
-        _experiments={"smart_transaction_trimming": True},
     )
     events = capture_events()
 

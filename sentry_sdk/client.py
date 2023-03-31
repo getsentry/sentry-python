@@ -320,12 +320,7 @@ class _Client(object):
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
-            event = serialize(
-                event,
-                smart_transaction_trimming=self.options["_experiments"].get(
-                    "smart_transaction_trimming"
-                ),
-            )
+            event = serialize(event)
 
         before_send = self.options["before_send"]
         if before_send is not None and event.get("type") != "transaction":
