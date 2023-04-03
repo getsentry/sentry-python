@@ -29,6 +29,12 @@ except ImportError:
     from urlparse import urlsplit  # type: ignore
     from urlparse import urlunsplit  # type: ignore
 
+try:
+    # Python 3.11
+    from builtins import ExceptionGroup  # type: ignore
+except ImportError:
+    # Python 3.10 and below
+    ExceptionGroup = None
 
 from datetime import datetime
 from functools import partial
@@ -672,6 +678,8 @@ def single_exception_from_error_tuple(
             "number", errno
         )
 
+    # TODO: set new mechanism data here
+
     if client_options is None:
         include_local_variables = True
     else:
@@ -705,9 +713,6 @@ if HAS_CHAINED_EXCEPTIONS:
 
     def walk_exception_chain(exc_info):
         # type: (ExcInfo) -> Iterator[ExcInfo]
-        import ipdb
-
-        ipdb.set_trace()
 
         exc_type, exc_value, tb = exc_info
 
@@ -746,21 +751,43 @@ else:
         yield exc_info
 
 
-def exceptions_from_error_tuple(
+def _get_exceptions_from_group(
     exc_info,  # type: ExcInfo
     client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> List[Dict[str, Any]]
-    exc_type, exc_value, tb = exc_info
-    exceptions = []
+    raise NotImplementedError()
 
+
+def _get_exceptions_from_chain(
+    exc_info,  # type: ExcInfo
+    client_options=None,  # type: Optional[Dict[str, Any]]
+    mechanism=None,  # type: Optional[Dict[str, Any]]
+):
+    # type: (...) -> List[Dict[str, Any]]
+    exceptions = []
     for exc_type, exc_value, tb in walk_exception_chain(exc_info):
         exceptions.append(
             single_exception_from_error_tuple(
                 exc_type, exc_value, tb, client_options, mechanism
             )
         )
+    return exceptions
+
+
+def exceptions_from_error_tuple(
+    exc_info,  # type: ExcInfo
+    client_options=None,  # type: Optional[Dict[str, Any]]
+    mechanism=None,  # type: Optional[Dict[str, Any]]
+):
+    # type: (...) -> List[Dict[str, Any]]
+    exceptions = []
+
+    if exc_info[0] == ExceptionGroup:
+        exceptions = _get_exceptions_from_group(exc_info, client_options, mechanism)
+    else:
+        exceptions = _get_exceptions_from_chain(exc_info, client_options, mechanism)
 
     exceptions.reverse()
 
