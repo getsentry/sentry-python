@@ -64,12 +64,12 @@ CELERY_CONTROL_FLOW_EXCEPTIONS = (Retry, Ignore, Reject)
 class CeleryIntegration(Integration):
     identifier = "celery"
 
-    def __init__(self, propagate_traces=True, celery_app=None):
-        # type: (bool, Celery) -> None
+    def __init__(self, propagate_traces=True, monitor_beat_tasks=False):
+        # type: (bool, bool) -> None
         self.propagate_traces = propagate_traces
 
-        if celery_app is not None:
-            _patch_celery_beat_tasks(celery_app)
+        if monitor_beat_tasks:
+            _patch_celery_beat_tasks()
 
     @staticmethod
     def setup_once():
@@ -402,8 +402,8 @@ def _reinstall_patched_tasks(app, sender, add_updated_periodic_tasks):
 celery_beat_init = None
 
 
-def _patch_celery_beat_tasks(app):
-    # type: (Celery) -> None
+def _patch_celery_beat_tasks():
+    # type: () -> None
 
     global celery_beat_init
 
@@ -413,6 +413,8 @@ def _patch_celery_beat_tasks(app):
         # Because we restart Celery Beat,
         # make sure that this will not be called infinitely
         beat_init.disconnect(celery_beat_init)
+
+        app = sender.app
 
         add_updated_periodic_tasks = []
 
