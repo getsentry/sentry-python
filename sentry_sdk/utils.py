@@ -705,6 +705,10 @@ if HAS_CHAINED_EXCEPTIONS:
 
     def walk_exception_chain(exc_info):
         # type: (ExcInfo) -> Iterator[ExcInfo]
+        import ipdb
+
+        ipdb.set_trace()
+
         exc_type, exc_value, tb = exc_info
 
         seen_exceptions = []
@@ -727,8 +731,10 @@ if HAS_CHAINED_EXCEPTIONS:
                 cause = exc_value.__cause__
             else:
                 cause = exc_value.__context__
+
             if cause is None:
                 break
+
             exc_type = type(cause)
             exc_value = cause
             tb = getattr(cause, "__traceback__", None)
@@ -747,17 +753,18 @@ def exceptions_from_error_tuple(
 ):
     # type: (...) -> List[Dict[str, Any]]
     exc_type, exc_value, tb = exc_info
-    rv = []
+    exceptions = []
+
     for exc_type, exc_value, tb in walk_exception_chain(exc_info):
-        rv.append(
+        exceptions.append(
             single_exception_from_error_tuple(
                 exc_type, exc_value, tb, client_options, mechanism
             )
         )
 
-    rv.reverse()
+    exceptions.reverse()
 
-    return rv
+    return exceptions
 
 
 def to_string(value):
