@@ -33,8 +33,7 @@ if TYPE_CHECKING:
         {
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
-            "smart_transaction_trimming": Optional[bool],
-            # TODO: Remvoe these 2 profiling related experiments
+            # TODO: Remove these 2 profiling related experiments
             "profiles_sample_rate": Optional[float],
             "profiler_mode": Optional[ProfilerMode],
         },
