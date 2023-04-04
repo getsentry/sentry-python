@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.19.0
+
+### Various fixes & improvements
+
+- Celery Beat auto monitoring (#1967) by @antonpirker
+- Do not trim span descriptions. (#1983) by @antonpirker
+- Add integerations for socket and grpc (#1911) by @hossein-raeisi
+
 ## 1.18.0
 
 ### Various fixes & improvements
