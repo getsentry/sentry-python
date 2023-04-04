@@ -4,9 +4,94 @@
 
 ### Various fixes & improvements
 
-- Celery Beat auto monitoring (#1967) by @antonpirker
-- Do not trim span descriptions. (#1983) by @antonpirker
-- Add integerations for socket and grpc (#1911) by @hossein-raeisi
+- **New:** [Celery Beat](https://docs.celeryq.dev/en/stable/userguide/periodic-tasks.html) auto monitoring (#1967) by @antonpirker
+
+  The CeleryIntegration can now also monitor your Celery Beat scheduled tasks automatically using the new [Crons](https://blog.sentry.io/2023/01/04/cron-job-monitoring-beta-because-scheduled-jobs-fail-too/) feature of Sentry.
+
+  To learn more see our [Celery Beat Auto Discovery](https://docs.sentry.io/platforms/python/guides/celery/crons/) documentation.
+
+  Usage:
+
+  ```python
+  from celery import Celery, signals
+  from celery.schedules import crontab
+
+  import sentry_sdk
+  from sentry_sdk.integrations.celery import CeleryIntegration
+
+
+  app = Celery('tasks', broker='...')
+  app.conf.beat_schedule = {
+      'set-in-beat-schedule': {
+          'task': 'tasks.some_important_task',
+          'schedule': crontab(...),
+      },
+  }
+
+
+  @signals.celeryd_init.connect
+  def init_sentry(**kwargs):
+      sentry_sdk.init(
+          dsn='...',
+          integrations=[CeleryIntegration(monitor_beat_tasks=True)],  # 👈 here
+          environment="local.dev.grace",
+          release="v1.0",
+      )
+  ```
+
+  This will auto detect all schedules tasks in your `beat_schedule` and will monitor them with Sentry [Crons](https://blog.sentry.io/2023/01/04/cron-job-monitoring-beta-because-scheduled-jobs-fail-too/).
+
+- **New:** [gRPC](https://grpc.io/) integration (#1911) by @hossein-raeisi
+
+  The [gRPC](https://grpc.io/) integration instruments all incoming requests and outgoing unary-unary, unary-stream grpc requests using grpcio channels.
+
+  To learn more see our [gRPC Integration](https://docs.sentry.io/platforms/python/configuration/integrations/grpc/) documentation.
+
+  On the server:
+
+  ```python
+  import grpc
+  from sentry_sdk.integrations.grpc.server import ServerInterceptor
+
+
+  server = grpc.server(
+      thread_pool=...,
+      interceptors=[ServerInterceptor()],
+  )
+  ```
+
+  On the client:
+
+  ```python
+  import grpc
+  from sentry_sdk.integrations.grpc.client import ClientInterceptor
+
+
+  with grpc.insecure_channel("example.com:12345") as channel:
+      channel = grpc.intercept_channel(channel, *[ClientInterceptor()])
+
+  ```
+
+- **New:** socket integration (#1911) by @hossein-raeisi
+
+  Use this integration to create spans for DNS resolves (`socket.getaddrinfo()`) and connection creations (`socket.create_connection()`).
+
+  To learn more see our [Socket Integration](https://docs.sentry.io/platforms/python/configuration/integrations/socket/) documentation.
+
+  Usage:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.socket import SocketIntegration
+  sentry_sdk.init(
+      dsn="___PUBLIC_DSN___",
+      integrations=[
+          SocketIntegration(),
+      ],
+  )
+  ```
+
+- Fix: Do not trim span descriptions. (#1983) by @antonpirker
 
 ## 1.18.0
 
