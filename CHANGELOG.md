@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.19.1
+
+### Various fixes & improvements
+
+- Make auto monitoring beat update support Celery 4 and 5 (#1989) by @antonpirker
+
 ## 1.19.0
 
 ### Various fixes & improvements
