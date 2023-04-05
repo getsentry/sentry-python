@@ -1,3 +1,4 @@
+import tempfile
 import mock
 
 import pytest
@@ -287,16 +288,20 @@ def test_reinstall_patched_tasks():
 
     add_updated_periodic_tasks = [mock.MagicMock(), mock.MagicMock(), mock.MagicMock()]
 
-    with mock.patch("sentry_sdk.integrations.celery.shutil.copy2") as mock_copy2:
-        _reinstall_patched_tasks(app, sender, add_updated_periodic_tasks)
+    mock_open = (mock.Mock(return_value=tempfile.NamedTemporaryFile()),)
 
-        sender.stop.assert_called_once_with()
+    with mock.patch("sentry_sdk.integrations.celery.open", mock_open):
+        with mock.patch(
+            "sentry_sdk.integrations.celery.shutil.copyfileobj"
+        ) as mock_copyfileobj:
+            _reinstall_patched_tasks(app, sender, add_updated_periodic_tasks)
 
-        add_updated_periodic_tasks[0].assert_called_once_with()
-        add_updated_periodic_tasks[1].assert_called_once_with()
-        add_updated_periodic_tasks[2].assert_called_once_with()
+            sender.stop.assert_called_once_with()
 
-        mock_copy2.assert_called_once_with(
-            "test_schedule_filename", "test_schedule_filename-patched-by-sentry-sdk"
-        )
-        fake_beat.run.assert_called_once_with()
+            add_updated_periodic_tasks[0].assert_called_once_with()
+            add_updated_periodic_tasks[1].assert_called_once_with()
+            add_updated_periodic_tasks[2].assert_called_once_with()
+
+            mock_copyfileobj.assert_called_once()
+
+            fake_beat.run.assert_called_once_with()
