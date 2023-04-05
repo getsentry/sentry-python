@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.19.1
+
+### Various fixes & improvements
+
+- Auto monitoring beat update (#1989) by @antonpirker
+
 ## 1.19.0
 
 ### Various fixes & improvements
