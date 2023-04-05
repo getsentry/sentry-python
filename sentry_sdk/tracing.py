@@ -415,6 +415,9 @@ class Span(object):
 
         hub = hub or self.hub or sentry_sdk.Hub.current
 
+        if hub.client.options.get("propagate_traces_without_performance", False):
+            return None
+
         try:
             if end_timestamp:
                 self.timestamp = end_timestamp
@@ -570,6 +573,9 @@ class Transaction(Span):
 
         if client is None:
             # We have no client and therefore nowhere to send this transaction.
+            return None
+
+        if client.options.get("propagate_traces_without_performance", False):
             return None
 
         # This is a de facto proxy for checking if sampled = False

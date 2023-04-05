@@ -138,6 +138,7 @@ class ClientConstructor(object):
         ],  # type: Optional[Sequence[str]]
         functions_to_trace=[],  # type: Sequence[str]  # noqa: B006
         event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
+        propagate_traces_without_performance=False,  # type: bool
     ):
         # type: (...) -> None
         pass
