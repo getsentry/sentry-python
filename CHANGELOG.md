@@ -4,7 +4,7 @@
 
 ### Various fixes & improvements
 
-- Auto monitoring beat update (#1989) by @antonpirker
+- Make auto monitoring beat update support Celery 4 and 5 (#1989) by @antonpirker
 
 ## 1.19.0
 
