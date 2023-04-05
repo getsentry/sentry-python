@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import sys
 import shutil
 import functools
+import tempfile
 
 from sentry_sdk.consts import OP
 from sentry_sdk._compat import reraise
@@ -320,6 +321,11 @@ def _patch_worker_exit():
 def _get_headers(task):
     # type: (Task) -> Dict[str, Any]
     headers = task.request.get("headers") or {}
+
+    if "headers" in headers:
+        headers.update(headers["headers"])
+        del headers["headers"]
+
     return headers
 
 
@@ -392,9 +398,11 @@ def _reinstall_patched_tasks(app, sender, add_updated_periodic_tasks):
         add_updated_periodic_task()
 
     # Start Celery Beat (with new (cloned) schedule, because old one is still in use)
-    new_schedule_filename = sender.schedule_filename + ".new"
-    shutil.copy2(sender.schedule_filename, new_schedule_filename)
-    app.Beat(schedule=new_schedule_filename).run()
+    cloned_schedule = tempfile.NamedTemporaryFile(suffix="-patched-by-sentry-sdk")
+    with open(sender.schedule_filename, "rb") as original_schedule:
+        shutil.copyfileobj(original_schedule, cloned_schedule)
+
+    app.Beat(schedule=cloned_schedule.name).run()
 
 
 # Nested functions do not work as Celery hook receiver,
@@ -480,9 +488,7 @@ def crons_task_before_run(sender, **kwargs):
     if "sentry-monitor-slug" not in headers:
         return
 
-    monitor_config = (
-        headers["sentry-monitor-config"] if "sentry-monitor-config" in headers else {}
-    )
+    monitor_config = headers.get("sentry-monitor-config", {})
 
     start_timestamp_s = now()
 
@@ -506,9 +512,7 @@ def crons_task_success(sender, **kwargs):
     if "sentry-monitor-slug" not in headers:
         return
 
-    monitor_config = (
-        headers["sentry-monitor-config"] if "sentry-monitor-config" in headers else {}
-    )
+    monitor_config = headers.get("sentry-monitor-config", {})
 
     start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
 
@@ -529,9 +533,7 @@ def crons_task_failure(sender, **kwargs):
     if "sentry-monitor-slug" not in headers:
         return
 
-    monitor_config = (
-        headers["sentry-monitor-config"] if "sentry-monitor-config" in headers else {}
-    )
+    monitor_config = headers.get("sentry-monitor-config", {})
 
     start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
 
@@ -552,9 +554,7 @@ def crons_task_retry(sender, **kwargs):
     if "sentry-monitor-slug" not in headers:
         return
 
-    monitor_config = (
-        headers["sentry-monitor-config"] if "sentry-monitor-config" in headers else {}
-    )
+    monitor_config = headers.get("sentry-monitor-config", {})
 
     start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
 
