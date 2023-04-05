@@ -392,7 +392,7 @@ def _reinstall_patched_tasks(app, sender, add_updated_periodic_tasks):
         add_updated_periodic_task()
 
     # Start Celery Beat (with new (cloned) schedule, because old one is still in use)
-    new_schedule_filename = sender.schedule_filename + ".new"
+    new_schedule_filename = sender.schedule_filename + "-patched-by-sentry-sdk"
     shutil.copy2(sender.schedule_filename, new_schedule_filename)
     app.Beat(schedule=new_schedule_filename).run()
 
