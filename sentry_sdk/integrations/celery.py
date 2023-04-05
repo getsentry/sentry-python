@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import sys
 import shutil
 import functools
+import tempfile
 
 from sentry_sdk.consts import OP
 from sentry_sdk._compat import reraise
@@ -397,9 +398,11 @@ def _reinstall_patched_tasks(app, sender, add_updated_periodic_tasks):
         add_updated_periodic_task()
 
     # Start Celery Beat (with new (cloned) schedule, because old one is still in use)
-    new_schedule_filename = sender.schedule_filename + "-patched-by-sentry-sdk"
-    shutil.copy2(sender.schedule_filename, new_schedule_filename)
-    app.Beat(schedule=new_schedule_filename).run()
+    cloned_schedule = tempfile.NamedTemporaryFile(suffix="-patched-by-sentry-sdk")
+    with open(sender.schedule_filename, "rb") as original_schedule:
+        shutil.copyfileobj(original_schedule, cloned_schedule)
+
+    app.Beat(schedule=cloned_schedule.name).run()
 
 
 # Nested functions do not work as Celery hook receiver,
