@@ -320,6 +320,11 @@ def _patch_worker_exit():
 def _get_headers(task):
     # type: (Task) -> Dict[str, Any]
     headers = task.request.get("headers") or {}
+
+    if "headers" in headers:
+        headers.update(headers["headers"])
+        del headers["headers"]
+
     return headers
 
 

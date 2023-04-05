@@ -37,6 +37,20 @@ def test_get_headers():
 
     assert _get_headers(fake_task) == {"bla": "blub"}
 
+    fake_task.request.update(
+        {
+            "headers": {
+                "headers": {
+                    "tri": "blub",
+                    "bar": "baz",
+                },
+                "bla": "blub",
+            },
+        }
+    )
+
+    assert _get_headers(fake_task) == {"bla": "blub", "tri": "blub", "bar": "baz"}
+
 
 @pytest.mark.parametrize(
     "seconds, expected_tuple",
@@ -283,6 +297,6 @@ def test_reinstall_patched_tasks():
         add_updated_periodic_tasks[2].assert_called_once_with()
 
         mock_copy2.assert_called_once_with(
-            "test_schedule_filename", "test_schedule_filename.new"
+            "test_schedule_filename", "test_schedule_filename-patched-by-sentry-sdk"
         )
         fake_beat.run.assert_called_once_with()
