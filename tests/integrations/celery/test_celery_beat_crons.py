@@ -288,7 +288,7 @@ def test_reinstall_patched_tasks():
 
     add_updated_periodic_tasks = [mock.MagicMock(), mock.MagicMock(), mock.MagicMock()]
 
-    mock_open = (mock.Mock(return_value=tempfile.NamedTemporaryFile()),)
+    mock_open = mock.Mock(return_value=tempfile.NamedTemporaryFile())
 
     with mock.patch("sentry_sdk.integrations.celery.open", mock_open):
         with mock.patch(
