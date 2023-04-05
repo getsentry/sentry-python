@@ -485,9 +485,7 @@ def crons_task_before_run(sender, **kwargs):
     if "sentry-monitor-slug" not in headers:
         return
 
-    monitor_config = (
-        headers["sentry-monitor-config"] if "sentry-monitor-config" in headers else {}
-    )
+    monitor_config = headers.get("sentry-monitor-config", {})
 
     start_timestamp_s = now()
 
@@ -511,9 +509,7 @@ def crons_task_success(sender, **kwargs):
     if "sentry-monitor-slug" not in headers:
         return
 
-    monitor_config = (
-        headers["sentry-monitor-config"] if "sentry-monitor-config" in headers else {}
-    )
+    monitor_config = headers.get("sentry-monitor-config", {})
 
     start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
 
@@ -534,9 +530,7 @@ def crons_task_failure(sender, **kwargs):
     if "sentry-monitor-slug" not in headers:
         return
 
-    monitor_config = (
-        headers["sentry-monitor-config"] if "sentry-monitor-config" in headers else {}
-    )
+    monitor_config = headers.get("sentry-monitor-config", {})
 
     start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
 
@@ -557,9 +551,7 @@ def crons_task_retry(sender, **kwargs):
     if "sentry-monitor-slug" not in headers:
         return
 
-    monitor_config = (
-        headers["sentry-monitor-config"] if "sentry-monitor-config" in headers else {}
-    )
+    monitor_config = headers.get("sentry-monitor-config", {})
 
     start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
 
