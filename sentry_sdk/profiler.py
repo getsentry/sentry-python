@@ -47,6 +47,13 @@ from sentry_sdk.utils import (
     set_in_app_in_frames,
 )
 
+try:
+    from functools import lru_cache
+
+    filename_for_module = lru_cache(256)(filename_for_module)
+except ImportError:
+    pass
+
 if TYPE_CHECKING:
     from types import FrameType
     from typing import Any

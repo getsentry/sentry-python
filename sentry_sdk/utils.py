@@ -31,7 +31,7 @@ except ImportError:
 
 
 from datetime import datetime
-from functools import lru_cache, partial
+from functools import partial
 
 try:
     from functools import partialmethod
@@ -570,7 +570,6 @@ else:
             return "<broken repr>"
 
 
-@lru_cache(maxsize=256)
 def filename_for_module(module, abs_path):
     # type: (Optional[str], Optional[str]) -> Optional[str]
     if not abs_path or not module:
