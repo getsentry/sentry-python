@@ -295,9 +295,7 @@ def extract_stack(
         # Make sure to keep in mind that the stack is ordered from the inner most
         # from to the outer most frame so be careful with the indexing.
         stack = tuple(
-            prev_stack[i]
-            if i >= 0 and frame is prev_frames[i]
-            else frame_key(frame)
+            prev_stack[i] if i >= 0 and frame is prev_frames[i] else frame_key(frame)
             for i, frame in zip(range(prev_depth - depth, prev_depth), frames)
         )
 
@@ -635,6 +633,7 @@ class Profile(object):
 
     def write(self, cwd, ts, sample, frame_cache):
         # type: (str, int, RawSample, Dict[RawFrame, ProcessedFrame]) -> None
+
         if not self.active:
             return
 
@@ -664,7 +663,9 @@ class Profile(object):
                         self.frames.append(processed_frame)
 
                 self.indexed_stacks[stack_id] = len(self.indexed_stacks)
-                self.stacks.append([self.indexed_frames[raw_frame] for raw_frame in raw_stack])
+                self.stacks.append(
+                    [self.indexed_frames[raw_frame] for raw_frame in raw_stack]
+                )
 
             self.samples.append(
                 {
@@ -845,10 +846,7 @@ class Scheduler(object):
             # the most recent stack for better cache hits
             last_sample[0] = raw_sample
 
-            sample = [
-                (str(tid), data)
-                for tid, data in raw_sample.items()
-            ]
+            sample = [(str(tid), data) for tid, data in raw_sample.items()]
 
             # Move the new profiles into the active_profiles set.
             #
