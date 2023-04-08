@@ -107,7 +107,7 @@ class LoggingIntegration(Integration):
         logging.Logger.callHandlers = sentry_patched_callhandlers  # type: ignore
 
 
-class BaseHandler(logging.Handler, object):
+class _BaseHandler(logging.Handler, object):
     COMMON_RECORD_ATTRS = frozenset(
         (
             "args",
@@ -161,7 +161,7 @@ class BaseHandler(logging.Handler, object):
         }
 
 
-class EventHandler(BaseHandler):
+class EventHandler(_BaseHandler):
     """
     A logging handler that emits Sentry events for each log record
 
@@ -250,7 +250,7 @@ class EventHandler(BaseHandler):
 SentryHandler = EventHandler
 
 
-class BreadcrumbHandler(BaseHandler):
+class BreadcrumbHandler(_BaseHandler):
     """
     A logging handler that records breadcrumbs for each log record.
 

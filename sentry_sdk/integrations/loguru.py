@@ -4,7 +4,7 @@ import enum
 
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.integrations.logging import BreadcrumbHandler, EventHandler, BaseHandler
+from sentry_sdk.integrations.logging import BreadcrumbHandler, EventHandler, _BaseHandler
 
 if TYPE_CHECKING:
     from logging import LogRecord
@@ -28,7 +28,11 @@ class LoggingLevels(enum.IntEnum):
 
 DEFAULT_LEVEL = LoggingLevels.INFO.value
 DEFAULT_EVENT_LEVEL = LoggingLevels.ERROR.value
-ADDED_HANDLERS = (None, None)  # type: Tuple[Optional[int], Optional[int]]
+# We need to save the handlers to be able to remove them later
+# in tests (they call `LoguruIntegration.__init__` multiple times,
+# and we can't use `setup_once` because it's called before
+# than we get configuration).
+_ADDED_HANDLERS = (None, None)  # type: Tuple[Optional[int], Optional[int]]
 
 
 class LoguruIntegration(Integration):
@@ -36,8 +40,8 @@ class LoguruIntegration(Integration):
 
     def __init__(self, level=DEFAULT_LEVEL, event_level=DEFAULT_EVENT_LEVEL):
         # type: (Optional[int], Optional[int]) -> None
-        global ADDED_HANDLERS
-        breadcrumb_handler, event_handler = ADDED_HANDLERS
+        global _ADDED_HANDLERS
+        breadcrumb_handler, event_handler = _ADDED_HANDLERS
 
         if breadcrumb_handler is not None:
             logger.remove(breadcrumb_handler)
@@ -56,15 +60,15 @@ class LoguruIntegration(Integration):
                 LoguruEventHandler(level=event_level), level=event_level
             )
 
-        ADDED_HANDLERS = (breadcrumb_handler, event_handler)
+        _ADDED_HANDLERS = (breadcrumb_handler, event_handler)
 
     @staticmethod
     def setup_once():
         # type: () -> None
-        pass
+        pass  # we do everything in __init__
 
 
-class LoguruBaseHandler(BaseHandler):
+class _LoguruBaseHandler(_BaseHandler):
     def _logging_to_event_level(self, record):
         # type: (LogRecord) -> str
         try:
@@ -73,9 +77,9 @@ class LoguruBaseHandler(BaseHandler):
             return record.levelname.lower() if record.levelname else ""
 
 
-class LoguruEventHandler(LoguruBaseHandler, EventHandler):
-    pass
+class LoguruEventHandler(_LoguruBaseHandler, EventHandler):
+    """Modified version of :class:`sentry_sdk.integrations.logging.EventHandler` to use loguru's level names."""
 
 
-class LoguruBreadcrumbHandler(LoguruBaseHandler, BreadcrumbHandler):
-    pass
+class LoguruBreadcrumbHandler(_LoguruBaseHandler, BreadcrumbHandler):
+    """Modified version of :class:`sentry_sdk.integrations.logging.BreadcrumbHandler` to use loguru's level names."""
