@@ -7,6 +7,7 @@ from opentelemetry.trace import (
     set_span_in_context,
     TraceFlags,
     SpanContext,
+    NonRecordingSpan,
 )
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
@@ -16,6 +17,7 @@ from sentry_sdk.integrations.opentelemetry.consts import (
 from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
 from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
 from sentry_sdk.tracing_utils import Baggage
+
 
 
 def test_extract_no_context_no_sentry_trace_header():
@@ -135,7 +137,31 @@ def test_inject_empty_otel_span_map():
         is_remote=True,
     )
     span = MagicMock()
-    span.context = span_context
+    span.get_span_context.return_value = span_context
+
+    with mock.patch(
+        "sentry_sdk.integrations.opentelemetry.propagator.trace.get_current_span",
+        return_value=span,
+    ):
+        full_context = set_span_in_context(span, context)
+        SentryPropagator().inject(carrier, full_context, setter)
+
+        setter.set.assert_not_called()
+
+
+def test_inject_sentry_span_non_recording_span():
+    carrier = None
+    context = get_current()
+    setter = MagicMock()
+    setter.set = MagicMock()
+
+    span_context = SpanContext(
+        trace_id=int("1234567890abcdef1234567890abcdef", 16),
+        span_id=int("1234567890abcdef", 16),
+        trace_flags=TraceFlags(TraceFlags.SAMPLED),
+        is_remote=True,
+    )
+    span = NonRecordingSpan(context=span_context)
 
     with mock.patch(
         "sentry_sdk.integrations.opentelemetry.propagator.trace.get_current_span",
@@ -166,7 +192,7 @@ def test_inject_sentry_span_no_baggage():
         is_remote=True,
     )
     span = MagicMock()
-    span.context = span_context
+    span.get_span_context.return_value = span_context
 
     sentry_span = MagicMock()
     sentry_span.to_traceparent = mock.Mock(
@@ -210,7 +236,7 @@ def test_inject_sentry_span_baggage():
         is_remote=True,
     )
     span = MagicMock()
-    span.context = span_context
+    span.get_span_context.return_value = span_context
 
     sentry_span = MagicMock()
     sentry_span.to_traceparent = mock.Mock(

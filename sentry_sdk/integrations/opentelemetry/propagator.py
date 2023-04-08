@@ -90,11 +90,11 @@ class SentryPropagator(TextMapPropagator):  # type: ignore
             context = get_current()
 
         current_span = trace.get_current_span(context)
-
-        if not current_span.context.is_valid:
+        span_context = current_span.get_span_context()
+        if not span_context.is_valid:
             return
 
-        span_id = trace.format_span_id(current_span.context.span_id)
+        span_id = trace.format_span_id(span_context.span_id)
 
         span_map = SentrySpanProcessor().otel_span_map
         sentry_span = span_map.get(span_id, None)
