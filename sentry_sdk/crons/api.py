@@ -30,6 +30,8 @@ def _create_check_in_event(
         "release": options.get("release", None),
     }
 
+    print("check_in", check_in)
+
     return check_in
 
 

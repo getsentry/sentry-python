@@ -68,9 +68,12 @@ class CeleryIntegration(Integration):
     def __init__(self, propagate_traces=True, monitor_beat_tasks=False):
         # type: (bool, bool) -> None
         self.propagate_traces = propagate_traces
+        self.monitor_beat_tasks = monitor_beat_tasks
 
         if monitor_beat_tasks:
-            _patch_celery_beat_tasks()
+            # _patch_celery_beat_tasks()
+            _patch_beat_apply_entry()
+            _setup_celery_beat_signals()
 
     @staticmethod
     def setup_once():
@@ -131,6 +134,12 @@ def _wrap_apply_async(f):
             ) as span:
                 with capture_internal_exceptions():
                     headers = dict(hub.iter_trace_propagation_headers(span))
+                    if integration.monitor_beat_tasks:
+                        headers.update(
+                            {
+                                "sentry-monitor-start-timestamp-s": now(),
+                            }
+                        )
 
                     if headers:
                         # Note: kwargs can contain headers=None, so no setdefault!
@@ -145,6 +154,8 @@ def _wrap_apply_async(f):
                         # workaround and we don't want to break them.
                         kwarg_headers.setdefault("headers", {}).update(headers)
                         kwargs["headers"] = kwarg_headers
+                        print("xxxxxxxxxxxxxxx")
+                        print(kwargs)
 
                 return f(*args, **kwargs)
         else:
@@ -322,9 +333,17 @@ def _get_headers(task):
     # type: (Task) -> Dict[str, Any]
     headers = task.request.get("headers") or {}
 
+    from pprint import pprint
+
+    pprint(task.request)
+
     if "headers" in headers:
         headers.update(headers["headers"])
         del headers["headers"]
+
+    for key in task.request.get("properties", {}).keys():
+        if key.startswith("sentry-"):
+            headers[key] = task.request.properties.get(key)
 
     return headers
 
@@ -509,6 +528,9 @@ def crons_task_success(sender, **kwargs):
     logger.debug("celery_task_success %s", sender)
     headers = _get_headers(sender)
 
+    print("FLATTENED HEADERS OUT 1 <-")
+    print(headers)
+
     if "sentry-monitor-slug" not in headers:
         return
 
@@ -565,3 +587,49 @@ def crons_task_retry(sender, **kwargs):
         duration=now() - start_timestamp_s,
         status=MonitorStatus.ERROR,
     )
+
+
+def _setup_celery_beat_signals():
+    # type: () -> None
+    task_success.connect(crons_task_success)
+    task_failure.connect(crons_task_failure)
+    task_retry.connect(crons_task_retry)
+
+
+def _patch_beat_apply_entry():
+    # type: () -> None
+    from celery.beat import Scheduler
+
+    original_apply_entry = Scheduler.apply_entry
+
+    def sentry_apply_entry(*args, **kwargs):
+        # type: (*Any, **Any) -> None
+        scheduler, schedule_entry = args
+        app = scheduler.app
+
+        celery_schedule = schedule_entry.schedule
+        monitor_config = _get_monitor_config(celery_schedule, app)
+        monitor_name = schedule_entry.name
+
+        headers = schedule_entry.options.pop("headers", {})
+        headers.update(
+            {
+                "sentry-monitor-slug": monitor_name,
+                "sentry-monitor-config": monitor_config,
+            }
+        )
+
+        print("HEADERS IN ->")
+        print(headers)
+
+        check_in_id = capture_checkin(
+            monitor_slug=monitor_name,
+            monitor_config=monitor_config,
+            status=MonitorStatus.IN_PROGRESS,
+        )
+        headers.update({"sentry-monitor-check-in-id": check_in_id})
+
+        schedule_entry.options.update(headers)
+        original_apply_entry(*args, **kwargs)
+
+    Scheduler.apply_entry = sentry_apply_entry
