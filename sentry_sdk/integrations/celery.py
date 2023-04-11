@@ -1,9 +1,6 @@
 from __future__ import absolute_import
 
 import sys
-import shutil
-import functools
-import tempfile
 
 from sentry_sdk.consts import OP
 from sentry_sdk._compat import reraise
@@ -25,7 +22,6 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
-    from typing import List
     from typing import Optional
     from typing import Tuple
     from typing import TypeVar
@@ -40,7 +36,6 @@ try:
     from celery import VERSION as CELERY_VERSION
     from celery import Task, Celery
     from celery.app.trace import task_has_custom
-    from celery.beat import Service  # type: ignore
     from celery.exceptions import (  # type: ignore
         Ignore,
         Reject,
@@ -49,8 +44,6 @@ try:
     )
     from celery.schedules import crontab, schedule  # type: ignore
     from celery.signals import (  # type: ignore
-        beat_init,
-        task_prerun,
         task_failure,
         task_success,
         task_retry,
@@ -154,8 +147,6 @@ def _wrap_apply_async(f):
                         # workaround and we don't want to break them.
                         kwarg_headers.setdefault("headers", {}).update(headers)
                         kwargs["headers"] = kwarg_headers
-                        print("xxxxxxxxxxxxxxx")
-                        print(kwargs)
 
                 return f(*args, **kwargs)
         else:
@@ -333,10 +324,6 @@ def _get_headers(task):
     # type: (Task) -> Dict[str, Any]
     headers = task.request.get("headers") or {}
 
-    from pprint import pprint
-
-    pprint(task.request)
-
     if "headers" in headers:
         headers.update(headers["headers"])
         del headers["headers"]
@@ -406,130 +393,10 @@ def _get_monitor_config(celery_schedule, app):
     return monitor_config
 
 
-def _reinstall_patched_tasks(app, sender, add_updated_periodic_tasks):
-    # type: (Celery, Service, List[functools.partial[Any]]) -> None
-
-    # Stop Celery Beat
-    sender.stop()
-
-    # Update tasks to include Monitor information in headers
-    for add_updated_periodic_task in add_updated_periodic_tasks:
-        add_updated_periodic_task()
-
-    # Start Celery Beat (with new (cloned) schedule, because old one is still in use)
-    cloned_schedule = tempfile.NamedTemporaryFile(suffix="-patched-by-sentry-sdk")
-    with open(sender.schedule_filename, "rb") as original_schedule:
-        shutil.copyfileobj(original_schedule, cloned_schedule)
-
-    app.Beat(schedule=cloned_schedule.name).run()
-
-
-# Nested functions do not work as Celery hook receiver,
-# so defining it here explicitly
-celery_beat_init = None
-
-
-def _patch_celery_beat_tasks():
-    # type: () -> None
-
-    global celery_beat_init
-
-    def celery_beat_init(sender, **kwargs):
-        # type: (Service, Dict[Any, Any]) -> None
-
-        # Because we restart Celery Beat,
-        # make sure that this will not be called infinitely
-        beat_init.disconnect(celery_beat_init)
-
-        app = sender.app
-
-        add_updated_periodic_tasks = []
-
-        for name in sender.scheduler.schedule.keys():
-            # Ignore Celery's internal tasks
-            if name.startswith("celery."):
-                continue
-
-            monitor_name = name
-
-            schedule_entry = sender.scheduler.schedule[name]
-            celery_schedule = schedule_entry.schedule
-            monitor_config = _get_monitor_config(celery_schedule, app)
-
-            if monitor_config is None:
-                continue
-
-            headers = schedule_entry.options.pop("headers", {})
-            headers.update(
-                {
-                    "headers": {
-                        "sentry-monitor-slug": monitor_name,
-                        "sentry-monitor-config": monitor_config,
-                    },
-                }
-            )
-
-            task_signature = app.tasks.get(schedule_entry.task).s()
-            task_signature.set(headers=headers)
-
-            logger.debug(
-                "Set up Sentry Celery Beat monitoring for %s (%s)",
-                task_signature,
-                monitor_name,
-            )
-
-            add_updated_periodic_tasks.append(
-                functools.partial(
-                    app.add_periodic_task,
-                    celery_schedule,
-                    task_signature,
-                    args=schedule_entry.args,
-                    kwargs=schedule_entry.kwargs,
-                    name=schedule_entry.name,
-                    **(schedule_entry.options or {})
-                )
-            )
-
-        _reinstall_patched_tasks(app, sender, add_updated_periodic_tasks)
-
-    beat_init.connect(celery_beat_init)
-    task_prerun.connect(crons_task_before_run)
-    task_success.connect(crons_task_success)
-    task_failure.connect(crons_task_failure)
-    task_retry.connect(crons_task_retry)
-
-
-def crons_task_before_run(sender, **kwargs):
-    # type: (Task, Dict[Any, Any]) -> None
-    logger.debug("celery_task_before_run %s", sender)
-    headers = _get_headers(sender)
-
-    if "sentry-monitor-slug" not in headers:
-        return
-
-    monitor_config = headers.get("sentry-monitor-config", {})
-
-    start_timestamp_s = now()
-
-    check_in_id = capture_checkin(
-        monitor_slug=headers["sentry-monitor-slug"],
-        monitor_config=monitor_config,
-        status=MonitorStatus.IN_PROGRESS,
-    )
-
-    headers.update({"sentry-monitor-check-in-id": check_in_id})
-    headers.update({"sentry-monitor-start-timestamp-s": start_timestamp_s})
-
-    sender.s().set(headers=headers)
-
-
 def crons_task_success(sender, **kwargs):
     # type: (Task, Dict[Any, Any]) -> None
     logger.debug("celery_task_success %s", sender)
     headers = _get_headers(sender)
-
-    print("FLATTENED HEADERS OUT 1 <-")
-    print(headers)
 
     if "sentry-monitor-slug" not in headers:
         return
@@ -618,9 +485,6 @@ def _patch_beat_apply_entry():
                 "sentry-monitor-config": monitor_config,
             }
         )
-
-        print("HEADERS IN ->")
-        print(headers)
 
         check_in_id = capture_checkin(
             monitor_slug=monitor_name,
