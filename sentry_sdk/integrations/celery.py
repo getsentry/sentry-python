@@ -36,6 +36,7 @@ try:
     from celery import VERSION as CELERY_VERSION
     from celery import Task, Celery
     from celery.app.trace import task_has_custom
+    from celery.beat import Scheduler  # type: ignore
     from celery.exceptions import (  # type: ignore
         Ignore,
         Reject,
@@ -465,8 +466,6 @@ def _setup_celery_beat_signals():
 
 def _patch_beat_apply_entry():
     # type: () -> None
-    from celery.beat import Scheduler
-
     original_apply_entry = Scheduler.apply_entry
 
     def sentry_apply_entry(*args, **kwargs):
