@@ -151,7 +151,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         pass
 
 
-def _request_websocket_started(app, **kwargs):
+async def _request_websocket_started(app, **kwargs):
     # type: (Quart, **Any) -> None
     hub = Hub.current
     integration = hub.get_integration(QuartIntegration)
@@ -205,7 +205,7 @@ def _make_request_event_processor(app, request, integration):
     return inner
 
 
-def _capture_exception(sender, exception, **kwargs):
+async def _capture_exception(sender, exception, **kwargs):
     # type: (Quart, Union[ValueError, BaseException], **Any) -> None
     hub = Hub.current
     if hub.get_integration(QuartIntegration) is None:
