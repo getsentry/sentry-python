@@ -65,7 +65,6 @@ class CeleryIntegration(Integration):
         self.monitor_beat_tasks = monitor_beat_tasks
 
         if monitor_beat_tasks:
-            # _patch_celery_beat_tasks()
             _patch_beat_apply_entry()
             _setup_celery_beat_signals()
 
@@ -323,15 +322,14 @@ def _patch_worker_exit():
 
 def _get_headers(task):
     # type: (Task) -> Dict[str, Any]
-    headers = task.request.get("headers") or {}
+    headers = task.request.get("headers", {})
 
+    # flatten nested headers
     if "headers" in headers:
         headers.update(headers["headers"])
         del headers["headers"]
 
-    for key in task.request.get("properties", {}).keys():
-        if key.startswith("sentry-"):
-            headers[key] = task.request.properties.get(key)
+    headers.update(task.request.get("properties", {}))
 
     return headers
 
@@ -392,6 +390,47 @@ def _get_monitor_config(celery_schedule, app):
     monitor_config["timezone"] = app.conf.timezone or "UTC"
 
     return monitor_config
+
+
+def _patch_beat_apply_entry():
+    # type: () -> None
+    original_apply_entry = Scheduler.apply_entry
+
+    def sentry_apply_entry(*args, **kwargs):
+        # type: (*Any, **Any) -> None
+        scheduler, schedule_entry = args
+        app = scheduler.app
+
+        celery_schedule = schedule_entry.schedule
+        monitor_config = _get_monitor_config(celery_schedule, app)
+        monitor_name = schedule_entry.name
+
+        headers = schedule_entry.options.pop("headers", {})
+        headers.update(
+            {
+                "sentry-monitor-slug": monitor_name,
+                "sentry-monitor-config": monitor_config,
+            }
+        )
+
+        check_in_id = capture_checkin(
+            monitor_slug=monitor_name,
+            monitor_config=monitor_config,
+            status=MonitorStatus.IN_PROGRESS,
+        )
+        headers.update({"sentry-monitor-check-in-id": check_in_id})
+
+        schedule_entry.options.update(headers)
+        original_apply_entry(*args, **kwargs)
+
+    Scheduler.apply_entry = sentry_apply_entry
+
+
+def _setup_celery_beat_signals():
+    # type: () -> None
+    task_success.connect(crons_task_success)
+    task_failure.connect(crons_task_failure)
+    task_retry.connect(crons_task_retry)
 
 
 def crons_task_success(sender, **kwargs):
@@ -455,44 +494,3 @@ def crons_task_retry(sender, **kwargs):
         duration=now() - start_timestamp_s,
         status=MonitorStatus.ERROR,
     )
-
-
-def _setup_celery_beat_signals():
-    # type: () -> None
-    task_success.connect(crons_task_success)
-    task_failure.connect(crons_task_failure)
-    task_retry.connect(crons_task_retry)
-
-
-def _patch_beat_apply_entry():
-    # type: () -> None
-    original_apply_entry = Scheduler.apply_entry
-
-    def sentry_apply_entry(*args, **kwargs):
-        # type: (*Any, **Any) -> None
-        scheduler, schedule_entry = args
-        app = scheduler.app
-
-        celery_schedule = schedule_entry.schedule
-        monitor_config = _get_monitor_config(celery_schedule, app)
-        monitor_name = schedule_entry.name
-
-        headers = schedule_entry.options.pop("headers", {})
-        headers.update(
-            {
-                "sentry-monitor-slug": monitor_name,
-                "sentry-monitor-config": monitor_config,
-            }
-        )
-
-        check_in_id = capture_checkin(
-            monitor_slug=monitor_name,
-            monitor_config=monitor_config,
-            status=MonitorStatus.IN_PROGRESS,
-        )
-        headers.update({"sentry-monitor-check-in-id": check_in_id})
-
-        schedule_entry.options.update(headers)
-        original_apply_entry(*args, **kwargs)
-
-    Scheduler.apply_entry = sentry_apply_entry
