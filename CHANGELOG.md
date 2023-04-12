@@ -1,5 +1,164 @@
 # Changelog
 
+## 1.19.1
+
+### Various fixes & improvements
+
+- Make auto monitoring beat update support Celery 4 and 5 (#1989) by @antonpirker
+
+## 1.19.0
+
+### Various fixes & improvements
+
+- **New:** [Celery Beat](https://docs.celeryq.dev/en/stable/userguide/periodic-tasks.html) auto monitoring (#1967) by @antonpirker
+
+  The CeleryIntegration can now also monitor your Celery Beat scheduled tasks automatically using the new [Crons](https://blog.sentry.io/2023/01/04/cron-job-monitoring-beta-because-scheduled-jobs-fail-too/) feature of Sentry.
+
+  To learn more see our [Celery Beat Auto Discovery](https://docs.sentry.io/platforms/python/guides/celery/crons/) documentation.
+
+  Usage:
+
+  ```python
+  from celery import Celery, signals
+  from celery.schedules import crontab
+
+  import sentry_sdk
+  from sentry_sdk.integrations.celery import CeleryIntegration
+
+
+  app = Celery('tasks', broker='...')
+  app.conf.beat_schedule = {
+      'set-in-beat-schedule': {
+          'task': 'tasks.some_important_task',
+          'schedule': crontab(...),
+      },
+  }
+
+
+  @signals.celeryd_init.connect
+  def init_sentry(**kwargs):
+      sentry_sdk.init(
+          dsn='...',
+          integrations=[CeleryIntegration(monitor_beat_tasks=True)],  # 👈 here
+          environment="local.dev.grace",
+          release="v1.0",
+      )
+  ```
+
+  This will auto detect all schedules tasks in your `beat_schedule` and will monitor them with Sentry [Crons](https://blog.sentry.io/2023/01/04/cron-job-monitoring-beta-because-scheduled-jobs-fail-too/).
+
+- **New:** [gRPC](https://grpc.io/) integration (#1911) by @hossein-raeisi
+
+  The [gRPC](https://grpc.io/) integration instruments all incoming requests and outgoing unary-unary, unary-stream grpc requests using grpcio channels.
+
+  To learn more see our [gRPC Integration](https://docs.sentry.io/platforms/python/configuration/integrations/grpc/) documentation.
+
+  On the server:
+
+  ```python
+  import grpc
+  from sentry_sdk.integrations.grpc.server import ServerInterceptor
+
+
+  server = grpc.server(
+      thread_pool=...,
+      interceptors=[ServerInterceptor()],
+  )
+  ```
+
+  On the client:
+
+  ```python
+  import grpc
+  from sentry_sdk.integrations.grpc.client import ClientInterceptor
+
+
+  with grpc.insecure_channel("example.com:12345") as channel:
+      channel = grpc.intercept_channel(channel, *[ClientInterceptor()])
+
+  ```
+
+- **New:** socket integration (#1911) by @hossein-raeisi
+
+  Use this integration to create spans for DNS resolves (`socket.getaddrinfo()`) and connection creations (`socket.create_connection()`).
+
+  To learn more see our [Socket Integration](https://docs.sentry.io/platforms/python/configuration/integrations/socket/) documentation.
+
+  Usage:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.socket import SocketIntegration
+  sentry_sdk.init(
+      dsn="___PUBLIC_DSN___",
+      integrations=[
+          SocketIntegration(),
+      ],
+  )
+  ```
+
+- Fix: Do not trim span descriptions. (#1983) by @antonpirker
+
+## 1.18.0
+
+### Various fixes & improvements
+
+- **New:** Implement `EventScrubber` (#1943) by @sl0thentr0py
+
+  To learn more see our [Scrubbing Sensitive Data](https://docs.sentry.io/platforms/python/data-management/sensitive-data/#event-scrubber) documentation.
+
+  Add a new `EventScrubber` class that scrubs certain potentially sensitive interfaces with a `DEFAULT_DENYLIST`. The default scrubber is automatically run if `send_default_pii = False`:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.scrubber import EventScrubber
+  sentry_sdk.init(
+      # ...
+      send_default_pii=False,
+      event_scrubber=EventScrubber(),  # this is set by default
+  )
+  ```
+
+  You can also pass in a custom `denylist` to the `EventScrubber` class and filter additional fields that you want.
+
+  ```python
+  from sentry_sdk.scrubber import EventScrubber, DEFAULT_DENYLIST
+  # custom denylist
+  denylist = DEFAULT_DENYLIST + ["my_sensitive_var"]
+  sentry_sdk.init(
+      # ...
+      send_default_pii=False,
+      event_scrubber=EventScrubber(denylist=denylist),
+  )
+  ```
+
+- **New:** Added new `functions_to_trace` option for central way of performance instrumentation (#1960) by @antonpirker
+
+  To learn more see our [Tracing Options](https://docs.sentry.io/platforms/python/configuration/options/#functions-to-trace) documentation.
+
+  An optional list of functions that should be set up for performance monitoring. For each function in the list, a span will be created when the function is executed.
+
+  ```python
+  functions_to_trace = [
+      {"qualified_name": "tests.test_basics._hello_world_counter"},
+      {"qualified_name": "time.sleep"},
+      {"qualified_name": "collections.Counter.most_common"},
+  ]
+
+  sentry_sdk.init(
+      # ...
+      traces_sample_rate=1.0,
+      functions_to_trace=functions_to_trace,
+  )
+  ```
+
+- Updated denylist to include other widely used cookies/headers (#1972) by @antonpirker
+- Forward all `sentry-` baggage items (#1970) by @cleptric
+- Update OSS licensing (#1973) by @antonpirker
+- Profiling: Handle non frame types in profiler (#1965) by @Zylphrex
+- Tests: Bad arq dependency in tests (#1966) by @Zylphrex
+- Better naming (#1962) by @antonpirker
+
 ## 1.17.0
 
 ### Various fixes & improvements

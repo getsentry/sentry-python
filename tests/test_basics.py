@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import time
 
 import pytest
 
@@ -618,3 +619,70 @@ def test_event_processor_drop_records_client_report(
 )
 def test_get_sdk_name(installed_integrations, expected_name):
     assert get_sdk_name(installed_integrations) == expected_name
+
+
+def _hello_world(word):
+    return "Hello, {}".format(word)
+
+
+def test_functions_to_trace(sentry_init, capture_events):
+    functions_to_trace = [
+        {"qualified_name": "tests.test_basics._hello_world"},
+        {"qualified_name": "time.sleep"},
+    ]
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        functions_to_trace=functions_to_trace,
+    )
+
+    events = capture_events()
+
+    with start_transaction(name="something"):
+        time.sleep(0)
+
+        for word in ["World", "You"]:
+            _hello_world(word)
+
+    assert len(events) == 1
+
+    (event,) = events
+
+    assert len(event["spans"]) == 3
+    assert event["spans"][0]["description"] == "time.sleep"
+    assert event["spans"][1]["description"] == "tests.test_basics._hello_world"
+    assert event["spans"][2]["description"] == "tests.test_basics._hello_world"
+
+
+class WorldGreeter:
+    def __init__(self, word):
+        self.word = word
+
+    def greet(self, new_word=None):
+        return "Hello, {}".format(new_word if new_word else self.word)
+
+
+def test_functions_to_trace_with_class(sentry_init, capture_events):
+    functions_to_trace = [
+        {"qualified_name": "tests.test_basics.WorldGreeter.greet"},
+    ]
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        functions_to_trace=functions_to_trace,
+    )
+
+    events = capture_events()
+
+    with start_transaction(name="something"):
+        wg = WorldGreeter("World")
+        wg.greet()
+        wg.greet("You")
+
+    assert len(events) == 1
+
+    (event,) = events
+
+    assert len(event["spans"]) == 2
+    assert event["spans"][0]["description"] == "tests.test_basics.WorldGreeter.greet"
+    assert event["spans"][1]["description"] == "tests.test_basics.WorldGreeter.greet"

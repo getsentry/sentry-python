@@ -8,8 +8,8 @@ from sqlalchemy.orm import relationship, sessionmaker
 
 from sentry_sdk import capture_message, start_transaction, configure_scope
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
-from sentry_sdk.utils import json_dumps, MAX_STRING_LENGTH
 from sentry_sdk.serializer import MAX_EVENT_BYTES
+from sentry_sdk.utils import json_dumps, MAX_STRING_LENGTH
 
 
 def test_orm_queries(sentry_init, capture_events):
@@ -143,7 +143,6 @@ def test_long_sql_query_preserved(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1,
         integrations=[SqlalchemyIntegration()],
-        _experiments={"smart_transaction_trimming": True},
     )
     events = capture_events()
 
@@ -158,11 +157,10 @@ def test_long_sql_query_preserved(sentry_init, capture_events):
     assert description.endswith("SELECT 98 UNION SELECT 99")
 
 
-def test_too_large_event_truncated(sentry_init, capture_events):
+def test_large_event_not_truncated(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1,
         integrations=[SqlalchemyIntegration()],
-        _experiments={"smart_transaction_trimming": True},
     )
     events = capture_events()
 
@@ -178,36 +176,26 @@ def test_too_large_event_truncated(sentry_init, capture_events):
     engine = create_engine("sqlite:///:memory:")
     with start_transaction(name="test"):
         with engine.connect() as con:
-            for _ in range(2000):
+            for _ in range(1500):
                 con.execute(" UNION ".join("SELECT {}".format(i) for i in range(100)))
 
     (event,) = events
 
-    # Because of attached metadata in the "_meta" key, we may send out a little
-    # bit more than MAX_EVENT_BYTES.
-    max_bytes = 1.2 * MAX_EVENT_BYTES
-    assert len(json_dumps(event)) < max_bytes
+    assert len(json_dumps(event)) > MAX_EVENT_BYTES
 
     # Some spans are discarded.
     assert len(event["spans"]) == 1000
 
-    for i, span in enumerate(event["spans"]):
-        description = span["description"]
+    # Span descriptions are not truncated.
+    description = event["spans"][0]["description"]
+    assert len(description) == 1583
+    assert description.startswith("SELECT 0")
+    assert description.endswith("SELECT 98 UNION SELECT 99")
 
-        assert description.startswith("SELECT ")
-        if str(i) in event["_meta"]["spans"]:
-            # Description must have been truncated
-            assert len(description) == 10
-            assert description.endswith("...")
-        else:
-            # Description was not truncated, check for original length
-            assert len(description) == 1583
-            assert description.endswith("SELECT 98 UNION SELECT 99")
-
-    # Smoke check the meta info for one of the spans.
-    assert next(iter(event["_meta"]["spans"].values())) == {
-        "description": {"": {"len": 1583, "rem": [["!limit", "x", 7, 10]]}}
-    }
+    description = event["spans"][999]["description"]
+    assert len(description) == 1583
+    assert description.startswith("SELECT 0")
+    assert description.endswith("SELECT 98 UNION SELECT 99")
 
     # Smoke check that truncation of other fields has not changed.
     assert len(event["message"]) == MAX_STRING_LENGTH
