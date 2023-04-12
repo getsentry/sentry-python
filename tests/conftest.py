@@ -311,20 +311,21 @@ def capture_events_forksafe(monkeypatch, capture_events, request):
         monkeypatch.setattr(test_client.transport, "capture_event", append)
         monkeypatch.setattr(test_client, "flush", flush)
 
-        return EventStreamReader(events_r)
+        return EventStreamReader(events_r, events_w)
 
     return inner
 
 
 class EventStreamReader(object):
-    def __init__(self, file):
-        self.file = file
+    def __init__(self, read_file, write_file):
+        self.read_file = read_file
+        self.write_file = write_file
 
     def read_event(self):
-        return json.loads(self.file.readline().decode("utf-8"))
+        return json.loads(self.read_file.readline().decode("utf-8"))
 
     def read_flush(self):
-        assert self.file.readline() == b"flush\n"
+        assert self.read_file.readline() == b"flush\n"
 
 
 # scope=session ensures that fixture is run earlier

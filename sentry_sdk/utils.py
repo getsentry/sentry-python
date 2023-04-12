@@ -1311,3 +1311,16 @@ else:
     def nanosecond_time():
         # type: () -> int
         raise AttributeError
+
+
+if PY2:
+
+    def now():
+        # type: () -> float
+        return time.time()
+
+else:
+
+    def now():
+        # type: () -> float
+        return time.perf_counter()

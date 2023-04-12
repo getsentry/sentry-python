@@ -20,7 +20,9 @@ def _break_world(name):
 def test_decorator(sentry_init):
     sentry_init()
 
-    with mock.patch("sentry_sdk.crons.capture_checkin") as fake_capture_checking:
+    with mock.patch(
+        "sentry_sdk.crons.decorator.capture_checkin"
+    ) as fake_capture_checking:
         result = _hello_world("Grace")
         assert result == "Hello, Grace"
 
@@ -41,7 +43,9 @@ def test_decorator(sentry_init):
 def test_decorator_error(sentry_init):
     sentry_init()
 
-    with mock.patch("sentry_sdk.crons.capture_checkin") as fake_capture_checking:
+    with mock.patch(
+        "sentry_sdk.crons.decorator.capture_checkin"
+    ) as fake_capture_checking:
         with pytest.raises(Exception):
             result = _break_world("Grace")
 
