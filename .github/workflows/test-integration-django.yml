@@ -64,7 +64,7 @@ jobs:
 
       - name: Setup Test Env
         run: |
-          pip install "tox>=3,<4"
+          pip install coverage "tox>=3,<4"
 
       - name: Test django
         timeout-minutes: 45
