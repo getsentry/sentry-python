@@ -60,11 +60,11 @@ jobs:
           coverage combine .coverage*
           coverage xml -i
 
-          # Upload coverage report to CodeCov
-          curl -Os https://uploader.codecov.io/latest/linux/codecov
-          chmod +x codecov
-          ./codecov --file coverage.xml
-
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          verbose: true # optional (default = false)
 
   check_required_tests:
     name: All sanic tests passed or skipped
