@@ -82,7 +82,6 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
-          verbose: true # optional (default = false)
 
   check_required_tests:
     name: All django tests passed or skipped

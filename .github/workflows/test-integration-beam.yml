@@ -64,7 +64,6 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
-          verbose: true # optional (default = false)
 
   check_required_tests:
     name: All beam tests passed or skipped
