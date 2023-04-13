@@ -502,7 +502,7 @@ class _Client(object):
         # If tracing is enabled all events should go to /envelope endpoint.
         # If no tracing is enabled only transactions, events with attachments, and checkins should go to the /envelope endpoint.
         should_use_envelope_endpoint = (
-            tracing_enabled or is_transaction or is_checkin or attachments
+            tracing_enabled or is_transaction or is_checkin or bool(attachments)
         )
         if should_use_envelope_endpoint:
             headers = {
