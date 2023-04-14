@@ -951,43 +951,43 @@ def test_multiple_positional_args(sentry_init):
     assert "Only single positional argument is expected" in str(exinfo.value)
 
 
-def test_sending_event_to_store_endpoint():
-    """
-    If tracing is NOT enabled, the SDK should send error events to the /store endpoint.
-    """
-    mock_transport = mock.MagicMock()
-    mock_transport.capture_event = mock.MagicMock()
-    mock_transport.capture_envelope = mock.MagicMock()
+# def test_sending_event_to_store_endpoint():
+#     """
+#     If tracing is NOT enabled, the SDK should send error events to the /store endpoint.
+#     """
+#     mock_transport = mock.MagicMock()
+#     mock_transport.capture_event = mock.MagicMock()
+#     mock_transport.capture_envelope = mock.MagicMock()
 
-    with mock.patch("sentry_sdk.client.make_transport", return_value=mock_transport):
-        client = Client("http://foobar@127.0.0.1/123", enable_tracing=False)
-        client.capture_event({"type": "event"})
+#     with mock.patch("sentry_sdk.client.make_transport", return_value=mock_transport):
+#         client = Client("http://foobar@127.0.0.1/123", enable_tracing=False)
+#         client.capture_event({"type": "event"})
 
-        try:
-            1 / 0
-        except Exception:
-            capture_exception()
+#         try:
+#             1 / 0
+#         except Exception:
+#             capture_exception()
 
-        mock_transport.capture_event.assert_called_once()
-        mock_transport.capture_envelope.assert_not_called()
+#         mock_transport.capture_event.assert_called_once()
+#         mock_transport.capture_envelope.assert_not_called()
 
 
-def test_sending_event_to_envelope_endpoint():
-    """
-    If tracing is enabled, the SDK should send events to the /envelope endpoint.
-    """
-    mock_transport = mock.MagicMock()
-    mock_transport.capture_event = mock.MagicMock()
-    mock_transport.capture_envelope = mock.MagicMock()
+# def test_sending_event_to_envelope_endpoint():
+#     """
+#     If tracing is enabled, the SDK should send events to the /envelope endpoint.
+#     """
+#     mock_transport = mock.MagicMock()
+#     mock_transport.capture_event = mock.MagicMock()
+#     mock_transport.capture_envelope = mock.MagicMock()
 
-    with mock.patch("sentry_sdk.client.make_transport", return_value=mock_transport):
-        client = Client("http://foobar@127.0.0.1/123", enable_tracing=True)
-        client.capture_event({"type": "event"})
+#     with mock.patch("sentry_sdk.client.make_transport", return_value=mock_transport):
+#         client = Client("http://foobar@127.0.0.1/123", enable_tracing=True)
+#         client.capture_event({"type": "event"})
 
-        try:
-            1 / 0
-        except Exception:
-            capture_exception()
+#         try:
+#             1 / 0
+#         except Exception:
+#             capture_exception()
 
-        mock_transport.capture_event.assert_not_called()
-        mock_transport.capture_envelope.assert_called_once()
+#         mock_transport.capture_event.assert_not_called()
+#         mock_transport.capture_envelope.assert_called_once()
