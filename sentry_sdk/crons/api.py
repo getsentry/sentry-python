@@ -30,8 +30,6 @@ def _create_check_in_event(
         "release": options.get("release", None),
     }
 
-    print("check_in", check_in)
-
     return check_in
 
 
@@ -43,7 +41,6 @@ def capture_checkin(
     monitor_config=None,
 ):
     # type: (Optional[str], Optional[str], Optional[str], Optional[float], Optional[Dict[str, Any]]) -> str
-
     check_in_event = _create_check_in_event(
         monitor_slug=monitor_slug,
         check_in_id=check_in_id,
