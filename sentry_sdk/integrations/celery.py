@@ -130,7 +130,7 @@ def _wrap_apply_async(f):
                     if integration.monitor_beat_tasks:
                         headers.update(
                             {
-                                "sentry-monitor-start-timestamp-s": now(),
+                                "sentry-monitor-start-timestamp-s": "%.9f" % now(),
                             }
                         )
 
@@ -443,7 +443,7 @@ def crons_task_success(sender, **kwargs):
 
     monitor_config = headers.get("sentry-monitor-config", {})
 
-    start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
+    start_timestamp_s = float(headers["sentry-monitor-start-timestamp-s"])
 
     capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
@@ -464,7 +464,7 @@ def crons_task_failure(sender, **kwargs):
 
     monitor_config = headers.get("sentry-monitor-config", {})
 
-    start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
+    start_timestamp_s = float(headers["sentry-monitor-start-timestamp-s"])
 
     capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
@@ -485,7 +485,7 @@ def crons_task_retry(sender, **kwargs):
 
     monitor_config = headers.get("sentry-monitor-config", {})
 
-    start_timestamp_s = headers["sentry-monitor-start-timestamp-s"]
+    start_timestamp_s = float(headers["sentry-monitor-start-timestamp-s"])
 
     capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
