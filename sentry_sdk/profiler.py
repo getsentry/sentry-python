@@ -73,13 +73,10 @@ if TYPE_CHECKING:
 
     RawFrame = Tuple[
         str,  # abs_path
-        Optional[str],  # module
-        Optional[str],  # filename
-        str,  # function
         int,  # lineno
     ]
     RawStack = Tuple[RawFrame, ...]
-    RawSample = Sequence[Tuple[str, Tuple[RawStackId, RawStack]]]
+    RawSample = Sequence[Tuple[str, Tuple[RawStackId, RawStack, Deque[FrameType]]]]
 
     ProcessedSample = TypedDict(
         "ProcessedSample",
@@ -249,7 +246,6 @@ MAX_STACK_DEPTH = 128
 
 def extract_stack(
     frame,  # type: Optional[FrameType]
-    cwd,  # type: str
     prev_cache=None,  # type: Optional[Tuple[RawStackId, RawStack, Deque[FrameType]]]
     max_stack_depth=MAX_STACK_DEPTH,  # type: int
 ):
@@ -278,7 +274,7 @@ def extract_stack(
         frame = f_back
 
     if prev_cache is None:
-        stack = tuple(extract_frame(frame, cwd) for frame in frames)
+        stack = tuple(frame_key(frame) for frame in frames)
     else:
         _, prev_stack, prev_frames = prev_cache
         prev_depth = len(prev_frames)
@@ -292,9 +288,7 @@ def extract_stack(
         # Make sure to keep in mind that the stack is ordered from the inner most
         # from to the outer most frame so be careful with the indexing.
         stack = tuple(
-            prev_stack[i]
-            if i >= 0 and frame is prev_frames[i]
-            else extract_frame(frame, cwd)
+            prev_stack[i] if i >= 0 and frame is prev_frames[i] else frame_key(frame)
             for i, frame in zip(range(prev_depth - depth, prev_depth), frames)
         )
 
@@ -314,8 +308,13 @@ def extract_stack(
     return stack_id, stack, frames
 
 
+def frame_key(frame):
+    # type: (FrameType) -> RawFrame
+    return (frame.f_code.co_filename, frame.f_lineno)
+
+
 def extract_frame(frame, cwd):
-    # type: (FrameType, str) -> RawFrame
+    # type: (FrameType, str) -> ProcessedFrame
     abs_path = frame.f_code.co_filename
 
     try:
@@ -325,7 +324,7 @@ def extract_frame(frame, cwd):
 
     # namedtuples can be many times slower when initialing
     # and accessing attribute so we opt to use a tuple here instead
-    return (
+    return {
         # This originally was `os.path.abspath(abs_path)` but that had
         # a large performance overhead.
         #
@@ -335,12 +334,12 @@ def extract_frame(frame, cwd):
         #
         # Additionally, since we are using normalized path already,
         # we skip calling `os.path.normpath` entirely.
-        os.path.join(cwd, abs_path),
-        module,
-        filename_for_module(module, abs_path) or None,
-        get_frame_name(frame),
-        frame.f_lineno,
-    )
+        "abs_path": os.path.join(cwd, abs_path),
+        "module": module,
+        "filename": filename_for_module(module, abs_path) or None,
+        "function": get_frame_name(frame),
+        "lineno": frame.f_lineno,
+    }
 
 
 if PY311:
@@ -625,8 +624,8 @@ class Profile(object):
 
         scope.profile = old_profile
 
-    def write(self, ts, sample):
-        # type: (int, RawSample) -> None
+    def write(self, cwd, ts, sample, frame_cache):
+        # type: (str, int, RawSample, Dict[RawFrame, ProcessedFrame]) -> None
         if not self.active:
             return
 
@@ -642,25 +641,23 @@ class Profile(object):
 
         elapsed_since_start_ns = str(offset)
 
-        for tid, (stack_id, stack) in sample:
+        for tid, (stack_id, raw_stack, frames) in sample:
             # Check if the stack is indexed first, this lets us skip
             # indexing frames if it's not necessary
             if stack_id not in self.indexed_stacks:
-                for frame in stack:
-                    if frame not in self.indexed_frames:
-                        self.indexed_frames[frame] = len(self.indexed_frames)
-                        self.frames.append(
-                            {
-                                "abs_path": frame[0],
-                                "module": frame[1],
-                                "filename": frame[2],
-                                "function": frame[3],
-                                "lineno": frame[4],
-                            }
-                        )
+                for i, raw_frame in enumerate(raw_stack):
+                    if raw_frame not in self.indexed_frames:
+                        self.indexed_frames[raw_frame] = len(self.indexed_frames)
+                        processed_frame = frame_cache.get(raw_frame)
+                        if processed_frame is None:
+                            processed_frame = extract_frame(frames[i], cwd)
+                            frame_cache[raw_frame] = processed_frame
+                        self.frames.append(processed_frame)
 
                 self.indexed_stacks[stack_id] = len(self.indexed_stacks)
-                self.stacks.append([self.indexed_frames[frame] for frame in stack])
+                self.stacks.append(
+                    [self.indexed_frames[raw_frame] for raw_frame in raw_stack]
+                )
 
             self.samples.append(
                 {
@@ -833,7 +830,7 @@ class Scheduler(object):
             now = nanosecond_time()
 
             raw_sample = {
-                tid: extract_stack(frame, cwd, last_sample[0].get(tid))
+                tid: extract_stack(frame, last_sample[0].get(tid))
                 for tid, frame in sys._current_frames().items()
             }
 
@@ -841,10 +838,7 @@ class Scheduler(object):
             # the most recent stack for better cache hits
             last_sample[0] = raw_sample
 
-            sample = [
-                (str(tid), (stack_id, stack))
-                for tid, (stack_id, stack, _) in raw_sample.items()
-            ]
+            sample = [(str(tid), data) for tid, data in raw_sample.items()]
 
             # Move the new profiles into the active_profiles set.
             #
@@ -861,9 +855,11 @@ class Scheduler(object):
 
             inactive_profiles = []
 
+            frame_cache = {}  # type: Dict[RawFrame, ProcessedFrame]
+
             for profile in self.active_profiles:
                 if profile.active:
-                    profile.write(now, sample)
+                    profile.write(cwd, now, sample, frame_cache)
                 else:
                     # If a thread is marked inactive, we buffer it
                     # to `inactive_profiles` so it can be removed.
