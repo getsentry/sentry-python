@@ -157,15 +157,11 @@ def monkeypatch_test_transport(monkeypatch, validate_event_schema):
 
     def check_envelope(envelope):
         with capture_internal_exceptions():
+            # There used to be a check here for errors are not sent in envelopes.
+            # We changed the behaviour to send errors in envelopes when tracing is enabled.
+            # This is checked in test_client.py::test_sending_events_with_tracing
+            # and test_client.py::test_sending_events_with_no_tracing
             pass
-            # # Assert error events are sent without envelope to server, for compat.
-            # # This does not apply if any item in the envelope is an attachment.
-            # envelope_contains_attachments = any(x.type == "attachment" for x in envelope.items)
-            # if not envelope_contains_attachments:
-            #     import ipdb
-            #     ipdb.set_trace()
-            #     assert not any(item.data_category == "error" for item in envelope.items)
-            #     assert not any(item.get_event() is not None for item in envelope.items)
 
     def inner(client):
         monkeypatch.setattr(
