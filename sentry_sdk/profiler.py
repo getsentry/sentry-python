@@ -575,10 +575,6 @@ class Profile(object):
                 )
             )
 
-    def get_profile_context(self):
-        # type: () -> ProfileContext
-        return {"profile_id": self.event_id}
-
     def start(self):
         # type: () -> None
         if not self.sampled or self.active:
