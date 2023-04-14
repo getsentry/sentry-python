@@ -499,6 +499,12 @@ class _Client(object):
         is_checkin = event_opt.get("type") == "check_in"
         attachments = hint.get("attachments")
 
+        dynamic_sampling_context = (
+            event_opt.get("contexts", {})
+            .get("trace", {})
+            .pop("dynamic_sampling_context", {})
+        )
+
         # If tracing is enabled all events should go to /envelope endpoint.
         # If no tracing is enabled only transactions, events with attachments, and checkins should go to the /envelope endpoint.
         should_use_envelope_endpoint = (
@@ -509,12 +515,6 @@ class _Client(object):
                 "event_id": event_opt["event_id"],
                 "sent_at": format_timestamp(datetime.utcnow()),
             }
-
-            dynamic_sampling_context = (
-                event_opt.get("contexts", {})
-                .get("trace", {})
-                .pop("dynamic_sampling_context", {})
-            )
 
             if dynamic_sampling_context:
                 headers["trace"] = dynamic_sampling_context

@@ -886,7 +886,7 @@ def test_init_string_types(dsn, sentry_init):
     )
 
 
-def test_envelope_types():
+def test_sending_events_with_tracing():
     """
     Tests for calling the right transport method (capture_event vs
     capture_envelope) from the SDK client for different data types.
@@ -902,8 +902,56 @@ def test_envelope_types():
         def capture_event(self, event):
             events.append(event)
 
-    with Hub(Client(traces_sample_rate=1.0, transport=CustomTransport())):
-        event_id = capture_message("hello")
+    with Hub(Client(enable_tracing=True, transport=CustomTransport())):
+        try:
+            1 / 0
+        except Exception:
+            event_id = capture_exception()
+
+        # Assert error events get passed in via capture_envelope
+        assert not events
+        envelope = envelopes.pop()
+        (item,) = envelope.items
+        assert item.data_category == "error"
+        assert item.headers.get("type") == "event"
+        assert item.get_event()["event_id"] == event_id
+
+        with start_transaction(name="foo"):
+            pass
+
+        # Assert transactions get passed in via capture_envelope
+        assert not events
+        envelope = envelopes.pop()
+
+        (item,) = envelope.items
+        assert item.data_category == "transaction"
+        assert item.headers.get("type") == "transaction"
+
+    assert not envelopes
+    assert not events
+
+
+def test_sending_events_with_no_tracing():
+    """
+    Tests for calling the right transport method (capture_event vs
+    capture_envelope) from the SDK client for different data types.
+    """
+
+    envelopes = []
+    events = []
+
+    class CustomTransport(Transport):
+        def capture_envelope(self, envelope):
+            envelopes.append(envelope)
+
+        def capture_event(self, event):
+            events.append(event)
+
+    with Hub(Client(enable_tracing=False, transport=CustomTransport())):
+        try:
+            1 / 0
+        except Exception:
+            event_id = capture_exception()
 
         # Assert error events get passed in via capture_event
         assert not envelopes
@@ -917,11 +965,7 @@ def test_envelope_types():
 
         # Assert transactions get passed in via capture_envelope
         assert not events
-        envelope = envelopes.pop()
-
-        (item,) = envelope.items
-        assert item.data_category == "transaction"
-        assert item.headers.get("type") == "transaction"
+        assert not envelopes
 
     assert not envelopes
     assert not events
@@ -949,45 +993,3 @@ def test_multiple_positional_args(sentry_init):
     with pytest.raises(TypeError) as exinfo:
         sentry_init(1, None)
     assert "Only single positional argument is expected" in str(exinfo.value)
-
-
-# def test_sending_event_to_store_endpoint():
-#     """
-#     If tracing is NOT enabled, the SDK should send error events to the /store endpoint.
-#     """
-#     mock_transport = mock.MagicMock()
-#     mock_transport.capture_event = mock.MagicMock()
-#     mock_transport.capture_envelope = mock.MagicMock()
-
-#     with mock.patch("sentry_sdk.client.make_transport", return_value=mock_transport):
-#         client = Client("http://foobar@127.0.0.1/123", enable_tracing=False)
-#         client.capture_event({"type": "event"})
-
-#         try:
-#             1 / 0
-#         except Exception:
-#             capture_exception()
-
-#         mock_transport.capture_event.assert_called_once()
-#         mock_transport.capture_envelope.assert_not_called()
-
-
-# def test_sending_event_to_envelope_endpoint():
-#     """
-#     If tracing is enabled, the SDK should send events to the /envelope endpoint.
-#     """
-#     mock_transport = mock.MagicMock()
-#     mock_transport.capture_event = mock.MagicMock()
-#     mock_transport.capture_envelope = mock.MagicMock()
-
-#     with mock.patch("sentry_sdk.client.make_transport", return_value=mock_transport):
-#         client = Client("http://foobar@127.0.0.1/123", enable_tracing=True)
-#         client.capture_event({"type": "event"})
-
-#         try:
-#             1 / 0
-#         except Exception:
-#             capture_exception()
-
-#         mock_transport.capture_event.assert_not_called()
-#         mock_transport.capture_envelope.assert_called_once()
