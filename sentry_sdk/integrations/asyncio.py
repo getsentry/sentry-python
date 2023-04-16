@@ -28,8 +28,8 @@ def patch_asyncio():
         loop = asyncio.get_running_loop()
         orig_task_factory = loop.get_task_factory()
 
-        def _sentry_task_factory(loop, coro):
-            # type: (Any, Any) -> Any
+        def _sentry_task_factory(loop, coro, context=None):
+            # type: (Any, Any, Any) -> Any
 
             async def _coro_creating_hub_and_span():
                 # type: () -> Any
