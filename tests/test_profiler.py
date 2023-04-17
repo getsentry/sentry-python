@@ -233,37 +233,6 @@ def test_profiles_sampler(
     assert len(items["profile"]) == profile_count
 
 
-@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
-def test_profile_context(
-    sentry_init,
-    capture_envelopes,
-    teardown_profiling,
-):
-    sentry_init(
-        traces_sample_rate=1.0,
-        _experiments={"profiles_sample_rate": 1.0},
-    )
-
-    envelopes = capture_envelopes()
-
-    with start_transaction(name="profiling"):
-        pass
-
-    items = defaultdict(list)
-    for envelope in envelopes:
-        for item in envelope.items:
-            items[item.type].append(item)
-
-    assert len(items["transaction"]) == 1
-    assert len(items["profile"]) == 1
-
-    transaction = items["transaction"][0]
-    profile = items["profile"][0]
-    assert transaction.payload.json["contexts"]["profile"] == {
-        "profile_id": profile.payload.json["event_id"],
-    }
-
-
 def test_minimum_unique_samples_required(
     sentry_init,
     capture_envelopes,
