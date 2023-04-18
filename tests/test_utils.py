@@ -238,6 +238,6 @@ def test_include_source_context_when_serializing_frame(include_source_context):
     frame = sys._getframe()
     result = serialize_frame(frame, include_source_context=include_source_context)
 
-    assert (include_source_context ^ ("pre_context" in result)) ^ True
-    assert (include_source_context ^ ("context_line" in result)) ^ True
-    assert (include_source_context ^ ("post_context" in result)) ^ True
+    assert include_source_context ^ ("pre_context" in result) ^ True
+    assert include_source_context ^ ("context_line" in result) ^ True
+    assert include_source_context ^ ("post_context" in result) ^ True

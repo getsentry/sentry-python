@@ -622,13 +622,8 @@ def serialize_frame(
     }  # type: Dict[str, Any]
 
     if include_source_context:
-        pre_context, context_line, post_context = get_source_context(frame, tb_lineno)
-        rv.update(
-            {
-                "pre_context": pre_context,
-                "context_line": context_line,
-                "post_context": post_context,
-            }
+        rv["pre_context"], rv["context_line"], rv["post_context"] = get_source_context(
+            frame, tb_lineno
         )
 
     if include_local_variables:
