@@ -421,7 +421,7 @@ def _patch_beat_apply_entry():
         headers.update({"sentry-monitor-check-in-id": check_in_id})
 
         schedule_entry.options.update(headers)
-        original_apply_entry(*args, **kwargs)
+        return original_apply_entry(*args, **kwargs)
 
     Scheduler.apply_entry = sentry_apply_entry
 
