@@ -161,4 +161,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.19.1"
+VERSION = "1.20.0"
