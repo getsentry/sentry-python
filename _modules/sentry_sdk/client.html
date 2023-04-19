@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>sentry_sdk.client &#8212; sentry-python 1.19.1 documentation</title>
+    <title>sentry_sdk.client &#8212; sentry-python 1.20.0 documentation</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css" />
     <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
@@ -53,7 +53,7 @@
     <span class="n">logger</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.serializer</span> <span class="kn">import</span> <span class="n">serialize</span>
-<span class="kn">from</span> <span class="nn">sentry_sdk.tracing</span> <span class="kn">import</span> <span class="n">trace</span>
+<span class="kn">from</span> <span class="nn">sentry_sdk.tracing</span> <span class="kn">import</span> <span class="n">trace</span><span class="p">,</span> <span class="n">has_tracing_enabled</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.transport</span> <span class="kn">import</span> <span class="n">make_transport</span>
 <span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">DEFAULT_OPTIONS</span><span class="p">,</span>
@@ -530,6 +530,8 @@
         <span class="k">if</span> <span class="ow">not</span> <span class="n">is_transaction</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_sample_error</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">None</span>
 
+        <span class="n">tracing_enabled</span> <span class="o">=</span> <span class="n">has_tracing_enabled</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
+        <span class="n">is_checkin</span> <span class="o">=</span> <span class="n">event_opt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;check_in&quot;</span>
         <span class="n">attachments</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;attachments&quot;</span><span class="p">)</span>
 
         <span class="n">dynamic_sampling_context</span> <span class="o">=</span> <span class="p">(</span>
@@ -538,12 +540,12 @@
             <span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;dynamic_sampling_context&quot;</span><span class="p">,</span> <span class="p">{})</span>
         <span class="p">)</span>
 
-        <span class="n">is_checkin</span> <span class="o">=</span> <span class="n">event_opt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;check_in&quot;</span>
-
-        <span class="c1"># Transactions, events with attachments, and checkins should go to the /envelope/</span>
-        <span class="c1"># endpoint.</span>
-        <span class="k">if</span> <span class="n">is_transaction</span> <span class="ow">or</span> <span class="n">is_checkin</span> <span class="ow">or</span> <span class="n">attachments</span><span class="p">:</span>
-
+        <span class="c1"># If tracing is enabled all events should go to /envelope endpoint.</span>
+        <span class="c1"># If no tracing is enabled only transactions, events with attachments, and checkins should go to the /envelope endpoint.</span>
+        <span class="n">should_use_envelope_endpoint</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">tracing_enabled</span> <span class="ow">or</span> <span class="n">is_transaction</span> <span class="ow">or</span> <span class="n">is_checkin</span> <span class="ow">or</span> <span class="nb">bool</span><span class="p">(</span><span class="n">attachments</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">should_use_envelope_endpoint</span><span class="p">:</span>
             <span class="n">headers</span> <span class="o">=</span> <span class="p">{</span>
                 <span class="s2">&quot;event_id&quot;</span><span class="p">:</span> <span class="n">event_opt</span><span class="p">[</span><span class="s2">&quot;event_id&quot;</span><span class="p">],</span>
                 <span class="s2">&quot;sent_at&quot;</span><span class="p">:</span> <span class="n">format_timestamp</span><span class="p">(</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()),</span>
@@ -567,9 +569,11 @@
                 <span class="n">envelope</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span><span class="n">attachment</span><span class="o">.</span><span class="n">to_envelope_item</span><span class="p">())</span>
 
             <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">capture_envelope</span><span class="p">(</span><span class="n">envelope</span><span class="p">)</span>
+
         <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># All other events go to the /store/ endpoint.</span>
+            <span class="c1"># All other events go to the legacy /store/ endpoint (will be removed in the future).</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event_opt</span><span class="p">)</span>
+
         <span class="k">return</span> <span class="n">event_id</span>
 
     <span class="k">def</span> <span class="nf">capture_session</span><span class="p">(</span>
