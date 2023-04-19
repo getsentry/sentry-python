@@ -631,7 +631,6 @@ class Transaction(Span):
 
         if self._profile is not None and self._profile.valid():
             event["profile"] = self._profile
-            contexts.update({"profile": self._profile.get_profile_context()})
             self._profile = None
 
         event["measurements"] = self._measurements
