@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.20.0
+
+### Various fixes & improvements
+
+- Send all events to /envelope endpoint when tracing is enabled (#2009) by @antonpirker
+- Celery Beat monitoring without restarting the Beat process (#2001) by @antonpirker
+- chore(profiling): Remove profile context from sdk (#2013) by @Zylphrex
+- Using the Codecov uploader instead of deprecated python package (#2011) by @antonpirker
+- perf(profiling): Additionl performance improvements to the profiler (#1991) by @Zylphrex
+- Fixed support for Quart (#2003)` (#2003) by @antonpirker
+
 ## 1.19.1
 
 ### Various fixes & improvements
