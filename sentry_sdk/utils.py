@@ -678,8 +678,6 @@ def single_exception_from_error_tuple(
             "number", errno
         )
 
-    # TODO: set new mechanism data here
-
     if client_options is None:
         include_local_variables = True
     else:
@@ -713,20 +711,17 @@ if HAS_CHAINED_EXCEPTIONS:
 
     def walk_exception_chain(exc_info):
         # type: (ExcInfo) -> Iterator[ExcInfo]
-
         exc_type, exc_value, tb = exc_info
 
         seen_exceptions = []
         seen_exception_ids = set()  # type: Set[int]
-
-        source = None
 
         while (
             exc_type is not None
             and exc_value is not None
             and id(exc_value) not in seen_exception_ids
         ):
-            yield exc_type, exc_value, tb, source
+            yield exc_type, exc_value, tb
 
             # Avoid hashing random types we don't know anything
             # about. Use the list to keep a ref so that the `id` is
@@ -736,15 +731,10 @@ if HAS_CHAINED_EXCEPTIONS:
 
             if exc_value.__suppress_context__:
                 cause = exc_value.__cause__
-                source = "__cause__"
             else:
                 cause = exc_value.__context__
-                source = "__context__"
-
             if cause is None:
-                source = None
                 break
-
             exc_type = type(cause)
             exc_value = cause
             tb = getattr(cause, "__traceback__", None)
@@ -756,56 +746,24 @@ else:
         yield exc_info
 
 
-def _get_exceptions_from_group(
-    exc_info,  # type: ExcInfo
-    client_options=None,  # type: Optional[Dict[str, Any]]
-    mechanism=None,  # type: Optional[Dict[str, Any]]
-):
-    # type: (...) -> List[Dict[str, Any]]
-    raise NotImplementedError()
-
-
-def _get_exceptions_from_chain(
-    exc_info,  # type: ExcInfo
-    client_options=None,  # type: Optional[Dict[str, Any]]
-    mechanism=None,  # type: Optional[Dict[str, Any]]
-):
-    # type: (...) -> List[Dict[str, Any]]
-    exceptions = []
-    idx = 0
-    for exc_type, exc_value, tb, source in walk_exception_chain(exc_info):
-        exception_mechanism = mechanism.copy()
-        if idx > 0:
-            exception_mechanism["type"] = "chained"
-            if source is not None:
-                exception_mechanism["source"] = source
-
-        exceptions.append(
-            single_exception_from_error_tuple(
-                exc_type, exc_value, tb, client_options, exception_mechanism
-            )
-        )
-
-        idx += 1
-
-    return exceptions
-
-
 def exceptions_from_error_tuple(
     exc_info,  # type: ExcInfo
     client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
     # type: (...) -> List[Dict[str, Any]]
-    exceptions = []
-    if exc_info[0] == ExceptionGroup:
-        exceptions = _get_exceptions_from_group(exc_info, client_options, mechanism)
-    else:
-        exceptions = _get_exceptions_from_chain(exc_info, client_options, mechanism)
+    exc_type, exc_value, tb = exc_info
+    rv = []
+    for exc_type, exc_value, tb in walk_exception_chain(exc_info):
+        rv.append(
+            single_exception_from_error_tuple(
+                exc_type, exc_value, tb, client_options, mechanism
+            )
+        )
 
-    exceptions.reverse()
+    rv.reverse()
 
-    return exceptions
+    return rv
 
 
 def to_string(value):
