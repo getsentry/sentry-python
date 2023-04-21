@@ -31,10 +31,10 @@ except ImportError:
 
 try:
     # Python 3.11
-    from builtins import ExceptionGroup  # type: ignore
+    from builtins import ExceptionGroup
 except ImportError:
     # Python 3.10 and below
-    ExceptionGroup = None
+    ExceptionGroup = None  # type: ignore
 
 from datetime import datetime
 from functools import partial
@@ -675,7 +675,7 @@ def single_exception_from_error_tuple(
     See the Exception Interface documentation for more details:
     https://develop.sentry.dev/sdk/event-payloads/exception/
     """
-    exception_value = {}
+    exception_value = {}  # type: Dict[str, Any]
     exception_value["mechanism"] = (
         mechanism.copy() if mechanism else {"type": "generic", "handled": True}
     )
@@ -710,7 +710,9 @@ def single_exception_from_error_tuple(
     exception_value["module"] = get_type_module(exc_type)
     exception_value["type"] = get_type_name(exc_type)
     exception_value["value"] = (
-        safe_str(exc_value) if not hasattr(exc_value, "message") else exc_value.message
+        safe_str(exc_value)
+        if not exc_value or not hasattr(exc_value, "message")
+        else exc_value.message
     )
 
     if client_options is None:
@@ -809,33 +811,48 @@ def exceptions_from_error(
     parent_id = exception_id
     exception_id += 1
 
-    # Add direct cause. The field `__cause__` is set when raised with the exception (using the `from` keyword).
-    if hasattr(exc_value, "__cause__") and exc_value.__cause__ is not None:
+    # Add direct cause.
+    # The field `__cause__` is set when raised with the exception (using the `from` keyword).
+    exception_has_cause = (
+        exc_value
+        and hasattr(exc_value, "__cause__")
+        and exc_value.__cause__ is not None
+    )
+    if exception_has_cause:
+        cause = exc_value.__cause__  # type: ignore
         (exception_id, child_exceptions) = exceptions_from_error(
-            exc_type=type(exc_value.__cause__),
-            exc_value=exc_value.__cause__,
-            tb=getattr(exc_value.__cause__, "__traceback__", None),
+            exc_type=type(cause),
+            exc_value=cause,
+            tb=getattr(cause, "__traceback__", None),
             mechanism=mechanism,
             exception_id=exception_id,
             source="__cause__",
         )
         exceptions.extend(child_exceptions)
 
-    # Add indirect cause. The field `__context__` is assigned if another exception occurs while handling the exception
-    if hasattr(exc_value, "__context__") and exc_value.__context__ is not None:
+    # Add indirect cause.
+    # The field `__context__` is assigned if another exception occurs while handling the exception.
+    exception_has_content = (
+        exc_value
+        and hasattr(exc_value, "__context__")
+        and exc_value.__context__ is not None
+    )
+    if exception_has_content:
+        context = exc_value.__context__  # type: ignore
         (exception_id, child_exceptions) = exceptions_from_error(
-            exc_type=type(exc_value.__context__),
-            exc_value=exc_value.__context__,
-            tb=getattr(exc_value.__context__, "__traceback__", None),
+            exc_type=type(context),
+            exc_value=context,
+            tb=getattr(context, "__traceback__", None),
             mechanism=mechanism,
             exception_id=exception_id,
             source="__context__",
         )
         exceptions.extend(child_exceptions)
 
-    # Add exceptions from an ExceptionGroup
-    if hasattr(exc_value, "exceptions"):
-        for idx, e in enumerate(exc_value.exceptions):
+    # Add exceptions from an ExceptionGroup.
+    is_exception_group = exc_value and hasattr(exc_value, "exceptions")
+    if is_exception_group:
+        for idx, e in enumerate(exc_value.exceptions):  # type: ignore
             (exception_id, child_exceptions) = exceptions_from_error(
                 exc_type=type(e),
                 exc_value=e,
@@ -1188,10 +1205,10 @@ def qualname_from_function(func):
     if (
         _PARTIALMETHOD_AVAILABLE
         and hasattr(func, "_partialmethod")
-        and isinstance(func._partialmethod, partialmethod)  # type: ignore
+        and isinstance(func._partialmethod, partialmethod)
     ):
         prefix, suffix = "partialmethod(<function ", ">)"
-        func = func._partialmethod.func  # type: ignore
+        func = func._partialmethod.func
     elif isinstance(func, partial) and hasattr(func.func, "__name__"):
         prefix, suffix = "partial(<function ", ">)"
         func = func.func
