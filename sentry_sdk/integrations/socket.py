@@ -65,7 +65,7 @@ def _patch_create_connection():
                 address=address, timeout=timeout, source_address=source_address
             )
 
-    socket.create_connection = create_connection
+    socket.create_connection = create_connection  # type: ignore
 
 
 def _patch_getaddrinfo():
@@ -86,4 +86,4 @@ def _patch_getaddrinfo():
 
             return real_getaddrinfo(host, port, family, type, proto, flags)
 
-    socket.getaddrinfo = getaddrinfo
+    socket.getaddrinfo = getaddrinfo  # type: ignore

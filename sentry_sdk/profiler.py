@@ -346,7 +346,7 @@ if PY311:
 
     def get_frame_name(frame):
         # type: (FrameType) -> str
-        return frame.f_code.co_qualname  # type: ignore
+        return frame.f_code.co_qualname
 
 else:
 
