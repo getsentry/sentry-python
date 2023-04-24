@@ -209,3 +209,31 @@ def test_exception_chain_context():
 
     exception_values = event["exception"]["values"]
     assert exception_values == expected_exception_values
+
+
+def test_simple_exception():
+    simple_excpetion = ValueError("A simple exception")
+
+    (event, _) = event_from_exception(
+        simple_excpetion,
+        client_options={
+            "include_local_variables": True,
+        },
+        mechanism={"type": "test_suite", "handled": False},
+    )
+
+    expected_exception_values = [
+        {
+            "mechanism": {
+                "handled": False,
+                "type": "test_suite",
+                "exception_id": 0,
+            },
+            "module": None,
+            "type": "ValueError",
+            "value": "A simple exception",
+        },
+    ]
+
+    exception_values = event["exception"]["values"]
+    assert exception_values == expected_exception_values

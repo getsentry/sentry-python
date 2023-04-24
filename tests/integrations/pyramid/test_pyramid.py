@@ -89,7 +89,10 @@ def test_view_exceptions(
     (event,) = events
     (breadcrumb,) = event["breadcrumbs"]["values"]
     assert breadcrumb["message"] == "hi2"
-    assert event["exception"]["values"][0]["mechanism"]["type"] == "pyramid"
+    assert event["exception"]["values"][1]["mechanism"]["type"] == "pyramid"
+    assert event["exception"]["values"][1]["type"] == "ZeroDivisionError"
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "chained"
+    assert event["exception"]["values"][0]["type"] == "HTTPNotFound"
 
 
 def test_has_context(route, get_client, sentry_init, capture_events):
