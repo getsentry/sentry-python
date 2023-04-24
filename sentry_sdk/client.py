@@ -18,7 +18,7 @@ from sentry_sdk.utils import (
     logger,
 )
 from sentry_sdk.serializer import serialize
-from sentry_sdk.tracing import trace
+from sentry_sdk.tracing import trace, has_tracing_enabled
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import (
     DEFAULT_OPTIONS,
@@ -495,6 +495,8 @@ class _Client(object):
         if not is_transaction and not self._should_sample_error(event):
             return None
 
+        tracing_enabled = has_tracing_enabled(self.options)
+        is_checkin = event_opt.get("type") == "check_in"
         attachments = hint.get("attachments")
 
         dynamic_sampling_context = (
@@ -503,12 +505,12 @@ class _Client(object):
             .pop("dynamic_sampling_context", {})
         )
 
-        is_checkin = event_opt.get("type") == "check_in"
-
-        # Transactions, events with attachments, and checkins should go to the /envelope/
-        # endpoint.
-        if is_transaction or is_checkin or attachments:
-
+        # If tracing is enabled all events should go to /envelope endpoint.
+        # If no tracing is enabled only transactions, events with attachments, and checkins should go to the /envelope endpoint.
+        should_use_envelope_endpoint = (
+            tracing_enabled or is_transaction or is_checkin or bool(attachments)
+        )
+        if should_use_envelope_endpoint:
             headers = {
                 "event_id": event_opt["event_id"],
                 "sent_at": format_timestamp(datetime.utcnow()),
@@ -532,9 +534,11 @@ class _Client(object):
                 envelope.add_item(attachment.to_envelope_item())
 
             self.transport.capture_envelope(envelope)
+
         else:
-            # All other events go to the /store/ endpoint.
+            # All other events go to the legacy /store/ endpoint (will be removed in the future).
             self.transport.capture_event(event_opt)
+
         return event_id
 
     def capture_session(

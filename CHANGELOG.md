@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.20.0
+
+### Various fixes & improvements
+
+- Send all events to /envelope endpoint when tracing is enabled (#2009) by @antonpirker
+
+  _Note:_ If you’re self-hosting Sentry 9, you need to stay in the previous version of the SDK or update your self-hosted to at least 20.6.0
+
+- Profiling: Remove profile context from SDK (#2013) by @Zylphrex
+- Profiling: Additionl performance improvements to the profiler (#1991) by @Zylphrex
+- Fix: Celery Beat monitoring without restarting the Beat process (#2001) by @antonpirker
+- Fix: Using the Codecov uploader instead of deprecated python package (#2011) by @antonpirker
+- Fix: Support for Quart (#2003)` (#2003) by @antonpirker
+
 ## 1.19.1
 
 ### Various fixes & improvements
