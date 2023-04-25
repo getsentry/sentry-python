@@ -26,7 +26,7 @@ _COMMANDS_INCLUDING_SENSITIVE_DATA = [
 
 _MAX_NUM_ARGS = 10  # Trim argument lists to this many values
 
-DEFAULT_MAX_DATA_SIZE = 1024
+_DEFAULT_MAX_DATA_SIZE = 1024
 
 
 def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
@@ -106,7 +106,7 @@ def _patch_rediscluster():
 class RedisIntegration(Integration):
     identifier = "redis"
 
-    def __init__(self, max_data_size=DEFAULT_MAX_DATA_SIZE):
+    def __init__(self, max_data_size=_DEFAULT_MAX_DATA_SIZE):
         # type: (int) -> None
         self.max_data_size = max_data_size
 
