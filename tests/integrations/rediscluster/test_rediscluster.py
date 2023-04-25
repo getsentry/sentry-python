@@ -73,7 +73,7 @@ def test_rediscluster_pipeline(sentry_init, capture_events):
             "count": 3,
             "first_ten": ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"],
         },
-        [SPANDATA.DB_SYSTEM]: "redis",
+        SPANDATA.DB_SYSTEM: "redis",
     }
     assert span["tags"] == {
         "redis.transaction": False,  # For Cluster, this is always False
