@@ -55,6 +55,7 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
         "net.peer.port": str(mongo_server.port),
     }
     for span in find, insert_success, insert_fail:
+        assert span["data"]["db.system"] == "mongodb"
         for field, value in common_tags.items():
             assert span["tags"][field] == value
 
