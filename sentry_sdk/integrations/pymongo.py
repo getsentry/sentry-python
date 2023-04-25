@@ -123,6 +123,7 @@ class CommandTracer(monitoring.CommandListener):
 
             data["operation_ids"]["operation"] = event.operation_id
             data["operation_ids"]["request"] = event.request_id
+            data["db.system"] = "mongodb"
 
             try:
                 lsid = command.pop("lsid")["id"]
