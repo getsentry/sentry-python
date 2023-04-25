@@ -322,14 +322,14 @@ def _patch_worker_exit():
 
 def _get_headers(task):
     # type: (Task) -> Dict[str, Any]
-    headers = task.request.get("headers", {})
+    headers = task.request.get("headers") or {}
 
     # flatten nested headers
     if "headers" in headers:
         headers.update(headers["headers"])
         del headers["headers"]
 
-    headers.update(task.request.get("properties", {}))
+    headers.update(task.request.get("properties") or {})
 
     return headers
 
