@@ -89,7 +89,7 @@ class OP:
 
 
 # See: https://develop.sentry.dev/sdk/performance/span-data-conventions/
-class SPAN_DATA:
+class SPANDATA:
     DB_SYSTEM = "db.system"
     """
     An identifier for the database management system (DBMS) product being used.

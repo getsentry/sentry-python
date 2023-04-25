@@ -1,6 +1,6 @@
 import mock
 
-from sentry_sdk.consts import SPAN_DATA
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.integrations.redis import RedisIntegration
 
@@ -55,7 +55,7 @@ def test_redis_pipeline(sentry_init, capture_events, is_transaction):
             "count": 3,
             "first_ten": ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"],
         },
-        [SPAN_DATA.DB_SYSTEM]: "redis",
+        [SPANDATA.DB_SYSTEM]: "redis",
     }
     assert span["tags"] == {
         "redis.transaction": is_transaction,

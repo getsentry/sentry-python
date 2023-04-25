@@ -6,7 +6,7 @@ import threading
 import weakref
 
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.consts import OP, SPAN_DATA
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
@@ -586,7 +586,7 @@ def install_sql_hook():
             hub, self.cursor, sql, params, paramstyle="format", executemany=False
         ) as span:
             if db_system:
-                span.set_data(SPAN_DATA.DB_SYSTEM, db_system)
+                span.set_data(SPANDATA.DB_SYSTEM, db_system)
             return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):
@@ -603,7 +603,7 @@ def install_sql_hook():
             hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
         ) as span:
             if db_system:
-                span.set_data(SPAN_DATA.DB_SYSTEM, db_system)
+                span.set_data(SPANDATA.DB_SYSTEM, db_system)
             return real_executemany(self, sql, param_list)
 
     def connect(self):
@@ -621,7 +621,7 @@ def install_sql_hook():
 
         with hub.start_span(op=OP.DB, description="connect") as span:
             if db_system:
-                span.set_data(SPAN_DATA.DB_SYSTEM, db_system)
+                span.set_data(SPANDATA.DB_SYSTEM, db_system)
 
             return real_connect(self)
 
