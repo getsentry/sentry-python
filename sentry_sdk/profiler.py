@@ -657,9 +657,8 @@ class Profile(object):
                     }
                 )
             except AttributeError:
-                # For some reason, the frame we got isn't a `FrameType` and doesn't
-                # have a `f_back`. When this happens, we continue with any frames
-                # that we've managed to extract up to this point.
+                # For some reason, the frame we get doesn't have certain attributes.
+                # When this happens, we abandon the current sample as it's bad.
                 capture_internal_exception(sys.exc_info())
 
     def process(self):
@@ -830,9 +829,8 @@ class Scheduler(object):
                     for tid, frame in sys._current_frames().items()
                 }
             except AttributeError:
-                # For some reason, the frame we got isn't a `FrameType` and doesn't
-                # have a `f_back`. When this happens, we continue with any frames
-                # that we've managed to extract up to this point.
+                # For some reason, the frame we get doesn't have certain attributes.
+                # When this happens, we abandon the current sample as it's bad.
                 capture_internal_exception(sys.exc_info())
 
                 # make sure to clear the cache if something went wrong when extracting
