@@ -7,6 +7,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
 from sentry_sdk import capture_message, start_transaction, configure_scope
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.serializer import MAX_EVENT_BYTES
 from sentry_sdk.utils import json_dumps, MAX_STRING_LENGTH
@@ -118,6 +119,9 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
             session.query(Person).first()
 
     (event,) = events
+
+    for span in event["spans"]:
+        assert span["data"][SPANDATA.DB_SYSTEM] == "sqlite"
 
     assert (
         render_span_tree(event)
