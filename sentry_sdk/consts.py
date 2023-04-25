@@ -88,6 +88,15 @@ class OP:
     SOCKET_DNS = "socket.dns"
 
 
+# See: https://develop.sentry.dev/sdk/performance/span-data-conventions/
+class SPAN_DATA:
+    DB_SYSTEM = "db.system"
+    """
+    An identifier for the database management system (DBMS) product being used.
+    See: https://github.com/open-telemetry/opentelemetry-python/blob/e00306206ea25cf8549eca289e39e0b6ba2fa560/opentelemetry-semantic-conventions/src/opentelemetry/semconv/trace/__init__.py#L58
+    """
+
+
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
 # take these arguments (even though they take opaque **kwargs)
 class ClientConstructor(object):

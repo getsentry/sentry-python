@@ -135,7 +135,19 @@ def record_sql_queries(
     with hub.start_span(op=OP.DB, description=query) as span:
         for k, v in data.items():
             span.set_data(k, v)
+
         yield span
+
+
+def get_db_system(name):
+    # type: (str) -> Optional[str]
+    if "sqlite" in name:
+        return "sqlite"
+
+    if "postgres" in name:
+        return "postgresql"
+
+    return None
 
 
 def maybe_create_breadcrumbs_from_span(hub, span):

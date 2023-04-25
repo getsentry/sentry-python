@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
 from sentry_sdk import Hub
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPAN_DATA
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
@@ -63,6 +63,7 @@ def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
                     "redis.commands",
                     {"count": len(self.command_stack), "first_ten": commands},
                 )
+                span.set_data(SPAN_DATA.DB_SYSTEM, "redis")
 
             return old_execute(self, *args, **kwargs)
 

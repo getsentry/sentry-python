@@ -3,9 +3,10 @@ from __future__ import absolute_import
 import re
 
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.consts import SPAN_DATA
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.tracing_utils import record_sql_queries
+from sentry_sdk.tracing_utils import record_sql_queries, get_db_system
 
 try:
     from sqlalchemy.engine import Engine  # type: ignore
@@ -67,6 +68,9 @@ def _before_cursor_execute(
     span = ctx_mgr.__enter__()
 
     if span is not None:
+        db_system = get_db_system(conn.engine.name)
+        if db_system is not None:
+            span.set_data(SPAN_DATA.DB_SYSTEM, db_system)
         context._sentry_sql_span = span
 
 

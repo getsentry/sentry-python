@@ -6,12 +6,12 @@ import threading
 import weakref
 
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPAN_DATA
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
-from sentry_sdk.tracing_utils import record_sql_queries
+from sentry_sdk.tracing_utils import record_sql_queries, get_db_system
 from sentry_sdk.utils import (
     AnnotatedValue,
     HAS_REAL_CONTEXTVARS,
@@ -570,15 +570,23 @@ def install_sql_hook():
         # This won't work on Django versions < 1.6
         return
 
+    from django.db import connection
+
     def execute(self, sql, params=None):
         # type: (CursorWrapper, Any, Optional[Any]) -> Any
         hub = Hub.current
         if hub.get_integration(DjangoIntegration) is None:
             return real_execute(self, sql, params)
 
+        db_name = connection.settings_dict["NAME"]
+        if db_name:
+            db_system = get_db_system(db_name)
+
         with record_sql_queries(
             hub, self.cursor, sql, params, paramstyle="format", executemany=False
-        ):
+        ) as span:
+            if db_system:
+                span.set_data(SPAN_DATA.DB_SYSTEM, db_system)
             return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):
@@ -587,9 +595,15 @@ def install_sql_hook():
         if hub.get_integration(DjangoIntegration) is None:
             return real_executemany(self, sql, param_list)
 
+        db_name = connection.settings_dict["NAME"]
+        if db_name:
+            db_system = get_db_system(db_name)
+
         with record_sql_queries(
             hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
-        ):
+        ) as span:
+            if db_system:
+                span.set_data(SPAN_DATA.DB_SYSTEM, db_system)
             return real_executemany(self, sql, param_list)
 
     def connect(self):
@@ -601,7 +615,14 @@ def install_sql_hook():
         with capture_internal_exceptions():
             hub.add_breadcrumb(message="connect", category="query")
 
-        with hub.start_span(op=OP.DB, description="connect"):
+        db_name = connection.settings_dict["NAME"]
+        if db_name:
+            db_system = get_db_system(db_name)
+
+        with hub.start_span(op=OP.DB, description="connect") as span:
+            if db_system:
+                span.set_data(SPAN_DATA.DB_SYSTEM, db_system)
+
             return real_connect(self)
 
     CursorWrapper.execute = execute
