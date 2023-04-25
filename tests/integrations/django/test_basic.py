@@ -18,6 +18,7 @@ except ImportError:
 
 from sentry_sdk._compat import PY2, PY310
 from sentry_sdk import capture_message, capture_exception, configure_scope
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.executing import ExecutingIntegration
@@ -442,12 +443,15 @@ def test_django_connect_trace(sentry_init, client, capture_events, render_span_t
     # trigger Django to open a new connection by marking the existing one as None.
     connections["postgres"].connection = None
 
-    events = capture_events()
+    (event,) = capture_events()
 
     content, status, headers = client.get(reverse("postgres_select"))
     assert status == "200 OK"
 
-    assert '- op="db": description="connect"' in render_span_tree(events[0])
+    for span in event["spans"]:
+        assert span["data"][SPANDATA.DB_SYSTEM] == "postgres"
+
+    assert '- op="db": description="connect"' in render_span_tree(event)
 
 
 @pytest.mark.forked
