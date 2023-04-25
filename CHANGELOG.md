@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.21.0
+
+### Various fixes & improvements
+
+- Add `db.system` to redis and SQLAlchemy db spans (#2037, #2038, #2039) (#2037) by @AbhiPrasad
+- Upgraded linting tooling  (#2026) by @antonpirker
+- Made code more resilient. (#2031) by @antonpirker
+- Better handling of redis span/breadcrumb data (#2033) by @antonpirker
+
 ## 1.20.0
 
 ### Various fixes & improvements
