@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 
 try:
-    from celery import VERSION as CELERY_VERSION
+    from celery import VERSION as CELERY_VERSION  # type: ignore
     from celery import Task, Celery
     from celery.app.trace import task_has_custom
     from celery.beat import Scheduler  # type: ignore

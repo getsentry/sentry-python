@@ -1077,10 +1077,10 @@ def qualname_from_function(func):
     if (
         _PARTIALMETHOD_AVAILABLE
         and hasattr(func, "_partialmethod")
-        and isinstance(func._partialmethod, partialmethod)  # type: ignore
+        and isinstance(func._partialmethod, partialmethod)
     ):
         prefix, suffix = "partialmethod(<function ", ">)"
-        func = func._partialmethod.func  # type: ignore
+        func = func._partialmethod.func
     elif isinstance(func, partial) and hasattr(func.func, "__name__"):
         prefix, suffix = "partial(<function ", ">)"
         func = func.func
