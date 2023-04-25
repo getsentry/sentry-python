@@ -139,17 +139,6 @@ def record_sql_queries(
         yield span
 
 
-def get_db_system(name):
-    # type: (str) -> Optional[str]
-    if "sqlite" in name:
-        return "sqlite"
-
-    if "postgres" in name:
-        return "postgresql"
-
-    return None
-
-
 def maybe_create_breadcrumbs_from_span(hub, span):
     # type: (sentry_sdk.Hub, Span) -> None
     if span.op == OP.DB_REDIS:
