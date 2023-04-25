@@ -61,6 +61,23 @@ def test_redis_pipeline(sentry_init, capture_events, is_transaction):
     }
 
 
+def test_span_otel_data(sentry_init, capture_events):
+    sentry_init(
+        integrations=[RedisIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    connection = FakeStrictRedis()
+    with start_transaction():
+        connection.set("somekey", 123)
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert "db.system" in span["data"]
+    assert span["data"]["db.system"] == "redis"
+
+
 def test_sensitive_data(sentry_init, capture_events):
     # fakeredis does not support the AUTH command, so we need to mock it
     with mock.patch(

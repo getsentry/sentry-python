@@ -191,6 +191,8 @@ def patch_redis_client(cls, is_cluster):
             description = description[: integration.max_data_size - len("...")] + "..."
 
         with hub.start_span(op=OP.DB_REDIS, description=description) as span:
+            span.set_data("db.system", "redis")
+
             span.set_tag("redis.is_cluster", is_cluster)
 
             if name:
