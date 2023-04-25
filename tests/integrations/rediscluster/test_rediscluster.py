@@ -1,5 +1,6 @@
 import pytest
 from sentry_sdk import capture_message
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.api import start_transaction
 from sentry_sdk.integrations.redis import RedisIntegration
 
@@ -71,7 +72,8 @@ def test_rediscluster_pipeline(sentry_init, capture_events):
         "redis.commands": {
             "count": 3,
             "first_ten": ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"],
-        }
+        },
+        SPANDATA.DB_SYSTEM: "redis",
     }
     assert span["tags"] == {
         "redis.transaction": False,  # For Cluster, this is always False
