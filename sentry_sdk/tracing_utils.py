@@ -140,9 +140,12 @@ def record_sql_queries(
 
 def maybe_create_breadcrumbs_from_span(hub, span):
     # type: (sentry_sdk.Hub, Span) -> None
-    if span.op == OP.HTTP_CLIENT:
+    if span.op == OP.DB_REDIS:
+        hub.add_breadcrumb(
+            message=span.description, type="redis", category="redis", data=span._tags
+        )
+    elif span.op == OP.HTTP_CLIENT:
         hub.add_breadcrumb(type="http", category="httplib", data=span._data)
-
     elif span.op == "subprocess":
         hub.add_breadcrumb(
             type="subprocess",
