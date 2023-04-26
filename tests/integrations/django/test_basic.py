@@ -443,11 +443,12 @@ def test_django_connect_trace(sentry_init, client, capture_events, render_span_t
     # trigger Django to open a new connection by marking the existing one as None.
     connections["postgres"].connection = None
 
-    (event,) = capture_events()
+    events = capture_events()
 
     content, status, headers = client.get(reverse("postgres_select"))
     assert status == "200 OK"
 
+    (event,) = events
     for span in event["spans"]:
         assert span["data"][SPANDATA.DB_SYSTEM] == "postgres"
 
