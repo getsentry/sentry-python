@@ -67,7 +67,8 @@ setup(
         "fastapi": ["fastapi>=0.79.0"],
         "pymongo": ["pymongo>=3.1"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
-        "grpcio": ["grpcio>=1.21.1"]
+        "grpcio": ["grpcio>=1.21.1"],
+        "markupsafe": ["markupsafe"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
