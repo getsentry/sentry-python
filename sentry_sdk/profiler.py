@@ -262,14 +262,7 @@ def extract_stack(
     frames = deque(maxlen=max_stack_depth)  # type: Deque[FrameType]
 
     while frame is not None:
-        try:
-            f_back = frame.f_back
-        except AttributeError:
-            capture_internal_exception(sys.exc_info())
-            # For some reason, the frame we got isn't a `FrameType` and doesn't
-            # have a `f_back`. When this happens, we continue with any frames
-            # that we've managed to extract up to this point.
-            break
+        f_back = frame.f_back
         frames.append(frame)
         frame = f_back
 
@@ -346,7 +339,7 @@ if PY311:
 
     def get_frame_name(frame):
         # type: (FrameType) -> str
-        return frame.f_code.co_qualname  # type: ignore
+        return frame.f_code.co_qualname
 
 else:
 
@@ -638,30 +631,35 @@ class Profile(object):
         elapsed_since_start_ns = str(offset)
 
         for tid, (stack_id, raw_stack, frames) in sample:
-            # Check if the stack is indexed first, this lets us skip
-            # indexing frames if it's not necessary
-            if stack_id not in self.indexed_stacks:
-                for i, raw_frame in enumerate(raw_stack):
-                    if raw_frame not in self.indexed_frames:
-                        self.indexed_frames[raw_frame] = len(self.indexed_frames)
-                        processed_frame = frame_cache.get(raw_frame)
-                        if processed_frame is None:
-                            processed_frame = extract_frame(frames[i], cwd)
-                            frame_cache[raw_frame] = processed_frame
-                        self.frames.append(processed_frame)
+            try:
+                # Check if the stack is indexed first, this lets us skip
+                # indexing frames if it's not necessary
+                if stack_id not in self.indexed_stacks:
+                    for i, raw_frame in enumerate(raw_stack):
+                        if raw_frame not in self.indexed_frames:
+                            self.indexed_frames[raw_frame] = len(self.indexed_frames)
+                            processed_frame = frame_cache.get(raw_frame)
+                            if processed_frame is None:
+                                processed_frame = extract_frame(frames[i], cwd)
+                                frame_cache[raw_frame] = processed_frame
+                            self.frames.append(processed_frame)
 
-                self.indexed_stacks[stack_id] = len(self.indexed_stacks)
-                self.stacks.append(
-                    [self.indexed_frames[raw_frame] for raw_frame in raw_stack]
+                    self.indexed_stacks[stack_id] = len(self.indexed_stacks)
+                    self.stacks.append(
+                        [self.indexed_frames[raw_frame] for raw_frame in raw_stack]
+                    )
+
+                self.samples.append(
+                    {
+                        "elapsed_since_start_ns": elapsed_since_start_ns,
+                        "thread_id": tid,
+                        "stack_id": self.indexed_stacks[stack_id],
+                    }
                 )
-
-            self.samples.append(
-                {
-                    "elapsed_since_start_ns": elapsed_since_start_ns,
-                    "thread_id": tid,
-                    "stack_id": self.indexed_stacks[stack_id],
-                }
-            )
+            except AttributeError:
+                # For some reason, the frame we get doesn't have certain attributes.
+                # When this happens, we abandon the current sample as it's bad.
+                capture_internal_exception(sys.exc_info())
 
     def process(self):
         # type: () -> ProcessedProfile
@@ -825,10 +823,21 @@ class Scheduler(object):
 
             now = nanosecond_time()
 
-            raw_sample = {
-                tid: extract_stack(frame, last_sample[0].get(tid))
-                for tid, frame in sys._current_frames().items()
-            }
+            try:
+                raw_sample = {
+                    tid: extract_stack(frame, last_sample[0].get(tid))
+                    for tid, frame in sys._current_frames().items()
+                }
+            except AttributeError:
+                # For some reason, the frame we get doesn't have certain attributes.
+                # When this happens, we abandon the current sample as it's bad.
+                capture_internal_exception(sys.exc_info())
+
+                # make sure to clear the cache if something went wrong when extracting
+                # the stack so we dont keep a reference to the last stack of frames around
+                last_sample[0] = {}
+
+                return
 
             # make sure to update the last sample so the cache has
             # the most recent stack for better cache hits
