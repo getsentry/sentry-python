@@ -453,7 +453,7 @@ def test_django_connect_trace(sentry_init, client, capture_events, render_span_t
     for span in event["spans"]:
         if span.get("op") == "db":
             data = span.get("data")
-            assert data.get(SPANDATA.DB_SYSTEM) == "postgres"
+            assert data.get(SPANDATA.DB_SYSTEM) == "postgresql"
 
     assert '- op="db": description="connect"' in render_span_tree(event)
 
