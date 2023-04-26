@@ -1,8 +1,13 @@
 from __future__ import absolute_import
 
 from sentry_sdk import Hub
-from sentry_sdk.consts import OP
-from sentry_sdk.utils import capture_internal_exceptions, logger
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.hub import _should_send_default_pii
+from sentry_sdk.utils import (
+    SENSITIVE_DATA_SUBSTITUTE,
+    capture_internal_exceptions,
+    logger,
+)
 from sentry_sdk.integrations import Integration, DidNotEnable
 
 from sentry_sdk._types import TYPE_CHECKING
@@ -16,8 +21,13 @@ _SINGLE_KEY_COMMANDS = frozenset(
 )
 _MULTI_KEY_COMMANDS = frozenset(["del", "touch", "unlink"])
 
-#: Trim argument lists to this many values
-_MAX_NUM_ARGS = 10
+_COMMANDS_INCLUDING_SENSITIVE_DATA = [
+    "auth",
+]
+
+_MAX_NUM_ARGS = 10  # Trim argument lists to this many values
+
+_DEFAULT_MAX_DATA_SIZE = 1024
 
 
 def _set_pipeline_data(
@@ -67,6 +77,7 @@ def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
                     self.transaction,
                     self.command_stack,
                 )
+                span.set_data(SPANDATA.DB_SYSTEM, "redis")
 
             return old_execute(self, *args, **kwargs)
 
@@ -146,6 +157,10 @@ def _patch_rediscluster():
 class RedisIntegration(Integration):
     identifier = "redis"
 
+    def __init__(self, max_data_size=_DEFAULT_MAX_DATA_SIZE):
+        # type: (int) -> None
+        self.max_data_size = max_data_size
+
     @staticmethod
     def setup_once():
         # type: () -> None
@@ -173,7 +188,21 @@ def _get_span_description(name, *args):
             if i > _MAX_NUM_ARGS:
                 break
 
-            description_parts.append(repr(arg))
+            name_low = name.lower()
+
+            if name_low in _COMMANDS_INCLUDING_SENSITIVE_DATA:
+                description_parts.append(SENSITIVE_DATA_SUBSTITUTE)
+                continue
+
+            arg_is_the_key = i == 0
+            if arg_is_the_key:
+                description_parts.append(repr(arg))
+
+            else:
+                if _should_send_default_pii():
+                    description_parts.append(repr(arg))
+                else:
+                    description_parts.append(SENSITIVE_DATA_SUBSTITUTE)
 
         description = " ".join(description_parts)
 
@@ -205,11 +234,18 @@ def patch_redis_client(cls, is_cluster):
     def sentry_patched_execute_command(self, name, *args, **kwargs):
         # type: (Any, str, *Any, **Any) -> Any
         hub = Hub.current
+        integration = hub.get_integration(RedisIntegration)
 
-        if hub.get_integration(RedisIntegration) is None:
+        if integration is None:
             return old_execute_command(self, name, *args, **kwargs)
 
         description = _get_span_description(name, *args)
+
+        data_should_be_truncated = (
+            integration.max_data_size and len(description) > integration.max_data_size
+        )
+        if data_should_be_truncated:
+            description = description[: integration.max_data_size - len("...")] + "..."
 
         with hub.start_span(op=OP.DB_REDIS, description=description) as span:
             _set_client_data(span, is_cluster, name, *args)

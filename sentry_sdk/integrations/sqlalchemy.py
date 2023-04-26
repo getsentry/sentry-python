@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import re
 
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing_utils import record_sql_queries
@@ -67,6 +68,9 @@ def _before_cursor_execute(
     span = ctx_mgr.__enter__()
 
     if span is not None:
+        db_system = _get_db_system(conn.engine.name)
+        if db_system is not None:
+            span.set_data(SPANDATA.DB_SYSTEM, db_system)
         context._sentry_sql_span = span
 
 
@@ -102,3 +106,24 @@ def _handle_error(context, *args):
     if ctx_mgr is not None:
         execution_context._sentry_sql_span_manager = None
         ctx_mgr.__exit__(None, None, None)
+
+
+# See: https://docs.sqlalchemy.org/en/20/dialects/index.html
+def _get_db_system(name):
+    # type: (str) -> Optional[str]
+    if "sqlite" in name:
+        return "sqlite"
+
+    if "postgres" in name:
+        return "postgresql"
+
+    if "mariadb" in name:
+        return "mariadb"
+
+    if "mysql" in name:
+        return "mysql"
+
+    if "oracle" in name:
+        return "oracle"
+
+    return None
