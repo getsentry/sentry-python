@@ -679,12 +679,8 @@ thread_metadata = {
 
 
 sample_stacks = [
-    extract_stack(
-        get_frame(), LRUCache(max_size=1), max_stack_depth=1
-    ),
-    extract_stack(
-        get_frame(), LRUCache(max_size=1), max_stack_depth=2
-    ),
+    extract_stack(get_frame(), LRUCache(max_size=1), max_stack_depth=1),
+    extract_stack(get_frame(), LRUCache(max_size=1), max_stack_depth=2),
 ]
 
 
