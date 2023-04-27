@@ -66,18 +66,6 @@ if TYPE_CHECKING:
 
     ThreadId = str
 
-    # The exact value of this id is not very meaningful. The purpose
-    # of this id is to give us a compact and unique identifier for a
-    # raw stack that can be used as a key to a dictionary so that it
-    # can be used during the sampled format generation.
-    RawStackId = Tuple[int, int]
-
-    RawFrame = Tuple[
-        str,  # abs_path
-        int,  # lineno
-    ]
-    RawStack = Tuple[RawFrame, ...]
-    RawSample = Sequence[Tuple[str, Tuple[RawStackId, RawStack, Deque[FrameType]]]]
     ProcessedSample = TypedDict(
         "ProcessedSample",
         {
@@ -126,8 +114,14 @@ if TYPE_CHECKING:
     ]
     FrameIds = Tuple[FrameId, ...]
 
-    ExtractedStack = Tuple[RawStackId, FrameIds, List[ProcessedFrame]]
-    ExtractedSample = Sequence[Tuple[str, ExtractedStack]]
+    # The exact value of this id is not very meaningful. The purpose
+    # of this id is to give us a compact and unique identifier for a
+    # raw stack that can be used as a key to a dictionary so that it
+    # can be used during the sampled format generation.
+    StackId = Tuple[int, int]
+
+    ExtractedStack = Tuple[StackId, FrameIds, List[ProcessedFrame]]
+    ExtractedSample = Sequence[Tuple[ThreadId, ExtractedStack]]
 
 
 try:
@@ -475,8 +469,8 @@ class Profile(object):
         self.stop_ns = 0  # type: int
         self.active = False  # type: bool
 
-        self.indexed_frames = {}  # type: Dict[RawFrame, int]
-        self.indexed_stacks = {}  # type: Dict[RawStackId, int]
+        self.indexed_frames = {}  # type: Dict[FrameId, int]
+        self.indexed_stacks = {}  # type: Dict[StackId, int]
         self.frames = []  # type: List[ProcessedFrame]
         self.stacks = []  # type: List[ProcessedStack]
         self.samples = []  # type: List[ProcessedSample]
