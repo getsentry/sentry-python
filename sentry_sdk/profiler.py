@@ -252,9 +252,12 @@ def teardown_profiler():
 MAX_STACK_DEPTH = 128
 
 
+CWD = os.getcwd()
+
+
 def extract_stack(
     frame,  # type: Optional[FrameType]
-    cwd,  # type: str
+    cwd=CWD,  # type: str
     max_stack_depth=MAX_STACK_DEPTH,  # type: int
 ):
     # type: (...) -> ExtractedStack
@@ -301,7 +304,12 @@ def frame_id(frame):
 
 def extract_frame(frame, cwd):
     # type: (FrameType, str) -> ProcessedFrame
-    abs_path = frame.f_code.co_filename
+    try:
+        abs_path = frame.f_code.co_filename
+    except Exception as e:
+        print(frame)
+        print(e)
+        raise
 
     try:
         module = frame.f_globals["__name__"]
@@ -606,8 +614,8 @@ class Profile(object):
 
         scope.profile = old_profile
 
-    def write(self, cwd, ts, sample):
-        # type: (str, int, ExtractedSample) -> None
+    def write(self, ts, sample):
+        # type: (int, ExtractedSample) -> None
         if not self.active:
             return
 
@@ -832,7 +840,7 @@ class Scheduler(object):
 
             for profile in self.active_profiles:
                 if profile.active:
-                    profile.write(cwd, now, sample)
+                    profile.write(now, sample)
                 else:
                     # If a thread is marked inactive, we buffer it
                     # to `inactive_profiles` so it can be removed.
