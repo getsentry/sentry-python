@@ -6,7 +6,7 @@ import threading
 import weakref
 
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
@@ -64,6 +64,7 @@ if TYPE_CHECKING:
     from django.http.request import QueryDict
     from django.utils.datastructures import MultiValueDict
 
+    from sentry_sdk.tracing import Span
     from sentry_sdk.scope import Scope
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from sentry_sdk._types import Event, Hint, EventProcessor, NotImplementedType
@@ -578,7 +579,8 @@ def install_sql_hook():
 
         with record_sql_queries(
             hub, self.cursor, sql, params, paramstyle="format", executemany=False
-        ):
+        ) as span:
+            _set_db_system_on_span(span, self.db.vendor)
             return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):
@@ -589,7 +591,8 @@ def install_sql_hook():
 
         with record_sql_queries(
             hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
-        ):
+        ) as span:
+            _set_db_system_on_span(span, self.db.vendor)
             return real_executemany(self, sql, param_list)
 
     def connect(self):
@@ -601,10 +604,18 @@ def install_sql_hook():
         with capture_internal_exceptions():
             hub.add_breadcrumb(message="connect", category="query")
 
-        with hub.start_span(op=OP.DB, description="connect"):
+        with hub.start_span(op=OP.DB, description="connect") as span:
+            _set_db_system_on_span(span, self.vendor)
             return real_connect(self)
 
     CursorWrapper.execute = execute
     CursorWrapper.executemany = executemany
     BaseDatabaseWrapper.connect = connect
     ignore_logger("django.db.backends")
+
+
+# https://github.com/django/django/blob/6a0dc2176f4ebf907e124d433411e52bba39a28e/django/db/backends/base/base.py#L29
+# Avaliable in Django 1.8+
+def _set_db_system_on_span(span, vendor):
+    # type: (Span, str) -> None
+    span.set_data(SPANDATA.DB_SYSTEM, vendor)
