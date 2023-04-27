@@ -37,6 +37,7 @@ from collections import deque
 
 import sentry_sdk
 from sentry_sdk._compat import PY33, PY311
+from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exception,
@@ -256,7 +257,8 @@ CWD = os.getcwd()
 
 
 def extract_stack(
-    frame,  # type: Optional[FrameType]
+    raw_frame,  # type: Optional[FrameType]
+    cache,  # type: LRUCache
     cwd=CWD,  # type: str
     max_stack_depth=MAX_STACK_DEPTH,  # type: int
 ):
@@ -272,14 +274,19 @@ def extract_stack(
 
     raw_frames = deque(maxlen=max_stack_depth)  # type: Deque[FrameType]
 
-    while frame is not None:
-        f_back = frame.f_back
-        raw_frames.append(frame)
-        frame = f_back
+    while raw_frame is not None:
+        f_back = raw_frame.f_back
+        raw_frames.append(raw_frame)
+        raw_frame = f_back
 
-    # TODO: add a cache
-    frame_keys = tuple(frame_id(frame) for frame in raw_frames)
-    frames = [extract_frame(frame, cwd) for frame in raw_frames]
+    frame_ids = tuple(frame_id(raw_frame) for raw_frame in raw_frames)
+    frames = []
+    for i, fid in enumerate(frame_ids):
+        frame = cache.get(fid)
+        if frame is None:
+            frame = extract_frame(raw_frames[i], cwd)
+            cache.set(fid, frame)
+        frames.append(frame)
 
     # Instead of mapping the stack into frame ids and hashing
     # that as a tuple, we can directly hash the stack.
@@ -292,14 +299,14 @@ def extract_stack(
     # To Reduce the likelihood of hash collisions, we include
     # the stack depth. This means that only stacks of the same
     # depth can suffer from hash collisions.
-    stack_id = len(raw_frames), hash(frame_keys)
+    stack_id = len(raw_frames), hash(frame_ids)
 
-    return stack_id, frame_keys, frames
+    return stack_id, frame_ids, frames
 
 
-def frame_id(frame):
+def frame_id(raw_frame):
     # type: (FrameType) -> FrameId
-    return (frame.f_code.co_filename, frame.f_lineno)
+    return (raw_frame.f_code.co_filename, raw_frame.f_lineno)
 
 
 def extract_frame(frame, cwd):
@@ -788,6 +795,8 @@ class Scheduler(object):
         # type: () -> Callable[..., None]
         cwd = os.getcwd()
 
+        cache = LRUCache(max_size=256)
+
         def _sample_stack(*args, **kwargs):
             # type: (*Any, **Any) -> None
             """
@@ -814,7 +823,7 @@ class Scheduler(object):
 
             try:
                 sample = [
-                    (str(tid), extract_stack(frame, cwd))
+                    (str(tid), extract_stack(frame, cache, cwd))
                     for tid, frame in sys._current_frames().items()
                 ]
             except AttributeError:
