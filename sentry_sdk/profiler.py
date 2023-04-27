@@ -77,7 +77,6 @@ if TYPE_CHECKING:
     ]
     RawStack = Tuple[RawFrame, ...]
     RawSample = Sequence[Tuple[str, Tuple[RawStackId, RawStack, Deque[FrameType]]]]
-
     ProcessedSample = TypedDict(
         "ProcessedSample",
         {
@@ -119,6 +118,15 @@ if TYPE_CHECKING:
         "ProfileContext",
         {"profile_id": str},
     )
+
+    FrameId = Tuple[
+        str,  # abs_path
+        int,  # lineno
+    ]
+    FrameIds = Tuple[FrameId, ...]
+
+    ExtractedStack = Tuple[RawStackId, FrameIds, List[ProcessedFrame]]
+    ExtractedSample = Sequence[Tuple[str, ExtractedStack]]
 
 
 try:
@@ -246,10 +254,10 @@ MAX_STACK_DEPTH = 128
 
 def extract_stack(
     frame,  # type: Optional[FrameType]
-    prev_cache=None,  # type: Optional[Tuple[RawStackId, RawStack, Deque[FrameType]]]
+    cwd,  # type: str
     max_stack_depth=MAX_STACK_DEPTH,  # type: int
 ):
-    # type: (...) -> Tuple[RawStackId, RawStack, Deque[FrameType]]
+    # type: (...) -> ExtractedStack
     """
     Extracts the stack starting the specified frame. The extracted stack
     assumes the specified frame is the top of the stack, and works back
@@ -259,31 +267,16 @@ def extract_stack(
     only the first `MAX_STACK_DEPTH` frames will be returned.
     """
 
-    frames = deque(maxlen=max_stack_depth)  # type: Deque[FrameType]
+    raw_frames = deque(maxlen=max_stack_depth)  # type: Deque[FrameType]
 
     while frame is not None:
         f_back = frame.f_back
-        frames.append(frame)
+        raw_frames.append(frame)
         frame = f_back
 
-    if prev_cache is None:
-        stack = tuple(frame_key(frame) for frame in frames)
-    else:
-        _, prev_stack, prev_frames = prev_cache
-        prev_depth = len(prev_frames)
-        depth = len(frames)
-
-        # We want to match the frame found in this sample to the frames found in the
-        # previous sample. If they are the same (using the `is` operator), we can
-        # skip the expensive work of extracting the frame information and reuse what
-        # we extracted during the last sample.
-        #
-        # Make sure to keep in mind that the stack is ordered from the inner most
-        # from to the outer most frame so be careful with the indexing.
-        stack = tuple(
-            prev_stack[i] if i >= 0 and frame is prev_frames[i] else frame_key(frame)
-            for i, frame in zip(range(prev_depth - depth, prev_depth), frames)
-        )
+    # TODO: add a cache
+    frame_keys = tuple(frame_id(frame) for frame in raw_frames)
+    frames = [extract_frame(frame, cwd) for frame in raw_frames]
 
     # Instead of mapping the stack into frame ids and hashing
     # that as a tuple, we can directly hash the stack.
@@ -296,13 +289,13 @@ def extract_stack(
     # To Reduce the likelihood of hash collisions, we include
     # the stack depth. This means that only stacks of the same
     # depth can suffer from hash collisions.
-    stack_id = len(stack), hash(stack)
+    stack_id = len(raw_frames), hash(frame_keys)
 
-    return stack_id, stack, frames
+    return stack_id, frame_keys, frames
 
 
-def frame_key(frame):
-    # type: (FrameType) -> RawFrame
+def frame_id(frame):
+    # type: (FrameType) -> FrameId
     return (frame.f_code.co_filename, frame.f_lineno)
 
 
@@ -613,8 +606,8 @@ class Profile(object):
 
         scope.profile = old_profile
 
-    def write(self, cwd, ts, sample, frame_cache):
-        # type: (str, int, RawSample, Dict[RawFrame, ProcessedFrame]) -> None
+    def write(self, cwd, ts, sample):
+        # type: (str, int, ExtractedSample) -> None
         if not self.active:
             return
 
@@ -630,23 +623,19 @@ class Profile(object):
 
         elapsed_since_start_ns = str(offset)
 
-        for tid, (stack_id, raw_stack, frames) in sample:
+        for tid, (stack_id, frame_ids, frames) in sample:
             try:
                 # Check if the stack is indexed first, this lets us skip
                 # indexing frames if it's not necessary
                 if stack_id not in self.indexed_stacks:
-                    for i, raw_frame in enumerate(raw_stack):
-                        if raw_frame not in self.indexed_frames:
-                            self.indexed_frames[raw_frame] = len(self.indexed_frames)
-                            processed_frame = frame_cache.get(raw_frame)
-                            if processed_frame is None:
-                                processed_frame = extract_frame(frames[i], cwd)
-                                frame_cache[raw_frame] = processed_frame
-                            self.frames.append(processed_frame)
+                    for i, frame_id in enumerate(frame_ids):
+                        if frame_id not in self.indexed_frames:
+                            self.indexed_frames[frame_id] = len(self.indexed_frames)
+                            self.frames.append(frames[i])
 
                     self.indexed_stacks[stack_id] = len(self.indexed_stacks)
                     self.stacks.append(
-                        [self.indexed_frames[raw_frame] for raw_frame in raw_stack]
+                        [self.indexed_frames[frame_id] for frame_id in frame_ids]
                     )
 
                 self.samples.append(
@@ -791,13 +780,6 @@ class Scheduler(object):
         # type: () -> Callable[..., None]
         cwd = os.getcwd()
 
-        # In Python3+, we can use the `nonlocal` keyword to rebind the value,
-        # but this is not possible in Python2. To get around this, we wrap
-        # the value in a list to allow updating this value each sample.
-        last_sample = [
-            {}
-        ]  # type: List[Dict[int, Tuple[RawStackId, RawStack, Deque[FrameType]]]]
-
         def _sample_stack(*args, **kwargs):
             # type: (*Any, **Any) -> None
             """
@@ -808,7 +790,6 @@ class Scheduler(object):
             if not self.new_profiles and not self.active_profiles:
                 # make sure to clear the cache if we're not profiling so we dont
                 # keep a reference to the last stack of frames around
-                last_sample[0] = {}
                 return
 
             # This is the number of profiles we want to pop off.
@@ -824,26 +805,15 @@ class Scheduler(object):
             now = nanosecond_time()
 
             try:
-                raw_sample = {
-                    tid: extract_stack(frame, last_sample[0].get(tid))
+                sample = [
+                    (str(tid), extract_stack(frame, cwd))
                     for tid, frame in sys._current_frames().items()
-                }
+                ]
             except AttributeError:
                 # For some reason, the frame we get doesn't have certain attributes.
                 # When this happens, we abandon the current sample as it's bad.
                 capture_internal_exception(sys.exc_info())
-
-                # make sure to clear the cache if something went wrong when extracting
-                # the stack so we dont keep a reference to the last stack of frames around
-                last_sample[0] = {}
-
                 return
-
-            # make sure to update the last sample so the cache has
-            # the most recent stack for better cache hits
-            last_sample[0] = raw_sample
-
-            sample = [(str(tid), data) for tid, data in raw_sample.items()]
 
             # Move the new profiles into the active_profiles set.
             #
@@ -860,11 +830,9 @@ class Scheduler(object):
 
             inactive_profiles = []
 
-            frame_cache = {}  # type: Dict[RawFrame, ProcessedFrame]
-
             for profile in self.active_profiles:
                 if profile.active:
-                    profile.write(cwd, now, sample, frame_cache)
+                    profile.write(cwd, now, sample)
                 else:
                     # If a thread is marked inactive, we buffer it
                     # to `inactive_profiles` so it can be removed.
