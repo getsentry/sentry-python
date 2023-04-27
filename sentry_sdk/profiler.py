@@ -311,12 +311,7 @@ def frame_id(raw_frame):
 
 def extract_frame(frame, cwd):
     # type: (FrameType, str) -> ProcessedFrame
-    try:
-        abs_path = frame.f_code.co_filename
-    except Exception as e:
-        print(frame)
-        print(e)
-        raise
+    abs_path = frame.f_code.co_filename
 
     try:
         module = frame.f_globals["__name__"]
