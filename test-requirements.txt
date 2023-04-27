@@ -12,5 +12,3 @@ executing
 asttokens
 responses
 ipdb
-# The tests do not run in urllib3 and the minimum version is taken from setup.py
-urllib3<2.0.0,>=1.25.7
