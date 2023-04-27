@@ -120,7 +120,7 @@ class CommandTracer(monitoring.CommandListener):
             except TypeError:
                 pass
 
-            data = {"operation_ids": {}}  # type: Dict[str, Union[Dict[str, Any], str]]
+            data = {"operation_ids": {}}  # type: Dict[str, Any]
 
             data["operation_ids"]["operation"] = event.operation_id
             data["operation_ids"]["request"] = event.request_id
