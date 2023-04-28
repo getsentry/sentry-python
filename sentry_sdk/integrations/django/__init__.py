@@ -40,7 +40,7 @@ try:
 except ImportError:
     raise DidNotEnable("Django not installed")
 
-
+from sentry_sdk.integrations.django.caching import patch_caching
 from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
 from sentry_sdk.integrations.django.templates import (
     get_template_frame_from_exception,
@@ -223,6 +223,7 @@ class DjangoIntegration(Integration):
         patch_views()
         patch_templates()
         patch_signals()
+        patch_caching()
 
 
 _DRF_PATCHED = False

@@ -53,14 +53,17 @@ class INSTRUMENTER:
 
 # See: https://develop.sentry.dev/sdk/performance/span-data-conventions/
 class SPANDATA:
-    DB_SYSTEM = "db.system"
     """
     An identifier for the database management system (DBMS) product being used.
     See: https://github.com/open-telemetry/opentelemetry-python/blob/e00306206ea25cf8549eca289e39e0b6ba2fa560/opentelemetry-semantic-conventions/src/opentelemetry/semconv/trace/__init__.py#L58
     """
 
+    DB_SYSTEM = "db.system"
+    CACHE_HIT = "cache.hit"
+
 
 class OP:
+    CACHE = "cache"
     DB = "db"
     DB_REDIS = "db.redis"
     EVENT_DJANGO = "event.django"
