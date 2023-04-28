@@ -5,7 +5,8 @@ from django.core.cache import CacheHandler
 
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk._compat import text_type
+
 
 if TYPE_CHECKING:
     from typing import Any
@@ -29,6 +30,10 @@ def _instrument_call(cache, method_name, original_method, args, kwargs):
 
         if value:
             span.set_data(SPANDATA.CACHE_HIT, True)
+
+            size = len(text_type(value).encode("utf-8"))
+            span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
+
         else:
             span.set_data(SPANDATA.CACHE_HIT, False)
 
@@ -54,26 +59,28 @@ def _patch_cache_method(cache, method_name):
 
 def _patch_cache(cache):
     # type: (CacheHandler) -> None
-    if not hasattr(cache, "_sentry_patched"):
-        for method_name in METHODS_TO_INSTRUMENT:
-            _patch_cache_method(cache, method_name)
-        cache._sentry_patched = True
-        cache._sentry_recording = False
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    integration = Hub.current.get_integration(DjangoIntegration)
+    if integration and integration.cache_spans:
+        if not hasattr(cache, "_sentry_patched"):
+            for method_name in METHODS_TO_INSTRUMENT:
+                _patch_cache_method(cache, method_name)
+            cache._sentry_patched = True
+            cache._sentry_recording = False
 
 
 def patch_caching():
     # type: () -> None
-    integration = Hub.current.get_integration(DjangoIntegration)
-    if integration and integration.cache_spans:
-        if not hasattr(CacheHandler, "_sentry_patched"):
-            original_create_connection = CacheHandler.create_connection
+    if not hasattr(CacheHandler, "_sentry_patched"):
+        original_create_connection = CacheHandler.create_connection
 
-            @functools.wraps(original_create_connection)
-            def sentry_create_connection(self, alias):
-                # type: (CacheHandler, str) -> Any
-                cache = original_create_connection(self, alias)
-                _patch_cache(cache)
-                return cache
+        @functools.wraps(original_create_connection)
+        def sentry_create_connection(self, alias):
+            # type: (CacheHandler, str) -> Any
+            cache = original_create_connection(self, alias)
+            _patch_cache(cache)
+            return cache
 
-            CacheHandler.create_connection = sentry_create_connection
-            CacheHandler._sentry_patched = True
+        CacheHandler.create_connection = sentry_create_connection
+        CacheHandler._sentry_patched = True

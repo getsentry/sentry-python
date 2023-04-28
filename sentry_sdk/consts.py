@@ -53,13 +53,15 @@ class INSTRUMENTER:
 
 # See: https://develop.sentry.dev/sdk/performance/span-data-conventions/
 class SPANDATA:
-    """
-    An identifier for the database management system (DBMS) product being used.
-    See: https://github.com/open-telemetry/opentelemetry-python/blob/e00306206ea25cf8549eca289e39e0b6ba2fa560/opentelemetry-semantic-conventions/src/opentelemetry/semconv/trace/__init__.py#L58
-    """
-
+    # An identifier for the database management system (DBMS) product being used.
+    # See: https://github.com/open-telemetry/opentelemetry-python/blob/e00306206ea25cf8549eca289e39e0b6ba2fa560/opentelemetry-semantic-conventions/src/opentelemetry/semconv/trace/__init__.py#L58
     DB_SYSTEM = "db.system"
+
+    # A boolean indicating whether the requested data was found in the cache.
     CACHE_HIT = "cache.hit"
+
+    # The size of the requested data in bytes.
+    CACHE_ITEM_SIZE = "cache.item_size"
 
 
 class OP:
