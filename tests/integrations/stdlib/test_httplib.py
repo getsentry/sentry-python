@@ -23,7 +23,7 @@ except ImportError:
 
 
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk.consts import MATCH_ALL
+from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 
@@ -51,8 +51,8 @@ def test_crumb_capture(sentry_init, capture_events):
         "method": "GET",
         "status_code": 200,
         "reason": "OK",
-        "http.fragment": "",
-        "http.query": "",
+        SPANDATA.HTTP_FRAGMENT: "",
+        SPANDATA.HTTP_QUERY: "",
     }
 
 
@@ -79,8 +79,8 @@ def test_crumb_capture_hint(sentry_init, capture_events):
         "status_code": 200,
         "reason": "OK",
         "extra": "foo",
-        "http.fragment": "",
-        "http.query": "",
+        SPANDATA.HTTP_FRAGMENT: "",
+        SPANDATA.HTTP_QUERY: "",
     }
 
 
@@ -136,8 +136,8 @@ def test_httplib_misuse(sentry_init, capture_events, request):
         "method": "GET",
         "status_code": 200,
         "reason": "OK",
-        "http.fragment": "",
-        "http.query": "",
+        SPANDATA.HTTP_FRAGMENT: "",
+        SPANDATA.HTTP_QUERY: "",
     }
 
 
