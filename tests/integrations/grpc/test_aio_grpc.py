@@ -109,11 +109,39 @@ async def test_grpc_server_continues_transaction(
     assert span["op"] == "test"
 
 
+@pytest.mark.asyncio
+async def test_grpc_server_exception(sentry_init, capture_events, grpc_server):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
+        stub = gRPCTestServiceStub(channel)
+        try:
+            await stub.TestServe(gRPCTestMessage(text="exception"))
+            raise AssertionError()
+        except Exception:
+            pass
+
+    (event, _) = events
+
+    assert event["exception"]["values"][0]["type"] == "TestService.TestException"
+    assert event["exception"]["values"][0]["value"] == "test"
+    assert event["exception"]["values"][0]["mechanism"]["handled"] is False
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "gRPC"
+
+
 class TestService(gRPCTestServiceServicer):
-    @staticmethod
-    async def TestServe(request, context):  # noqa: N802
+    class TestException(Exception):
+        def __init__(self):
+            super().__init__("test")
+
+    @classmethod
+    async def TestServe(cls, request, context):  # noqa: N802
         hub = Hub.current
         with hub.start_span(op="test", description="test"):
             pass
+
+        if request.text == "exception":
+            raise cls.TestException()
 
         return gRPCTestMessage(text=request.text)

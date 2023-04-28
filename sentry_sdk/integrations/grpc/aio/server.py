@@ -5,6 +5,7 @@ from sentry_sdk._types import MYPY
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_CUSTOM
+from sentry_sdk.utils import event_from_exception
 
 if MYPY:
     from collections.abc import Awaitable, Callable
@@ -51,7 +52,15 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
             )
 
             with hub.start_transaction(transaction=transaction):
-                return await handler(request, context)
+                try:
+                    return await handler(request, context)
+                except Exception as exc:
+                    event, hint = event_from_exception(
+                        exc,
+                        mechanism={"type": "gRPC", "handled": False},
+                    )
+                    hub.capture_event(event, hint=hint)
+                    raise
 
         return wrapped
 
