@@ -48,7 +48,7 @@ def _patch_cache_method(cache, method_name):
     def sentry_method(*args, **kwargs):
         # type: (*Any, **Any) -> Any
 
-        # If this call is being made inside another call, don't record it.
+        # If this call is being made inside another call, don't instrument it.
         if cache._sentry_recording:
             return original_method(*args, **kwargs)
         else:
