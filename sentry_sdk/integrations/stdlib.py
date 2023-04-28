@@ -2,7 +2,7 @@ import os
 import subprocess
 import sys
 import platform
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
@@ -93,8 +93,8 @@ def _install_httplib():
 
         span.set_data("method", method)
         span.set_data("url", parsed_url.url)
-        span.set_data("http.query", parsed_url.query)
-        span.set_data("http.fragment", parsed_url.fragment)
+        span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+        span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
