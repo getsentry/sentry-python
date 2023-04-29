@@ -18,12 +18,12 @@ from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
     gRPCTestServiceStub,
 )
 
-AIO_PORT = 50052
-AIO_PORT += os.getpid() % 100  # avoid port conflicts when running tests in parallel
+PORT = 50151
+PORT += os.getpid() % 100  # avoid port conflicts when running tests in parallel
 
 
-@pytest.fixture(scope="function")
-def event_loop(request):
+@pytest.fixture(scope="module")
+def event_loop():
     """Create an instance of the default event loop for each test case."""
     loop = asyncio.new_event_loop()
     yield loop
@@ -35,15 +35,16 @@ async def grpc_server(event_loop):
     server = grpc.aio.server(
         interceptors=[ServerInterceptor(find_name=lambda request: request.__class__)]
     )
-    server.add_insecure_port(f"[::]:{AIO_PORT}")
+    server.add_insecure_port(f"[::]:{PORT}")
     add_gRPCTestServiceServicer_to_server(TestService, server)
 
-    await event_loop.create_task(server.start())
+    await server.start()
 
     try:
         yield server
     finally:
         await server.stop(None)
+        await server.wait_for_termination()
 
 
 @pytest.mark.asyncio
@@ -51,7 +52,7 @@ async def test_grpc_server_starts_transaction(sentry_init, capture_events, grpc_
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
+    async with grpc.aio.insecure_channel(f"localhost:{PORT}") as channel:
         stub = gRPCTestServiceStub(channel)
         await stub.TestServe(gRPCTestMessage(text="test"))
 
@@ -73,7 +74,7 @@ async def test_grpc_server_continues_transaction(
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
+    async with grpc.aio.insecure_channel(f"localhost:{PORT}") as channel:
         stub = gRPCTestServiceStub(channel)
 
         with sentry_sdk.start_transaction() as transaction:
@@ -114,7 +115,7 @@ async def test_grpc_server_exception(sentry_init, capture_events, grpc_server):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
-    async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
+    async with grpc.aio.insecure_channel(f"localhost:{PORT}") as channel:
         stub = gRPCTestServiceStub(channel)
         try:
             await stub.TestServe(gRPCTestMessage(text="exception"))
@@ -124,14 +125,14 @@ async def test_grpc_server_exception(sentry_init, capture_events, grpc_server):
 
     (event, _) = events
 
-    assert event["exception"]["values"][0]["type"] == "TestService.TestException"
+    assert event["exception"]["values"][0]["type"] == "TestService.ExceptionForTest"
     assert event["exception"]["values"][0]["value"] == "test"
     assert event["exception"]["values"][0]["mechanism"]["handled"] is False
     assert event["exception"]["values"][0]["mechanism"]["type"] == "gRPC"
 
 
 class TestService(gRPCTestServiceServicer):
-    class TestException(Exception):
+    class ExceptionForTest(Exception):
         def __init__(self):
             super().__init__("test")
 
@@ -142,6 +143,6 @@ class TestService(gRPCTestServiceServicer):
             pass
 
         if request.text == "exception":
-            raise cls.TestException()
+            raise cls.ExceptionForTest()
 
         return gRPCTestMessage(text=request.text)
