@@ -2,6 +2,7 @@ from __future__ import absolute_import
 import copy
 
 from sentry_sdk import Hub
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.tracing import Span
@@ -119,10 +120,11 @@ class CommandTracer(monitoring.CommandListener):
             except TypeError:
                 pass
 
-            data = {"operation_ids": {}}  # type: Dict[str, Dict[str, Any]]
+            data = {"operation_ids": {}}  # type: Dict[str, Any]
 
             data["operation_ids"]["operation"] = event.operation_id
             data["operation_ids"]["request"] = event.request_id
+            data[SPANDATA.DB_SYSTEM] = "mongodb"
 
             try:
                 lsid = command.pop("lsid")["id"]
