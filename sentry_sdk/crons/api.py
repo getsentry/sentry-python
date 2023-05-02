@@ -22,13 +22,15 @@ def _create_check_in_event(
     check_in = {
         "type": "check_in",
         "monitor_slug": monitor_slug,
-        "monitor_config": monitor_config or {},
         "check_in_id": check_in_id,
         "status": status,
         "duration": duration_s,
         "environment": options.get("environment", None),
         "release": options.get("release", None),
     }
+
+    if monitor_config:
+        check_in["monitor_config"] = monitor_config
 
     return check_in
 

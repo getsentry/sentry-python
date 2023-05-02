@@ -4,6 +4,7 @@ import responses
 requests = pytest.importorskip("requests")
 
 from sentry_sdk import capture_message
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 
 
@@ -25,8 +26,8 @@ def test_crumb_capture(sentry_init, capture_events):
     assert crumb["data"] == {
         "url": url,
         "method": "GET",
-        "http.fragment": "",
-        "http.query": "",
+        SPANDATA.HTTP_FRAGMENT: "",
+        SPANDATA.HTTP_QUERY: "",
         "status_code": response.status_code,
         "reason": response.reason,
     }

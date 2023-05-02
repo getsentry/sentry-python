@@ -62,6 +62,25 @@ class SPANDATA:
 
     # The size of the requested data in bytes.
     CACHE_ITEM_SIZE = "cache.item_size"
+    """
+    An identifier for the database management system (DBMS) product being used.
+    See: https://github.com/open-telemetry/opentelemetry-python/blob/e00306206ea25cf8549eca289e39e0b6ba2fa560/opentelemetry-semantic-conventions/src/opentelemetry/semconv/trace/__init__.py#L58
+    """
+    HTTP_QUERY = "http.query"
+    """
+    The Query string present in the URL.
+    Example: ?foo=bar&bar=baz
+    """
+    HTTP_FRAGMENT = "http.fragment"
+    """
+    The Fragments present in the URL.
+    Example: #foo=bar
+    """
+    HTTP_METHOD = "http.method"
+    """
+    The HTTP method used.
+    Example: GET
+    """
 
 
 class OP:
@@ -175,4 +194,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.21.0"
+VERSION = "1.21.1"
