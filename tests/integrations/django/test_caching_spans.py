@@ -17,7 +17,7 @@ DJANGO_VERSION = DJANGO_VERSION[:2]
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
-def test_cache_spans_disabled_middleware_XXX(
+def test_cache_spans_disabled_middleware(
     sentry_init,
     client,
     capture_events,
