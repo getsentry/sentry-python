@@ -52,7 +52,7 @@ from sentry_sdk.integrations.django.views import patch_views
 if DJANGO_VERSION[:2] > (1, 8):
     from sentry_sdk.integrations.django.caching import patch_caching
 else:
-    patch_caching = None
+    patch_caching = None  # type: ignore
 
 
 if TYPE_CHECKING:
