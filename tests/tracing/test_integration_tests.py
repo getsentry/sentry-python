@@ -6,6 +6,7 @@ import pytest
 import random
 
 from sentry_sdk import (
+    capture_exception,
     capture_message,
     configure_scope,
     Hub,
@@ -276,3 +277,58 @@ def test_trace_propagation_meta_head_sdk(sentry_init):
     assert 'meta name="baggage"' in baggage
     baggage_content = re.findall('content="([^"]*)"', baggage)[0]
     assert baggage_content == transaction.get_baggage().serialize()
+
+
+def test_dsc_attached_to_errors(sentry_init, capture_envelopes):
+    sentry_init(traces_sample_rate=1.0, release="foo")
+    envelopes = capture_envelopes()
+    transaction = Transaction(name="transaction")
+
+    with start_transaction(transaction):
+        try:
+            raise ValueError("definitely not")
+        except Exception:
+            capture_exception()
+
+    trace_id = transaction.trace_id
+    span_id = transaction.span_id
+
+    envelope = envelopes[0]
+    assert envelope.headers["trace"] == {
+        "environment": "production",
+        "sample_rate": "1.0",
+        "transaction": "transaction",
+        "trace_id": trace_id,
+        "release": "foo",
+    }
+    assert "contexts" in envelope.get_event()
+    assert "trace" in envelope.get_event()["contexts"]
+    assert envelope.get_event()["contexts"]["trace"] == {
+        "trace_id": trace_id,
+        "span_id": span_id,
+        "parent_span_id": None,
+        "op": None,
+        "description": None,
+        "dynamic_sampling_context": {
+            "environment": "production",
+            "release": "foo",
+            "sample_rate": "1.0",
+            "trace_id": trace_id,
+            "transaction": "transaction",
+        },
+    }
+
+
+def test_dsc_not_attached_to_errors_outside_transaction(sentry_init, capture_envelopes):
+    sentry_init(traces_sample_rate=1.0)
+    envelopes = capture_envelopes()
+
+    try:
+        with start_transaction(name="some_name"):
+            raise ValueError("definitely not")
+    except Exception:
+        capture_exception()
+
+    envelope = envelopes[1]
+    assert "trace" not in envelope.headers
+    assert "trace" not in envelope.get_event()["contexts"]
