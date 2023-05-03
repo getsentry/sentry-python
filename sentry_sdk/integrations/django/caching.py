@@ -22,7 +22,7 @@ METHODS_TO_INSTRUMENT = [
 
 def _instrument_call(cache, method_name, original_method, args, kwargs):
     # type: (CacheHandler, str, Callable[..., Any], Any, Any) -> Any
-    description = f"{method_name} {' '.join(args)}"
+    description = "{} {}".format(method_name, " ".join(args))
 
     with Hub.current.start_span(op=OP.CACHE, description=description) as span:
         cache._sentry_recording = True
