@@ -29,5 +29,13 @@ def use_django_caching_with_middlewares(settings):
             "LOCATION": "unique-snowflake-%s" % random.randint(1, 1000000),
         }
     }
-    settings.MIDDLEWARE.insert(0, "django.middleware.cache.UpdateCacheMiddleware")
-    settings.MIDDLEWARE.append("django.middleware.cache.FetchFromCacheMiddleware")
+    if hasattr(settings, "MIDDLEWARE"):
+        middleware = settings.MIDDLEWARE
+    elif hasattr(settings, "MIDDLEWARE_CLASSES"):
+        middleware = settings.MIDDLEWARE_CLASSES
+    else:
+        middleware = None
+
+    if middleware is not None:
+        middleware.insert(0, "django.middleware.cache.UpdateCacheMiddleware")
+        middleware.append("django.middleware.cache.FetchFromCacheMiddleware")
