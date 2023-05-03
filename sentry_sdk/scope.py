@@ -83,6 +83,7 @@ class Scope(object):
         # not a Transaction object (the object is stored in _span)
         "_transaction",
         "_transaction_info",
+        "_last_exception_transaction",
         "_user",
         "_tags",
         "_contexts",
@@ -113,6 +114,7 @@ class Scope(object):
         self._fingerprint = None  # type: Optional[List[str]]
         self._transaction = None  # type: Optional[str]
         self._transaction_info = {}  # type: Dict[str, str]
+        self._last_exception_transaction = None  # type: Optional[Transaction]
         self._user = None  # type: Optional[Dict[str, Any]]
 
         self._tags = {}  # type: Dict[str, Any]
@@ -201,6 +203,16 @@ class Scope(object):
 
         if source:
             self._transaction_info["source"] = source
+
+    @property
+    def last_exception_transaction(self):
+        # type: () -> Optional[Transaction]
+        return self._last_exception_transaction
+
+    @last_exception_transaction.setter
+    def last_exception_transaction(self, value):
+        # type: (Optional[Transaction]) -> None
+        self._last_exception_transaction = value
 
     @_attr_setter
     def user(self, value):
@@ -420,6 +432,12 @@ class Scope(object):
             if not contexts.get("trace"):
                 contexts["trace"] = self._span.get_trace_context()
 
+        elif not is_transaction and self._last_exception_transaction is not None:
+            contexts = event.setdefault("contexts", {})
+            if not contexts.get("trace"):
+                contexts["trace"] = self._last_exception_transaction.get_trace_context()
+            self._last_exception_transaction = None
+
         exc_info = hint.get("exc_info")
         if exc_info is not None:
             for error_processor in self._error_processors:
@@ -448,6 +466,8 @@ class Scope(object):
             self._transaction = scope._transaction
         if scope._transaction_info is not None:
             self._transaction_info.update(scope._transaction_info)
+        if scope._last_exception_transaction is not None:
+            self._last_exception_transaction = scope._last_exception_transaction
         if scope._user is not None:
             self._user = scope._user
         if scope._tags:
@@ -497,6 +517,7 @@ class Scope(object):
         rv._fingerprint = self._fingerprint
         rv._transaction = self._transaction
         rv._transaction_info = dict(self._transaction_info)
+        rv._last_exception_transaction = self._last_exception_transaction
         rv._user = self._user
 
         rv._tags = dict(self._tags)

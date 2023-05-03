@@ -1,6 +1,7 @@
 import uuid
 import random
 
+from copy import copy
 from datetime import datetime, timedelta
 
 import sentry_sdk
@@ -193,6 +194,15 @@ class Span(object):
 
         hub, scope, old_span = self._context_manager_state
         del self._context_manager_state
+
+        if ty is not None:
+            # An exception occurred inside of the context manager. If unhandled,
+            # we should eventually capture it as an error event; however, at
+            # that point in time we'll already have exited the transaction
+            # context manager and with it the scope will no longer have
+            # information on the transaction the exception happened in. Let's
+            # record it explicitly.
+            scope.last_exception_transaction = copy(scope.transaction)
 
         self.finish(hub)
         scope.span = old_span

@@ -510,7 +510,7 @@ class _Client(object):
         dynamic_sampling_context = (
             event_opt.get("contexts", {})
             .get("trace", {})
-            .pop("dynamic_sampling_context", {})
+            .get("dynamic_sampling_context", {})
         )
 
         # If tracing is enabled all events should go to /envelope endpoint.
