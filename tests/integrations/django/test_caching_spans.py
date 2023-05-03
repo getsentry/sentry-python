@@ -9,8 +9,14 @@ except ImportError:
     from django.core.urlresolvers import reverse
 
 
+from django import VERSION as DJANGO_VERSION
+
+DJANGO_VERSION = DJANGO_VERSION[:2]
+
+
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
+@pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_disabled_middleware_XXX(
     sentry_init,
     client,
@@ -40,6 +46,7 @@ def test_cache_spans_disabled_middleware_XXX(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
+@pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_disabled_decorator(
     sentry_init, client, capture_events, use_django_caching
 ):
@@ -65,6 +72,7 @@ def test_cache_spans_disabled_decorator(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
+@pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_disabled_templatetag(
     sentry_init, client, capture_events, use_django_caching
 ):
@@ -90,6 +98,7 @@ def test_cache_spans_disabled_templatetag(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
+@pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_middleware(
     sentry_init,
     client,
@@ -139,6 +148,7 @@ def test_cache_spans_middleware(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
+@pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_caching):
     sentry_init(
         integrations=[
@@ -180,6 +190,7 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
+@pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_templatetag(
     sentry_init, client, capture_events, use_django_caching
 ):
