@@ -1,4 +1,3 @@
-import logging
 import pytest
 import random
 
@@ -61,16 +60,14 @@ def test_cache_spans_disabled_middleware(
     )
     events = capture_events()
 
-    client.get(reverse("not_cached_view"))
-    client.get(reverse("not_cached_view"))
+    # Call to client.get() messes up the urlpatterns,
+    # so the first all the urls you want to get need to be reversed and then get with client.get()
+    url = reverse("not_cached_view")
+    client.get(url)
+    client.get(url)
 
     (first_event, second_event) = events
-    logging.warn("@@@@ first_event[spans] #####")
-    logging.warn(first_event["spans"])
     assert len(first_event["spans"]) == 0
-
-    logging.warn("@@@@ first_event[spans] #####")
-    logging.warn(first_event["spans"])
     assert len(second_event["spans"]) == 0
 
 
@@ -90,8 +87,11 @@ def test_cache_spans_disabled_decorator(
     )
     events = capture_events()
 
-    client.get(reverse("cached_view"))
-    client.get(reverse("cached_view"))
+    # Call to client.get() messes up the urlpatterns,
+    # so the first all the urls you want to get need to be reversed and then get with client.get()
+    url = reverse("cached_view")
+    client.get(url)
+    client.get(url)
 
     (first_event, second_event) = events
     assert len(first_event["spans"]) == 0
@@ -114,8 +114,11 @@ def test_cache_spans_disabled_templatetag(
     )
     events = capture_events()
 
-    client.get(reverse("view_with_cached_template_fragment"))
-    client.get(reverse("view_with_cached_template_fragment"))
+    # Call to client.get() messes up the urlpatterns,
+    # so the first all the urls you want to get need to be reversed and then get with client.get()
+    url = reverse("view_with_cached_template_fragment")
+    client.get(url)
+    client.get(url)
 
     (first_event, second_event) = events
     assert len(first_event["spans"]) == 0
@@ -144,8 +147,11 @@ def test_cache_spans_middleware(
     )
     events = capture_events()
 
-    client.get(reverse("not_cached_view"))
-    client.get(reverse("not_cached_view"))
+    # Call to client.get() messes up the urlpatterns,
+    # so the first all the urls you want to get need to be reversed and then get with client.get()
+    url = reverse("not_cached_view")
+    client.get(url)
+    client.get(url)
 
     (first_event, second_event) = events
     assert len(first_event["spans"]) == 1
@@ -186,8 +192,11 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
     )
     events = capture_events()
 
-    client.get(reverse("cached_view"))
-    client.get(reverse("cached_view"))
+    # Call to client.get() messes up the urlpatterns,
+    # so the first all the urls you want to get need to be reversed and then get with client.get()
+    url = reverse("cached_view")
+    client.get(url)
+    client.get(url)
 
     (first_event, second_event) = events
     assert len(first_event["spans"]) == 1
@@ -230,16 +239,13 @@ def test_cache_spans_templatetag(
     )
     events = capture_events()
 
-    client.get(reverse("view_with_cached_template_fragment"))
-    client.get(reverse("view_with_cached_template_fragment"))
+    # Call to client.get() messes up the urlpatterns,
+    # so the first all the urls you want to get need to be reversed and then get with client.get()
+    url = reverse("view_with_cached_template_fragment")
+    client.get(url)
+    client.get(url)
 
     (first_event, second_event) = events
-    import logging
-
-    logging.warning("----- first_event -----")
-    logging.warning(first_event)
-    logging.warning("----- second_event -----")
-    logging.warning(second_event)
     assert len(first_event["spans"]) == 1
     assert first_event["spans"][0]["op"] == "cache"
     assert first_event["spans"][0]["description"].startswith(
