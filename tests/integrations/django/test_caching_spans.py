@@ -12,6 +12,8 @@ from sentry_sdk.integrations.django import DjangoIntegration
 
 from tests.integrations.django.myapp.wsgi import application
 
+from sentry_sdk._compat import PY2
+
 
 @pytest.fixture
 def client():
@@ -60,8 +62,8 @@ def test_cache_spans_disabled_middleware(
     )
     events = capture_events()
 
-    # Call to client.get() messes up the urlpatterns,
-    # so the first all the urls you want to get need to be reversed and then get with client.get()
+    # Calling client.get() messes up the Django urlpatterns,
+    # so we reverse all urls, before we get them with client.get()
     url = reverse("not_cached_view")
     client.get(url)
     client.get(url)
@@ -87,8 +89,8 @@ def test_cache_spans_disabled_decorator(
     )
     events = capture_events()
 
-    # Call to client.get() messes up the urlpatterns,
-    # so the first all the urls you want to get need to be reversed and then get with client.get()
+    # Calling client.get() messes up the Django urlpatterns,
+    # so we reverse all urls, before we get them with client.get()
     url = reverse("cached_view")
     client.get(url)
     client.get(url)
@@ -114,8 +116,8 @@ def test_cache_spans_disabled_templatetag(
     )
     events = capture_events()
 
-    # Call to client.get() messes up the urlpatterns,
-    # so the first all the urls you want to get need to be reversed and then get with client.get()
+    # Calling client.get() messes up the Django urlpatterns,
+    # so we reverse all urls, before we get them with client.get()
     url = reverse("view_with_cached_template_fragment")
     client.get(url)
     client.get(url)
@@ -147,8 +149,8 @@ def test_cache_spans_middleware(
     )
     events = capture_events()
 
-    # Call to client.get() messes up the urlpatterns,
-    # so the first all the urls you want to get need to be reversed and then get with client.get()
+    # Calling client.get() messes up the Django urlpatterns,
+    # so we reverse all urls, before we get them with client.get()
     url = reverse("not_cached_view")
     client.get(url)
     client.get(url)
@@ -174,7 +176,7 @@ def test_cache_spans_middleware(
     )
     assert second_event["spans"][1]["data"] == {
         "cache.hit": True,
-        "cache.item_size": 58,
+        "cache.item_size": 112 if PY2 else 58,
     }
 
 
@@ -192,8 +194,8 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
     )
     events = capture_events()
 
-    # Call to client.get() messes up the urlpatterns,
-    # so the first all the urls you want to get need to be reversed and then get with client.get()
+    # Calling client.get() messes up the Django urlpatterns,
+    # so we reverse all urls, before we get them with client.get()
     url = reverse("cached_view")
     client.get(url)
     client.get(url)
@@ -219,7 +221,7 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
     )
     assert second_event["spans"][1]["data"] == {
         "cache.hit": True,
-        "cache.item_size": 58,
+        "cache.item_size": 111 if PY2 else 58,
     }
 
 
@@ -239,8 +241,8 @@ def test_cache_spans_templatetag(
     )
     events = capture_events()
 
-    # Call to client.get() messes up the urlpatterns,
-    # so the first all the urls you want to get need to be reversed and then get with client.get()
+    # Calling client.get() messes up the Django urlpatterns,
+    # so we reverse all urls, before we get them with client.get()
     url = reverse("view_with_cached_template_fragment")
     client.get(url)
     client.get(url)
