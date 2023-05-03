@@ -1,6 +1,7 @@
 import functools
 from typing import TYPE_CHECKING
 
+from django import VERSION as DJANGO_VERSION
 from django.core.cache import CacheHandler
 
 from sentry_sdk import Hub
@@ -73,14 +74,28 @@ def _patch_cache(cache):
 def patch_caching():
     # type: () -> None
     if not hasattr(CacheHandler, "_sentry_patched"):
-        original_create_connection = CacheHandler.create_connection
+        if DJANGO_VERSION < (3, 2):
+            original_get_item = CacheHandler.__getitem__
 
-        @functools.wraps(original_create_connection)
-        def sentry_create_connection(self, alias):
-            # type: (CacheHandler, str) -> Any
-            cache = original_create_connection(self, alias)
-            _patch_cache(cache)
-            return cache
+            @functools.wraps(original_get_item)
+            def sentry_get_item(self, alias):
+                # type: (CacheHandler, str) -> Any
+                cache = original_get_item(self, alias)
+                _patch_cache(cache)
+                return cache
 
-        CacheHandler.create_connection = sentry_create_connection
-        CacheHandler._sentry_patched = True
+            CacheHandler.__getitem__ = sentry_get_item
+            CacheHandler._sentry_patched = True
+
+        else:
+            original_create_connection = CacheHandler.create_connection
+
+            @functools.wraps(original_create_connection)
+            def sentry_create_connection(self, alias):
+                # type: (CacheHandler, str) -> Any
+                cache = original_create_connection(self, alias)
+                _patch_cache(cache)
+                return cache
+
+            CacheHandler.create_connection = sentry_create_connection
+            CacheHandler._sentry_patched = True
