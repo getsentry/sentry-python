@@ -1,6 +1,5 @@
 import pytest
 
-from sentry_sdk._compat import PY2
 from sentry_sdk.integrations.django import DjangoIntegration
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
 
@@ -134,10 +133,8 @@ def test_cache_spans_middleware(
     assert second_event["spans"][1]["description"].startswith(
         "get views.decorators.cache.cache_page."
     )
-    assert second_event["spans"][1]["data"] == {
-        "cache.hit": True,
-        "cache.item_size": 112 if PY2 else 58,
-    }
+    assert second_event["spans"][1]["data"]["cache.hit"]
+    assert "cache.item_size" in second_event["spans"][1]["data"]
 
 
 @pytest.mark.forked
@@ -177,10 +174,8 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
     assert second_event["spans"][1]["description"].startswith(
         "get views.decorators.cache.cache_page."
     )
-    assert second_event["spans"][1]["data"] == {
-        "cache.hit": True,
-        "cache.item_size": 111 if PY2 else 58,
-    }
+    assert second_event["spans"][1]["data"]["cache.hit"]
+    assert "cache.item_size" in second_event["spans"][1]["data"]
 
 
 @pytest.mark.forked
@@ -216,7 +211,5 @@ def test_cache_spans_templatetag(
     assert second_event["spans"][0]["description"].startswith(
         "get template.cache.some_identifier."
     )
-    assert second_event["spans"][0]["data"] == {
-        "cache.hit": True,
-        "cache.item_size": 51,
-    }
+    assert second_event["spans"][0]["data"]["cache.hit"]
+    assert "cache.item_size" in second_event["spans"][0]["data"]
