@@ -1,12 +1,20 @@
 import pytest
 
+from werkzeug.test import Client
+
 from sentry_sdk.integrations.django import DjangoIntegration
+from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
 
 try:
     from django.urls import reverse
 except ImportError:
     from django.core.urlresolvers import reverse
+
+
+@pytest.fixture
+def client():
+    return Client(application)
 
 
 @pytest.mark.forked
