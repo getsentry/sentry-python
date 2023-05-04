@@ -58,6 +58,7 @@ def test_exceptiongroup():
         {
             "mechanism": {
                 "exception_id": 6,
+                "handled": False,
                 "parent_id": 0,
                 "source": "exceptions[2]",
                 "type": "chained",
@@ -68,6 +69,7 @@ def test_exceptiongroup():
         {
             "mechanism": {
                 "exception_id": 5,
+                "handled": False,
                 "parent_id": 3,
                 "source": "exceptions[1]",
                 "type": "chained",
@@ -78,6 +80,7 @@ def test_exceptiongroup():
         {
             "mechanism": {
                 "exception_id": 4,
+                "handled": False,
                 "parent_id": 3,
                 "source": "exceptions[0]",
                 "type": "chained",
@@ -88,6 +91,7 @@ def test_exceptiongroup():
         {
             "mechanism": {
                 "exception_id": 3,
+                "handled": False,
                 "is_exception_group": True,
                 "parent_id": 0,
                 "source": "exceptions[1]",
@@ -99,6 +103,7 @@ def test_exceptiongroup():
         {
             "mechanism": {
                 "exception_id": 2,
+                "handled": False,
                 "parent_id": 0,
                 "source": "exceptions[0]",
                 "type": "chained",
@@ -109,6 +114,7 @@ def test_exceptiongroup():
         {
             "mechanism": {
                 "exception_id": 1,
+                "handled": False,
                 "parent_id": 0,
                 "source": "__context__",
                 "type": "chained",
@@ -133,7 +139,10 @@ def test_exceptiongroup():
 
 def test_exception_chain_cause():
     exception_chain_cause = ValueError("Exception with cause")
-    exception_chain_cause.__cause__ = TypeError("Exception in __cause__")
+    exception_chain_cause.__context__ = TypeError("Exception in __context__")
+    exception_chain_cause.__cause__ = TypeError(
+        "Exception in __cause__"
+    )  # this implicitly sets exception_chain_cause.__suppress_context__=True
 
     (event, _) = event_from_exception(
         exception_chain_cause,
@@ -146,10 +155,8 @@ def test_exception_chain_cause():
     expected_exception_values = [
         {
             "mechanism": {
-                "source": "__cause__",
-                "type": "chained",
-                "parent_id": 0,
-                "exception_id": 1,
+                "handled": False,
+                "type": "test_suite",
             },
             "module": None,
             "type": "TypeError",
@@ -159,7 +166,6 @@ def test_exception_chain_cause():
             "mechanism": {
                 "handled": False,
                 "type": "test_suite",
-                "exception_id": 0,
             },
             "module": None,
             "type": "ValueError",
@@ -186,10 +192,8 @@ def test_exception_chain_context():
     expected_exception_values = [
         {
             "mechanism": {
-                "source": "__context__",
-                "type": "chained",
-                "parent_id": 0,
-                "exception_id": 1,
+                "handled": False,
+                "type": "test_suite",
             },
             "module": None,
             "type": "TypeError",
@@ -199,7 +203,6 @@ def test_exception_chain_context():
             "mechanism": {
                 "handled": False,
                 "type": "test_suite",
-                "exception_id": 0,
             },
             "module": None,
             "type": "ValueError",
@@ -227,7 +230,6 @@ def test_simple_exception():
             "mechanism": {
                 "handled": False,
                 "type": "test_suite",
-                "exception_id": 0,
             },
             "module": None,
             "type": "ValueError",
