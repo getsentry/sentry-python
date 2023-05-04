@@ -702,7 +702,7 @@ def single_exception_from_error_tuple(
     if is_root_exception and "type" not in exception_value["mechanism"]:
         exception_value["mechanism"]["type"] = "generic"
 
-    if isinstance(exc_value, BaseExceptionGroup):
+    if BaseExceptionGroup is not None and isinstance(exc_value, BaseExceptionGroup):
         exception_value["mechanism"]["is_exception_group"] = True
 
     exception_value["module"] = get_type_module(exc_type)
