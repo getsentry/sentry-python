@@ -809,43 +809,48 @@ def exceptions_from_error(
     parent_id = exception_id
     exception_id += 1
 
-    # Add direct cause.
-    # The field `__cause__` is set when raised with the exception (using the `from` keyword).
-    exception_has_cause = (
-        exc_value
-        and hasattr(exc_value, "__cause__")
-        and exc_value.__cause__ is not None
+    should_supress_context = (
+        hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__
     )
-    if exception_has_cause:
-        cause = exc_value.__cause__  # type: ignore
-        (exception_id, child_exceptions) = exceptions_from_error(
-            exc_type=type(cause),
-            exc_value=cause,
-            tb=getattr(cause, "__traceback__", None),
-            mechanism=mechanism,
-            exception_id=exception_id,
-            source="__cause__",
+    if should_supress_context:
+        # Add direct cause.
+        # The field `__cause__` is set when raised with the exception (using the `from` keyword).
+        exception_has_cause = (
+            exc_value
+            and hasattr(exc_value, "__cause__")
+            and exc_value.__cause__ is not None
         )
-        exceptions.extend(child_exceptions)
+        if exception_has_cause:
+            cause = exc_value.__cause__  # type: ignore
+            (exception_id, child_exceptions) = exceptions_from_error(
+                exc_type=type(cause),
+                exc_value=cause,
+                tb=getattr(cause, "__traceback__", None),
+                mechanism=mechanism,
+                exception_id=exception_id,
+                source="__cause__",
+            )
+            exceptions.extend(child_exceptions)
 
-    # Add indirect cause.
-    # The field `__context__` is assigned if another exception occurs while handling the exception.
-    exception_has_content = (
-        exc_value
-        and hasattr(exc_value, "__context__")
-        and exc_value.__context__ is not None
-    )
-    if exception_has_content:
-        context = exc_value.__context__  # type: ignore
-        (exception_id, child_exceptions) = exceptions_from_error(
-            exc_type=type(context),
-            exc_value=context,
-            tb=getattr(context, "__traceback__", None),
-            mechanism=mechanism,
-            exception_id=exception_id,
-            source="__context__",
+    else:
+        # Add indirect cause.
+        # The field `__context__` is assigned if another exception occurs while handling the exception.
+        exception_has_content = (
+            exc_value
+            and hasattr(exc_value, "__context__")
+            and exc_value.__context__ is not None
         )
-        exceptions.extend(child_exceptions)
+        if exception_has_content:
+            context = exc_value.__context__  # type: ignore
+            (exception_id, child_exceptions) = exceptions_from_error(
+                exc_type=type(context),
+                exc_value=context,
+                tb=getattr(context, "__traceback__", None),
+                mechanism=mechanism,
+                exception_id=exception_id,
+                source="__context__",
+            )
+            exceptions.extend(child_exceptions)
 
     # Add exceptions from an ExceptionGroup.
     is_exception_group = exc_value and hasattr(exc_value, "exceptions")
