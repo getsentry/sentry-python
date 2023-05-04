@@ -781,7 +781,7 @@ class NoOpSpan(Span):
 
     def new_span(self, **kwargs):
         # type: (**Any) -> NoOpSpan
-        pass
+        return self.start_child(**kwargs)
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None

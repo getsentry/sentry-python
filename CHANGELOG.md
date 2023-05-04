@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.21.1
+
+### Various fixes & improvements
+
+- Do not send monitor_config when unset (#2058) by @evanpurkhiser
+- Add `db.system` span data (#2040, #2042) by @antonpirker
+- Fix memory leak in profiling (#2049) by @Zylphrex
+- Fix crash loop when returning none in before_send (#2045) by @sentrivana
+
+## 1.21.0
+
+### Various fixes & improvements
+
+- Better handling of redis span/breadcrumb data (#2033) by @antonpirker
+
+  _Note:_ With this release we will limit the description of redis db spans and the data in breadcrumbs represting redis db operations to 1024 characters.
+
+  This can can lead to truncated data. If you do not want this there is a new parameter `max_data_size` in `RedisIntegration`. You can set this to `None` for disabling trimming.
+
+  Example for **disabling** trimming of redis commands in spans or breadcrumbs:
+
+  ```python
+  sentry_sdk.init(
+    integrations=[
+      RedisIntegration(max_data_size=None),
+    ]
+  )
+  ```
+
+  Example for custom trim size of redis commands in spans or breadcrumbs:
+
+  ```python
+  sentry_sdk.init(
+    integrations=[
+      RedisIntegration(max_data_size=50),
+    ]
+  )`
+
+  ```
+
+- Add `db.system` to redis and SQLAlchemy db spans (#2037, #2038, #2039) (#2037) by @AbhiPrasad
+- Upgraded linting tooling (#2026) by @antonpirker
+- Made code more resilient. (#2031) by @antonpirker
+
 ## 1.20.0
 
 ### Various fixes & improvements

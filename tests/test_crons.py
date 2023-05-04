@@ -90,3 +90,46 @@ def test_capture_checkin_new_id(sentry_init):
         )
 
         assert check_in_id == "a8098c1af86e11dabd1a00112444be1e"
+
+
+def test_end_to_end(sentry_init, capture_envelopes):
+    sentry_init()
+    envelopes = capture_envelopes()
+
+    capture_checkin(
+        monitor_slug="abc123",
+        check_in_id="112233",
+        duration=123,
+        status="ok",
+    )
+
+    check_in = envelopes[0].items[0].payload.json
+
+    # Check for final checkin
+    assert check_in["check_in_id"] == "112233"
+    assert check_in["monitor_slug"] == "abc123"
+    assert check_in["status"] == "ok"
+    assert check_in["duration"] == 123
+
+
+def test_monitor_config(sentry_init, capture_envelopes):
+    sentry_init()
+    envelopes = capture_envelopes()
+
+    monitor_config = {
+        "schedule": {"type": "crontab", "value": "0 0 * * *"},
+    }
+
+    capture_checkin(monitor_slug="abc123", monitor_config=monitor_config)
+    check_in = envelopes[0].items[0].payload.json
+
+    # Check for final checkin
+    assert check_in["monitor_slug"] == "abc123"
+    assert check_in["monitor_config"] == monitor_config
+
+    # Without passing a monitor_config the field is not in the checkin
+    capture_checkin(monitor_slug="abc123")
+    check_in = envelopes[1].items[0].payload.json
+
+    assert check_in["monitor_slug"] == "abc123"
+    assert "monitor_config" not in check_in

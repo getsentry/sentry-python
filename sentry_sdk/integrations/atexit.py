@@ -27,7 +27,7 @@ def default_callback(pending, timeout):
         # type: (str) -> None
         sys.stderr.write(msg + "\n")
 
-    echo("Sentry is attempting to send %i pending error messages" % pending)
+    echo("Sentry is attempting to send %i pending events" % pending)
     echo("Waiting up to %s seconds" % timeout)
     echo("Press Ctrl-%s to quit" % (os.name == "nt" and "Break" or "C"))
     sys.stderr.flush()
