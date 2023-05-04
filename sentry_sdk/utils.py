@@ -664,8 +664,8 @@ def single_exception_from_error_tuple(
     tb,  # type: Optional[TracebackType]
     client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
-    exception_id=0,  # type: int
-    parent_id=0,  # type: int
+    exception_id=None,  # type: Optional[int]
+    parent_id=None,  # type: Optional[int]
     source=None,  # type: Optional[str]
 ):
     # type: (...) -> Dict[str, Any]
@@ -679,7 +679,8 @@ def single_exception_from_error_tuple(
     exception_value["mechanism"] = (
         mechanism.copy() if mechanism else {"type": "generic", "handled": True}
     )
-    exception_value["mechanism"]["exception_id"] = exception_id
+    if exception_id is not None:
+        exception_value["mechanism"]["exception_id"] = exception_id
 
     if exc_value is not None:
         errno = get_errno(exc_value)
@@ -696,7 +697,8 @@ def single_exception_from_error_tuple(
 
     is_root_exception = exception_id == 0
     if not is_root_exception:
-        exception_value["mechanism"]["parent_id"] = parent_id
+        if parent_id is not None:
+            exception_value["mechanism"]["parent_id"] = parent_id
         exception_value["mechanism"]["type"] = "chained"
 
     if is_root_exception and "type" not in exception_value["mechanism"]:
@@ -892,6 +894,8 @@ def exceptions_from_error_tuple(
             tb=tb,
             client_options=client_options,
             mechanism=mechanism,
+            exception_id=0,
+            parent_id=0,
         )
 
     else:
