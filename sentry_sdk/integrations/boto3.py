@@ -75,6 +75,7 @@ def _sentry_request_created(service_id, request, operation_name, **kwargs):
     span.set_data("aws.request.url", parsed_url.url)
     span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
     span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+    span.set_data(SPANDATA.HTTP_METHOD, request.method)
 
     # We do it in order for subsequent http calls/retries be
     # attached to this span.
