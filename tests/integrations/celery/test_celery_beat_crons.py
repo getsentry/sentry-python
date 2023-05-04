@@ -1,4 +1,3 @@
-import tempfile
 import mock
 
 import pytest
@@ -9,8 +8,6 @@ from sentry_sdk.integrations.celery import (
     _get_headers,
     _get_humanized_interval,
     _get_monitor_config,
-    _reinstall_patched_tasks,
-    crons_task_before_run,
     crons_task_success,
     crons_task_failure,
     crons_task_retry,
@@ -68,42 +65,6 @@ def test_get_headers():
 )
 def test_get_humanized_interval(seconds, expected_tuple):
     assert _get_humanized_interval(seconds) == expected_tuple
-
-
-def test_crons_task_before_run():
-    fake_task = mock.MagicMock()
-    fake_task.request = {
-        "headers": {
-            "sentry-monitor-slug": "test123",
-            "sentry-monitor-config": {
-                "schedule": {
-                    "type": "interval",
-                    "value": 3,
-                    "unit": "day",
-                },
-                "timezone": "Europe/Vienna",
-            },
-            "sentry-monitor-some-future-key": "some-future-value",
-        },
-    }
-
-    with mock.patch(
-        "sentry_sdk.integrations.celery.capture_checkin"
-    ) as mock_capture_checkin:
-        crons_task_before_run(fake_task)
-
-        mock_capture_checkin.assert_called_once_with(
-            monitor_slug="test123",
-            monitor_config={
-                "schedule": {
-                    "type": "interval",
-                    "value": 3,
-                    "unit": "day",
-                },
-                "timezone": "Europe/Vienna",
-            },
-            status=MonitorStatus.IN_PROGRESS,
-        )
 
 
 def test_crons_task_success():
@@ -273,35 +234,3 @@ def test_get_monitor_config_default_timezone():
     monitor_config = _get_monitor_config(celery_schedule, app)
 
     assert monitor_config["timezone"] == "UTC"
-
-
-def test_reinstall_patched_tasks():
-    fake_beat = mock.MagicMock()
-    fake_beat.run = mock.MagicMock()
-
-    app = mock.MagicMock()
-    app.Beat = mock.MagicMock(return_value=fake_beat)
-
-    sender = mock.MagicMock()
-    sender.schedule_filename = "test_schedule_filename"
-    sender.stop = mock.MagicMock()
-
-    add_updated_periodic_tasks = [mock.MagicMock(), mock.MagicMock(), mock.MagicMock()]
-
-    mock_open = mock.Mock(return_value=tempfile.NamedTemporaryFile())
-
-    with mock.patch("sentry_sdk.integrations.celery.open", mock_open):
-        with mock.patch(
-            "sentry_sdk.integrations.celery.shutil.copyfileobj"
-        ) as mock_copyfileobj:
-            _reinstall_patched_tasks(app, sender, add_updated_periodic_tasks)
-
-            sender.stop.assert_called_once_with()
-
-            add_updated_periodic_tasks[0].assert_called_once_with()
-            add_updated_periodic_tasks[1].assert_called_once_with()
-            add_updated_periodic_tasks[2].assert_called_once_with()
-
-            mock_copyfileobj.assert_called_once()
-
-            fake_beat.run.assert_called_once_with()
