@@ -5,7 +5,7 @@ import httpx
 import responses
 
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk.consts import MATCH_ALL
+from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.integrations.httpx import HttpxIntegration
 
 
@@ -43,9 +43,9 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
         assert crumb["category"] == "httplib"
         assert crumb["data"] == {
             "url": url,
-            "method": "GET",
-            "http.fragment": "",
-            "http.query": "",
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_FRAGMENT: "",
+            SPANDATA.HTTP_QUERY: "",
             "status_code": 200,
             "reason": "OK",
             "extra": "foo",
