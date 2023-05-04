@@ -43,7 +43,7 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
         assert crumb["category"] == "httplib"
         assert crumb["data"] == {
             "url": url,
-            "method": "GET",
+            SPANDATA.HTTP_METHOD: "GET",
             SPANDATA.HTTP_FRAGMENT: "",
             SPANDATA.HTTP_QUERY: "",
             "status_code": 200,
