@@ -31,10 +31,10 @@ except ImportError:
 
 try:
     # Python 3.11
-    from builtins import ExceptionGroup
+    from builtins import BaseExceptionGroup
 except ImportError:
     # Python 3.10 and below
-    ExceptionGroup = None  # type: ignore
+    BaseExceptionGroup = None  # type: ignore
 
 from datetime import datetime
 from functools import partial
