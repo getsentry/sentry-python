@@ -183,7 +183,9 @@ def patch_exception_middleware(middleware_class):
                 exp = args[0]
 
                 is_http_server_error = (
-                    hasattr(exp, "status_code") and exp.status_code >= 500
+                    hasattr(exp, "status_code")
+                    and isinstance(exp.status_code, int)
+                    and exp.status_code >= 500
                 )
                 if is_http_server_error:
                     _capture_exception(exp, handled=True)
