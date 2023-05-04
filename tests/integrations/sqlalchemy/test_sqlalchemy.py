@@ -208,3 +208,15 @@ def test_large_event_not_truncated(sentry_init, capture_events):
     assert event["_meta"]["message"] == {
         "": {"len": 1034, "rem": [["!limit", "x", 1021, 1024]]}
     }
+
+
+def test_engine_name_not_string(sentry_init):
+    sentry_init(
+        integrations=[SqlalchemyIntegration()],
+    )
+
+    engine = create_engine("sqlite:///:memory:")
+    engine.dialect.name = b"sqlite"
+
+    with engine.connect() as con:
+        con.execute("SELECT 0")
