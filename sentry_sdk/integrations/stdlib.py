@@ -91,7 +91,7 @@ def _install_httplib():
             description="%s %s" % (method, parsed_url.url),
         )
 
-        span.set_data("method", method)
+        span.set_data(SPANDATA.HTTP_METHOD, method)
         span.set_data("url", parsed_url.url)
         span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
         span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
