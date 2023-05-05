@@ -20,29 +20,35 @@ METHODS_TO_INSTRUMENT = [
 ]
 
 
-def _instrument_call(cache, method_name, original_method, args, kwargs):
-    # type: (CacheHandler, str, Callable[..., Any], Any, Any) -> Any
-    description = "{} {}".format(method_name, " ".join(args))
-
-    with Hub.current.start_span(op=OP.CACHE, description=description) as span:
-        cache._sentry_recording = True
-        value = original_method(*args, **kwargs)
-        cache._sentry_recording = False
-
-        if value:
-            span.set_data(SPANDATA.CACHE_HIT, True)
-
-            size = len(text_type(value).encode("utf-8"))
-            span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
-
-        else:
-            span.set_data(SPANDATA.CACHE_HIT, False)
-
-        return value
-
-
 def _patch_cache_method(cache, method_name):
     # type: (CacheHandler, str) -> None
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    def _instrument_call(cache, method_name, original_method, args, kwargs):
+        # type: (CacheHandler, str, Callable[..., Any], Any, Any) -> Any
+        hub = Hub.current
+        integration = hub.get_integration(DjangoIntegration)
+        if integration is None or not integration.cache_spans:
+            return None
+
+        description = "{} {}".format(method_name, " ".join(args))
+
+        with hub.start_span(op=OP.CACHE, description=description) as span:
+            cache._sentry_recording = True
+            value = original_method(*args, **kwargs)
+            cache._sentry_recording = False
+
+            if value:
+                span.set_data(SPANDATA.CACHE_HIT, True)
+
+                size = len(text_type(value).encode("utf-8"))
+                span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
+
+            else:
+                span.set_data(SPANDATA.CACHE_HIT, False)
+
+            return value
+
     original_method = getattr(cache, method_name)
 
     @functools.wraps(original_method)
