@@ -29,7 +29,7 @@ def _patch_cache_method(cache, method_name):
         hub = Hub.current
         integration = hub.get_integration(DjangoIntegration)
         if integration is None or not integration.cache_spans:
-            return None
+            return original_method(*args, **kwargs)
 
         description = "{} {}".format(method_name, " ".join(args))
 
