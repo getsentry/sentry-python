@@ -31,7 +31,7 @@ def _patch_cache_method(cache, method_name):
         if integration is None or not integration.cache_spans:
             return original_method(*args, **kwargs)
 
-        description = "{} {}".format(method_name, args)
+        description = "{} {}".format(method_name, args[0])
 
         with hub.start_span(op=OP.CACHE, description=description) as span:
             value = original_method(*args, **kwargs)
