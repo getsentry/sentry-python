@@ -66,19 +66,17 @@ def _patch_cache_method(cache, method_name):
 
 def _patch_cache(cache):
     # type: (CacheHandler) -> None
-    from sentry_sdk.integrations.django import DjangoIntegration
-
-    integration = Hub.current.get_integration(DjangoIntegration)
-    if integration and integration.cache_spans:
-        if not hasattr(cache, "_sentry_patched"):
-            for method_name in METHODS_TO_INSTRUMENT:
-                _patch_cache_method(cache, method_name)
-            cache._sentry_patched = True
-            cache._sentry_recording = False
+    if not hasattr(cache, "_sentry_patched"):
+        for method_name in METHODS_TO_INSTRUMENT:
+            _patch_cache_method(cache, method_name)
+        cache._sentry_patched = True
+        cache._sentry_recording = False
 
 
 def patch_caching():
     # type: () -> None
+    from sentry_sdk.integrations.django import DjangoIntegration
+
     if not hasattr(CacheHandler, "_sentry_patched"):
         if DJANGO_VERSION < (3, 2):
             original_get_item = CacheHandler.__getitem__
@@ -87,7 +85,11 @@ def patch_caching():
             def sentry_get_item(self, alias):
                 # type: (CacheHandler, str) -> Any
                 cache = original_get_item(self, alias)
-                _patch_cache(cache)
+
+                integration = Hub.current.get_integration(DjangoIntegration)
+                if integration and integration.cache_spans:
+                    _patch_cache(cache)
+
                 return cache
 
             CacheHandler.__getitem__ = sentry_get_item
@@ -100,7 +102,11 @@ def patch_caching():
             def sentry_create_connection(self, alias):
                 # type: (CacheHandler, str) -> Any
                 cache = original_create_connection(self, alias)
-                _patch_cache(cache)
+
+                integration = Hub.current.get_integration(DjangoIntegration)
+                if integration and integration.cache_spans:
+                    _patch_cache(cache)
+
                 return cache
 
             CacheHandler.create_connection = sentry_create_connection
