@@ -21,12 +21,20 @@ _installed_modules = None
 def _generate_installed_modules():
     # type: () -> Iterator[Tuple[str, str]]
     try:
-        import pkg_resources
-    except ImportError:
-        return
+        from importlib.metadata import distributions, version
 
-    for info in pkg_resources.working_set:
-        yield info.key, info.version
+        for dist in distributions():
+            yield dist.metadata["Name"], version(dist.metadata["Name"])
+
+    except ImportError:
+        # < py3.8
+        try:
+            import pkg_resources
+        except ImportError:
+            return
+
+        for info in pkg_resources.working_set:
+            yield info.key, info.version
 
 
 def _get_installed_modules():
