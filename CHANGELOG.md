@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.22.0
+
+### Various fixes & improvements
+
+- Add `cache.hit` and `cache.item_size` to Django (#2057) by @antonpirker
+- Use functools.wrap for ThreadingIntegration patches to fix attributes (#2080) by @EpicWink
+- Handle non-int exc.status_code in starlette (#2075) by @sentrivana
+- fix(crons): Fix KeyError in capture_checkin if SDK is not initialized (#2073) by @antonpirker
+- Handle sqlalchemy engine.name being bytes (#2074) by @sentrivana
+- feat: Use `http.method` instead of `method` (#2054) by @AbhiPrasad
+- Pin urllib3 to <2.0.0 for now (#2069) by @sl0thentr0py
+
 ## 1.21.1
 
 ### Various fixes & improvements
