@@ -40,7 +40,6 @@ try:
 except ImportError:
     raise DidNotEnable("Django not installed")
 
-
 from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
 from sentry_sdk.integrations.django.templates import (
     get_template_frame_from_exception,
@@ -49,6 +48,11 @@ from sentry_sdk.integrations.django.templates import (
 from sentry_sdk.integrations.django.middleware import patch_django_middlewares
 from sentry_sdk.integrations.django.signals_handlers import patch_signals
 from sentry_sdk.integrations.django.views import patch_views
+
+if DJANGO_VERSION[:2] > (1, 8):
+    from sentry_sdk.integrations.django.caching import patch_caching
+else:
+    patch_caching = None  # type: ignore
 
 
 if TYPE_CHECKING:
@@ -92,11 +96,16 @@ class DjangoIntegration(Integration):
     transaction_style = ""
     middleware_spans = None
     signals_spans = None
+    cache_spans = None
 
     def __init__(
-        self, transaction_style="url", middleware_spans=True, signals_spans=True
+        self,
+        transaction_style="url",
+        middleware_spans=True,
+        signals_spans=True,
+        cache_spans=True,
     ):
-        # type: (str, bool, bool) -> None
+        # type: (str, bool, bool, bool) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -105,6 +114,7 @@ class DjangoIntegration(Integration):
         self.transaction_style = transaction_style
         self.middleware_spans = middleware_spans
         self.signals_spans = signals_spans
+        self.cache_spans = cache_spans
 
     @staticmethod
     def setup_once():
@@ -223,6 +233,9 @@ class DjangoIntegration(Integration):
         patch_views()
         patch_templates()
         patch_signals()
+
+        if patch_caching is not None:
+            patch_caching()
 
 
 _DRF_PATCHED = False
