@@ -34,9 +34,7 @@ def _patch_cache_method(cache, method_name):
         description = "{} {}".format(method_name, " ".join(args))
 
         with hub.start_span(op=OP.CACHE, description=description) as span:
-            cache._sentry_recording = True
             value = original_method(*args, **kwargs)
-            cache._sentry_recording = False
 
             if value:
                 span.set_data(SPANDATA.CACHE_HIT, True)
@@ -54,12 +52,7 @@ def _patch_cache_method(cache, method_name):
     @functools.wraps(original_method)
     def sentry_method(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-
-        # If this call is being made inside another call, don't instrument it.
-        if cache._sentry_recording:
-            return original_method(*args, **kwargs)
-        else:
-            return _instrument_call(cache, method_name, original_method, args, kwargs)
+        return _instrument_call(cache, method_name, original_method, args, kwargs)
 
     setattr(cache, method_name, sentry_method)
 
@@ -70,7 +63,6 @@ def _patch_cache(cache):
         for method_name in METHODS_TO_INSTRUMENT:
             _patch_cache_method(cache, method_name)
         cache._sentry_patched = True
-        cache._sentry_recording = False
 
 
 def patch_caching():
