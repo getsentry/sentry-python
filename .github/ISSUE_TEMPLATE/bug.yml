@@ -42,6 +42,19 @@ body:
       description: Logs? Screenshots? Yes, please.
     validations:
       required: true
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional details
+      description: Optionally give us further details, such as environment,
+        suggested fixes or potential workarounds.
+      placeholder: |
+        * Python: 3.11
+        * OS: Linux
+
+        A workaround is to rename `foo` to `"bar"`.
+    validations:
+      required: false
   - type: markdown
     attributes:
       value: |-
