@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.22.1
+
+### Various fixes & improvements
+
+- Fix: Handle a list of keys (not just a single key) in Django cache spans (#2082) by @antonpirker
+
 ## 1.22.0
 
 ### Various fixes & improvements
