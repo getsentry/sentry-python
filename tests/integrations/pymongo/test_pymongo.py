@@ -1,4 +1,5 @@
 from sentry_sdk import capture_message, start_transaction
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pymongo import PyMongoIntegration, _strip_pii
 
 from mockupdb import MockupDB, OpQuery
@@ -55,6 +56,7 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
         "net.peer.port": str(mongo_server.port),
     }
     for span in find, insert_success, insert_fail:
+        assert span["data"][SPANDATA.DB_SYSTEM] == "mongodb"
         for field, value in common_tags.items():
             assert span["tags"][field] == value
 

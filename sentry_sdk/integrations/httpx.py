@@ -1,5 +1,5 @@
 from sentry_sdk import Hub
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import logger, parse_url
@@ -48,10 +48,10 @@ def _install_httpx_client():
             op=OP.HTTP_CLIENT,
             description="%s %s" % (request.method, parsed_url.url),
         ) as span:
-            span.set_data("method", request.method)
+            span.set_data(SPANDATA.HTTP_METHOD, request.method)
             span.set_data("url", parsed_url.url)
-            span.set_data("http.query", parsed_url.query)
-            span.set_data("http.fragment", parsed_url.fragment)
+            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
             if should_propagate_trace(hub, str(request.url)):
                 for key, value in hub.iter_trace_propagation_headers():
@@ -89,10 +89,10 @@ def _install_httpx_async_client():
             op=OP.HTTP_CLIENT,
             description="%s %s" % (request.method, parsed_url.url),
         ) as span:
-            span.set_data("method", request.method)
+            span.set_data(SPANDATA.HTTP_METHOD, request.method)
             span.set_data("url", parsed_url.url)
-            span.set_data("http.query", parsed_url.query)
-            span.set_data("http.fragment", parsed_url.fragment)
+            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
             if should_propagate_trace(hub, str(request.url)):
                 for key, value in hub.iter_trace_propagation_headers():

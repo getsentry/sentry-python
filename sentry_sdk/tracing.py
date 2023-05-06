@@ -631,7 +631,6 @@ class Transaction(Span):
 
         if self._profile is not None and self._profile.valid():
             event["profile"] = self._profile
-            contexts.update({"profile": self._profile.get_profile_context()})
             self._profile = None
 
         event["measurements"] = self._measurements
@@ -782,7 +781,7 @@ class NoOpSpan(Span):
 
     def new_span(self, **kwargs):
         # type: (**Any) -> NoOpSpan
-        pass
+        return self.start_child(**kwargs)
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
