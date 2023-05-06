@@ -105,7 +105,7 @@ def _patch_redis(redis):
     else:
         patch_redis_pipeline(strict_pipeline, False, _get_redis_command_args)
     try:
-        import redis.asyncio  # type: ignore
+        import redis.asyncio
     except ImportError:
         pass
     else:
