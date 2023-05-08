@@ -4,9 +4,9 @@
 
 ### Various fixes & improvements
 
-- Django caching span fixes (#2086) by @antonpirker
+- Fix: Django caching spans when using keyword arguments (#2086) by @antonpirker
 - Fix: Duration in Celery Beat tasks monitoring (#2087) by @antonpirker
-- Fixed doc strings of SPANDATA (#2084) by @antonpirker
+- Fix: Docstrings of SPANDATA (#2084) by @antonpirker
 
 ## 1.22.1
 
