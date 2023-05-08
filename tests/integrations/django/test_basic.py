@@ -1036,20 +1036,20 @@ def test_cache_spans_middleware(
 
     (first_event, second_event) = events
     assert len(first_event["spans"]) == 1
-    assert first_event["spans"][0]["op"] == "cache"
+    assert first_event["spans"][0]["op"] == "cache.get_item"
     assert first_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
     assert first_event["spans"][0]["data"] == {"cache.hit": False}
 
     assert len(second_event["spans"]) == 2
-    assert second_event["spans"][0]["op"] == "cache"
+    assert second_event["spans"][0]["op"] == "cache.get_item"
     assert second_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
     assert second_event["spans"][0]["data"] == {"cache.hit": False}
 
-    assert second_event["spans"][1]["op"] == "cache"
+    assert second_event["spans"][1]["op"] == "cache.get_item"
     assert second_event["spans"][1]["description"].startswith(
         "get views.decorators.cache.cache_page."
     )
@@ -1078,20 +1078,20 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
 
     (first_event, second_event) = events
     assert len(first_event["spans"]) == 1
-    assert first_event["spans"][0]["op"] == "cache"
+    assert first_event["spans"][0]["op"] == "cache.get_item"
     assert first_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
     assert first_event["spans"][0]["data"] == {"cache.hit": False}
 
     assert len(second_event["spans"]) == 2
-    assert second_event["spans"][0]["op"] == "cache"
+    assert second_event["spans"][0]["op"] == "cache.get_item"
     assert second_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
     assert second_event["spans"][0]["data"] == {"cache.hit": False}
 
-    assert second_event["spans"][1]["op"] == "cache"
+    assert second_event["spans"][1]["op"] == "cache.get_item"
     assert second_event["spans"][1]["description"].startswith(
         "get views.decorators.cache.cache_page."
     )
@@ -1122,14 +1122,14 @@ def test_cache_spans_templatetag(
 
     (first_event, second_event) = events
     assert len(first_event["spans"]) == 1
-    assert first_event["spans"][0]["op"] == "cache"
+    assert first_event["spans"][0]["op"] == "cache.get_item"
     assert first_event["spans"][0]["description"].startswith(
         "get template.cache.some_identifier."
     )
     assert first_event["spans"][0]["data"] == {"cache.hit": False}
 
     assert len(second_event["spans"]) == 1
-    assert second_event["spans"][0]["op"] == "cache"
+    assert second_event["spans"][0]["op"] == "cache.get_item"
     assert second_event["spans"][0]["description"].startswith(
         "get template.cache.some_identifier."
     )
