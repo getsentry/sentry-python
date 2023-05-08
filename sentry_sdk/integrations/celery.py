@@ -115,6 +115,7 @@ class CeleryIntegration(Integration):
 
 
 def _now_seconds_since_epoch():
+    # type: () -> float
     # We can not use `time.perf_counter()` when dealing with the duration
     # of a Celery tasks, because the start of a Celery tasks and
     # the end are recorded in differenct processes.
