@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     WsgiExcInfo = TypeVar("WsgiExcInfo")
 
     class StartResponse(Protocol):
-        def __call__(self, status, response_headers, exc_info=None):
+        def __call__(self, status, response_headers, exc_info=None):  # type: ignore
             # type: (str, WsgiResponseHeaders, Optional[WsgiExcInfo]) -> WsgiResponseIter
             pass
 
@@ -119,7 +119,7 @@ class SentryWsgiMiddleware(object):
         return _ScopedResponse(hub, rv)
 
 
-def _sentry_start_response(
+def _sentry_start_response(  # type: ignore
     old_start_response,  # type: StartResponse
     transaction,  # type: Transaction
     status,  # type: str

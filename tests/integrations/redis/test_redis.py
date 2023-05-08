@@ -1,4 +1,7 @@
+import mock
+
 from sentry_sdk import capture_message, start_transaction
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 
 from fakeredis import FakeStrictRedis
@@ -37,7 +40,6 @@ def test_redis_pipeline(sentry_init, capture_events, is_transaction):
 
     connection = FakeStrictRedis()
     with start_transaction():
-
         pipeline = connection.pipeline(transaction=is_transaction)
         pipeline.get("foo")
         pipeline.set("bar", 1)
@@ -52,9 +54,173 @@ def test_redis_pipeline(sentry_init, capture_events, is_transaction):
         "redis.commands": {
             "count": 3,
             "first_ten": ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"],
-        }
+        },
+        SPANDATA.DB_SYSTEM: "redis",
     }
     assert span["tags"] == {
         "redis.transaction": is_transaction,
         "redis.is_cluster": False,
+    }
+
+
+def test_sensitive_data(sentry_init, capture_events):
+    # fakeredis does not support the AUTH command, so we need to mock it
+    with mock.patch(
+        "sentry_sdk.integrations.redis._COMMANDS_INCLUDING_SENSITIVE_DATA", ["get"]
+    ):
+        sentry_init(
+            integrations=[RedisIntegration()],
+            traces_sample_rate=1.0,
+            send_default_pii=True,
+        )
+        events = capture_events()
+
+        connection = FakeStrictRedis()
+        with start_transaction():
+            connection.get(
+                "this is super secret"
+            )  # because fakeredis does not support AUTH we use GET instead
+
+        (event,) = events
+        spans = event["spans"]
+        assert spans[0]["op"] == "db.redis"
+        assert spans[0]["description"] == "GET [Filtered]"
+
+
+def test_pii_data_redacted(sentry_init, capture_events):
+    sentry_init(
+        integrations=[RedisIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    connection = FakeStrictRedis()
+    with start_transaction():
+        connection.set("somekey1", "my secret string1")
+        connection.set("somekey2", "my secret string2")
+        connection.get("somekey2")
+        connection.delete("somekey1", "somekey2")
+
+    (event,) = events
+    spans = event["spans"]
+    assert spans[0]["op"] == "db.redis"
+    assert spans[0]["description"] == "SET 'somekey1' [Filtered]"
+    assert spans[1]["description"] == "SET 'somekey2' [Filtered]"
+    assert spans[2]["description"] == "GET 'somekey2'"
+    assert spans[3]["description"] == "DEL 'somekey1' [Filtered]"
+
+
+def test_pii_data_sent(sentry_init, capture_events):
+    sentry_init(
+        integrations=[RedisIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    connection = FakeStrictRedis()
+    with start_transaction():
+        connection.set("somekey1", "my secret string1")
+        connection.set("somekey2", "my secret string2")
+        connection.get("somekey2")
+        connection.delete("somekey1", "somekey2")
+
+    (event,) = events
+    spans = event["spans"]
+    assert spans[0]["op"] == "db.redis"
+    assert spans[0]["description"] == "SET 'somekey1' 'my secret string1'"
+    assert spans[1]["description"] == "SET 'somekey2' 'my secret string2'"
+    assert spans[2]["description"] == "GET 'somekey2'"
+    assert spans[3]["description"] == "DEL 'somekey1' 'somekey2'"
+
+
+def test_data_truncation(sentry_init, capture_events):
+    sentry_init(
+        integrations=[RedisIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    connection = FakeStrictRedis()
+    with start_transaction():
+        long_string = "a" * 100000
+        connection.set("somekey1", long_string)
+        short_string = "b" * 10
+        connection.set("somekey2", short_string)
+
+    (event,) = events
+    spans = event["spans"]
+    assert spans[0]["op"] == "db.redis"
+    assert spans[0]["description"] == "SET 'somekey1' '%s..." % (
+        long_string[: 1024 - len("...") - len("SET 'somekey1' '")],
+    )
+    assert spans[1]["description"] == "SET 'somekey2' '%s'" % (short_string,)
+
+
+def test_data_truncation_custom(sentry_init, capture_events):
+    sentry_init(
+        integrations=[RedisIntegration(max_data_size=30)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    connection = FakeStrictRedis()
+    with start_transaction():
+        long_string = "a" * 100000
+        connection.set("somekey1", long_string)
+        short_string = "b" * 10
+        connection.set("somekey2", short_string)
+
+    (event,) = events
+    spans = event["spans"]
+    assert spans[0]["op"] == "db.redis"
+    assert spans[0]["description"] == "SET 'somekey1' '%s..." % (
+        long_string[: 30 - len("...") - len("SET 'somekey1' '")],
+    )
+    assert spans[1]["description"] == "SET 'somekey2' '%s'" % (short_string,)
+
+
+def test_breadcrumbs(sentry_init, capture_events):
+
+    sentry_init(
+        integrations=[RedisIntegration(max_data_size=30)],
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    connection = FakeStrictRedis()
+
+    long_string = "a" * 100000
+    connection.set("somekey1", long_string)
+    short_string = "b" * 10
+    connection.set("somekey2", short_string)
+
+    capture_message("hi")
+
+    (event,) = events
+    crumbs = event["breadcrumbs"]["values"]
+
+    assert crumbs[0] == {
+        "message": "SET 'somekey1' 'aaaaaaaaaaa...",
+        "type": "redis",
+        "category": "redis",
+        "data": {
+            "redis.is_cluster": False,
+            "redis.command": "SET",
+            "redis.key": "somekey1",
+        },
+        "timestamp": crumbs[0]["timestamp"],
+    }
+    assert crumbs[1] == {
+        "message": "SET 'somekey2' 'bbbbbbbbbb'",
+        "type": "redis",
+        "category": "redis",
+        "data": {
+            "redis.is_cluster": False,
+            "redis.command": "SET",
+            "redis.key": "somekey2",
+        },
+        "timestamp": crumbs[1]["timestamp"],
     }

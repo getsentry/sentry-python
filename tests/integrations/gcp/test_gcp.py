@@ -94,8 +94,8 @@ def init_sdk(timeout_warning=False, **extra_init_args):
 def run_cloud_function():
     def inner(code, subprocess_kwargs=()):
 
-        event = []
-        envelope = []
+        events = []
+        envelopes = []
         return_value = None
 
         # STEP : Create a zip of cloud function
@@ -133,10 +133,10 @@ def run_cloud_function():
                 print("GCP:", line)
                 if line.startswith("EVENT: "):
                     line = line[len("EVENT: ") :]
-                    event = json.loads(line)
+                    events.append(json.loads(line))
                 elif line.startswith("ENVELOPE: "):
                     line = line[len("ENVELOPE: ") :]
-                    envelope = json.loads(line)
+                    envelopes.append(json.loads(line))
                 elif line.startswith("RETURN VALUE: "):
                     line = line[len("RETURN VALUE: ") :]
                     return_value = json.loads(line)
@@ -145,13 +145,13 @@ def run_cloud_function():
 
             stream.close()
 
-        return envelope, event, return_value
+        return envelopes, events, return_value
 
     return inner
 
 
 def test_handled_exception(run_cloud_function):
-    envelope, event, return_value = run_cloud_function(
+    _, events, return_value = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -168,8 +168,8 @@ def test_handled_exception(run_cloud_function):
         """
         )
     )
-    assert event["level"] == "error"
-    (exception,) = event["exception"]["values"]
+    assert events[0]["level"] == "error"
+    (exception,) = events[0]["exception"]["values"]
 
     assert exception["type"] == "Exception"
     assert exception["value"] == "something went wrong"
@@ -177,7 +177,7 @@ def test_handled_exception(run_cloud_function):
 
 
 def test_unhandled_exception(run_cloud_function):
-    envelope, event, return_value = run_cloud_function(
+    _, events, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -195,8 +195,8 @@ def test_unhandled_exception(run_cloud_function):
         """
         )
     )
-    assert event["level"] == "error"
-    (exception,) = event["exception"]["values"]
+    assert events[0]["level"] == "error"
+    (exception,) = events[0]["exception"]["values"]
 
     assert exception["type"] == "ZeroDivisionError"
     assert exception["value"] == "division by zero"
@@ -204,7 +204,7 @@ def test_unhandled_exception(run_cloud_function):
 
 
 def test_timeout_error(run_cloud_function):
-    envelope, event, return_value = run_cloud_function(
+    _, events, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -222,8 +222,8 @@ def test_timeout_error(run_cloud_function):
         """
         )
     )
-    assert event["level"] == "error"
-    (exception,) = event["exception"]["values"]
+    assert events[0]["level"] == "error"
+    (exception,) = events[0]["exception"]["values"]
 
     assert exception["type"] == "ServerlessTimeoutWarning"
     assert (
@@ -234,7 +234,7 @@ def test_timeout_error(run_cloud_function):
 
 
 def test_performance_no_error(run_cloud_function):
-    envelope, event, return_value = run_cloud_function(
+    envelopes, _, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -252,15 +252,15 @@ def test_performance_no_error(run_cloud_function):
         )
     )
 
-    assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == "function.gcp"
-    assert envelope["transaction"].startswith("Google Cloud function")
-    assert envelope["transaction_info"] == {"source": "component"}
-    assert envelope["transaction"] in envelope["request"]["url"]
+    assert envelopes[0]["type"] == "transaction"
+    assert envelopes[0]["contexts"]["trace"]["op"] == "function.gcp"
+    assert envelopes[0]["transaction"].startswith("Google Cloud function")
+    assert envelopes[0]["transaction_info"] == {"source": "component"}
+    assert envelopes[0]["transaction"] in envelopes[0]["request"]["url"]
 
 
 def test_performance_error(run_cloud_function):
-    envelope, event, return_value = run_cloud_function(
+    envelopes, events, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -278,16 +278,17 @@ def test_performance_error(run_cloud_function):
         )
     )
 
-    assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == "function.gcp"
-    assert envelope["transaction"].startswith("Google Cloud function")
-    assert envelope["transaction"] in envelope["request"]["url"]
-    assert event["level"] == "error"
-    (exception,) = event["exception"]["values"]
+    assert envelopes[0]["level"] == "error"
+    (exception,) = envelopes[0]["exception"]["values"]
 
     assert exception["type"] == "Exception"
     assert exception["value"] == "something went wrong"
     assert exception["mechanism"] == {"type": "gcp", "handled": False}
+
+    assert envelopes[1]["type"] == "transaction"
+    assert envelopes[1]["contexts"]["trace"]["op"] == "function.gcp"
+    assert envelopes[1]["transaction"].startswith("Google Cloud function")
+    assert envelopes[1]["transaction"] in envelopes[0]["request"]["url"]
 
 
 def test_traces_sampler_gets_correct_values_in_sampling_context(

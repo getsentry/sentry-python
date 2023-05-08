@@ -51,7 +51,52 @@ class INSTRUMENTER:
     OTEL = "otel"
 
 
+class SPANDATA:
+    """
+    Additional information describing the type of the span.
+    See: https://develop.sentry.dev/sdk/performance/span-data-conventions/
+    """
+
+    DB_SYSTEM = "db.system"
+    """
+    An identifier for the database management system (DBMS) product being used.
+    See: https://github.com/open-telemetry/opentelemetry-specification/blob/24de67b3827a4e3ab2515cd8ab62d5bcf837c586/specification/trace/semantic_conventions/database.md
+    Example: postgresql
+    """
+
+    CACHE_HIT = "cache.hit"
+    """
+    A boolean indicating whether the requested data was found in the cache.
+    Example: true
+    """
+
+    CACHE_ITEM_SIZE = "cache.item_size"
+    """
+    The size of the requested data in bytes.
+    Example: 58
+    """
+
+    HTTP_QUERY = "http.query"
+    """
+    The Query string present in the URL.
+    Example: ?foo=bar&bar=baz
+    """
+
+    HTTP_FRAGMENT = "http.fragment"
+    """
+    The Fragments present in the URL.
+    Example: #foo=bar
+    """
+
+    HTTP_METHOD = "http.method"
+    """
+    The HTTP method used.
+    Example: GET
+    """
+
+
 class OP:
+    CACHE = "cache"
     DB = "db"
     DB_REDIS = "db.redis"
     EVENT_DJANGO = "event.django"
@@ -161,4 +206,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.19.1"
+VERSION = "1.22.1"

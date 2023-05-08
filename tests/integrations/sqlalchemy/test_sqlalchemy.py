@@ -7,6 +7,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
 from sentry_sdk import capture_message, start_transaction, configure_scope
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.serializer import MAX_EVENT_BYTES
 from sentry_sdk.utils import json_dumps, MAX_STRING_LENGTH
@@ -119,6 +120,9 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
 
     (event,) = events
 
+    for span in event["spans"]:
+        assert span["data"][SPANDATA.DB_SYSTEM] == "sqlite"
+
     assert (
         render_span_tree(event)
         == """\
@@ -204,3 +208,15 @@ def test_large_event_not_truncated(sentry_init, capture_events):
     assert event["_meta"]["message"] == {
         "": {"len": 1034, "rem": [["!limit", "x", 1021, 1024]]}
     }
+
+
+def test_engine_name_not_string(sentry_init):
+    sentry_init(
+        integrations=[SqlalchemyIntegration()],
+    )
+
+    engine = create_engine("sqlite:///:memory:")
+    engine.dialect.name = b"sqlite"
+
+    with engine.connect() as con:
+        con.execute("SELECT 0")

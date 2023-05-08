@@ -37,6 +37,7 @@ from collections import deque
 
 import sentry_sdk
 from sentry_sdk._compat import PY33, PY311
+from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exception,
@@ -64,22 +65,6 @@ if TYPE_CHECKING:
     from sentry_sdk._types import SamplingContext, ProfilerMode
 
     ThreadId = str
-
-    # The exact value of this id is not very meaningful. The purpose
-    # of this id is to give us a compact and unique identifier for a
-    # raw stack that can be used as a key to a dictionary so that it
-    # can be used during the sampled format generation.
-    RawStackId = Tuple[int, int]
-
-    RawFrame = Tuple[
-        str,  # abs_path
-        Optional[str],  # module
-        Optional[str],  # filename
-        str,  # function
-        int,  # lineno
-    ]
-    RawStack = Tuple[RawFrame, ...]
-    RawSample = Sequence[Tuple[str, Tuple[RawStackId, RawStack]]]
 
     ProcessedSample = TypedDict(
         "ProcessedSample",
@@ -122,6 +107,21 @@ if TYPE_CHECKING:
         "ProfileContext",
         {"profile_id": str},
     )
+
+    FrameId = Tuple[
+        str,  # abs_path
+        int,  # lineno
+    ]
+    FrameIds = Tuple[FrameId, ...]
+
+    # The exact value of this id is not very meaningful. The purpose
+    # of this id is to give us a compact and unique identifier for a
+    # raw stack that can be used as a key to a dictionary so that it
+    # can be used during the sampled format generation.
+    StackId = Tuple[int, int]
+
+    ExtractedStack = Tuple[StackId, FrameIds, List[ProcessedFrame]]
+    ExtractedSample = Sequence[Tuple[ThreadId, ExtractedStack]]
 
 
 try:
@@ -247,13 +247,16 @@ def teardown_profiler():
 MAX_STACK_DEPTH = 128
 
 
+CWD = os.getcwd()
+
+
 def extract_stack(
-    frame,  # type: Optional[FrameType]
-    cwd,  # type: str
-    prev_cache=None,  # type: Optional[Tuple[RawStackId, RawStack, Deque[FrameType]]]
+    raw_frame,  # type: Optional[FrameType]
+    cache,  # type: LRUCache
+    cwd=CWD,  # type: str
     max_stack_depth=MAX_STACK_DEPTH,  # type: int
 ):
-    # type: (...) -> Tuple[RawStackId, RawStack, Deque[FrameType]]
+    # type: (...) -> ExtractedStack
     """
     Extracts the stack starting the specified frame. The extracted stack
     assumes the specified frame is the top of the stack, and works back
@@ -263,40 +266,21 @@ def extract_stack(
     only the first `MAX_STACK_DEPTH` frames will be returned.
     """
 
-    frames = deque(maxlen=max_stack_depth)  # type: Deque[FrameType]
+    raw_frames = deque(maxlen=max_stack_depth)  # type: Deque[FrameType]
 
-    while frame is not None:
-        try:
-            f_back = frame.f_back
-        except AttributeError:
-            capture_internal_exception(sys.exc_info())
-            # For some reason, the frame we got isn't a `FrameType` and doesn't
-            # have a `f_back`. When this happens, we continue with any frames
-            # that we've managed to extract up to this point.
-            break
+    while raw_frame is not None:
+        f_back = raw_frame.f_back
+        raw_frames.append(raw_frame)
+        raw_frame = f_back
+
+    frame_ids = tuple(frame_id(raw_frame) for raw_frame in raw_frames)
+    frames = []
+    for i, fid in enumerate(frame_ids):
+        frame = cache.get(fid)
+        if frame is None:
+            frame = extract_frame(raw_frames[i], cwd)
+            cache.set(fid, frame)
         frames.append(frame)
-        frame = f_back
-
-    if prev_cache is None:
-        stack = tuple(extract_frame(frame, cwd) for frame in frames)
-    else:
-        _, prev_stack, prev_frames = prev_cache
-        prev_depth = len(prev_frames)
-        depth = len(frames)
-
-        # We want to match the frame found in this sample to the frames found in the
-        # previous sample. If they are the same (using the `is` operator), we can
-        # skip the expensive work of extracting the frame information and reuse what
-        # we extracted during the last sample.
-        #
-        # Make sure to keep in mind that the stack is ordered from the inner most
-        # from to the outer most frame so be careful with the indexing.
-        stack = tuple(
-            prev_stack[i]
-            if i >= 0 and frame is prev_frames[i]
-            else extract_frame(frame, cwd)
-            for i, frame in zip(range(prev_depth - depth, prev_depth), frames)
-        )
 
     # Instead of mapping the stack into frame ids and hashing
     # that as a tuple, we can directly hash the stack.
@@ -309,13 +293,18 @@ def extract_stack(
     # To Reduce the likelihood of hash collisions, we include
     # the stack depth. This means that only stacks of the same
     # depth can suffer from hash collisions.
-    stack_id = len(stack), hash(stack)
+    stack_id = len(raw_frames), hash(frame_ids)
 
-    return stack_id, stack, frames
+    return stack_id, frame_ids, frames
+
+
+def frame_id(raw_frame):
+    # type: (FrameType) -> FrameId
+    return (raw_frame.f_code.co_filename, raw_frame.f_lineno)
 
 
 def extract_frame(frame, cwd):
-    # type: (FrameType, str) -> RawFrame
+    # type: (FrameType, str) -> ProcessedFrame
     abs_path = frame.f_code.co_filename
 
     try:
@@ -325,7 +314,7 @@ def extract_frame(frame, cwd):
 
     # namedtuples can be many times slower when initialing
     # and accessing attribute so we opt to use a tuple here instead
-    return (
+    return {
         # This originally was `os.path.abspath(abs_path)` but that had
         # a large performance overhead.
         #
@@ -335,19 +324,19 @@ def extract_frame(frame, cwd):
         #
         # Additionally, since we are using normalized path already,
         # we skip calling `os.path.normpath` entirely.
-        os.path.join(cwd, abs_path),
-        module,
-        filename_for_module(module, abs_path) or None,
-        get_frame_name(frame),
-        frame.f_lineno,
-    )
+        "abs_path": os.path.join(cwd, abs_path),
+        "module": module,
+        "filename": filename_for_module(module, abs_path) or None,
+        "function": get_frame_name(frame),
+        "lineno": frame.f_lineno,
+    }
 
 
 if PY311:
 
     def get_frame_name(frame):
         # type: (FrameType) -> str
-        return frame.f_code.co_qualname  # type: ignore
+        return frame.f_code.co_qualname
 
 else:
 
@@ -480,8 +469,8 @@ class Profile(object):
         self.stop_ns = 0  # type: int
         self.active = False  # type: bool
 
-        self.indexed_frames = {}  # type: Dict[RawFrame, int]
-        self.indexed_stacks = {}  # type: Dict[RawStackId, int]
+        self.indexed_frames = {}  # type: Dict[FrameId, int]
+        self.indexed_stacks = {}  # type: Dict[StackId, int]
         self.frames = []  # type: List[ProcessedFrame]
         self.stacks = []  # type: List[ProcessedStack]
         self.samples = []  # type: List[ProcessedSample]
@@ -575,10 +564,6 @@ class Profile(object):
                 )
             )
 
-    def get_profile_context(self):
-        # type: () -> ProfileContext
-        return {"profile_id": self.event_id}
-
     def start(self):
         # type: () -> None
         if not self.sampled or self.active:
@@ -626,7 +611,7 @@ class Profile(object):
         scope.profile = old_profile
 
     def write(self, ts, sample):
-        # type: (int, RawSample) -> None
+        # type: (int, ExtractedSample) -> None
         if not self.active:
             return
 
@@ -642,33 +627,32 @@ class Profile(object):
 
         elapsed_since_start_ns = str(offset)
 
-        for tid, (stack_id, stack) in sample:
-            # Check if the stack is indexed first, this lets us skip
-            # indexing frames if it's not necessary
-            if stack_id not in self.indexed_stacks:
-                for frame in stack:
-                    if frame not in self.indexed_frames:
-                        self.indexed_frames[frame] = len(self.indexed_frames)
-                        self.frames.append(
-                            {
-                                "abs_path": frame[0],
-                                "module": frame[1],
-                                "filename": frame[2],
-                                "function": frame[3],
-                                "lineno": frame[4],
-                            }
-                        )
+        for tid, (stack_id, frame_ids, frames) in sample:
+            try:
+                # Check if the stack is indexed first, this lets us skip
+                # indexing frames if it's not necessary
+                if stack_id not in self.indexed_stacks:
+                    for i, frame_id in enumerate(frame_ids):
+                        if frame_id not in self.indexed_frames:
+                            self.indexed_frames[frame_id] = len(self.indexed_frames)
+                            self.frames.append(frames[i])
 
-                self.indexed_stacks[stack_id] = len(self.indexed_stacks)
-                self.stacks.append([self.indexed_frames[frame] for frame in stack])
+                    self.indexed_stacks[stack_id] = len(self.indexed_stacks)
+                    self.stacks.append(
+                        [self.indexed_frames[frame_id] for frame_id in frame_ids]
+                    )
 
-            self.samples.append(
-                {
-                    "elapsed_since_start_ns": elapsed_since_start_ns,
-                    "thread_id": tid,
-                    "stack_id": self.indexed_stacks[stack_id],
-                }
-            )
+                self.samples.append(
+                    {
+                        "elapsed_since_start_ns": elapsed_since_start_ns,
+                        "thread_id": tid,
+                        "stack_id": self.indexed_stacks[stack_id],
+                    }
+                )
+            except AttributeError:
+                # For some reason, the frame we get doesn't have certain attributes.
+                # When this happens, we abandon the current sample as it's bad.
+                capture_internal_exception(sys.exc_info())
 
     def process(self):
         # type: () -> ProcessedProfile
@@ -800,12 +784,7 @@ class Scheduler(object):
         # type: () -> Callable[..., None]
         cwd = os.getcwd()
 
-        # In Python3+, we can use the `nonlocal` keyword to rebind the value,
-        # but this is not possible in Python2. To get around this, we wrap
-        # the value in a list to allow updating this value each sample.
-        last_sample = [
-            {}
-        ]  # type: List[Dict[int, Tuple[RawStackId, RawStack, Deque[FrameType]]]]
+        cache = LRUCache(max_size=256)
 
         def _sample_stack(*args, **kwargs):
             # type: (*Any, **Any) -> None
@@ -817,7 +796,6 @@ class Scheduler(object):
             if not self.new_profiles and not self.active_profiles:
                 # make sure to clear the cache if we're not profiling so we dont
                 # keep a reference to the last stack of frames around
-                last_sample[0] = {}
                 return
 
             # This is the number of profiles we want to pop off.
@@ -832,19 +810,16 @@ class Scheduler(object):
 
             now = nanosecond_time()
 
-            raw_sample = {
-                tid: extract_stack(frame, cwd, last_sample[0].get(tid))
-                for tid, frame in sys._current_frames().items()
-            }
-
-            # make sure to update the last sample so the cache has
-            # the most recent stack for better cache hits
-            last_sample[0] = raw_sample
-
-            sample = [
-                (str(tid), (stack_id, stack))
-                for tid, (stack_id, stack, _) in raw_sample.items()
-            ]
+            try:
+                sample = [
+                    (str(tid), extract_stack(frame, cache, cwd))
+                    for tid, frame in sys._current_frames().items()
+                ]
+            except AttributeError:
+                # For some reason, the frame we get doesn't have certain attributes.
+                # When this happens, we abandon the current sample as it's bad.
+                capture_internal_exception(sys.exc_info())
+                return
 
             # Move the new profiles into the active_profiles set.
             #

@@ -1,5 +1,93 @@
 # Changelog
 
+## 1.22.1
+
+### Various fixes & improvements
+
+- Fix: Handle a list of keys (not just a single key) in Django cache spans (#2082) by @antonpirker
+
+## 1.22.0
+
+### Various fixes & improvements
+
+- Add `cache.hit` and `cache.item_size` to Django (#2057) by @antonpirker
+
+  _Note:_ This will add spans for all requests to the caches configured in Django. This will probably add some overhead to your server an also add multiple spans to your performance waterfall diagrams. If you do not want this, you can disable this feature in the DjangoIntegration:
+
+  ```python
+  sentry_sdk.init(
+      dsn="...",
+      integrations=[
+          DjangoIntegration(cache_spans=False),
+      ]
+  )
+  ```
+
+- Use `http.method` instead of `method` (#2054) by @AbhiPrasad
+- Handle non-int `exc.status_code` in Starlette (#2075) by @sentrivana
+- Handle SQLAlchemy `engine.name` being bytes (#2074) by @sentrivana
+- Fix `KeyError` in `capture_checkin` if SDK is not initialized (#2073) by @antonpirker
+- Use `functools.wrap` for `ThreadingIntegration` patches to fix attributes (#2080) by @EpicWink
+- Pin `urllib3` to <2.0.0 for now (#2069) by @sl0thentr0py
+
+## 1.21.1
+
+### Various fixes & improvements
+
+- Do not send monitor_config when unset (#2058) by @evanpurkhiser
+- Add `db.system` span data (#2040, #2042) by @antonpirker
+- Fix memory leak in profiling (#2049) by @Zylphrex
+- Fix crash loop when returning none in before_send (#2045) by @sentrivana
+
+## 1.21.0
+
+### Various fixes & improvements
+
+- Better handling of redis span/breadcrumb data (#2033) by @antonpirker
+
+  _Note:_ With this release we will limit the description of redis db spans and the data in breadcrumbs represting redis db operations to 1024 characters.
+
+  This can can lead to truncated data. If you do not want this there is a new parameter `max_data_size` in `RedisIntegration`. You can set this to `None` for disabling trimming.
+
+  Example for **disabling** trimming of redis commands in spans or breadcrumbs:
+
+  ```python
+  sentry_sdk.init(
+    integrations=[
+      RedisIntegration(max_data_size=None),
+    ]
+  )
+  ```
+
+  Example for custom trim size of redis commands in spans or breadcrumbs:
+
+  ```python
+  sentry_sdk.init(
+    integrations=[
+      RedisIntegration(max_data_size=50),
+    ]
+  )`
+
+  ```
+
+- Add `db.system` to redis and SQLAlchemy db spans (#2037, #2038, #2039) (#2037) by @AbhiPrasad
+- Upgraded linting tooling (#2026) by @antonpirker
+- Made code more resilient. (#2031) by @antonpirker
+
+## 1.20.0
+
+### Various fixes & improvements
+
+- Send all events to /envelope endpoint when tracing is enabled (#2009) by @antonpirker
+
+  _Note:_ If you’re self-hosting Sentry 9, you need to stay in the previous version of the SDK or update your self-hosted to at least 20.6.0
+
+- Profiling: Remove profile context from SDK (#2013) by @Zylphrex
+- Profiling: Additionl performance improvements to the profiler (#1991) by @Zylphrex
+- Fix: Celery Beat monitoring without restarting the Beat process (#2001) by @antonpirker
+- Fix: Using the Codecov uploader instead of deprecated python package (#2011) by @antonpirker
+- Fix: Support for Quart (#2003)` (#2003) by @antonpirker
+
 ## 1.19.1
 
 ### Various fixes & improvements
