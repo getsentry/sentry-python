@@ -33,7 +33,7 @@ def _patch_cache_method(cache, method_name):
 
         description = "{} {}".format(method_name, args[0])
 
-        with hub.start_span(op=OP.CACHE, description=description) as span:
+        with hub.start_span(op=OP.CACHE_GET_ITEM, description=description) as span:
             value = original_method(*args, **kwargs)
 
             if value:
