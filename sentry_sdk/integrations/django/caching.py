@@ -27,7 +27,7 @@ def _get_span_description(method_name, args, kwargs):
     if args is not None and len(args) >= 1:
         description += text_type(args[0])
     elif kwargs is not None and "key" in kwargs:
-        description += kwargs["key"]
+        description += text_type(kwargs["key"])
 
     return description
 
