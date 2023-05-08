@@ -133,3 +133,15 @@ def test_monitor_config(sentry_init, capture_envelopes):
 
     assert check_in["monitor_slug"] == "abc123"
     assert "monitor_config" not in check_in
+
+
+def test_capture_checkin_sdk_not_initialized():
+    # Tests that the capture_checkin does not raise an error when Sentry SDK is not initialized.
+    # sentry_init() is intentionally omitted.
+    check_in_id = capture_checkin(
+        monitor_slug="abc123",
+        check_in_id="112233",
+        status=None,
+        duration=None,
+    )
+    assert check_in_id == "112233"
