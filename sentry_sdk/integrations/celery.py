@@ -115,9 +115,11 @@ class CeleryIntegration(Integration):
 
 
 def _now_seconds_since_epoch():
-    # We can not use a perf_counter here, because the start of a Celery
-    # tasks and the finish are recorded in differenct processes
-    # Start happens in the Celery Beat process, the end in the Celery Worker process
+    # We can not use a perf_counter when dealing with durations
+    # of Celery tasks, because the start of a Celery tasks and
+    # the finish are recorded in differenct processes.
+    # Start happens in the Celery Beat process,
+    # the end in the Celery Worker process.
     return time.time()
 
 
