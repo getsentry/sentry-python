@@ -89,7 +89,10 @@ def test_crons_task_success():
     with mock.patch(
         "sentry_sdk.integrations.celery.capture_checkin"
     ) as mock_capture_checkin:
-        with mock.patch("sentry_sdk.integrations.celery.now", return_value=500.5):
+        with mock.patch(
+            "sentry_sdk.integrations.celery._now_seconds_since_epoch",
+            return_value=500.5,
+        ):
             crons_task_success(fake_task)
 
             mock_capture_checkin.assert_called_once_with(
@@ -130,7 +133,10 @@ def test_crons_task_failure():
     with mock.patch(
         "sentry_sdk.integrations.celery.capture_checkin"
     ) as mock_capture_checkin:
-        with mock.patch("sentry_sdk.integrations.celery.now", return_value=500.5):
+        with mock.patch(
+            "sentry_sdk.integrations.celery._now_seconds_since_epoch",
+            return_value=500.5,
+        ):
             crons_task_failure(fake_task)
 
             mock_capture_checkin.assert_called_once_with(
@@ -171,7 +177,10 @@ def test_crons_task_retry():
     with mock.patch(
         "sentry_sdk.integrations.celery.capture_checkin"
     ) as mock_capture_checkin:
-        with mock.patch("sentry_sdk.integrations.celery.now", return_value=500.5):
+        with mock.patch(
+            "sentry_sdk.integrations.celery._now_seconds_since_epoch",
+            return_value=500.5,
+        ):
             crons_task_retry(fake_task)
 
             mock_capture_checkin.assert_called_once_with(
