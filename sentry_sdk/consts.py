@@ -96,7 +96,7 @@ class SPANDATA:
 
 
 class OP:
-    CACHE = "cache"
+    CACHE_GET_ITEM = "cache.get_item"
     DB = "db"
     DB_REDIS = "db.redis"
     EVENT_DJANGO = "event.django"
