@@ -196,6 +196,7 @@ def patch_redis_client(cls, is_cluster):
 
             if name:
                 span.set_tag("redis.command", name)
+                span.set_tag(SPANDATA.DB_OPERATION, name)
 
             if name and args:
                 name_low = name.lower()
