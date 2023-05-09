@@ -27,6 +27,7 @@ def test_basic(sentry_init, capture_events):
             "redis.key": "foobar",
             "redis.command": "GET",
             "redis.is_cluster": False,
+            "db.operation": "GET",
         },
         "timestamp": crumb["timestamp"],
         "type": "redis",
@@ -207,6 +208,7 @@ def test_breadcrumbs(sentry_init, capture_events):
         "type": "redis",
         "category": "redis",
         "data": {
+            "db.operation": "SET",
             "redis.is_cluster": False,
             "redis.command": "SET",
             "redis.key": "somekey1",
@@ -218,6 +220,7 @@ def test_breadcrumbs(sentry_init, capture_events):
         "type": "redis",
         "category": "redis",
         "data": {
+            "db.operation": "SET",
             "redis.is_cluster": False,
             "redis.command": "SET",
             "redis.key": "somekey2",
