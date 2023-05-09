@@ -137,7 +137,7 @@ def test_no_trimming_if_request_bodies_is_always(body_normalizer):
     curr = data
     for _ in range(MAX_DATABAG_DEPTH + 5):
         curr["nested"] = {}
-        curr = data["nested"]
+        curr = curr["nested"]
 
     result = body_normalizer(data, request_bodies="always")
 
