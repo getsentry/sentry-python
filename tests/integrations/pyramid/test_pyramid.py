@@ -12,6 +12,7 @@ from pyramid.response import Response
 
 from sentry_sdk import capture_message, add_breadcrumb
 from sentry_sdk.integrations.pyramid import PyramidIntegration
+from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
 from werkzeug.test import Client
 
@@ -187,6 +188,31 @@ def test_flask_empty_json_request(sentry_init, capture_events, route, get_client
     client = get_client()
     response = client.post("/", content_type="application/json", data=json.dumps(data))
     assert response[1] == "200 OK"
+
+    (event,) = events
+    assert event["request"]["data"] == data
+
+
+def test_json_not_truncated_if_request_bodies_is_always(
+    sentry_init, capture_events, route, get_client
+):
+    sentry_init(integrations=[PyramidIntegration()], request_bodies="always")
+
+    data = {
+        "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
+    }
+
+    @route("/")
+    def index(request):
+        assert request.json == data
+        assert request.text == json.dumps(data)
+        capture_message("hi")
+        return Response("ok")
+
+    events = capture_events()
+
+    client = get_client()
+    client.post("/", content_type="application/json", data=json.dumps(data))
 
     (event,) = events
     assert event["request"]["data"] == data

@@ -67,6 +67,8 @@ else:
 # this value due to attached metadata, so keep the number conservative.
 MAX_EVENT_BYTES = 10**6
 
+# Maximum depth and breadth of databags. Excess data will be trimmed. If
+# request_bodies is "always", request bodies won't be trimmed.
 MAX_DATABAG_DEPTH = 5
 MAX_DATABAG_BREADTH = 10
 CYCLE_MARKER = "<cyclic>"
@@ -117,6 +119,10 @@ def serialize(event, **kwargs):
     memo = Memo()
     path = []  # type: List[Segment]
     meta_stack = []  # type: List[Dict[str, Any]]
+
+    do_not_trim_request_bodies = (
+        kwargs.pop("request_bodies", None) == "always"
+    )  # type: bool
 
     def _annotate(**meta):
         # type: (**Any) -> None
@@ -182,10 +188,11 @@ def serialize(event, **kwargs):
             if rv in (True, None):
                 return rv
 
-            p0 = path[0]
-            if p0 == "request" and path[1] == "data":
-                return True
+            is_request_body = _is_request_body()
+            if is_request_body in (True, None):
+                return is_request_body
 
+            p0 = path[0]
             if p0 == "breadcrumbs" and path[1] == "values":
                 path[2]
                 return True
@@ -198,9 +205,20 @@ def serialize(event, **kwargs):
 
         return False
 
+    def _is_request_body():
+        # type: () -> Optional[bool]
+        try:
+            if path[0] == "request" and path[1] == "data":
+                return True
+        except IndexError:
+            return None
+
+        return False
+
     def _serialize_node(
         obj,  # type: Any
         is_databag=None,  # type: Optional[bool]
+        is_request_body=None,  # type: Optional[bool]
         should_repr_strings=None,  # type: Optional[bool]
         segment=None,  # type: Optional[Segment]
         remaining_breadth=None,  # type: Optional[int]
@@ -218,6 +236,7 @@ def serialize(event, **kwargs):
                 return _serialize_node_impl(
                     obj,
                     is_databag=is_databag,
+                    is_request_body=is_request_body,
                     should_repr_strings=should_repr_strings,
                     remaining_depth=remaining_depth,
                     remaining_breadth=remaining_breadth,
@@ -242,9 +261,14 @@ def serialize(event, **kwargs):
         return obj
 
     def _serialize_node_impl(
-        obj, is_databag, should_repr_strings, remaining_depth, remaining_breadth
+        obj,
+        is_databag,
+        is_request_body,
+        should_repr_strings,
+        remaining_depth,
+        remaining_breadth,
     ):
-        # type: (Any, Optional[bool], Optional[bool], Optional[int], Optional[int]) -> Any
+        # type: (Any, Optional[bool], Optional[bool], Optional[bool], Optional[int], Optional[int]) -> Any
         if isinstance(obj, AnnotatedValue):
             should_repr_strings = False
         if should_repr_strings is None:
@@ -253,10 +277,18 @@ def serialize(event, **kwargs):
         if is_databag is None:
             is_databag = _is_databag()
 
-        if is_databag and remaining_depth is None:
-            remaining_depth = MAX_DATABAG_DEPTH
-        if is_databag and remaining_breadth is None:
-            remaining_breadth = MAX_DATABAG_BREADTH
+        if is_request_body is None:
+            is_request_body = _is_request_body()
+
+        if is_databag:
+            if is_request_body and do_not_trim_request_bodies:
+                remaining_depth = float("inf")
+                remaining_breadth = float("inf")
+            else:
+                if remaining_depth is None:
+                    remaining_depth = MAX_DATABAG_DEPTH
+                if remaining_breadth is None:
+                    remaining_breadth = MAX_DATABAG_BREADTH
 
         obj = _flatten_annotated(obj)
 
