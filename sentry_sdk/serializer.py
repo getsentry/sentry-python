@@ -221,8 +221,8 @@ def serialize(event, **kwargs):
         is_request_body=None,  # type: Optional[bool]
         should_repr_strings=None,  # type: Optional[bool]
         segment=None,  # type: Optional[Segment]
-        remaining_breadth=None,  # type: Optional[int]
-        remaining_depth=None,  # type: Optional[int]
+        remaining_breadth=None,  # type: Optional[Union[int, float]]
+        remaining_depth=None,  # type: Optional[Union[int, float]]
     ):
         # type: (...) -> Any
         if segment is not None:
@@ -268,7 +268,7 @@ def serialize(event, **kwargs):
         remaining_depth,
         remaining_breadth,
     ):
-        # type: (Any, Optional[bool], Optional[bool], Optional[bool], Optional[int], Optional[int]) -> Any
+        # type: (Any, Optional[bool], Optional[bool], Optional[bool], Optional[Union[float, int]], Optional[Union[float, int]]) -> Any
         if isinstance(obj, AnnotatedValue):
             should_repr_strings = False
         if should_repr_strings is None:
