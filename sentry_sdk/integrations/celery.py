@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import sys
+import time
 
 from sentry_sdk.consts import OP
 from sentry_sdk._compat import reraise
@@ -15,7 +16,6 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     logger,
-    now,
 )
 
 if TYPE_CHECKING:
@@ -114,6 +114,16 @@ class CeleryIntegration(Integration):
         ignore_logger("celery.redirected")
 
 
+def _now_seconds_since_epoch():
+    # type: () -> float
+    # We cannot use `time.perf_counter()` when dealing with the duration
+    # of a Celery task, because the start of a Celery task and
+    # the end are recorded in different processes.
+    # Start happens in the Celery Beat process,
+    # the end in a Celery Worker process.
+    return time.time()
+
+
 def _wrap_apply_async(f):
     # type: (F) -> F
     @wraps(f)
@@ -130,7 +140,8 @@ def _wrap_apply_async(f):
                     if integration.monitor_beat_tasks:
                         headers.update(
                             {
-                                "sentry-monitor-start-timestamp-s": "%.9f" % now(),
+                                "sentry-monitor-start-timestamp-s": "%.9f"
+                                % _now_seconds_since_epoch(),
                             }
                         )
 
@@ -449,7 +460,7 @@ def crons_task_success(sender, **kwargs):
         monitor_slug=headers["sentry-monitor-slug"],
         monitor_config=monitor_config,
         check_in_id=headers["sentry-monitor-check-in-id"],
-        duration=now() - start_timestamp_s,
+        duration=_now_seconds_since_epoch() - start_timestamp_s,
         status=MonitorStatus.OK,
     )
 
@@ -470,7 +481,7 @@ def crons_task_failure(sender, **kwargs):
         monitor_slug=headers["sentry-monitor-slug"],
         monitor_config=monitor_config,
         check_in_id=headers["sentry-monitor-check-in-id"],
-        duration=now() - start_timestamp_s,
+        duration=_now_seconds_since_epoch() - start_timestamp_s,
         status=MonitorStatus.ERROR,
     )
 
@@ -491,6 +502,6 @@ def crons_task_retry(sender, **kwargs):
         monitor_slug=headers["sentry-monitor-slug"],
         monitor_config=monitor_config,
         check_in_id=headers["sentry-monitor-check-in-id"],
-        duration=now() - start_timestamp_s,
+        duration=_now_seconds_since_epoch() - start_timestamp_s,
         status=MonitorStatus.ERROR,
     )

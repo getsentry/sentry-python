@@ -20,6 +20,18 @@ METHODS_TO_INSTRUMENT = [
 ]
 
 
+def _get_span_description(method_name, args, kwargs):
+    # type: (str, Any, Any) -> str
+    description = "{} ".format(method_name)
+
+    if args is not None and len(args) >= 1:
+        description += text_type(args[0])
+    elif kwargs is not None and "key" in kwargs:
+        description += text_type(kwargs["key"])
+
+    return description
+
+
 def _patch_cache_method(cache, method_name):
     # type: (CacheHandler, str) -> None
     from sentry_sdk.integrations.django import DjangoIntegration
@@ -31,9 +43,9 @@ def _patch_cache_method(cache, method_name):
         if integration is None or not integration.cache_spans:
             return original_method(*args, **kwargs)
 
-        description = "{} {}".format(method_name, args[0])
+        description = _get_span_description(method_name, args, kwargs)
 
-        with hub.start_span(op=OP.CACHE, description=description) as span:
+        with hub.start_span(op=OP.CACHE_GET_ITEM, description=description) as span:
             value = original_method(*args, **kwargs)
 
             if value:
