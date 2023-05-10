@@ -18,17 +18,9 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-def extension_relay_dsn(original_dsn):
-    dsn = Dsn(original_dsn)
-    dsn.host = "localhost"
-    dsn.port = 5333
-    dsn.scheme = "http"
-    return str(dsn)
-
-
 # Configure Sentry SDK
 sentry_sdk.init(
-    dsn=extension_relay_dsn(os.environ["SENTRY_DSN"]),
+    dsn=os.environ["SENTRY_DSN"],
     integrations=[AwsLambdaIntegration(timeout_warning=True)],
     traces_sample_rate=float(os.environ["SENTRY_TRACES_SAMPLE_RATE"]),
 )
