@@ -68,18 +68,6 @@ jobs:
           pip install virtualenv
           # This will also trigger "make dist" that creates the Python packages
           make aws-lambda-layer
-
-          echo "Saving SDK_VERSION for later"
-          export SDK_VERSION=$(grep "VERSION = " sentry_sdk/consts.py | cut -f3 -d' ' | tr -d '"')
-          echo "SDK_VERSION=$SDK_VERSION"
-          echo "SDK_VERSION=$SDK_VERSION" >> $GITHUB_ENV
-      - name: Upload Python AWS Lambda Layer
-        uses: getsentry/action-build-aws-lambda-extension@v1
-        with:
-          artifact_name: ${{ github.sha }}
-          zip_file_name: sentry-python-serverless-${{ env.SDK_VERSION }}.zip
-          build_cache_paths: ${{ env.CACHED_BUILD_PATHS }}
-          build_cache_key: ${{ env.BUILD_CACHE_KEY }}
       - name: Upload Python Packages
         uses: actions/upload-artifact@v3
         with:
