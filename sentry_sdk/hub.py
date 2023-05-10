@@ -327,7 +327,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         event,  # type: Event
         hint=None,  # type: Optional[Hint]
         scope=None,  # type: Optional[Any]
-        **scope_args  # type: Any
+        **scope_args,  # type: Any
     ):
         # type: (...) -> Optional[str]
         """Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`."""
@@ -346,7 +346,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         message,  # type: str
         level=None,  # type: Optional[str]
         scope=None,  # type: Optional[Any]
-        **scope_args  # type: Any
+        **scope_args,  # type: Any
     ):
         # type: (...) -> Optional[str]
         """Captures a message.  The message is just a string.  If no level
@@ -366,7 +366,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self,
         error=None,  # type: Optional[Union[BaseException, ExcInfo]]
         scope=None,  # type: Optional[Any]
-        **scope_args  # type: Any
+        **scope_args,  # type: Any
     ):
         # type: (...) -> Optional[str]
         """Captures an exception.
@@ -407,7 +407,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self,
         crumb=None,  # type: Optional[Breadcrumb]
         hint=None,  # type: Optional[BreadcrumbHint]
-        **kwargs  # type: Any
+        **kwargs,  # type: Any
     ):
         # type: (...) -> None
         """
@@ -453,7 +453,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self,
         span=None,  # type: Optional[Span]
         instrumenter=INSTRUMENTER.SENTRY,  # type: str
-        **kwargs  # type: Any
+        **kwargs,  # type: Any
     ):
         # type: (...) -> Span
         """
@@ -503,7 +503,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self,
         transaction=None,  # type: Optional[Transaction]
         instrumenter=INSTRUMENTER.SENTRY,  # type: str
-        **kwargs  # type: Any
+        **kwargs,  # type: Any
     ):
         # type: (...) -> Union[Transaction, NoOpSpan]
         """
@@ -721,18 +721,24 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         from the span representing the request, if available, or the current
         span on the scope if not.
         """
-        span = span or self.scope.span
-        if not span:
-            return
-
         client = self._stack[-1][0]
-
         propagate_traces = client and client.options["propagate_traces"]
         if not propagate_traces:
             return
 
-        for header in span.iter_headers():
-            yield header
+        span = span or self.scope.span
+        if span is None:
+            logger.warning(
+                f"TwP: yield trace propagation headers from scope: {dict(self.scope.iter_headers())}"
+            )
+            for header in self.scope.iter_headers():
+                yield header
+        else:
+            logger.warning(
+                f"TwP: yield trace propagation headers from span: {dict(span.iter_headers())}"
+            )
+            for header in span.iter_headers():
+                yield header
 
     def trace_propagation_meta(self, span=None):
         # type: (Optional[Span]) -> str

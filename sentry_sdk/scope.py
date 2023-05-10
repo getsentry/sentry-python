@@ -1,11 +1,17 @@
 from copy import copy
 from collections import deque
 from itertools import chain
+from typing import Iterator, Tuple
 
 from sentry_sdk._functools import wraps
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import logger, capture_internal_exceptions
-from sentry_sdk.tracing import Transaction
+from sentry_sdk.tracing import (
+    BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
+    Transaction,
+)
 from sentry_sdk.attachments import Attachment
 
 if TYPE_CHECKING:
@@ -96,6 +102,7 @@ class Scope(object):
         "_attachments",
         "_force_auto_session_tracking",
         "_profile",
+        "_propagation_context",
     )
 
     def __init__(self):
@@ -105,6 +112,50 @@ class Scope(object):
 
         self._name = None  # type: Optional[str]
         self.clear()
+
+        logger.warning("TwP: Initializing propagation context in Scope")
+        self._propagation_context = {
+            "trace_id": -1,  # uuid.uuid4().hex,
+            "span_id": -1,  # uuid.uuid4().hex[16:],
+            "dynamic_sampling_context": {
+                "trace_id": -2,
+                "environment": "xxx-environment",
+                "release": "xxx-release",
+                "public_key": "xxx-public-key",
+                "transaction": "xxx-transaction",
+                "user_segement": "xxx-user-segement",
+                "sample_rate": 123,
+            },
+        }
+
+    def get_traceparent(self):
+        # type: () -> str
+        sampled = "XXX"
+        return "%s-%s-%s" % (
+            self._propagation_context.trace_id,
+            self._propagation_context.span_id,
+            sampled,
+        )
+
+    def get_trace_context(self):
+        # type: () -> Any
+        trace_context = {
+            "trace_id": self._propagation_context.trace_id,
+            "span_id": self._propagation_context.span_id,
+            "dynamic_sampling_context": self._propagation_context.dynamic_sampling_context,
+        }  # type: Dict[str, Any]
+
+        return trace_context
+
+    def iter_headers(self):
+        # type: () -> Iterator[Tuple[str, str]]
+        """
+        Creates a generator which returns the span's `sentry-trace` and `baggage` headers.
+        """
+        yield SENTRY_TRACE_HEADER_NAME, self.get_traceparent()
+
+        baggage = Baggage(self._propagation_context.dynamic_sampling_context)
+        yield BAGGAGE_HEADER_NAME, baggage
 
     def clear(self):
         # type: () -> None
@@ -128,6 +179,8 @@ class Scope(object):
         self._force_auto_session_tracking = None  # type: Optional[bool]
 
         self._profile = None  # type: Optional[Profile]
+
+        self._propagation_context = {}  # type: Dict[str, Any]
 
     @_attr_setter
     def level(self, value):
@@ -415,10 +468,17 @@ class Scope(object):
         if self._contexts:
             event.setdefault("contexts", {}).update(self._contexts)
 
+        # TwP
+        contexts = event.setdefault("contexts", {})
+        logger.warning(
+            f"TwP: Setting trace context from Scope: {self.get_trace_context()}"
+        )
+        contexts["trace"] = self.get_trace_context()
         if self._span is not None:
-            contexts = event.setdefault("contexts", {})
-            if not contexts.get("trace"):
-                contexts["trace"] = self._span.get_trace_context()
+            logger.warning(
+                f"TwP: Setting trace from scope._span: {self._span.get_trace_context()}"
+            )
+            contexts["trace"] = self._span.get_trace_context()
 
         exc_info = hint.get("exc_info")
         if exc_info is not None:
