@@ -36,6 +36,11 @@ urlpatterns = [
         name="view_with_cached_template_fragment",
     ),
     path(
+        "view-with-cache-of-non-bool-object",
+        views.view_with_cache_of_non_bool_object,
+        name="view_with_cache_of_non_bool_object",
+    ),
+    path(
         "read-body-and-view-exc",
         views.read_body_and_view_exc,
         name="read_body_and_view_exc",

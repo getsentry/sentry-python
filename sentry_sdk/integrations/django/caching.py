@@ -32,6 +32,17 @@ def _get_span_description(method_name, args, kwargs):
     return description
 
 
+def _check_truthy_value(value):
+    # type: (Any) -> bool
+    if value is not None:
+        try:
+            return bool(value)
+        except BaseException:
+            return True
+
+    return False
+
+
 def _patch_cache_method(cache, method_name):
     # type: (CacheHandler, str) -> None
     from sentry_sdk.integrations.django import DjangoIntegration
@@ -48,7 +59,7 @@ def _patch_cache_method(cache, method_name):
         with hub.start_span(op=OP.CACHE_GET_ITEM, description=description) as span:
             value = original_method(*args, **kwargs)
 
-            if value:
+            if _check_truthy_value(value):
                 span.set_data(SPANDATA.CACHE_HIT, True)
 
                 size = len(text_type(value).encode("utf-8"))

@@ -5,6 +5,7 @@ from django import VERSION
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
+from django.core.cache import caches
 from django.http import HttpResponse, HttpResponseNotFound, HttpResponseServerError
 from django.shortcuts import render
 from django.template import Context, Template
@@ -13,7 +14,6 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import ListView
-
 
 try:
     from rest_framework.decorators import api_view
@@ -72,6 +72,27 @@ def view_with_cached_template_fragment(request):
     )
     rendered = template.render(Context({}))
     return HttpResponse(rendered)
+
+
+class NoBool:
+    def __nonzero__(self):
+        raise ValueError("No truthy value here")
+
+    __bool__ = __nonzero__
+
+    def __str__(self):
+        return "NoBool"
+
+
+def view_with_cache_of_non_bool_object(request):
+
+    no_bool = NoBool()
+
+    cache = caches["default"]
+    cache.set("no_bool_cache_key", no_bool)
+    cache.get("no_bool_cache_key")
+
+    return HttpResponse("ok")
 
 
 # This is a "class based view" as previously found in the sentry codebase. The

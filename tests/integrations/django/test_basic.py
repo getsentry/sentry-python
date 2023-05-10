@@ -1137,6 +1137,35 @@ def test_cache_spans_templatetag(
     assert "cache.item_size" in second_event["spans"][0]["data"]
 
 
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+@pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
+def test_cache_spans_non_bool_cache_object(
+    sentry_init, client, capture_events, use_django_caching
+):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                cache_spans=True,
+                middleware_spans=False,
+                signals_spans=False,
+            )
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client.get(reverse("view_with_cache_of_non_bool_object"))
+
+    single_event = events[0]
+
+    assert len(single_event["spans"]) == 1
+    assert single_event["spans"][0]["op"] == "cache.get_item"
+    assert single_event["spans"][0]["description"].startswith("get no_bool_cache_key")
+    assert single_event["spans"][0]["data"]["cache.hit"]
+    assert "cache.item_size" in single_event["spans"][0]["data"]
+
+
 @pytest.mark.parametrize(
     "method_name, args, kwargs, expected_description",
     [
