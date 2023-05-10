@@ -120,9 +120,7 @@ def serialize(event, **kwargs):
     path = []  # type: List[Segment]
     meta_stack = []  # type: List[Dict[str, Any]]
 
-    do_not_trim_request_bodies = (
-        kwargs.pop("request_bodies", None) == "always"
-    )  # type: bool
+    keep_request_bodies = kwargs.pop("request_bodies", None) == "always"  # type: bool
 
     def _annotate(**meta):
         # type: (**Any) -> None
@@ -281,7 +279,7 @@ def serialize(event, **kwargs):
             is_request_body = _is_request_body()
 
         if is_databag:
-            if is_request_body and do_not_trim_request_bodies:
+            if is_request_body and keep_request_bodies:
                 remaining_depth = float("inf")
                 remaining_breadth = float("inf")
             else:
@@ -344,6 +342,7 @@ def serialize(event, **kwargs):
                     segment=str_k,
                     should_repr_strings=should_repr_strings,
                     is_databag=is_databag,
+                    is_request_body=is_request_body,
                     remaining_depth=remaining_depth - 1
                     if remaining_depth is not None
                     else None,
@@ -370,6 +369,7 @@ def serialize(event, **kwargs):
                         segment=i,
                         should_repr_strings=should_repr_strings,
                         is_databag=is_databag,
+                        is_request_body=is_request_body,
                         remaining_depth=remaining_depth - 1
                         if remaining_depth is not None
                         else None,
