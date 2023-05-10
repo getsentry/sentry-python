@@ -110,8 +110,8 @@ class CommandTracer(monitoring.CommandListener):
 
             tags = {
                 "db.name": event.database_name,
-                "db.system": "mongodb",
-                "db.operation": event.command_name,
+                SPANDATA.DB_SYSTEM: "mongodb",
+                SPANDATA.DB_OPERATION: event.command_name,
             }
 
             try:

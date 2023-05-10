@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="1.22.1",
+    version="1.22.2",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -68,7 +68,8 @@ setup(
         "fastapi": ["fastapi>=0.79.0"],
         "pymongo": ["pymongo>=3.1"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
-        "grpcio": ["grpcio>=1.21.1"]
+        "grpcio": ["grpcio>=1.21.1"],
+        "loguru": ["loguru>=0.5"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
