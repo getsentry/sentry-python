@@ -711,11 +711,7 @@ def single_exception_from_error_tuple(
 
     exception_value["module"] = get_type_module(exc_type)
     exception_value["type"] = get_type_name(exc_type)
-    exception_value["value"] = (
-        safe_str(exc_value)
-        if not exc_value or not hasattr(exc_value, "message")
-        else exc_value.message
-    )
+    exception_value["value"] = getattr(exc_value, "message", safe_str(exc_value))
 
     if client_options is None:
         include_local_variables = True
@@ -797,7 +793,6 @@ def exceptions_from_error(
     https://develop.sentry.dev/sdk/event-payloads/exception/
     """
 
-    # TODO: implement also the seen_exception_ids from walk_exception_chain above.
     parent = single_exception_from_error_tuple(
         exc_type=exc_type,
         exc_value=exc_value,
@@ -830,6 +825,7 @@ def exceptions_from_error(
                 exc_type=type(cause),
                 exc_value=cause,
                 tb=getattr(cause, "__traceback__", None),
+                client_options=client_options,
                 mechanism=mechanism,
                 exception_id=exception_id,
                 source="__cause__",
@@ -850,6 +846,7 @@ def exceptions_from_error(
                 exc_type=type(context),
                 exc_value=context,
                 tb=getattr(context, "__traceback__", None),
+                client_options=client_options,
                 mechanism=mechanism,
                 exception_id=exception_id,
                 source="__context__",
@@ -864,6 +861,7 @@ def exceptions_from_error(
                 exc_type=type(e),
                 exc_value=e,
                 tb=getattr(e, "__traceback__", None),
+                client_options=client_options,
                 mechanism=mechanism,
                 exception_id=exception_id,
                 parent_id=parent_id,

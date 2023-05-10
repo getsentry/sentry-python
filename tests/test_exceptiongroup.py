@@ -1,3 +1,6 @@
+import sys
+import pytest
+
 from sentry_sdk.utils import event_from_exception
 
 
@@ -9,11 +12,13 @@ except ImportError:
     ExceptionGroup = None
 
 
-def test_exceptiongroup():
-    exception_groups_available = ExceptionGroup is not None
-    if not exception_groups_available:
-        return
+minimum_python_311 = pytest.mark.skipif(
+    sys.version_info < (3, 11), reason="ExceptionGroup tests need Python >= 3.11"
+)
 
+
+@minimum_python_311
+def test_exceptiongroup():
     exception_group = None
 
     try:
@@ -135,6 +140,56 @@ def test_exceptiongroup():
     ]
 
     assert values == expected_values
+
+
+@minimum_python_311
+def test_exceptiongroup_simple():
+    exception_group = None
+
+    try:
+        raise ExceptionGroup(
+            "simple",
+            [
+                RuntimeError("something strange's going on"),
+            ],
+        )
+    except ExceptionGroup as e:
+        exception_group = e
+
+    (event, _) = event_from_exception(
+        exception_group,
+        client_options={
+            "include_local_variables": True,
+        },
+        mechanism={"type": "test_suite", "handled": False},
+    )
+
+    exception_values = event["exception"]["values"]
+
+    assert len(exception_values) == 2
+
+    assert exception_values[0]["type"] == "RuntimeError"
+    assert exception_values[0]["value"] == "something strange's going on"
+    assert exception_values[0]["mechanism"] == {
+        "type": "chained",
+        "handled": False,
+        "exception_id": 1,
+        "source": "exceptions[0]",
+        "parent_id": 0,
+    }
+
+    assert exception_values[1]["type"] == "ExceptionGroup"
+    assert exception_values[1]["value"] == "simple"
+    assert exception_values[1]["mechanism"] == {
+        "type": "test_suite",
+        "handled": False,
+        "exception_id": 0,
+        "is_exception_group": True,
+    }
+    frame = exception_values[1]["stacktrace"]["frames"][0]
+    assert frame["module"] == "tests.test_exceptiongroup"
+    assert frame["lineno"] == 150
+    assert frame["context_line"] == "        raise ExceptionGroup("
 
 
 def test_exception_chain_cause():
