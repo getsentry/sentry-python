@@ -1,6 +1,10 @@
 import sentry_sdk
 
-from sentry_sdk.integrations.modules import ModulesIntegration, _get_installed_modules
+from sentry_sdk.integrations.modules import (
+    ModulesIntegration,
+    _get_installed_modules,
+    _normalize_module_name,
+)
 
 
 def test_basic(sentry_init, capture_events):
@@ -32,12 +36,13 @@ def test_installed_modules():
     installed_modules = _get_installed_modules()
     if importlib_available:
         assert installed_modules == {
-            dist.metadata["Name"]
-            .lower()
-            .replace("-", "_"): version(dist.metadata["Name"])
+            _normalize_module_name(dist.metadata["Name"]): version(
+                dist.metadata["Name"]
+            )
             for dist in distributions()
         }
     if pkg_resources_available:
         assert installed_modules == {
-            dist.key: dist.version for dist in pkg_resources.working_set
+            _normalize_module_name(dist.key): dist.version
+            for dist in pkg_resources.working_set
         }

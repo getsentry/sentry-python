@@ -18,13 +18,17 @@ if TYPE_CHECKING:
 _installed_modules = None
 
 
+def _normalize_module_name(name):
+    return name.lower().replace("-", "_")
+
+
 def _generate_installed_modules():
     # type: () -> Iterator[Tuple[str, str]]
     try:
         from importlib.metadata import distributions, version
 
         for dist in distributions():
-            yield dist.metadata["Name"].lower().replace("-", "_"), version(
+            yield _normalize_module_name(dist.metadata["Name"]), version(
                 dist.metadata["Name"]
             )
 
@@ -36,7 +40,7 @@ def _generate_installed_modules():
             return
 
         for info in pkg_resources.working_set:
-            yield info.key, info.version
+            yield _normalize_module_name(info.key), info.version
 
 
 def _get_installed_modules():
