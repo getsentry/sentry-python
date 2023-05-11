@@ -8,6 +8,7 @@ pytest.importorskip("bottle")
 from io import BytesIO
 from bottle import Bottle, debug as set_debug, abort, redirect
 from sentry_sdk import capture_message
+from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
 from sentry_sdk.integrations.logging import LoggingIntegration
 from werkzeug.test import Client
@@ -273,6 +274,37 @@ def test_files_and_form(sentry_init, capture_events, app, get_client):
         }
     }
     assert not event["request"]["data"]["file"]
+
+
+def test_json_not_truncated_if_request_bodies_is_always(
+    sentry_init, capture_events, app, get_client
+):
+    sentry_init(
+        integrations=[bottle_sentry.BottleIntegration()], request_bodies="always"
+    )
+
+    data = {
+        "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
+    }
+
+    @app.route("/", method="POST")
+    def index():
+        import bottle
+
+        assert bottle.request.json == data
+        assert bottle.request.body.read() == json.dumps(data).encode("ascii")
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = get_client()
+
+    response = client.post("/", content_type="application/json", data=json.dumps(data))
+    assert response[1] == "200 OK"
+
+    (event,) = events
+    assert event["request"]["data"] == data
 
 
 @pytest.mark.parametrize(
