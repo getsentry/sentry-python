@@ -157,6 +157,13 @@ def _wrap_apply_async(f):
                         # tracing tools (dd-trace-py) also employ this exact
                         # workaround and we don't want to break them.
                         kwarg_headers.setdefault("headers", {}).update(headers)
+
+                        # Add the sentry options to the header
+                        # (set by sentry_apply_entry for auto instrumenting celery beat tasks)
+                        for key, value in kwargs.items():
+                            if key.startswith("sentry-"):
+                                kwarg_headers[key] = value
+
                         kwargs["headers"] = kwarg_headers
 
                 return f(*args, **kwargs)
