@@ -32,7 +32,9 @@ def test_installed_modules():
     installed_modules = _get_installed_modules()
     if importlib_available:
         assert installed_modules == {
-            dist.metadata["Name"].lower(): version(dist.metadata["Name"])
+            dist.metadata["Name"]
+            .lower()
+            .replace("-", "_"): version(dist.metadata["Name"])
             for dist in distributions()
         }
     if pkg_resources_available:
