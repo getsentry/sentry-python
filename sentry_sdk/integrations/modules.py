@@ -24,7 +24,9 @@ def _generate_installed_modules():
         from importlib.metadata import distributions, version
 
         for dist in distributions():
-            yield dist.metadata["Name"].lower(), version(dist.metadata["Name"])
+            yield dist.metadata["Name"].lower().replace("-", "_"), version(
+                dist.metadata["Name"]
+            )
 
     except ImportError:
         # < py3.8
