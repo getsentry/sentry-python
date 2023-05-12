@@ -158,8 +158,8 @@ def _wrap_apply_async(f):
                         # workaround and we don't want to break them.
                         kwarg_headers.setdefault("headers", {}).update(headers)
 
-                        # Add the sentry options to the header
-                        # (set by sentry_apply_entry for auto instrumenting celery beat tasks)
+                        # Add the sentry options potentially added in `sentry_apply_entry`
+                        # to the header (when auto-instrumenting Celery Beat tasks)
                         for key, value in kwargs.items():
                             if key.startswith("sentry-"):
                                 kwarg_headers[key] = value
@@ -438,6 +438,8 @@ def _patch_beat_apply_entry():
         )
         headers.update({"sentry-monitor-check-in-id": check_in_id})
 
+        # Set the Sentry configuration in the options of the ScheduleEntry.
+        # Those will be picked up in `apply_async` and added to the headers.
         schedule_entry.options.update(headers)
         return original_apply_entry(*args, **kwargs)
 
