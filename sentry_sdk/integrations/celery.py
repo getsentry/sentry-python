@@ -158,7 +158,7 @@ def _wrap_apply_async(f):
                         # workaround and we don't want to break them.
                         kwarg_headers.setdefault("headers", {}).update(headers)
 
-                        # Add the sentry options potentially added in `sentry_apply_entry`
+                        # Add the Sentry options potentially added in `sentry_apply_entry`
                         # to the header (when auto-instrumenting Celery Beat tasks)
                         for key, value in kwargs.items():
                             if key.startswith("sentry-"):
