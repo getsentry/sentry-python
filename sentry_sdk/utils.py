@@ -632,8 +632,8 @@ def serialize_frame(
     return rv
 
 
-def current_stacktrace(include_local_variables=True):
-    # type: (bool) -> Any
+def current_stacktrace(include_local_variables=True, include_source_context=True):
+    # type: (bool, bool) -> Any
     __tracebackhide__ = True
     frames = []
 
@@ -641,7 +641,11 @@ def current_stacktrace(include_local_variables=True):
     while f is not None:
         if not should_hide_frame(f):
             frames.append(
-                serialize_frame(f, include_local_variables=include_local_variables)
+                serialize_frame(
+                    f,
+                    include_local_variables=include_local_variables,
+                    include_source_context=include_source_context,
+                )
             )
         f = f.f_back
 
@@ -677,14 +681,17 @@ def single_exception_from_error_tuple(
 
     if client_options is None:
         include_local_variables = True
+        include_source_context = True
     else:
         include_local_variables = client_options["include_local_variables"]
+        include_source_context = client_options["include_source_context"]
 
     frames = [
         serialize_frame(
             tb.tb_frame,
             tb_lineno=tb.tb_lineno,
             include_local_variables=include_local_variables,
+            include_source_context=include_source_context,
         )
         for tb in iter_stacks(tb)
     ]

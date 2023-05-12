@@ -365,6 +365,38 @@ def test_include_local_variables_disabled(sentry_init, capture_events):
     )
 
 
+def test_include_source_context_enabled(sentry_init, capture_events):
+    sentry_init(include_source_context=True)
+    events = capture_events()
+    try:
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+
+    frame = event["exception"]["values"][0]["stacktrace"]["frames"][0]
+    assert "post_context" in frame
+    assert "pre_context" in frame
+    assert "context_line" in frame
+
+
+def test_include_source_context_disabled(sentry_init, capture_events):
+    sentry_init(include_source_context=False)
+    events = capture_events()
+    try:
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+
+    frame = event["exception"]["values"][0]["stacktrace"]["frames"][0]
+    assert "post_context" not in frame
+    assert "pre_context" not in frame
+    assert "context_line" not in frame
+
+
 @pytest.mark.parametrize("integrations", [[], [ExecutingIntegration()]])
 def test_function_names(sentry_init, capture_events, integrations):
     sentry_init(integrations=integrations)
