@@ -45,7 +45,7 @@ setup(
         "certifi",
     ],
     extras_require={
-        "flask": ["flask>=0.11", "blinker>=1.1"],
+        "flask": ["flask>=0.11", "blinker>=1.1", "markupsafe"],
         "quart": ["quart>=0.16.1", "blinker>=1.1"],
         "bottle": ["bottle>=0.12.13"],
         "falcon": ["falcon>=1.4"],
@@ -69,7 +69,6 @@ setup(
         "pymongo": ["pymongo>=3.1"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
         "grpcio": ["grpcio>=1.21.1"],
-        "markupsafe": ["markupsafe"],
         "loguru": ["loguru>=0.5"],
     },
     classifiers=[
