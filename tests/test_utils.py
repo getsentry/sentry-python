@@ -1,7 +1,14 @@
 import pytest
 import re
+import sys
 
-from sentry_sdk.utils import is_valid_sample_rate, logger, parse_url, sanitize_url
+from sentry_sdk.utils import (
+    is_valid_sample_rate,
+    logger,
+    parse_url,
+    sanitize_url,
+    serialize_frame,
+)
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -221,3 +228,16 @@ def test_warns_on_invalid_sample_rate(rate, StringContaining):  # noqa: N803
         result = is_valid_sample_rate(rate, source="Testing")
         logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))
         assert result is False
+
+
+@pytest.mark.parametrize(
+    "include_source_context",
+    [True, False],
+)
+def test_include_source_context_when_serializing_frame(include_source_context):
+    frame = sys._getframe()
+    result = serialize_frame(frame, include_source_context=include_source_context)
+
+    assert include_source_context ^ ("pre_context" in result) ^ True
+    assert include_source_context ^ ("context_line" in result) ^ True
+    assert include_source_context ^ ("post_context" in result) ^ True

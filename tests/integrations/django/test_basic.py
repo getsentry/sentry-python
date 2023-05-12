@@ -22,6 +22,7 @@ from sentry_sdk import capture_message, capture_exception, configure_scope
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
+from sentry_sdk.integrations.django.caching import _get_span_description
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
@@ -1035,20 +1036,20 @@ def test_cache_spans_middleware(
 
     (first_event, second_event) = events
     assert len(first_event["spans"]) == 1
-    assert first_event["spans"][0]["op"] == "cache"
+    assert first_event["spans"][0]["op"] == "cache.get_item"
     assert first_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
     assert first_event["spans"][0]["data"] == {"cache.hit": False}
 
     assert len(second_event["spans"]) == 2
-    assert second_event["spans"][0]["op"] == "cache"
+    assert second_event["spans"][0]["op"] == "cache.get_item"
     assert second_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
     assert second_event["spans"][0]["data"] == {"cache.hit": False}
 
-    assert second_event["spans"][1]["op"] == "cache"
+    assert second_event["spans"][1]["op"] == "cache.get_item"
     assert second_event["spans"][1]["description"].startswith(
         "get views.decorators.cache.cache_page."
     )
@@ -1077,20 +1078,20 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
 
     (first_event, second_event) = events
     assert len(first_event["spans"]) == 1
-    assert first_event["spans"][0]["op"] == "cache"
+    assert first_event["spans"][0]["op"] == "cache.get_item"
     assert first_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
     assert first_event["spans"][0]["data"] == {"cache.hit": False}
 
     assert len(second_event["spans"]) == 2
-    assert second_event["spans"][0]["op"] == "cache"
+    assert second_event["spans"][0]["op"] == "cache.get_item"
     assert second_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
     assert second_event["spans"][0]["data"] == {"cache.hit": False}
 
-    assert second_event["spans"][1]["op"] == "cache"
+    assert second_event["spans"][1]["op"] == "cache.get_item"
     assert second_event["spans"][1]["description"].startswith(
         "get views.decorators.cache.cache_page."
     )
@@ -1121,16 +1122,49 @@ def test_cache_spans_templatetag(
 
     (first_event, second_event) = events
     assert len(first_event["spans"]) == 1
-    assert first_event["spans"][0]["op"] == "cache"
+    assert first_event["spans"][0]["op"] == "cache.get_item"
     assert first_event["spans"][0]["description"].startswith(
         "get template.cache.some_identifier."
     )
     assert first_event["spans"][0]["data"] == {"cache.hit": False}
 
     assert len(second_event["spans"]) == 1
-    assert second_event["spans"][0]["op"] == "cache"
+    assert second_event["spans"][0]["op"] == "cache.get_item"
     assert second_event["spans"][0]["description"].startswith(
         "get template.cache.some_identifier."
     )
     assert second_event["spans"][0]["data"]["cache.hit"]
     assert "cache.item_size" in second_event["spans"][0]["data"]
+
+
+@pytest.mark.parametrize(
+    "method_name, args, kwargs, expected_description",
+    [
+        ("get", None, None, "get "),
+        ("get", [], {}, "get "),
+        ("get", ["bla", "blub", "foo"], {}, "get bla"),
+        (
+            "get_many",
+            [["bla 1", "bla 2", "bla 3"], "blub", "foo"],
+            {},
+            "get_many ['bla 1', 'bla 2', 'bla 3']",
+        ),
+        (
+            "get_many",
+            [["bla 1", "bla 2", "bla 3"], "blub", "foo"],
+            {"key": "bar"},
+            "get_many ['bla 1', 'bla 2', 'bla 3']",
+        ),
+        ("get", [], {"key": "bar"}, "get bar"),
+        (
+            "get",
+            "something",
+            {},
+            "get s",
+        ),  # this should never happen, just making sure that we are not raising an exception in that case.
+    ],
+)
+def test_cache_spans_get_span_description(
+    method_name, args, kwargs, expected_description
+):
+    assert _get_span_description(method_name, args, kwargs) == expected_description
