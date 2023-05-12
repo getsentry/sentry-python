@@ -159,10 +159,10 @@ def _wrap_apply_async(f):
                         kwarg_headers.setdefault("headers", {}).update(headers)
 
                         # Add the Sentry options potentially added in `sentry_apply_entry`
-                        # to the header (when auto-instrumenting Celery Beat tasks)
-                        for key, value in kwargs.items():
+                        # to the headers (done when auto-instrumenting Celery Beat tasks)
+                        for key, value in kwarg_headers.items():
                             if key.startswith("sentry-"):
-                                kwarg_headers[key] = value
+                                kwarg_headers["headers"][key] = value
 
                         kwargs["headers"] = kwarg_headers
 
@@ -440,7 +440,7 @@ def _patch_beat_apply_entry():
 
         # Set the Sentry configuration in the options of the ScheduleEntry.
         # Those will be picked up in `apply_async` and added to the headers.
-        schedule_entry.options.update(headers)
+        schedule_entry.options["headers"] = headers
         return original_apply_entry(*args, **kwargs)
 
     Scheduler.apply_entry = sentry_apply_entry
