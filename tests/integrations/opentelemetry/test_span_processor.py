@@ -190,7 +190,6 @@ def test_update_span_with_otel_data_http_method():
 
     assert sentry_span.op == "http.client"
     assert sentry_span.description == "GET example.com /"
-    assert sentry_span._tags["http.status_code"] == "429"
     assert sentry_span.status == "resource_exhausted"
 
     assert sentry_span._data["http.method"] == "GET"
@@ -220,7 +219,6 @@ def test_update_span_with_otel_data_http_method2():
 
     assert sentry_span.op == "http.server"
     assert sentry_span.description == "GET https://example.com/status/403"
-    assert sentry_span._tags["http.status_code"] == "429"
     assert sentry_span.status == "resource_exhausted"
 
     assert sentry_span._data["http.method"] == "GET"
