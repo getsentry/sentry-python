@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.23.0
+
+### Various fixes & improvements
+
+- Fixed Celery headers for Beat auto-instrumentation (#2102) by @antonpirker
+- Add a note about `pip freeze` to the bug template (#2103) by @sentrivana
+- Make sure we're importing redis the library (#2106) by @sentrivana
+- Surface `include_source_context` as an option (#2100) by @sentrivana
+- Import Markup from markupsafe (#2047) by @rco-ableton
+- Fix __qualname__ missing attribute in asyncio integration (#2105) by @sl0thentr0py
+- Ref: Add `include_source_context` option in utils (#2020) by @farhat-nawaz
+- Do not truncate request body if `request_bodies` is `"always"` (#2092) by @sentrivana
+- Remove relay extension from AWS Layer (#2068) by @sl0thentr0py
+- Add `loguru` integration (#1994) by @PerchunPak
+- Add `db.operation` to Redis and MongoDB spans. (#2089) by @antonpirker
+
 ## 1.22.2
 
 ### Various fixes & improvements
