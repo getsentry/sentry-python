@@ -594,8 +594,10 @@ def filename_for_module(module, abs_path):
         return abs_path
 
 
-def serialize_frame(frame, tb_lineno=None, include_local_variables=True):
-    # type: (FrameType, Optional[int], bool) -> Dict[str, Any]
+def serialize_frame(
+    frame, tb_lineno=None, include_local_variables=True, include_source_context=True
+):
+    # type: (FrameType, Optional[int], bool, bool) -> Dict[str, Any]
     f_code = getattr(frame, "f_code", None)
     if not f_code:
         abs_path = None
@@ -611,26 +613,27 @@ def serialize_frame(frame, tb_lineno=None, include_local_variables=True):
     if tb_lineno is None:
         tb_lineno = frame.f_lineno
 
-    pre_context, context_line, post_context = get_source_context(frame, tb_lineno)
-
     rv = {
         "filename": filename_for_module(module, abs_path) or None,
         "abs_path": os.path.abspath(abs_path) if abs_path else None,
         "function": function or "<unknown>",
         "module": module,
         "lineno": tb_lineno,
-        "pre_context": pre_context,
-        "context_line": context_line,
-        "post_context": post_context,
     }  # type: Dict[str, Any]
+
+    if include_source_context:
+        rv["pre_context"], rv["context_line"], rv["post_context"] = get_source_context(
+            frame, tb_lineno
+        )
+
     if include_local_variables:
         rv["vars"] = frame.f_locals
 
     return rv
 
 
-def current_stacktrace(include_local_variables=True):
-    # type: (bool) -> Any
+def current_stacktrace(include_local_variables=True, include_source_context=True):
+    # type: (bool, bool) -> Any
     __tracebackhide__ = True
     frames = []
 
@@ -638,7 +641,11 @@ def current_stacktrace(include_local_variables=True):
     while f is not None:
         if not should_hide_frame(f):
             frames.append(
-                serialize_frame(f, include_local_variables=include_local_variables)
+                serialize_frame(
+                    f,
+                    include_local_variables=include_local_variables,
+                    include_source_context=include_source_context,
+                )
             )
         f = f.f_back
 
@@ -674,14 +681,17 @@ def single_exception_from_error_tuple(
 
     if client_options is None:
         include_local_variables = True
+        include_source_context = True
     else:
         include_local_variables = client_options["include_local_variables"]
+        include_source_context = client_options["include_source_context"]
 
     frames = [
         serialize_frame(
             tb.tb_frame,
             tb_lineno=tb.tb_lineno,
             include_local_variables=include_local_variables,
+            include_source_context=include_source_context,
         )
         for tb in iter_stacks(tb)
     ]
@@ -1240,7 +1250,6 @@ ParsedUrl = namedtuple("ParsedUrl", ["url", "query", "fragment"])
 
 
 def parse_url(url, sanitize=True):
-
     # type: (str, bool) -> ParsedUrl
     """
     Splits a URL into a url (including path), query and fragment. If sanitize is True, the query
