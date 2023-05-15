@@ -101,6 +101,12 @@ class SPANDATA:
     Example: GET
     """
 
+    HTTP_STATUS_CODE = "http.status_code"
+    """
+    The integer HTTP status code.
+    Example: 418
+    """
+
 
 class OP:
     CACHE_GET_ITEM = "cache.get_item"
