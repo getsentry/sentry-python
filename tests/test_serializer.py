@@ -2,7 +2,7 @@ import re
 import sys
 import pytest
 
-from sentry_sdk.serializer import serialize
+from sentry_sdk.serializer import MAX_DATABAG_BREADTH, MAX_DATABAG_DEPTH, serialize
 
 try:
     from hypothesis import given
@@ -40,10 +40,20 @@ def message_normalizer(validate_event_schema):
 
 @pytest.fixture
 def extra_normalizer(validate_event_schema):
-    def inner(message, **kwargs):
-        event = serialize({"extra": {"foo": message}}, **kwargs)
+    def inner(extra, **kwargs):
+        event = serialize({"extra": {"foo": extra}}, **kwargs)
         validate_event_schema(event)
         return event["extra"]["foo"]
+
+    return inner
+
+
+@pytest.fixture
+def body_normalizer(validate_event_schema):
+    def inner(body, **kwargs):
+        event = serialize({"request": {"data": body}}, **kwargs)
+        validate_event_schema(event)
+        return event["request"]["data"]
 
     return inner
 
@@ -106,3 +116,29 @@ def test_custom_mapping_doesnt_mess_with_mock(extra_normalizer):
     m = mock.Mock()
     extra_normalizer(m)
     assert len(m.mock_calls) == 0
+
+
+def test_trim_databag_breadth(body_normalizer):
+    data = {
+        "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
+    }
+
+    result = body_normalizer(data)
+
+    assert len(result) == MAX_DATABAG_BREADTH
+    for key, value in result.items():
+        assert data.get(key) == value
+
+
+def test_no_trimming_if_request_bodies_is_always(body_normalizer):
+    data = {
+        "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
+    }
+    curr = data
+    for _ in range(MAX_DATABAG_DEPTH + 5):
+        curr["nested"] = {}
+        curr = curr["nested"]
+
+    result = body_normalizer(data, request_bodies="always")
+
+    assert result == data
