@@ -443,7 +443,7 @@ def test_abstract_task(capture_events, celery, celery_invocation):
 
 def test_task_headers(celery):
     """
-    Test that the headers set in the Celery Beat auto-strumentation are passed to the celery signal handlers
+    Test that the headers set in the Celery Beat auto-instrumentation are passed to the celery signal handlers
     """
     sentry_crons_setup = {
         "sentry-monitor-slug": "some-slug",
