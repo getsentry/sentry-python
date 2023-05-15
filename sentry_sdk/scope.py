@@ -113,7 +113,6 @@ class Scope(object):
         self._name = None  # type: Optional[str]
         self.clear()
 
-        logger.warning("TwP: Initializing propagation context in Scope")
         self._propagation_context = {
             "trace_id": -1,  # uuid.uuid4().hex,
             "span_id": -1,  # uuid.uuid4().hex[16:],
@@ -127,22 +126,27 @@ class Scope(object):
                 "sample_rate": 123,
             },
         }
+        logger.warning(
+            f"TwP: Initializing propagation context in Scope: {self._propagation_context }"
+        )
 
     def get_traceparent(self):
         # type: () -> str
         sampled = "XXX"
         return "%s-%s-%s" % (
-            self._propagation_context.trace_id,
-            self._propagation_context.span_id,
+            self._propagation_context["trace_id"],
+            self._propagation_context["span_id"],
             sampled,
         )
 
     def get_trace_context(self):
         # type: () -> Any
         trace_context = {
-            "trace_id": self._propagation_context.trace_id,
-            "span_id": self._propagation_context.span_id,
-            "dynamic_sampling_context": self._propagation_context.dynamic_sampling_context,
+            "trace_id": self._propagation_context["trace_id"],
+            "span_id": self._propagation_context["span_id"],
+            "dynamic_sampling_context": self._propagation_context[
+                "dynamic_sampling_context"
+            ],
         }  # type: Dict[str, Any]
 
         return trace_context
@@ -154,7 +158,7 @@ class Scope(object):
         """
         yield SENTRY_TRACE_HEADER_NAME, self.get_traceparent()
 
-        baggage = Baggage(self._propagation_context.dynamic_sampling_context)
+        baggage = Baggage(self._propagation_context["dynamic_sampling_context"])
         yield BAGGAGE_HEADER_NAME, baggage
 
     def clear(self):
