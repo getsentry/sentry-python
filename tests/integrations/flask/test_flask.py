@@ -28,6 +28,7 @@ from sentry_sdk import (
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
 import sentry_sdk.integrations.flask as flask_sentry
+from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
 
 login_manager = LoginManager()
@@ -445,6 +446,32 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
 
     assert event["_meta"]["request"]["data"]["file"] == {"": {"rem": [["!raw", "x"]]}}
     assert not event["request"]["data"]["file"]
+
+
+def test_json_not_truncated_if_request_bodies_is_always(
+    sentry_init, capture_events, app
+):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="always")
+
+    data = {
+        "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
+    }
+
+    @app.route("/", methods=["POST"])
+    def index():
+        assert request.get_json() == data
+        assert request.get_data() == json.dumps(data).encode("ascii")
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.post("/", content_type="application/json", data=json.dumps(data))
+    assert response.status_code == 200
+
+    (event,) = events
+    assert event["request"]["data"] == data
 
 
 @pytest.mark.parametrize(
