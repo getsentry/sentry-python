@@ -627,7 +627,11 @@ def serialize_frame(
         )
 
     if include_local_variables:
-        rv["vars"] = frame.f_locals
+        # repr local vars here already to avoid changing stuff
+        # by reference later (e.g. when scrubbing PII)
+        from sentry_sdk.serializer import serialize
+
+        rv["vars"] = serialize(frame.f_locals, should_repr_strings=True)
 
     return rv
 

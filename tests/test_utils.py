@@ -241,3 +241,11 @@ def test_include_source_context_when_serializing_frame(include_source_context):
     assert include_source_context ^ ("pre_context" in result) ^ True
     assert include_source_context ^ ("context_line" in result) ^ True
     assert include_source_context ^ ("post_context" in result) ^ True
+
+
+def test_local_vars_serialized_when_serializing_frame():
+    local_var = lambda: "cats"  # noqa: F841
+    frame = sys._getframe()
+    result = serialize_frame(frame)
+
+    assert all(isinstance(val, str) for val in result["vars"].values())
