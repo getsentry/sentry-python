@@ -320,7 +320,11 @@ class _Client(object):
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
-            event = serialize(event, request_bodies=self.options.get("request_bodies"))
+            event = serialize(
+                event,
+                request_bodies=self.options.get("request_bodies"),
+                ignore_local_vars=True,
+            )
 
         before_send = self.options["before_send"]
         if (

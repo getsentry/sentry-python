@@ -121,6 +121,7 @@ def serialize(event, **kwargs):
     meta_stack = []  # type: List[Dict[str, Any]]
 
     keep_request_bodies = kwargs.pop("request_bodies", None) == "always"  # type: bool
+    ignore_local_vars = kwargs.pop("ignore_local_vars", False)
 
     def _annotate(**meta):
         # type: (**Any) -> None
@@ -380,7 +381,8 @@ def serialize(event, **kwargs):
             return rv_list
 
         if should_repr_strings:
-            obj = safe_repr(obj)
+            if not ignore_local_vars:
+                obj = safe_repr(obj)
         else:
             if isinstance(obj, bytes) or isinstance(obj, bytearray):
                 obj = obj.decode("utf-8", "replace")
