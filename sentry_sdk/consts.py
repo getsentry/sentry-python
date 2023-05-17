@@ -185,6 +185,7 @@ class ClientConstructor(object):
         project_root=None,  # type: Optional[str]
         enable_tracing=None,  # type: Optional[bool]
         include_local_variables=True,  # type: Optional[bool]
+        include_source_context=True,  # type: Optional[bool]
         trace_propagation_targets=[  # noqa: B006
             MATCH_ALL
         ],  # type: Optional[Sequence[str]]
@@ -213,4 +214,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.22.2"
+VERSION = "1.23.1"
