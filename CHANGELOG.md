@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.23.1
+
+### Various fixes & improvements
+
+- Disable Django Cache spans by default. (#2120) by @antonpirker
+
 ## 1.23.0
 
 ### Various fixes & improvements
