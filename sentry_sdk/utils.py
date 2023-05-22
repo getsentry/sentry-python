@@ -10,6 +10,7 @@ import sys
 import threading
 import time
 from collections import namedtuple
+from copy import copy
 from decimal import Decimal
 from numbers import Real
 
@@ -627,7 +628,7 @@ def serialize_frame(
         )
 
     if include_local_variables:
-        rv["vars"] = frame.f_locals
+        rv["vars"] = copy(frame.f_locals)
 
     return rv
 
