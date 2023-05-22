@@ -274,7 +274,7 @@ def test_exclude_beat_tasks_option(
 
     with mock.patch(
         "sentry_sdk.integrations.celery.Scheduler", fake_scheduler
-    ) as Scheduler:
+    ) as Scheduler:  # noqa: N806
         with mock.patch(
             "sentry_sdk.integrations.celery.Hub.current.get_integration",
             return_value=fake_integration,
