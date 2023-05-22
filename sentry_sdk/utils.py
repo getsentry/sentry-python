@@ -1303,6 +1303,19 @@ def is_valid_sample_rate(rate, source):
     return True
 
 
+def match_regex_list(item, regex_list=None):
+    # type: (str, Optional[List[str]]) -> bool
+    if regex_list is None:
+        return False
+
+    for item_matcher in regex_list:
+        matched = re.search(item_matcher, item)
+        if matched:
+            return True
+
+    return False
+
+
 if PY37:
 
     def nanosecond_time():
