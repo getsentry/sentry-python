@@ -1,8 +1,9 @@
+import sys
+from copy import deepcopy
 from datetime import datetime, timedelta
 from os import environ
-import sys
-from sentry_sdk.consts import OP
 
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, Transaction
 from sentry_sdk._compat import reraise
@@ -193,7 +194,7 @@ def _make_request_event_processor(gcp_event, configured_timeout, initial_time):
                 # event. Meaning every body is unstructured to us.
                 request["data"] = AnnotatedValue.removed_because_raw_data()
 
-        event["request"] = request
+        event["request"] = deepcopy(request)
 
         return event
 
