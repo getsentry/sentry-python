@@ -48,7 +48,7 @@ def test_installed_modules():
             )
             for dist in distributions()
         }
-        del importlib_modules["typing-extensions"]
+        importlib_modules.pop("typing-extensions", None)
         assert installed_modules == importlib_modules
 
     if pkg_resources_available:
@@ -56,5 +56,5 @@ def test_installed_modules():
             _normalize_module_name(dist.key): dist.version
             for dist in pkg_resources.working_set
         }
-        del pkg_resources_modules["typing-extensions"]
+        pkg_resources_modules.pop("typing-extensions", None)
         assert installed_modules == pkg_resources_modules
