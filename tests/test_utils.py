@@ -5,6 +5,7 @@ import sys
 from sentry_sdk.utils import (
     is_valid_sample_rate,
     logger,
+    match_regex_list,
     parse_url,
     sanitize_url,
     serialize_frame,
@@ -241,3 +242,24 @@ def test_include_source_context_when_serializing_frame(include_source_context):
     assert include_source_context ^ ("pre_context" in result) ^ True
     assert include_source_context ^ ("context_line" in result) ^ True
     assert include_source_context ^ ("post_context" in result) ^ True
+
+
+@pytest.mark.parametrize(
+    "item,regex_list,expected_result",
+    [
+        ["", [], False],
+        [None, [], False],
+        ["", None, False],
+        [None, None, False],
+        ["some-string", [], False],
+        ["some-string", None, False],
+        ["some-string", ["some-string"], True],
+        ["some-string", ["some"], False],
+        ["some-string", ["some$"], False],  # same as above
+        ["some-string", ["some.*"], True],
+        ["some-string", ["Some"], False],  # we do case sensitive matching
+        ["some-string", [".*string$"], True],
+    ],
+)
+def test_match_regex_list(item, regex_list, expected_result):
+    assert match_regex_list(item, regex_list) == expected_result
