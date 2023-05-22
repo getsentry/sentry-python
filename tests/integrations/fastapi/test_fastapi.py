@@ -1,4 +1,5 @@
 import json
+import logging
 import threading
 
 import pytest
@@ -6,7 +7,7 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 
 fastapi = pytest.importorskip("fastapi")
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.starlette import StarletteIntegration
@@ -187,3 +188,37 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
         transactions = profile.payload.json["transactions"]
         assert len(transactions) == 1
         assert str(data["active"]) == transactions[0]["active_thread_id"]
+
+
+@pytest.mark.asyncio
+async def test_original_request_not_scrubbed(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        traces_sample_rate=1.0,
+        debug=True,
+    )
+
+    app = FastAPI()
+
+    @app.post("/error")
+    async def _error(request: Request):
+        headers = request.headers
+        body = await request.json()
+
+        logging.critical("Oh no!")
+
+        assert headers["Authorization"] == "Bearer ohno"
+        assert body == {"password": "secret"}
+
+        return {"error": "Oh no!"}
+
+    events = capture_events()
+
+    client = TestClient(app)
+    client.post(
+        "/error", json={"password": "secret"}, headers={"Authorization": "Bearer ohno"}
+    )
+
+    event = events[0]
+    assert event["request"]["data"] == {"password": "[Filtered]"}
+    assert event["request"]["headers"]["authorization"] == "[Filtered]"
