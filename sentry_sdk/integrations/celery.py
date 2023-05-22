@@ -59,10 +59,13 @@ CELERY_CONTROL_FLOW_EXCEPTIONS = (Retry, Ignore, Reject)
 class CeleryIntegration(Integration):
     identifier = "celery"
 
-    def __init__(self, propagate_traces=True, monitor_beat_tasks=False):
+    def __init__(
+        self, propagate_traces=True, monitor_beat_tasks=False, exclude_beat_tasks=[]
+    ):
         # type: (bool, bool) -> None
         self.propagate_traces = propagate_traces
         self.monitor_beat_tasks = monitor_beat_tasks
+        self.exclude_beat_tasks = exclude_beat_tasks
 
         if monitor_beat_tasks:
             _patch_beat_apply_entry()
@@ -420,8 +423,18 @@ def _patch_beat_apply_entry():
         app = scheduler.app
 
         celery_schedule = schedule_entry.schedule
-        monitor_config = _get_monitor_config(celery_schedule, app)
         monitor_name = schedule_entry.name
+
+        # TODO: skip if in exclude_beat_tasks
+        hub = Hub.current
+        integration = hub.get_integration(CeleryIntegration)
+        if integration is None:
+            return original_apply_entry(*args, **kwargs)
+
+        if monitor_name in integration.exclude_beat_tasks:
+            return original_apply_entry(*args, **kwargs)
+
+        monitor_config = _get_monitor_config(celery_schedule, app)
 
         headers = schedule_entry.options.pop("headers", {})
         headers.update(
