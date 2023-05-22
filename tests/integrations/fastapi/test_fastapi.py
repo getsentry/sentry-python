@@ -202,13 +202,9 @@ async def test_original_request_not_scrubbed(sentry_init, capture_events):
 
     @app.post("/error")
     async def _error(request: Request):
-        headers = request.headers
-        body = await request.json()
-
         logging.critical("Oh no!")
-
-        assert headers["Authorization"] == "Bearer ohno"
-        assert body == {"password": "secret"}
+        assert request.headers["Authorization"] == "Bearer ohno"
+        assert await request.json() == {"password": "secret"}
 
         return {"error": "Oh no!"}
 
