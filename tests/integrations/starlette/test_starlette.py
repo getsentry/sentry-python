@@ -884,7 +884,7 @@ def test_original_request_not_scrubbed(sentry_init, capture_events):
     async def _error(request):
         logging.critical("Oh no!")
         assert request.headers["Authorization"] == "Bearer ohno"
-        assert request.get_json() == {"password": "ohno"}
+        assert await request.json() == {"password": "ohno"}
         return starlette.responses.JSONResponse({"status": "Oh no!"})
 
     app = starlette.applications.Starlette(
@@ -896,14 +896,11 @@ def test_original_request_not_scrubbed(sentry_init, capture_events):
     events = capture_events()
 
     client = TestClient(app)
-    try:
-        client.get(
-            "/error",
-            json={"password": "ohno"},
-            headers={"Authorization": "Bearer ohno"},
-        )
-    except Exception:
-        pass
+    client.get(
+        "/error",
+        json={"password": "ohno"},
+        headers={"Authorization": "Bearer ohno"},
+    )
 
     event = events[0]
     assert event["request"]["data"] == {"password": "[Filtered]"}
