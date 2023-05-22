@@ -1303,12 +1303,15 @@ def is_valid_sample_rate(rate, source):
     return True
 
 
-def match_regex_list(item, regex_list=None):
-    # type: (str, Optional[List[str]]) -> bool
+def match_regex_list(item, regex_list=None, substring_matching=False):
+    # type: (str, Optional[List[str]], bool) -> bool
     if regex_list is None:
         return False
 
     for item_matcher in regex_list:
+        if not substring_matching and item_matcher[-1] != "$":
+            item_matcher += "$"
+
         matched = re.search(item_matcher, item)
         if matched:
             return True

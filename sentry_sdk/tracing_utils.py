@@ -335,7 +335,7 @@ def should_propagate_trace(hub, url):
     client = hub.client  # type: Any
     trace_propagation_targets = client.options["trace_propagation_targets"]
 
-    return match_regex_list(url, trace_propagation_targets)
+    return match_regex_list(url, trace_propagation_targets, substring_matching=True)
 
 
 # Circular imports

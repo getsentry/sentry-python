@@ -254,13 +254,9 @@ def test_include_source_context_when_serializing_frame(include_source_context):
         ["some-string", [], False],
         ["some-string", None, False],
         ["some-string", ["some-string"], True],
-        [
-            "some-string",
-            ["some"],
-            True,
-        ],  # String do not need to fully match, a substring match is enough
-        ["some-string", ["some.*"], True],  # same as the one above
-        ["some-string", ["some$"], False],
+        ["some-string", ["some"], False],
+        ["some-string", ["some$"], False],  # same as above
+        ["some-string", ["some.*"], True],
         ["some-string", ["Some"], False],  # we do case sensitive matching
         ["some-string", [".*string$"], True],
     ],
