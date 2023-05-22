@@ -113,6 +113,9 @@ class Scope(object):
         self._name = None  # type: Optional[str]
         self.clear()
 
+        self._propagation_context = None
+
+    def generate_propagation_context(self):
         self._propagation_context = {
             "trace_id": 111,  # uuid.uuid4().hex,
             "span_id": 222,  # uuid.uuid4().hex[16:],
