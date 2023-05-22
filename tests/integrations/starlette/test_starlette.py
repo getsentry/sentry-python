@@ -877,9 +877,9 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
 
 
 def test_original_request_not_scrubbed(sentry_init, capture_events):
-    sentry_init(
-        integrations=[StarletteIntegration()],
-    )
+    sentry_init(integrations=[StarletteIntegration()])
+
+    events = capture_events()
 
     async def _error(request):
         logging.critical("Oh no!")
@@ -889,14 +889,12 @@ def test_original_request_not_scrubbed(sentry_init, capture_events):
 
     app = starlette.applications.Starlette(
         routes=[
-            starlette.routing.Route("/error", _error),
+            starlette.routing.Route("/error", _error, methods=["POST"]),
         ],
     )
 
-    events = capture_events()
-
     client = TestClient(app)
-    client.get(
+    client.post(
         "/error",
         json={"password": "ohno"},
         headers={"Authorization": "Bearer ohno"},
