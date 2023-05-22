@@ -20,7 +20,7 @@ _installed_modules = None
 
 def _normalize_module_name(name):
     # type: (str) -> str
-    return name.lower().replace("-", "_")
+    return name.lower()
 
 
 def _generate_installed_modules():
