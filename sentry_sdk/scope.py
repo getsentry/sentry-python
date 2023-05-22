@@ -114,8 +114,8 @@ class Scope(object):
         self.clear()
 
         self._propagation_context = {
-            "trace_id": -1,  # uuid.uuid4().hex,
-            "span_id": -1,  # uuid.uuid4().hex[16:],
+            "trace_id": 111,  # uuid.uuid4().hex,
+            "span_id": 222,  # uuid.uuid4().hex[16:],
             "dynamic_sampling_context": {
                 "trace_id": -2,
                 "environment": "xxx-environment",
@@ -132,7 +132,7 @@ class Scope(object):
 
     def get_traceparent(self):
         # type: () -> str
-        sampled = "XXX"
+        sampled = "XXX"  # This should be 0 zero?
         return "%s-%s-%s" % (
             self._propagation_context["trace_id"],
             self._propagation_context["span_id"],

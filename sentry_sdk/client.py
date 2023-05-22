@@ -241,6 +241,8 @@ class _Client(object):
             except ValueError as e:
                 logger.debug(str(e))
 
+        # TODO for later: Load tracing stuff from environment into new _propagation_context on scope.
+
         self._setup_instrumentation(self.options.get("functions_to_trace", []))
 
     @property
