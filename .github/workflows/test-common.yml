@@ -54,7 +54,7 @@ jobs:
           timeout_minutes: 45
           max_attempts: 2
           retry_wait_seconds: 5
-          shell: bash
+          shell: bash -e
           command: |
             set -x # print commands that are executed
             coverage erase
