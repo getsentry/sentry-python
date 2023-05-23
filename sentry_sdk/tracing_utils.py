@@ -82,11 +82,14 @@ class EnvironHeaders(Mapping):  # type: ignore
 
 
 def has_tracing_enabled(options):
-    # type: (Dict[str, Any]) -> bool
+    # type: (Optional[Dict[str, Any]]) -> bool
     """
     Returns True if either traces_sample_rate or traces_sampler is
     defined and enable_tracing is set and not false.
     """
+    if options is None:
+        return False
+
     return bool(
         options.get("enable_tracing") is not False
         and (
