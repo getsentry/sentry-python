@@ -117,12 +117,16 @@ class Scope(object):
         self._propagation_context = None
 
     def generate_propagation_context(self):
+        # type: () -> None
+        """
+        Populates `_propagation_context` with a new Propagation Context.
+        """
         self._propagation_context = {
             "trace_id": uuid.uuid4().hex,
             "span_id": uuid.uuid4().hex[16:],
             "dynamic_sampling_context": None,
             # {
-            #     "trace_id": -2,
+            #     "trace_id": "999xxx",
             #     "environment": "xxx-environment",
             #     "release": "xxx-release",
             #     "public_key": "xxx-public-key",
@@ -136,25 +140,36 @@ class Scope(object):
         )
 
     def get_dynamic_sampling_context(self):
-
+        # type: () -> Dict[str, str]
+        """
+        Returns the Dynamic Sampling Context from the Propagation Context.
+        If not existing, creates a new one.
+        """
         if self._propagation_context["dynamic_sampling_context"] is None:
-            # TODO: create new and return
+            # TwP TODO: create new and return
             ...
 
         return self._propagation_context["dynamic_sampling_context"]
-        ...
 
     def get_traceparent(self):
         # type: () -> str
+        """
+        Returns the Sentry "sentry-trace" header (aka the traceparent) from the Propagation Context.
+        """
         sampled = 0
-        return "%s-%s-%s" % (
+
+        traceparent = "%s-%s-%s" % (
             self._propagation_context["trace_id"],
             self._propagation_context["span_id"],
             sampled,
         )
+        return traceparent
 
     def get_trace_context(self):
         # type: () -> Any
+        """
+        Returns the Sentry "trace" context from the Propagation Context.
+        """
         trace_context = {
             "trace_id": self._propagation_context["trace_id"],
             "span_id": self._propagation_context["span_id"],
@@ -166,7 +181,7 @@ class Scope(object):
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
         """
-        Creates a generator which returns the span's `sentry-trace` and `baggage` headers.
+        Creates a generator which returns the `sentry-trace` and `baggage` headers from the Propagation Context.
         """
         yield SENTRY_TRACE_HEADER_NAME, self.get_traceparent()
 
@@ -435,7 +450,7 @@ class Scope(object):
         self,
         event,  # type: Event
         hint,  # type: Hint
-        options=None,
+        options=None,  # type: Dict[str, Any]
     ):
         # type: (...) -> Optional[Event]
         """Applies the information contained on the scope to the given event."""
@@ -485,10 +500,8 @@ class Scope(object):
         if self._contexts:
             event.setdefault("contexts", {}).update(self._contexts)
 
-        # TwP
         contexts = event.setdefault("contexts", {})
 
-        # check options if performance is enabled, if yes take from span, if no take from scope.propagation_context
         if has_tracing_enabled(options):
             logger.warning(
                 f"TwP: Setting trace from self._span: {self._span.get_trace_context()}"
