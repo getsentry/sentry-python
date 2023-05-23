@@ -1017,8 +1017,6 @@ def test_cache_spans_middleware(
     use_django_caching_with_middlewares,
     settings,
 ):
-    client.application.load_middleware()
-
     sentry_init(
         integrations=[
             DjangoIntegration(
@@ -1029,6 +1027,8 @@ def test_cache_spans_middleware(
         ],
         traces_sample_rate=1.0,
     )
+
+    client.application.load_middleware()
     events = capture_events()
 
     client.get(reverse("not_cached_view"))

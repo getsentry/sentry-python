@@ -18,15 +18,30 @@ if TYPE_CHECKING:
 _installed_modules = None
 
 
+def _normalize_module_name(name):
+    # type: (str) -> str
+    return name.lower()
+
+
 def _generate_installed_modules():
     # type: () -> Iterator[Tuple[str, str]]
     try:
-        import pkg_resources
-    except ImportError:
-        return
+        from importlib.metadata import distributions, version
 
-    for info in pkg_resources.working_set:
-        yield info.key, info.version
+        for dist in distributions():
+            yield _normalize_module_name(dist.metadata["Name"]), version(
+                dist.metadata["Name"]
+            )
+
+    except ImportError:
+        # < py3.8
+        try:
+            import pkg_resources
+        except ImportError:
+            return
+
+        for info in pkg_resources.working_set:
+            yield _normalize_module_name(info.key), info.version
 
 
 def _get_installed_modules():

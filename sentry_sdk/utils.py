@@ -10,6 +10,7 @@ import sys
 import threading
 import time
 from collections import namedtuple
+from copy import copy
 from decimal import Decimal
 from numbers import Real
 
@@ -29,6 +30,12 @@ except ImportError:
     from urlparse import urlsplit  # type: ignore
     from urlparse import urlunsplit  # type: ignore
 
+try:
+    # Python 3.11
+    from builtins import BaseExceptionGroup
+except ImportError:
+    # Python 3.10 and below
+    BaseExceptionGroup = None  # type: ignore
 
 from datetime import datetime
 from functools import partial
@@ -627,7 +634,7 @@ def serialize_frame(
         )
 
     if include_local_variables:
-        rv["vars"] = frame.f_locals
+        rv["vars"] = copy(frame.f_locals)
 
     return rv
 
@@ -665,9 +672,23 @@ def single_exception_from_error_tuple(
     tb,  # type: Optional[TracebackType]
     client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
+    exception_id=None,  # type: Optional[int]
+    parent_id=None,  # type: Optional[int]
+    source=None,  # type: Optional[str]
 ):
     # type: (...) -> Dict[str, Any]
-    mechanism = mechanism or {"type": "generic", "handled": True}
+    """
+    Creates a dict that goes into the events `exception.values` list and is ingestible by Sentry.
+
+    See the Exception Interface documentation for more details:
+    https://develop.sentry.dev/sdk/event-payloads/exception/
+    """
+    exception_value = {}  # type: Dict[str, Any]
+    exception_value["mechanism"] = (
+        mechanism.copy() if mechanism else {"type": "generic", "handled": True}
+    )
+    if exception_id is not None:
+        exception_value["mechanism"]["exception_id"] = exception_id
 
     if exc_value is not None:
         errno = get_errno(exc_value)
@@ -675,9 +696,30 @@ def single_exception_from_error_tuple(
         errno = None
 
     if errno is not None:
-        mechanism.setdefault("meta", {}).setdefault("errno", {}).setdefault(
-            "number", errno
-        )
+        exception_value["mechanism"].setdefault("meta", {}).setdefault(
+            "errno", {}
+        ).setdefault("number", errno)
+
+    if source is not None:
+        exception_value["mechanism"]["source"] = source
+
+    is_root_exception = exception_id == 0
+    if not is_root_exception and parent_id is not None:
+        exception_value["mechanism"]["parent_id"] = parent_id
+        exception_value["mechanism"]["type"] = "chained"
+
+    if is_root_exception and "type" not in exception_value["mechanism"]:
+        exception_value["mechanism"]["type"] = "generic"
+
+    is_exception_group = BaseExceptionGroup is not None and isinstance(
+        exc_value, BaseExceptionGroup
+    )
+    if is_exception_group:
+        exception_value["mechanism"]["is_exception_group"] = True
+
+    exception_value["module"] = get_type_module(exc_type)
+    exception_value["type"] = get_type_name(exc_type)
+    exception_value["value"] = getattr(exc_value, "message", safe_str(exc_value))
 
     if client_options is None:
         include_local_variables = True
@@ -696,17 +738,10 @@ def single_exception_from_error_tuple(
         for tb in iter_stacks(tb)
     ]
 
-    rv = {
-        "module": get_type_module(exc_type),
-        "type": get_type_name(exc_type),
-        "value": safe_str(exc_value),
-        "mechanism": mechanism,
-    }
-
     if frames:
-        rv["stacktrace"] = {"frames": frames}
+        exception_value["stacktrace"] = {"frames": frames}
 
-    return rv
+    return exception_value
 
 
 HAS_CHAINED_EXCEPTIONS = hasattr(Exception, "__suppress_context__")
@@ -750,6 +785,104 @@ else:
         yield exc_info
 
 
+def exceptions_from_error(
+    exc_type,  # type: Optional[type]
+    exc_value,  # type: Optional[BaseException]
+    tb,  # type: Optional[TracebackType]
+    client_options=None,  # type: Optional[Dict[str, Any]]
+    mechanism=None,  # type: Optional[Dict[str, Any]]
+    exception_id=0,  # type: int
+    parent_id=0,  # type: int
+    source=None,  # type: Optional[str]
+):
+    # type: (...) -> Tuple[int, List[Dict[str, Any]]]
+    """
+    Creates the list of exceptions.
+    This can include chained exceptions and exceptions from an ExceptionGroup.
+
+    See the Exception Interface documentation for more details:
+    https://develop.sentry.dev/sdk/event-payloads/exception/
+    """
+
+    parent = single_exception_from_error_tuple(
+        exc_type=exc_type,
+        exc_value=exc_value,
+        tb=tb,
+        client_options=client_options,
+        mechanism=mechanism,
+        exception_id=exception_id,
+        parent_id=parent_id,
+        source=source,
+    )
+    exceptions = [parent]
+
+    parent_id = exception_id
+    exception_id += 1
+
+    should_supress_context = (
+        hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
+    )
+    if should_supress_context:
+        # Add direct cause.
+        # The field `__cause__` is set when raised with the exception (using the `from` keyword).
+        exception_has_cause = (
+            exc_value
+            and hasattr(exc_value, "__cause__")
+            and exc_value.__cause__ is not None
+        )
+        if exception_has_cause:
+            cause = exc_value.__cause__  # type: ignore
+            (exception_id, child_exceptions) = exceptions_from_error(
+                exc_type=type(cause),
+                exc_value=cause,
+                tb=getattr(cause, "__traceback__", None),
+                client_options=client_options,
+                mechanism=mechanism,
+                exception_id=exception_id,
+                source="__cause__",
+            )
+            exceptions.extend(child_exceptions)
+
+    else:
+        # Add indirect cause.
+        # The field `__context__` is assigned if another exception occurs while handling the exception.
+        exception_has_content = (
+            exc_value
+            and hasattr(exc_value, "__context__")
+            and exc_value.__context__ is not None
+        )
+        if exception_has_content:
+            context = exc_value.__context__  # type: ignore
+            (exception_id, child_exceptions) = exceptions_from_error(
+                exc_type=type(context),
+                exc_value=context,
+                tb=getattr(context, "__traceback__", None),
+                client_options=client_options,
+                mechanism=mechanism,
+                exception_id=exception_id,
+                source="__context__",
+            )
+            exceptions.extend(child_exceptions)
+
+    # Add exceptions from an ExceptionGroup.
+    is_exception_group = exc_value and hasattr(exc_value, "exceptions")
+    if is_exception_group:
+        for idx, e in enumerate(exc_value.exceptions):  # type: ignore
+            (exception_id, child_exceptions) = exceptions_from_error(
+                exc_type=type(e),
+                exc_value=e,
+                tb=getattr(e, "__traceback__", None),
+                client_options=client_options,
+                mechanism=mechanism,
+                exception_id=exception_id,
+                parent_id=parent_id,
+                source="exceptions[%s]" % idx,
+            )
+            exceptions.extend(child_exceptions)
+
+    return (exception_id, exceptions)
+
+
 def exceptions_from_error_tuple(
     exc_info,  # type: ExcInfo
     client_options=None,  # type: Optional[Dict[str, Any]]
@@ -757,17 +890,34 @@ def exceptions_from_error_tuple(
 ):
     # type: (...) -> List[Dict[str, Any]]
     exc_type, exc_value, tb = exc_info
-    rv = []
-    for exc_type, exc_value, tb in walk_exception_chain(exc_info):
-        rv.append(
-            single_exception_from_error_tuple(
-                exc_type, exc_value, tb, client_options, mechanism
-            )
+
+    is_exception_group = BaseExceptionGroup is not None and isinstance(
+        exc_value, BaseExceptionGroup
+    )
+
+    if is_exception_group:
+        (_, exceptions) = exceptions_from_error(
+            exc_type=exc_type,
+            exc_value=exc_value,
+            tb=tb,
+            client_options=client_options,
+            mechanism=mechanism,
+            exception_id=0,
+            parent_id=0,
         )
 
-    rv.reverse()
+    else:
+        exceptions = []
+        for exc_type, exc_value, tb in walk_exception_chain(exc_info):
+            exceptions.append(
+                single_exception_from_error_tuple(
+                    exc_type, exc_value, tb, client_options, mechanism
+                )
+            )
 
-    return rv
+    exceptions.reverse()
+
+    return exceptions
 
 
 def to_string(value):
@@ -1301,6 +1451,22 @@ def is_valid_sample_rate(rate, source):
         return False
 
     return True
+
+
+def match_regex_list(item, regex_list=None, substring_matching=False):
+    # type: (str, Optional[List[str]], bool) -> bool
+    if regex_list is None:
+        return False
+
+    for item_matcher in regex_list:
+        if not substring_matching and item_matcher[-1] != "$":
+            item_matcher += "$"
+
+        matched = re.search(item_matcher, item)
+        if matched:
+            return True
+
+    return False
 
 
 if PY37:
