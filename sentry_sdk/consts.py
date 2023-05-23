@@ -103,8 +103,8 @@ class SPANDATA:
 
     HTTP_STATUS_CODE = "http.status_code"
     """
-    The integer HTTP status code.
-    Example: 418
+    The HTTP status code as string.
+    Example: "418"
     """
 
 
