@@ -10,6 +10,7 @@ import sys
 import threading
 import time
 from collections import namedtuple
+from copy import copy
 from decimal import Decimal
 from numbers import Real
 
@@ -633,7 +634,7 @@ def serialize_frame(
         )
 
     if include_local_variables:
-        rv["vars"] = frame.f_locals
+        rv["vars"] = copy(frame.f_locals)
 
     return rv
 
@@ -1450,6 +1451,22 @@ def is_valid_sample_rate(rate, source):
         return False
 
     return True
+
+
+def match_regex_list(item, regex_list=None, substring_matching=False):
+    # type: (str, Optional[List[str]], bool) -> bool
+    if regex_list is None:
+        return False
+
+    for item_matcher in regex_list:
+        if not substring_matching and item_matcher[-1] != "$":
+            item_matcher += "$"
+
+        matched = re.search(item_matcher, item)
+        if matched:
+            return True
+
+    return False
 
 
 if PY37:
