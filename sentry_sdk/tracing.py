@@ -162,7 +162,21 @@ class Span(object):
             self._span_recorder = _SpanRecorder(maxlen)
 
     @property
-    def span_id(self) -> str:
+    def trace_id(self):
+        # type: () -> str
+        if not self._trace_id:
+            self._trace_id = uuid.uuid4().hex
+
+        return self._trace_id
+
+    @trace_id.setter
+    def trace_id(self, value):
+        # type: (str) -> None
+        self._trace_id = value
+
+    @property
+    def span_id(self):
+        # type: () -> str
         if not self._span_id:
             self._span_id = uuid.uuid4().hex[16:]
 
@@ -170,18 +184,8 @@ class Span(object):
 
     @span_id.setter
     def span_id(self, value: str) -> None:
+        # type: (str) -> None
         self._span_id = value
-
-    @property
-    def trace_id(self) -> str:
-        if not self._trace_id:
-            self._trace_id = uuid.uuid4().hex
-
-        return self._trace_id
-
-    @trace_id.setter
-    def trace_id(self, value: str) -> None:
-        self._trace_id = value
 
     def __repr__(self):
         # type: () -> str
