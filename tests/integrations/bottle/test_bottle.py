@@ -386,10 +386,8 @@ def test_mount(app, capture_exceptions, capture_events, sentry_init, get_client)
     assert error is exc.value
 
     (event,) = events
-    assert event["exception"]["values"][0]["mechanism"] == {
-        "type": "bottle",
-        "handled": False,
-    }
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "bottle"
+    assert event["exception"]["values"][0]["mechanism"]["handled"] is False
 
 
 def test_500(sentry_init, capture_events, app, get_client):

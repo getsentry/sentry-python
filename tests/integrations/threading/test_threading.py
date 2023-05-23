@@ -29,7 +29,8 @@ def test_handles_exceptions(sentry_init, capture_events, integrations):
 
         (exception,) = event["exception"]["values"]
         assert exception["type"] == "ZeroDivisionError"
-        assert exception["mechanism"] == {"type": "threading", "handled": False}
+        assert exception["mechanism"]["type"] == "threading"
+        assert not exception["mechanism"]["handled"]
     else:
         assert not events
 
@@ -63,7 +64,8 @@ def test_propagates_hub(sentry_init, capture_events, propagate_hub):
     (exception,) = event["exception"]["values"]
 
     assert exception["type"] == "ZeroDivisionError"
-    assert exception["mechanism"] == {"type": "threading", "handled": False}
+    assert exception["mechanism"]["type"] == "threading"
+    assert not exception["mechanism"]["handled"]
 
     if propagate_hub:
         assert event["tags"]["stage1"] == "true"

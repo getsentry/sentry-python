@@ -153,3 +153,21 @@ def test_custom_denylist(sentry_init, capture_events):
     assert meta == {
         "my_sensitive_var": {"": {"rem": [["!config", "s"]]}},
     }
+
+
+def test_scrubbing_doesnt_affect_local_vars(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    try:
+        password = "cat123"
+        1 / 0
+    except ZeroDivisionError:
+        capture_exception()
+
+    (event,) = events
+
+    frames = event["exception"]["values"][0]["stacktrace"]["frames"]
+    (frame,) = frames
+    assert frame["vars"]["password"] == "[Filtered]"
+    assert password == "cat123"

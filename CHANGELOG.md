@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.24.0
+
+### Various fixes & improvements
+
+- **New:** Celery Beat exclude tasks option (#2130) by @antonpirker
+
+  You can exclude Celery Beat tasks from being auto-instrumented. To do this, add a list of tasks you want to exclude as option `exclude_beat_tasks` when creating `CeleryIntegration`. The list can contain simple strings with the full task name, as specified in the Celery Beat schedule, or regular expressions to match multiple tasks.
+
+  For more information, see the documentation for [Crons](https://docs.sentry.io/platforms/python/guides/celery/crons/) for more information.
+
+  Usage:
+
+  ```python
+      exclude_beat_tasks = [
+          "some-task-a",
+          "payment-check-.*",
+      ]
+      sentry_sdk.init(
+          dsn='___PUBLIC_DSN___',
+          integrations=[
+              CeleryIntegration(
+                  monitor_beat_tasks=True,
+                  exclude_beat_tasks=exclude_beat_tasks,
+              ),
+          ],
+      )
+  ```
+
+  In this example the task `some-task-a` and all tasks with a name starting with `payment-check-` will be ignored.
+
+- **New:** Add support for **ExceptionGroups** (#2025) by @antonpirker
+
+  _Note:_ If running Self-Hosted Sentry, you should wait to adopt this SDK update until after updating to the 23.6.0 (est. June 2023) release of Sentry. Updating early will not break anything, but you will not get the full benefit of the Exception Groups improvements to issue grouping that were added to the Sentry backend.
+
+- Prefer `importlib.metadata` over `pkg_resources` if available (#2081) by @sentrivana
+- Work with a copy of request, vars in the event (#2125) by @sentrivana
+- Pinned version of dependency that broke the build (#2133) by @antonpirker
+
 ## 1.23.1
 
 ### Various fixes & improvements

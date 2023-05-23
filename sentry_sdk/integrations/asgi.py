@@ -7,6 +7,7 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 import asyncio
 import inspect
 import urllib
+from copy import deepcopy
 
 from sentry_sdk._functools import partial
 from sentry_sdk._types import TYPE_CHECKING
@@ -211,7 +212,7 @@ class SentryAsgiMiddleware:
 
         self._set_transaction_name_and_source(event, self.transaction_style, asgi_scope)
 
-        event["request"] = request_info
+        event["request"] = deepcopy(request_info)
 
         return event
 
