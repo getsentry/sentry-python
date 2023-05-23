@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.24.0
+
+### Various fixes & improvements
+
+- Pinned version of dependency that broke the build (#2133) by @antonpirker
+- Add support for ExceptionGroups (#2025) by @antonpirker
+- Celery beat exclude option (#2130) by @antonpirker
+- Work with a copy of request, vars in the event (#2125) by @sentrivana
+- Prefer importlib.metadata over pkg_resources if available (#2081) by @sentrivana
+
 ## 1.23.1
 
 ### Various fixes & improvements
