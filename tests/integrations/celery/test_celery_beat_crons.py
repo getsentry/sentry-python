@@ -8,6 +8,7 @@ from sentry_sdk.integrations.celery import (
     _get_headers,
     _get_humanized_interval,
     _get_monitor_config,
+    _patch_beat_apply_entry,
     crons_task_success,
     crons_task_failure,
     crons_task_retry,
@@ -243,3 +244,56 @@ def test_get_monitor_config_default_timezone():
     monitor_config = _get_monitor_config(celery_schedule, app)
 
     assert monitor_config["timezone"] == "UTC"
+
+
+@pytest.mark.parametrize(
+    "task_name,exclude_beat_tasks,task_in_excluded_beat_tasks",
+    [
+        ["some_task_name", ["xxx", "some_task.*"], True],
+        ["some_task_name", ["xxx", "some_other_task.*"], False],
+    ],
+)
+def test_exclude_beat_tasks_option(
+    task_name, exclude_beat_tasks, task_in_excluded_beat_tasks
+):
+    """
+    Test excluding Celery Beat tasks from automatic instrumentation.
+    """
+    fake_apply_entry = mock.MagicMock()
+
+    fake_scheduler = mock.MagicMock()
+    fake_scheduler.apply_entry = fake_apply_entry
+
+    fake_integration = mock.MagicMock()
+    fake_integration.exclude_beat_tasks = exclude_beat_tasks
+
+    fake_schedule_entry = mock.MagicMock()
+    fake_schedule_entry.name = task_name
+
+    fake_get_monitor_config = mock.MagicMock()
+
+    with mock.patch(
+        "sentry_sdk.integrations.celery.Scheduler", fake_scheduler
+    ) as Scheduler:  # noqa: N806
+        with mock.patch(
+            "sentry_sdk.integrations.celery.Hub.current.get_integration",
+            return_value=fake_integration,
+        ):
+            with mock.patch(
+                "sentry_sdk.integrations.celery._get_monitor_config",
+                fake_get_monitor_config,
+            ) as _get_monitor_config:
+                # Mimic CeleryIntegration patching of Scheduler.apply_entry()
+                _patch_beat_apply_entry()
+                # Mimic Celery Beat calling a task from the Beat schedule
+                Scheduler.apply_entry(fake_scheduler, fake_schedule_entry)
+
+                if task_in_excluded_beat_tasks:
+                    # Only the original Scheduler.apply_entry() is called, _get_monitor_config is NOT called.
+                    fake_apply_entry.assert_called_once()
+                    _get_monitor_config.assert_not_called()
+
+                else:
+                    # The original Scheduler.apply_entry() is called, AND _get_monitor_config is called.
+                    fake_apply_entry.assert_called_once()
+                    _get_monitor_config.assert_called_once()

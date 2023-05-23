@@ -7,6 +7,7 @@ from sentry_sdk.consts import OP
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     Dsn,
+    match_regex_list,
     to_string,
 )
 from sentry_sdk._compat import PY2, iteritems
@@ -334,15 +335,7 @@ def should_propagate_trace(hub, url):
     client = hub.client  # type: Any
     trace_propagation_targets = client.options["trace_propagation_targets"]
 
-    if trace_propagation_targets is None:
-        return False
-
-    for target in trace_propagation_targets:
-        matched = re.search(target, url)
-        if matched:
-            return True
-
-    return False
+    return match_regex_list(url, trace_propagation_targets, substring_matching=True)
 
 
 # Circular imports

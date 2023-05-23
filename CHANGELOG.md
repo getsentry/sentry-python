@@ -1,5 +1,93 @@
 # Changelog
 
+## 1.24.0
+
+### Various fixes & improvements
+
+- **New:** Celery Beat exclude tasks option (#2130) by @antonpirker
+
+  You can exclude Celery Beat tasks from being auto-instrumented. To do this, add a list of tasks you want to exclude as option `exclude_beat_tasks` when creating `CeleryIntegration`. The list can contain simple strings with the full task name, as specified in the Celery Beat schedule, or regular expressions to match multiple tasks.
+
+  For more information, see the documentation for [Crons](https://docs.sentry.io/platforms/python/guides/celery/crons/) for more information.
+
+  Usage:
+
+  ```python
+      exclude_beat_tasks = [
+          "some-task-a",
+          "payment-check-.*",
+      ]
+      sentry_sdk.init(
+          dsn='___PUBLIC_DSN___',
+          integrations=[
+              CeleryIntegration(
+                  monitor_beat_tasks=True,
+                  exclude_beat_tasks=exclude_beat_tasks,
+              ),
+          ],
+      )
+  ```
+
+  In this example the task `some-task-a` and all tasks with a name starting with `payment-check-` will be ignored.
+
+- **New:** Add support for **ExceptionGroups** (#2025) by @antonpirker
+
+  _Note:_ If running Self-Hosted Sentry, you should wait to adopt this SDK update until after updating to the 23.6.0 (est. June 2023) release of Sentry. Updating early will not break anything, but you will not get the full benefit of the Exception Groups improvements to issue grouping that were added to the Sentry backend.
+
+- Prefer `importlib.metadata` over `pkg_resources` if available (#2081) by @sentrivana
+- Work with a copy of request, vars in the event (#2125) by @sentrivana
+- Pinned version of dependency that broke the build (#2133) by @antonpirker
+
+## 1.23.1
+
+### Various fixes & improvements
+
+- Disable Django Cache spans by default. (#2120) by @antonpirker
+
+## 1.23.0
+
+### Various fixes & improvements
+
+- **New:** Add `loguru` integration (#1994) by @PerchunPak
+
+  Check [the documentation](https://docs.sentry.io/platforms/python/configuration/integrations/loguru/) for more information.
+
+  Usage:
+
+  ```python
+  from loguru import logger
+  import sentry_sdk
+  from sentry_sdk.integrations.loguru import LoguruIntegration
+
+  sentry_sdk.init(
+      dsn="___PUBLIC_DSN___",
+      integrations=[
+          LoguruIntegration(),
+      ],
+  )
+
+  logger.debug("I am ignored")
+  logger.info("I am a breadcrumb")
+  logger.error("I am an event", extra=dict(bar=43))
+  logger.exception("An exception happened")
+  ```
+
+  - An error event with the message `"I am an event"` will be created.
+  - `"I am a breadcrumb"` will be attached as a breadcrumb to that event.
+  - `bar` will end up in the `extra` attributes of that event.
+  - `"An exception happened"` will send the current exception from `sys.exc_info()` with the stack trace to Sentry. If there's no exception, the current stack will be attached.
+  - The debug message `"I am ignored"` will not be captured by Sentry. To capture it, set `level` to `DEBUG` or lower in `LoguruIntegration`.
+
+- Do not truncate request body if `request_bodies` is `"always"` (#2092) by @sentrivana
+- Fixed Celery headers for Beat auto-instrumentation (#2102) by @antonpirker
+- Add `db.operation` to Redis and MongoDB spans (#2089) by @antonpirker
+- Make sure we're importing `redis` the library (#2106) by @sentrivana
+- Add `include_source_context` option (#2020) by @farhat-nawaz and @sentrivana
+- Import `Markup` from `markupsafe` (#2047) by @rco-ableton
+- Fix `__qualname__` missing attribute in asyncio integration (#2105) by @sl0thentr0py
+- Remove relay extension from AWS Layer (#2068) by @sl0thentr0py
+- Add a note about `pip freeze` to the bug template (#2103) by @sentrivana
+
 ## 1.22.2
 
 ### Various fixes & improvements
