@@ -2,10 +2,11 @@ from copy import copy
 from collections import deque
 from itertools import chain
 from typing import Iterator, Tuple
+import uuid
 
 from sentry_sdk._functools import wraps
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.tracing_utils import Baggage
+from sentry_sdk.tracing_utils import Baggage, has_tracing_enabled
 from sentry_sdk.utils import logger, capture_internal_exceptions
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
@@ -117,25 +118,35 @@ class Scope(object):
 
     def generate_propagation_context(self):
         self._propagation_context = {
-            "trace_id": 111,  # uuid.uuid4().hex,
-            "span_id": 222,  # uuid.uuid4().hex[16:],
-            "dynamic_sampling_context": {
-                "trace_id": -2,
-                "environment": "xxx-environment",
-                "release": "xxx-release",
-                "public_key": "xxx-public-key",
-                "transaction": "xxx-transaction",
-                "user_segement": "xxx-user-segement",
-                "sample_rate": 123,
-            },
+            "trace_id": uuid.uuid4().hex,
+            "span_id": uuid.uuid4().hex[16:],
+            "dynamic_sampling_context": None,
+            # {
+            #     "trace_id": -2,
+            #     "environment": "xxx-environment",
+            #     "release": "xxx-release",
+            #     "public_key": "xxx-public-key",
+            #     "transaction": "xxx-transaction",
+            #     "user_segement": "xxx-user-segement",
+            #     "sample_rate": 123,
+            # },
         }
         logger.warning(
             f"TwP: Initializing propagation context in Scope: {self._propagation_context }"
         )
 
+    def get_dynamic_sampling_context(self):
+
+        if self._propagation_context["dynamic_sampling_context"] is None:
+            # TODO: create new and return
+            ...
+
+        return self._propagation_context["dynamic_sampling_context"]
+        ...
+
     def get_traceparent(self):
         # type: () -> str
-        sampled = "XXX"  # This should be 0 zero?
+        sampled = 0
         return "%s-%s-%s" % (
             self._propagation_context["trace_id"],
             self._propagation_context["span_id"],
@@ -147,9 +158,7 @@ class Scope(object):
         trace_context = {
             "trace_id": self._propagation_context["trace_id"],
             "span_id": self._propagation_context["span_id"],
-            "dynamic_sampling_context": self._propagation_context[
-                "dynamic_sampling_context"
-            ],
+            "dynamic_sampling_context": self.get_dynamic_sampling_context(),
         }  # type: Dict[str, Any]
 
         return trace_context
@@ -161,7 +170,7 @@ class Scope(object):
         """
         yield SENTRY_TRACE_HEADER_NAME, self.get_traceparent()
 
-        baggage = Baggage(self._propagation_context["dynamic_sampling_context"])
+        baggage = Baggage(self.get_dynamic_sampling_context())
         yield BAGGAGE_HEADER_NAME, baggage
 
     def clear(self):
@@ -426,6 +435,7 @@ class Scope(object):
         self,
         event,  # type: Event
         hint,  # type: Hint
+        options=None,
     ):
         # type: (...) -> Optional[Event]
         """Applies the information contained on the scope to the given event."""
@@ -477,15 +487,18 @@ class Scope(object):
 
         # TwP
         contexts = event.setdefault("contexts", {})
-        logger.warning(
-            f"TwP: Setting trace context from Scope: {self.get_trace_context()}"
-        )
-        contexts["trace"] = self.get_trace_context()
-        if self._span is not None:
+
+        # check options if performance is enabled, if yes take from span, if no take from scope.propagation_context
+        if has_tracing_enabled(options):
             logger.warning(
-                f"TwP: Setting trace from scope._span: {self._span.get_trace_context()}"
+                f"TwP: Setting trace from self._span: {self._span.get_trace_context()}"
             )
             contexts["trace"] = self._span.get_trace_context()
+        else:
+            logger.warning(
+                f"TwP: Setting trace context from Scope: {self.get_trace_context()}"
+            )
+            contexts["trace"] = self.get_trace_context()
 
         exc_info = hint.get("exc_info")
         if exc_info is not None:

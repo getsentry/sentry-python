@@ -94,6 +94,7 @@ class SentryWsgiMiddleware(object):
                                 )
                             )
 
+                    # if no tracing info in `environ` add it from propagation context fr
                     transaction = Transaction.continue_from_environ(
                         environ,
                         op=OP.HTTP_SERVER,

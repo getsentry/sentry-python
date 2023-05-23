@@ -241,7 +241,7 @@ class _Client(object):
             except ValueError as e:
                 logger.debug(str(e))
 
-        # TODO for later: Load tracing stuff from environment into new _propagation_context on scope.
+        # TwP TODO for later: Load tracing stuff from environment into new _propagation_context on scope with generate_propagation_context and given environement variables.
 
         self._setup_instrumentation(self.options.get("functions_to_trace", []))
 
@@ -264,7 +264,7 @@ class _Client(object):
 
         if scope is not None:
             is_transaction = event.get("type") == "transaction"
-            event_ = scope.apply_to_event(event, hint)
+            event_ = scope.apply_to_event(event, hint, self.options)
 
             # one of the event/error processors returned None
             if event_ is None:

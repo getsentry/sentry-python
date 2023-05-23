@@ -11,6 +11,7 @@ from sentry_sdk.client import Client
 from sentry_sdk.profiler import Profile
 from sentry_sdk.tracing import NoOpSpan, Span, Transaction
 from sentry_sdk.session import Session
+from sentry_sdk.tracing_utils import has_tracing_enabled
 from sentry_sdk.utils import (
     exc_info_from_error,
     event_from_exception,
@@ -577,7 +578,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         pass
 
     def push_scope(  # noqa
-        self, callback=None  # type: Optional[Callable[[Scope], None]]
+        self,
+        callback=None,  # type: Optional[Callable[[Scope], None]]
+        continue_trace=True,  # type: bool
     ):
         # type: (...) -> Optional[ContextManager[Scope]]
         """
@@ -595,7 +598,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return None
 
         client, scope = self._stack[-1]
-        new_layer = (client, copy.copy(scope))
+
+        new_scope = copy.copy(scope)
+
+        if continue_trace:
+            new_scope.generate_propagation_context()
+
+        new_layer = (client, new_scope)
         self._stack.append(new_layer)
 
         return _ScopeManager(self)
@@ -626,7 +635,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         pass
 
     def configure_scope(  # noqa
-        self, callback=None  # type: Optional[Callable[[Scope], None]]
+        self,
+        callback=None,  # type: Optional[Callable[[Scope], None]]
+        continue_trace=True,  # type: bool
     ):
         # type: (...) -> Optional[ContextManager[Scope]]
 
@@ -639,6 +650,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
 
         client, scope = self._stack[-1]
+
+        if continue_trace:
+            scope.generate_propagation_context()
+
         if callback is not None:
             if client is not None:
                 callback(scope)
@@ -727,17 +742,18 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return
 
         span = span or self.scope.span
-        if span is None:
-            logger.warning(
-                f"TwP: yield trace propagation headers from scope: {dict(self.scope.iter_headers())}"
-            )
-            for header in self.scope.iter_headers():
-                yield header
-        else:
+
+        if has_tracing_enabled(client.options):
             logger.warning(
                 f"TwP: yield trace propagation headers from span: {dict(span.iter_headers())}"
             )
             for header in span.iter_headers():
+                yield header
+        else:
+            logger.warning(
+                f"TwP: yield trace propagation headers from scope: {dict(self.scope.iter_headers())}"
+            )
+            for header in self.scope.iter_headers():
                 yield header
 
     def trace_propagation_meta(self, span=None):
