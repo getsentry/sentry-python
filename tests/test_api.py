@@ -17,8 +17,6 @@ def test_get_current_span():
     fake_hub.scope.span = None
     assert get_current_span(fake_hub) is None
 
-    assert False  # XXX just for testing the github action
-
 
 def test_get_current_span_default_hub(sentry_init):
     sentry_init()
