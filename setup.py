@@ -38,10 +38,10 @@ setup(
     zip_safe=False,
     license="MIT",
     install_requires=[
-        'urllib3>=1.25.7; python_version<="3.4"',
-        'urllib3>=1.26.9; python_version=="3.5"',
         'urllib3>=1.26.11,<2.0.0; python_version<="3.8"',
+        'urllib3>=1.25.7; python_version<="3.4"',
         'urllib3>=1.26.11; python_version>="3.9"',
+        'urllib3>=1.26.9; python_version=="3.5"',
         "certifi",
     ],
     extras_require={
