@@ -6,7 +6,11 @@ import uuid
 
 from sentry_sdk._functools import wraps
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.tracing_utils import Baggage, has_tracing_enabled
+from sentry_sdk.tracing_utils import (
+    Baggage,
+    extract_sentrytrace_data,
+    has_tracing_enabled,
+)
 from sentry_sdk.utils import logger, capture_internal_exceptions
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
@@ -71,6 +75,24 @@ def _disable_capture(fn):
     return wrapper  # type: ignore
 
 
+def _normalize_incoming_data(incoming_data):
+    # type: (Dict[str, Any]) -> Dict[str, Any]
+    """
+    Normalizes incoming data so they keys are all lowercase and dashes instead of underscores and stripped from known prefixes.
+    """
+    data = {}
+    for k, v in incoming_data.items():
+        if k.startswith("HTTP_"):
+            k = k[5:]
+
+        # TODO: when loading from environment like described in RFC-0071 also trim `SENTRY_TRACING_` prefix.
+
+        k = k.replace("_", "-").lower()
+        data[k] = v
+
+    return data
+
+
 class Scope(object):
     """The scope holds extra information that should be sent with all
     events that belong to it.
@@ -115,29 +137,50 @@ class Scope(object):
         self.clear()
 
         self._propagation_context = None
+        self.generate_propagation_context()
 
-    def generate_propagation_context(self):
-        # type: () -> None
+    def generate_propagation_context(self, incoming_data=None):
+        # type: (bool) -> None
         """
         Populates `_propagation_context` with a new Propagation Context.
         """
-        self._propagation_context = {
-            "trace_id": uuid.uuid4().hex,
-            "span_id": uuid.uuid4().hex[16:],
-            "dynamic_sampling_context": None,
-            # {
-            #     "trace_id": "999xxx",
-            #     "environment": "xxx-environment",
-            #     "release": "xxx-release",
-            #     "public_key": "xxx-public-key",
-            #     "transaction": "xxx-transaction",
-            #     "user_segement": "xxx-user-segement",
-            #     "sample_rate": 123,
-            # },
-        }
         logger.warning(
-            f"TwP: Initializing propagation context in Scope: {self._propagation_context }"
+            f"TwP: generate_propagation_context: incoming_data: {incoming_data}"
         )
+
+        if incoming_data is None:
+            self._propagation_context = {
+                "trace_id": uuid.uuid4().hex,
+                "span_id": uuid.uuid4().hex[16:],
+                "dynamic_sampling_context": None,
+            }
+
+            logger.warning(
+                f"TwP: generate_propagation_context: (no incoming data) Initializing propagation context in Scope: {self._propagation_context }"
+            )
+        else:
+            context = {}
+            incoming_data = _normalize_incoming_data(incoming_data)
+
+            if incoming_data.get(BAGGAGE_HEADER_NAME):
+                baggage = Baggage.from_incoming_header(
+                    incoming_data.get(BAGGAGE_HEADER_NAME)
+                )
+                dynamic_sampling_context = baggage.dynamic_sampling_context()
+                context["dynamic_sampling_context"] = dynamic_sampling_context
+
+            if incoming_data.get(SENTRY_TRACE_HEADER_NAME):
+                context.update(
+                    extract_sentrytrace_data(
+                        incoming_data.get(SENTRY_TRACE_HEADER_NAME)
+                    )
+                )
+
+            self._propagation_context = context
+
+            logger.warning(
+                f"TwP: generate_propagation_context: (incoming data) Initializing propagation context in Scope: {self._propagation_context }"
+            )
 
     def get_dynamic_sampling_context(self):
         # type: () -> Dict[str, str]
@@ -145,12 +188,10 @@ class Scope(object):
         Returns the Dynamic Sampling Context from the Propagation Context.
         If not existing, creates a new one.
         """
-        client = None
         if self._propagation_context["dynamic_sampling_context"] is None:
-            # TwP TODO: implement `from_options` and get the client options here from client.
             self._propagation_context[
                 "dynamic_sampling_context"
-            ] = Baggage.from_options(client.options).dynamic_sampling_context()
+            ] = Baggage.from_options(self).dynamic_sampling_context()
 
         return self._propagation_context["dynamic_sampling_context"]
 
@@ -188,7 +229,7 @@ class Scope(object):
         """
         yield SENTRY_TRACE_HEADER_NAME, self.get_traceparent()
 
-        baggage = Baggage(self.get_dynamic_sampling_context())
+        baggage = Baggage(self.get_dynamic_sampling_context()).serialize()
         yield BAGGAGE_HEADER_NAME, baggage
 
     def clear(self):
@@ -507,12 +548,12 @@ class Scope(object):
 
         if has_tracing_enabled(options):
             logger.warning(
-                f"TwP: Setting trace from self._span: {self._span.get_trace_context()}"
+                f"TwP: apply_to_event: Setting trace from self._span: {self._span.get_trace_context()}"
             )
             contexts["trace"] = self._span.get_trace_context()
         else:
             logger.warning(
-                f"TwP: Setting trace context from Scope: {self.get_trace_context()}"
+                f"TwP: apply_to_event: Setting trace context from Scope: {self.get_trace_context()}"
             )
             contexts["trace"] = self.get_trace_context()
 

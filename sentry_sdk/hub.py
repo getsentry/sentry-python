@@ -745,13 +745,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         if has_tracing_enabled(client.options) and span is not None:
             logger.warning(
-                f"TwP: yield trace propagation headers from span: {dict(span.iter_headers())}"
+                f"TwP: iter_trace_propagation_headers: yield trace propagation headers from span: {dict(span.iter_headers())}"
             )
             for header in span.iter_headers():
                 yield header
         else:
             logger.warning(
-                f"TwP: yield trace propagation headers from scope: {dict(self.scope.iter_headers())}"
+                f"TwP: iter_trace_propagation_headers: yield trace propagation headers from scope: {dict(self.scope.iter_headers())}"
             )
             for header in self.scope.iter_headers():
                 yield header

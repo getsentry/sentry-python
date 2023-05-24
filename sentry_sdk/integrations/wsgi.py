@@ -86,6 +86,7 @@ class SentryWsgiMiddleware(object):
                 with hub:
                     with capture_internal_exceptions():
                         with hub.configure_scope() as scope:
+                            scope.generate_propagation_context(environ)
                             scope.clear_breadcrumbs()
                             scope._name = "wsgi"
                             scope.add_event_processor(

@@ -255,6 +255,39 @@ class Baggage(object):
         return Baggage(sentry_items, third_party_items, mutable)
 
     @classmethod
+    def from_options(cls, scope):
+        # type: (Optional[str]) -> Baggage
+        sentry_items = {}
+        third_party_items = ""
+        mutable = False
+
+        client = sentry_sdk.Hub.current.client
+        options = client.options
+
+        propagation_context = scope._propagation_context
+
+        if "trace_id" in propagation_context:
+            sentry_items["trace_id"] = propagation_context["trace_id"]
+
+        if options.get("environment"):
+            sentry_items["environment"] = options["environment"]
+
+        if options.get("release"):
+            sentry_items["release"] = options["release"]
+
+        if options.get("dsn"):
+            sentry_items["public_key"] = Dsn(options["dsn"]).public_key
+
+        if options.get("traces_sample_rate"):
+            sentry_items["sample_rate"] = options["traces_sample_rate"]
+
+        user = (scope and scope._user) or {}
+        if user.get("segment"):
+            sentry_items["user_segment"] = user["segment"]
+
+        return Baggage(sentry_items, third_party_items, mutable)
+
+    @classmethod
     def populate_from_transaction(cls, transaction):
         # type: (Transaction) -> Baggage
         """
