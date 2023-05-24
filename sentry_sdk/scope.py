@@ -145,9 +145,12 @@ class Scope(object):
         Returns the Dynamic Sampling Context from the Propagation Context.
         If not existing, creates a new one.
         """
+        client = None
         if self._propagation_context["dynamic_sampling_context"] is None:
-            # TwP TODO: create new and return
-            ...
+            # TwP TODO: implement `from_options` and get the client options here from client.
+            self._propagation_context[
+                "dynamic_sampling_context"
+            ] = Baggage.from_options(client.options).dynamic_sampling_context()
 
         return self._propagation_context["dynamic_sampling_context"]
 
