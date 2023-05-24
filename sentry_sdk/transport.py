@@ -208,7 +208,7 @@ class HttpTransport(Transport):
         self,
         body,  # type: bytes
         headers,  # type: Dict[str, str]
-        endpoint_type="store",  # type: EndpointType
+        endpoint_type="envelope",  # type: EndpointType
         envelope=None,  # type: Optional[Envelope]
     ):
         # type: (...) -> None

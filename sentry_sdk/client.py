@@ -18,7 +18,7 @@ from sentry_sdk.utils import (
     logger,
 )
 from sentry_sdk.serializer import serialize
-from sentry_sdk.tracing import trace, has_tracing_enabled
+from sentry_sdk.tracing import trace
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import (
     DEFAULT_OPTIONS,
@@ -503,7 +503,6 @@ class _Client(object):
         if not is_transaction and not self._should_sample_error(event):
             return None
 
-        tracing_enabled = has_tracing_enabled(self.options)
         is_checkin = event_opt.get("type") == "check_in"
         attachments = hint.get("attachments")
 
@@ -513,39 +512,29 @@ class _Client(object):
             .pop("dynamic_sampling_context", {})
         )
 
-        # If tracing is enabled all events should go to /envelope endpoint.
-        # If no tracing is enabled only transactions, events with attachments, and checkins should go to the /envelope endpoint.
-        should_use_envelope_endpoint = (
-            tracing_enabled or is_transaction or is_checkin or bool(attachments)
-        )
-        if should_use_envelope_endpoint:
-            headers = {
-                "event_id": event_opt["event_id"],
-                "sent_at": format_timestamp(datetime.utcnow()),
-            }
+        headers = {
+            "event_id": event_opt["event_id"],
+            "sent_at": format_timestamp(datetime.utcnow()),
+        }
 
-            if dynamic_sampling_context:
-                headers["trace"] = dynamic_sampling_context
+        if dynamic_sampling_context:
+            headers["trace"] = dynamic_sampling_context
 
-            envelope = Envelope(headers=headers)
+        envelope = Envelope(headers=headers)
 
-            if is_transaction:
-                if profile is not None:
-                    envelope.add_profile(profile.to_json(event_opt, self.options))
-                envelope.add_transaction(event_opt)
-            elif is_checkin:
-                envelope.add_checkin(event_opt)
-            else:
-                envelope.add_event(event_opt)
-
-            for attachment in attachments or ():
-                envelope.add_item(attachment.to_envelope_item())
-
-            self.transport.capture_envelope(envelope)
-
+        if is_transaction:
+            if profile is not None:
+                envelope.add_profile(profile.to_json(event_opt, self.options))
+            envelope.add_transaction(event_opt)
+        elif is_checkin:
+            envelope.add_checkin(event_opt)
         else:
-            # All other events go to the legacy /store/ endpoint (will be removed in the future).
-            self.transport.capture_event(event_opt)
+            envelope.add_event(event_opt)
+
+        for attachment in attachments or ():
+            envelope.add_item(attachment.to_envelope_item())
+
+        self.transport.capture_envelope(envelope)
 
         return event_id
 

@@ -327,10 +327,10 @@ class Auth(object):
 
         Deprecated: use get_api_url instead.
         """
-        return self.get_api_url(type="store")
+        return self.get_api_url(type="envelope")
 
     def get_api_url(
-        self, type="store"  # type: EndpointType
+        self, type="envelope"  # type: EndpointType
     ):
         # type: (...) -> str
         """Returns the API url for storing events."""

@@ -53,7 +53,7 @@ if TYPE_CHECKING:
         "profile",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
-    EndpointType = Literal["store", "envelope"]
+    EndpointType = Literal["envelope"]
 
     DurationUnit = Literal[
         "nanosecond",

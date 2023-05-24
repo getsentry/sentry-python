@@ -221,7 +221,7 @@ def test_data_category_limits(
     client.flush()
 
     assert len(capturing_server.captured) == 1
-    assert capturing_server.captured[0].path == "/api/132/store/"
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
 
     assert captured_outcomes == [
         ("ratelimit_backoff", "transaction"),

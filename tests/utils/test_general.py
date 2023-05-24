@@ -91,30 +91,26 @@ def test_filename():
 
 
 @pytest.mark.parametrize(
-    "given,expected_store,expected_envelope",
+    "given,expected_envelope",
     [
         (
             "https://foobar@sentry.io/123",
-            "https://sentry.io/api/123/store/",
             "https://sentry.io/api/123/envelope/",
         ),
         (
             "https://foobar@sentry.io/bam/123",
-            "https://sentry.io/bam/api/123/store/",
             "https://sentry.io/bam/api/123/envelope/",
         ),
         (
             "https://foobar@sentry.io/bam/baz/123",
-            "https://sentry.io/bam/baz/api/123/store/",
             "https://sentry.io/bam/baz/api/123/envelope/",
         ),
     ],
 )
-def test_parse_dsn_paths(given, expected_store, expected_envelope):
+def test_parse_dsn_paths(given, expected_envelope):
     dsn = Dsn(given)
     auth = dsn.to_auth()
-    assert auth.store_api_url == expected_store
-    assert auth.get_api_url("store") == expected_store
+    assert auth.store_api_url == expected_envelope
     assert auth.get_api_url("envelope") == expected_envelope
 
 
