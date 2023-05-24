@@ -78,7 +78,7 @@ def _disable_capture(fn):
 def _normalize_incoming_data(incoming_data):
     # type: (Dict[str, Any]) -> Dict[str, Any]
     """
-    Normalizes incoming data so they keys are all lowercase and dashes instead of underscores and stripped from known prefixes.
+    Normalizes incoming data so the keys are all lowercase with dashes instead of underscores and stripped from known prefixes.
     """
     data = {}
     for k, v in incoming_data.items():
@@ -134,9 +134,9 @@ class Scope(object):
         self._error_processors = []  # type: List[ErrorProcessor]
 
         self._name = None  # type: Optional[str]
-        self.clear()
+        self._propagation_context = None  # type: Optional[Dict[str, Any]]
 
-        self._propagation_context = None
+        self.clear()
         self.generate_propagation_context()
 
     def generate_propagation_context(self, incoming_data=None):
@@ -149,6 +149,12 @@ class Scope(object):
         )
 
         if incoming_data is None:
+            if self._propagation_context is not None:
+                logger.warning(
+                    f"TwP: generate_propagation_context: Do NOT override exiting propagation context: {self._propagation_context }"
+                )
+                return
+
             self._propagation_context = {
                 "trace_id": uuid.uuid4().hex,
                 "span_id": uuid.uuid4().hex[16:],
@@ -158,6 +164,7 @@ class Scope(object):
             logger.warning(
                 f"TwP: generate_propagation_context: (no incoming data) Initializing propagation context in Scope: {self._propagation_context }"
             )
+
         else:
             context = {}
             incoming_data = _normalize_incoming_data(incoming_data)
@@ -175,6 +182,10 @@ class Scope(object):
                         incoming_data.get(SENTRY_TRACE_HEADER_NAME)
                     )
                 )
+
+            # TODO: think if this is OK like this?
+            if not context.get("span_id"):
+                context["span_id"] = uuid.uuid4().hex[16:]
 
             self._propagation_context = context
 
@@ -227,10 +238,11 @@ class Scope(object):
         """
         Creates a generator which returns the `sentry-trace` and `baggage` headers from the Propagation Context.
         """
-        yield SENTRY_TRACE_HEADER_NAME, self.get_traceparent()
+        if self._propagation_context is not None:
+            yield SENTRY_TRACE_HEADER_NAME, self.get_traceparent()
 
-        baggage = Baggage(self.get_dynamic_sampling_context()).serialize()
-        yield BAGGAGE_HEADER_NAME, baggage
+            baggage = Baggage(self.get_dynamic_sampling_context()).serialize()
+            yield BAGGAGE_HEADER_NAME, baggage
 
     def clear(self):
         # type: () -> None
@@ -255,7 +267,7 @@ class Scope(object):
 
         self._profile = None  # type: Optional[Profile]
 
-        self._propagation_context = {}  # type: Dict[str, Any]
+        self._propagation_context = None  # type: Dict[str, Any]
 
     @_attr_setter
     def level(self, value):
@@ -601,6 +613,8 @@ class Scope(object):
             self._attachments.extend(scope._attachments)
         if scope._profile:
             self._profile = scope._profile
+        if scope._propagation_context:
+            self._propagation_context = scope._propagation_context
 
     def update_from_kwargs(
         self,
@@ -643,6 +657,7 @@ class Scope(object):
         rv._breadcrumbs = copy(self._breadcrumbs)
         rv._event_processors = list(self._event_processors)
         rv._error_processors = list(self._error_processors)
+        rv._propagation_context = self._propagation_context
 
         rv._should_capture = self._should_capture
         rv._span = self._span
