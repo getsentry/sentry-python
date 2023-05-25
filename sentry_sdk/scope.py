@@ -148,7 +148,7 @@ class Scope(object):
             f"TwP: generate_propagation_context: incoming_data: {incoming_data}"
         )
 
-        if incoming_data:
+        if not incoming_data:
             if self._propagation_context is not None:
                 logger.warning(
                     f"TwP: generate_propagation_context: Do NOT override exiting propagation context: {self._propagation_context }"
