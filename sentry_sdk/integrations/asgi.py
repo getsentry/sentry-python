@@ -163,8 +163,13 @@ class SentryAsgiMiddleware:
                     ty = scope["type"]
 
                     if ty in ("http", "websocket"):
+                        headers = self._get_headers(scope)
+
+                        with hub.configure_scope() as sentry_scope:
+                            sentry_scope.generate_propagation_context(headers)
+
                         transaction = Transaction.continue_from_headers(
-                            self._get_headers(scope),
+                            headers,
                             op="{}.server".format(ty),
                         )
                     else:

@@ -109,6 +109,7 @@ def _handle_request_impl(self):
 
     with Hub(hub) as hub:
         with hub.configure_scope() as scope:
+            scope.generate_propagation_context(self.request.headers)
             scope.clear_breadcrumbs()
             processor = _make_event_processor(weak_handler)
             scope.add_event_processor(processor)

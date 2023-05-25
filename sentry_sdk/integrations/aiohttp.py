@@ -97,6 +97,7 @@ class AioHttpIntegration(Integration):
                     # Scope data will not leak between requests because aiohttp
                     # create a task to wrap each request.
                     with hub.configure_scope() as scope:
+                        scope.generate_propagation_context(request.headers)
                         scope.clear_breadcrumbs()
                         scope.add_event_processor(_make_request_processor(weak_request))
 

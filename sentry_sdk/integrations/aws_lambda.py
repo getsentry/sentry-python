@@ -140,6 +140,9 @@ def _wrap_handler(handler):
             # AWS Service may set an explicit `{headers: None}`, we can't rely on `.get()`'s default.
             if headers is None:
                 headers = {}
+
+            scope.generate_propagation_context(headers)
+
             transaction = Transaction.continue_from_headers(
                 headers,
                 op=OP.FUNCTION_AWS,

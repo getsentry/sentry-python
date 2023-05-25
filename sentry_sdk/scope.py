@@ -140,7 +140,7 @@ class Scope(object):
         self.generate_propagation_context()
 
     def generate_propagation_context(self, incoming_data=None):
-        # type: (bool) -> None
+        # type: (Optional[Dict[str, str]]) -> None
         """
         Populates `_propagation_context` with a new Propagation Context.
         """
@@ -148,7 +148,7 @@ class Scope(object):
             f"TwP: generate_propagation_context: incoming_data: {incoming_data}"
         )
 
-        if incoming_data is None:
+        if incoming_data:
             if self._propagation_context is not None:
                 logger.warning(
                     f"TwP: generate_propagation_context: Do NOT override exiting propagation context: {self._propagation_context }"

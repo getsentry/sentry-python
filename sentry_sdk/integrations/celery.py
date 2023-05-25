@@ -207,8 +207,10 @@ def _wrap_tracer(task, f):
             # Celery task objects are not a thing to be trusted. Even
             # something such as attribute access can fail.
             with capture_internal_exceptions():
+                headers = args[3].get("headers") or {}
+                scope.generate_propagation_context(headers)
                 transaction = Transaction.continue_from_headers(
-                    args[3].get("headers") or {},
+                    headers,
                     op=OP.QUEUE_TASK_CELERY,
                     name="unknown celery task",
                     source=TRANSACTION_SOURCE_TASK,

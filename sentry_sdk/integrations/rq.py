@@ -64,8 +64,11 @@ class RqIntegration(Integration):
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
 
+                headers = job.meta.get("_sentry_trace_headers") or {}
+                scope.generate_propagation_context(headers)
+
                 transaction = Transaction.continue_from_headers(
-                    job.meta.get("_sentry_trace_headers") or {},
+                    headers,
                     op=OP.QUEUE_TASK_RQ,
                     name="unknown RQ task",
                     source=TRANSACTION_SOURCE_TASK,

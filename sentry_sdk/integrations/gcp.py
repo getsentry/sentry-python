@@ -82,6 +82,8 @@ def _wrap_func(func):
             headers = {}
             if hasattr(gcp_event, "headers"):
                 headers = gcp_event.headers
+
+            scope.generate_propagation_context(headers)
             transaction = Transaction.continue_from_headers(
                 headers,
                 op=OP.FUNCTION_GCP,
