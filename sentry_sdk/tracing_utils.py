@@ -3,7 +3,6 @@ import contextlib
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     Dsn,
@@ -256,7 +255,8 @@ class Baggage(object):
 
     @classmethod
     def from_options(cls, scope):
-        # type: (Optional[Scope]) -> Optional[Baggage]
+        # XXX fix type here, Scope can't be imported due to a circular ref: type: (Optional[Scope]) -> Optional[Baggage]
+        # type: (Any) -> Optional[Baggage]
         sentry_items = {}  # type: Dict[str, str]
         third_party_items = ""
         mutable = False
