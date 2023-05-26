@@ -170,11 +170,9 @@ class Scope(object):
             incoming_data = _normalize_incoming_data(incoming_data)
 
             if incoming_data.get(BAGGAGE_HEADER_NAME):
-                baggage = Baggage.from_incoming_header(
+                context["dynamic_sampling_context"] = Baggage.from_incoming_header(
                     incoming_data.get(BAGGAGE_HEADER_NAME)
-                )
-                dynamic_sampling_context = baggage.dynamic_sampling_context()
-                context["dynamic_sampling_context"] = dynamic_sampling_context
+                ).dynamic_sampling_context()
 
             if incoming_data.get(SENTRY_TRACE_HEADER_NAME):
                 sentrytrace_data = extract_sentrytrace_data(
