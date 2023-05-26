@@ -166,7 +166,7 @@ class Scope(object):
             )
 
         else:
-            context = {}
+            context = {}  # type: Dict[str, Any]
             incoming_data = _normalize_incoming_data(incoming_data)
 
             if incoming_data.get(BAGGAGE_HEADER_NAME):
@@ -177,11 +177,11 @@ class Scope(object):
                 context["dynamic_sampling_context"] = dynamic_sampling_context
 
             if incoming_data.get(SENTRY_TRACE_HEADER_NAME):
-                context.update(
-                    extract_sentrytrace_data(
-                        incoming_data.get(SENTRY_TRACE_HEADER_NAME)
-                    )
+                sentrytrace_data = extract_sentrytrace_data(
+                    incoming_data.get(SENTRY_TRACE_HEADER_NAME)
                 )
+                if sentrytrace_data is not None:
+                    context.update(sentrytrace_data)
 
             # TODO: think if this is OK like this?
             if not context.get("span_id"):
@@ -194,23 +194,31 @@ class Scope(object):
             )
 
     def get_dynamic_sampling_context(self):
-        # type: () -> Dict[str, str]
+        # type: () -> Optional[Dict[str, str]]
         """
         Returns the Dynamic Sampling Context from the Propagation Context.
         If not existing, creates a new one.
         """
+        if self._propagation_context is None:
+            return None
+
         if self._propagation_context["dynamic_sampling_context"] is None:
-            self._propagation_context[
-                "dynamic_sampling_context"
-            ] = Baggage.from_options(self).dynamic_sampling_context()
+            baggage = Baggage.from_options(self)
+            if baggage is not None:
+                self._propagation_context[
+                    "dynamic_sampling_context"
+                ] = baggage.dynamic_sampling_context()
 
         return self._propagation_context["dynamic_sampling_context"]
 
     def get_traceparent(self):
-        # type: () -> str
+        # type: () -> Optional[str]
         """
         Returns the Sentry "sentry-trace" header (aka the traceparent) from the Propagation Context.
         """
+        if self._propagation_context is None:
+            return None
+
         sampled = 0
 
         traceparent = "%s-%s-%s" % (
@@ -225,6 +233,9 @@ class Scope(object):
         """
         Returns the Sentry "trace" context from the Propagation Context.
         """
+        if self._propagation_context is None:
+            return None
+
         trace_context = {
             "trace_id": self._propagation_context["trace_id"],
             "span_id": self._propagation_context["span_id"],
@@ -239,10 +250,14 @@ class Scope(object):
         Creates a generator which returns the `sentry-trace` and `baggage` headers from the Propagation Context.
         """
         if self._propagation_context is not None:
-            yield SENTRY_TRACE_HEADER_NAME, self.get_traceparent()
+            traceparent = self.get_traceparent()
+            if traceparent is not None:
+                yield SENTRY_TRACE_HEADER_NAME, traceparent
 
-            baggage = Baggage(self.get_dynamic_sampling_context()).serialize()
-            yield BAGGAGE_HEADER_NAME, baggage
+            dsc = self.get_dynamic_sampling_context()
+            if dsc is not None:
+                baggage = Baggage(dsc).serialize()
+                yield BAGGAGE_HEADER_NAME, baggage
 
     def clear(self):
         # type: () -> None
@@ -267,7 +282,7 @@ class Scope(object):
 
         self._profile = None  # type: Optional[Profile]
 
-        self._propagation_context = None  # type: Dict[str, Any]
+        self._propagation_context = None  # type: Optional[Dict[str, Any]]
 
     @_attr_setter
     def level(self, value):
@@ -506,7 +521,7 @@ class Scope(object):
         self,
         event,  # type: Event
         hint,  # type: Hint
-        options=None,  # type: Dict[str, Any]
+        options=None,  # type: Optional[Dict[str, Any]]
     ):
         # type: (...) -> Optional[Event]
         """Applies the information contained on the scope to the given event."""
@@ -559,10 +574,11 @@ class Scope(object):
         contexts = event.setdefault("contexts", {})
 
         if has_tracing_enabled(options):
-            logger.warning(
-                f"TwP: apply_to_event: Setting trace from self._span: {self._span.get_trace_context()}"
-            )
-            contexts["trace"] = self._span.get_trace_context()
+            if self._span is not None:
+                logger.warning(
+                    f"TwP: apply_to_event: Setting trace from self._span: {self._span.get_trace_context()}"
+                )
+                contexts["trace"] = self._span.get_trace_context()
         else:
             logger.warning(
                 f"TwP: apply_to_event: Setting trace context from Scope: {self.get_trace_context()}"

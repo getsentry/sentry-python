@@ -743,7 +743,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         span = span or self.scope.span
 
-        if has_tracing_enabled(client.options) and span is not None:
+        if client and has_tracing_enabled(client.options) and span is not None:
             logger.warning(
                 f"TwP: iter_trace_propagation_headers: yield trace propagation headers from span: {dict(span.iter_headers())}"
             )

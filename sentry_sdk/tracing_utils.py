@@ -3,7 +3,7 @@ import contextlib
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-
+from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     Dsn,
@@ -160,7 +160,7 @@ def maybe_create_breadcrumbs_from_span(hub, span):
 
 
 def extract_sentrytrace_data(header):
-    # type: (Optional[str]) -> Optional[typing.Mapping[str, Union[str, bool, None]]]
+    # type: (Optional[str]) -> Optional[Dict[str, Union[str, bool, None]]]
     """
     Given a `sentry-trace` header string, return a dictionary of data.
     """
@@ -256,17 +256,20 @@ class Baggage(object):
 
     @classmethod
     def from_options(cls, scope):
-        # type: (Optional[str]) -> Baggage
-        sentry_items = {}
+        # type: (Optional[Scope]) -> Optional[Baggage]
+        sentry_items = {}  # type: Dict[str, str]
         third_party_items = ""
         mutable = False
 
         client = sentry_sdk.Hub.current.client
-        options = client.options
 
+        if client is None or scope is None or scope._propagation_context is None:
+            return Baggage(sentry_items)
+
+        options = client.options
         propagation_context = scope._propagation_context
 
-        if "trace_id" in propagation_context:
+        if propagation_context is not None and "trace_id" in propagation_context:
             sentry_items["trace_id"] = propagation_context["trace_id"]
 
         if options.get("environment"):
