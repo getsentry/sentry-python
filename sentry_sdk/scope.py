@@ -280,7 +280,7 @@ class Scope(object):
 
         self._profile = None  # type: Optional[Profile]
 
-        self._propagation_context = None  # type: Optional[Dict[str, Any]]
+        self._propagation_context = None
 
     @_attr_setter
     def level(self, value):
