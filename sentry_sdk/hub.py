@@ -323,14 +323,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         top = self._stack[-1]
         self._stack[-1] = (new, top[1])
 
-    def capture_event(
-        self,
-        event,  # type: Event
-        hint=None,  # type: Optional[Hint]
-        scope=None,  # type: Optional[Any]
-        **scope_args,  # type: Any
-    ):
-        # type: (...) -> Optional[str]
+    def capture_event(self, event, hint=None, scope=None, **scope_args):
+        # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
         """Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`."""
         client, top_scope = self._stack[-1]
         scope = _update_scope(top_scope, scope, scope_args)
@@ -342,14 +336,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return rv
         return None
 
-    def capture_message(
-        self,
-        message,  # type: str
-        level=None,  # type: Optional[str]
-        scope=None,  # type: Optional[Any]
-        **scope_args,  # type: Any
-    ):
-        # type: (...) -> Optional[str]
+    def capture_message(self, message, level=None, scope=None, **scope_args):
+        # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
         """Captures a message.  The message is just a string.  If no level
         is provided the default level is `info`.
 
@@ -363,13 +351,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             {"message": message, "level": level}, scope=scope, **scope_args
         )
 
-    def capture_exception(
-        self,
-        error=None,  # type: Optional[Union[BaseException, ExcInfo]]
-        scope=None,  # type: Optional[Any]
-        **scope_args,  # type: Any
-    ):
-        # type: (...) -> Optional[str]
+    def capture_exception(self, error=None, scope=None, **scope_args):
+        # type: (Optional[Union[BaseException, ExcInfo]], Optional[Scope], Any) -> Optional[str]
         """Captures an exception.
 
         :param error: An exception to catch. If `None`, `sys.exc_info()` will be used.
@@ -404,13 +387,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
-    def add_breadcrumb(
-        self,
-        crumb=None,  # type: Optional[Breadcrumb]
-        hint=None,  # type: Optional[BreadcrumbHint]
-        **kwargs,  # type: Any
-    ):
-        # type: (...) -> None
+    def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
+        # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], Any) -> None
         """
         Adds a breadcrumb.
 
@@ -450,13 +428,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         while len(scope._breadcrumbs) > max_breadcrumbs:
             scope._breadcrumbs.popleft()
 
-    def start_span(
-        self,
-        span=None,  # type: Optional[Span]
-        instrumenter=INSTRUMENTER.SENTRY,  # type: str
-        **kwargs,  # type: Any
-    ):
-        # type: (...) -> Span
+    def start_span(self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
+        # type: (Optional[Span], str, Any) -> Span
         """
         Create and start timing a new span whose parent is the currently active
         span or transaction, if any. The return value is a span instance,
@@ -501,12 +474,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return Span(**kwargs)
 
     def start_transaction(
-        self,
-        transaction=None,  # type: Optional[Transaction]
-        instrumenter=INSTRUMENTER.SENTRY,  # type: str
-        **kwargs,  # type: Any
+        self, transaction=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs
     ):
-        # type: (...) -> Union[Transaction, NoOpSpan]
+        # type: (Optional[Transaction], str, Any) -> Union[Transaction, NoOpSpan]
         """
         Start and return a transaction.
 
