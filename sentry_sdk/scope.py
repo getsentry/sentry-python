@@ -148,24 +148,7 @@ class Scope(object):
             f"TwP: generate_propagation_context: incoming_data: {incoming_data}"
         )
 
-        if not incoming_data:
-            if self._propagation_context is not None:
-                logger.warning(
-                    f"TwP: generate_propagation_context: Do NOT override exiting propagation context: {self._propagation_context }"
-                )
-                return
-
-            self._propagation_context = {
-                "trace_id": uuid.uuid4().hex,
-                "span_id": uuid.uuid4().hex[16:],
-                "dynamic_sampling_context": None,
-            }
-
-            logger.warning(
-                f"TwP: generate_propagation_context: (no incoming data) Initializing propagation context in Scope: {self._propagation_context }"
-            )
-
-        else:
+        if incoming_data:
             context = {}  # type: Dict[str, Any]
             incoming_data = _normalize_incoming_data(incoming_data)
 
@@ -181,15 +164,27 @@ class Scope(object):
                 if sentrytrace_data is not None:
                     context.update(sentrytrace_data)
 
-            # TODO: think if this is OK like this?
-            if not context.get("span_id"):
-                context["span_id"] = uuid.uuid4().hex[16:]
+            if context:
+                # TODO: think if this is OK like this?
+                if not context.get("span_id"):
+                    context["span_id"] = uuid.uuid4().hex[16:]
 
-            self._propagation_context = context
+                self._propagation_context = context
 
+                logger.warning(
+                    f"TwP: generate_propagation_context: (incoming data) Initializing propagation context in Scope: {self._propagation_context}"
+                )
+
+        if self._propagation_context is None:
             logger.warning(
-                f"TwP: generate_propagation_context: (incoming data) Initializing propagation context in Scope: {self._propagation_context }"
+                f"TwP: generate_propagation_context: Initializing propagation context in Scope: {self._propagation_context}"
             )
+
+            self._propagation_context = {
+                "trace_id": uuid.uuid4().hex,
+                "span_id": uuid.uuid4().hex[16:],
+                "dynamic_sampling_context": None,
+            }
 
     def get_dynamic_sampling_context(self):
         # type: () -> Optional[Dict[str, str]]
