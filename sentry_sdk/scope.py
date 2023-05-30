@@ -145,7 +145,7 @@ class Scope(object):
         Populates `_propagation_context` with a new Propagation Context.
         """
         logger.warning(
-            f"TwP: generate_propagation_context: incoming_data: {incoming_data}"
+            "TwP: generate_propagation_context: incoming_data: {}".format(incoming_data)
         )
 
         if incoming_data:
@@ -172,12 +172,16 @@ class Scope(object):
                 self._propagation_context = context
 
                 logger.warning(
-                    f"TwP: generate_propagation_context: (incoming data) Initializing propagation context in Scope: {self._propagation_context}"
+                    "TwP: generate_propagation_context: (incoming data) Initializing propagation context in Scope: {}".format(
+                        self._propagation_context
+                    )
                 )
 
         if self._propagation_context is None:
             logger.warning(
-                f"TwP: generate_propagation_context: Initializing propagation context in Scope: {self._propagation_context}"
+                "TwP: generate_propagation_context: Initializing propagation context in Scope: {}".format(
+                    self._propagation_context
+                )
             )
 
             self._propagation_context = {
@@ -569,12 +573,16 @@ class Scope(object):
         if has_tracing_enabled(options):
             if self._span is not None:
                 logger.warning(
-                    f"TwP: apply_to_event: Setting trace from self._span: {self._span.get_trace_context()}"
+                    "TwP: apply_to_event: Setting trace from self._span: {}".format(
+                        self._span.get_trace_context()
+                    )
                 )
                 contexts["trace"] = self._span.get_trace_context()
         else:
             logger.warning(
-                f"TwP: apply_to_event: Setting trace context from Scope: {self.get_trace_context()}"
+                "TwP: apply_to_event: Setting trace context from Scope: {}".format(
+                    self.get_trace_context()
+                )
             )
             contexts["trace"] = self.get_trace_context()
 
