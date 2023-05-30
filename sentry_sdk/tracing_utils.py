@@ -255,7 +255,8 @@ class Baggage(object):
 
     @classmethod
     def from_options(cls, scope):
-        # XXX fix type here, Scope can't be imported due to a circular ref: type: (Optional[Scope]) -> Optional[Baggage]
+        # XXX fix type here, Scope can't be imported due to a circular ref
+        # should be type: (Scope) -> Optional[Baggage]
         # type: (Any) -> Optional[Baggage]
         sentry_items = {}  # type: Dict[str, str]
         third_party_items = ""
