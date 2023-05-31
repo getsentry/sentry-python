@@ -255,8 +255,6 @@ class Baggage(object):
 
     @classmethod
     def from_options(cls, scope):
-        # XXX fix type here, Scope can't be imported due to a circular ref
-        # should be type: (Scope) -> Optional[Baggage]
         # type: (Any) -> Optional[Baggage]
         sentry_items = {}  # type: Dict[str, str]
         third_party_items = ""
@@ -264,7 +262,7 @@ class Baggage(object):
 
         client = sentry_sdk.Hub.current.client
 
-        if client is None or scope is None or scope._propagation_context is None:
+        if client is None or scope._propagation_context is None:
             return Baggage(sentry_items)
 
         options = client.options
