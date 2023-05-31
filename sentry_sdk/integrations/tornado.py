@@ -108,14 +108,16 @@ def _handle_request_impl(self):
     weak_handler = weakref.ref(self)
 
     with Hub(hub) as hub:
+        headers = self.request.headers
+
         with hub.configure_scope() as scope:
-            scope.generate_propagation_context(self.request.headers)
+            scope.generate_propagation_context(headers)
             scope.clear_breadcrumbs()
             processor = _make_event_processor(weak_handler)
             scope.add_event_processor(processor)
 
         transaction = Transaction.continue_from_headers(
-            self.request.headers,
+            headers,
             op=OP.HTTP_SERVER,
             # Like with all other integrations, this is our
             # fallback transaction in case there is no route.
