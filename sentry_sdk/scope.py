@@ -93,6 +93,41 @@ def _normalize_incoming_data(incoming_data):
     return data
 
 
+def _extract_propagation_context(data):
+    # type: (Dict[str, Any]) -> Optional[Dict[str, Any]]
+    context = {}  # type: Dict[str, Any]
+    normalized_data = _normalize_incoming_data(data)
+
+    if normalized_data.get(BAGGAGE_HEADER_NAME):
+        context["dynamic_sampling_context"] = Baggage.from_incoming_header(
+            normalized_data.get(BAGGAGE_HEADER_NAME)
+        ).dynamic_sampling_context()
+
+    if normalized_data.get(SENTRY_TRACE_HEADER_NAME):
+        sentrytrace_data = extract_sentrytrace_data(
+            normalized_data.get(SENTRY_TRACE_HEADER_NAME)
+        )
+        if sentrytrace_data is not None:
+            context.update(sentrytrace_data)
+
+    if context:
+        if not context.get("span_id"):
+            context["span_id"] = uuid.uuid4().hex[16:]
+
+        return context
+
+    return None
+
+
+def _create_new_propagation_context():
+    # type: () -> Dict[str, Any]
+    return {
+        "trace_id": uuid.uuid4().hex,
+        "span_id": uuid.uuid4().hex[16:],
+        "dynamic_sampling_context": None,
+    }
+
+
 class Scope(object):
     """The scope holds extra information that should be sent with all
     events that belong to it.
@@ -139,52 +174,19 @@ class Scope(object):
         self.clear()
         self.generate_propagation_context()
 
-    def _extract_propagation_context(data):
-        # type: (Dict[str, Any]) -> Optional[Dict[str, Any]]
-        context = {}  # type: Dict[str, Any]
-        normalized_data = _normalize_incoming_data(data)
-
-        if normalized_data.get(BAGGAGE_HEADER_NAME):
-            context["dynamic_sampling_context"] = Baggage.from_incoming_header(
-                normalized_data.get(BAGGAGE_HEADER_NAME)
-            ).dynamic_sampling_context()
-
-        if normalized_data.get(SENTRY_TRACE_HEADER_NAME):
-            sentrytrace_data = extract_sentrytrace_data(
-                normalized_data.get(SENTRY_TRACE_HEADER_NAME)
-            )
-            if sentrytrace_data is not None:
-                context.update(sentrytrace_data)
-
-        if context:
-            if not context.get("span_id"):
-                context["span_id"] = uuid.uuid4().hex[16:]
-
-            return context
-
-        return None
-
-    def _create_new_propagation_context():
-        # type: () -> Dict[str, Any]
-        return {
-            "trace_id": uuid.uuid4().hex,
-            "span_id": uuid.uuid4().hex[16:],
-            "dynamic_sampling_context": None,
-        }
-
     def generate_propagation_context(self, incoming_data=None):
         # type: (Optional[Dict[str, str]]) -> None
         """
         Populates `_propagation_context`. Either from `incoming_data` or with a new propagation context.
         """
         if incoming_data:
-            context = self._extract_propagation_context(incoming_data)
+            context = _extract_propagation_context(incoming_data)
 
             if context is not None:
                 self._propagation_context = context
 
         if self._propagation_context is None:
-            self._propagation_context = self._create_new_propagation_context()
+            self._propagation_context = _create_new_propagation_context()
 
     def get_dynamic_sampling_context(self):
         # type: () -> Optional[Dict[str, str]]
