@@ -139,7 +139,7 @@ class Scope(object):
         self.clear()
         self.generate_propagation_context()
 
-    def extract_propagation_context(data):
+    def _extract_propagation_context(data):
         # type: (Dict[str, Any]) -> Optional[Dict[str, Any]]
         context = {}  # type: Dict[str, Any]
         normalized_data = _normalize_incoming_data(data)
@@ -164,7 +164,7 @@ class Scope(object):
 
         return None
 
-    def new_propagation_context():
+    def _create_new_propagation_context():
         # type: () -> Dict[str, Any]
         return {
             "trace_id": uuid.uuid4().hex,
@@ -175,16 +175,16 @@ class Scope(object):
     def generate_propagation_context(self, incoming_data=None):
         # type: (Optional[Dict[str, str]]) -> None
         """
-        Populates `_propagation_context` with a new Propagation Context.
+        Populates `_propagation_context`. Either from `incoming_data` or with a new propagation context.
         """
         if incoming_data:
-            context = self.extract_propagation_context(incoming_data)
+            context = self._extract_propagation_context(incoming_data)
 
             if context is not None:
                 self._propagation_context = context
 
         if self._propagation_context is None:
-            self._propagation_context = self.new_propagation_context()
+            self._propagation_context = self._create_new_propagation_context()
 
     def get_dynamic_sampling_context(self):
         # type: () -> Optional[Dict[str, str]]
