@@ -255,7 +255,7 @@ class Baggage(object):
 
     @classmethod
     def from_options(cls, scope):
-        # type: (Any) -> Optional[Baggage]
+        # type: (Scope) -> Optional[Baggage]
         sentry_items = {}  # type: Dict[str, str]
         third_party_items = ""
         mutable = False
@@ -381,3 +381,4 @@ from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
 
 if TYPE_CHECKING:
     from sentry_sdk.tracing import Span, Transaction
+    from sentry_sdk.scope import Scope
