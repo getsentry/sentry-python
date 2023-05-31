@@ -109,9 +109,10 @@ class RqIntegration(Integration):
             # type: (Queue, Any, **Any) -> Any
             hub = Hub.current
             if hub.get_integration(RqIntegration) is not None:
-                job.meta["_sentry_trace_headers"] = dict(
-                    hub.iter_trace_propagation_headers()
-                )
+                if hub.scope.span is not None:
+                    job.meta["_sentry_trace_headers"] = dict(
+                        hub.iter_trace_propagation_headers()
+                    )
 
             return old_enqueue_job(self, job, **kwargs)
 
