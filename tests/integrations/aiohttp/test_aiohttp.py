@@ -7,6 +7,7 @@ from aiohttp import web
 from aiohttp.client import ServerDisconnectedError
 from aiohttp.web_request import Request
 
+from sentry_sdk import capture_message
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
 
 try:
@@ -15,7 +16,8 @@ except ImportError:
     import mock  # python < 3.3
 
 
-async def test_basic(sentry_init, aiohttp_client, loop, capture_events):
+@pytest.mark.asyncio
+async def test_basic(sentry_init, aiohttp_client, capture_events):
     sentry_init(integrations=[AioHttpIntegration()])
 
     async def hello(request):
@@ -55,7 +57,8 @@ async def test_basic(sentry_init, aiohttp_client, loop, capture_events):
     }
 
 
-async def test_post_body_not_read(sentry_init, aiohttp_client, loop, capture_events):
+@pytest.mark.asyncio
+async def test_post_body_not_read(sentry_init, aiohttp_client, capture_events):
     from sentry_sdk.integrations.aiohttp import BODY_NOT_READ_MESSAGE
 
     sentry_init(integrations=[AioHttpIntegration()])
@@ -84,7 +87,8 @@ async def test_post_body_not_read(sentry_init, aiohttp_client, loop, capture_eve
     assert request["data"] == BODY_NOT_READ_MESSAGE
 
 
-async def test_post_body_read(sentry_init, aiohttp_client, loop, capture_events):
+@pytest.mark.asyncio
+async def test_post_body_read(sentry_init, aiohttp_client, capture_events):
     sentry_init(integrations=[AioHttpIntegration()])
 
     body = {"some": "value"}
@@ -112,7 +116,8 @@ async def test_post_body_read(sentry_init, aiohttp_client, loop, capture_events)
     assert request["data"] == json.dumps(body)
 
 
-async def test_403_not_captured(sentry_init, aiohttp_client, loop, capture_events):
+@pytest.mark.asyncio
+async def test_403_not_captured(sentry_init, aiohttp_client, capture_events):
     sentry_init(integrations=[AioHttpIntegration()])
 
     async def hello(request):
@@ -130,8 +135,9 @@ async def test_403_not_captured(sentry_init, aiohttp_client, loop, capture_event
     assert not events
 
 
+@pytest.mark.asyncio
 async def test_cancelled_error_not_captured(
-    sentry_init, aiohttp_client, loop, capture_events
+    sentry_init, aiohttp_client, capture_events
 ):
     sentry_init(integrations=[AioHttpIntegration()])
 
@@ -152,7 +158,8 @@ async def test_cancelled_error_not_captured(
     assert not events
 
 
-async def test_half_initialized(sentry_init, aiohttp_client, loop, capture_events):
+@pytest.mark.asyncio
+async def test_half_initialized(sentry_init, aiohttp_client, capture_events):
     sentry_init(integrations=[AioHttpIntegration()])
     sentry_init()
 
@@ -171,7 +178,8 @@ async def test_half_initialized(sentry_init, aiohttp_client, loop, capture_event
     assert events == []
 
 
-async def test_tracing(sentry_init, aiohttp_client, loop, capture_events):
+@pytest.mark.asyncio
+async def test_tracing(sentry_init, aiohttp_client, capture_events):
     sentry_init(integrations=[AioHttpIntegration()], traces_sample_rate=1.0)
 
     async def hello(request):
@@ -195,6 +203,7 @@ async def test_tracing(sentry_init, aiohttp_client, loop, capture_events):
     )
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "url,transaction_style,expected_transaction,expected_source",
     [
@@ -245,6 +254,7 @@ async def test_transaction_style(
     assert event["transaction_info"] == {"source": expected_source}
 
 
+@pytest.mark.asyncio
 async def test_traces_sampler_gets_request_object_in_sampling_context(
     sentry_init,
     aiohttp_client,
@@ -275,3 +285,145 @@ async def test_traces_sampler_gets_request_object_in_sampling_context(
             }
         )
     )
+
+
+@pytest.mark.asyncio
+async def test_has_trace_if_performance_enabled(
+    sentry_init, aiohttp_client, capture_events
+):
+    sentry_init(integrations=[AioHttpIntegration()], traces_sample_rate=1.0)
+
+    async def hello(request):
+        capture_message("It's a good day to try dividing by 0")
+        1 / 0
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/")
+    assert resp.status == 500
+
+    msg_event, error_event, transaction_event = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert transaction_event["contexts"]["trace"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert (
+        error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+        == msg_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_has_trace_if_performance_disabled(
+    sentry_init, aiohttp_client, capture_events
+):
+    sentry_init(integrations=[AioHttpIntegration()])
+
+    async def hello(request):
+        capture_message("It's a good day to try dividing by 0")
+        1 / 0
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/")
+    assert resp.status == 500
+
+    msg_event, error_event = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert (
+        error_event["contexts"]["trace"]["trace_id"]
+        == msg_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_trace_from_headers_if_performance_enabled(
+    sentry_init, aiohttp_client, capture_events
+):
+    sentry_init(integrations=[AioHttpIntegration()], traces_sample_rate=1.0)
+
+    async def hello(request):
+        capture_message("It's a good day to try dividing by 0")
+        1 / 0
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    events = capture_events()
+
+    trace_id = "582b43a4192642f0b136d5159a501701"
+    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/", headers={"sentry-trace": sentry_trace_header})
+    assert resp.status == 500
+
+    msg_event, error_event, transaction_event = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert transaction_event["contexts"]["trace"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert transaction_event["contexts"]["trace"]["trace_id"] == trace_id
+
+
+@pytest.mark.asyncio
+async def test_trace_from_headers_if_performance_disabled(
+    sentry_init, aiohttp_client, capture_events
+):
+    sentry_init(integrations=[AioHttpIntegration()])
+
+    async def hello(request):
+        capture_message("It's a good day to try dividing by 0")
+        1 / 0
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    events = capture_events()
+
+    trace_id = "582b43a4192642f0b136d5159a501701"
+    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/", headers={"sentry-trace": sentry_trace_header})
+    assert resp.status == 500
+
+    msg_event, error_event = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
