@@ -241,9 +241,6 @@ class _Client(object):
             except ValueError as e:
                 logger.debug(str(e))
 
-        # TwP TODO: Load tracing information from environment into new _propagation_context on scope with generate_propagation_context and given environement variables.
-        # See: https://github.com/getsentry/rfcs/blob/main/text/0071-continue-trace-over-process-boundaries.md
-
         self._setup_instrumentation(self.options.get("functions_to_trace", []))
 
     @property
