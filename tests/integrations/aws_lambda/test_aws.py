@@ -666,3 +666,35 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
         assert response["Payload"]["errorMessage"] == "something went wrong"
 
         assert "sentry_handler" in response["LogResult"][3].decode("utf-8")
+
+
+def test_error_has_new_trace_context_performance_enabled(run_lambda_function):
+    envelopes, events, response = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0)
+
+        def test_handler(event, context):
+            raise Exception("something went wrong")
+        """
+        ),
+        b'{"foo": "bar"}',
+    )
+
+    (event,) = events
+    assert event["level"] == "error"
+    assert "trace" in event["contexts"]
+    assert "trace_id" in event["contexts"]["trace"]
+
+
+def test_error_has_new_trace_context_performance_disabled(run_lambda_function):
+    ...
+
+
+def test_error_has_existing_trace_context_performance_enabled(run_lambda_function):
+    ...
+
+
+def test_error_has_existing_trace_context_performance_disabled(run_lambda_function):
+    ...
