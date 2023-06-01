@@ -10,7 +10,8 @@ import sphinx.builders.html
 import sphinx.builders.latex
 import sphinx.builders.texinfo
 import sphinx.builders.text
-import sphinx.ext.autodoc
+import sphinx.ext.autodoc  # noqa: F401
+import urllib3.exceptions  # noqa: F401
 
 typing.TYPE_CHECKING = True
 
