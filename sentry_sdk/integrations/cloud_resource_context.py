@@ -58,7 +58,7 @@ class CloudResourceContextIntegration(Integration):
 
     cloud_provider = ""
 
-    aws_token = ""
+    aws_token = b""
     http = urllib3.PoolManager()
 
     gcp_metadata = None
