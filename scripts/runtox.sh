@@ -17,4 +17,4 @@ searchstring="$1"
 
 export TOX_PARALLEL_NO_SPINNER=1
 printenv | sort
-exec $TOXPATH -vv -p auto -e "$($TOXPATH -l | grep "$searchstring" | tr $'\n' ',')" -- "${@:2}"
+exec $TOXPATH -vvv -e "$($TOXPATH -l | grep "$searchstring" | tr $'\n' ',')" -- "${@:2}"
