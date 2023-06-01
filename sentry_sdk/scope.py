@@ -567,18 +567,8 @@ class Scope(object):
 
         if has_tracing_enabled(options):
             if self._span is not None:
-                logger.warning(
-                    "TwP: apply_to_event: Setting trace from self._span: {}".format(
-                        self._span.get_trace_context()
-                    )
-                )
                 contexts["trace"] = self._span.get_trace_context()
         else:
-            logger.warning(
-                "TwP: apply_to_event: Setting trace context from Scope: {}".format(
-                    self.get_trace_context()
-                )
-            )
             contexts["trace"] = self.get_trace_context()
 
         exc_info = hint.get("exc_info")

@@ -31,7 +31,7 @@ def test_basic(sentry_init, capture_events):
 
 def test_installed_modules():
     try:
-        from importlib import distributions, version
+        from importlib.metadata import distributions, version
 
         importlib_available = True
     except ImportError:
