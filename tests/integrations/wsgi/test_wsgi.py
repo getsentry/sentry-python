@@ -182,8 +182,120 @@ def test_transaction_no_error(
     )
 
 
+def test_has_trace_if_performance_enabled(
+    sentry_init,
+    capture_events,
+):
+    def dogpark(environ, start_response):
+        raise Exception("Fetch aborted. The ball was not returned.")
+
+    sentry_init(traces_sample_rate=1.0)
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(Exception):
+        client.get("http://dogs.are.great/sit/stay/rollover/")
+
+    error_event, transaction_event = events
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert transaction_event["contexts"]["trace"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert (
+        error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+def test_has_trace_if_performance_disabled(
+    sentry_init,
+    capture_events,
+):
+    def dogpark(environ, start_response):
+        raise Exception("Fetch aborted. The ball was not returned.")
+
+    sentry_init()
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(Exception):
+        client.get("http://dogs.are.great/sit/stay/rollover/")
+
+    (error_event,) = events
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+
+def test_trace_from_headers_if_performance_enabled(
+    sentry_init,
+    capture_events,
+):
+    def dogpark(environ, start_response):
+        raise Exception("Fetch aborted. The ball was not returned.")
+
+    sentry_init(traces_sample_rate=1.0)
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+    events = capture_events()
+
+    trace_id = "582b43a4192642f0b136d5159a501701"
+    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+
+    with pytest.raises(Exception):
+        client.get(
+            "http://dogs.are.great/sit/stay/rollover/",
+            headers={"sentry-trace": sentry_trace_header},
+        )
+
+    error_event, transaction_event = events
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert transaction_event["contexts"]["trace"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert transaction_event["contexts"]["trace"]["trace_id"] == trace_id
+
+
+def test_trace_from_headers_if_performance_disabled(
+    sentry_init,
+    capture_events,
+):
+    def dogpark(environ, start_response):
+        raise Exception("Fetch aborted. The ball was not returned.")
+
+    sentry_init()
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+    events = capture_events()
+
+    trace_id = "582b43a4192642f0b136d5159a501701"
+    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+
+    with pytest.raises(Exception):
+        client.get(
+            "http://dogs.are.great/sit/stay/rollover/",
+            headers={"sentry-trace": sentry_trace_header},
+        )
+
+    (error_event,) = events
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+
+
 def test_traces_sampler_gets_correct_values_in_sampling_context(
-    sentry_init, DictionaryContaining, ObjectDescribedBy  # noqa:N803
+    sentry_init,
+    DictionaryContaining,  # noqa:N803
 ):
     def app(environ, start_response):
         start_response("200 OK", [])
