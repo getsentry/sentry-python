@@ -26,7 +26,7 @@ jobs:
   test:
     name: {{ framework }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 30
 {{ strategy_matrix }}
 {{ services }}
 
@@ -43,7 +43,7 @@ jobs:
       - name: Test {{ framework }}
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 45
+          timeout_minutes: 15
           max_attempts: 2
           retry_wait_seconds: 5
           shell: bash
