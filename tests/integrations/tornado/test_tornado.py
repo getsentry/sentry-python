@@ -348,10 +348,7 @@ def test_error_has_new_trace_context_performance_disabled(
     client = tornado_testcase(Application([(r"/hi", CrashingWithMessageHandler)]))
     client.fetch("/hi")
 
-    (
-        msg_event,
-        error_event,
-    ) = events
+    (msg_event, error_event) = events
 
     assert "trace" in msg_event["contexts"]
     assert "trace_id" in msg_event["contexts"]["trace"]
@@ -425,10 +422,7 @@ def test_error_has_existing_trace_context_performance_disabled(
     client = tornado_testcase(Application([(r"/hi", CrashingWithMessageHandler)]))
     client.fetch("/hi", headers=headers)
 
-    (
-        msg_event,
-        error_event,
-    ) = events
+    (msg_event, error_event) = events
 
     assert "trace" in msg_event["contexts"]
     assert "trace_id" in msg_event["contexts"]["trace"]
