@@ -106,7 +106,12 @@ def lambda_client():
 
 
 @pytest.fixture(
-    params=["python3.6", "python3.7", "python3.8", "python3.9", "python2.7"]
+    params=[
+        "python3.7",
+        "python3.8",
+        "python3.9",
+        "python3.10",
+    ]
 )
 def lambda_runtime(request):
     return request.param
@@ -284,9 +289,6 @@ def test_request_data(run_lambda_function):
 
 
 def test_init_error(run_lambda_function, lambda_runtime):
-    if lambda_runtime == "python2.7":
-        pytest.skip("initialization error not supported on Python 2.7")
-
     envelopes, events, response = run_lambda_function(
         LAMBDA_PRELUDE
         + (
