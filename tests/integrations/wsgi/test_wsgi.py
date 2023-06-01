@@ -5,6 +5,7 @@ from werkzeug.test import Client
 import pytest
 
 import sentry_sdk
+from sentry_sdk import capture_message
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from collections import Counter
 
@@ -187,6 +188,7 @@ def test_has_trace_if_performance_enabled(
     capture_events,
 ):
     def dogpark(environ, start_response):
+        capture_message("Attempting to fetch the ball")
         raise Exception("Fetch aborted. The ball was not returned.")
 
     sentry_init(traces_sample_rate=1.0)
@@ -197,7 +199,10 @@ def test_has_trace_if_performance_enabled(
     with pytest.raises(Exception):
         client.get("http://dogs.are.great/sit/stay/rollover/")
 
-    error_event, transaction_event = events
+    msg_event, error_event, transaction_event = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
 
     assert error_event["contexts"]["trace"]
     assert "trace_id" in error_event["contexts"]["trace"]
@@ -208,6 +213,7 @@ def test_has_trace_if_performance_enabled(
     assert (
         error_event["contexts"]["trace"]["trace_id"]
         == transaction_event["contexts"]["trace"]["trace_id"]
+        == msg_event["contexts"]["trace"]["trace_id"]
     )
 
 
@@ -216,6 +222,7 @@ def test_has_trace_if_performance_disabled(
     capture_events,
 ):
     def dogpark(environ, start_response):
+        capture_message("Attempting to fetch the ball")
         raise Exception("Fetch aborted. The ball was not returned.")
 
     sentry_init()
@@ -226,7 +233,10 @@ def test_has_trace_if_performance_disabled(
     with pytest.raises(Exception):
         client.get("http://dogs.are.great/sit/stay/rollover/")
 
-    (error_event,) = events
+    msg_event, error_event = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
 
     assert error_event["contexts"]["trace"]
     assert "trace_id" in error_event["contexts"]["trace"]
@@ -237,6 +247,7 @@ def test_trace_from_headers_if_performance_enabled(
     capture_events,
 ):
     def dogpark(environ, start_response):
+        capture_message("Attempting to fetch the ball")
         raise Exception("Fetch aborted. The ball was not returned.")
 
     sentry_init(traces_sample_rate=1.0)
@@ -253,7 +264,10 @@ def test_trace_from_headers_if_performance_enabled(
             headers={"sentry-trace": sentry_trace_header},
         )
 
-    error_event, transaction_event = events
+    msg_event, error_event, transaction_event = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
 
     assert error_event["contexts"]["trace"]
     assert "trace_id" in error_event["contexts"]["trace"]
@@ -261,6 +275,7 @@ def test_trace_from_headers_if_performance_enabled(
     assert transaction_event["contexts"]["trace"]
     assert "trace_id" in transaction_event["contexts"]["trace"]
 
+    assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
     assert transaction_event["contexts"]["trace"]["trace_id"] == trace_id
 
@@ -270,6 +285,7 @@ def test_trace_from_headers_if_performance_disabled(
     capture_events,
 ):
     def dogpark(environ, start_response):
+        capture_message("Attempting to fetch the ball")
         raise Exception("Fetch aborted. The ball was not returned.")
 
     sentry_init()
@@ -286,7 +302,11 @@ def test_trace_from_headers_if_performance_disabled(
             headers={"sentry-trace": sentry_trace_header},
         )
 
-    (error_event,) = events
+    msg_event, error_event = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+    assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
 
     assert error_event["contexts"]["trace"]
     assert "trace_id" in error_event["contexts"]["trace"]
