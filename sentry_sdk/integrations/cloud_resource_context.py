@@ -1,5 +1,5 @@
 import json
-import urllib3  # type: ignore
+import urllib3
 
 from sentry_sdk.integrations import Integration
 from sentry_sdk.api import set_context

@@ -29,6 +29,11 @@ if TYPE_CHECKING:
     from urllib3.poolmanager import PoolManager
     from urllib3.poolmanager import ProxyManager
 
+    try:
+        from urllib3 import BaseHTTPResponse as Response
+    except ImportError:
+        from urllib3 import HTTPResponse as Response
+
     from sentry_sdk._types import Event, EndpointType
 
     DataCategory = Optional[str]
@@ -186,7 +191,7 @@ class HttpTransport(Transport):
         self._discarded_events[data_category, reason] += quantity
 
     def _update_rate_limits(self, response):
-        # type: (urllib3.HTTPResponse) -> None
+        # type: (Response) -> None
 
         # new sentries with more rate limit insights.  We honor this header
         # no matter of the status code to update our internal rate limits.
