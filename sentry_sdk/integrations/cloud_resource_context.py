@@ -58,7 +58,7 @@ class CloudResourceContextIntegration(Integration):
 
     cloud_provider = ""
 
-    aws_token = b""
+    aws_token = ""
     http = urllib3.PoolManager()
 
     gcp_metadata = None
@@ -80,7 +80,7 @@ class CloudResourceContextIntegration(Integration):
             if r.status != 200:
                 return False
 
-            cls.aws_token = r.data
+            cls.aws_token = r.data.decode()
             return True
 
         except Exception:
