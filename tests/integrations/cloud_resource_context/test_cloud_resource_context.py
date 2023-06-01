@@ -136,7 +136,7 @@ def test_is_aws_ok():
     CloudResourceContextIntegration.http.request = MagicMock(return_value=response)
 
     assert CloudResourceContextIntegration._is_aws() is True
-    assert CloudResourceContextIntegration.aws_token == b"something"
+    assert CloudResourceContextIntegration.aws_token == "something"
 
     CloudResourceContextIntegration.http.request = MagicMock(
         side_effect=Exception("Test")
