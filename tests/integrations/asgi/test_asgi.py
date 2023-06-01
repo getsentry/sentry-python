@@ -166,6 +166,111 @@ async def test_capture_transaction_with_error(
 
 @minimum_python_36
 @pytest.mark.asyncio
+async def test_has_trace_if_performance_enabled(
+    sentry_init,
+    asgi3_app_with_error,
+    capture_events,
+):
+    sentry_init(traces_sample_rate=1.0)
+    app = SentryAsgiMiddleware(asgi3_app_with_error)
+
+    with pytest.raises(ZeroDivisionError):
+        async with TestClient(app) as client:
+            events = capture_events()
+            await client.get("/")
+
+    (error_event, transaction_event) = events
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert transaction_event["contexts"]["trace"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert (
+        error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+@minimum_python_36
+@pytest.mark.asyncio
+async def test_has_trace_if_performance_disabled(
+    sentry_init,
+    asgi3_app_with_error,
+    capture_events,
+):
+    sentry_init()
+    app = SentryAsgiMiddleware(asgi3_app_with_error)
+
+    with pytest.raises(ZeroDivisionError):
+        async with TestClient(app) as client:
+            events = capture_events()
+            await client.get("/")
+
+    (error_event,) = events
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+
+@minimum_python_36
+@pytest.mark.asyncio
+async def test_trace_from_headers_if_performance_enabled(
+    sentry_init,
+    asgi3_app_with_error,
+    capture_events,
+):
+    sentry_init(traces_sample_rate=1.0)
+    app = SentryAsgiMiddleware(asgi3_app_with_error)
+
+    trace_id = "582b43a4192642f0b136d5159a501701"
+    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+
+    with pytest.raises(ZeroDivisionError):
+        async with TestClient(app) as client:
+            events = capture_events()
+            await client.get("/", headers={"sentry-trace": sentry_trace_header})
+
+    error_event, transaction_event = events
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert transaction_event["contexts"]["trace"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert transaction_event["contexts"]["trace"]["trace_id"] == trace_id
+
+
+@minimum_python_36
+@pytest.mark.asyncio
+async def test_trace_from_headers_if_performance_disabled(
+    sentry_init,
+    asgi3_app_with_error,
+    capture_events,
+):
+    sentry_init()
+    app = SentryAsgiMiddleware(asgi3_app_with_error)
+
+    trace_id = "582b43a4192642f0b136d5159a501701"
+    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+
+    with pytest.raises(ZeroDivisionError):
+        async with TestClient(app) as client:
+            events = capture_events()
+            await client.get("/", headers={"sentry-trace": sentry_trace_header})
+
+    (error_event,) = events
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+
+
+@minimum_python_36
+@pytest.mark.asyncio
 async def test_websocket(sentry_init, asgi3_ws_app, capture_events, request):
     sentry_init(debug=True, send_default_pii=True)
 

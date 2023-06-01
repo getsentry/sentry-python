@@ -232,7 +232,7 @@ def test_has_trace_if_performance_disabled(
     assert "trace_id" in error_event["contexts"]["trace"]
 
 
-def test_trace_continues_from_headers_if_performance_enabled(
+def test_trace_from_headers_if_performance_enabled(
     sentry_init,
     capture_events,
 ):
@@ -265,7 +265,7 @@ def test_trace_continues_from_headers_if_performance_enabled(
     assert transaction_event["contexts"]["trace"]["trace_id"] == trace_id
 
 
-def test_trace_continues_from_headers_if_performance_disabled(
+def test_trace_from_headers_if_performance_disabled(
     sentry_init,
     capture_events,
 ):
