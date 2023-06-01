@@ -356,6 +356,11 @@ def test_error_has_new_trace_context_performance_disabled(
     assert "trace" in error_event["contexts"]
     assert "trace_id" in error_event["contexts"]["trace"]
 
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+    )
+
 
 def test_error_has_existing_trace_context_performance_enabled(
     tornado_testcase, sentry_init, capture_events
