@@ -144,7 +144,7 @@ def test_error_has_trace_context_if_tracing_disabled(
     assert error_event["contexts"]["trace"]
 
 
-def test_performance_enabled(
+def test_tracing_enabled(
     sentry_init,
     capture_events,
 ):
@@ -166,7 +166,7 @@ def test_performance_enabled(
     assert envelope["contexts"]["trace"] == error_event["contexts"]["trace"]
 
 
-def test_performance_disabled(
+def test_tracing_disabled(
     sentry_init,
     capture_events,
 ):
