@@ -4,11 +4,14 @@
 
 ### Various fixes & improvements
 
-- Revert "Pin urllib3 to <2.0.0 for now" (#2148) by @asottile-sentry
+- Support urllib3>=2.0.0 (#2148) by @asottile-sentry
+
+  We're now supporting urllib3's new major version, 2.0.0. If you encounter issues (e.g. some of your dependencies not supporting the new urllib3 version yet) you might consider pinning the urllib3 version to `<2.0.0` manually in your project. Check out the [the urllib3 migration guide](https://urllib3.readthedocs.io/en/latest/v2-migration-guide.html#migrating-as-an-application-developer) for details.
+
 - Auto-retry tests on failure (#2134) by @sentrivana
-- correct importlib.metadata check in test_modules (#2149) by @asottile-sentry
+- Correct `importlib.metadata` check in `test_modules` (#2149) by @asottile-sentry
 - Fix distribution name normalization (PEP-0503) (#2144) by @rominf
-- fix: functions_to_trace typing (#2141) by @rcmarron
+- Fix `functions_to_trace` typing (#2141) by @rcmarron
 
 ## 1.24.0
 
