@@ -540,10 +540,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_cloud_functio
         """
         )
     )
-    (
-        msg_event,
-        error_event,
-    ) = events
+    (msg_event, error_event) = events
 
     assert "trace" in msg_event["contexts"]
     assert "trace_id" in msg_event["contexts"]["trace"]
