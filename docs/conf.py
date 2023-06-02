@@ -11,6 +11,7 @@ import sphinx.builders.latex
 import sphinx.builders.texinfo
 import sphinx.builders.text
 import sphinx.ext.autodoc
+import urllib3.exceptions
 
 typing.TYPE_CHECKING = True
 
