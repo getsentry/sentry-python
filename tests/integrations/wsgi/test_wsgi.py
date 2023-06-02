@@ -211,9 +211,9 @@ def test_has_trace_if_performance_enabled(
     assert "trace_id" in transaction_event["contexts"]["trace"]
 
     assert (
-        error_event["contexts"]["trace"]["trace_id"]
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
         == transaction_event["contexts"]["trace"]["trace_id"]
-        == msg_event["contexts"]["trace"]["trace_id"]
     )
 
 
