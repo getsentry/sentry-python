@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.25.0
+
+### Various fixes & improvements
+
+- Revert "Pin urllib3 to <2.0.0 for now" (#2148) by @asottile-sentry
+- Auto-retry tests on failure (#2134) by @sentrivana
+- correct importlib.metadata check in test_modules (#2149) by @asottile-sentry
+- Fix distribution name normalization (PEP-0503) (#2144) by @rominf
+- fix: functions_to_trace typing (#2141) by @rcmarron
+
 ## 1.24.0
 
 ### Various fixes & improvements
