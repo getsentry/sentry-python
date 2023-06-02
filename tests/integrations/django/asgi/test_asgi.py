@@ -83,9 +83,7 @@ async def test_async_views(sentry_init, capture_events, application):
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_active_thread_id(
-    sentry_init, capture_envelopes, teardown_profiling, endpoint, application
-):
+async def test_active_thread_id(sentry_init, capture_envelopes, endpoint, application):
     with mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0):
         sentry_init(
             integrations=[DjangoIntegration()],
@@ -119,7 +117,7 @@ async def test_active_thread_id(
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_async_views_concurrent_execution(sentry_init, capture_events, settings):
+async def test_async_views_concurrent_execution(sentry_init, settings):
     import asyncio
     import time
 
@@ -153,7 +151,7 @@ async def test_async_views_concurrent_execution(sentry_init, capture_events, set
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
 async def test_async_middleware_that_is_function_concurrent_execution(
-    sentry_init, capture_events, settings
+    sentry_init, settings
 ):
     import asyncio
     import time

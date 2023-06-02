@@ -24,7 +24,7 @@ def asgi3_app():
             and "route" in scope
             and scope["route"] == "/trigger/error"
         ):
-            division_by_zero = 1 / 0  # noqa
+            1 / 0
 
         await send(
             {
@@ -59,7 +59,7 @@ def asgi3_app_with_error():
             }
         )
 
-        division_by_zero = 1 / 0  # noqa
+        1 / 0
 
         await send(
             {
@@ -85,7 +85,7 @@ def asgi3_app_with_error_and_msg():
         )
 
         capture_message("Let's try dividing by 0")
-        division_by_zero = 1 / 0  # noqa
+        1 / 0
 
         await send(
             {
