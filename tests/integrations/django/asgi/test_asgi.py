@@ -230,3 +230,118 @@ async def test_async_middleware_spans(
   - op="event.django": description="django.core.cache.close_caches"
   - op="event.django": description="django.core.handlers.base.reset_urlconf\""""
     )
+
+
+@pytest.mark.asyncio
+async def test_has_trace_if_performance_enabled(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    comm = HttpCommunicator(asgi_application, "GET", "/view-exc-with-msg")
+    response = await comm.get_response()
+    assert response["status"] == 500
+
+    (msg_event, error_event, transaction_event) = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert transaction_event["contexts"]["trace"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_has_trace_if_performance_disabled(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+
+    events = capture_events()
+
+    comm = HttpCommunicator(asgi_application, "GET", "/view-exc-with-msg")
+    response = await comm.get_response()
+    assert response["status"] == 500
+
+    (msg_event, error_event) = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_trace_from_headers_if_performance_enabled(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    trace_id = "582b43a4192642f0b136d5159a501701"
+    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+
+    comm = HttpCommunicator(
+        asgi_application,
+        "GET",
+        "/view-exc-with-msg",
+        headers=[(b"sentry-trace", sentry_trace_header.encode())],
+    )
+    response = await comm.get_response()
+    assert response["status"] == 500
+
+    (msg_event, error_event, transaction_event) = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert transaction_event["contexts"]["trace"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert transaction_event["contexts"]["trace"]["trace_id"] == trace_id
+
+
+@pytest.mark.asyncio
+async def test_trace_from_headers_if_performance_disabled(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+
+    events = capture_events()
+
+    trace_id = "582b43a4192642f0b136d5159a501701"
+    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+
+    comm = HttpCommunicator(
+        asgi_application,
+        "GET",
+        "/view-exc-with-msg",
+        headers=[(b"sentry-trace", sentry_trace_header.encode())],
+    )
+    response = await comm.get_response()
+    assert response["status"] == 500
+
+    (msg_event, error_event) = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
