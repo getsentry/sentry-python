@@ -377,6 +377,7 @@ def patch_request_response():
 
                     extractor = StarletteRequestExtractor(request)
                     info = await extractor.extract_request_info()
+                    graphql_operation_name = await extractor.graphql_operation_name()
 
                     def _make_request_event_processor(req, integration):
                         # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
@@ -390,7 +391,13 @@ def patch_request_response():
                                     request_info["cookies"] = info["cookies"]
                                 if "data" in info:
                                     request_info["data"] = info["data"]
+
                             event["request"] = deepcopy(request_info)
+
+                            if graphql_operation_name:
+                                sentry_scope.set_tag(
+                                    "graphql.operation_name", graphql_operation_name
+                                )
 
                             return event
 
@@ -529,6 +536,18 @@ class StarletteRequestExtractor:
             # Raw data, do not add body just an annotation
             request_info["data"] = AnnotatedValue.removed_because_raw_data()
             return request_info
+
+    async def graphql_operation_name(self):
+        # type: (StarletteRequestExtractor) -> Optional[str]
+        with capture_internal_exceptions():
+            # Add JSON body, if it is a JSON request
+            json = await self.json()
+            operation_name = self.request.query_params.get("operationName")
+            if operation_name:
+                return operation_name
+            elif json:
+                if "operationName" in json:
+                    return json["operationName"]
 
     async def content_length(self):
         # type: (StarletteRequestExtractor) -> Optional[int]

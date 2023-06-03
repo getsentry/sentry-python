@@ -135,6 +135,7 @@ def starlette_app_factory(middleware=None, debug=True):
             starlette.routing.Route("/message/{message_id}", _message_with_id),
             starlette.routing.Route("/sync/thread_ids", _thread_ids_sync),
             starlette.routing.Route("/async/thread_ids", _thread_ids_async),
+            starlette.routing.Route("/graphql", _message, methods=["GET", "POST"]),
         ],
         middleware=middleware,
     )
@@ -485,6 +486,40 @@ def test_transaction_style(
     (event,) = events
     assert event["transaction"] == expected_transaction
     assert event["transaction_info"] == {"source": expected_source}
+
+
+@pytest.mark.parametrize(
+    "method,request_kwargs",
+    [
+        (
+            "GET",
+            {"params": {"operationName": "MyOperation"}},
+        ),
+        (
+            "POST",
+            {"json": {"operationName": "MyOperation"}},
+        ),
+    ],
+)
+def test_graphql_operation_name_tag(
+    sentry_init,
+    capture_events,
+    method,
+    request_kwargs,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+    )
+    starlette_app = starlette_app_factory()
+
+    events = capture_events()
+
+    client = TestClient(starlette_app)
+    client.request(method=method, url="/graphql", **request_kwargs)
+
+    (_, transaction_event) = events
+    assert transaction_event["tags"]["graphql.operation_name"] == "MyOperation"
 
 
 @pytest.mark.parametrize(
