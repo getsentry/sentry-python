@@ -178,7 +178,7 @@ def test_update_span_with_otel_data_http_method():
     otel_span.kind = SpanKind.CLIENT
     otel_span.attributes = {
         "http.method": "GET",
-        "http.status_code": "429",
+        "http.response.status_code": 429,
         "http.status_text": "xxx",
         "http.user_agent": "curl/7.64.1",
         "net.peer.name": "example.com",
@@ -193,7 +193,7 @@ def test_update_span_with_otel_data_http_method():
     assert sentry_span.status == "resource_exhausted"
 
     assert sentry_span._data["http.method"] == "GET"
-    assert sentry_span._data["http.status_code"] == "429"
+    assert sentry_span._data["http.response.status_code"] == 429
     assert sentry_span._data["http.status_text"] == "xxx"
     assert sentry_span._data["http.user_agent"] == "curl/7.64.1"
     assert sentry_span._data["net.peer.name"] == "example.com"
@@ -208,7 +208,7 @@ def test_update_span_with_otel_data_http_method2():
     otel_span.kind = SpanKind.SERVER
     otel_span.attributes = {
         "http.method": "GET",
-        "http.status_code": 429,
+        "http.response.status_code": 429,
         "http.status_text": "xxx",
         "http.user_agent": "curl/7.64.1",
         "http.url": "https://example.com/status/403?password=123&username=test@example.com&author=User123&auth=1234567890abcdef",
@@ -222,7 +222,7 @@ def test_update_span_with_otel_data_http_method2():
     assert sentry_span.status == "resource_exhausted"
 
     assert sentry_span._data["http.method"] == "GET"
-    assert sentry_span._data["http.status_code"] == "429"
+    assert sentry_span._data["http.response.status_code"] == 429
     assert sentry_span._data["http.status_text"] == "xxx"
     assert sentry_span._data["http.user_agent"] == "curl/7.64.1"
     assert (
