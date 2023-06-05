@@ -51,7 +51,7 @@ def _patch_cache_method(cache, method_name):
             if value:
                 span.set_data(SPANDATA.CACHE_HIT, True)
 
-                size = len(text_type(value).encode("utf-8"))
+                size = len(text_type(value))
                 span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
 
             else:
