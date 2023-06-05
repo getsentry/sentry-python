@@ -18,8 +18,8 @@ searchstring="$1"
 export TOX_PARALLEL_NO_SPINNER=1
 ENV="$($TOXPATH -l | grep "$searchstring" | tr $'\n' ',')"
 
-if [ "$ENV" = py2.7-common, ]; then
-    exec $TOXPATH -vv -e "${ENV}" -- "${@:2}"
+if [ "$ENV" = py2.7-common, ] || [ "$ENV" = py2.7-gevent, ]; then
+    exec $TOXPATH -vv -e "$ENV" -- "${@:2}"
 else
-    exec $TOXPATH -vv -p auto -e "${ENV}" -- "${@:2}"
+    exec $TOXPATH -vv -p auto -e "$ENV" -- "${@:2}"
 fi
