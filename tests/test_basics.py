@@ -73,7 +73,6 @@ def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
 def test_event_id(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
-
     assert False  # XXX for testing the ci
 
     try:
