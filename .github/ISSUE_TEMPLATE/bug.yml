@@ -27,6 +27,8 @@ body:
         1. What
         2. you
         3. did.
+
+        Extra points for also including the output of `pip freeze --all`.
     validations:
       required: true
   - type: textarea

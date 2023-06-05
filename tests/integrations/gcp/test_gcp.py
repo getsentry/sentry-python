@@ -173,7 +173,8 @@ def test_handled_exception(run_cloud_function):
 
     assert exception["type"] == "Exception"
     assert exception["value"] == "something went wrong"
-    assert exception["mechanism"] == {"type": "gcp", "handled": False}
+    assert exception["mechanism"]["type"] == "gcp"
+    assert not exception["mechanism"]["handled"]
 
 
 def test_unhandled_exception(run_cloud_function):
@@ -200,7 +201,8 @@ def test_unhandled_exception(run_cloud_function):
 
     assert exception["type"] == "ZeroDivisionError"
     assert exception["value"] == "division by zero"
-    assert exception["mechanism"] == {"type": "gcp", "handled": False}
+    assert exception["mechanism"]["type"] == "gcp"
+    assert not exception["mechanism"]["handled"]
 
 
 def test_timeout_error(run_cloud_function):
@@ -230,7 +232,8 @@ def test_timeout_error(run_cloud_function):
         exception["value"]
         == "WARNING : Function is expected to get timed out. Configured timeout duration = 3 seconds."
     )
-    assert exception["mechanism"] == {"type": "threading", "handled": False}
+    assert exception["mechanism"]["type"] == "threading"
+    assert not exception["mechanism"]["handled"]
 
 
 def test_performance_no_error(run_cloud_function):
@@ -283,7 +286,8 @@ def test_performance_error(run_cloud_function):
 
     assert exception["type"] == "Exception"
     assert exception["value"] == "something went wrong"
-    assert exception["mechanism"] == {"type": "gcp", "handled": False}
+    assert exception["mechanism"]["type"] == "gcp"
+    assert not exception["mechanism"]["handled"]
 
     assert envelopes[1]["type"] == "transaction"
     assert envelopes[1]["contexts"]["trace"]["op"] == "function.gcp"

@@ -20,6 +20,7 @@ help:
 
 dist: .venv
 	rm -rf dist dist-serverless build
+	$(VENV_PATH)/bin/pip install wheel
 	$(VENV_PATH)/bin/python setup.py sdist bdist_wheel
 .PHONY: dist
 

@@ -5,11 +5,13 @@ import pytest
 pytest.importorskip("celery")
 
 from sentry_sdk import Hub, configure_scope, start_transaction
-from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.integrations.celery import CeleryIntegration, _get_headers
+
 from sentry_sdk._compat import text_type
 
 from celery import Celery, VERSION
 from celery.bin import worker
+from celery.signals import task_success
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -437,3 +439,29 @@ def test_abstract_task(capture_events, celery, celery_invocation):
         celery_invocation(dummy_task, 1, 0)
 
     assert not events
+
+
+def test_task_headers(celery):
+    """
+    Test that the headers set in the Celery Beat auto-instrumentation are passed to the celery signal handlers
+    """
+    sentry_crons_setup = {
+        "sentry-monitor-slug": "some-slug",
+        "sentry-monitor-config": {"some": "config"},
+        "sentry-monitor-check-in-id": "123abc",
+    }
+
+    @celery.task(name="dummy_task")
+    def dummy_task(x, y):
+        return x + y
+
+    def crons_task_success(sender, **kwargs):
+        headers = _get_headers(sender)
+        assert headers == sentry_crons_setup
+
+    task_success.connect(crons_task_success)
+
+    # This is how the Celery Beat auto-instrumentation starts a task
+    # in the monkey patched version of `apply_async`
+    # in `sentry_sdk/integrations/celery.py::_wrap_apply_async()`
+    dummy_task.apply_async(args=(1, 0), headers=sentry_crons_setup)

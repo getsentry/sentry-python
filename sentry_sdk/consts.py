@@ -57,10 +57,17 @@ class SPANDATA:
     See: https://develop.sentry.dev/sdk/performance/span-data-conventions/
     """
 
+    DB_OPERATION = "db.operation"
+    """
+    The name of the operation being executed, e.g. the MongoDB command name such as findAndModify, or the SQL keyword.
+    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
+    Example: findAndModify, HMSET, SELECT
+    """
+
     DB_SYSTEM = "db.system"
     """
     An identifier for the database management system (DBMS) product being used.
-    See: https://github.com/open-telemetry/opentelemetry-specification/blob/24de67b3827a4e3ab2515cd8ab62d5bcf837c586/specification/trace/semantic_conventions/database.md
+    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
     Example: postgresql
     """
 
@@ -178,10 +185,11 @@ class ClientConstructor(object):
         project_root=None,  # type: Optional[str]
         enable_tracing=None,  # type: Optional[bool]
         include_local_variables=True,  # type: Optional[bool]
+        include_source_context=True,  # type: Optional[bool]
         trace_propagation_targets=[  # noqa: B006
             MATCH_ALL
         ],  # type: Optional[Sequence[str]]
-        functions_to_trace=[],  # type: Sequence[str]  # noqa: B006
+        functions_to_trace=[],  # type: Sequence[Dict[str, str]]  # noqa: B006
         event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
     ):
         # type: (...) -> None
@@ -206,4 +214,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.22.2"
+VERSION = "1.25.0"
