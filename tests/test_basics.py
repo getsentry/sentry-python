@@ -74,6 +74,8 @@ def test_event_id(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
+    assert False  # XXX for testing the ci
+
     try:
         raise ValueError("aha!")
     except Exception:
