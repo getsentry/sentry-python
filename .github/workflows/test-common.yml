@@ -63,11 +63,9 @@ jobs:
             export LANG=en_US.UTF-8
             locale
 
-            python -c 'import sys; print(sys.getdefaultencoding())'
             python -c 'import sys; print(sys.stdin.encoding, sys.stdout.encoding)'
             export PYTHONIOENCODING="utf-8"
             python -c 'import sys; print(sys.stdin.encoding, sys.stdout.encoding)'
-            python -c 'import sys; print(sys.getdefaultencoding())'
 
             # Run tests
             PYTHONIOENCODING="utf-8" ./scripts/runtox.sh "py${{ matrix.python-version }}-common" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
