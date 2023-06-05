@@ -279,7 +279,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
                 SpanAttributes.HTTP_STATUS_CODE, None
             )
             if status_code:
-                sentry_span.set_http_status(int(status_code))
+                sentry_span.set_http_status(status_code)
 
         elif db_query:
             op = "db"
