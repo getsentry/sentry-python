@@ -14,6 +14,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     SENSITIVE_DATA_SUBSTITUTE,
+    parse_version,
 )
 
 try:
@@ -45,11 +46,15 @@ class ArqIntegration(Integration):
 
         try:
             if isinstance(ARQ_VERSION, str):
-                version = tuple(map(int, ARQ_VERSION.split(".")[:2]))
+                version = parse_version(ARQ_VERSION)
             else:
                 version = ARQ_VERSION.version[:2]
+
         except (TypeError, ValueError):
-            raise DidNotEnable("arq version unparsable: {}".format(ARQ_VERSION))
+            version = None
+
+        if version is None:
+            raise DidNotEnable("Unparsable arq version: {}".format(ARQ_VERSION))
 
         if version < (0, 23):
             raise DidNotEnable("arq 0.23 or newer required.")

@@ -10,6 +10,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
+    parse_version,
 )
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
@@ -57,9 +58,9 @@ class SanicIntegration(Integration):
     def setup_once():
         # type: () -> None
 
-        try:
-            SanicIntegration.version = tuple(map(int, SANIC_VERSION.split(".")))
-        except (TypeError, ValueError):
+        version = parse_version(SANIC_VERSION)
+
+        if version is None:
             raise DidNotEnable("Unparsable Sanic version: {}".format(SANIC_VERSION))
 
         if SanicIntegration.version < (0, 8):

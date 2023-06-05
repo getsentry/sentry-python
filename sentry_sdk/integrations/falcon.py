@@ -8,6 +8,7 @@ from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    parse_version,
 )
 
 from sentry_sdk._types import TYPE_CHECKING
@@ -131,9 +132,10 @@ class FalconIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        try:
-            version = tuple(map(int, FALCON_VERSION.split(".")))
-        except (ValueError, TypeError):
+
+        version = parse_version(FALCON_VERSION)
+
+        if version is None:
             raise DidNotEnable("Unparsable Falcon version: {}".format(FALCON_VERSION))
 
         if version < (1, 4):
