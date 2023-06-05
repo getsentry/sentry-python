@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 import io
-import urllib3  # type: ignore
+import urllib3
 import certifi
 import gzip
 import time
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import DefaultDict
 
-    from urllib3.poolmanager import PoolManager  # type: ignore
+    from urllib3.poolmanager import PoolManager
     from urllib3.poolmanager import ProxyManager
 
     from sentry_sdk._types import Event, EndpointType
@@ -186,7 +186,7 @@ class HttpTransport(Transport):
         self._discarded_events[data_category, reason] += quantity
 
     def _update_rate_limits(self, response):
-        # type: (urllib3.HTTPResponse) -> None
+        # type: (urllib3.BaseHTTPResponse) -> None
 
         # new sentries with more rate limit insights.  We honor this header
         # no matter of the status code to update our internal rate limits.
